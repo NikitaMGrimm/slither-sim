@@ -22,3 +22,13 @@ Keep whole-search/tick timing and separate construction diagnostics. The
 exhausted saving should retain most of 63%; successful-search ticks at 80/160
 must have no measurable CPU cost increase versus main. If not met, retain
 the numbers and leave the maintaining agent's decision explicit.
+
+## Second revision, after the first-run CPU result
+
+The first layout fails CPU acceptance in two control rows despite slightly
+lower instructions. Move the cells to a Safety-owned lazy table to preserve
+main's obstacle layout. Keep per-index caches initialized only after outer
+near/support guards. Reuse byte-identical main/eager source/binaries from the
+first completed proof; rebuild lazy/mutation, rerun every proof and all
+three-arm pairs. Preserve the first rejected layout and all its results.
+Stay on the existing timer and combined $1 builder cap.

@@ -25,7 +25,6 @@ impl Edge {
 struct Obstacle {
     valid: bool,
     edges: Vec<Edge>,
-    head_blocks: OnceCell<Vec<Bounds>>,
     bounds: Bounds,
     body_width: f64,
     path: Edge,
@@ -65,36 +64,11 @@ fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
         .collect()
 }
 
-impl Obstacle {
-    fn blocks_head(&self, head: Point) -> bool {
-        let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, self.head_width);
-        if !head_boundable(head) || !(0. ..=HEAD_BLOCK_LIMIT).contains(&self.head_width) {
-            return self.edges.iter().any(blocked);
-        }
-        // Most successful searches never reach this obstacle. Build only after
-        // the outer near check admits a supported head query, then reuse it.
-        let blocks = self.head_blocks.get_or_init(|| head_blocks(&self.edges));
-        if blocks.is_empty() {
-            return self.edges.iter().any(blocked);
-        }
-        // As in visibility's eight-edge bounds, one unit exceeds projection/
-        // hypot roundoff at this finite scale. Borderline boxes keep every
-        // original edge test, in order; extreme/non-finite inputs stay linear.
-        // research/performance/2026-10-29-spawn-head-blocks/REPORT.md
-        let query = Bounds::between(head, head);
-        blocks
-            .iter()
-            .zip(self.edges.chunks(HEAD_BLOCK_EDGES))
-            .any(|(&bounds, edges)| {
-                bounds.near(query, self.head_width + 1.) && edges.iter().any(blocked)
-            })
-    }
-}
-
 /// Immutable neighbors, with a reused candidate buffer. Built after excluding
 /// the joining slot; no world tick runs during the search.
 pub(crate) struct Safety {
     obstacles: Vec<Obstacle>,
+    head_blocks: OnceCell<Vec<OnceCell<Vec<Bounds>>>>,
     candidate: Vec<Edge>,
     wall_limit: f64,
     segments: usize,
@@ -118,6 +92,34 @@ fn near(a: Bounds, b: Bounds, width: f64) -> bool {
 }
 
 impl Safety {
+    fn blocks_head(&self, index: usize, head: Point) -> bool {
+        let obstacle = &self.obstacles[index];
+        let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, obstacle.head_width);
+        if !head_boundable(head) || !(0. ..=HEAD_BLOCK_LIMIT).contains(&obstacle.head_width) {
+            return obstacle.edges.iter().any(blocked);
+        }
+        // Keep obstacle layout/construction unchanged. Neither the cache table
+        // nor an obstacle's bounds exist until a supported query reaches them.
+        let cells = self
+            .head_blocks
+            .get_or_init(|| self.obstacles.iter().map(|_| OnceCell::new()).collect());
+        let blocks = cells[index].get_or_init(|| head_blocks(&obstacle.edges));
+        if blocks.is_empty() {
+            return obstacle.edges.iter().any(blocked);
+        }
+        // As in visibility's eight-edge bounds, one unit exceeds projection/
+        // hypot roundoff at this finite scale. Borderline boxes keep every
+        // original edge test, in order; extreme/non-finite inputs stay linear.
+        // research/performance/2026-10-29-spawn-head-blocks/REPORT.md
+        let query = Bounds::between(head, head);
+        blocks
+            .iter()
+            .zip(obstacle.edges.chunks(HEAD_BLOCK_EDGES))
+            .any(|(&bounds, edges)| {
+                bounds.near(query, obstacle.head_width + 1.) && edges.iter().any(blocked)
+            })
+    }
+
     #[cfg(test)]
     pub(crate) fn new(world: &Simulator, segments: usize, clearance: f64, horizon: f64) -> Self {
         Self::new_excluding(world, None, segments, clearance, horizon)
@@ -155,7 +157,6 @@ impl Safety {
                 );
                 Obstacle {
                     valid: path.a.finite() && path.b.finite() && s.body.iter().all(|p| p.finite()),
-                    head_blocks: OnceCell::new(),
                     edges,
                     bounds,
                     body_width: contact.max(clearance),
@@ -185,6 +186,7 @@ impl Safety {
             .collect();
         Self {
             obstacles,
+            head_blocks: OnceCell::new(),
             candidate: Vec::with_capacity(segments.saturating_sub(1)),
             wall_limit: world.radius() - crate::simulator::SPAWN_WALL_MARGIN,
             segments,
@@ -292,10 +294,10 @@ impl Safety {
             return false;
         }
         let head_bounds = Bounds::between(head, head);
-        !self.obstacles.iter().any(|obstacle| {
+        !self.obstacles.iter().enumerate().any(|(index, obstacle)| {
             !obstacle.valid
                 || (near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    && obstacle.blocks_head(head))
+                    && self.blocks_head(index, head))
         })
     }
 

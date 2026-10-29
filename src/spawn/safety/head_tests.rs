@@ -79,7 +79,6 @@ fn candidate(obstacles: &[RawObstacle]) -> Safety {
                     .collect();
                 Obstacle {
                     valid: raw.valid,
-                    head_blocks: OnceCell::new(),
                     edges,
                     bounds: Bounds {
                         min: Point {
@@ -102,6 +101,7 @@ fn candidate(obstacles: &[RawObstacle]) -> Safety {
                 }
             })
             .collect(),
+        head_blocks: OnceCell::new(),
         candidate: Vec::new(),
         wall_limit: 1e10,
         segments: 26,
@@ -342,7 +342,7 @@ fn randomized_multiblock_worlds_match_independent_linear_oracle() {
         for raw in &world {
             let query = candidate(std::slice::from_ref(raw));
             assert_eq!(
-                query.obstacles[0].blocks_head(head),
+                query.blocks_head(0, head),
                 raw.vertices
                     .windows(2)
                     .any(|p| original_segment(head, p[0], p[1]) <= raw.width)
@@ -408,7 +408,7 @@ fn block_guard_domain_edges_and_cancellation_keep_scalar_verdicts() {
                 assert_head(head, std::slice::from_ref(&raw));
                 let query = candidate(std::slice::from_ref(&raw));
                 assert_eq!(
-                    query.obstacles[0].blocks_head(head),
+                    query.blocks_head(0, head),
                     raw.vertices
                         .windows(2)
                         .any(|p| original_segment(head, p[0], p[1]) <= width)
@@ -433,24 +433,26 @@ fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt
     }];
     let lazy = candidate(&raw);
     let eager = candidate(&raw);
-    for obstacle in &eager.obstacles {
-        assert!(
-            obstacle
-                .head_blocks
-                .set(head_blocks(&obstacle.edges))
-                .is_ok()
-        );
-    }
-    assert!(lazy.obstacles[0].head_blocks.get().is_none());
+    let cells = eager
+        .obstacles
+        .iter()
+        .map(|obstacle| {
+            let cell = OnceCell::new();
+            assert!(cell.set(head_blocks(&obstacle.edges)).is_ok());
+            cell
+        })
+        .collect();
+    assert!(eager.head_blocks.set(cells).is_ok());
+    assert!(lazy.head_blocks.get().is_none());
     let distant = Point { x: -1e6, y: -1e6 };
     assert_eq!(lazy.head_is_clear(distant), eager.head_is_clear(distant));
-    assert!(lazy.obstacles[0].head_blocks.get().is_none());
+    assert!(lazy.head_blocks.get().is_none());
     // Unsupported head/width inputs retain the linear path without allocating.
     assert_eq!(
-        lazy.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. }),
-        eager.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. })
+        lazy.blocks_head(0, Point { x: f64::MAX, y: 0. }),
+        eager.blocks_head(0, Point { x: f64::MAX, y: 0. })
     );
-    assert!(lazy.obstacles[0].head_blocks.get().is_none());
+    assert!(lazy.head_blocks.get().is_none());
     for x in [
         -200_f64,
         -200_f64.next_down(),
@@ -468,7 +470,7 @@ fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt
             assert_eq!(eager.head_is_clear(head), expected);
         }
     }
-    let cached = lazy.obstacles[0].head_blocks.get().unwrap();
+    let cached = lazy.head_blocks.get().unwrap()[0].get().unwrap();
     assert!(!cached.is_empty());
     let address = cached.as_ptr();
     for _ in 0..3 {
@@ -476,6 +478,6 @@ fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt
     }
     assert_eq!(
         address,
-        lazy.obstacles[0].head_blocks.get().unwrap().as_ptr()
+        lazy.head_blocks.get().unwrap()[0].get().unwrap().as_ptr()
     );
 }
