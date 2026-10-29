@@ -1,0 +1,141 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "label": "documentation-tests",
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_documentation.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "public-table-recalculation",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/tables.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "rejected-bounded.patch-applies",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--check",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/rejected-bounded.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "rejected-bounded.patch-apply",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/rejected-bounded.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "rejected-bounded.patch-reverse",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--reverse",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/rejected-bounded.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "separate-vectors.patch-applies",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--check",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/separate-vectors.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "separate-vectors.patch-apply",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/separate-vectors.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "separate-vectors.patch-reverse",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--reverse",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/separate-vectors.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "unrestricted-linear.patch-applies",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--check",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/unrestricted-linear.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "unrestricted-linear.patch-apply",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/unrestricted-linear.patch"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "unrestricted-linear.patch-reverse",
+      "command": [
+        "git",
+        "apply",
+        "--unidiff-zero",
+        "--reverse",
+        "/tmp/slither-compact-history-20261029/current-main/final-check-source/research/performance/2026-10-29-compact-snake-history/unrestricted-linear.patch"
+      ],
+      "exit": 0
+    }
+  ],
+  "boundedPatchMatchesMeasuredCandidateExactly": true,
+  "allPatchesReverseToPristineBase": true,
+  "finalDocumentationCheck": {
+    "command": [
+      "python3",
+      "-B",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tools",
+      "-p",
+      "test_documentation.py"
+    ],
+    "exit": 0,
+    "includesArchiveAndCheckReceiptLinks": true
+  }
+}

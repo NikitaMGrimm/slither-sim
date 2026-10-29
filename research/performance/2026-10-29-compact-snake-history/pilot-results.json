@@ -1,0 +1,198 @@
+{
+  "design": "linear",
+  "pilotResults": [
+    {
+      "design": "candidate",
+      "pairs": [
+        {
+          "pair": -1,
+          "discarded": true,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 2101690.183333333,
+            "instructions": 10291270.56851852,
+            "cycles": 8431774.087037036,
+            "L1dMPKI": 28.87916078278674,
+            "dTLBMPKI": 1.107531064892859
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1582914.276851852,
+            "instructions": 10590598.175925925,
+            "cycles": 6893780.019444444,
+            "L1dMPKI": 26.762069378896857,
+            "dTLBMPKI": 0.3961700470626111
+          },
+          "cpuRatio": 0.7531625210055035,
+          "instructionRatio": 1.0290855833023245
+        },
+        {
+          "pair": 0,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 1867791.7962962964,
+            "instructions": 10291271.252777778,
+            "cycles": 8102551.460185185,
+            "L1dMPKI": 28.95270896693713,
+            "dTLBMPKI": 1.0923267183848948
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1449310.6287037036,
+            "instructions": 10590500.899074074,
+            "cycles": 6289503.074074074,
+            "L1dMPKI": 26.73278558897695,
+            "dTLBMPKI": 0.39987144415984516
+          },
+          "cpuRatio": 0.7759487066907498,
+          "instructionRatio": 1.0290760625141941
+        },
+        {
+          "pair": 1,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 1811545.2592592593,
+            "instructions": 10291270.460185185,
+            "cycles": 7886560.40462963,
+            "L1dMPKI": 28.874014329946363,
+            "dTLBMPKI": 1.083436671687101
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1618966.8055555555,
+            "instructions": 10590501.139814815,
+            "cycles": 6816861.361111111,
+            "L1dMPKI": 26.694499449984978,
+            "dTLBMPKI": 0.39925767752316443
+          },
+          "cpuRatio": 0.8936938214933425,
+          "instructionRatio": 1.0290761651622404
+        },
+        {
+          "pair": 2,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 1804389.5638888888,
+            "instructions": 10291270.73888889,
+            "cycles": 7861238.685185186,
+            "L1dMPKI": 28.92015504418688,
+            "dTLBMPKI": 1.0833168896508005
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1569137.3324074075,
+            "instructions": 10590501.640740741,
+            "cycles": 6848615.288888888,
+            "L1dMPKI": 26.76073565057227,
+            "dTLBMPKI": 0.4007573427843253
+          },
+          "cpuRatio": 0.8696222610740129,
+          "instructionRatio": 1.0290761859680857
+        }
+      ],
+      "medianCpuRatio": 0.8696222610740129,
+      "medianInstructionRatio": 1.0290761651622404
+    },
+    {
+      "design": "linear",
+      "pairs": [
+        {
+          "pair": -1,
+          "discarded": true,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 1825477.6666666667,
+            "instructions": 10291272.525,
+            "cycles": 7936896.240740741,
+            "L1dMPKI": 28.972207619121356,
+            "dTLBMPKI": 1.0809146303349921
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1567525.4898148149,
+            "instructions": 10513904.60462963,
+            "cycles": 6812887.946296296,
+            "L1dMPKI": 27.6626210024072,
+            "dTLBMPKI": 0.4239815767292557
+          },
+          "cpuRatio": 0.8586933263758444,
+          "instructionRatio": 1.0216330953328465
+        },
+        {
+          "pair": 0,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 2154259.203703704,
+            "instructions": 10291270.946296297,
+            "cycles": 9378582.50925926,
+            "L1dMPKI": 28.961439899438716,
+            "dTLBMPKI": 1.0807725504643342
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1725321.9064814814,
+            "instructions": 10513904.814814815,
+            "cycles": 7455190.052777777,
+            "L1dMPKI": 27.695054834439176,
+            "dTLBMPKI": 0.4236344970045488
+          },
+          "cpuRatio": 0.8008887247714791,
+          "instructionRatio": 1.021633272477258
+        },
+        {
+          "pair": 1,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 2032165.462962963,
+            "instructions": 10291271.132407408,
+            "cycles": 8795881.719444444,
+            "L1dMPKI": 28.962716977647354,
+            "dTLBMPKI": 1.0852987507570357
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1504352.388888889,
+            "instructions": 10513905.09074074,
+            "cycles": 6521848.555555556,
+            "L1dMPKI": 27.654419295726214,
+            "dTLBMPKI": 0.42264998718366575
+          },
+          "cpuRatio": 0.7402706208260692,
+          "instructionRatio": 1.021633280813315
+        },
+        {
+          "pair": 2,
+          "discarded": false,
+          "base": {
+            "ticks": 1080,
+            "cpuNs": 1852721.036111111,
+            "instructions": 10291270.714814816,
+            "cycles": 7927368.364814815,
+            "L1dMPKI": 28.918086386274872,
+            "dTLBMPKI": 1.0828832272774371
+          },
+          "design": {
+            "ticks": 1080,
+            "cpuNs": 1598986.861111111,
+            "instructions": 10513904.241666667,
+            "cycles": 6827941.222222222,
+            "L1dMPKI": 27.68726093505297,
+            "dTLBMPKI": 0.4187877636354109
+          },
+          "cpuRatio": 0.8630478253042391,
+          "instructionRatio": 1.0216332397641974
+        }
+      ],
+      "medianCpuRatio": 0.8008887247714791,
+      "medianInstructionRatio": 1.021633272477258
+    }
+  ],
+  "completeProofContinuationsEqual": true,
+  "proofSha256": "25d54e5b0e4c17d3e51e643c006d81f58b1ba4561d8cce03ae134d70cae26c73",
+  "selectionRule": "lowest median whole-window paired CPU ratio, tie instruction ratio; primary data not yet collected"
+}

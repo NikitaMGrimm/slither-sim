@@ -48,6 +48,15 @@
 
 ### Performance
 
+- Each player's record of the snakes it has been told about now keeps only
+  those snakes, in one sorted list, instead of a slot for every snake in the
+  world. Output is byte-identical. In a fully grown 500-player world, ticks
+  use 14% less CPU with stock clients and 18% less with protocol 13, and the
+  memory reserved for these records falls from 20 MB to 0.4 MB. The study's
+  frozen 2% limit for small worlds rejected the change, because worlds of 1
+  to 50 players pay up to 1.6 µs more per tick; it was adopted anyway after
+  the results, since that cost is negligible next to a 7 ms tick
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-compact-snake-history/REPORT.md)).
 - Battledome spawn searches now skip groups of eight body edges that are
   provably too far from a candidate head. Each group's bounds are built only
   when a search first reaches that snake, so ordinary respawns cost the same

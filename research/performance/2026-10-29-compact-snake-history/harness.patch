@@ -1,0 +1,530 @@
+--- /dev/null
++++ b/build.py
+@@ -0,0 +1,61 @@
++"""Overlay existing fixed-work fixtures; immutable binaries share one target."""
++from pathlib import Path
++import importlib.util,json,hashlib,os,re,shutil,subprocess,sys
++r=Path(__file__).resolve().parent
++prior=Path('/var/tmp/slither-bounds-reuse-20261028/shared')
++spec=importlib.util.spec_from_file_location('prior',prior/'reproduce.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
++arm=sys.argv[1]
++if arm=='linear' and not (r/'linear.tar').exists():(r/'linear.tar').symlink_to(r/'candidate.tar')
++name,source,pin=s.prepare(r,arm,False)
++if arm=='linear':shutil.copyfile(r/'linear-snakes.rs',source/'src/client/simulation/snakes.rs')
++payload=(source/'research/performance/2026-10-28-mature-covered-bounds/fixture.rs').read_text()
++payload=payload.replace('const SEATS:usize=500;','fn seats()->usize{static N:std::sync::OnceLock<usize>=std::sync::OnceLock::new();*N.get_or_init(||std::env::var("STUDY_SEATS").map_or(500,|v|v.parse().unwrap()))}')
++payload=re.sub(r'\bSEATS\b','seats()',payload)
++payload=payload.replace('if tick>0 && tick<180_000','if seats()==500 && tick>0 && tick<180_000')
++needle='  let guard=measured.then(||crate::study_counter::enter(2));self.sim.advance_tick_with(0,&mut |_|Ok(())).unwrap();drop(guard);'
++assert payload.count(needle)==1
++payload=payload.replace(needle,'''  let epoch=self.sim.backend.food_epoch;
++  let before=measured.then(||(crate::study_pmu::read(),cpu()));
++  self.sim.advance_tick_with(0,&mut |_|Ok(())).unwrap();
++  if let Some((start,time))=before{let ns=((cpu()-time)*1e9).round() as u64;let end=crate::study_pmu::read();crate::study_pmu::record(start,end,self.sim.backend.tick,epoch!=self.sim.backend.food_epoch,ns);}
++''')
++payload=payload.replace('fn window(&mut self,ticks:usize,path:&Path,trace:bool)','fn window(&mut self,ticks:usize,path:&Path,trace:bool,pmu:i32)')
++payload=payload.replace('  crate::study_counter::enable();','  crate::study_pmu::configure(pmu);').replace('  crate::study_counter::disable();','')
++payload=payload.replace('crate::study_counter::result()','crate::study_pmu::result()').replace('crate::study_counter::finish()','crate::study_pmu::finish()')
++payload=payload.replace('let trace=words.get(2)==Some(&"trace");','let trace=words.get(2)==Some(&"trace");let pmu=words.iter().find_map(|w|w.strip_prefix("pmu=")).map_or(0,|v|v.parse().unwrap());')
++payload=payload.replace('f.window(ticks,path,trace);','f.window(ticks,path,trace,pmu);')
++payload=payload.replace('"threads":fs::read_dir("/proc/self/task").unwrap().count()', '"threads":fs::read_dir("/proc/self/task").unwrap().count(),"knownStorage":f.sim.backend.slots.iter().map(|slot|slot.connection.snakes.study_storage()).collect::<Vec<_>>()')
++(source/'src/client/simulation/study_host.rs').write_text(payload)
++f=source/'src/client/simulation.rs';f.write_text(f.read_text()+'\npub mod study_host;\n')
++(source/'examples/study_host.rs').write_text('fn main(){let a:Vec<_>=std::env::args().collect();slither_sim::client::simulation::study_host::run(a[1]=="1",a[2].parse().unwrap(),a[3].parse().unwrap(),a[4]=="1");}\n')
++f=source/'src/client/simulation/snakes.rs'
++layout=f.read_text()
++if 'by_slot: Vec<Option<KnownSnake>>' in layout:body='[self.slots.len(),self.by_slot.len(),self.by_slot.capacity()*std::mem::size_of::<Option<KnownSnake>>(),self.slots.capacity()*8]'
++elif 'entries: Vec<(usize, KnownSnake)>' in layout:body='[self.entries.len(),self.entries.len(),self.entries.capacity()*std::mem::size_of::<(usize,KnownSnake)>(),0]'
++elif 'records: Vec<KnownSnake>' in layout:body='[self.slots.len(),self.slots.len(),self.records.capacity()*std::mem::size_of::<KnownSnake>(),self.slots.capacity()*8]'
++else:raise AssertionError('unknown KnownSnakes layout')
++f.write_text(f.read_text()+'\nimpl KnownSnakes{pub(super) fn study_storage(&self)->[usize;4]{'+body+'}}\n')
++shutil.copyfile(r/'compact-pmu.rs',source/'src/study_pmu.rs')
++f=source/'src/lib.rs';f.write_text(f.read_text()+'\npub mod study_pmu;\n')
++c=source/'src/study_counter.rs';text=c.read_text().replace('pub fn enter(id:usize)->Guard {','fn enter_active(id:usize)->Guard {')
++text+='''
++static ENABLED:std::sync::atomic::AtomicBool=std::sync::atomic::AtomicBool::new(false);
++pub fn enter(id:usize)->Option<Guard>{ENABLED.load(std::sync::atomic::Ordering::Relaxed).then(||enter_active(id))}
++pub fn enable(){ENABLED.store(true,std::sync::atomic::Ordering::Relaxed);}
++pub fn disable(){ENABLED.store(false,std::sync::atomic::Ordering::Relaxed);}
++''';c.write_text(text)
++for example in ['study_protocols','perf_baseline']:
++ f=source/f'examples/{example}.rs';s.swap(f,'let g=slither_sim::study_counter::enter(1);','slither_sim::study_counter::enable();let g=slither_sim::study_counter::enter(1);')
++subprocess.run(['cc','-O2','-c',str(r/'compact-pmu.c'),'-o',str(r/'compact-pmu.o')],check=True)
++subprocess.run(['ar','rcs',str(r/'libcompactpmu.a'),str(r/'compact-pmu.o')],check=True)
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-compact-history-target',CARGO_BUILD_JOBS='2',CARGO_PROFILE_RELEASE_DEBUG='0',CARGO_PROFILE_DEV_DEBUG='0',CARGO_PROFILE_TEST_DEBUG='0',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',RAYON_NUM_THREADS='1',RUST_TEST_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS=f'-L native={r} -l static=compactpmu')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None)
++cmd=['cargo','build','--release','--locked','--offline','-j2','--example','study_host','--example','study_protocols','--example','perf_baseline']
++with (r/arm/'build.log').open('x') as log:subprocess.run(cmd,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
++bins=r/arm/'bin';bins.mkdir()
++for binary in ['study_host','study_protocols','perf_baseline']:shutil.copy2(Path(env['CARGO_TARGET_DIR'])/'release/examples'/binary,bins/binary)
++digest=hashlib.sha256()
++for p in sorted(source.rglob('*.rs'),key=lambda p:p.relative_to(source).as_posix()):digest.update(p.relative_to(source).as_posix().encode()+b'\0'+p.read_bytes()+b'\0')
++(r/arm/'pins.json').write_text(json.dumps({'archiveCommit':pin,'archiveSha256':s.sha(r/('base.tar' if arm=='base' else 'candidate.tar')),'generatedRustAggregateSha256':digest.hexdigest(),'binaries':{p.name:s.sha(p) for p in bins.iterdir()},'command':cmd,'portableCodegen':True,'compiler':subprocess.check_output([compiler,'--version'],text=True).strip(),'layout':arm},indent=2)+'\n')
++print('BUILT',arm,flush=True)
+--- /dev/null
++++ b/setup.py
+@@ -0,0 +1,47 @@
++"""Execution-only overlay of the retained full-stream comparer."""
++from pathlib import Path
++import shutil
++r=Path(__file__).resolve().parent
++prior=Path('/var/tmp/slither-food-maintenance-20261029')
++shutil.copytree(prior/'shared',r/'shared',ignore=shutil.ignore_patterns('__pycache__'))
++for name in ['compare.py','accept249.py']:
++ shutil.copyfile(prior/name,r/name)
++text=(prior/'serve.py').read_text()
++def swap(a,b):
++ global text
++ assert text.count(a)==1,a
++ text=text.replace(a,b)
++swap('a=p.parse_args()',"p.add_argument('--seats',type=int,default=500);a=p.parse_args()")
++swap('os.sched_setaffinity(0,{2});','')
++swap("env=dict(os.environ,RAYON_NUM_THREADS='1',RUST_TEST_THREADS='1')","env=dict(os.environ,RAYON_NUM_THREADS='1',RUST_TEST_THREADS='1',STUDY_SEATS=str(a.seats))")
++swap("cmd=['taskset','-c',str(a.warm_cpus[i] if a.warm_cpus else i),*preload,str(exe),str(a.legacy),str(a.warm),str(a.ticks),str(int(trace))]","cmd=[*preload,str(exe),str(a.legacy),str(a.warm),str(a.ticks),str(int(trace))]")
++start=text.index(' if len(a.arms)==2:\n  left,right=')
++end=text.index(' for arm in list(paused):',start)
++text=text[:start]+''' if len(a.arms)>=2:
++  left=buffers[a.arms[0]];n=min(len(b) for b in buffers.values())
++  for other in a.arms[1:]:
++   right=buffers[other]
++   if memoryview(left)[:n]!=memoryview(right)[:n]:
++    offset=next(i for i in range(n) if left[i]!=right[i])
++    (session/'mismatch-left.bin').write_bytes(left[:n]);(session/'mismatch-right.bin').write_bytes(right[:n])
++    (session/'mismatch.json').write_text(json.dumps({'arm':other,'offset':matched+offset,'matchedPrefixBytes':matched,'readBytes':total},indent=2)+'\\n')
++    raise AssertionError(('full warm trace mismatch',other,matched+offset))
++  matched+=n
++  for b in buffers.values():del b[:n]
++ else:
++  for b in buffers.values():b.clear()
++'''+text[end:]
++swap('if len(a.arms)==2:assert len(set(total.values()))==1','if len(a.arms)>=2:assert len(set(total.values()))==1')
++swap("'warmTraceComparedEveryByte':trace and len(a.arms)==2","'warmTraceComparedEveryByte':trace and len(a.arms)>=2")
++swap(' for proc in procs.values():os.sched_setaffinity(proc.pid,{0})\n','')
++swap("receipt['countCpu']=0","receipt['countCpu']='un-pinned';receipt['seats']=a.seats")
++lines=text.splitlines(True)
++found=0
++for i,line in enumerate(lines):
++ if line.startswith('   cmd=f'):
++  found+=1
++  lines[i]='   cmd=f"{v.get(\'mode\',\'child\')} {path}"+(\' trace\' if v.get(\'trace\') else \'\')+f" pmu={v.get(\'pmu\',0)}\\n"\n'
++assert found==1
++(r/'serve.py').write_text(''.join(lines))
++assert 'sched_setaffinity(' not in (r/'serve.py').read_text()
++print('SETUP COMPLETE',flush=True)
+--- /dev/null
++++ b/check.py
+@@ -0,0 +1,29 @@
++from pathlib import Path
++import tarfile,subprocess,json,os,sys,hashlib
++r=Path(__file__).resolve().parent;source=r/'checks/source';source.mkdir(parents=True)
++with tarfile.open(r/'candidate.tar') as t:t.extractall(source,filter='data')
++compiler=subprocess.check_output(['rustup','which','rustc'],text=True).strip()
++env=dict(os.environ,CARGO_TARGET_DIR='/tmp/slither-compact-history-target',CARGO_BUILD_JOBS='2',CARGO_PROFILE_DEV_DEBUG='0',CARGO_PROFILE_TEST_DEBUG='0',CARGO_INCREMENTAL='0',CARGO_NET_OFFLINE='true',RUST_TEST_THREADS='1',RAYON_NUM_THREADS='1',RUSTC=compiler,RUSTDOC=str(Path(compiler).with_name('rustdoc')),RUSTFLAGS='')
++env.pop('CARGO_ENCODED_RUSTFLAGS',None);rows=[]
++def run(label,args,failure=False):
++ with (r/'checks'/(label+'.log')).open('x') as log:p=subprocess.run(args,cwd=source,env=env,stdout=log,stderr=subprocess.STDOUT)
++ text=(r/'checks'/(label+'.log')).read_text()
++ assert (p.returncode!=0 and 'test result: FAILED' in text) if failure else p.returncode==0,(label,p.returncode)
++ rows.append({'label':label,'command':args,'expectedFailure':failure,'exit':p.returncode});(r/'checks/results.json').write_text(json.dumps(rows,indent=2)+'\n');print(label,'detected' if failure else 'PASS',flush=True)
++suite=['cargo','test','--locked','--offline','-j2','--lib','client::simulation::snakes']
++run('focused-snake-oracles',suite)
++f=source/'src/client/simulation/snakes.rs';before=f.read_bytes()
++for label,needle,replacement in [
++ ('wrong-removal','Some(self.entries.remove(index).1)','Some(self.entries.remove(0).1)'),
++ ('lost-replacement','Ok(index) => self.entries[index].1 = known,','Ok(_) => {},'),
++ ('reverse-enumeration','let mut known = self.entries.iter().map(|(key, _)| *key).peekable();','let mut known = self.entries.iter().map(|(key, _)| *key).rev().peekable();')]:
++ try:
++  text=before.decode();assert text.count(needle)==1,label
++  f.write_text(text.replace(needle,replacement))
++  run(label,['cargo','test','--locked','--offline','-j2','--lib','client::simulation::snakes::known_tests'],True)
++ finally:f.write_bytes(before)
++assert f.read_bytes()==before
++run('restored-snake-oracles',suite)
++run('rust-group',[sys.executable,'tools/check.py','rust'])
++(r/'required-checks-pass.json').write_text(json.dumps({'passed':True,'sourceRestored':True,'candidateArchiveSha256':hashlib.file_digest((r/'candidate.tar').open('rb'),'sha256').hexdigest(),'checks':rows},indent=2)+'\n')
++print('PRIMARY CHECKS COMPLETE',flush=True)
+--- /dev/null
++++ b/pipeline.py
+@@ -0,0 +1,30 @@
++from pathlib import Path
++import subprocess,sys,json,importlib.util,hashlib,gzip,struct
++r=Path(__file__).resolve().parent
++def run(name,args):
++ with (r/(name+'.log')).open('x') as log:p=subprocess.run([sys.executable,*args],stdout=log,stderr=subprocess.STDOUT)
++ assert p.returncode==0,name
++ print(name,'PASS',flush=True)
++run('checks',[str(r/'check.py')])
++run('setup',[str(r/'setup.py')])
++for arm in ['base','candidate','mutation']:run('build-'+arm,[str(r/'build.py'),arm])
++spec=importlib.util.spec_from_file_location('shared',r/'shared/reproduce.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
++assert json.loads((r/'required-checks-pass.json').read_text())['passed']
++s.matrix(r)
++mutations=[]
++def payload_digest(path):
++ digest=hashlib.sha256();frames=0
++ with gzip.open(path,'rb') as f:
++  while header:=f.read(16):
++   assert len(header)==16;tag,n=struct.unpack('<QQ',header);data=f.read(n);assert len(data)==n
++   if tag==2:digest.update(struct.pack('<Q',n));digest.update(data);frames+=1
++ return frames,digest.hexdigest()
++for case in ['official500','official500-legacy']:
++ row=s.trace(r,'mutation','study_protocols',[case],'trace-mutation-'+case)
++ assert not s.compare(r/('trace-'+case+'-candidate.gz'),r/('trace-mutation-'+case+'.gz'))
++ current=payload_digest(r/('trace-'+case+'-candidate.gz'));mutant=payload_digest(r/('trace-mutation-'+case+'.gz'))
++ assert current!=mutant,'wire payload mutation escaped'
++ mutations.append({'case':case,'fullTraceMutationDetected':True,'wirePayloadMutationDetected':True,'candidateFrames':current[0],'mutantFrames':mutant[0],**row})
++(r/'wire-mutations.json').write_text(json.dumps(mutations,indent=2)+'\n')
++(r/'PROOFS-READY').write_text('27 traces and wire mutation controls passed\n')
++print('ALL PRIMARY BUILD/SHORT PROOFS COMPLETE',flush=True)
+--- /dev/null
++++ b/compact-cohort.py
+@@ -0,0 +1,82 @@
++"""Separate proof, counted and direct-parent phases of one frozen cohort."""
++from pathlib import Path
++import argparse,json,time,struct,hashlib,math
++p=argparse.ArgumentParser();p.add_argument('session');p.add_argument('phase',choices=['proof','time','finish','supersede']);a=p.parse_args()
++r=Path(__file__).resolve().parent;directory=r/'sessions'/a.session
++ready=json.loads((directory/'ready.json').read_text())
++assert ready['warmTraceComparedEveryByte'] and len(set(ready['traceSha256'].values()))==1
++assert all(v['threads']==1 for v in ready['ready'].values())
++ticks=ready['windowTicks'];seats=ready['seats']
++sequence=max([int(p.stem) for p in (directory/'requests').glob('*.request')],default=-1)+1
++def request(arm,label,trace=False,parent=False):
++ global sequence
++ path=directory/(label+'.json');assert not path.exists()
++ row={'arm':arm,'label':label,'trace':trace,'mode':'parent' if parent else 'child','pmu':0}
++ (directory/'requests'/f'{sequence:03}.request').write_text(json.dumps(row));sequence+=1
++ start=time.monotonic()
++ while not (directory/(label+'.done')).exists():
++  assert time.monotonic()-start<1200,label
++  time.sleep(.05)
++ data=json.loads(path.read_text());rows=data['counts']['rows'];assert len(rows)==ticks
++ assert all(v[7]>0 and v[8]/v[7]>=.99 for v in rows)
++ assert all(bool(v[1])==(math.floor(v[0]*.007/.504)>math.floor((v[0]-1)*.007/.504)) for v in rows)
++ return data
++def same(left,right):
++ with left.open('rb') as a,right.open('rb') as b:
++  while True:
++   x,y=a.read(1<<20),b.read(1<<20)
++   if x!=y:return False
++   if not x:return True
++def validate(label):
++ path=directory/(label+'.trace');digest=hashlib.sha256();wire=hashlib.sha256()
++ counts={};summaries=[];frames=0;size=0;previous=None
++ with path.open('rb') as f:
++  while header:=f.read(16):
++   assert len(header)==16;tag,n=struct.unpack('<QQ',header);data=f.read(n);assert len(data)==n
++   digest.update(header);digest.update(data);counts[tag]=counts.get(tag,0)+1
++   if tag==0:assert json.loads(data)['state']
++   elif tag==1:
++    tick,actions=json.loads(data);assert len(actions)==seats
++   elif tag==2:
++    tick,slot,at=struct.unpack('<QQQ',data);assert slot<seats
++   elif tag==3:
++    assert previous==2;frames+=1;size+=n;wire.update(struct.pack('<Q',n));wire.update(data)
++   elif tag==4:summaries.append(json.loads(data))
++   else:raise AssertionError(tag)
++   previous=tag
++ assert previous==4 and counts[0]==2 and counts[4]==2 and counts[1]==ticks
++ assert frames==summaries[1]['frames']-summaries[0]['frames']
++ assert size==summaries[1]['bytes']-summaries[0]['bytes']
++ data=json.loads((directory/(label+'.json')).read_text());assert summaries[-1]==data['summary']
++ return {'label':label,'completeTraceSha256':digest.hexdigest(),'wirePayloadSha256':wire.hexdigest(),'frames':frames,'wireBytes':size,'terminalValidated':True}
++if a.phase=='proof':
++ receipts=[]
++ for arm in ['base','candidate']:
++  for repeat in range(2):
++   label=f'proof-{arm}-{repeat}';request(arm,label,True);receipts.append(validate(label))
++ reference=directory/'proof-base-0.trace'
++ assert all(same(reference,directory/(x['label']+'.trace')) for x in receipts[1:])
++ (directory/'proof-pass.json').write_text(json.dumps({'allChildStreamsEqual':True,'receipts':receipts},indent=2)+'\n')
++ print(a.session,'CHILD PROOFS PASS',flush=True)
++elif a.phase=='time':
++ assert (directory/'proof-pass.json').exists()
++ notice=json.loads((r/'primary-timing-notice.json').read_text());assert time.time()-notice['unix']>=60
++ assert json.loads((r/'required-checks-pass.json').read_text())['passed']
++ assert len(json.loads((r/'parity.json').read_text()))==27
++ for pair in range(-1,5):
++  data={}
++  for arm in (['base','candidate'] if pair<0 or pair%2==0 else ['candidate','base']):
++   data[arm]=request(arm,f'pair-{pair}-{arm}')
++  assert data['base']['summary']==data['candidate']['summary']
++ (directory/'TIME-DONE').write_text(str(time.time()))
++ print(a.session,'TIMING COMPLETE',flush=True)
++else:
++ assert (directory/'TIME-DONE').exists() if a.phase=='finish' else not (directory/'TIME-DONE').exists()
++ receipts=json.loads((directory/'proof-pass.json').read_text())['receipts']
++ for arm in ['base','candidate']:
++  label=f'proof-{arm}-parent';request(arm,label,True,True);receipts.append(validate(label))
++ reference=directory/'proof-base-0.trace';assert all(same(reference,directory/(x['label']+'.trace')) for x in receipts[1:])
++ outcome={'warmTrace':ready,'allSixCompleteContinuationStreamsEqual':True,'receipts':receipts,'timedPairs':5 if a.phase=='finish' else 0,'discardedAB':1 if a.phase=='finish' else 0}
++ if a.phase=='supersede':outcome['reason']='Main runtime advanced before any primary timing; preserved proofs, refreshed both arms.'
++ (directory/('accepted.json' if a.phase=='finish' else 'superseded.json')).write_text(json.dumps(outcome,indent=2)+'\n')
++ print(a.session,'COMPLETE',flush=True)
+--- /dev/null
++++ b/compact-start-mature.py
+@@ -0,0 +1,12 @@
++from pathlib import Path
++import subprocess,sys,json
++r=Path(__file__).resolve().parent
++assert (r/'PROOFS-READY').exists()
++controllers={}
++for legacy in [0,1]:
++ name='mature-'+('legacy' if legacy else 'stock')
++ command=[sys.executable,str(r/'serve.py'),name,'base','candidate','--legacy',str(legacy),'--warm','193000','--ticks','1080']
++ p=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=(r/(name+'.log')).open('x'),stderr=subprocess.STDOUT,start_new_session=True)
++ controllers[name]={'pid':p.pid,'command':command}
++(r/'mature-controllers.json').write_text(json.dumps(controllers,indent=2)+'\n')
++print('Fresh stock and legacy complete-stream proof warmups started; no timed requests.',flush=True)
+--- /dev/null
++++ b/compact-proof-mature.py
+@@ -0,0 +1,13 @@
++from pathlib import Path
++import json,subprocess,time,sys
++r=Path(__file__).resolve().parent
++for name in ['mature-stock','mature-legacy']:
++ directory=r/'sessions'/name
++ while not (directory/'ready.json').exists():
++  assert 'Traceback' not in (r/(name+'.log')).read_text(),name
++  time.sleep(1)
++ with (r/(name+'-proofs.log')).open('x') as log:
++  p=subprocess.run([sys.executable,str(r/'compact-cohort.py'),name,'proof'],stdout=log,stderr=subprocess.STDOUT)
++ assert p.returncode==0,name
++ print(name,'MATURE CHILD PROOFS PASS',flush=True)
++(r/'MATURE-PROOFS-PASS').write_text('both protocols\n')
+--- /dev/null
++++ b/compact-proof-short.py
+@@ -0,0 +1,22 @@
++from pathlib import Path
++import subprocess,time,json,sys
++r=Path(__file__).resolve().parent
++cases=[]
++for legacy in [0,1]:
++ for seats,warm in [(500,0),(1,600),(10,600),(50,600)]:
++  name=f'short-{seats}-'+('legacy' if legacy else 'stock')
++  cases.append({'name':name,'seats':seats,'warm':warm,'legacy':legacy})
++(r/'short-cases.json').write_text(json.dumps(cases,indent=2)+'\n')
++for case in cases:
++ name=case['name'];directory=r/'sessions'/name
++ command=[sys.executable,str(r/'serve.py'),name,'base','candidate','--legacy',str(case['legacy']),'--warm',str(case['warm']),'--ticks','1080','--seats',str(case['seats'])]
++ with (r/(name+'.log')).open('x') as log:
++  server=subprocess.Popen(command,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
++ (r/(name+'-controller.json')).write_text(json.dumps({'pid':server.pid,'command':command},indent=2))
++ while not (directory/'ready.json').exists():
++  assert server.poll() is None,(name,'warm failed');time.sleep(.2)
++ with (r/(name+'-proofs.log')).open('x') as log:
++  p=subprocess.run([sys.executable,str(r/'compact-cohort.py'),name,'proof'],stdout=log,stderr=subprocess.STDOUT)
++ assert p.returncode==0,name
++ print(name,'SHORT CHILD PROOFS PASS',flush=True)
++(r/'SHORT-PROOFS-PASS').write_text('all 8 cases\n')
+--- /dev/null
++++ b/compact-time-primary.py
+@@ -0,0 +1,21 @@
++from pathlib import Path
++import subprocess,time,json,sys
++r=Path(__file__).resolve().parent
++assert (r/'MATURE-PROOFS-PASS').exists() and (r/'SHORT-PROOFS-PASS').exists()
++assert (r/'target-cleanup.json').exists()
++notice=json.loads((r/'primary-timing-notice.json').read_text());assert time.time()-notice['unix']>=60
++names=['mature-stock','mature-legacy']+[x['name'] for x in json.loads((r/'short-cases.json').read_text())]
++for name in names:
++ with (r/(name+'-timing.log')).open('x') as log:
++  result=subprocess.run([sys.executable,str(r/'compact-cohort.py'),name,'time'],stdout=log,stderr=subprocess.STDOUT)
++ assert result.returncode==0,name
++ print(name,'TIMING DONE',flush=True)
++(r/'ALL-TIMING-DONE').write_text(str(time.time()))
++print('ALL COUNTED WINDOWS FINISHED',flush=True)
++# Final direct-parent proofs happen after every counted window has finished.
++for name in names:
++ with (r/(name+'-finish.log')).open('x') as log:
++  result=subprocess.run([sys.executable,str(r/'compact-cohort.py'),name,'finish'],stdout=log,stderr=subprocess.STDOUT)
++ assert result.returncode==0,name
++ print(name,'DIRECT PROOFS DONE',flush=True)
++(r/'ALL-COHORTS-DONE').write_text(str(time.time()))
+--- /dev/null
++++ b/compact-select-primary.py
+@@ -0,0 +1,52 @@
++"""Guest-only reduction of all frozen pairs; no observation replacement."""
++from pathlib import Path
++import json,math,statistics,hashlib
++r=Path(__file__).resolve().parent
++assert (r/'ALL-COHORTS-DONE').exists()
++names=['mature-stock','mature-legacy']+[x['name'] for x in json.loads((r/'short-cases.json').read_text())]
++def metrics(rows,maintenance=None):
++ rows=[x for x in rows if maintenance is None or bool(x[1])==maintenance];n=len(rows)
++ assert n>0 and all(x[7]>0 and x[8]/x[7]>=.99 for x in rows)
++ sums=[sum(x[i] for x in rows) for i in range(9)]
++ cpu=sorted(x[2]/1e6 for x in rows)
++ return {'ticks':n,'instructionsPerTick':sums[3]/n,'cyclesPerTick':sums[4]/n,'cpuMsPerTick':sums[2]/n/1e6,'cpuP99Ms':cpu[math.ceil((n-1)*.99)],'L1dMPKI':sums[5]/sums[3]*1000,'dTLBMPKI':sums[6]/sums[3]*1000,'minimumScheduledFraction':min(x[8]/x[7] for x in rows)}
++results=[]
++for name in names:
++ directory=r/'sessions'/name
++ accepted=json.loads((directory/'accepted.json').read_text());ready=accepted['warmTrace']
++ assert accepted['allSixCompleteContinuationStreamsEqual'] and ready['warmTraceComparedEveryByte']
++ pairs=[]
++ for pair in range(-1,5):
++  arms={};summaries={}
++  for arm in ['base','candidate']:
++   data=json.loads((directory/f'pair-{pair}-{arm}.json').read_text());rows=data['counts']['rows']
++   assert len(rows)==1080 and data['counts']['pmuMode']==0
++   arms[arm]={label:metrics(rows,kind) for label,kind in [('all',None),('ordinary',False),('maintenance',True)]}
++   summaries[arm]=data['summary']
++  assert summaries['base']==summaries['candidate']
++  ratios={label:{key:arms['candidate'][label][key]/arms['base'][label][key] for key in ['cpuMsPerTick','instructionsPerTick','cyclesPerTick']} for label in ['all','ordinary','maintenance']}
++  pairs.append({'pair':pair,'discardedAB':pair==-1,'base':arms['base'],'candidate':arms['candidate'],'ratios':ratios})
++ reported=[x for x in pairs if not x['discardedAB']]
++ summary={}
++ for label in ['all','ordinary','maintenance']:
++  summary[label]={}
++  for key in ['cpuMsPerTick','instructionsPerTick','cyclesPerTick']:
++   ratios=[x['ratios'][label][key] for x in reported]
++   summary[label][key]={'pairedMedianRatio':statistics.median(ratios),'pairedRatioRange':[min(ratios),max(ratios)],'baseMedian':statistics.median(x['base'][label][key] for x in reported),'candidateMedian':statistics.median(x['candidate'][label][key] for x in reported)}
++  for key in ['L1dMPKI','dTLBMPKI','cpuP99Ms']:
++   summary[label][key]={arm:{'median':statistics.median(x[arm][label][key] for x in reported),'range':[min(x[arm][label][key] for x in reported),max(x[arm][label][key] for x in reported)]} for arm in ['base','candidate']}
++ storage={}
++ for arm,v in ready['ready'].items():
++  data=v['knownStorage'];storage[arm]={'occupied':sum(x[0] for x in data),'logicalSlotsOrRecords':sum(x[1] for x in data),'recordCapacityBytes':sum(x[2] for x in data),'keyCapacityBytes':sum(x[3] for x in data)}
++ results.append({'name':name,'seats':ready['seats'],'requestedWarmTicks':ready['warmTicks'],'start':ready['ready']['base']['summary']['census'],'startTick':ready['ready']['base']['summary']['tick'],'end':summaries['base']['census'],'endTick':summaries['base']['tick'],'storage':storage,'pairs':pairs,'summary':summary,'proofs':{'warmBytes':ready['traceBytes'],'warmSha256':ready['traceSha256'],'completeWarmStreamsEqual':True,'allSixContinuationStreamsEqual':True,'completeContinuationSha256':accepted['receipts'][0]['completeTraceSha256'],'wirePayloadSha256':accepted['receipts'][0]['wirePayloadSha256'],'terminalRecordsValidated':all(x['terminalValidated'] for x in accepted['receipts'])}})
++mature=[x for x in results if x['name'].startswith('mature-')]
++assert len(mature)==2
++all_pairs_lower=all(p['ratios']['all']['cpuMsPerTick']<1 for row in mature for p in row['pairs'] if not p['discardedAB'])
++maintenance_lower=all(row['summary']['maintenance']['cpuMsPerTick']['candidateMedian']<row['summary']['maintenance']['cpuMsPerTick']['baseMedian'] for row in mature)
++short_regressions=[row['name'] for row in results if row not in mature and all(p['ratios']['all']['cpuMsPerTick']>1.02 for p in row['pairs'] if not p['discardedAB'])]
++decision={'allTenMatureWholeWindowPairsLowerCpu':all_pairs_lower,'bothMatureMaintenanceCpuMediansLower':maintenance_lower,'shortRowsWithAllFiveCpuRatiosAbove1_02':short_regressions,'runtimeQualifies':all_pairs_lower and maintenance_lower and not short_regressions}
++out={'baseline':'e860ec237f172de5df34caff86a9eb26082e82d6','candidate':'d781ff000d2dfee10627ab1b8a4c07bfff3638c0','decision':decision,'rows':results}
++(r/'selected-results.json').write_text(json.dumps(out,indent=2)+'\n')
++print(json.dumps(decision),flush=True)
++for row in results:
++ print(row['name'],json.dumps({label:row['summary'][label]['cpuMsPerTick'] for label in ['all','ordinary','maintenance']}),flush=True)
+--- /dev/null
++++ b/compact-current-driver.py
+@@ -0,0 +1,17 @@
++from pathlib import Path
++import subprocess,sys,json,hashlib,shutil
++r=Path(__file__).resolve().parent
++for name in ['pipeline.py','compact-start-mature.py','compact-proof-mature.py','compact-proof-short.py']:
++ print('START',name,flush=True)
++ p=subprocess.run([sys.executable,str(r/name)])
++ assert p.returncode==0,name
++ if name=='pipeline.py':
++  for arm in ['base','candidate','mutation']:
++   pins=json.loads((r/arm/'pins.json').read_text())
++   for binary,digest in pins['binaries'].items():
++    with (r/arm/'bin'/binary).open('rb') as f:assert hashlib.file_digest(f,'sha256').hexdigest()==digest
++  target=Path('/tmp/slither-compact-history-target')
++  assert target.resolve()==target and target.is_dir() and not target.is_symlink()
++  shutil.rmtree(target)
++  (r/'target-cleanup.json').write_text(json.dumps({'target':str(target),'allCopiedBinariesVerified':True,'removedBeforeWarmProofs':True})+'\n')
++print('REFRESHED PROOFS COMPLETE / NO TIMING REQUESTED',flush=True)
+--- /dev/null
++++ b/compact-stream-control.py
+@@ -0,0 +1,9 @@
++from pathlib import Path
++import subprocess,json,sys
++r=Path(__file__).resolve().parent
++command=[sys.executable,str(r/'serve.py'),'stream-byte-mutation','base','candidate','--warm','120','--ticks','12','--perturb-stream']
++with (r/'stream-byte-mutation.log').open('x') as log:p=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT)
++assert p.returncode!=0 and 'full warm trace mismatch' in (r/'stream-byte-mutation.log').read_text()
++assert (r/'sessions/stream-byte-mutation/mismatch.json').exists()
++(r/'stream-mutation.json').write_text(json.dumps({'command':command,'expectedFailure':True,'exit':p.returncode,'detected':True},indent=2)+'\n')
++print('STREAM BYTE MUTATION DETECTED',flush=True)
+--- /dev/null
++++ b/compact-pmu.c
+@@ -0,0 +1,47 @@
++#define _GNU_SOURCE
++#include <linux/perf_event.h>
++#include <sys/syscall.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++#include <stdint.h>
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++static int fds[4]={-1,-1,-1,-1}, count;
++static uint64_t ids[4];
++static int indices[4];
++static const uint32_t types[4]={PERF_TYPE_HARDWARE,PERF_TYPE_HARDWARE,PERF_TYPE_HW_CACHE,PERF_TYPE_HW_CACHE};
++static const uint64_t configs[4]={PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_HW_CPU_CYCLES,PERF_COUNT_HW_CACHE_L1D|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16),PERF_COUNT_HW_CACHE_DTLB|(PERF_COUNT_HW_CACHE_RESULT_MISS<<16)};
++void pmu_close(void){for(int i=0;i<count;i++){if(fds[i]>=0)close(fds[i]);fds[i]=-1;}count=0;}
++int pmu_open(int mode){
++ int masks[]={15,3,13};if(mode<0||mode>2)return -EINVAL;count=0;
++ for(int event=0;event<4;event++){
++  if(!(masks[mode]&(1<<event)))continue;
++  struct perf_event_attr a={0};a.size=sizeof(a);a.type=types[event];a.config=configs[event];a.disabled=count==0;a.exclude_kernel=1;a.exclude_hv=1;
++  a.read_format=PERF_FORMAT_GROUP|PERF_FORMAT_TOTAL_TIME_ENABLED|PERF_FORMAT_TOTAL_TIME_RUNNING|PERF_FORMAT_ID;
++  int fd=syscall(__NR_perf_event_open,&a,0,-1,count?fds[0]:-1,0);
++  if(fd<0){int e=errno;pmu_close();return -e;}
++  fds[count]=fd;indices[count]=event;
++  if(ioctl(fd,PERF_EVENT_IOC_ID,&ids[count])){int e=errno;count++;pmu_close();return -e;}count++;
++ }
++ if(ioctl(fds[0],PERF_EVENT_IOC_ENABLE,PERF_IOC_FLAG_GROUP)){int e=errno;pmu_close();return -e;}
++ return 0;
++}
++int pmu_read(uint64_t out[6]){
++ uint64_t raw[11]={0};ssize_t n=read(fds[0],raw,sizeof(raw));if(n<0)return -errno;
++ if(raw[0]!=(uint64_t)count||n!=(ssize_t)((3+2*count)*8))return -EIO;
++ for(int i=0;i<6;i++)out[i]=0;out[0]=raw[1];out[1]=raw[2];
++ for(int j=0;j<count;j++){
++  int found=0;for(int i=0;i<count;i++)if(raw[4+2*j]==ids[i]){out[2+indices[i]]=raw[3+2*j];found=1;break;}
++  if(!found)return -EIO;
++ }
++ return 0;
++}
++#ifdef PROBE
++static volatile uint64_t sink;
++int main(void){printf("[");for(int mode=0;mode<3;mode++){
++ int result=pmu_open(mode);printf("%s{\"mode\":%d,\"open\":%d",mode?",":"",mode,result);
++ if(result==0){uint64_t a[6],b[6];if(pmu_read(a))abort();volatile uint64_t data[512];for(int i=0;i<512;i++)data[i]=i;
++ uint64_t v=0;for(int i=0;i<100000;i++)v+=data[(i*17)%512];sink=v;if(pmu_read(b))abort();
++ printf(",\"delta\":[");for(int i=0;i<6;i++)printf("%s%llu",i?",":"",(unsigned long long)(b[i]-a[i]));printf("]");pmu_close();}printf("}");}puts("]");}
++#endif
+--- /dev/null
++++ b/compact-pmu.rs
+@@ -0,0 +1,9 @@
++use std::cell::RefCell;
++unsafe extern "C" { fn pmu_open(mode:i32)->i32;fn pmu_read(out:*mut u64)->i32;fn pmu_close(); }
++struct Counter{mode:i32,rows:Vec<[u64;9]>,total:[u64;6]}
++thread_local!{static C:RefCell<Option<Counter>>=const{RefCell::new(None)};}
++pub fn configure(mode:i32){let result=unsafe{pmu_open(mode)};assert_eq!(result,0,"PMU group open errno {}",-result);C.with_borrow_mut(|c|{assert!(c.is_none());*c=Some(Counter{mode,rows:Vec::new(),total:[0;6]});});}
++pub fn read()->[u64;6]{let mut out=[0;6];assert_eq!(unsafe{pmu_read(out.as_mut_ptr())},0);out}
++pub fn record(start:[u64;6],end:[u64;6],tick:u64,maintenance:bool,ns:u64){let delta=std::array::from_fn::<_,6,_>(|i|end[i]-start[i]);assert!(delta[0]>0 && delta[1] as f64/delta[0] as f64>=0.99,"PMU group multiplexed");C.with_borrow_mut(|c|{let c=c.as_mut().unwrap();for(i,v)in delta.iter().enumerate(){c.total[i]+=v;}c.rows.push([tick,u64::from(maintenance),ns,delta[2],delta[3],delta[4],delta[5],delta[0],delta[1]]);});}
++pub fn result()->serde_json::Value{C.with_borrow(|c|{let c=c.as_ref().unwrap();let mut ins=[0u64;16];let mut calls=[0u64;16];ins[2]=c.total[2];calls[2]=c.rows.len() as u64;serde_json::json!({"instructions":ins,"calls":calls,"pmuMode":c.mode,"rows":c.rows,"total":c.total,"rowColumns":["tick","maintenance","cpuNs","instructions","cycles","L1d","dTLB","enabledNs","runningNs"]})})}
++pub fn finish(){unsafe{pmu_close()};C.with_borrow_mut(|c|*c=None);}
+--- /dev/null
++++ b/postchecks.py
+@@ -0,0 +1,34 @@
++from pathlib import Path
++import json,subprocess,sys,tarfile,hashlib
++r=Path(__file__).resolve().parent
++source=r/'final-check-source';source.mkdir()
++with tarfile.open(r/'final-delivery.tar') as t:t.extractall(source,filter='data')
++study=source/'research/performance/2026-10-29-compact-snake-history'
++rows=[]
++def run(label,args,cwd):
++ with (r/(label+'.log')).open('x') as out:p=subprocess.run(args,cwd=cwd,stdout=out,stderr=subprocess.STDOUT)
++ rows.append({'label':label,'command':args,'exit':p.returncode})
++ assert p.returncode==0,label
++ print(label,'PASS',flush=True)
++run('documentation-tests',[sys.executable,'-B','-m','unittest','discover','-s','tools','-p','test_documentation.py'],source)
++run('public-table-recalculation',[sys.executable,str(study/'tables.py')],study)
++base=r/'patch-check-source';base.mkdir()
++with tarfile.open(r/'base.tar') as t:t.extractall(base,filter='data')
++for patch in ['rejected-bounded.patch','separate-vectors.patch','unrestricted-linear.patch']:
++ if patch!='rejected-bounded.patch':
++  subprocess.run(['git','apply','--unidiff-zero',str(study/'rejected-bounded.patch')],cwd=base,check=True)
++ path=study/patch
++ run(patch+'-applies',['git','apply','--unidiff-zero','--check',str(path)],base)
++ run(patch+'-apply',['git','apply','--unidiff-zero',str(path)],base)
++ if patch=='rejected-bounded.patch':
++  with tarfile.open(r/'candidate.tar') as t:
++   for name in ['src/client/simulation/snakes.rs','src/client/simulation/snakes/known_tests.rs']:
++    assert (base/name).read_bytes()==t.extractfile(name).read(),name
++ run(patch+'-reverse',['git','apply','--unidiff-zero','--reverse',str(path)],base)
++ if patch!='rejected-bounded.patch':
++  subprocess.run(['git','apply','--unidiff-zero','--reverse',str(study/'rejected-bounded.patch')],cwd=base,check=True)
++ with tarfile.open(r/'base.tar') as t:
++  name='src/client/simulation/snakes.rs';assert (base/name).read_bytes()==t.extractfile(name).read()
++ assert not (base/'src/client/simulation/snakes/known_tests.rs').exists()
++(r/'postprocessing-checks.json').write_text(json.dumps({'passed':True,'checks':rows,'boundedPatchMatchesMeasuredCandidateExactly':True,'allPatchesReverseToPristineBase':True},indent=2)+'\n')
++print('ALL POSTPROCESSING CHECKS PASS',flush=True)
