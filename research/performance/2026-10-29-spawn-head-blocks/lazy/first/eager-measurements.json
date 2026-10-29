@@ -1,0 +1,5480 @@
+{
+  "spawn": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.2916666665,
+              "cpuMeanMs": 0.3273334722222222,
+              "cpuMs": {
+                "p50": 0.617967,
+                "p99": 0.652164,
+                "max": 0.974947
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.922222222,
+              "cpuMeanMs": 0.6323814277777777,
+              "cpuMs": {
+                "p50": 0.631301,
+                "p99": 0.652614,
+                "max": 0.803158
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.922222222,
+              "cpuMeanMs": 0.6323814277777777,
+              "cpuMs": {
+                "p50": 0.631301,
+                "p99": 0.652614,
+                "max": 0.803158
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.6611111111,
+              "cpuMeanMs": 0.022285516666666668,
+              "cpuMs": {
+                "p50": 0.016301,
+                "p99": 0.054062,
+                "max": 0.974947
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278311,
+              "cpuMeanMs": 0.0271786,
+              "cpuMs": {
+                "p50": 0.020961,
+                "p99": 0.054062,
+                "max": 0.054062
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912460,
+              "cpuMeanMs": 0.974947,
+              "cpuMs": {
+                "p50": 0.974947,
+                "p99": 0.974947,
+                "max": 0.974947
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7550904,
+              "cpuMeanMs": 0.77072075,
+              "cpuMs": {
+                "p50": 0.803158,
+                "p99": 0.974947,
+                "max": 0.974947
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.855555556,
+              "cpuMeanMs": 0.32655321111111113,
+              "cpuMs": {
+                "p50": 0.616461,
+                "p99": 0.651163,
+                "max": 0.81476
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.716666667,
+              "cpuMeanMs": 0.6318938611111111,
+              "cpuMs": {
+                "p50": 0.630889,
+                "p99": 0.776962,
+                "max": 0.787235
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.716666667,
+              "cpuMeanMs": 0.6318938611111111,
+              "cpuMs": {
+                "p50": 0.630889,
+                "p99": 0.776962,
+                "max": 0.787235
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315056.9944444444,
+              "cpuMeanMs": 0.02121256111111111,
+              "cpuMs": {
+                "p50": 0.01623,
+                "p99": 0.045881,
+                "max": 0.81476
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278401.8,
+              "cpuMeanMs": 0.0243864,
+              "cpuMs": {
+                "p50": 0.016342,
+                "p99": 0.045881,
+                "max": 0.045881
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.81476,
+              "cpuMs": {
+                "p50": 0.81476,
+                "p99": 0.81476,
+                "max": 0.81476
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7490782.75,
+              "cpuMeanMs": 0.75753,
+              "cpuMs": {
+                "p50": 0.787235,
+                "p99": 0.81476,
+                "max": 0.81476
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.2805555556,
+              "cpuMeanMs": 0.3270652694444444,
+              "cpuMs": {
+                "p50": 0.616236,
+                "p99": 0.643978,
+                "max": 0.971577
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.905555556,
+              "cpuMeanMs": 0.6319540055555556,
+              "cpuMs": {
+                "p50": 0.631564,
+                "p99": 0.649388,
+                "max": 0.790475
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.905555556,
+              "cpuMeanMs": 0.6319540055555556,
+              "cpuMs": {
+                "p50": 0.631564,
+                "p99": 0.649388,
+                "max": 0.790475
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.65555555554,
+              "cpuMeanMs": 0.022176533333333335,
+              "cpuMs": {
+                "p50": 0.016264,
+                "p99": 0.045323,
+                "max": 0.971577
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278310.8,
+              "cpuMeanMs": 0.0245492,
+              "cpuMs": {
+                "p50": 0.016751,
+                "p99": 0.045323,
+                "max": 0.045323
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912460,
+              "cpuMeanMs": 0.971577,
+              "cpuMs": {
+                "p50": 0.971577,
+                "p99": 0.971577,
+                "max": 0.971577
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7520404,
+              "cpuMeanMs": 0.7638545,
+              "cpuMs": {
+                "p50": 0.790475,
+                "p99": 0.971577,
+                "max": 0.971577
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.8583333334,
+              "cpuMeanMs": 0.32679914444444447,
+              "cpuMs": {
+                "p50": 0.615933,
+                "p99": 0.705622,
+                "max": 0.823747
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.705555555,
+              "cpuMeanMs": 0.6321929666666667,
+              "cpuMs": {
+                "p50": 0.630264,
+                "p99": 0.778747,
+                "max": 0.784882
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.705555555,
+              "cpuMeanMs": 0.6321929666666667,
+              "cpuMs": {
+                "p50": 0.630264,
+                "p99": 0.778747,
+                "max": 0.784882
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315057.0111111111,
+              "cpuMeanMs": 0.02140532222222222,
+              "cpuMs": {
+                "p50": 0.016229,
+                "p99": 0.056056,
+                "max": 0.823747
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278402,
+              "cpuMeanMs": 0.0266644,
+              "cpuMs": {
+                "p50": 0.016813,
+                "p99": 0.056056,
+                "max": 0.056056
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.823747,
+              "cpuMs": {
+                "p50": 0.823747,
+                "p99": 0.823747,
+                "max": 0.823747
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7495825,
+              "cpuMeanMs": 0.7732494999999999,
+              "cpuMs": {
+                "p50": 0.784882,
+                "p99": 0.823747,
+                "max": 0.823747
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.283333333,
+              "cpuMeanMs": 0.327301325,
+              "cpuMs": {
+                "p50": 0.616209,
+                "p99": 0.645997,
+                "max": 0.963105
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.916666667,
+              "cpuMeanMs": 0.6324829611111111,
+              "cpuMs": {
+                "p50": 0.631663,
+                "p99": 0.653713,
+                "max": 0.779638
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.916666667,
+              "cpuMeanMs": 0.6324829611111111,
+              "cpuMs": {
+                "p50": 0.631663,
+                "p99": 0.653713,
+                "max": 0.779638
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.65,
+              "cpuMeanMs": 0.022119688888888888,
+              "cpuMs": {
+                "p50": 0.016282,
+                "p99": 0.04513,
+                "max": 0.963105
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278310.8,
+              "cpuMeanMs": 0.0245854,
+              "cpuMs": {
+                "p50": 0.017155,
+                "p99": 0.04513,
+                "max": 0.04513
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912459,
+              "cpuMeanMs": 0.963105,
+              "cpuMs": {
+                "p50": 0.963105,
+                "p99": 0.963105,
+                "max": 0.963105
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7537296.5,
+              "cpuMeanMs": 0.76061325,
+              "cpuMs": {
+                "p50": 0.779638,
+                "p99": 0.963105,
+                "max": 0.963105
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.8694444443,
+              "cpuMeanMs": 0.3272418138888889,
+              "cpuMs": {
+                "p50": 0.619917,
+                "p99": 0.658193,
+                "max": 0.824234
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.727777778,
+              "cpuMeanMs": 0.6330178555555556,
+              "cpuMs": {
+                "p50": 0.631355,
+                "p99": 0.776491,
+                "max": 0.784069
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.727777778,
+              "cpuMeanMs": 0.6330178555555556,
+              "cpuMs": {
+                "p50": 0.631355,
+                "p99": 0.776491,
+                "max": 0.784069
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315057.0111111111,
+              "cpuMeanMs": 0.02146577222222222,
+              "cpuMs": {
+                "p50": 0.016293,
+                "p99": 0.045168,
+                "max": 0.824234
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278401.8,
+              "cpuMeanMs": 0.024568,
+              "cpuMs": {
+                "p50": 0.017119,
+                "p99": 0.045168,
+                "max": 0.045168
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.824234,
+              "cpuMs": {
+                "p50": 0.824234,
+                "p99": 0.824234,
+                "max": 0.824234
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7492682,
+              "cpuMeanMs": 0.76074675,
+              "cpuMs": {
+                "p50": 0.784069,
+                "p99": 0.824234,
+                "max": 0.824234
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.2916666665,
+              "cpuMeanMs": 0.3273666333333333,
+              "cpuMs": {
+                "p50": 0.618083,
+                "p99": 0.643412,
+                "max": 0.967501
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.922222222,
+              "cpuMeanMs": 0.6325662444444444,
+              "cpuMs": {
+                "p50": 0.631531,
+                "p99": 0.713692,
+                "max": 0.776437
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.922222222,
+              "cpuMeanMs": 0.6325662444444444,
+              "cpuMs": {
+                "p50": 0.631531,
+                "p99": 0.713692,
+                "max": 0.776437
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.6611111111,
+              "cpuMeanMs": 0.02216702222222222,
+              "cpuMs": {
+                "p50": 0.016285,
+                "p99": 0.045488,
+                "max": 0.967501
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278310.8,
+              "cpuMeanMs": 0.0245452,
+              "cpuMs": {
+                "p50": 0.016534,
+                "p99": 0.045488,
+                "max": 0.045488
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912460,
+              "cpuMeanMs": 0.967501,
+              "cpuMs": {
+                "p50": 0.967501,
+                "p99": 0.967501,
+                "max": 0.967501
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7534536,
+              "cpuMeanMs": 0.7752605,
+              "cpuMs": {
+                "p50": 0.776437,
+                "p99": 0.967501,
+                "max": 0.967501
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.863888889,
+              "cpuMeanMs": 0.32690234444444444,
+              "cpuMs": {
+                "p50": 0.617848,
+                "p99": 0.656952,
+                "max": 0.824087
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.722222222,
+              "cpuMeanMs": 0.6324383055555556,
+              "cpuMs": {
+                "p50": 0.630486,
+                "p99": 0.773512,
+                "max": 0.798387
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.722222222,
+              "cpuMeanMs": 0.6324383055555556,
+              "cpuMs": {
+                "p50": 0.630486,
+                "p99": 0.773512,
+                "max": 0.798387
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315057.0055555556,
+              "cpuMeanMs": 0.021366383333333332,
+              "cpuMs": {
+                "p50": 0.016225,
+                "p99": 0.046583,
+                "max": 0.824087
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278401.8,
+              "cpuMeanMs": 0.0247128,
+              "cpuMs": {
+                "p50": 0.016893,
+                "p99": 0.046583,
+                "max": 0.046583
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.824087,
+              "cpuMs": {
+                "p50": 0.824087,
+                "p99": 0.824087,
+                "max": 0.824087
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7491775.25,
+              "cpuMeanMs": 0.7632345,
+              "cpuMs": {
+                "p50": 0.798387,
+                "p99": 0.824087,
+                "max": 0.824087
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.2916666665,
+              "cpuMeanMs": 0.32710503888888887,
+              "cpuMs": {
+                "p50": 0.618707,
+                "p99": 0.646971,
+                "max": 0.977153
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.916666667,
+              "cpuMeanMs": 0.6319441555555556,
+              "cpuMs": {
+                "p50": 0.631088,
+                "p99": 0.64988,
+                "max": 0.784515
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.916666667,
+              "cpuMeanMs": 0.6319441555555556,
+              "cpuMs": {
+                "p50": 0.631088,
+                "p99": 0.64988,
+                "max": 0.784515
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.6666666667,
+              "cpuMeanMs": 0.022265922222222224,
+              "cpuMs": {
+                "p50": 0.016281,
+                "p99": 0.044997,
+                "max": 0.977153
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278311,
+              "cpuMeanMs": 0.025734,
+              "cpuMs": {
+                "p50": 0.023994,
+                "p99": 0.044997,
+                "max": 0.044997
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912460,
+              "cpuMeanMs": 0.977153,
+              "cpuMs": {
+                "p50": 0.977153,
+                "p99": 0.977153,
+                "max": 0.977153
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7532864,
+              "cpuMeanMs": 0.76462975,
+              "cpuMs": {
+                "p50": 0.784515,
+                "p99": 0.977153,
+                "max": 0.977153
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.8583333334,
+              "cpuMeanMs": 0.3266973138888889,
+              "cpuMs": {
+                "p50": 0.619073,
+                "p99": 0.645783,
+                "max": 0.823361
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.716666667,
+              "cpuMeanMs": 0.6320574666666666,
+              "cpuMs": {
+                "p50": 0.630931,
+                "p99": 0.769076,
+                "max": 0.783001
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.716666667,
+              "cpuMeanMs": 0.6320574666666666,
+              "cpuMs": {
+                "p50": 0.630931,
+                "p99": 0.769076,
+                "max": 0.783001
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315057,
+              "cpuMeanMs": 0.02133716111111111,
+              "cpuMs": {
+                "p50": 0.016209,
+                "p99": 0.047603,
+                "max": 0.823361
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278401.8,
+              "cpuMeanMs": 0.0248376,
+              "cpuMs": {
+                "p50": 0.016695,
+                "p99": 0.046991,
+                "max": 0.046991
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.823361,
+              "cpuMs": {
+                "p50": 0.823361,
+                "p99": 0.823361,
+                "max": 0.823361
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7498681.5,
+              "cpuMeanMs": 0.7553052499999999,
+              "cpuMs": {
+                "p50": 0.783001,
+                "p99": 0.823361,
+                "max": 0.823361
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520823.283333333,
+              "cpuMeanMs": 0.327513925,
+              "cpuMs": {
+                "p50": 0.616814,
+                "p99": 0.649661,
+                "max": 0.973928
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726633.905555556,
+              "cpuMeanMs": 0.6327101111111111,
+              "cpuMs": {
+                "p50": 0.63237,
+                "p99": 0.654639,
+                "max": 0.779179
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726633.905555556,
+              "cpuMeanMs": 0.6327101111111111,
+              "cpuMs": {
+                "p50": 0.63237,
+                "p99": 0.654639,
+                "max": 0.779179
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315012.6611111111,
+              "cpuMeanMs": 0.02231773888888889,
+              "cpuMs": {
+                "p50": 0.016295,
+                "p99": 0.055074,
+                "max": 0.973928
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278311,
+              "cpuMeanMs": 0.0265124,
+              "cpuMs": {
+                "p50": 0.016754,
+                "p99": 0.055074,
+                "max": 0.055074
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912460,
+              "cpuMeanMs": 0.973928,
+              "cpuMs": {
+                "p50": 0.973928,
+                "p99": 0.973928,
+                "max": 0.973928
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7520869.75,
+              "cpuMeanMs": 0.76435175,
+              "cpuMs": {
+                "p50": 0.779179,
+                "p99": 0.973928,
+                "max": 0.973928
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493725.863888889,
+              "cpuMeanMs": 0.3281350361111111,
+              "cpuMs": {
+                "p50": 0.616191,
+                "p99": 0.68096,
+                "max": 0.824165
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672394.722222222,
+              "cpuMeanMs": 0.6347564111111111,
+              "cpuMs": {
+                "p50": 0.632015,
+                "p99": 0.78108,
+                "max": 0.796433
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672394.722222222,
+              "cpuMeanMs": 0.6347564111111111,
+              "cpuMs": {
+                "p50": 0.632015,
+                "p99": 0.78108,
+                "max": 0.796433
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315057.0055555556,
+              "cpuMeanMs": 0.02151366111111111,
+              "cpuMs": {
+                "p50": 0.016306,
+                "p99": 0.047023,
+                "max": 0.824165
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278401.8,
+              "cpuMeanMs": 0.0247534,
+              "cpuMs": {
+                "p50": 0.016442,
+                "p99": 0.047023,
+                "max": 0.047023
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912385,
+              "cpuMeanMs": 0.824165,
+              "cpuMs": {
+                "p50": 0.824165,
+                "p99": 0.824165,
+                "max": 0.824165
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7492687.25,
+              "cpuMeanMs": 0.7706595,
+              "cpuMs": {
+                "p50": 0.796433,
+                "p99": 0.824165,
+                "max": 0.824165
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9923036687550116,
+          "ratioMin": 0.9923036656234724,
+          "ratioMax": 0.9923036711279544,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.9919366505406494,
+          "ratioMin": 0.9919366505206707,
+          "ratioMax": 0.9919366529983834,
+          "n": 5
+        },
+        "exhausted": {
+          "ratioMedian": 0.9919366505406494,
+          "ratioMin": 0.9919366505206707,
+          "ratioMax": 0.9919366529983834,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 1.0001407703559853,
+          "ratioMin": 1.0001407350815523,
+          "ratioMax": 1.0001408232688784,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 1.000326972578858,
+          "ratioMin": 1.0003262537233526,
+          "ratioMax": 1.0003276911999104,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 0.9999924337651804,
+          "ratioMin": 0.9999924337651804,
+          "ratioMax": 0.9999925346475582,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 0.9954622172921216,
+          "ratioMin": 0.9940808352172427,
+          "ratioMax": 0.9967316915421033,
+          "n": 5
+        }
+      }
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.722222222,
+              "cpuMeanMs": 0.32720910555555555,
+              "cpuMs": {
+                "p50": 0.619237,
+                "p99": 0.656986,
+                "max": 0.949816
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.044444445,
+              "cpuMeanMs": 0.6321976888888889,
+              "cpuMs": {
+                "p50": 0.631281,
+                "p99": 0.703753,
+                "max": 0.793491
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.044444445,
+              "cpuMeanMs": 0.6321976888888889,
+              "cpuMs": {
+                "p50": 0.631281,
+                "p99": 0.703753,
+                "max": 0.793491
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.4,
+              "cpuMeanMs": 0.022220522222222223,
+              "cpuMs": {
+                "p50": 0.016356,
+                "p99": 0.044889,
+                "max": 0.949816
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.024439,
+              "cpuMs": {
+                "p50": 0.016624,
+                "p99": 0.044889,
+                "max": 0.044889
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.949816,
+              "cpuMs": {
+                "p50": 0.949816,
+                "p99": 0.949816,
+                "max": 0.949816
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7540621,
+              "cpuMeanMs": 0.7760115,
+              "cpuMs": {
+                "p50": 0.793491,
+                "p99": 0.949816,
+                "max": 0.949816
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.136111111,
+              "cpuMeanMs": 0.32649664444444443,
+              "cpuMs": {
+                "p50": 0.616815,
+                "p99": 0.65341,
+                "max": 0.805869
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.616666666,
+              "cpuMeanMs": 0.6316077555555556,
+              "cpuMs": {
+                "p50": 0.629987,
+                "p99": 0.759316,
+                "max": 0.78477
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.616666666,
+              "cpuMeanMs": 0.6316077555555556,
+              "cpuMs": {
+                "p50": 0.629987,
+                "p99": 0.759316,
+                "max": 0.78477
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.65555555554,
+              "cpuMeanMs": 0.02138553333333333,
+              "cpuMs": {
+                "p50": 0.016353,
+                "p99": 0.045212,
+                "max": 0.805869
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0245144,
+              "cpuMs": {
+                "p50": 0.016661,
+                "p99": 0.045212,
+                "max": 0.045212
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910586,
+              "cpuMeanMs": 0.805869,
+              "cpuMs": {
+                "p50": 0.805869,
+                "p99": 0.805869,
+                "max": 0.805869
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7486174,
+              "cpuMeanMs": 0.75084125,
+              "cpuMs": {
+                "p50": 0.78477,
+                "p99": 0.805869,
+                "max": 0.805869
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.722222222,
+              "cpuMeanMs": 0.3268504638888889,
+              "cpuMs": {
+                "p50": 0.618132,
+                "p99": 0.64555,
+                "max": 0.973843
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.63147875,
+              "cpuMs": {
+                "p50": 0.630903,
+                "p99": 0.645587,
+                "max": 0.778692
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.63147875,
+              "cpuMs": {
+                "p50": 0.630903,
+                "p99": 0.645587,
+                "max": 0.778692
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.3888888889,
+              "cpuMeanMs": 0.02222217777777778,
+              "cpuMs": {
+                "p50": 0.016352,
+                "p99": 0.045404,
+                "max": 0.973843
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.024396,
+              "cpuMs": {
+                "p50": 0.016761,
+                "p99": 0.045404,
+                "max": 0.045404
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.973843,
+              "cpuMs": {
+                "p50": 0.973843,
+                "p99": 0.973843,
+                "max": 0.973843
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7537075.5,
+              "cpuMeanMs": 0.760918,
+              "cpuMs": {
+                "p50": 0.778692,
+                "p99": 0.973843,
+                "max": 0.973843
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.1333333333,
+              "cpuMeanMs": 0.32635994166666665,
+              "cpuMs": {
+                "p50": 0.617246,
+                "p99": 0.65464,
+                "max": 0.816173
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6311941555555556,
+              "cpuMs": {
+                "p50": 0.629345,
+                "p99": 0.757383,
+                "max": 0.782911
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6311941555555556,
+              "cpuMs": {
+                "p50": 0.629345,
+                "p99": 0.757383,
+                "max": 0.782911
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.6611111111,
+              "cpuMeanMs": 0.021525727777777778,
+              "cpuMs": {
+                "p50": 0.016325,
+                "p99": 0.044577,
+                "max": 0.816173
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0245228,
+              "cpuMs": {
+                "p50": 0.016946,
+                "p99": 0.044577,
+                "max": 0.044577
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910586,
+              "cpuMeanMs": 0.816173,
+              "cpuMs": {
+                "p50": 0.816173,
+                "p99": 0.816173,
+                "max": 0.816173
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7481217.5,
+              "cpuMeanMs": 0.75277675,
+              "cpuMs": {
+                "p50": 0.782911,
+                "p99": 0.816173,
+                "max": 0.816173
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.7277777777,
+              "cpuMeanMs": 0.3270047222222222,
+              "cpuMs": {
+                "p50": 0.61658,
+                "p99": 0.644416,
+                "max": 0.950956
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.6318220388888889,
+              "cpuMs": {
+                "p50": 0.630234,
+                "p99": 0.711631,
+                "max": 0.778033
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.6318220388888889,
+              "cpuMs": {
+                "p50": 0.630234,
+                "p99": 0.711631,
+                "max": 0.778033
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.4,
+              "cpuMeanMs": 0.022187405555555557,
+              "cpuMs": {
+                "p50": 0.016347,
+                "p99": 0.04536,
+                "max": 0.950956
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.0242482,
+              "cpuMs": {
+                "p50": 0.016461,
+                "p99": 0.04536,
+                "max": 0.04536
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.950956,
+              "cpuMs": {
+                "p50": 0.950956,
+                "p99": 0.950956,
+                "max": 0.950956
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7545099.75,
+              "cpuMeanMs": 0.771259,
+              "cpuMs": {
+                "p50": 0.778033,
+                "p99": 0.950956,
+                "max": 0.950956
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.1222222224,
+              "cpuMeanMs": 0.32614680555555553,
+              "cpuMs": {
+                "p50": 0.615377,
+                "p99": 0.673086,
+                "max": 0.820795
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.6,
+              "cpuMeanMs": 0.6309688333333333,
+              "cpuMs": {
+                "p50": 0.629928,
+                "p99": 0.758772,
+                "max": 0.764713
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.6,
+              "cpuMeanMs": 0.6309688333333333,
+              "cpuMs": {
+                "p50": 0.629928,
+                "p99": 0.758772,
+                "max": 0.764713
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.64444444445,
+              "cpuMeanMs": 0.02132477777777778,
+              "cpuMs": {
+                "p50": 0.016355,
+                "p99": 0.042608,
+                "max": 0.820795
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0238706,
+              "cpuMs": {
+                "p50": 0.016481,
+                "p99": 0.042608,
+                "max": 0.042608
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910587,
+              "cpuMeanMs": 0.820795,
+              "cpuMs": {
+                "p50": 0.820795,
+                "p99": 0.820795,
+                "max": 0.820795
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7477808.25,
+              "cpuMeanMs": 0.7543415,
+              "cpuMs": {
+                "p50": 0.764713,
+                "p99": 0.820795,
+                "max": 0.820795
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.730555556,
+              "cpuMeanMs": 0.3269658166666667,
+              "cpuMs": {
+                "p50": 0.617866,
+                "p99": 0.643277,
+                "max": 0.947669
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.066666666,
+              "cpuMeanMs": 0.6318076666666667,
+              "cpuMs": {
+                "p50": 0.630804,
+                "p99": 0.649273,
+                "max": 0.775813
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.066666666,
+              "cpuMeanMs": 0.6318076666666667,
+              "cpuMs": {
+                "p50": 0.630804,
+                "p99": 0.649273,
+                "max": 0.775813
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.39444444445,
+              "cpuMeanMs": 0.022123966666666668,
+              "cpuMs": {
+                "p50": 0.016341,
+                "p99": 0.044135,
+                "max": 0.947669
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.0241324,
+              "cpuMs": {
+                "p50": 0.016783,
+                "p99": 0.044135,
+                "max": 0.044135
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.947669,
+              "cpuMs": {
+                "p50": 0.947669,
+                "p99": 0.947669,
+                "max": 0.947669
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7536946,
+              "cpuMeanMs": 0.754008,
+              "cpuMs": {
+                "p50": 0.775813,
+                "p99": 0.947669,
+                "max": 0.947669
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.1222222224,
+              "cpuMeanMs": 0.3261751027777778,
+              "cpuMs": {
+                "p50": 0.617189,
+                "p99": 0.653174,
+                "max": 0.833092
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6309846222222222,
+              "cpuMs": {
+                "p50": 0.630417,
+                "p99": 0.75253,
+                "max": 0.771436
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6309846222222222,
+              "cpuMs": {
+                "p50": 0.630417,
+                "p99": 0.75253,
+                "max": 0.771436
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.6388888889,
+              "cpuMeanMs": 0.021365583333333334,
+              "cpuMs": {
+                "p50": 0.016349,
+                "p99": 0.044854,
+                "max": 0.833092
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0242854,
+              "cpuMs": {
+                "p50": 0.016849,
+                "p99": 0.044854,
+                "max": 0.044854
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910587,
+              "cpuMeanMs": 0.833092,
+              "cpuMs": {
+                "p50": 0.833092,
+                "p99": 0.833092,
+                "max": 0.833092
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7480202.75,
+              "cpuMeanMs": 0.7525580000000001,
+              "cpuMs": {
+                "p50": 0.771436,
+                "p99": 0.833092,
+                "max": 0.833092
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.738888889,
+              "cpuMeanMs": 0.3278763138888889,
+              "cpuMs": {
+                "p50": 0.618921,
+                "p99": 0.653491,
+                "max": 0.949736
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.072222223,
+              "cpuMeanMs": 0.6334916444444445,
+              "cpuMs": {
+                "p50": 0.632339,
+                "p99": 0.65677,
+                "max": 0.788963
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.072222223,
+              "cpuMeanMs": 0.6334916444444445,
+              "cpuMs": {
+                "p50": 0.632339,
+                "p99": 0.65677,
+                "max": 0.788963
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.40555555554,
+              "cpuMeanMs": 0.022260983333333335,
+              "cpuMs": {
+                "p50": 0.016381,
+                "p99": 0.044688,
+                "max": 0.949736
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.0242514,
+              "cpuMs": {
+                "p50": 0.016554,
+                "p99": 0.044688,
+                "max": 0.044688
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.949736,
+              "cpuMs": {
+                "p50": 0.949736,
+                "p99": 0.949736,
+                "max": 0.949736
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7524653.75,
+              "cpuMeanMs": 0.76224,
+              "cpuMs": {
+                "p50": 0.788963,
+                "p99": 0.949736,
+                "max": 0.949736
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.1305555557,
+              "cpuMeanMs": 0.3264525861111111,
+              "cpuMs": {
+                "p50": 0.61646,
+                "p99": 0.71416,
+                "max": 0.808723
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.611111111,
+              "cpuMeanMs": 0.6315880833333334,
+              "cpuMs": {
+                "p50": 0.630133,
+                "p99": 0.750115,
+                "max": 0.7649
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.611111111,
+              "cpuMeanMs": 0.6315880833333334,
+              "cpuMs": {
+                "p50": 0.630133,
+                "p99": 0.750115,
+                "max": 0.7649
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.65,
+              "cpuMeanMs": 0.021317088888888888,
+              "cpuMs": {
+                "p50": 0.01632,
+                "p99": 0.043592,
+                "max": 0.808723
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0242784,
+              "cpuMs": {
+                "p50": 0.016699,
+                "p99": 0.043592,
+                "max": 0.043592
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910587,
+              "cpuMeanMs": 0.808723,
+              "cpuMs": {
+                "p50": 0.808723,
+                "p99": 0.808723,
+                "max": 0.808723
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7476423.25,
+              "cpuMeanMs": 0.7594745,
+              "cpuMs": {
+                "p50": 0.7649,
+                "p99": 0.808723,
+                "max": 0.808723
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3520879.725,
+              "cpuMeanMs": 0.3271345027777778,
+              "cpuMs": {
+                "p50": 0.617282,
+                "p99": 0.648143,
+                "max": 0.960018
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.63201375,
+              "cpuMs": {
+                "p50": 0.632155,
+                "p99": 0.653031,
+                "max": 0.77195
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6726711.055555556,
+              "cpuMeanMs": 0.63201375,
+              "cpuMs": {
+                "p50": 0.632155,
+                "p99": 0.653031,
+                "max": 0.77195
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315048.39444444445,
+              "cpuMeanMs": 0.022255255555555555,
+              "cpuMs": {
+                "p50": 0.016371,
+                "p99": 0.045637,
+                "max": 0.960018
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278929.6,
+              "cpuMeanMs": 0.0245878,
+              "cpuMs": {
+                "p50": 0.016685,
+                "p99": 0.045637,
+                "max": 0.045637
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9912433,
+              "cpuMeanMs": 0.960018,
+              "cpuMs": {
+                "p50": 0.960018,
+                "p99": 0.960018,
+                "max": 0.960018
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7534657.5,
+              "cpuMeanMs": 0.7582855000000001,
+              "cpuMs": {
+                "p50": 0.77195,
+                "p99": 0.960018,
+                "max": 0.960018
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 3493747.136111111,
+              "cpuMeanMs": 0.3267014222222222,
+              "cpuMs": {
+                "p50": 0.616629,
+                "p99": 0.703558,
+                "max": 0.818011
+              }
+            },
+            "search": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6318665555555556,
+              "cpuMs": {
+                "p50": 0.630603,
+                "p99": 0.767067,
+                "max": 0.774676
+              }
+            },
+            "exhausted": {
+              "n": 180,
+              "instructionsMean": 6672404.605555556,
+              "cpuMeanMs": 0.6318665555555556,
+              "cpuMs": {
+                "p50": 0.630603,
+                "p99": 0.767067,
+                "max": 0.774676
+              }
+            },
+            "other": {
+              "n": 180,
+              "instructionsMean": 315089.6666666667,
+              "cpuMeanMs": 0.02153628888888889,
+              "cpuMs": {
+                "p50": 0.016374,
+                "p99": 0.044069,
+                "max": 0.818011
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 278755.4,
+              "cpuMeanMs": 0.0243292,
+              "cpuMs": {
+                "p50": 0.016695,
+                "p99": 0.044069,
+                "max": 0.044069
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 9910586,
+              "cpuMeanMs": 0.818011,
+              "cpuMs": {
+                "p50": 0.818011,
+                "p99": 0.818011,
+                "max": 0.818011
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 7486935,
+              "cpuMeanMs": 0.7658280000000001,
+              "cpuMs": {
+                "p50": 0.774676,
+                "p99": 0.818011,
+                "max": 0.818011
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9922937993759077,
+          "ratioMin": 0.992293798593043,
+          "ratioMax": 0.9922938041034931,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.9919267447186236,
+          "ratioMin": 0.9919267439060644,
+          "ratioMax": 0.9919267455445185,
+          "n": 5
+        },
+        "exhausted": {
+          "ratioMedian": 0.9919267447186236,
+          "ratioMin": 0.9919267439060644,
+          "ratioMax": 0.9919267455445185,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 1.0001309146314399,
+          "ratioMin": 1.000130914626823,
+          "ratioMax": 1.0001310028036259,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 0.9993754696525576,
+          "ratioMin": 0.9993754696525576,
+          "ratioMax": 0.9993754696525576,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 0.999813769233043,
+          "ratioMin": 0.9998136683496373,
+          "ratioMax": 0.999813769233043,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 0.992588902685133,
+          "ratioMin": 0.99108143003676,
+          "ratioMax": 0.9936662681747644,
+          "n": 5
+        }
+      }
+    }
+  },
+  "seats80": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.013888889,
+              "cpuMeanMs": 0.163392275,
+              "cpuMs": {
+                "p50": 0.149447,
+                "p99": 0.356968,
+                "max": 0.831252
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175,
+              "cpuMeanMs": 0.2877746,
+              "cpuMs": {
+                "p50": 0.283946,
+                "p99": 0.356968,
+                "max": 0.356968
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.7746478873,
+              "cpuMeanMs": 0.16164041126760564,
+              "cpuMs": {
+                "p50": 0.149423,
+                "p99": 0.33886,
+                "max": 0.831252
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274061.6,
+              "cpuMeanMs": 0.2367824,
+              "cpuMs": {
+                "p50": 0.236012,
+                "p99": 0.247389,
+                "max": 0.247389
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065015,
+              "cpuMeanMs": 0.831252,
+              "cpuMs": {
+                "p50": 0.831252,
+                "p99": 0.831252,
+                "max": 0.831252
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.5,
+              "cpuMeanMs": 0.53937825,
+              "cpuMs": {
+                "p50": 0.500752,
+                "p99": 0.831252,
+                "max": 0.831252
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.7861111113,
+              "cpuMeanMs": 0.16052892222222223,
+              "cpuMs": {
+                "p50": 0.146743,
+                "p99": 0.334351,
+                "max": 0.840335
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395221.6,
+              "cpuMeanMs": 0.269201,
+              "cpuMs": {
+                "p50": 0.25633,
+                "p99": 0.334264,
+                "max": 0.334264
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.9014084507,
+              "cpuMeanMs": 0.1589983295774648,
+              "cpuMs": {
+                "p50": 0.146731,
+                "p99": 0.334351,
+                "max": 0.840335
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598.2,
+              "cpuMeanMs": 0.2327022,
+              "cpuMs": {
+                "p50": 0.23446,
+                "p99": 0.238952,
+                "max": 0.238952
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.840335,
+              "cpuMs": {
+                "p50": 0.840335,
+                "p99": 0.840335,
+                "max": 0.840335
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6308272.5,
+              "cpuMeanMs": 0.53240975,
+              "cpuMs": {
+                "p50": 0.491657,
+                "p99": 0.840335,
+                "max": 0.840335
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.0222222223,
+              "cpuMeanMs": 0.1643406027777778,
+              "cpuMs": {
+                "p50": 0.149928,
+                "p99": 0.393199,
+                "max": 0.864653
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175,
+              "cpuMeanMs": 0.2954836,
+              "cpuMs": {
+                "p50": 0.275238,
+                "p99": 0.393199,
+                "max": 0.393199
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.7830985915,
+              "cpuMeanMs": 0.16249351830985914,
+              "cpuMs": {
+                "p50": 0.149906,
+                "p99": 0.339925,
+                "max": 0.864653
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274061.8,
+              "cpuMeanMs": 0.2398356,
+              "cpuMs": {
+                "p50": 0.237385,
+                "p99": 0.261693,
+                "max": 0.261693
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065016,
+              "cpuMeanMs": 0.864653,
+              "cpuMs": {
+                "p50": 0.864653,
+                "p99": 0.864653,
+                "max": 0.864653
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.5,
+              "cpuMeanMs": 0.557161,
+              "cpuMs": {
+                "p50": 0.501525,
+                "p99": 0.864653,
+                "max": 0.864653
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.7861111113,
+              "cpuMeanMs": 0.1607050388888889,
+              "cpuMs": {
+                "p50": 0.146768,
+                "p99": 0.365611,
+                "max": 0.840641
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395222,
+              "cpuMeanMs": 0.2800568,
+              "cpuMs": {
+                "p50": 0.261184,
+                "p99": 0.365611,
+                "max": 0.365611
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.895774648,
+              "cpuMeanMs": 0.1590240281690141,
+              "cpuMs": {
+                "p50": 0.146755,
+                "p99": 0.342155,
+                "max": 0.840641
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598.2,
+              "cpuMeanMs": 0.2338608,
+              "cpuMs": {
+                "p50": 0.231619,
+                "p99": 0.245611,
+                "max": 0.245611
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.840641,
+              "cpuMs": {
+                "p50": 0.840641,
+                "p99": 0.840641,
+                "max": 0.840641
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5869478.5,
+              "cpuMeanMs": 0.5460935,
+              "cpuMs": {
+                "p50": 0.510764,
+                "p99": 0.840641,
+                "max": 0.840641
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.013888889,
+              "cpuMeanMs": 0.16374659444444445,
+              "cpuMs": {
+                "p50": 0.149753,
+                "p99": 0.361327,
+                "max": 0.837138
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175,
+              "cpuMeanMs": 0.2886592,
+              "cpuMs": {
+                "p50": 0.280409,
+                "p99": 0.361327,
+                "max": 0.361327
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.7746478873,
+              "cpuMeanMs": 0.161987261971831,
+              "cpuMs": {
+                "p50": 0.149751,
+                "p99": 0.341586,
+                "max": 0.837138
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274062,
+              "cpuMeanMs": 0.24004999999999999,
+              "cpuMs": {
+                "p50": 0.242397,
+                "p99": 0.256256,
+                "max": 0.256256
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065016,
+              "cpuMeanMs": 0.837138,
+              "cpuMs": {
+                "p50": 0.837138,
+                "p99": 0.837138,
+                "max": 0.837138
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.75,
+              "cpuMeanMs": 0.5437682500000001,
+              "cpuMs": {
+                "p50": 0.506095,
+                "p99": 0.837138,
+                "max": 0.837138
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.797222222,
+              "cpuMeanMs": 0.1607519361111111,
+              "cpuMs": {
+                "p50": 0.14687,
+                "p99": 0.368333,
+                "max": 0.847239
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395221.6,
+              "cpuMeanMs": 0.2769232,
+              "cpuMs": {
+                "p50": 0.26187,
+                "p99": 0.368333,
+                "max": 0.368333
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.9126760564,
+              "cpuMeanMs": 0.15911572112676056,
+              "cpuMs": {
+                "p50": 0.146861,
+                "p99": 0.336725,
+                "max": 0.847239
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598.4,
+              "cpuMeanMs": 0.2370076,
+              "cpuMs": {
+                "p50": 0.239602,
+                "p99": 0.24882,
+                "max": 0.24882
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.847239,
+              "cpuMs": {
+                "p50": 0.847239,
+                "p99": 0.847239,
+                "max": 0.847239
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5869478,
+              "cpuMeanMs": 0.537818,
+              "cpuMs": {
+                "p50": 0.483202,
+                "p99": 0.847239,
+                "max": 0.847239
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.013888889,
+              "cpuMeanMs": 0.164231725,
+              "cpuMs": {
+                "p50": 0.150007,
+                "p99": 0.405461,
+                "max": 0.841184
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175,
+              "cpuMeanMs": 0.2988732,
+              "cpuMs": {
+                "p50": 0.278539,
+                "p99": 0.405461,
+                "max": 0.405461
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.7746478873,
+              "cpuMeanMs": 0.1623353661971831,
+              "cpuMs": {
+                "p50": 0.149985,
+                "p99": 0.339808,
+                "max": 0.841184
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274061.8,
+              "cpuMeanMs": 0.2418242,
+              "cpuMs": {
+                "p50": 0.234338,
+                "p99": 0.259088,
+                "max": 0.259088
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065016,
+              "cpuMeanMs": 0.841184,
+              "cpuMs": {
+                "p50": 0.841184,
+                "p99": 0.841184,
+                "max": 0.841184
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.75,
+              "cpuMeanMs": 0.55863025,
+              "cpuMs": {
+                "p50": 0.515368,
+                "p99": 0.841184,
+                "max": 0.841184
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.7916666665,
+              "cpuMeanMs": 0.16100490833333334,
+              "cpuMs": {
+                "p50": 0.146784,
+                "p99": 0.391124,
+                "max": 0.839945
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395221.6,
+              "cpuMeanMs": 0.2835326,
+              "cpuMs": {
+                "p50": 0.26298,
+                "p99": 0.391124,
+                "max": 0.391124
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.9070422533,
+              "cpuMeanMs": 0.1592791661971831,
+              "cpuMs": {
+                "p50": 0.146747,
+                "p99": 0.337336,
+                "max": 0.839945
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598.2,
+              "cpuMeanMs": 0.236185,
+              "cpuMs": {
+                "p50": 0.233103,
+                "p99": 0.253331,
+                "max": 0.253331
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.839945,
+              "cpuMs": {
+                "p50": 0.839945,
+                "p99": 0.839945,
+                "max": 0.839945
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5869478.25,
+              "cpuMeanMs": 0.5549645,
+              "cpuMs": {
+                "p50": 0.505902,
+                "p99": 0.839945,
+                "max": 0.839945
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.019444444,
+              "cpuMeanMs": 0.16550379444444444,
+              "cpuMs": {
+                "p50": 0.151029,
+                "p99": 0.42002,
+                "max": 0.824316
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175.8,
+              "cpuMeanMs": 0.3100798,
+              "cpuMs": {
+                "p50": 0.283103,
+                "p99": 0.42002,
+                "max": 0.42002
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.7690140847,
+              "cpuMeanMs": 0.16346751267605633,
+              "cpuMs": {
+                "p50": 0.151025,
+                "p99": 0.345402,
+                "max": 0.824316
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274061.6,
+              "cpuMeanMs": 0.2407254,
+              "cpuMs": {
+                "p50": 0.238708,
+                "p99": 0.249474,
+                "max": 0.249474
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065015,
+              "cpuMeanMs": 0.824316,
+              "cpuMs": {
+                "p50": 0.824316,
+                "p99": 0.824316,
+                "max": 0.824316
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.75,
+              "cpuMeanMs": 0.55980075,
+              "cpuMs": {
+                "p50": 0.517536,
+                "p99": 0.824316,
+                "max": 0.824316
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.797222222,
+              "cpuMeanMs": 0.16124846944444443,
+              "cpuMs": {
+                "p50": 0.146977,
+                "p99": 0.397554,
+                "max": 0.842531
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395221.6,
+              "cpuMeanMs": 0.2855782,
+              "cpuMs": {
+                "p50": 0.263788,
+                "p99": 0.397554,
+                "max": 0.397554
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.9126760564,
+              "cpuMeanMs": 0.15949734647887323,
+              "cpuMs": {
+                "p50": 0.146948,
+                "p99": 0.34421,
+                "max": 0.842531
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598.2,
+              "cpuMeanMs": 0.2370254,
+              "cpuMs": {
+                "p50": 0.234719,
+                "p99": 0.249307,
+                "max": 0.249307
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.842531,
+              "cpuMs": {
+                "p50": 0.842531,
+                "p99": 0.842531,
+                "max": 0.842531
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5869478.5,
+              "cpuMeanMs": 0.5489135,
+              "cpuMs": {
+                "p50": 0.491213,
+                "p99": 0.842531,
+                "max": 0.842531
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2738561.0166666666,
+              "cpuMeanMs": 0.16424025833333333,
+              "cpuMs": {
+                "p50": 0.149779,
+                "p99": 0.415553,
+                "max": 0.836866
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3598175,
+              "cpuMeanMs": 0.301198,
+              "cpuMs": {
+                "p50": 0.28195,
+                "p99": 0.415553,
+                "max": 0.415553
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726453.777464789,
+              "cpuMeanMs": 0.16231127605633802,
+              "cpuMs": {
+                "p50": 0.149772,
+                "p99": 0.344047,
+                "max": 0.836866
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274062,
+              "cpuMeanMs": 0.2445594,
+              "cpuMs": {
+                "p50": 0.237794,
+                "p99": 0.262644,
+                "max": 0.262644
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12065016,
+              "cpuMeanMs": 0.836866,
+              "cpuMs": {
+                "p50": 0.836866,
+                "p99": 0.836866,
+                "max": 0.836866
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5919004.75,
+              "cpuMeanMs": 0.562762,
+              "cpuMs": {
+                "p50": 0.520187,
+                "p99": 0.836866,
+                "max": 0.836866
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2735710.7916666665,
+              "cpuMeanMs": 0.16122076944444444,
+              "cpuMs": {
+                "p50": 0.146925,
+                "p99": 0.403419,
+                "max": 0.848763
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3395221.8,
+              "cpuMeanMs": 0.2920048,
+              "cpuMs": {
+                "p50": 0.268101,
+                "p99": 0.403419,
+                "max": 0.403419
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2726421.904225352,
+              "cpuMeanMs": 0.15937874084507042,
+              "cpuMs": {
+                "p50": 0.146895,
+                "p99": 0.340467,
+                "max": 0.848763
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3274598,
+              "cpuMeanMs": 0.2355348,
+              "cpuMs": {
+                "p50": 0.235691,
+                "p99": 0.245021,
+                "max": 0.245021
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068078,
+              "cpuMeanMs": 0.848763,
+              "cpuMs": {
+                "p50": 0.848763,
+                "p99": 0.848763,
+                "max": 0.848763
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 5869478,
+              "cpuMeanMs": 0.55597025,
+              "cpuMs": {
+                "p50": 0.507334,
+                "p99": 0.848763,
+                "max": 0.848763
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9989592263207695,
+          "ratioMin": 0.9989592212523356,
+          "ratioMax": 0.9989592283494099,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.9435954615881662,
+          "ratioMin": 0.9435952517939785,
+          "ratioMax": 0.9435955727556331,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 0.9999883117014745,
+          "ratioMin": 0.9999883044692923,
+          "ratioMax": 0.9999883158341467,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 1.0001638331933749,
+          "ratioMin": 1.0001637110109705,
+          "ratioMax": 1.0001638942895883,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 1.0002537916236498,
+          "ratioMin": 1.0002537916236498,
+          "ratioMax": 1.0002538745289584,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 0.9916326304688301,
+          "ratioMin": 0.9916325882319996,
+          "ratioMax": 0.9916327145890833,
+          "n": 5
+        }
+      }
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1305555557,
+              "cpuMeanMs": 0.166285,
+              "cpuMs": {
+                "p50": 0.149517,
+                "p99": 0.40883,
+                "max": 0.853119
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596.8,
+              "cpuMeanMs": 0.2930862,
+              "cpuMs": {
+                "p50": 0.286532,
+                "p99": 0.329004,
+                "max": 0.329004
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.895774648,
+              "cpuMeanMs": 0.1644990676056338,
+              "cpuMs": {
+                "p50": 0.149504,
+                "p99": 0.40883,
+                "max": 0.853119
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.4,
+              "cpuMeanMs": 0.2545846,
+              "cpuMs": {
+                "p50": 0.251036,
+                "p99": 0.266413,
+                "max": 0.266413
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.853119,
+              "cpuMs": {
+                "p50": 0.853119,
+                "p99": 0.853119,
+                "max": 0.853119
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.5,
+              "cpuMeanMs": 0.61272675,
+              "cpuMs": {
+                "p50": 0.597884,
+                "p99": 0.853119,
+                "max": 0.853119
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.2722222223,
+              "cpuMeanMs": 0.16451490277777778,
+              "cpuMs": {
+                "p50": 0.147501,
+                "p99": 0.404109,
+                "max": 0.851388
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422056.4,
+              "cpuMeanMs": 0.302864,
+              "cpuMs": {
+                "p50": 0.300907,
+                "p99": 0.395432,
+                "max": 0.395432
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.9746478875,
+              "cpuMeanMs": 0.16256632394366197,
+              "cpuMs": {
+                "p50": 0.147466,
+                "p99": 0.404109,
+                "max": 0.851388
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.4,
+              "cpuMeanMs": 0.2523326,
+              "cpuMs": {
+                "p50": 0.25248,
+                "p99": 0.263738,
+                "max": 0.263738
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068739,
+              "cpuMeanMs": 0.851388,
+              "cpuMs": {
+                "p50": 0.851388,
+                "p99": 0.851388,
+                "max": 0.851388
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807642.75,
+              "cpuMeanMs": 0.60549525,
+              "cpuMs": {
+                "p50": 0.595094,
+                "p99": 0.851388,
+                "max": 0.851388
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1305555557,
+              "cpuMeanMs": 0.16668451388888889,
+              "cpuMs": {
+                "p50": 0.149639,
+                "p99": 0.40667,
+                "max": 0.851465
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596.4,
+              "cpuMeanMs": 0.29127179999999997,
+              "cpuMs": {
+                "p50": 0.301793,
+                "p99": 0.320194,
+                "max": 0.320194
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.9014084507,
+              "cpuMeanMs": 0.1649297633802817,
+              "cpuMs": {
+                "p50": 0.149581,
+                "p99": 0.40667,
+                "max": 0.851465
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.8,
+              "cpuMeanMs": 0.2596652,
+              "cpuMs": {
+                "p50": 0.257178,
+                "p99": 0.278412,
+                "max": 0.278412
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.851465,
+              "cpuMs": {
+                "p50": 0.851465,
+                "p99": 0.851465,
+                "max": 0.851465
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.75,
+              "cpuMeanMs": 0.61242925,
+              "cpuMs": {
+                "p50": 0.597952,
+                "p99": 0.851465,
+                "max": 0.851465
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.263888889,
+              "cpuMeanMs": 0.1633117,
+              "cpuMs": {
+                "p50": 0.146658,
+                "p99": 0.413832,
+                "max": 0.850078
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422056,
+              "cpuMeanMs": 0.2976866,
+              "cpuMs": {
+                "p50": 0.289592,
+                "p99": 0.388316,
+                "max": 0.388316
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.971830986,
+              "cpuMeanMs": 0.16141909577464789,
+              "cpuMs": {
+                "p50": 0.146641,
+                "p99": 0.413832,
+                "max": 0.850078
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.8,
+              "cpuMeanMs": 0.2553324,
+              "cpuMs": {
+                "p50": 0.253182,
+                "p99": 0.264269,
+                "max": 0.264269
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068739,
+              "cpuMeanMs": 0.850078,
+              "cpuMs": {
+                "p50": 0.850078,
+                "p99": 0.850078,
+                "max": 0.850078
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807642.5,
+              "cpuMeanMs": 0.60224625,
+              "cpuMs": {
+                "p50": 0.587306,
+                "p99": 0.850078,
+                "max": 0.850078
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1277777776,
+              "cpuMeanMs": 0.16626105555555556,
+              "cpuMs": {
+                "p50": 0.14953,
+                "p99": 0.408235,
+                "max": 0.84904
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596.2,
+              "cpuMeanMs": 0.2876312,
+              "cpuMs": {
+                "p50": 0.287371,
+                "p99": 0.322148,
+                "max": 0.322148
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.9014084507,
+              "cpuMeanMs": 0.16455161690140846,
+              "cpuMs": {
+                "p50": 0.149514,
+                "p99": 0.408235,
+                "max": 0.84904
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.4,
+              "cpuMeanMs": 0.25838659999999997,
+              "cpuMs": {
+                "p50": 0.253032,
+                "p99": 0.272667,
+                "max": 0.272667
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.84904,
+              "cpuMs": {
+                "p50": 0.84904,
+                "p99": 0.84904,
+                "max": 0.84904
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.25,
+              "cpuMeanMs": 0.60459775,
+              "cpuMs": {
+                "p50": 0.582809,
+                "p99": 0.84904,
+                "max": 0.84904
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.2861111113,
+              "cpuMeanMs": 0.16415833055555556,
+              "cpuMs": {
+                "p50": 0.147285,
+                "p99": 0.401674,
+                "max": 0.869263
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422055.8,
+              "cpuMeanMs": 0.2935038,
+              "cpuMs": {
+                "p50": 0.2996,
+                "p99": 0.37825,
+                "max": 0.37825
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.9971830985,
+              "cpuMeanMs": 0.16233656338028168,
+              "cpuMs": {
+                "p50": 0.147268,
+                "p99": 0.401674,
+                "max": 0.869263
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.4,
+              "cpuMeanMs": 0.25314939999999997,
+              "cpuMs": {
+                "p50": 0.249189,
+                "p99": 0.264794,
+                "max": 0.264794
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068740,
+              "cpuMeanMs": 0.869263,
+              "cpuMs": {
+                "p50": 0.869263,
+                "p99": 0.869263,
+                "max": 0.869263
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807643,
+              "cpuMeanMs": 0.6077845,
+              "cpuMs": {
+                "p50": 0.597585,
+                "p99": 0.869263,
+                "max": 0.869263
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1277777776,
+              "cpuMeanMs": 0.16619435277777778,
+              "cpuMs": {
+                "p50": 0.149638,
+                "p99": 0.414897,
+                "max": 0.855278
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596,
+              "cpuMeanMs": 0.285444,
+              "cpuMs": {
+                "p50": 0.289645,
+                "p99": 0.317086,
+                "max": 0.317086
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.904225352,
+              "cpuMeanMs": 0.16451478028169014,
+              "cpuMs": {
+                "p50": 0.149616,
+                "p99": 0.414897,
+                "max": 0.855278
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.6,
+              "cpuMeanMs": 0.2571312,
+              "cpuMs": {
+                "p50": 0.259575,
+                "p99": 0.266101,
+                "max": 0.266101
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.855278,
+              "cpuMs": {
+                "p50": 0.855278,
+                "p99": 0.855278,
+                "max": 0.855278
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.5,
+              "cpuMeanMs": 0.6138825,
+              "cpuMs": {
+                "p50": 0.597072,
+                "p99": 0.855278,
+                "max": 0.855278
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.275,
+              "cpuMeanMs": 0.1636576777777778,
+              "cpuMs": {
+                "p50": 0.146844,
+                "p99": 0.404693,
+                "max": 0.858546
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422055.6,
+              "cpuMeanMs": 0.295502,
+              "cpuMs": {
+                "p50": 0.292476,
+                "p99": 0.393665,
+                "max": 0.393665
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.9887323943,
+              "cpuMeanMs": 0.16180071549295774,
+              "cpuMs": {
+                "p50": 0.146814,
+                "p99": 0.404693,
+                "max": 0.858546
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.4,
+              "cpuMeanMs": 0.2524454,
+              "cpuMs": {
+                "p50": 0.251428,
+                "p99": 0.260915,
+                "max": 0.260915
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068739,
+              "cpuMeanMs": 0.858546,
+              "cpuMs": {
+                "p50": 0.858546,
+                "p99": 0.858546,
+                "max": 0.858546
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807642.5,
+              "cpuMeanMs": 0.61045525,
+              "cpuMs": {
+                "p50": 0.599897,
+                "p99": 0.858546,
+                "max": 0.858546
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1194444443,
+              "cpuMeanMs": 0.16643003333333334,
+              "cpuMs": {
+                "p50": 0.149377,
+                "p99": 0.413639,
+                "max": 0.852189
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596.6,
+              "cpuMeanMs": 0.293064,
+              "cpuMs": {
+                "p50": 0.299244,
+                "p99": 0.334998,
+                "max": 0.334998
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.8873239434,
+              "cpuMeanMs": 0.16464645633802816,
+              "cpuMs": {
+                "p50": 0.149361,
+                "p99": 0.413639,
+                "max": 0.852189
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.4,
+              "cpuMeanMs": 0.2568552,
+              "cpuMs": {
+                "p50": 0.258833,
+                "p99": 0.265857,
+                "max": 0.265857
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.852189,
+              "cpuMs": {
+                "p50": 0.852189,
+                "p99": 0.852189,
+                "max": 0.852189
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.5,
+              "cpuMeanMs": 0.61412725,
+              "cpuMs": {
+                "p50": 0.596594,
+                "p99": 0.852189,
+                "max": 0.852189
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.2527777776,
+              "cpuMeanMs": 0.16338103055555556,
+              "cpuMs": {
+                "p50": 0.146774,
+                "p99": 0.417192,
+                "max": 0.848833
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422055.6,
+              "cpuMeanMs": 0.2924618,
+              "cpuMs": {
+                "p50": 0.294164,
+                "p99": 0.377686,
+                "max": 0.377686
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.966197183,
+              "cpuMeanMs": 0.16156299154929576,
+              "cpuMs": {
+                "p50": 0.146734,
+                "p99": 0.417192,
+                "max": 0.848833
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.8,
+              "cpuMeanMs": 0.2554418,
+              "cpuMs": {
+                "p50": 0.253476,
+                "p99": 0.269986,
+                "max": 0.269986
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068739,
+              "cpuMeanMs": 0.848833,
+              "cpuMs": {
+                "p50": 0.848833,
+                "p99": 0.848833,
+                "max": 0.848833
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807642.5,
+              "cpuMeanMs": 0.599418,
+              "cpuMs": {
+                "p50": 0.579715,
+                "p99": 0.848833,
+                "max": 0.848833
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2758664.1194444443,
+              "cpuMeanMs": 0.16656417777777777,
+              "cpuMs": {
+                "p50": 0.149776,
+                "p99": 0.406739,
+                "max": 0.850383
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3624596.4,
+              "cpuMeanMs": 0.289443,
+              "cpuMs": {
+                "p50": 0.288796,
+                "p99": 0.330799,
+                "max": 0.330799
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746467.890140845,
+              "cpuMeanMs": 0.16483349014084506,
+              "cpuMs": {
+                "p50": 0.149741,
+                "p99": 0.406739,
+                "max": 0.850383
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3388392.4,
+              "cpuMeanMs": 0.2577984,
+              "cpuMs": {
+                "p50": 0.253702,
+                "p99": 0.273568,
+                "max": 0.273568
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12066669,
+              "cpuMeanMs": 0.850383,
+              "cpuMs": {
+                "p50": 0.850383,
+                "p99": 0.850383,
+                "max": 0.850383
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6800991.25,
+              "cpuMeanMs": 0.608334,
+              "cpuMs": {
+                "p50": 0.591496,
+                "p99": 0.850383,
+                "max": 0.850383
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 2756055.2583333333,
+              "cpuMeanMs": 0.16325300833333334,
+              "cpuMs": {
+                "p50": 0.146535,
+                "p99": 0.405531,
+                "max": 0.841157
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 3422056.2,
+              "cpuMeanMs": 0.2964068,
+              "cpuMs": {
+                "p50": 0.301003,
+                "p99": 0.384116,
+                "max": 0.384116
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 2746674.963380282,
+              "cpuMeanMs": 0.16137760281690142,
+              "cpuMs": {
+                "p50": 0.146504,
+                "p99": 0.405531,
+                "max": 0.841157
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 3389633.4,
+              "cpuMeanMs": 0.2526864,
+              "cpuMs": {
+                "p50": 0.257012,
+                "p99": 0.261396,
+                "max": 0.261396
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 12068739,
+              "cpuMeanMs": 0.841157,
+              "cpuMs": {
+                "p50": 0.841157,
+                "p99": 0.841157,
+                "max": 0.841157
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 6807642.5,
+              "cpuMeanMs": 0.6061037499999999,
+              "cpuMs": {
+                "p50": 0.599907,
+                "p99": 0.841157,
+                "max": 0.841157
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9990543027356167,
+          "ratioMin": 0.9990543007217595,
+          "ratioMax": 0.9990543097869736,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.9441205616228366,
+          "ratioMin": 0.9441204022538674,
+          "ratioMax": 0.9441206198847409,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 1.000075398250311,
+          "ratioMin": 1.000075395172989,
+          "ratioMax": 1.000075404403795,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 1.0003662503787931,
+          "ratioMin": 1.0003661913321378,
+          "ratioMax": 1.000366368428875,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 1.0001715469281538,
+          "ratioMin": 1.0001715469281538,
+          "ratioMax": 1.000171629801066,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 1.0009779456421906,
+          "ratioMin": 1.0009779088468973,
+          "ratioMax": 1.0009780559561814,
+          "n": 5
+        }
+      }
+    }
+  },
+  "seats160": {
+    "19": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.527777778,
+              "cpuMeanMs": 0.47946038888888887,
+              "cpuMs": {
+                "p50": 0.456996,
+                "p99": 0.895256,
+                "max": 1.475192
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947.4,
+              "cpuMeanMs": 0.6957328,
+              "cpuMs": {
+                "p50": 0.659178,
+                "p99": 0.832348,
+                "max": 0.832348
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.416901409,
+              "cpuMeanMs": 0.4764142985915493,
+              "cpuMs": {
+                "p50": 0.456864,
+                "p99": 0.895256,
+                "max": 1.475192
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149686.2,
+              "cpuMeanMs": 0.6691998,
+              "cpuMs": {
+                "p50": 0.655169,
+                "p99": 0.759601,
+                "max": 0.759601
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022318,
+              "cpuMeanMs": 1.275185,
+              "cpuMs": {
+                "p50": 1.275185,
+                "p99": 1.275185,
+                "max": 1.275185
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852.5,
+              "cpuMeanMs": 1.1839365000000002,
+              "cpuMs": {
+                "p50": 1.275185,
+                "p99": 1.475192,
+                "max": 1.475192
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.816666666,
+              "cpuMeanMs": 0.4697697722222222,
+              "cpuMs": {
+                "p50": 0.447646,
+                "p99": 0.889895,
+                "max": 1.433068
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.6,
+              "cpuMeanMs": 0.661878,
+              "cpuMs": {
+                "p50": 0.626447,
+                "p99": 0.795911,
+                "max": 0.795911
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.932394366,
+              "cpuMeanMs": 0.4670640225352113,
+              "cpuMs": {
+                "p50": 0.447455,
+                "p99": 0.889895,
+                "max": 1.433068
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.6,
+              "cpuMeanMs": 0.6583228,
+              "cpuMs": {
+                "p50": 0.651183,
+                "p99": 0.75132,
+                "max": 0.75132
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018264,
+              "cpuMeanMs": 1.26067,
+              "cpuMs": {
+                "p50": 1.26067,
+                "p99": 1.26067,
+                "max": 1.26067
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.75,
+              "cpuMeanMs": 1.16630975,
+              "cpuMs": {
+                "p50": 1.26067,
+                "p99": 1.433068,
+                "max": 1.433068
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.508333334,
+              "cpuMeanMs": 0.4802336277777778,
+              "cpuMs": {
+                "p50": 0.457093,
+                "p99": 0.873589,
+                "max": 1.446774
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947.4,
+              "cpuMeanMs": 0.7083132,
+              "cpuMs": {
+                "p50": 0.683605,
+                "p99": 0.849088,
+                "max": 0.849088
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.397183099,
+              "cpuMeanMs": 0.4770212394366197,
+              "cpuMs": {
+                "p50": 0.456904,
+                "p99": 0.873589,
+                "max": 1.446774
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149686.2,
+              "cpuMeanMs": 0.6803663999999999,
+              "cpuMs": {
+                "p50": 0.673321,
+                "p99": 0.773372,
+                "max": 0.773372
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022317,
+              "cpuMeanMs": 1.259298,
+              "cpuMs": {
+                "p50": 1.259298,
+                "p99": 1.259298,
+                "max": 1.259298
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852,
+              "cpuMeanMs": 1.16658375,
+              "cpuMs": {
+                "p50": 1.259298,
+                "p99": 1.446774,
+                "max": 1.446774
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.786111111,
+              "cpuMeanMs": 0.4699407027777778,
+              "cpuMs": {
+                "p50": 0.44812,
+                "p99": 0.880616,
+                "max": 1.42899
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.6,
+              "cpuMeanMs": 0.6588234000000001,
+              "cpuMs": {
+                "p50": 0.631641,
+                "p99": 0.797193,
+                "max": 0.797193
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.901408451,
+              "cpuMeanMs": 0.46728038309859155,
+              "cpuMs": {
+                "p50": 0.447945,
+                "p99": 0.880616,
+                "max": 1.42899
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.2,
+              "cpuMeanMs": 0.6528584,
+              "cpuMs": {
+                "p50": 0.632064,
+                "p99": 0.759456,
+                "max": 0.759456
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018263,
+              "cpuMeanMs": 1.250085,
+              "cpuMs": {
+                "p50": 1.250085,
+                "p99": 1.250085,
+                "max": 1.250085
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.25,
+              "cpuMeanMs": 1.1598595,
+              "cpuMs": {
+                "p50": 1.250085,
+                "p99": 1.42899,
+                "max": 1.42899
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.497222222,
+              "cpuMeanMs": 0.47985351944444443,
+              "cpuMs": {
+                "p50": 0.457159,
+                "p99": 0.886453,
+                "max": 1.461784
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947.4,
+              "cpuMeanMs": 0.6927802,
+              "cpuMs": {
+                "p50": 0.656431,
+                "p99": 0.829148,
+                "max": 0.829148
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.385915493,
+              "cpuMeanMs": 0.4768545521126761,
+              "cpuMs": {
+                "p50": 0.457046,
+                "p99": 0.886453,
+                "max": 1.461784
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149686.2,
+              "cpuMeanMs": 0.6685166,
+              "cpuMs": {
+                "p50": 0.649593,
+                "p99": 0.7591,
+                "max": 0.7591
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022318,
+              "cpuMeanMs": 1.279779,
+              "cpuMs": {
+                "p50": 1.279779,
+                "p99": 1.279779,
+                "max": 1.279779
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852.5,
+              "cpuMeanMs": 1.17934825,
+              "cpuMs": {
+                "p50": 1.279779,
+                "p99": 1.461784,
+                "max": 1.461784
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.841666667,
+              "cpuMeanMs": 0.4696751361111111,
+              "cpuMs": {
+                "p50": 0.447965,
+                "p99": 0.871972,
+                "max": 1.41635
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.2,
+              "cpuMeanMs": 0.6493686,
+              "cpuMs": {
+                "p50": 0.6146,
+                "p99": 0.773918,
+                "max": 0.773918
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.963380282,
+              "cpuMeanMs": 0.46714424225352114,
+              "cpuMs": {
+                "p50": 0.447826,
+                "p99": 0.871972,
+                "max": 1.41635
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.4,
+              "cpuMeanMs": 0.6525380000000001,
+              "cpuMs": {
+                "p50": 0.640996,
+                "p99": 0.753947,
+                "max": 0.753947
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018263,
+              "cpuMeanMs": 1.248217,
+              "cpuMs": {
+                "p50": 1.248217,
+                "p99": 1.248217,
+                "max": 1.248217
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.5,
+              "cpuMeanMs": 1.153667,
+              "cpuMs": {
+                "p50": 1.248217,
+                "p99": 1.41635,
+                "max": 1.41635
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.522222222,
+              "cpuMeanMs": 0.4784979861111111,
+              "cpuMs": {
+                "p50": 0.455864,
+                "p99": 0.882893,
+                "max": 1.45336
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947,
+              "cpuMeanMs": 0.6849296,
+              "cpuMs": {
+                "p50": 0.653904,
+                "p99": 0.8263,
+                "max": 0.8263
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.416901409,
+              "cpuMeanMs": 0.4755904985915493,
+              "cpuMs": {
+                "p50": 0.45567,
+                "p99": 0.882893,
+                "max": 1.45336
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149686.4,
+              "cpuMeanMs": 0.6734928,
+              "cpuMs": {
+                "p50": 0.654893,
+                "p99": 0.763106,
+                "max": 0.763106
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022318,
+              "cpuMeanMs": 1.282949,
+              "cpuMs": {
+                "p50": 1.282949,
+                "p99": 1.282949,
+                "max": 1.282949
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852.25,
+              "cpuMeanMs": 1.17719975,
+              "cpuMs": {
+                "p50": 1.282949,
+                "p99": 1.45336,
+                "max": 1.45336
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.797222222,
+              "cpuMeanMs": 0.470645375,
+              "cpuMs": {
+                "p50": 0.449389,
+                "p99": 0.871305,
+                "max": 1.438572
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.6,
+              "cpuMeanMs": 0.652499,
+              "cpuMs": {
+                "p50": 0.618654,
+                "p99": 0.786247,
+                "max": 0.786247
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.912676056,
+              "cpuMeanMs": 0.4680840563380282,
+              "cpuMs": {
+                "p50": 0.449205,
+                "p99": 0.871305,
+                "max": 1.438572
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.4,
+              "cpuMeanMs": 0.650702,
+              "cpuMs": {
+                "p50": 0.627139,
+                "p99": 0.763786,
+                "max": 0.763786
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018263,
+              "cpuMeanMs": 1.25045,
+              "cpuMs": {
+                "p50": 1.25045,
+                "p99": 1.25045,
+                "max": 1.25045
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.75,
+              "cpuMeanMs": 1.1615250000000001,
+              "cpuMs": {
+                "p50": 1.25045,
+                "p99": 1.438572,
+                "max": 1.438572
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.505555555,
+              "cpuMeanMs": 0.4793625083333333,
+              "cpuMs": {
+                "p50": 0.456376,
+                "p99": 0.890759,
+                "max": 1.459745
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947.4,
+              "cpuMeanMs": 0.704569,
+              "cpuMs": {
+                "p50": 0.667105,
+                "p99": 0.849344,
+                "max": 0.849344
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.394366197,
+              "cpuMeanMs": 0.47619058591549296,
+              "cpuMs": {
+                "p50": 0.456255,
+                "p99": 0.890759,
+                "max": 1.459745
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149686.4,
+              "cpuMeanMs": 0.6831926,
+              "cpuMs": {
+                "p50": 0.663788,
+                "p99": 0.783246,
+                "max": 0.783246
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022317,
+              "cpuMeanMs": 1.254243,
+              "cpuMs": {
+                "p50": 1.254243,
+                "p99": 1.254243,
+                "max": 1.254243
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852.5,
+              "cpuMeanMs": 1.17452725,
+              "cpuMs": {
+                "p50": 1.254243,
+                "p99": 1.459745,
+                "max": 1.459745
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.819444444,
+              "cpuMeanMs": 0.4708907666666667,
+              "cpuMs": {
+                "p50": 0.449108,
+                "p99": 0.869794,
+                "max": 1.406183
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.6,
+              "cpuMeanMs": 0.6541374,
+              "cpuMs": {
+                "p50": 0.618387,
+                "p99": 0.794567,
+                "max": 0.794567
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.935211267,
+              "cpuMeanMs": 0.46830982816901406,
+              "cpuMs": {
+                "p50": 0.449029,
+                "p99": 0.869794,
+                "max": 1.406183
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.4,
+              "cpuMeanMs": 0.6487556,
+              "cpuMs": {
+                "p50": 0.622748,
+                "p99": 0.753388,
+                "max": 0.753388
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018264,
+              "cpuMeanMs": 1.266376,
+              "cpuMs": {
+                "p50": 1.266376,
+                "p99": 1.266376,
+                "max": 1.266376
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.5,
+              "cpuMeanMs": 1.153077,
+              "cpuMs": {
+                "p50": 1.266376,
+                "p99": 1.406183,
+                "max": 1.406183
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7809696.530555556,
+              "cpuMeanMs": 0.47962620833333336,
+              "cpuMs": {
+                "p50": 0.457125,
+                "p99": 0.880602,
+                "max": 1.447696
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9295947.2,
+              "cpuMeanMs": 0.6946656,
+              "cpuMs": {
+                "p50": 0.65766,
+                "p99": 0.84128,
+                "max": 0.84128
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788763.422535211,
+              "cpuMeanMs": 0.47659748450704226,
+              "cpuMs": {
+                "p50": 0.456799,
+                "p99": 0.880602,
+                "max": 1.447696
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9149685.8,
+              "cpuMeanMs": 0.6677826,
+              "cpuMs": {
+                "p50": 0.654085,
+                "p99": 0.7651,
+                "max": 0.7651
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18022317,
+              "cpuMeanMs": 1.268133,
+              "cpuMs": {
+                "p50": 1.268133,
+                "p99": 1.268133,
+                "max": 1.268133
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13019852.25,
+              "cpuMeanMs": 1.1707965,
+              "cpuMs": {
+                "p50": 1.268133,
+                "p99": 1.447696,
+                "max": 1.447696
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7803866.813888889,
+              "cpuMeanMs": 0.4715325,
+              "cpuMs": {
+                "p50": 0.449029,
+                "p99": 0.871614,
+                "max": 1.456247
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8881709.6,
+              "cpuMeanMs": 0.6524548,
+              "cpuMs": {
+                "p50": 0.609927,
+                "p99": 0.786747,
+                "max": 0.786747
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7788685.929577465,
+              "cpuMeanMs": 0.4689842985915493,
+              "cpuMs": {
+                "p50": 0.448941,
+                "p99": 0.871614,
+                "max": 1.456247
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9150070.6,
+              "cpuMeanMs": 0.6491214,
+              "cpuMs": {
+                "p50": 0.63393,
+                "p99": 0.730474,
+                "max": 0.730474
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18018263,
+              "cpuMeanMs": 1.24475,
+              "cpuMs": {
+                "p50": 1.24475,
+                "p99": 1.24475,
+                "max": 1.24475
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13014834.75,
+              "cpuMeanMs": 1.164704,
+              "cpuMs": {
+                "p50": 1.24475,
+                "p99": 1.456247,
+                "max": 1.456247
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9992535283997453,
+          "ratioMin": 0.9992535273318993,
+          "ratioMax": 0.9992535362215895,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.955438882969583,
+          "ratioMin": 0.9554388399400796,
+          "ratioMax": 0.9554389240816454,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 0.9999900506725469,
+          "ratioMin": 0.9999900492258906,
+          "ratioMax": 0.9999900597140554,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 1.000041968652433,
+          "ratioMin": 1.0000419686515158,
+          "ratioMax": 1.0000420560889642,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 0.9997750566700164,
+          "ratioMin": 0.9997750011957396,
+          "ratioMax": 0.9997751121567776,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 0.9996146077543738,
+          "ratioMin": 0.9996145885677277,
+          "ratioMax": 0.9996146269632207,
+          "n": 5
+        }
+      }
+    },
+    "13": {
+      "pairs": [
+        {
+          "pair": -1,
+          "warmup": true,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.708333333,
+              "cpuMeanMs": 0.4856658611111111,
+              "cpuMs": {
+                "p50": 0.458445,
+                "p99": 1.075519,
+                "max": 1.43832
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348560,
+              "cpuMeanMs": 0.7056852,
+              "cpuMs": {
+                "p50": 0.714849,
+                "p99": 0.78073,
+                "max": 0.78073
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.901408451,
+              "cpuMeanMs": 0.4825669971830986,
+              "cpuMs": {
+                "p50": 0.458357,
+                "p99": 1.075519,
+                "max": 1.43832
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999.4,
+              "cpuMeanMs": 0.7049143999999999,
+              "cpuMs": {
+                "p50": 0.694549,
+                "p99": 0.835796,
+                "max": 0.835796
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021221,
+              "cpuMeanMs": 1.39848,
+              "cpuMs": {
+                "p50": 1.39848,
+                "p99": 1.39848,
+                "max": 1.39848
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177.25,
+              "cpuMeanMs": 1.31566625,
+              "cpuMs": {
+                "p50": 1.39848,
+                "p99": 1.43832,
+                "max": 1.43832
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.3,
+              "cpuMeanMs": 0.4794147472222222,
+              "cpuMs": {
+                "p50": 0.452078,
+                "p99": 1.062064,
+                "max": 1.438942
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943483.4,
+              "cpuMeanMs": 0.6856268,
+              "cpuMs": {
+                "p50": 0.677909,
+                "p99": 0.763763,
+                "max": 0.763763
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.05915493,
+              "cpuMeanMs": 0.47651035211267606,
+              "cpuMs": {
+                "p50": 0.451882,
+                "p99": 1.062064,
+                "max": 1.438942
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632,
+              "cpuMeanMs": 0.698357,
+              "cpuMs": {
+                "p50": 0.680919,
+                "p99": 0.83452,
+                "max": 0.83452
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019435,
+              "cpuMeanMs": 1.415622,
+              "cpuMs": {
+                "p50": 1.415622,
+                "p99": 1.415622,
+                "max": 1.415622
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995205.25,
+              "cpuMeanMs": 1.316166,
+              "cpuMs": {
+                "p50": 1.415622,
+                "p99": 1.438942,
+                "max": 1.438942
+              }
+            }
+          }
+        },
+        {
+          "pair": 0,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.691666666,
+              "cpuMeanMs": 0.48664853333333336,
+              "cpuMs": {
+                "p50": 0.459148,
+                "p99": 1.079809,
+                "max": 1.451094
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348559.6,
+              "cpuMeanMs": 0.7231436,
+              "cpuMs": {
+                "p50": 0.737251,
+                "p99": 0.782832,
+                "max": 0.782832
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.890140845,
+              "cpuMeanMs": 0.48331761690140845,
+              "cpuMs": {
+                "p50": 0.459,
+                "p99": 1.079809,
+                "max": 1.451094
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999,
+              "cpuMeanMs": 0.7116278,
+              "cpuMs": {
+                "p50": 0.709752,
+                "p99": 0.834396,
+                "max": 0.834396
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021220,
+              "cpuMeanMs": 1.401666,
+              "cpuMs": {
+                "p50": 1.401666,
+                "p99": 1.401666,
+                "max": 1.401666
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177.5,
+              "cpuMeanMs": 1.32274325,
+              "cpuMs": {
+                "p50": 1.401666,
+                "p99": 1.451094,
+                "max": 1.451094
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.305555556,
+              "cpuMeanMs": 0.4795560527777778,
+              "cpuMs": {
+                "p50": 0.452274,
+                "p99": 1.046518,
+                "max": 1.458811
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943483.6,
+              "cpuMeanMs": 0.6639002,
+              "cpuMs": {
+                "p50": 0.660105,
+                "p99": 0.744389,
+                "max": 0.744389
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.061971831,
+              "cpuMeanMs": 0.47695965633802817,
+              "cpuMs": {
+                "p50": 0.452117,
+                "p99": 1.046518,
+                "max": 1.458811
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632.2,
+              "cpuMeanMs": 0.6905062,
+              "cpuMs": {
+                "p50": 0.670424,
+                "p99": 0.831053,
+                "max": 0.831053
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019435,
+              "cpuMeanMs": 1.404399,
+              "cpuMs": {
+                "p50": 1.404399,
+                "p99": 1.404399,
+                "max": 1.404399
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995205.25,
+              "cpuMeanMs": 1.3096045,
+              "cpuMs": {
+                "p50": 1.404399,
+                "p99": 1.458811,
+                "max": 1.458811
+              }
+            }
+          }
+        },
+        {
+          "pair": 1,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.708333333,
+              "cpuMeanMs": 0.48649860833333336,
+              "cpuMs": {
+                "p50": 0.45915,
+                "p99": 1.068016,
+                "max": 1.447236
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348559.6,
+              "cpuMeanMs": 0.7032838,
+              "cpuMs": {
+                "p50": 0.70418,
+                "p99": 0.766617,
+                "max": 0.766617
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.907042254,
+              "cpuMeanMs": 0.4834452957746479,
+              "cpuMs": {
+                "p50": 0.458996,
+                "p99": 1.068016,
+                "max": 1.447236
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999.2,
+              "cpuMeanMs": 0.7045202,
+              "cpuMs": {
+                "p50": 0.691103,
+                "p99": 0.828994,
+                "max": 0.828994
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021221,
+              "cpuMeanMs": 1.39507,
+              "cpuMs": {
+                "p50": 1.39507,
+                "p99": 1.39507,
+                "max": 1.39507
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177.75,
+              "cpuMeanMs": 1.313421,
+              "cpuMs": {
+                "p50": 1.39507,
+                "p99": 1.447236,
+                "max": 1.447236
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.316666666,
+              "cpuMeanMs": 0.47846045555555555,
+              "cpuMs": {
+                "p50": 0.451954,
+                "p99": 1.040655,
+                "max": 1.423204
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943483.8,
+              "cpuMeanMs": 0.6753848,
+              "cpuMs": {
+                "p50": 0.676328,
+                "p99": 0.75296,
+                "max": 0.75296
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.070422535,
+              "cpuMeanMs": 0.4756868732394366,
+              "cpuMs": {
+                "p50": 0.451709,
+                "p99": 1.040655,
+                "max": 1.423204
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632.4,
+              "cpuMeanMs": 0.6878558,
+              "cpuMs": {
+                "p50": 0.671642,
+                "p99": 0.816696,
+                "max": 0.816696
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019434,
+              "cpuMeanMs": 1.400897,
+              "cpuMs": {
+                "p50": 1.400897,
+                "p99": 1.400897,
+                "max": 1.400897
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995205,
+              "cpuMeanMs": 1.29974625,
+              "cpuMs": {
+                "p50": 1.400897,
+                "p99": 1.423204,
+                "max": 1.423204
+              }
+            }
+          }
+        },
+        {
+          "pair": 2,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.713888889,
+              "cpuMeanMs": 0.4861613472222222,
+              "cpuMs": {
+                "p50": 0.459456,
+                "p99": 1.064033,
+                "max": 1.448173
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348560,
+              "cpuMeanMs": 0.7009136,
+              "cpuMs": {
+                "p50": 0.695609,
+                "p99": 0.777438,
+                "max": 0.777438
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.907042254,
+              "cpuMeanMs": 0.4831366676056338,
+              "cpuMs": {
+                "p50": 0.459307,
+                "p99": 1.064033,
+                "max": 1.448173
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999.4,
+              "cpuMeanMs": 0.7048226,
+              "cpuMs": {
+                "p50": 0.687819,
+                "p99": 0.832625,
+                "max": 0.832625
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021221,
+              "cpuMeanMs": 1.417212,
+              "cpuMs": {
+                "p50": 1.417212,
+                "p99": 1.417212,
+                "max": 1.417212
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177.75,
+              "cpuMeanMs": 1.3193377499999999,
+              "cpuMs": {
+                "p50": 1.417212,
+                "p99": 1.448173,
+                "max": 1.448173
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.302777777,
+              "cpuMeanMs": 0.47777594166666665,
+              "cpuMs": {
+                "p50": 0.451159,
+                "p99": 1.054673,
+                "max": 1.458571
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943483.4,
+              "cpuMeanMs": 0.6587578,
+              "cpuMs": {
+                "p50": 0.653673,
+                "p99": 0.73278,
+                "max": 0.73278
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.061971831,
+              "cpuMeanMs": 0.4752269014084507,
+              "cpuMs": {
+                "p50": 0.450903,
+                "p99": 1.054673,
+                "max": 1.458571
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632.8,
+              "cpuMeanMs": 0.6924084,
+              "cpuMs": {
+                "p50": 0.676293,
+                "p99": 0.818608,
+                "max": 0.818608
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019436,
+              "cpuMeanMs": 1.409503,
+              "cpuMs": {
+                "p50": 1.409503,
+                "p99": 1.409503,
+                "max": 1.409503
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995205.25,
+              "cpuMeanMs": 1.315227,
+              "cpuMs": {
+                "p50": 1.409503,
+                "p99": 1.458571,
+                "max": 1.458571
+              }
+            }
+          }
+        },
+        {
+          "pair": 3,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.694444444,
+              "cpuMeanMs": 0.4866024527777778,
+              "cpuMs": {
+                "p50": 0.459311,
+                "p99": 1.07536,
+                "max": 1.433074
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348559.8,
+              "cpuMeanMs": 0.7188446000000001,
+              "cpuMs": {
+                "p50": 0.712905,
+                "p99": 0.856877,
+                "max": 0.856877
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.890140845,
+              "cpuMeanMs": 0.48333143661971834,
+              "cpuMs": {
+                "p50": 0.459094,
+                "p99": 1.07536,
+                "max": 1.433074
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999.6,
+              "cpuMeanMs": 0.7090246,
+              "cpuMs": {
+                "p50": 0.696264,
+                "p99": 0.832582,
+                "max": 0.832582
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021222,
+              "cpuMeanMs": 1.401615,
+              "cpuMs": {
+                "p50": 1.401615,
+                "p99": 1.401615,
+                "max": 1.401615
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177.25,
+              "cpuMeanMs": 1.31790275,
+              "cpuMs": {
+                "p50": 1.401615,
+                "p99": 1.433074,
+                "max": 1.433074
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.294444445,
+              "cpuMeanMs": 0.4799263166666667,
+              "cpuMs": {
+                "p50": 0.452567,
+                "p99": 1.070673,
+                "max": 1.420985
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943484,
+              "cpuMeanMs": 0.6687926,
+              "cpuMs": {
+                "p50": 0.674375,
+                "p99": 0.74323,
+                "max": 0.74323
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.045070423,
+              "cpuMeanMs": 0.4772662281690141,
+              "cpuMs": {
+                "p50": 0.452403,
+                "p99": 1.070673,
+                "max": 1.420985
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632.8,
+              "cpuMeanMs": 0.6935316,
+              "cpuMs": {
+                "p50": 0.677079,
+                "p99": 0.821724,
+                "max": 0.821724
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019436,
+              "cpuMeanMs": 1.420985,
+              "cpuMs": {
+                "p50": 1.420985,
+                "p99": 1.420985,
+                "max": 1.420985
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995206,
+              "cpuMeanMs": 1.30654525,
+              "cpuMs": {
+                "p50": 1.41507,
+                "p99": 1.420985,
+                "max": 1.420985
+              }
+            }
+          }
+        },
+        {
+          "pair": 4,
+          "warmup": false,
+          "base": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7849337.722222222,
+              "cpuMeanMs": 0.48530724166666667,
+              "cpuMs": {
+                "p50": 0.458305,
+                "p99": 1.061521,
+                "max": 1.4371
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 9348560,
+              "cpuMeanMs": 0.6999494,
+              "cpuMs": {
+                "p50": 0.70625,
+                "p99": 0.780805,
+                "max": 0.780805
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7828221.915492957,
+              "cpuMeanMs": 0.48228411267605636,
+              "cpuMs": {
+                "p50": 0.458118,
+                "p99": 1.061521,
+                "max": 1.4371
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422999.6,
+              "cpuMeanMs": 0.7017354,
+              "cpuMs": {
+                "p50": 0.687651,
+                "p99": 0.825765,
+                "max": 0.825765
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18021220,
+              "cpuMeanMs": 1.39886,
+              "cpuMs": {
+                "p50": 1.39886,
+                "p99": 1.39886,
+                "max": 1.39886
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13991177,
+              "cpuMeanMs": 1.3123545,
+              "cpuMs": {
+                "p50": 1.39886,
+                "p99": 1.4371,
+                "max": 1.4371
+              }
+            }
+          },
+          "candidate": {
+            "all": {
+              "n": 360,
+              "instructionsMean": 7844599.308333334,
+              "cpuMeanMs": 0.47795945,
+              "cpuMs": {
+                "p50": 0.451464,
+                "p99": 1.045901,
+                "max": 1.452651
+              }
+            },
+            "search": {
+              "n": 5,
+              "instructionsMean": 8943483.4,
+              "cpuMeanMs": 0.6682096,
+              "cpuMs": {
+                "p50": 0.66144,
+                "p99": 0.739154,
+                "max": 0.739154
+              }
+            },
+            "exhausted": {
+              "n": 0
+            },
+            "other": {
+              "n": 355,
+              "instructionsMean": 7829122.067605634,
+              "cpuMeanMs": 0.4752798704225352,
+              "cpuMs": {
+                "p50": 0.451345,
+                "p99": 1.045901,
+                "max": 1.452651
+              }
+            },
+            "foodEpoch": {
+              "n": 5,
+              "instructionsMean": 9422632.6,
+              "cpuMeanMs": 0.6912258,
+              "cpuMs": {
+                "p50": 0.672393,
+                "p99": 0.814715,
+                "max": 0.814715
+              }
+            },
+            "minimap": {
+              "n": 1,
+              "instructionsMean": 18019436,
+              "cpuMeanMs": 1.41189,
+              "cpuMs": {
+                "p50": 1.41189,
+                "p99": 1.41189,
+                "max": 1.41189
+              }
+            },
+            "marker": {
+              "n": 0
+            },
+            "slowestCpu1Percent": {
+              "n": 4,
+              "instructionsMean": 13995205.25,
+              "cpuMeanMs": 1.3086182499999999,
+              "cpuMs": {
+                "p50": 1.41189,
+                "p99": 1.452651,
+                "max": 1.452651
+              }
+            }
+          }
+        }
+      ],
+      "pairedInstructions": {
+        "all": {
+          "ratioMedian": 0.9993963312339902,
+          "ratioMin": 0.999396329466692,
+          "ratioMax": 0.9993963330032111,
+          "n": 5
+        },
+        "search": {
+          "ratioMedian": 0.9566696884512562,
+          "ratioMin": 0.9566696261242373,
+          "ratioMax": 0.9566697107719201,
+          "n": 5
+        },
+        "other": {
+          "ratioMedian": 1.0001149884280505,
+          "ratioMin": 1.0001149880678388,
+          "ratioMax": 1.0001149905870859,
+          "n": 5
+        },
+        "foodEpoch": {
+          "ratioMedian": 0.9999610739646461,
+          "ratioMin": 0.9999610527416344,
+          "ratioMax": 0.9999610951901367,
+          "n": 5
+        },
+        "minimap": {
+          "ratioMedian": 0.9999009501021573,
+          "ratioMin": 0.9999008391273821,
+          "ratioMax": 0.9999010055922962,
+          "n": 5
+        },
+        "slowestCpu1Percent": {
+          "ratioMedian": 1.0002878778430193,
+          "ratioMin": 1.0002878421010697,
+          "ratioMax": 1.0002879493217771,
+          "n": 5
+        }
+      }
+    }
+  }
+}

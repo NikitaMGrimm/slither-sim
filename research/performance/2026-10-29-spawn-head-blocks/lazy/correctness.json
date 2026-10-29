@@ -1,0 +1,750 @@
+{
+  "sourceAndBinaryPins": {
+    "base": {
+      "commit": "e860ec237f172de5df34caff86a9eb26082e82d6",
+      "archiveSha256": "410a301b6d723022e11870d3ab3aefb62373986d64cc5d71c9c02ba32189e2aa",
+      "instrumentedManifestSha256": "d9ec5548a41d7b6ca47d19c79da462fb7975cadecdcf0e35c72defeb01d5e224",
+      "binaries": {
+        "study_protocols": "0ae32e8a699ee5753dd2bbffce924e2d958bde74fa5a45bbdfa2e486b7550352",
+        "perf_baseline": "82220d8ff2e33451535c063c85f3f6af470ace78a653e4378ead5337f6284be8",
+        "study_fixed": "d88d18c9fbe8cc64cfc6847d9d5f28adaf27f6d5cbb5b0fc67c5367c38774687",
+        "study_build": "437406c5f12825c01856be2008fd8ed3afa22ea54e7e2e45bc0b50ebd2392ccc"
+      }
+    },
+    "eager": {
+      "commit": "78f7d1ec7f7f17b625b00a270bd074e3ff814251",
+      "archiveSha256": "561393aa7e0a4d8b708492281aadf6964c25ce50307023777fcdfb3005bf9a38",
+      "instrumentedManifestSha256": "85d1be03c6edbb0ecd705ab134a69d984de65af141edface2198248cd99be38e",
+      "binaries": {
+        "study_protocols": "33e74f20bdc5c51a6bd65256a8ef3c6290bada088324ef0aaf102d0dbb663067",
+        "perf_baseline": "9ec74b4ecf99139c7fd7872165113e189ee3f61a3b532aef30a892e01f243884",
+        "study_fixed": "3ed181656f1ad937009e55ef4474f6889345d4e2685cc5ef16c6febd1c53cb2c",
+        "study_build": "5675a2b752671c791156959062c7192a921acee5aa34640d93ac630b0066d031"
+      }
+    },
+    "candidate": {
+      "commit": "3d2965f56c7f1ab676d21dbbe26f0580c9f92322",
+      "archiveSha256": "45de09ac207c79380241dbe00b88ba8cc5d23a7e09153471b461ab8d16bf623a",
+      "instrumentedManifestSha256": "f0ac1ae5b16125aa36144db9560332ec6fc02c5133183a20c1ead295692fd9df",
+      "binaries": {
+        "study_protocols": "60472fe7d87587f84e445f14824aa41b40f366fcc7dfca2d74adb6b93b9a9e58",
+        "perf_baseline": "22d9fc6af9ef7cd90c2cb66d1cc058a34b17f9e179e6035be742d1af7346c2d1",
+        "study_fixed": "44dd926f16038073a7a3db4e0e6232313ecaa14fa9637fc093804b4c4db233cb",
+        "study_build": "7ad4aeb76fb6a0fc6bf69d36faafd8e2f07d5b3921eb5cad12d3bc9a2c6b8ec8"
+      }
+    },
+    "mutation": {
+      "commit": "3d2965f56c7f1ab676d21dbbe26f0580c9f92322",
+      "archiveSha256": "45de09ac207c79380241dbe00b88ba8cc5d23a7e09153471b461ab8d16bf623a",
+      "instrumentedManifestSha256": "7349486f5f2c053b693cf46dc31b0df86ccbe15dafbdb46d176cd0b1a185cd49",
+      "binaries": {
+        "study_protocols": "bce3ff208679fe72eb7966a3fc25b989b9605815e63c1f6460cf54e9023892d0",
+        "perf_baseline": "52366da2c78bf7dc6b0d264c0b924a48efdf72c9c31e3e99871ca13be65faea6",
+        "study_fixed": "5f35d8aa0281794e1dd6068badb9cadd0098a5d99f3c5f0d4d14c94b3d4a3fdd",
+        "study_build": "b7819ae0448c0cc4a0c696b387fb185bc7efeecb6d7cc147c1d6a215e722abc8"
+      }
+    }
+  },
+  "build": {
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustflags": "",
+    "studyPrepareSha256": "f6d6b0cdcd63b9a0da1d20c3a9b9f751370de05d40f414c88bf8b809d715a167",
+    "headDistancePrepareSha256": "1b5380f68d5eb9aa297cd1527cc577457750524ae1ed78339c8e114580f46349",
+    "priorPrepareSha256": "09fff9f8f4acb50ba335bcb5878a219b3920ab5a418134a1e590d613469ce94b"
+  },
+  "portableBuildWrapperSha256": "efbf892ef656d53731bffa6b922e49599ddce31b741723252f3db849de2253a2",
+  "focused": {
+    "headVerdicts": 1223404,
+    "directBlockVerdicts": 50159,
+    "standaloneSegmentVerdicts": 409996,
+    "independentSweptComparisonVerdicts": 19992,
+    "wrongSkipMutationExit": 101,
+    "exactRestorationPass": true
+  },
+  "fullRustCommands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--workspace",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "bot",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "networking",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "parallel",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "bot",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--all-targets",
+        "--no-default-features",
+        "--features",
+        "networking",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--doc",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--doc",
+        "--no-default-features",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "slither-sim-ffi",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "slither-sim-py",
+        "--all-targets",
+        "--locked"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "run",
+        "--locked",
+        "--example",
+        "basic"
+      ],
+      "exit": 0
+    }
+  ],
+  "catalog": [
+    {
+      "case": "step-default",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 4747394,
+      "sha256": "a411e133bff99d4f7ed584c89bf29e7f52317c11b918402fcfb3f0b3b234a17c"
+    },
+    {
+      "case": "step-food",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 114813212,
+      "sha256": "67630511030544231d21db7e802546a3d2c7ffb9f3852546e2d48c3b79181807"
+    },
+    {
+      "case": "step-body",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 26873819,
+      "sha256": "382c3d558f65ea2545a809d154a64b184a01aabf396955f4cb2112a618f663c5"
+    },
+    {
+      "case": "observe",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 210433034,
+      "sha256": "1fbe518beb4061867f1ff4c325e8b2d81c1a11204bf564413e07e6936a2ff8fc"
+    },
+    {
+      "case": "portable",
+      "iterations": 32,
+      "lines": 34,
+      "uncompressed_bytes": 17260699,
+      "sha256": "fcf03337c685e5ad3b88c55bb5f9aeeb3d01e5d04444a4eb931b7605d6ad374e"
+    },
+    {
+      "case": "protocol",
+      "iterations": 32,
+      "lines": 289,
+      "uncompressed_bytes": 8343664,
+      "sha256": "a480469b052379377297539cc3a6478c6c28ca6529175f9ecb92c4c28491f16c"
+    },
+    {
+      "case": "sandbox-16-step",
+      "iterations": 32,
+      "lines": 2036,
+      "uncompressed_bytes": 8039178,
+      "sha256": "832b67ededa7bdfbd09f8ac683e00cc24b3852f1107f4db0b4556b1a6e70eafe",
+      "end": {
+        "case": "sandbox-16-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 1,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 59,
+          "deferredRespawns": 14,
+          "epochs": 0,
+          "respawns": 2
+        },
+        "operations": 32,
+        "physicsTicks": 2032
+      }
+    },
+    {
+      "case": "sandbox-16-bot",
+      "iterations": 24,
+      "lines": 2028,
+      "uncompressed_bytes": 54871500,
+      "sha256": "9a8e43b87aab9c858ff1ceecd688c40bc7feb34a50708cfd95f97c86f6fa075b",
+      "end": {
+        "case": "sandbox-16-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 1,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 59,
+          "deferredRespawns": 12,
+          "epochs": 0,
+          "respawns": 1
+        },
+        "operations": 24,
+        "physicsTicks": 2024
+      }
+    },
+    {
+      "case": "official-30-step",
+      "iterations": 32,
+      "lines": 2036,
+      "uncompressed_bytes": 20728651,
+      "sha256": "3603ee58d469ce41cc494ec93fb18cd7c5a27c1979cb2782c16a64af8a8e8aad",
+      "end": {
+        "case": "official-30-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 32,
+        "physicsTicks": 2032
+      }
+    },
+    {
+      "case": "official-30-bot",
+      "iterations": 16,
+      "lines": 2020,
+      "uncompressed_bytes": 54020496,
+      "sha256": "c3b6e0be965889c45d59d3ffd46c9319425dc0f1f8f0ff81631ffaa3e2a4e0be",
+      "end": {
+        "case": "official-30-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 16,
+        "physicsTicks": 2016
+      }
+    },
+    {
+      "case": "official-100-step",
+      "iterations": 16,
+      "lines": 2020,
+      "uncompressed_bytes": 42173472,
+      "sha256": "ec5e4bef1ba4058df7bcc8808f6cc7a1fffdcc12d0e93f5f24f52ada199c7780",
+      "end": {
+        "case": "official-100-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 16,
+        "physicsTicks": 2016
+      }
+    },
+    {
+      "case": "official-100-bot",
+      "iterations": 4,
+      "lines": 2008,
+      "uncompressed_bytes": 59803592,
+      "sha256": "6c784ea5143c2217807d365eaf6d9b9aac8f6669a42e607dd22de6af6ad3447f",
+      "end": {
+        "case": "official-100-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 4,
+        "physicsTicks": 2004
+      }
+    },
+    {
+      "case": "official-200-step",
+      "iterations": 8,
+      "lines": 1012,
+      "uncompressed_bytes": 41669943,
+      "sha256": "f61bd6c55d7b6b12dfd77acbcc846a1b8eeec82b48d65c7206c55f5c1c13360d",
+      "end": {
+        "case": "official-200-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 1,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 101,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 1
+        },
+        "operations": 8,
+        "physicsTicks": 1008
+      }
+    },
+    {
+      "case": "official-200-bot",
+      "iterations": 2,
+      "lines": 1006,
+      "uncompressed_bytes": 57425821,
+      "sha256": "1e2f15c635a336985c39dedf6debaeecebaa3fe81e70cfbba66a8e2cb8af15af",
+      "end": {
+        "case": "official-200-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 2,
+        "physicsTicks": 1002
+      }
+    },
+    {
+      "case": "official-500-step",
+      "iterations": 4,
+      "lines": 608,
+      "uncompressed_bytes": 59311550,
+      "sha256": "febd1a0839889deffad0ab514cf2cc62379b1b508934723beb1771acb033188e",
+      "end": {
+        "case": "official-500-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 4,
+        "physicsTicks": 604
+      }
+    },
+    {
+      "case": "official-500-bot",
+      "iterations": 1,
+      "lines": 605,
+      "uncompressed_bytes": 78389779,
+      "sha256": "5531588202aa07e39dc2e784a263a2dccfd00909674e0e865294dae4df43f820",
+      "end": {
+        "case": "official-500-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 1,
+        "physicsTicks": 601
+      }
+    },
+    {
+      "case": "battledome-32-step",
+      "iterations": 16,
+      "lines": 8020,
+      "uncompressed_bytes": 17701194,
+      "sha256": "486f1d2b404ce21e02910a31bbf35d67bbbb24527441a95537b9dc4d5b82498e",
+      "end": {
+        "case": "battledome-32-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 16,
+        "physicsTicks": 8016
+      }
+    },
+    {
+      "case": "battledome-32-bot",
+      "iterations": 4,
+      "lines": 8008,
+      "uncompressed_bytes": 19456951,
+      "sha256": "a7fc8558862758abcac3b6308b68e8e5736e8587b6081389d1a649fc3a702250",
+      "end": {
+        "case": "battledome-32-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 4,
+        "physicsTicks": 8004
+      }
+    },
+    {
+      "case": "official-128-step",
+      "iterations": 16,
+      "lines": 2020,
+      "uncompressed_bytes": 53280691,
+      "sha256": "8f8600711a6d33b5cc9fa718f19cd1c01673242506d4e4e9d13008a512086e98",
+      "end": {
+        "case": "official-128-step",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 16,
+        "physicsTicks": 2016
+      }
+    },
+    {
+      "case": "official-128-bot",
+      "iterations": 3,
+      "lines": 2007,
+      "uncompressed_bytes": 60841865,
+      "sha256": "e15e9f057dfd4b09169a386f06e33b6fddcc2058a240d8bcfb3b8361f5c332c1",
+      "end": {
+        "case": "official-128-bot",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 0
+        },
+        "operations": 3,
+        "physicsTicks": 2003
+      }
+    },
+    {
+      "case": "client-battledome-64",
+      "iterations": 4,
+      "lines": 608,
+      "uncompressed_bytes": 36608905,
+      "sha256": "af80dff4e3dddbac3029210a57fe7f17af0b7b9dccd89797d0e829acf175cc6a",
+      "end": {
+        "case": "client-battledome-64",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 0,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 0,
+          "deferredRespawns": 17,
+          "epochs": 0,
+          "respawns": 3
+        },
+        "operations": 4,
+        "physicsTicks": 3624
+      }
+    },
+    {
+      "case": "client-official-500",
+      "iterations": 1,
+      "lines": 13,
+      "uncompressed_bytes": 82283629,
+      "sha256": "8d9281135ef8c0e8f16aca29867a6fd197f71ce69aacd0035df94cfb96b5d1df",
+      "end": {
+        "case": "client-official-500",
+        "kind": "end",
+        "lifecycle": {
+          "bodyDeaths": 26,
+          "boundaryDeaths": 0,
+          "deathFoodPellets": 130,
+          "deferredRespawns": 0,
+          "epochs": 0,
+          "respawns": 6
+        },
+        "operations": 1,
+        "physicsTicks": 54
+      }
+    },
+    {
+      "case": "shared-forager-a4-mean-8",
+      "iterations": 16,
+      "lines": 20,
+      "uncompressed_bytes": 8549310,
+      "sha256": "8ea8ef4cbe67754908f5a38d0ec701bd9083479e59d13bb9977cf5a4f90cb943"
+    }
+  ],
+  "host": [
+    {
+      "case": "official500",
+      "sha256": "0a486bada541f7b791c1244c298a65fdc0c24b0e370bcea62f1ea3731a2dfe9d",
+      "bytes": 37938956,
+      "wireSha256": "ec7067d174d9eb36db0a8cee515131f6ab84897c0f09ad7f8dcfe4925cba2930",
+      "frames": 317188
+    },
+    {
+      "case": "official500-half",
+      "sha256": "110920fe981ac942d1e1903157e23b6b0a2452883cc6e91420fa42cf18179fbf",
+      "bytes": 57556590,
+      "wireSha256": "f325f4c01229786d3592e946d61b9e5df4cbec6224fc246b8fe7308cd243a2c7",
+      "frames": 664841
+    },
+    {
+      "case": "official500-legacy",
+      "sha256": "31faa77ac80d8a070a5135b07be36cdfff7d06dc85f1470e3623de73c16649d6",
+      "bytes": 77137561,
+      "wireSha256": "4e128e1a074deb2d66b33da6826453954604d40aee89c06dfd912cc35fd4b481",
+      "frames": 1011810
+    },
+    {
+      "case": "official2281",
+      "sha256": "84de4a8109cc779b70a177c568e287bf5129728dd5b7a99cacce6b8d7d3c3c90",
+      "bytes": 180734869,
+      "wireSha256": "cb9031672a605ed15755f41d27020472f8b5bf853e676f8c7c617c748a4d54fe",
+      "frames": 1469820
+    },
+    {
+      "case": "battledome8",
+      "sha256": "3052edf46f77641454d9a3b6edb079735b7da78a9e4e6a4bfdfed2e834d84871",
+      "bytes": 643321,
+      "wireSha256": "19a9804a46714914bc1776408b68da23bbc3434765e0ac2cba2d6575c1e24cc0",
+      "frames": 5218
+    },
+    {
+      "case": "battledome8-legacy",
+      "sha256": "01750ef2083e512c34d1a56f0b2758ad44e335b2a57c0f666f092731baf9631e",
+      "bytes": 1666305,
+      "wireSha256": "fe79f9a1cdbcfbd6562d08b2d0cbd8a443ada7a82dddc55eedaca8ba76673b5b",
+      "frames": 23368
+    }
+  ],
+  "queued": [
+    {
+      "protocol": 19,
+      "identicalBaseAndCandidate": {
+        "sha256": "20bad192b8f5fbf9f50692163c17412def499e19f686af7befb7686262509251",
+        "bytes": 503148,
+        "wireSha256": "412491c9e0166f213117556d710de4031c3656168bca4a38eb82743ab7051146",
+        "frames": 343,
+        "summary": {
+          "blockedAttempts": 368640,
+          "blockedExhausted": 90,
+          "blockedSearches": 90,
+          "legacy": false,
+          "releaseExhausted": 90,
+          "releaseSearches": 99,
+          "row": "spawn",
+          "ticks": 360,
+          "waiting": 54
+        }
+      },
+      "mutation": {
+        "sha256": "7e7a4f069713663adc789f7ffb4a53fc9b1b1988e245edf430032084d635754a",
+        "bytes": 471437,
+        "wireSha256": "cf9bed6079234acc41992962d8a8169859f791a2cd8482617dd3609200cf22a5",
+        "frames": 4,
+        "summary": {
+          "blockedAttempts": 368640,
+          "blockedExhausted": 90,
+          "blockedSearches": 90,
+          "legacy": false,
+          "releaseExhausted": 90,
+          "releaseSearches": 90,
+          "row": "spawn",
+          "ticks": 360,
+          "waiting": 72
+        }
+      },
+      "wireMutationDetected": true
+    },
+    {
+      "protocol": 13,
+      "identicalBaseAndCandidate": {
+        "sha256": "3f507e387c0db4eb4324419b7ef4a509e0956f274d5ba0bcf5b6bbe068237a5c",
+        "bytes": 511212,
+        "wireSha256": "5236b4c0d7845bd8e3ea400356714c710192fd0f7f8d0d52f855f9207a09554e",
+        "frames": 458,
+        "summary": {
+          "blockedAttempts": 368640,
+          "blockedExhausted": 90,
+          "blockedSearches": 90,
+          "legacy": true,
+          "releaseExhausted": 90,
+          "releaseSearches": 99,
+          "row": "spawn",
+          "ticks": 360,
+          "waiting": 54
+        }
+      },
+      "mutation": {
+        "sha256": "71d6f68c8d68356cc84d067be1dc53bddd0f61d4d2afebfca12757fff4b9e7b8",
+        "bytes": 471796,
+        "wireSha256": "728cfb04d61dc47f835a7e787b16e15dc2d3211394513c7e7a3f259f040a5e2e",
+        "frames": 10,
+        "summary": {
+          "blockedAttempts": 368640,
+          "blockedExhausted": 90,
+          "blockedSearches": 90,
+          "legacy": true,
+          "releaseExhausted": 90,
+          "releaseSearches": 90,
+          "row": "spawn",
+          "ticks": 360,
+          "waiting": 72
+        }
+      },
+      "wireMutationDetected": true
+    }
+  ],
+  "access": "Full sources, logs, binaries and traces local-only; digests identify but do not grant access."
+}

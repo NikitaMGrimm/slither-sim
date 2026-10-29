@@ -1,0 +1,11 @@
+{
+  "kind": "Conservative launch-to-cleanup compute bound, not invoice",
+  "lifetimeMinutesRoundedUp": 30,
+  "computeAtVerifiedLaunchQuoteUSD": 0.04775,
+  "computeAtBidCapUSD": 0.1,
+  "noncomputeAllowanceUSD": 0.25,
+  "priorAttemptComputeBoundUSD": 0,
+  "combinedBoundUSD": 0.35,
+  "fullTimerBoundUSD": 0.6566666666666667,
+  "capUSD": 1
+}

@@ -71,33 +71,37 @@ fn candidate(obstacles: &[RawObstacle]) -> Safety {
     Safety {
         obstacles: obstacles
             .iter()
-            .map(|raw| Obstacle {
-                valid: raw.valid,
-                edges: raw
+            .map(|raw| {
+                let edges: Vec<_> = raw
                     .vertices
                     .windows(2)
                     .map(|p| Edge::new(p[0], p[1]))
-                    .collect(),
-                bounds: Bounds {
-                    min: Point {
-                        x: raw.bounds[0],
-                        y: raw.bounds[1],
+                    .collect();
+                Obstacle {
+                    valid: raw.valid,
+                    edges,
+                    bounds: Bounds {
+                        min: Point {
+                            x: raw.bounds[0],
+                            y: raw.bounds[1],
+                        },
+                        max: Point {
+                            x: raw.bounds[2],
+                            y: raw.bounds[3],
+                        },
                     },
-                    max: Point {
-                        x: raw.bounds[2],
-                        y: raw.bounds[3],
-                    },
-                },
-                head_width: raw.width,
-                body_width: 0.,
-                path: Edge::new(Point::default(), Point::default()),
-                inward: None,
-                inward_width: 0.,
-                path_width: 0.,
-                departure_width: 0.,
-                departure_path_width: 0.,
+                    head_width: raw.width,
+                    body_width: 0.,
+                    path: Edge::new(Point::default(), Point::default()),
+                    inward: None,
+                    inward_width: 0.,
+                    path_width: 0.,
+                    departure_width: 0.,
+                    departure_path_width: 0.,
+                }
             })
             .collect(),
+        head_blocks: OnceCell::new(),
         candidate: Vec::new(),
         wall_limit: 1e10,
         segments: 26,
@@ -251,4 +255,229 @@ fn random_edges_and_multi_obstacle_heads_match_original_scalar_bits() {
     }
     assert_head(Point::default(), &[]);
     assert_head(Point { x: f64::NAN, y: 0. }, &[]);
+}
+
+#[test]
+fn head_blocks_keep_thresholds_partial_blocks_and_nonfinite_edges() {
+    let origin = Point::default();
+    for edges in [0, 1, 7, 8, 9, 15, 16, 17, 24, 25, 65] {
+        for at in 0..=edges {
+            for width in [0_f64, 200., 400., HEAD_BLOCK_LIMIT] {
+                for distance in [width.next_down(), width, width.next_up()] {
+                    let mut raw = RawObstacle {
+                        valid: true,
+                        vertices: vec![Point { x: 1e6, y: 0. }; edges + 1],
+                        bounds: [-f64::INFINITY, -f64::INFINITY, f64::INFINITY, f64::INFINITY],
+                        width,
+                    };
+                    raw.vertices[at] = Point { x: distance, y: 0. };
+                    assert_head(origin, std::slice::from_ref(&raw));
+                    for exceptional in [
+                        f64::NAN,
+                        f64::INFINITY,
+                        f64::NEG_INFINITY,
+                        HEAD_BLOCK_LIMIT.next_up(),
+                        f64::MAX,
+                    ] {
+                        let old = raw.vertices[0];
+                        raw.vertices[0].y = exceptional;
+                        assert_head(origin, std::slice::from_ref(&raw));
+                        raw.vertices[0] = old;
+                    }
+                    raw.valid = false;
+                    assert_head(origin, &[raw]);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn randomized_multiblock_worlds_match_independent_linear_oracle() {
+    let mut state = 0xdfe2_94a1_2c75_b863u64;
+    let mut number = |bits_only: bool| {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        if bits_only {
+            f64::from_bits(state)
+        } else {
+            ((state >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * 65536.
+        }
+    };
+    for case in 0..25_000 {
+        let bits_only = case % 5 == 0;
+        let head = Point {
+            x: number(bits_only),
+            y: number(bits_only),
+        };
+        let mut world: Vec<_> = (0..1 + case % 3)
+            .map(|index| {
+                let mut vertices: Vec<_> = (0..10 + (case + index) % 25)
+                    .map(|_| Point {
+                        x: number(bits_only),
+                        y: number(bits_only),
+                    })
+                    .collect();
+                if case % 7 == 0 {
+                    vertices[8] = vertices[7];
+                }
+                let distance = original_segment(head, vertices[7], vertices[8]);
+                RawObstacle {
+                    valid: true,
+                    vertices,
+                    bounds: [-f64::INFINITY, -f64::INFINITY, f64::INFINITY, f64::INFINITY],
+                    width: match case % 4 {
+                        0 => distance.next_down(),
+                        1 => distance,
+                        2 => distance.next_up(),
+                        _ => number(bits_only).abs(),
+                    },
+                }
+            })
+            .collect();
+        assert_head(head, &world);
+        world.reverse();
+        assert_head(head, &world);
+        for raw in &world {
+            let query = candidate(std::slice::from_ref(raw));
+            assert_eq!(
+                query.blocks_head(0, head),
+                raw.vertices
+                    .windows(2)
+                    .any(|p| original_segment(head, p[0], p[1]) <= raw.width)
+            );
+        }
+    }
+}
+
+#[test]
+fn block_guard_domain_edges_and_cancellation_keep_scalar_verdicts() {
+    for scale in [
+        1e-200,
+        1e-50,
+        1.,
+        HEAD_BLOCK_LIMIT.next_down(),
+        HEAD_BLOCK_LIMIT,
+        HEAD_BLOCK_LIMIT.next_up(),
+        1e50,
+        f64::MAX,
+    ] {
+        for sign in [-1., 1.] {
+            let head = Point {
+                x: sign * scale,
+                y: -sign * scale,
+            };
+            let mut vertices: Vec<_> = (0..34)
+                .map(|i| {
+                    if i % 2 == 0 {
+                        Point {
+                            x: -scale,
+                            y: scale,
+                        }
+                    } else {
+                        Point {
+                            x: scale,
+                            y: -scale,
+                        }
+                    }
+                })
+                .collect();
+            vertices[16] = Point {
+                x: head.x + 400.,
+                y: head.y,
+            };
+            for width in [
+                -0.,
+                0.,
+                400_f64.next_down(),
+                400.,
+                400_f64.next_up(),
+                HEAD_BLOCK_LIMIT.next_down(),
+                HEAD_BLOCK_LIMIT,
+                HEAD_BLOCK_LIMIT.next_up(),
+                f64::NAN,
+                f64::INFINITY,
+            ] {
+                let raw = RawObstacle {
+                    valid: true,
+                    vertices: vertices.clone(),
+                    width,
+                    bounds: [-f64::INFINITY, -f64::INFINITY, f64::INFINITY, f64::INFINITY],
+                };
+                assert_head(head, std::slice::from_ref(&raw));
+                let query = candidate(std::slice::from_ref(&raw));
+                assert_eq!(
+                    query.blocks_head(0, head),
+                    raw.vertices
+                        .windows(2)
+                        .any(|p| original_segment(head, p[0], p[1]) <= width)
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt() {
+    let raw = [RawObstacle {
+        valid: true,
+        vertices: (0..34)
+            .map(|i| Point {
+                x: i as f64 * 40.,
+                y: if i % 3 == 0 { 200. } else { 0. },
+            })
+            .collect(),
+        bounds: [0., 0., 1320., 200.],
+        width: 200.,
+    }];
+    let lazy = candidate(&raw);
+    let eager = candidate(&raw);
+    let cells = eager
+        .obstacles
+        .iter()
+        .map(|obstacle| {
+            let cell = OnceCell::new();
+            assert!(cell.set(head_blocks(&obstacle.edges)).is_ok());
+            cell
+        })
+        .collect();
+    assert!(eager.head_blocks.set(cells).is_ok());
+    assert!(lazy.head_blocks.get().is_none());
+    let distant = Point { x: -1e6, y: -1e6 };
+    assert_eq!(lazy.head_is_clear(distant), eager.head_is_clear(distant));
+    assert!(lazy.head_blocks.get().is_none());
+    // Unsupported head/width inputs retain the linear path without allocating.
+    assert_eq!(
+        lazy.blocks_head(0, Point { x: f64::MAX, y: 0. }),
+        eager.blocks_head(0, Point { x: f64::MAX, y: 0. })
+    );
+    assert!(lazy.head_blocks.get().is_none());
+    for x in [
+        -200_f64,
+        -200_f64.next_down(),
+        -200_f64.next_up(),
+        0.,
+        280.,
+        640.,
+        1320.,
+        1520.,
+    ] {
+        for y in [-200., 0., 200., 400.] {
+            let head = Point { x, y };
+            let expected = original_head(head, &raw);
+            assert_eq!(lazy.head_is_clear(head), expected);
+            assert_eq!(eager.head_is_clear(head), expected);
+        }
+    }
+    let cached = lazy.head_blocks.get().unwrap()[0].get().unwrap();
+    assert!(!cached.is_empty());
+    let address = cached.as_ptr();
+    for _ in 0..3 {
+        assert!(!lazy.head_is_clear(Point::default()));
+    }
+    assert_eq!(
+        address,
+        lazy.head_blocks.get().unwrap()[0].get().unwrap().as_ptr()
+    );
 }

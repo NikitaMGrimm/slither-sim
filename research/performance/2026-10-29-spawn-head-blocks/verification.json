@@ -1,0 +1,166 @@
+{
+  "allRequiredProofsPass": true,
+  "catalogTraces": 23,
+  "hostTraces": 6,
+  "queuedTraces": 2,
+  "protocols": [
+    19,
+    13
+  ],
+  "wireMutationControls": 2,
+  "focusedWrongSkipMutationControls": 1,
+  "fullRustCommandsPassed": 15,
+  "measurementWindows": 60,
+  "discardedWarmupWindows": 12,
+  "alternatingPairsPerRowAndProtocol": 5,
+  "repeatedForkAndDirectParentProofs": true,
+  "qualifiedRows": [
+    {
+      "row": "spawn",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "spawn",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 737280,
+        "blockedExhausted": 180,
+        "blockedSearches": 180,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "spawn",
+        "ticks": 360,
+        "waiting": 72
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats80",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats80",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 19,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": false,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    },
+    {
+      "row": "seats160",
+      "protocol": 13,
+      "summary": {
+        "blockedAttempts": 5,
+        "blockedExhausted": 0,
+        "blockedSearches": 5,
+        "legacy": true,
+        "releaseExhausted": 0,
+        "releaseSearches": 0,
+        "row": "seats160",
+        "ticks": 360,
+        "waiting": 0
+      },
+      "minimumPmuScheduledFraction": 1.0
+    }
+  ],
+  "nativeByteProofArchive": {
+    "archiveSha256": "6dad36c80542bf0ec180b236724c902f5ceedf8e243ade046766da9f6212e2b3",
+    "archiveBytes": 769501026,
+    "manifestSha256": "3de7286a87222b51a75bcb2c303682ee8fd3f47fb06c7d1d44c9b3c125fac35b",
+    "allManifestMembersVerified": true
+  },
+  "timingContext": {
+    "instanceType": "c7i.xlarge",
+    "region": "Frankfurt",
+    "market": "Spot",
+    "physicalCoresAssigned": 2,
+    "threadsPerCore": 1,
+    "workerCpu": 0,
+    "controllerCpu": 1,
+    "scope": "AWS virtualized Intel; portable release; one pinned core; no concurrent build/test work; no dedicated physical-host or live-capacity claim"
+  },
+  "pmu": "Hardware instructions:u, >=99% scheduled time per tick; root task access without changing kernel/security settings.",
+  "localNativeWork": false,
+  "sshGuestUsed": false,
+  "independentReview": false,
+  "studySelectionSha256": "d1ebae4bea45e8b69c160ca45ac40cb8b12c8bfb9e810c27e8c24c859077efa2",
+  "documentationCheck": {
+    "testsPassed": 7,
+    "exit": 0,
+    "context": "Remote after selected JSON/tables; final verdict and cleanup prose completed after verified retrieval."
+  },
+  "retrieval": {
+    "requiredSourcesVerified": true,
+    "verifiedBeforeTeardown": true,
+    "timingDeltaArchiveSha256": "781aea069d92cfc6b8a1796ed54b3d27162a04f008b6c7ebf10098efae30c471",
+    "timingDeltaManifestSha256": "b24723c9bbe301cb18794017f24d644d90c1295bb2126bcba6e1a98c122e3bb7",
+    "method": "All source/trace/timing manifest members verified remotely in closed archives before readiness; every downloaded archive size/SHA verified locally; bounded selected files independently checked against the final delta manifest; delta binds the immutable proof archive.",
+    "sourceProofPinReference": "nativeByteProofArchive"
+  },
+  "sourceIdentity": {
+    "validatedCandidate": "ea5869fa",
+    "srcTreeSha": "db4e8007e8554fdb43c4c6a818e5d3826276a0a5",
+    "currentRustCargoAndCheckRunnerEqualValidatedRevision": true,
+    "baselineMatchesMerged272RustCargoAndCheckRunner": true
+  },
+  "retainedRustStage": {
+    "archiveSha256": "b27dc1353e1c9f100f5fb84abbbaedf6053a719ec3d39d7a699214a70ab88b3f",
+    "archiveBytes": 43572800,
+    "manifestSha256": "7faad248b27cf3cf5ba3ea8ae681a727e345a1d1cd19275da3afe97e18fda17e"
+  },
+  "cleanupReceipt": "cleanup.json",
+  "costReceipt": "cost.json",
+  "privacyScan": {
+    "passed": true,
+    "scope": "New study, index, changelog and changed Rust; identifier patterns and exact private-state tokens, excluding JSON fractions from account-number patterns"
+  }
+}
