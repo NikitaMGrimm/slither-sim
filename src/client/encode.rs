@@ -105,16 +105,13 @@ pub(crate) fn frameable(packet: &[u8]) -> bool {
 }
 
 /// Two-byte elapsed-ms header, then one raw packet or length-prefixed packets.
-pub(crate) fn frame<P: AsRef<[u8]>>(elapsed_ms: u16, packets: &[P]) -> Result<Vec<u8>, String> {
+pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, String> {
     let mut out = u16be(elapsed_ms).to_vec();
     match packets {
         [] => return Err("Empty frame".into()),
-        [packet] if packet.as_ref().first().is_some_and(|&code| code >= 32) => {
-            out.extend_from_slice(packet.as_ref())
-        }
+        [packet] if packet.first().is_some_and(|&code| code >= 32) => out.extend(packet),
         _ => {
             for packet in packets {
-                let packet = packet.as_ref();
                 if !frameable(packet) {
                     return Err("Packet length cannot be framed".into());
                 }
@@ -746,7 +743,7 @@ mod tests {
         let many = frame(300, &packets).unwrap();
         assert_eq!(&many[..2], &300u16.to_be_bytes());
         assert_eq!(split(&many), packets);
-        assert!(frame::<Vec<u8>>(0, &[]).is_err());
+        assert!(frame(0, &[]).is_err());
         assert!(frame(0, &[vec![b'F'; MAX_PACKET + 1], pong()]).is_err());
     }
 

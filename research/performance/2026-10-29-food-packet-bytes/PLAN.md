@@ -66,3 +66,29 @@ pickup, pit, handoff and reconnect regressions remain active. Also verify food
 insertion positions, byte aliasing, cache lifetime, frame errors, elapsed headers
 and physical latency draws. Retain all outcomes and timing overlap. No new live
 capacity hold or socket implementation is added.
+
+## Retained-listing alternative, frozen before its measurements
+
+The group variant also regresses its short guard: maintenance +0.354%, other
++0.650%, all +0.640% instructions. It is rejected; mature and protocol-13 timing
+are not run for that losing version. Preserve all 27 exact traces, mutation
+controls, full checks, short pairs and its source separately.
+
+The retained mature-stock baseline proof contains only 2.9328 incremental food
+packets / 20.5296 bytes per recipient per maintenance tick. This is a byte census,
+not allocation CPU attribution. The 1.741-ms food bracket includes bookkeeping;
+it cannot be treated as pure byte-copy cost. Before more packet-carrier plumbing,
+test the smaller retained-listing ownership operation on the same path.
+
+Membership changes currently drop/reclone every retained listing handle even
+when it already equals the current listing. Reuse that unchanged handle by move;
+changed and new listings still clone the current handle. Keep pickup emission
+with unchanged handles, all cache keys/encoding, membership order and wire timing.
+No packet representation, frame assembly or socket implementation changes land.
+
+Run the same full three-row comparison, all 27 traces and stock/protocol-13
+payload controls. Run focused retirement+pickup+fresh-state regression plus all
+existing older-view/pit/handoff/reconnect oracles, source-changing mutation
+controls and the complete offline Rust group. Report all tick classes and timing
+variation. Reuse the exact pinned baseline after rehash, with fresh candidate and
+wire-mutant builds; keep only one bounded target. No live capacity hold is added.

@@ -77,17 +77,16 @@ impl Encoder {
         });
     }
 
-    pub(crate) fn packets<P: AsRef<[u8]>>(
+    pub(crate) fn packets(
         &mut self,
-        packets: &[P],
+        packets: &[Vec<u8>],
         maps: &mut FullMapCache,
     ) -> Result<Vec<Vec<u8>>, String> {
         let mut out = Vec::with_capacity(packets.len());
         for p in packets {
-            let p = p.as_ref();
             match p[0] {
                 b'a' => {
-                    let mut p = p.to_vec();
+                    let mut p = p.clone();
                     p[23] = 13;
                     self.spacing = f64::from(p[24]);
                     if let Some(map) = &mut self.full_map {
@@ -99,7 +98,7 @@ impl Encoder {
                 b's' if p.len() > 7 => out.push(self.appearance(p)?),
                 b's' => {
                     self.fronts.remove(&u16_at(p, 1));
-                    out.push(p.to_vec());
+                    out.push(p.clone());
                 }
                 b'd' | b'7' => {
                     let mut q = vec![if p[0] == b'd' { b'e' } else { b'E' }];
@@ -154,19 +153,19 @@ impl Encoder {
                     out.push(if let Some(map) = &mut self.full_map {
                         map.packet(p, maps)?
                     } else {
-                        p.to_vec()
+                        p.clone()
                     });
                 }
                 b'z' => {
                     if let Some(map) = &mut self.full_map {
                         map.radius = u24_at(p, 1);
                     }
-                    out.push(p.to_vec());
+                    out.push(p.clone());
                 }
                 // Common catalog families, plus existing local score/record/rules
                 // presentation. Never forward a new 19-only layout silently.
                 b'e' | b'E' | b'3' | b'4' | b'5' | b'h' | b'r' | b'w' | b'y' | b'j' | b'l'
-                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.to_vec()),
+                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
                 _ => return Err(format!("No protocol-13 encoding for code {}", p[0])),
             }
         }
