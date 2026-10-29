@@ -64,5 +64,6 @@ The optional `CARGO_TARGET_DIR` lets both execution directories share one bounde
 build target; copied executables and per-directory pins remain immutable.
 
 The required Linux `instructions:u` fixed-work pairs and slow-tick splits have
-not run. Follow the [frozen plan](PLAN.md) only after the maintaining agent
+not run. Follow the [frozen plan](PLAN.md) and its
+[fixed-work amendment](PLAN-ADDENDUM.md) only after the maintaining agent
 releases the SSH bench. Do not substitute these debug checks for measurements.
