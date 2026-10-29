@@ -37,3 +37,8 @@
 - The documentation test rejected the new report before its index row existed.
   Added the required row with explicit pending-performance status; no completed
   speedup or capacity claim was substituted.
+
+- Full Rust check group completed: all 15 required format, strict-Clippy feature,
+  default/core/bot/networking, doctest, C ABI, Python build and basic-example
+  commands passed. One Cargo job and one test thread were set for every command.
+  This check run is validation only; its durations are not speed measurements.

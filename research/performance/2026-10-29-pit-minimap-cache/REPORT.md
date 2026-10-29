@@ -35,7 +35,8 @@ correctness tooling and notes. [Plan](PLAN.md), [attempts](ATTEMPTS.md),
   shrink, ordinary worlds and invalid-side errors. The test also verifies that
   adjacent radii inside one exact interval retain the mask allocations.
 - Existing Battledome and protocol-13 tests and strict default all-target
-  Clippy pass locally. Full Rust-group status is retained in the attempt notes.
+  Clippy pass locally. All 15 required full Rust-group commands pass; see
+  [verification](verification.json) and the attempt notes.
 
 These are untimed local Windows debug-build checks with one Cargo job and one
 Rust test thread, not the Linux performance experiment. The earlier 16-seat
