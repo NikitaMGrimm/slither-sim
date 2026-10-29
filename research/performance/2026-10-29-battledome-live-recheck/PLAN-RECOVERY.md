@@ -7,8 +7,10 @@ valid. Recover and verify all surviving fourth-row host evidence before
 releasing that process/control port; do not reconstruct missing client receipts.
 
 Retain this same target server for all six primary rows. Replace only the
-generator, using an eight-vCPU c7a.2xlarge Spot in the same AZ to avoid the
-repeatedly interrupted c8a pool. Keep portable flags, source, shared client
+generator, initially requesting an eight-vCPU c7a.2xlarge Spot in the same AZ
+to avoid the repeatedly interrupted c8a pool. That request was rejected for
+capacity without launching an instance. Before resumed collection, use an
+eight-vCPU x86-64 c7i.2xlarge Spot in that AZ instead. Keep portable flags, source, shared client
 binary, six fully decoding workers and all qualification gates unchanged.
 Require the newly built host/client hashes to match the previous builds.
 
