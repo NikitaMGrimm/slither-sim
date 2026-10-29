@@ -31,6 +31,12 @@
 
 ### Performance
 
+- When a player's view moves, the host keeps its existing reference to each
+  unchanged food sector instead of dropping and re-taking it. Output is
+  byte-identical. In a fully grown 500-player world, food-update ticks run
+  about 0.2% fewer instructions; no CPU-time change was measurable
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-food-packet-bytes/REPORT.md)).
+
 - On the food-update tick, the host now skips each player's sector cleanup
   until one of their retained sectors can actually expire. Output is
   byte-identical. In a fully grown 500-player world those ticks run about

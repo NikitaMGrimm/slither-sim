@@ -1,0 +1,124 @@
+{
+  "recipients": 8,
+  "protocol": 19,
+  "tickRange": [
+    301,
+    1000
+  ],
+  "limits": "Short world, ptrace and markers perturb scheduling; counts only, no CPU/tail/capacity claim. Completed call brackets validate the one-sendto mapping independently of tick-boundary crossings.",
+  "phases": {
+    "all": {
+      "ticks": 700,
+      "totals": {
+        "messages": 3944,
+        "tcp_write_calls": 3944,
+        "open_flushes": 33160,
+        "sendto": 3944,
+        "write": 0,
+        "writev": 0,
+        "sendmsg": 0,
+        "sends_outside_tcp_write": 0,
+        "one_sendto_calls": 3944,
+        "other_calls": 0
+      },
+      "perRecipientTick": {
+        "messages": 0.7042857142857143,
+        "tcp_write_calls": 0.7042857142857143,
+        "open_flushes": 5.921428571428572,
+        "sendto": 0.7042857142857143,
+        "write": 0.0,
+        "writev": 0.0,
+        "sendmsg": 0.0,
+        "sends_outside_tcp_write": 0.0,
+        "one_sendto_calls": 0.7042857142857143,
+        "other_calls": 0.0
+      }
+    },
+    "maintenance": {
+      "ticks": 9,
+      "totals": {
+        "messages": 72,
+        "tcp_write_calls": 72,
+        "open_flushes": 424,
+        "sendto": 72,
+        "write": 0,
+        "writev": 0,
+        "sendmsg": 0,
+        "sends_outside_tcp_write": 0,
+        "one_sendto_calls": 72,
+        "other_calls": 0
+      },
+      "perRecipientTick": {
+        "messages": 1.0,
+        "tcp_write_calls": 1.0,
+        "open_flushes": 5.888888888888889,
+        "sendto": 1.0,
+        "write": 0.0,
+        "writev": 0.0,
+        "sendmsg": 0.0,
+        "sends_outside_tcp_write": 0.0,
+        "one_sendto_calls": 1.0,
+        "other_calls": 0.0
+      }
+    },
+    "ordinary": {
+      "ticks": 691,
+      "totals": {
+        "messages": 3872,
+        "tcp_write_calls": 3872,
+        "open_flushes": 32736,
+        "sendto": 3872,
+        "write": 0,
+        "writev": 0,
+        "sendmsg": 0,
+        "sends_outside_tcp_write": 0,
+        "one_sendto_calls": 3872,
+        "other_calls": 0
+      },
+      "perRecipientTick": {
+        "messages": 0.7004341534008683,
+        "tcp_write_calls": 0.7004341534008683,
+        "open_flushes": 5.921852387843705,
+        "sendto": 0.7004341534008683,
+        "write": 0.0,
+        "writev": 0.0,
+        "sendmsg": 0.0,
+        "sends_outside_tcp_write": 0.0,
+        "one_sendto_calls": 0.7004341534008683,
+        "other_calls": 0.0
+      }
+    }
+  },
+  "clientSha256": "b124dfd7935bb4b7ae9a1aaa947132f74ea42af321248ad5ba8f54d5d3db822d",
+  "clientGate": {
+    "workers": 3,
+    "lastPlaying": 8,
+    "admissionRefusals": 0,
+    "clientExit": 0,
+    "counterExit": 0,
+    "hostPanic": false
+  },
+  "machine": "a 4-vCPU Zen 5 EPYC KVM guest",
+  "pins": {
+    "runtime": "23e987f37b061ac80307404c24f6b7fecc71a770",
+    "archiveSha256": "cfeb34861bc9884300af6e42666dac9db4160f0223ae4d8826d9241ae0f22f3b",
+    "hostSha256": "5eb3fd50f37598e82a45735e068264ea9cc3e9da6ef98cc5f2702450b959c5e0",
+    "counterSha256": "609325f868163aa69ba82b7504259635c38601a38d301365bf65911778212672",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--offline",
+      "--bin",
+      "slither-sim"
+    ],
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "rustSourcesDigest": "adde83091b94a66b1ee10eb9b4a67e9bf32a441ebca8b86a381867e8386164a0",
+    "scripts": {
+      "syscall_counts.c": "ff716d3c85536e36c6dbcce622b702118ca0922e0c755e844c811da345401e9c",
+      "build_socket_counts.py": "952d20a77c1313d3134fe5666f07351f4f28d544eca8345dff400fb49f271e2d",
+      "run_socket_counts.py": "d081c5300514812a9cee4bb3f87bf6af58c6c05d7e84e5ba830c8f2cbb00cf66"
+    }
+  }
+}

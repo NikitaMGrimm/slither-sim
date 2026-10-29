@@ -1,0 +1,61 @@
+{
+  "scope": "Exact encoded food-packet census in the retained mature stock base proof; bytes/counts only, not allocation CPU attribution. RawSimulator::take returns all generated frames including future deliveries. Header tick is the pre-advance tick; samples label its successor.",
+  "traceSha256": "d08ea194142cb2afd8b430231029259c8bf8b440d75516c119aa98f0353b67e8",
+  "recipients": 500,
+  "phases": {
+    "all": {
+      "ticks": 360,
+      "frames": 75455,
+      "packetsByCode": {
+        "<": 10141,
+        "F": 5065,
+        "b": 1076,
+        "f": 7174,
+        "w": 5457
+      },
+      "bytesByCode": {
+        "<": 70987,
+        "F": 102195,
+        "b": 7532,
+        "f": 50218,
+        "w": 16371
+      },
+      "incrementalPacketsPerRecipientTick": 0.1021722222222222,
+      "incrementalBytesPerRecipientTick": 0.7152055555555555
+    },
+    "maintenance": {
+      "ticks": 5,
+      "frames": 2369,
+      "packetsByCode": {
+        "f": 7174,
+        "w": 5457,
+        "<": 158,
+        "F": 49
+      },
+      "bytesByCode": {
+        "f": 50218,
+        "w": 16371,
+        "<": 1106,
+        "F": 799
+      },
+      "incrementalPacketsPerRecipientTick": 2.9328,
+      "incrementalBytesPerRecipientTick": 20.5296
+    },
+    "ordinary": {
+      "ticks": 355,
+      "frames": 73086,
+      "packetsByCode": {
+        "<": 9983,
+        "F": 5016,
+        "b": 1076
+      },
+      "bytesByCode": {
+        "<": 69881,
+        "F": 101396,
+        "b": 7532
+      },
+      "incrementalPacketsPerRecipientTick": 0.06230422535211267,
+      "incrementalBytesPerRecipientTick": 0.4361295774647887
+    }
+  }
+}
