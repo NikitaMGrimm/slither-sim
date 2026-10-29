@@ -1,0 +1,822 @@
+diff --git a/src/client/encode.rs b/src/client/encode.rs
+index 9a27e507..a6939333 100644
+--- a/src/client/encode.rs
++++ b/src/client/encode.rs
+@@ -99,19 +99,70 @@ fn with_id(code: u8, own: bool, id: u16) -> Vec<u8> {
+     packet
+ }
+ 
++/// Recipient packet storage. Food diffs share one encoded sector buffer;
++/// ordinary packet producers retain their existing owned allocations. Shared
++/// views stay on the simulation thread; only final owned frames cross to sockets.
++#[derive(Clone, Debug)]
++pub(crate) enum Packet {
++    Owned(Vec<u8>),
++    Shared {
++        bytes: std::rc::Rc<Vec<u8>>,
++        range: std::ops::Range<usize>,
++    },
++}
++
++impl From<Vec<u8>> for Packet {
++    fn from(bytes: Vec<u8>) -> Self {
++        Self::Owned(bytes)
++    }
++}
++
++impl AsRef<[u8]> for Packet {
++    fn as_ref(&self) -> &[u8] {
++        match self {
++            Self::Owned(bytes) => bytes,
++            Self::Shared { bytes, range } => &bytes[range.clone()],
++        }
++    }
++}
++
++impl std::ops::Deref for Packet {
++    type Target = [u8];
++    fn deref(&self) -> &[u8] {
++        self.as_ref()
++    }
++}
++
++#[cfg(test)]
++impl PartialEq for Packet {
++    fn eq(&self, other: &Self) -> bool {
++        self.as_ref() == other.as_ref()
++    }
++}
++
++#[cfg(test)]
++impl PartialEq<Vec<u8>> for Packet {
++    fn eq(&self, other: &Vec<u8>) -> bool {
++        self.as_ref() == other.as_slice()
++    }
++}
++
+ /// Whether a packet can share a frame behind a two-byte length prefix.
+ pub(crate) fn frameable(packet: &[u8]) -> bool {
+     !packet.is_empty() && packet.len() <= MAX_PACKET
+ }
+ 
+ /// Two-byte elapsed-ms header, then one raw packet or length-prefixed packets.
+-pub(crate) fn frame(elapsed_ms: u16, packets: &[Vec<u8>]) -> Result<Vec<u8>, String> {
++pub(crate) fn frame<P: AsRef<[u8]>>(elapsed_ms: u16, packets: &[P]) -> Result<Vec<u8>, String> {
+     let mut out = u16be(elapsed_ms).to_vec();
+     match packets {
+         [] => return Err("Empty frame".into()),
+-        [packet] if packet.first().is_some_and(|&code| code >= 32) => out.extend(packet),
++        [packet] if packet.as_ref().first().is_some_and(|&code| code >= 32) => {
++            out.extend_from_slice(packet.as_ref())
++        }
+         _ => {
+             for packet in packets {
++                let packet = packet.as_ref();
+                 if !frameable(packet) {
+                     return Err("Packet length cannot be framed".into());
+                 }
+@@ -743,7 +794,7 @@ mod tests {
+         let many = frame(300, &packets).unwrap();
+         assert_eq!(&many[..2], &300u16.to_be_bytes());
+         assert_eq!(split(&many), packets);
+-        assert!(frame(0, &[]).is_err());
++        assert!(frame::<Vec<u8>>(0, &[]).is_err());
+         assert!(frame(0, &[vec![b'F'; MAX_PACKET + 1], pong()]).is_err());
+     }
+ 
+diff --git a/src/client/encode13.rs b/src/client/encode13.rs
+index a8757cec..a13453f5 100644
+--- a/src/client/encode13.rs
++++ b/src/client/encode13.rs
+@@ -77,16 +77,17 @@ impl Encoder {
+         });
+     }
+ 
+-    pub(crate) fn packets(
++    pub(crate) fn packets<P: AsRef<[u8]>>(
+         &mut self,
+-        packets: &[Vec<u8>],
++        packets: &[P],
+         maps: &mut FullMapCache,
+     ) -> Result<Vec<Vec<u8>>, String> {
+         let mut out = Vec::with_capacity(packets.len());
+         for p in packets {
++            let p = p.as_ref();
+             match p[0] {
+                 b'a' => {
+-                    let mut p = p.clone();
++                    let mut p = p.to_vec();
+                     p[23] = 13;
+                     self.spacing = f64::from(p[24]);
+                     if let Some(map) = &mut self.full_map {
+@@ -98,7 +99,7 @@ impl Encoder {
+                 b's' if p.len() > 7 => out.push(self.appearance(p)?),
+                 b's' => {
+                     self.fronts.remove(&u16_at(p, 1));
+-                    out.push(p.clone());
++                    out.push(p.to_vec());
+                 }
+                 b'd' | b'7' => {
+                     let mut q = vec![if p[0] == b'd' { b'e' } else { b'E' }];
+@@ -153,19 +154,19 @@ impl Encoder {
+                     out.push(if let Some(map) = &mut self.full_map {
+                         map.packet(p, maps)?
+                     } else {
+-                        p.clone()
++                        p.to_vec()
+                     });
+                 }
+                 b'z' => {
+                     if let Some(map) = &mut self.full_map {
+                         map.radius = u24_at(p, 1);
+                     }
+-                    out.push(p.clone());
++                    out.push(p.to_vec());
+                 }
+                 // Common catalog families, plus existing local score/record/rules
+                 // presentation. Never forward a new 19-only layout silently.
+                 b'e' | b'E' | b'3' | b'4' | b'5' | b'h' | b'r' | b'w' | b'y' | b'j' | b'l'
+-                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.clone()),
++                | b'k' | b'p' | b'v' | b'S' | b'R' | b'm' | b'~' => out.push(p.to_vec()),
+                 _ => return Err(format!("No protocol-13 encoding for code {}", p[0])),
+             }
+         }
+diff --git a/src/client/simulation/broadcast.rs b/src/client/simulation/broadcast.rs
+index 38ab3cc2..b6535216 100644
+--- a/src/client/simulation/broadcast.rs
++++ b/src/client/simulation/broadcast.rs
+@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
+ /// Rows the stock leaderboard shows.
+ pub(super) const LEADERBOARD_ROWS: usize = 10;
+ /// Physical packets, plus a browser view when pit decoration is active.
+-type PacketViews = (Vec<Vec<u8>>, Option<Vec<Vec<u8>>>);
++type PacketViews = (Vec<encode::Packet>, Option<Vec<encode::Packet>>);
+ /// One prey's correction clock, shared by every recipient: official
+ /// corrections for one prey align across clients, and a new viewer does not
+ /// restart it.
+@@ -427,7 +427,7 @@ impl SimulatorBackend {
+             let mut prefix = if pongs == 0 {
+                 Vec::new()
+             } else {
+-                vec![encode::pong(); pongs]
++                vec![encode::Packet::from(encode::pong()); pongs]
+             };
+             let (updates, presented_updates) = self.updates(
+                 slot,
+@@ -438,7 +438,7 @@ impl SimulatorBackend {
+                 &mut snakes,
+             )?;
+             if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
+-                prefix.push(packet);
++                prefix.push(packet.into());
+             }
+             // Most broadcasts have neither pongs nor a map. Keep updates' own
+             // allocation instead of moving every packet through another Vec.
+@@ -460,9 +460,9 @@ impl SimulatorBackend {
+                 .filter(|_| leaderboard_due && (alive || was_over));
+             let hud = self.hud(slot, live_board)?;
+             if let Some(presented) = &mut presented {
+-                presented.extend(hud.iter().cloned());
++                presented.extend(hud.iter().cloned().map(encode::Packet::from));
+             }
+-            packets.extend(hud);
++            packets.extend(hud.into_iter().map(encode::Packet::from));
+             if let Some(presented) = presented {
+                 self.emit_presented(slot, now, &presented, Some(&packets))?;
+             } else if !packets.is_empty() {
+@@ -617,29 +617,29 @@ impl SimulatorBackend {
+             let known = connection.snakes.remove(slot);
+             let fam = encode::fam_u24(me.fam);
+             if known.as_ref().is_some_and(|known| known.fam != fam) {
+-                packets.push(encode::fam(id, fam));
++                packets.push((encode::fam(id, fam)).into());
+             }
+             // The stock game-over score adds the credit to the final mass.
+             let credit = encode::segment_credit(me.score, me.segments, fam);
+             if connection.credit != credit {
+                 connection.credit = credit;
+-                packets.push(encode::credit(credit));
++                packets.push((encode::credit(credit)).into());
+             }
+             // The local record rule qualifies this life; the stock v1 flag
+             // offers its player a victory-message input.
+-            packets.push(encode::game_over(record));
++            packets.push((encode::game_over(record)).into());
+             if known.is_some() {
+-                packets.push(encode::removal(id, true));
++                packets.push((encode::removal(id, true)).into());
+             }
+         }
+         let radius = world.radius().round() as u32;
+         if connection.radius != radius {
+             connection.radius = radius;
+-            packets.push(encode::radius(world.radius())?);
++            packets.push((encode::radius(world.radius())?).into());
+         }
+         let rules = world.rules();
+         if connection.rules_enabled && connection.rules_sent != Some(rules) {
+-            packets.push(crate::client::rules_packet::encode(rules));
++            packets.push((crate::client::rules_packet::encode(rules)).into());
+             connection.rules_sent = Some(rules);
+         }
+         let vision = world.config().vision;
+@@ -682,14 +682,14 @@ impl SimulatorBackend {
+                 }
+                 (Some(known), false) => {
+                     let died = !snake.alive || known.life != life;
+-                    packets.push(encode::removal(id, died));
++                    packets.push((encode::removal(id, died)).into());
+                     connection.snakes.remove(i);
+                 }
+                 (None, false) => {}
+                 (known, true) => {
+                     let wanted = physics::quantize_heading(control);
+                     if known.is_some() {
+-                        packets.push(encode::removal(id, true));
++                        packets.push((encode::removal(id, true)).into());
+                     }
+                     full(&mut packets, own, id, snake, wanted, profile)?;
+                     let known = KnownSnake::new(life, snake, wanted)?;
+@@ -706,10 +706,10 @@ impl SimulatorBackend {
+                 let credit = encode::segment_credit(snake.score, snake.segments, fam);
+                 if connection.credit != credit {
+                     connection.credit = credit;
+-                    packets.push(encode::credit(credit));
++                    packets.push((encode::credit(credit)).into());
+                 }
+                 if std::mem::take(&mut connection.session_pending) {
+-                    packets.push(encode::session(id, connection.session));
++                    packets.push((encode::session(id, connection.session)).into());
+                 }
+             }
+         }
+@@ -753,10 +753,9 @@ impl SimulatorBackend {
+             .collect();
+         for id in gone {
+             let known = connection.prey.remove(&id).expect("known prey");
+-            packets.push(encode::prey_removal(
+-                known.wire,
+-                self.prey_eaters.get(&id).copied(),
+-            ));
++            packets.push(
++                (encode::prey_removal(known.wire, self.prey_eaters.get(&id).copied())).into(),
++            );
+         }
+         for (id, prey) in visible {
+             let wire = self.prey_wire[&id];
+@@ -769,11 +768,11 @@ impl SimulatorBackend {
+                 ],
+             };
+             match connection.prey.get(&id) {
+-                None => packets.push(encode::prey_appearance(wire, prey)?),
++                None => packets.push((encode::prey_appearance(wire, prey)?).into()),
+                 // Keep corrections even when quantized position is still.
+                 Some(known) if self.prey_clocks[&id].due => {
+                     let changed = known.motion != current.motion;
+-                    packets.push(encode::prey_motion(wire, prey, changed)?)
++                    packets.push((encode::prey_motion(wire, prey, changed)?).into())
+                 }
+                 Some(_) => continue,
+             }
+diff --git a/src/client/simulation/connection.rs b/src/client/simulation/connection.rs
+index 46300075..5886c231 100644
+--- a/src/client/simulation/connection.rs
++++ b/src/client/simulation/connection.rs
+@@ -324,21 +324,21 @@ impl SimulatorBackend {
+     /// Frame packets emitted at `now`. A packet too long for a length prefix (a
+     /// dense large minimap) travels alone in its own frame, in stream order.
+     /// Aggregate broadcasts are split to fit the bounded socket transports.
+-    pub(super) fn emit(
++    pub(super) fn emit<P: AsRef<[u8]>>(
+         &mut self,
+         slot: usize,
+         now: f64,
+-        packets: &[Vec<u8>],
++        packets: &[P],
+     ) -> Result<(), String> {
+         self.emit_presented(slot, now, packets, None)
+     }
+ 
+-    pub(super) fn emit_presented(
++    pub(super) fn emit_presented<P: AsRef<[u8]>>(
+         &mut self,
+         slot: usize,
+         now: f64,
+-        packets: &[Vec<u8>],
+-        physical: Option<&[Vec<u8>]>,
++        packets: &[P],
++        physical: Option<&[P]>,
+     ) -> Result<(), String> {
+         if self.slots[slot].connection.output_fault.is_some() {
+             return Ok(());
+@@ -495,23 +495,23 @@ impl SimulatorBackend {
+ 
+ /// Consume legacy packet buffers while borrowing stock bundles. Both paths
+ /// keep the same queue preflight and per-frame latency/header progression.
+-enum FrameGroups<'a> {
++enum FrameGroups<'a, P> {
+     Legacy(std::vec::IntoIter<Vec<u8>>),
+-    Stock(std::vec::IntoIter<&'a [Vec<u8>]>),
++    Stock(std::vec::IntoIter<&'a [P]>),
+ }
+ 
+-enum FrameGroup<'a> {
++enum FrameGroup<'a, P> {
+     Legacy(Vec<u8>),
+-    Stock(&'a [Vec<u8>]),
++    Stock(&'a [P]),
+ }
+ 
+-impl FrameGroups<'_> {
++impl<P> FrameGroups<'_, P> {
+     fn is_empty(&self) -> bool {
+         self.len() == 0
+     }
+ }
+ 
+-impl FrameGroup<'_> {
++impl<P: AsRef<[u8]>> FrameGroup<'_, P> {
+     fn frame(self, elapsed: u16) -> Result<Vec<u8>, String> {
+         match self {
+             Self::Legacy(packet) => encode::frame_owned(elapsed, packet),
+@@ -520,8 +520,8 @@ impl FrameGroup<'_> {
+     }
+ }
+ 
+-impl<'a> Iterator for FrameGroups<'a> {
+-    type Item = FrameGroup<'a>;
++impl<'a, P> Iterator for FrameGroups<'a, P> {
++    type Item = FrameGroup<'a, P>;
+ 
+     fn next(&mut self) -> Option<Self::Item> {
+         match self {
+@@ -536,7 +536,7 @@ impl<'a> Iterator for FrameGroups<'a> {
+     }
+ }
+ 
+-impl ExactSizeIterator for FrameGroups<'_> {
++impl<P> ExactSizeIterator for FrameGroups<'_, P> {
+     fn len(&self) -> usize {
+         match self {
+             Self::Legacy(packets) => packets.len(),
+@@ -555,11 +555,12 @@ fn session_id(serial: u32, key: u32) -> u32 {
+ }
+ 
+ /// Stock transport grouping, shared by physical scheduling and presentation.
+-fn frame_groups(packets: &[Vec<u8>]) -> Vec<&[Vec<u8>]> {
+-    let mut groups: Vec<&[Vec<u8>]> = Vec::new();
++fn frame_groups<P: AsRef<[u8]>>(packets: &[P]) -> Vec<&[P]> {
++    let mut groups: Vec<&[P]> = Vec::new();
+     let mut start = 0;
+     let mut bytes = 2; // Elapsed-ms header.
+     for (index, packet) in packets.iter().enumerate() {
++        let packet = packet.as_ref();
+         if !encode::frameable(packet) {
+             if start < index {
+                 groups.push(&packets[start..index]);
+@@ -612,6 +613,96 @@ mod tests {
+         vec![packet; frames]
+     }
+ 
++    fn shared(packets: &[Vec<u8>]) -> Vec<encode::Packet> {
++        let bytes = std::rc::Rc::new(packets.concat());
++        let mut start = 0;
++        packets
++            .iter()
++            .map(|packet| {
++                let end = start + packet.len();
++                let view = encode::Packet::Shared {
++                    bytes: bytes.clone(),
++                    range: start..end,
++                };
++                start = end;
++                view
++            })
++            .collect()
++    }
++
++    #[test]
++    fn shared_packets_keep_group_boundaries_and_framing_errors() {
++        for packets in [
++            Vec::new(),
++            vec![Vec::new()],
++            vec![vec![31], vec![b'p']],
++            vec![vec![b'i'; 8192], vec![b'p']],
++            vec![vec![b'i'; 8191]; 130],
++        ] {
++            let views = shared(&packets);
++            let expected = frame_groups(&packets);
++            let actual = frame_groups(&views);
++            assert_eq!(
++                actual.iter().map(|g| g.len()).collect::<Vec<_>>(),
++                expected.iter().map(|g| g.len()).collect::<Vec<_>>()
++            );
++            for (a, b) in actual.iter().zip(expected) {
++                for elapsed in [0, 7, 65535] {
++                    assert_eq!(encode::frame(elapsed, a), encode::frame(elapsed, b));
++                }
++            }
++        }
++    }
++
++    #[test]
++    fn shared_packets_keep_stock_legacy_headers_and_physical_draws() {
++        for legacy in [false, true] {
++            let mut actual = backend();
++            let mut reference = backend();
++            if legacy {
++                actual.slots[0].connection.legacy =
++                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
++                reference.slots[0].connection.legacy =
++                    Some(Box::new(crate::client::encode13::Encoder::new(0)));
++            }
++            let style = encode::FoodStyle {
++                color: 4,
++                size: 20,
++                snake_food: false,
++            };
++            let packets = vec![
++                encode::pong(),
++                encode::food_add([108, 108, 1, 2], style),
++                encode::food_remove([108, 108, 1, 2], Some(17)),
++            ];
++            let views = shared(&packets);
++            for now in [0., 0.0004, 0.0006, 1000.] {
++                actual
++                    .emit_presented(0, now, &views, Some(&views[..1]))
++                    .unwrap();
++                reference
++                    .emit_presented(0, now, &packets, Some(&packets[..1]))
++                    .unwrap();
++                assert_eq!(
++                    actual.slots[0].connection.take_downlink(),
++                    reference.slots[0].connection.take_downlink()
++                );
++                assert_eq!(
++                    actual.slots[0].connection.header_ms,
++                    reference.slots[0].connection.header_ms
++                );
++                assert_eq!(
++                    format!("{:?}", actual.random),
++                    format!("{:?}", reference.random)
++                );
++                assert_eq!(
++                    format!("{:?}", actual.slots[0].connection.link),
++                    format!("{:?}", reference.slots[0].connection.link)
++                );
++            }
++        }
++    }
++
+     #[test]
+     fn owned_legacy_frames_keep_physical_draws_and_elapsed_allocation() {
+         let mut actual = backend();
+diff --git a/src/client/simulation/food.rs b/src/client/simulation/food.rs
+index 77f369a2..0180d5c2 100644
+--- a/src/client/simulation/food.rs
++++ b/src/client/simulation/food.rs
+@@ -11,6 +11,7 @@ use crate::{
+ use std::{
+     cell::RefCell,
+     collections::{BTreeMap, BTreeSet},
++    rc::Rc,
+     sync::Arc,
+ };
+ 
+@@ -160,13 +161,13 @@ pub(super) struct FoodChanges {
+ pub(super) struct SectorDiff {
+     previous: Arc<SectorFood>,
+     current: Arc<SectorFood>,
+-    packets: Vec<Vec<u8>>,
++    packets: Vec<encode::Packet>,
+ }
+ 
+ impl FoodChanges {
+     fn append_diff(
+         &self,
+-        packets: &mut Vec<Vec<u8>>,
++        packets: &mut Vec<encode::Packet>,
+         sector: [u8; 2],
+         previous: &Arc<SectorFood>,
+         current: &Arc<SectorFood>,
+@@ -181,17 +182,45 @@ impl FoodChanges {
+                 SectorDiff {
+                     previous: previous.clone(),
+                     current: current.clone(),
+-                    packets,
++                    packets: shared_packets(packets),
+                 }
+             });
+         if Arc::ptr_eq(previous, &diff.previous) && Arc::ptr_eq(current, &diff.current) {
+             packets.extend_from_slice(&diff.packets);
+         } else {
+             // A recipient skipped an earlier broadcast and holds an older view.
+-            sector_changes(packets, sector, previous, current, eaters);
++            let mut owned = Vec::new();
++            sector_changes(&mut owned, sector, previous, current, eaters);
++            packets.extend(owned.into_iter().map(encode::Packet::from));
+         }
+     }
+ }
++
++/// One allocation of encoded bytes per sector transition, with packet boundaries
++/// retained for the existing framing and protocol-13 conversion paths.
++fn shared_packets(packets: Vec<Vec<u8>>) -> Vec<encode::Packet> {
++    if packets.is_empty() {
++        return Vec::new();
++    }
++    let mut bytes = Vec::with_capacity(packets.iter().map(Vec::len).sum());
++    let ranges: Vec<_> = packets
++        .into_iter()
++        .map(|packet| {
++            let start = bytes.len();
++            bytes.extend_from_slice(&packet);
++            start..bytes.len()
++        })
++        .collect();
++    let bytes = Rc::new(bytes);
++    ranges
++        .into_iter()
++        .map(|range| encode::Packet::Shared {
++            bytes: bytes.clone(),
++            range,
++        })
++        .collect()
++}
++
+ #[cfg(test)]
+ impl std::ops::Index<&[u8; 2]> for KnownSectors {
+     type Output = SectorFood;
+@@ -478,7 +507,7 @@ impl SimulatorBackend {
+ /// nonempty `F`, then births/pickups; see docs/server-rules.md#food-sector-delivery.
+ /// `sectors` lists every subscribed sector.
+ pub(super) fn food_updates(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut Vec<encode::Packet>,
+     known: &mut KnownSectors,
+     interest: &SectorInterest,
+     sectors: &[Option<Arc<SectorFood>>],
+@@ -536,7 +565,7 @@ pub(super) fn food_updates(
+     for (sector, _) in &held {
+         while subscriptions.next_if(|next| *next < sector).is_some() {}
+         if subscriptions.peek() != Some(&sector) {
+-            packets.push(encode::sector_clear(*sector));
++            packets.push((encode::sector_clear(*sector)).into());
+         }
+     }
+     let mut held = held.into_iter().peekable();
+@@ -553,7 +582,11 @@ pub(super) fn food_updates(
+             None => {
+                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
+                 if !foods.is_empty() {
+-                    packets.extend(encode::food_sector(sector, &foods));
++                    packets.extend(
++                        encode::food_sector(sector, &foods)
++                            .into_iter()
++                            .map(encode::Packet::from),
++                    );
+                 }
+             }
+             // The same listing without a pickup at its points sends nothing.
+@@ -644,6 +677,31 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn shared_packet_storage_preserves_boundaries_and_outlives_the_diff() {
++        let expected = vec![vec![b'c', 1, 2, 3, 4], vec![b'f', 1, 2, 3, 4, 5, 6]];
++        let first = shared_packets(expected.clone());
++        let second = first.clone();
++        assert_eq!(first, expected);
++        let encode::Packet::Shared { bytes, .. } = &first[0] else {
++            panic!("shared bytes")
++        };
++        for (a, b) in first.iter().zip(&second) {
++            let encode::Packet::Shared { bytes: other, .. } = a else {
++                panic!("shared bytes")
++            };
++            assert!(Rc::ptr_eq(bytes, other), "one sector buffer");
++            assert_eq!(
++                a.as_ref().as_ptr(),
++                b.as_ref().as_ptr(),
++                "no recipient copy"
++            );
++        }
++        drop(first);
++        assert_eq!(second, expected);
++        assert!(shared_packets(Vec::new()).is_empty());
++    }
++
+     #[test]
+     fn shared_diffs_match_uncached_lifetimes_views_and_older_recipients() {
+         let sector = [108, 108];
+diff --git a/src/client/simulation/snakes.rs b/src/client/simulation/snakes.rs
+index 1e33d52d..c5c3114c 100644
+--- a/src/client/simulation/snakes.rs
++++ b/src/client/simulation/snakes.rs
+@@ -150,14 +150,14 @@ impl BodyBounds {
+ struct SnakeDelta {
+     before: KnownSnake,
+     after: KnownSnake,
+-    packets: Vec<Vec<u8>>,
++    packets: Vec<encode::Packet>,
+ }
+ 
+ impl SnakeDeltaCache {
+     #[expect(clippy::too_many_arguments, reason = "Same explicit inputs as changes")]
+     pub(super) fn changes(
+         &mut self,
+-        packets: &mut Vec<Vec<u8>>,
++        packets: &mut Vec<encode::Packet>,
+         own: bool,
+         id: u16,
+         known: &mut KnownSnake,
+@@ -519,24 +519,28 @@ pub(super) fn covered(
+ /// appearance handler leaves the heading at the last body anchor's direction.
+ /// A nonzero kill count follows, since appearances do not carry it.
+ pub(super) fn full(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut Vec<encode::Packet>,
+     own: bool,
+     id: u16,
+     snake: &Snake,
+     wanted: f64,
+     profile: &PlayerAppearance,
+ ) -> Result<(), String> {
+-    packets.push(encode::appearance(id, snake, wanted, profile)?);
+-    packets.extend(encode::motion(
+-        own,
+-        id,
+-        Some(encode::angle_byte(snake.heading)),
+-        Some(encode::angle_byte(wanted)),
+-        Some(encode::speed_byte(snake.speed)?),
+-        encode::direction(snake.heading, wanted),
+-    ));
++    packets.push((encode::appearance(id, snake, wanted, profile)?).into());
++    packets.extend(
++        encode::motion(
++            own,
++            id,
++            Some(encode::angle_byte(snake.heading)),
++            Some(encode::angle_byte(wanted)),
++            Some(encode::speed_byte(snake.speed)?),
++            encode::direction(snake.heading, wanted),
++        )
++        .into_iter()
++        .map(encode::Packet::from),
++    );
+     if snake.kills > 0 {
+-        packets.push(encode::kills(id, snake.kills));
++        packets.push((encode::kills(id, snake.kills)).into());
+     }
+     Ok(())
+ }
+@@ -552,7 +556,7 @@ pub(super) fn full(
+     reason = "Keep wire inputs explicit without a per-snake context"
+ )]
+ pub(super) fn changes(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut Vec<encode::Packet>,
+     own: bool,
+     id: u16,
+     known: &mut KnownSnake,
+@@ -576,24 +580,28 @@ pub(super) fn changes(
+             // reads the tail, so report removals first, then the new anchors.
+             let grown = change.clamp(0, fresh as isize);
+             for _ in 0..grown - change {
+-                packets.push(encode::tail(id, fam));
++                packets.push((encode::tail(id, fam)).into());
+                 fam_sent = true;
+             }
+             // Growth anchors carry the mass themselves.
+             if !fam_sent && grown == 0 && reports.fam_due && known.fam != fam {
+-                packets.push(encode::fam(id, fam));
++                packets.push((encode::fam(id, fam)).into());
+                 fam_sent = true;
+             }
+             if reports.motion_due {
+                 let [heading, target, speed] = reports.motion;
+-                packets.extend(encode::motion(
+-                    own,
+-                    id,
+-                    (heading != known.heading).then_some(heading),
+-                    (target != known.wanted).then_some(target),
+-                    (speed != known.speed).then_some(speed),
+-                    encode::direction(snake.heading, wanted),
+-                ));
++                packets.extend(
++                    encode::motion(
++                        own,
++                        id,
++                        (heading != known.heading).then_some(heading),
++                        (target != known.wanted).then_some(target),
++                        (speed != known.speed).then_some(speed),
++                        encode::direction(snake.heading, wanted),
++                    )
++                    .into_iter()
++                    .map(encode::Packet::from),
++                );
+                 known.heading = heading;
+                 known.wanted = target;
+                 known.speed = speed;
+@@ -609,11 +617,14 @@ pub(super) fn changes(
+                 };
+                 let carried = grows.then_some(fam);
+                 fam_sent |= grows;
+-                packets.push(if step.distance(point) < 1e-6 {
+-                    encode::anchor(own, id, angle, carried)
+-                } else {
+-                    encode::anchor_at(own, id, angle, point, carried)?
+-                });
++                packets.push(
++                    (if step.distance(point) < 1e-6 {
++                        encode::anchor(own, id, angle, carried)
++                    } else {
++                        encode::anchor_at(own, id, angle, point, carried)?
++                    })
++                    .into(),
++                );
+             }
+         }
+         None => {
+@@ -630,7 +641,7 @@ pub(super) fn changes(
+     }
+     if known.kills != snake.kills {
+         known.kills = snake.kills;
+-        packets.push(encode::kills(id, snake.kills));
++        packets.push((encode::kills(id, snake.kills)).into());
+     }
+     Ok(())
+ }
+@@ -1225,7 +1236,10 @@ mod tests {
+         for history in histories {
+             // Repeat peer encodings to exercise hits, with an own update between.
+             for own in [false, false, true, false] {
+-                let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
++                let (mut expected, mut actual) = (
++                    vec![encode::Packet::from(vec![99])],
++                    vec![encode::Packet::from(vec![99])],
++                );
+                 let (mut reference, mut shared) = (history.clone(), history.clone());
+                 changes(
+                     &mut expected,
+@@ -1295,8 +1309,10 @@ mod tests {
+                                     ..initial.clone()
+                                 };
+                                 for own in [false, false, true, false] {
+-                                    let (mut expected, mut actual) =
+-                                        (vec![vec![99]], vec![vec![99]]);
++                                    let (mut expected, mut actual) = (
++                                        vec![encode::Packet::from(vec![99])],
++                                        vec![encode::Packet::from(vec![99])],
++                                    );
+                                     let (mut reference, mut shared) =
+                                         (history.clone(), history.clone());
+                                     let result = changes(
+@@ -1361,7 +1377,7 @@ mod tests {
+         let reports = SnakeReports::default();
+         let mut cache = SnakeDeltaCache::default();
+         for own in [false, true] {
+-            let mut packets = vec![vec![99]];
++            let mut packets = vec![encode::Packet::from(vec![99])];
+             cache
+                 .changes(
+                     &mut packets,
+@@ -1423,7 +1439,10 @@ mod tests {
+                 let mut cache = SnakeDeltaCache::default();
+                 for _ in 0..2 {
+                     let (mut reference, mut shared) = (history.clone(), history.clone());
+-                    let (mut expected, mut actual) = (vec![vec![99]], vec![vec![99]]);
++                    let (mut expected, mut actual) = (
++                        vec![encode::Packet::from(vec![99])],
++                        vec![encode::Packet::from(vec![99])],
++                    );
+                     let result = changes(
+                         &mut expected,
+                         own,
+diff --git a/src/client/simulation/tests.rs b/src/client/simulation/tests.rs
+index b34d6e61..3df952ab 100644
+--- a/src/client/simulation/tests.rs
++++ b/src/client/simulation/tests.rs
+@@ -909,7 +909,7 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
+ 
+ /// Diff against freshly allocated listings, as after a changed broadcast.
+ fn diff_food(
+-    packets: &mut Vec<Vec<u8>>,
++    packets: &mut Vec<encode::Packet>,
+     connection: &mut Connection,
+     sectors: &BTreeMap<[u8; 2], BTreeMap<[u8; 2], KnownFood>>,
+     eaters: &BTreeMap<(u64, u64), u16>,
+@@ -1035,7 +1035,11 @@ fn food_replacement_removes_the_old_item_with_its_actual_eater() {
+         &BTreeMap::new(),
+         &BTreeSet::from([[sx, sy]]),
+     );
+-    assert!(packets.contains(&vec![b'F', sx, sy, 3, rx, ry, 20]));
++    assert!(
++        packets
++            .iter()
++            .any(|packet| packet.as_ref() == [b'F', sx, sy, 3, rx, ry, 20])
++    );
+     sectors.get_mut(&[sx, sy]).unwrap().insert([rx, ry], second);
+     let eaters = BTreeMap::from([(food_identity(point), 2)]);
+     packets.clear();

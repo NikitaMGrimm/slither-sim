@@ -549,21 +549,25 @@ pub(super) fn food_updates(
         let current = sectors[usize::from(u16::from_be_bytes(sector))]
             .as_ref()
             .expect("subscribed sectors are listed");
-        match previous {
+        let held = match previous {
             None => {
                 let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
                 if !foods.is_empty() {
                     packets.extend(encode::food_sector(sector, &foods));
                 }
+                current.clone()
             }
-            // The same listing without a pickup at its points sends nothing.
-            Some(previous)
-                if Arc::ptr_eq(&previous, current) && !changes.eaten.contains(&sector) => {}
             Some(previous) => {
-                changes.append_diff(packets, sector, &previous, current, eaters);
+                let unchanged = Arc::ptr_eq(&previous, current);
+                if !unchanged || changes.eaten.contains(&sector) {
+                    changes.append_diff(packets, sector, &previous, current, eaters);
+                }
+                // A membership edit does not replace unchanged listings. Move
+                // the held handle instead of dropping and cloning that Arc.
+                if unchanged { previous } else { current.clone() }
             }
-        }
-        known.entries.push((sector, current.clone()));
+        };
+        known.entries.push((sector, held));
     }
     known.subscription_revision = Some(interest.revision().clone());
     known.food_revision = Some(changes.current.clone());
@@ -643,6 +647,81 @@ pub(super) fn food_identity(point: Point) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retiring_membership_keeps_unchanged_pickups_and_fresh_listing_delivery() {
+        let point = Point::default();
+        let wire = encode::food_key(point).unwrap();
+        let sector = [wire[0], wire[1]];
+        let retired = [sector[0], sector[1] + 1];
+        let offset = [wire[2], wire[3]];
+        let style = encode::FoodStyle {
+            color: 4,
+            size: 20,
+            snake_food: false,
+        };
+        let listing = Arc::new(SectorFood(vec![(
+            offset,
+            KnownFood {
+                point,
+                style,
+                decorative: false,
+            },
+        )]));
+        let mut sectors = vec![None; 1 << 16];
+        sectors[usize::from(u16::from_be_bytes(sector))] = Some(listing.clone());
+        sectors[usize::from(u16::from_be_bytes(retired))] = Some(Arc::new(SectorFood::default()));
+        let first = FoodChanges::default();
+        let mut known = KnownSectors::default();
+        let mut packets = Vec::new();
+        food_updates(
+            &mut packets,
+            &mut known,
+            &SectorInterest::from_subscribed(BTreeSet::from([sector, retired])),
+            &sectors,
+            &first,
+            &BTreeMap::new(),
+        );
+        packets.clear();
+        let interest = SectorInterest::from_subscribed(BTreeSet::from([sector]));
+        let changes = FoodChanges {
+            previous: first.current.clone(),
+            eaten: BTreeSet::from([sector]),
+            ..Default::default()
+        };
+        let eaters = BTreeMap::from([(food_identity(point), 17)]);
+        food_updates(
+            &mut packets,
+            &mut known,
+            &interest,
+            &sectors,
+            &changes,
+            &eaters,
+        );
+        assert_eq!(
+            packets,
+            [
+                encode::sector_clear(retired),
+                encode::food_remove(wire, Some(17)),
+                encode::food_add(wire, style)
+            ]
+        );
+        assert!(Arc::ptr_eq(known.get(&sector).unwrap(), &listing));
+        assert!(!known.contains_key(&retired));
+        // Fresh state, as on reconnect, must still receive the initial listing.
+        let mut fresh = KnownSectors::default();
+        packets.clear();
+        food_updates(
+            &mut packets,
+            &mut fresh,
+            &interest,
+            &sectors,
+            &FoodChanges::default(),
+            &BTreeMap::new(),
+        );
+        assert_eq!(packets, encode::food_sector(sector, &[(offset, style)]));
+        assert!(Arc::ptr_eq(fresh.get(&sector).unwrap(), &listing));
+    }
 
     #[test]
     fn shared_diffs_match_uncached_lifetimes_views_and_older_recipients() {
