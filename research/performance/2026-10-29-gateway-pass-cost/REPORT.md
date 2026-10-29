@@ -179,7 +179,7 @@ Primary comparisons refresh both arms to main `539b37f3`, candidate `da7e65c2`,
 before any candidate timing. Attribution remains at its original pin. Later
 `afd7e03a` adds four transport tests only; the checked production prefix and
 readiness source match the measured candidate archive exactly. Runtime, archive,
-compiler, build, selected overlay and host-binary pins are in [pins.json](pins.json).
+compiler, build, whole-harness and host-binary pins are in [pins.json](pins.json).
 
 Current-main validation passes:
 
