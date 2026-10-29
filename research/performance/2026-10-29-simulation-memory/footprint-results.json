@@ -1,0 +1,124 @@
+[
+  {
+    "bodies": {
+      "capacity": 38290,
+      "len": 27618
+    },
+    "bounds": {
+      "blockSize": 32,
+      "blocksCapacity": 6860,
+      "blocksLen": 3464,
+      "bodyCapacity": 55964,
+      "bodyLen": 26734,
+      "headerSize": 48,
+      "headersCapacity": 500
+    },
+    "connections": 500,
+    "food": {
+      "decoratedTableCapacity": 0,
+      "heldCapacity": 30199,
+      "heldEntries": 30199,
+      "indexCapacity": 86384,
+      "indexEntries": 28897,
+      "indexEntrySize": 56,
+      "indexSectors": 7195,
+      "listingCapacity": 42392,
+      "listingLen": 28307,
+      "physicalTableCapacity": 65536,
+      "subscriptionCountsCapacity": 65536,
+      "subscriptionHeldCapacity": 64000,
+      "uniqueListings": 8490
+    },
+    "sizes": {
+      "connection": 664,
+      "food": 48,
+      "knownFood": 24,
+      "knownSectorEntry": 16,
+      "knownSnake": 48,
+      "listingEntry": 32,
+      "optionKnownSnake": 56,
+      "point": 16,
+      "slot": 1944,
+      "snake": 136
+    },
+    "slotsCapacity": 500,
+    "worldFoodLen": 28897,
+    "protocol": "stock",
+    "knownSnakes": {
+      "denseLengths": 243903,
+      "denseCapacities": 363951,
+      "occupied": 3681,
+      "slotCapacities": 7944,
+      "denseCapacityBytes": 20381256,
+      "occupiedPayloadBytes": 176688,
+      "slotCapacityBytes": 63552
+    },
+    "interests": {
+      "subscribed": 30199,
+      "lastSeen": 30199,
+      "lastSeenPayloadBytes": 301990,
+      "subscribedPayloadBytes": 60398
+    }
+  },
+  {
+    "bodies": {
+      "capacity": 38290,
+      "len": 27618
+    },
+    "bounds": {
+      "blockSize": 32,
+      "blocksCapacity": 6860,
+      "blocksLen": 3464,
+      "bodyCapacity": 55964,
+      "bodyLen": 26734,
+      "headerSize": 48,
+      "headersCapacity": 500
+    },
+    "connections": 500,
+    "food": {
+      "decoratedTableCapacity": 0,
+      "heldCapacity": 30199,
+      "heldEntries": 30199,
+      "indexCapacity": 86384,
+      "indexEntries": 28897,
+      "indexEntrySize": 56,
+      "indexSectors": 7195,
+      "listingCapacity": 42392,
+      "listingLen": 28307,
+      "physicalTableCapacity": 65536,
+      "subscriptionCountsCapacity": 65536,
+      "subscriptionHeldCapacity": 64000,
+      "uniqueListings": 8490
+    },
+    "sizes": {
+      "connection": 664,
+      "food": 48,
+      "knownFood": 24,
+      "knownSectorEntry": 16,
+      "knownSnake": 48,
+      "listingEntry": 32,
+      "optionKnownSnake": 56,
+      "point": 16,
+      "slot": 1944,
+      "snake": 136
+    },
+    "slotsCapacity": 500,
+    "worldFoodLen": 28897,
+    "protocol": "legacy",
+    "knownSnakes": {
+      "denseLengths": 243903,
+      "denseCapacities": 363951,
+      "occupied": 3681,
+      "slotCapacities": 7944,
+      "denseCapacityBytes": 20381256,
+      "occupiedPayloadBytes": 176688,
+      "slotCapacityBytes": 63552
+    },
+    "interests": {
+      "subscribed": 30199,
+      "lastSeen": 30199,
+      "lastSeenPayloadBytes": 301990,
+      "subscribedPayloadBytes": 60398
+    }
+  }
+]
