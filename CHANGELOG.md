@@ -4,9 +4,12 @@
 
 ### Added
 
-- A one-core Battledome experience study with received-frame A4 socket bots,
-  finding low latency at 80 seats and admission-search overload at 640, with
-  measured boosting, network jitter, spawn waits and ranked fix candidates
+- A Battledome check on one core of an AWS c7a.medium, with real WebSocket
+  bots on a second machine, from 80 to 640 players. At 80 the median tick
+  takes 1.1 ms. Up to 320 players the slowest tick stays under 7.5 ms, with no
+  stalls and respawns within 20 ms. At 480 frame delays grow, and at 640 spawn
+  searches overload the server and it falls behind. The bots boosted only
+  3–5% of the time, so constant-boost human play is still untested
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-experience/REPORT.md)).
 - A capacity check on one core of an AWS c7a.medium, with real WebSocket bots
   on a second machine. Starting from fully grown snakes and adding bots in
