@@ -4,6 +4,27 @@
 
 ### Added
 
+- A real-socket Battledome recheck after the two spawn-search speedups, with
+  bots boosting almost all the time. At 320 players the server still falls
+  behind, but for 66 ticks of the measured window instead of 231, and frame
+  jitter p99 drops from 8.4 to 6.3 ms. At 480 both versions are badly
+  overloaded and the results are mixed. Spawn search still takes about 60% of
+  the slowest ticks
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
+
+### Performance
+
+- A post-compact-history study tests contiguous retained-sector keys and exact
+  timestamps. Fully grown 500-player food-update ticks use 6.4–6.9% fewer
+  instructions, with lower CPU in every pair, but whole-window CPU is mixed
+  and young protocol-13 worlds exceed the preset +10 µs/tick control limit.
+  The prototype is rejected and kept as a patch; runtime behavior is unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-retained-sector-layout/REPORT.md)).
+
+## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
+
+### Added
+
 - A memory study of the simulation thread in a fully grown 500-player world.
   Each player's snake history reserves a slot for every snake, 20.38 MB in
   total, to hold 176.7 kB of snakes that players actually know, and those
@@ -48,12 +69,6 @@
 
 ### Performance
 
-- A post-compact-history study tests contiguous retained-sector keys and exact
-  timestamps. Fully grown 500-player food-update ticks use 6.4–6.9% fewer
-  instructions, with lower CPU in every pair, but whole-window CPU is mixed
-  and young protocol-13 worlds exceed the preset +10 µs/tick control limit.
-  The prototype is rejected and kept as a patch; runtime behavior is unchanged
-  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-retained-sector-layout/REPORT.md)).
 - Each player's record of the snakes it has been told about now keeps only
   those snakes, in one sorted list, instead of a slot for every snake in the
   world. Output is byte-identical. In a fully grown 500-player world, ticks
