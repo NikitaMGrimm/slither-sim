@@ -97,6 +97,7 @@ fn near(a: Bounds, b: Bounds, width: f64) -> bool {
 }
 
 impl Safety {
+    #[inline(always)]
     fn all_obstacles(
         &self,
         query: Bounds,
@@ -330,11 +331,17 @@ impl Safety {
             return false;
         }
         let head_bounds = Bounds::between(head, head);
-        self.all_obstacles(head_bounds, |index, obstacle| {
-            obstacle.valid
-                && (!near(head_bounds, obstacle.bounds, obstacle.head_width)
-                    || !self.blocks_head(index, head))
-        })
+        let blocked = |(index, obstacle): (usize, &Obstacle)| {
+            !obstacle.valid
+                || (near(head_bounds, obstacle.bounds, obstacle.head_width)
+                    && self.blocks_head(index, head))
+        };
+        // Keep small sets on the original iterator instead of routing every
+        // one of an exhausted search's 4,096 poses through the grid helper.
+        if self.obstacles.len() < 32 {
+            return !self.obstacles.iter().enumerate().any(blocked);
+        }
+        self.all_obstacles(head_bounds, |index, obstacle| !blocked((index, obstacle)))
     }
 
     /// A valid ring whose head already fails cannot become an accepted body.

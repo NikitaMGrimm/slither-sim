@@ -37,3 +37,13 @@
   retained the error, read the actual 15-command passing receipt and reran only
   gate writing and the remaining live-admission parity checks. No timing ran
   before all gates passed.
+- Initial fixed-work attempt (`e64d74cc` runtime): live-like refused CPU ratios
+  are 0.2342–0.2365 and successful ratios 0.2509–0.2612 across both labels;
+  all 80/160 controls pass. The old seven-ring row adds 70.617/72.429 microseconds
+  at median tick CPU (19/13) and 14.6% instructions, failing this study's stricter
+  old-row gate. Preserved every pair and selected result. No gate or workload
+  changed. The revision keeps small obstacle sets on the original head iterator
+  and inlines the shared helper to avoid repeated helper overhead.
+- The first counting-manifest write lacked permissions in the root-owned proof
+  directory. No counting ran; created it through the existing sudo path and
+  completed all ten combinations with frozen source/binary bindings.
