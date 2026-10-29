@@ -1,6 +1,9 @@
 use crate::model::{Arena, Point, Snake};
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+mod pit_projection_tests;
+
 /// Stock-client compatibility: it clamps transmitted U/L sides to 512, although
 /// the u16 size field could carry more.
 pub(crate) const MAX_SIDE: usize = 512;
@@ -13,6 +16,112 @@ pub const MAX_TEAM_MINIMAP_CELLS: usize = 1 << 20;
 /// supported L snapshot (team layers plus union); repeated small packets must
 /// not multiply full-grid work without bound. This is a local resource limit.
 pub const MAX_FRAME_MINIMAP_CELLS: usize = MAX_TEAM_MINIMAP_CELLS + MAX_SIDE * MAX_SIDE;
+
+/// Backend-local pit mask, independent of snakes and recipient wire histories.
+#[derive(Default)]
+pub(super) struct PitProjectionCache(Option<PitProjection>);
+
+struct PitProjection {
+    side: usize,
+    outside: Vec<usize>,
+    edge: Vec<usize>,
+    min_near_outside: f64,
+    max_near_edge: f64,
+    min_far_edge: f64,
+    max_far_inside: f64,
+}
+
+impl PitProjection {
+    fn new(side: usize, radius: f64) -> Self {
+        let mut mask = Self {
+            side,
+            outside: Vec::new(),
+            edge: Vec::new(),
+            min_near_outside: f64::INFINITY,
+            max_near_edge: f64::NEG_INFINITY,
+            min_far_edge: f64::INFINITY,
+            max_far_inside: f64::NEG_INFINITY,
+        };
+        let center = side as f64 / 2.;
+        for y in 0..side {
+            for x in 0..side {
+                let near = |v: usize| (v as f64 - center).max(0.).max(center - (v + 1) as f64);
+                let far = |v: usize| {
+                    (v as f64 - center)
+                        .abs()
+                        .max(((v + 1) as f64 - center).abs())
+                };
+                let nearest = near(x).hypot(near(y));
+                if nearest > radius {
+                    mask.outside.push(y * side + x);
+                    mask.min_near_outside = mask.min_near_outside.min(nearest);
+                } else {
+                    let farthest = far(x).hypot(far(y));
+                    if farthest >= radius {
+                        mask.edge.push(y * side + x);
+                        mask.max_near_edge = mask.max_near_edge.max(nearest);
+                        mask.min_far_edge = mask.min_far_edge.min(farthest);
+                    } else {
+                        mask.max_far_inside = mask.max_far_inside.max(farthest);
+                    }
+                }
+            }
+        }
+        mask
+    }
+
+    fn contains(&self, side: usize, radius: f64) -> bool {
+        // Exact original comparisons define the interval, including equality.
+        // Proportional growth can round the projected radius to adjacent floats;
+        // neither an epsilon nor a rounded-radius key preserves boundary cells.
+        self.side == side
+            && radius < self.min_near_outside
+            && radius >= self.max_near_edge
+            && radius <= self.min_far_edge
+            && radius > self.max_far_inside
+    }
+}
+
+impl PitProjectionCache {
+    pub(super) fn render_world(
+        &mut self,
+        world: &crate::Simulator,
+        side: usize,
+    ) -> Result<Minimap, String> {
+        let mut map = Minimap::from_snakes(
+            world.snakes(),
+            &Arena {
+                center: Point::default(),
+                radius: world.radius(),
+            },
+            side,
+        )?;
+        if let Some(pit) = world.pit_radius() {
+            self.apply(&mut map, pit / world.radius() * side as f64 / 2.);
+        }
+        Ok(map)
+    }
+
+    fn apply(&mut self, map: &mut Minimap, radius: f64) {
+        if !self
+            .0
+            .as_ref()
+            .is_some_and(|p| p.contains(map.side, radius))
+        {
+            self.0 = Some(PitProjection::new(map.side, radius));
+        }
+        let projection = self
+            .0
+            .as_ref()
+            .expect("pit projection was just constructed");
+        for &i in &projection.outside {
+            map.cells[i] = 0;
+        }
+        for &i in &projection.edge {
+            map.cells[i] = 1;
+        }
+    }
+}
 
 fn charge_cells(remaining: &mut usize, cells: usize) -> Result<(), String> {
     *remaining = remaining.checked_sub(cells).ok_or_else(|| {

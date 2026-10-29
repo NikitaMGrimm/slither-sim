@@ -1,0 +1,265 @@
+{
+  "baseline": "cf67b80e",
+  "candidate": "af420c844344d839f787cf6b96454e4986f94b37",
+  "counts": {
+    "catalog": 23,
+    "historicalHost": 4,
+    "supplementaryBattledome": 2,
+    "wireMutationControls": 2
+  },
+  "fullByteParity": true,
+  "allSuccessfulTerminalRecordsChecked": true,
+  "focusedStrictnessMutationDetected": true,
+  "projectedRadiusWireMutationsDetected": true,
+  "performanceEvidenceComplete": false,
+  "performanceBlocker": "Maintaining agent has not released the SSH bench",
+  "fullRustGroup": "All 15 required lint/test commands passed",
+  "documentationTests": 7,
+  "localCargoBuildJobs": 1,
+  "localRustTestThreads": 1,
+  "localChecksAreTimingEvidence": false,
+  "independentReview": false,
+  "fullRustLogSha256": "4027a299cd2a797e88634ae201c241ba536bc8853628882615ab326df13b71f8",
+  "fullRustCommands": [
+    {
+      "command": "cargo fmt --all --check",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --workspace --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --locked --",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --all-targets --no-default-features --features parallel",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features bot",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --all-targets --no-default-features --features networking",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --doc --no-default-features --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo test -p slither-sim-ffi --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo check -p slither-sim-py --all-targets --locked",
+      "exit": 0
+    },
+    {
+      "command": "cargo run --locked --example basic",
+      "exit": 0
+    }
+  ],
+  "finalFixedWorkQueuedParity": [
+    {
+      "protocol": 19,
+      "base": {
+        "sha256": "09ce5230119581384b7dd34ccac80cad200e0c09927f3d598704be3e811ca405",
+        "bytes": 574232,
+        "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+        "frames": 1006,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": false,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "candidate": {
+        "sha256": "09ce5230119581384b7dd34ccac80cad200e0c09927f3d598704be3e811ca405",
+        "bytes": 574232,
+        "wireSha256": "5b061fd195ee9bae544bd420045a20dba495df5df8d4c94a582fce0da120a1fb",
+        "frames": 1006,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": false,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "mutation": {
+        "sha256": "f2c3befbbc0dd8cc2e8a2202c755738ab1055424346ea6a9077975fde909f894",
+        "bytes": 574472,
+        "wireSha256": "ada2814ddb014849c12bceefe7139c4a63b66a38b73c43b05817499dfed34dc5",
+        "frames": 1006,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": false,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "wireMutationDetected": true
+    },
+    {
+      "protocol": 13,
+      "base": {
+        "sha256": "14f7a32c713a92d600dd26f6e7f3eda38e9b3d8566708c07cdb210c1eeb619f5",
+        "bytes": 592516,
+        "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+        "frames": 1274,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": true,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "candidate": {
+        "sha256": "14f7a32c713a92d600dd26f6e7f3eda38e9b3d8566708c07cdb210c1eeb619f5",
+        "bytes": 592516,
+        "wireSha256": "47c960d0c7c7431854d23fa01a9dbae29fdc5ea562306d04618f5413dd6ef530",
+        "frames": 1274,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": true,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "mutation": {
+        "sha256": "5958d3bdc7925c58b7f6242321623f33af0a3e576291e2b3324c18c1734976c1",
+        "bytes": 592756,
+        "wireSha256": "aabc40a04c867ad0f3238fdeace2dc202280f6b865781dfafd91d051b9a0199c",
+        "frames": 1274,
+        "summary": {
+          "blockedAttempts": 737280,
+          "blockedExhausted": 180,
+          "blockedSearches": 180,
+          "legacy": true,
+          "releaseExhausted": 182,
+          "releaseSearches": 193,
+          "row": "spawn",
+          "ticks": 720,
+          "waiting": 47
+        }
+      },
+      "wireMutationDetected": true
+    }
+  ],
+  "final80ViewerParity": [
+    {
+      "study": "minimap",
+      "protocol": 19,
+      "arm": "base",
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 19,
+      "arm": "candidate",
+      "sha256": "8c5d2ba17632b8ee504b7c66e584b451407a82ea6fc8c0a6169f33570808a81e",
+      "bytes": 538374,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 13,
+      "arm": "base",
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    },
+    {
+      "study": "minimap",
+      "protocol": 13,
+      "arm": "candidate",
+      "sha256": "a9f9023759e20e083ae2e0864bafe1ffbf685eea1cb0013edfa947292e89846e",
+      "bytes": 1054862,
+      "minimapTicks": 1,
+      "waiting": 0,
+      "living": 80,
+      "decoratedViewers": 80,
+      "routingGenerationsNonzero": true
+    }
+  ],
+  "finalLocalBinaries": {
+    "base": {
+      "study_fixed.exe": "f34a02e41e2d6b3b4d08cd36fefcff9db762ec2e6272362f0234e37462107921"
+    },
+    "candidate": {
+      "study_fixed.exe": "77371c6117d8b73970cccb0a60f9ef7430299935623dadaf29a19aa74297fff6"
+    },
+    "mutation": {
+      "study_fixed.exe": "abbcf3d8c98558e5900c9aa19ae7ce36f503670794bc7b137df8155d1f4a3448"
+    }
+  },
+  "stagedNativeManifests": {
+    "base": "303a2b4008b63784054a6773b493b72259cea17f85a84dc00acb5d9c45e98119",
+    "candidate": "4343b78af56111b158721d98be3a4392dc5adee9a7dff4a77bc44afc4e35739e",
+    "mutation": "9b6eecd78911e9083badc564c89026916180d7327ce217e6564fa5869c21fe9f"
+  },
+  "measurementPlanAmendedBeforeCounting": true,
+  "sshGuestUsed": false
+}
