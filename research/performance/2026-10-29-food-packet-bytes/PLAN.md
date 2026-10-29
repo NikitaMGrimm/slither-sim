@@ -92,3 +92,14 @@ existing older-view/pit/handoff/reconnect oracles, source-changing mutation
 controls and the complete offline Rust group. Report all tick classes and timing
 variation. Reuse the exact pinned baseline after rehash, with fresh candidate and
 wire-mutant builds; keep only one bounded target. No live capacity hold is added.
+
+## Current-main base refresh before primary timing
+
+Main landed #261 before any retained-listing timing. Supersede the old-base
+preparation (`b657c97f`) and retain its incomplete check preparation separately;
+no timing rows are selected from it. The primary comparison instead uses base
+`23eddca80a2ae970753dc40717fa74297ff281fc` (including #261) and implementation
+`a15bfc7a4ed4ee07d5d3d772033a869c4bb65024`. Rebuild both arms and the wire mutant,
+rerun all required checks and byte controls, then all three fixed rows. Runtime
+source relative to this base changes only held-listing ownership in food.rs.
+The unchanged fixture still warms complete backends and forks each pair.
