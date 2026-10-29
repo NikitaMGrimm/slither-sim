@@ -7,10 +7,11 @@ traces are retained in verified private archives. Public selected summaries
 pin those archives and instrumented sources without repeating per-file maps.
 The study was initially published without production changes. The separate
 [maintainer decision](REPORT.md#maintainer-decision) now adopts the identical
-measured source in #278 without new builds or timing. Fetch the
+measured source in #278 without new builds or timing. The historical
 [`perf/spawn-obstacle-index` prototype branch](https://github.com/NikitaMGrimm/slither-sim/tree/perf/spawn-obstacle-index)
-for source and oracle tests: `98371b98` includes the final evidence helpers and
-has the same production Rust as measured runtime `c717b268`.
+at `98371b98` has the same production Rust and oracle tests as measured runtime
+`c717b268`. Use this study directory from current #278 for the commands below:
+the historical prototype predates the committed `prepare_counting.py` helper.
 
 Use a dedicated remote Linux builder. Default portable release on both arms;
 empty `RUSTFLAGS`, no `target-cpu=native`. The selected machine is a Frankfurt
@@ -34,12 +35,16 @@ python prepare.py REPO OUTPUT mutation c717b268
 python build_staged.py OUTPUT base
 python build_staged.py OUTPUT candidate
 python build_staged.py OUTPUT mutation
-OUTPUT/base/bin/study_live warmup FIXTURE
+OUTPUT/base/bin/study_live warmup OUTPUT/../fixture
 ```
 
 [live_fixture.rs](live_fixture.rs) freezes the first qualifying checkpoint and
-selects the ascending refused/successful seeds without timing selection.
-Preserve its generated `world.json` and `fixture.json`; the checkpoint digest
+selects the ascending refused/successful seeds without timing selection. For a
+fresh run, `OUTPUT/../fixture` must not already exist: warmup creates that sibling
+directory and writes `world.json` and `fixture.json` there. Both `run_pairs.py`
+and `select_results.py` read exactly that location, not `OUTPUT/fixture`.
+For archived replay, restore those files there instead of running warmup.
+Preserve the generated `world.json` and `fixture.json`; the checkpoint digest
 is in the measurement pins; [fixture.json](fixture.json) records the census. For diagnostic
 profiling only, rebuild the baseline with full DWARF and identical portable
 codegen, sample `cpu-clock:u` at 499 Hz with DWARF call stacks, then classify
@@ -56,14 +61,29 @@ body and departure verdicts and direct inclusion of every original outer
 the exact source, then repeat the focused tests.
 
 Run the earlier catalog/host trace matrix, queued fixed parity and both protocol
-wire controls. Additionally compare complete raw JSON bytes from three repeated
-`study_live admission FIXTURE refused 3` and `successful 3` calls on both arms,
-including returned body/error, RNG and unchanged world state.
+wire controls. The inherited
+[write_gates.py](../2026-10-29-spawn-ring-prefilter/write_gates.py) consumes the
+completed correctness/build inventory and 15-command Rust receipt, writing
+`OUTPUT/required-checks-pass.json` and `OUTPUT/parity-pass.json`. It does not
+produce the additional live-admission receipt.
 
-Freeze `measurement-pins.json` before counting: runner SHA, world SHA, metadata
-SHA and each arm's `pins.json` SHA. Supply the proof gate receipts in OUTPUT.
+[prepare_counting.py](prepare_counting.py) exposes the original private
+controllers' two remaining steps. Its `parity` command runs
+`OUTPUT/ARM/bin/study_live admission OUTPUT/../fixture ROW 3` for both arms and
+both refused/successful rows. It checks repeated results, unchanged world state
+and complete raw byte equality (including result bodies/errors and RNG), then
+writes `OUTPUT/live-parity-pass.json`. Its `pins` command freezes
+`OUTPUT/measurement-pins.json` with the SHA-256 of this study's `run_pairs.py`
+(`runnerSha256`), sibling `fixture/world.json` (`fixtureSha256`), sibling
+`fixture/fixture.json` (`fixtureMetadataSha256`), and each base/candidate
+`OUTPUT/ARM/pins.json` (`arms.ARM.pinsFileSha256`). All three proof receipts
+must pass before freezing. These commands create fresh files exclusively;
+restore archived receipts/manifests unchanged when replaying retained evidence.
 
 ```sh
+python ../2026-10-29-spawn-ring-prefilter/write_gates.py OUTPUT CORRECTNESS_JSON RUST_RECEIPTS_JSON
+python prepare_counting.py OUTPUT parity
+python prepare_counting.py OUTPUT pins
 python run_pairs.py OUTPUT ../2026-10-28-broadcast-distance/reproduce.py 19 live-refused
 # Repeat labels 19 and 13 for live-refused, live-successful, spawn, seats80, seats160.
 python select_results.py OUTPUT SELECTED.json
