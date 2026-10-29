@@ -1,0 +1,41 @@
+{
+  "commands": [
+    {
+      "label": "documentation",
+      "command": [
+        "/usr/bin/python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools",
+        "-p",
+        "test_documentation.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "tables-and-frozen-gate",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-retained-delivery-20261029/delivery-source/research/performance/2026-10-29-retained-sector-layout/tables.py"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "attribution-tables",
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/slither-retained-delivery-20261029/delivery-source/research/performance/2026-10-29-retained-sector-layout/attribution-tables.py"
+      ],
+      "exit": 0
+    }
+  ],
+  "finalRuntimeSourceEqualsMeasuredArm": "base",
+  "bothRuntimeFilesByteChecked": true,
+  "rejectedPatchRoundTripMatchesBothArms": true,
+  "deliveryArchiveCommit": "1a7feb77b2f7f9d41db7079a5c1eff533e6a69d5",
+  "deliveryArchiveSha256": "14bb788b577b3df23ef40b4353c2b92016dedd8c5c595f7606429747d5e527a7",
+  "mainIntegration": "b750004a"
+}
