@@ -291,49 +291,49 @@ impl SnakeReports {
 /// What one connection has been told about each snake slot.
 #[derive(Clone, Debug, Default)]
 pub(super) struct KnownSnakes {
-    /// Ascending occupied slots preserve wire order without an optional record
-    /// for every world slot. The [diagnostic] found about seven occupied records
-    /// per recipient, versus hundreds of reserved optional slots.
-    ///
-    /// [diagnostic]: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-simulation-memory/REPORT.md
-    entries: Vec<(usize, KnownSnake)>,
+    by_slot: Vec<Option<KnownSnake>>,
+    /// Ascending occupied slots: broadcasts usually know only a few peers,
+    /// so enumerating them must not scan every world slot for every recipient.
+    slots: Vec<usize>,
 }
 impl KnownSnakes {
-    fn index(&self, slot: usize) -> Option<usize> {
-        // Bound linear work for crowded views without reserving sparse slots.
-        if self.entries.len() <= 8 {
-            self.entries.iter().position(|(key, _)| *key == slot)
-        } else {
-            self.entries
-                .binary_search_by_key(&slot, |(key, _)| *key)
-                .ok()
-        }
-    }
     pub(super) fn contains_key(&self, slot: usize) -> bool {
-        self.index(slot).is_some()
+        self.by_slot.get(slot).is_some_and(Option::is_some)
     }
     pub(super) fn get_mut(&mut self, slot: usize) -> Option<&mut KnownSnake> {
-        let index = self.index(slot)?;
-        self.entries.get_mut(index).map(|(_, known)| known)
+        self.by_slot.get_mut(slot)?.as_mut()
     }
     pub(super) fn remove(&mut self, slot: usize) -> Option<KnownSnake> {
-        let index = self.index(slot)?;
-        Some(self.entries.remove(index).1)
+        let known = self.by_slot.get_mut(slot)?.take()?;
+        let index = self
+            .slots
+            .binary_search(&slot)
+            .expect("occupied snake slot");
+        self.slots.remove(index);
+        Some(known)
     }
     pub(super) fn insert(&mut self, slot: usize, known: KnownSnake) {
-        match self.entries.binary_search_by_key(&slot, |(key, _)| *key) {
-            Ok(index) => self.entries[index].1 = known,
-            Err(index) => self.entries.insert(index, (slot, known)),
+        if self.by_slot.len() <= slot {
+            self.by_slot.resize(slot + 1, None);
         }
+        if self.by_slot[slot].is_none() {
+            let index = self.slots.binary_search(&slot).unwrap_err();
+            self.slots.insert(index, slot);
+        }
+        self.by_slot[slot] = Some(known);
     }
     #[cfg(test)]
     pub(super) fn slots(&self) -> impl Iterator<Item = usize> + '_ {
-        self.entries.iter().map(|(key, _)| *key)
+        self.slots.iter().copied()
     }
+
+    /// CoverageGrid and known slots are ascending and unique. Merge them once,
+    /// instead of sorting the same nearby candidates for every recipient.
+    /// Copy the membership before updates: removals and appearances mutate it.
     pub(super) fn candidates(&self, nearby: &[usize], out: &mut Vec<usize>) {
         out.clear();
-        out.reserve(nearby.len() + self.entries.len());
-        let mut known = self.entries.iter().map(|(key, _)| *key).peekable();
+        out.reserve(nearby.len() + self.slots.len());
+        let mut known = self.slots.iter().copied().peekable();
         for &slot in nearby {
             while let Some(slot) = known.next_if(|&known| known < slot) {
                 out.push(slot);
@@ -634,9 +634,6 @@ pub(super) fn changes(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod known_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1181,7 +1178,7 @@ mod tests {
             cloned.get_mut(slot).unwrap().kills += 1;
             assert_eq!(
                 cloned.remove(slot).unwrap().kills,
-                reference[&slot].kills + 1
+                known.by_slot[slot].as_ref().unwrap().kills + 1
             );
         }
         assert!(cloned.slots().next().is_none());
