@@ -68,9 +68,7 @@ fn head_blocks(edges: &[Edge]) -> Vec<Bounds> {
 impl Obstacle {
     fn blocks_head(&self, head: Point) -> bool {
         let blocked = |edge: &Edge| segment_distance_le(head, edge.a, edge.b, self.head_width);
-        if !head_boundable(head)
-            || !(0. ..=HEAD_BLOCK_LIMIT).contains(&self.head_width)
-        {
+        if !head_boundable(head) || !(0. ..=HEAD_BLOCK_LIMIT).contains(&self.head_width) {
             return self.edges.iter().any(blocked);
         }
         // Most successful searches never reach this obstacle. Build only after

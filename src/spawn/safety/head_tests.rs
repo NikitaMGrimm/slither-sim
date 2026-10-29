@@ -422,26 +422,45 @@ fn block_guard_domain_edges_and_cancellation_keep_scalar_verdicts() {
 fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt() {
     let raw = [RawObstacle {
         valid: true,
-        vertices: (0..34).map(|i| Point {
-            x: i as f64 * 40., y: if i % 3 == 0 { 200. } else { 0. },
-        }).collect(),
+        vertices: (0..34)
+            .map(|i| Point {
+                x: i as f64 * 40.,
+                y: if i % 3 == 0 { 200. } else { 0. },
+            })
+            .collect(),
         bounds: [0., 0., 1320., 200.],
         width: 200.,
     }];
     let lazy = candidate(&raw);
     let eager = candidate(&raw);
     for obstacle in &eager.obstacles {
-        assert!(obstacle.head_blocks.set(head_blocks(&obstacle.edges)).is_ok());
+        assert!(
+            obstacle
+                .head_blocks
+                .set(head_blocks(&obstacle.edges))
+                .is_ok()
+        );
     }
     assert!(lazy.obstacles[0].head_blocks.get().is_none());
     let distant = Point { x: -1e6, y: -1e6 };
     assert_eq!(lazy.head_is_clear(distant), eager.head_is_clear(distant));
     assert!(lazy.obstacles[0].head_blocks.get().is_none());
     // Unsupported head/width inputs retain the linear path without allocating.
-    assert_eq!(lazy.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. }),
-        eager.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. }));
+    assert_eq!(
+        lazy.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. }),
+        eager.obstacles[0].blocks_head(Point { x: f64::MAX, y: 0. })
+    );
     assert!(lazy.obstacles[0].head_blocks.get().is_none());
-    for x in [-200_f64, -200_f64.next_down(), -200_f64.next_up(), 0., 280., 640., 1320., 1520.] {
+    for x in [
+        -200_f64,
+        -200_f64.next_down(),
+        -200_f64.next_up(),
+        0.,
+        280.,
+        640.,
+        1320.,
+        1520.,
+    ] {
         for y in [-200., 0., 200., 400.] {
             let head = Point { x, y };
             let expected = original_head(head, &raw);
@@ -452,6 +471,11 @@ fn lazy_and_eager_blocks_have_identical_verdicts_and_leave_far_obstacles_unbuilt
     let cached = lazy.obstacles[0].head_blocks.get().unwrap();
     assert!(!cached.is_empty());
     let address = cached.as_ptr();
-    for _ in 0..3 { assert!(!lazy.head_is_clear(Point::default())); }
-    assert_eq!(address, lazy.obstacles[0].head_blocks.get().unwrap().as_ptr());
+    for _ in 0..3 {
+        assert!(!lazy.head_is_clear(Point::default()));
+    }
+    assert_eq!(
+        address,
+        lazy.obstacles[0].head_blocks.get().unwrap().as_ptr()
+    );
 }
