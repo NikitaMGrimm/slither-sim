@@ -90,6 +90,7 @@ impl SectorInterest {
             // Subtraction is monotone in the stored time for fixed finite now.
             // Keep the original subtraction: adding a future deadline can round
             // differently at the strict expiry boundary.
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-subscription-cleanup/REPORT.md
             if self
                 .oldest
                 .is_some_and(|(_, oldest)| now - oldest > RETENTION_SECONDS)
