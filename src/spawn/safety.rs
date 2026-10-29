@@ -245,6 +245,13 @@ impl Safety {
         })
     }
 
+    /// A valid ring whose head already fails cannot become an accepted body.
+    /// Keep invalid ring geometry on the original construction/error path.
+    pub(crate) fn rejects_ring_head(&self, head: Point) -> bool {
+        !self.head_is_clear(head)
+            && super::ring_step(head.distance(Point::default()), self.segments).is_some()
+    }
+
     /// Reserve short normal-speed departures toward the middle and along the
     /// tangent. Initial body clearance alone does not keep a newborn from
     /// turning into an older body as it leaves spawn. These are custom design
@@ -562,6 +569,35 @@ mod tests {
                 }
             }
             assert!(!query.head_is_clear(Point { x: f64::NAN, y: 0. }));
+        }
+    }
+
+    #[test]
+    fn ring_head_shortcut_keeps_invalid_geometry_on_the_error_path() {
+        let mut world = Simulator::new(crate::WorldOptions {
+            config: Config::sandbox(),
+            population: crate::InitialPopulation::Placed {
+                ids: vec!["old".into()],
+                placement: crate::Placement::TestRing,
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        let head = Point { x: 2684., y: 0. };
+        world.correct_pose(0, head, vec![head; 2], 0.).unwrap();
+        let query = Safety::new(&world, 26, 400., 2.);
+        assert!(query.rejects_ring_head(head));
+        for head in [
+            Point::default(),
+            Point { x: 1., y: 0. },
+            Point { x: f64::NAN, y: 0. },
+            Point {
+                x: f64::INFINITY,
+                y: 0.,
+            },
+        ] {
+            assert!(!query.rejects_ring_head(head));
+            assert!(crate::spawn::ring_body(head, 0., 26).is_none());
         }
     }
 
