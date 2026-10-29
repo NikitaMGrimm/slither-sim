@@ -121,3 +121,27 @@ Its source, binary, partial warm telemetry and failure are retained; no timing
 is selected. Fine timers also skip proven-empty flush calls. The corrected build
 passes another finite smoke run. Full-array CPU coordinates and exact interval
 intersections pass synthetic boundary/gap/flat-clock regressions.
+
+## Candidate selected after attribution
+
+The corrected mature attribution passes all original per-window quality gates.
+Coarse poll CPU is 0.266 ms per maintenance tick and 0.162 otherwise, against
+3.277/2.227 ms socket CPU. Rearm is 0.032/0.019 ms, retain/index 0.006/0.004,
+occupancy 0.001/0.001 and deadline scan 0.002/0.001. About 70% of explicit flush
+calls are proven empty, but no whole flush loop is empty: that diagnostic cannot
+identify their isolated removable CPU. Fine transport-write brackets dominate
+flush and include observer overhead. This supports testing the larger measured
+fixed poll cost first, without an unmeasured empty-flush implementation.
+
+Re-test the retained level-triggered epoll prototype on current main, with its
+original snapshot timing, ascending service/flush order and poll fallback. Its
+earlier rejection and tail bursts remain counterevidence, not acceptance. Keep
+fresh base/candidate live pairs, body-class/CPU/client gates and any new tail
+failures. No runtime PR if a meaningful exact saving fails to reproduce.
+
+The measured recorder's record-limit edit also changed its seconds multiplier
+from 1e9 to 4e9. Raw timestamps uniquely retain seconds and fractional nanoseconds:
+divide by 4e9, require remainder <1e9, then combine seconds*1e9+remainder. Preserve
+the module as run and failed first reduction. The selected decoder verifies every
+timestamp, disjoint CPU budgets and independent canonical socket-clock coverage.
+This is exact decoding, with no overhead subtraction or inferred timing values.
