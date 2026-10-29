@@ -4,6 +4,12 @@
 
 ### Added
 
+- A real-socket Battledome recheck after the exact minimap and spawn-ring
+  optimizations. With constant boosting, neither arm falls behind at 160 seats;
+  at 320 both still do, and spawn searches take 63.8% of the candidate's slow
+  ticks. The 480-seat pair was not measured after session expiry; the final
+  cleanup audit is pending
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-live-recheck/REPORT.md)).
 - A follow-up Battledome check with the bots boosting almost all the time,
   the way Battledome players do. 80 players still play smoothly, with
   sub-millisecond jitter. At 160 there are occasional slow ticks, and at 320
