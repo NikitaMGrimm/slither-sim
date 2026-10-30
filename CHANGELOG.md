@@ -33,6 +33,11 @@
 
 ### Performance
 
+- Collision checks keep each snake's body bounds until its body changes,
+  instead of rescanning every body point on every tick. In a frozen
+  10,000-snake world, world CPU per tick falls from about 14.2 to 11.6 ms, and
+  the 500-player catalog step gets about 6% faster. Collision results, death
+  order and killer attribution are unchanged.
 - Removing eaten food copies the surviving pellets in one pass instead of
   rotating them through the list. In a frozen 10,000-snake world, world CPU
   per tick falls from about 17.1 to 14.2 ms, and the 500-player catalog step

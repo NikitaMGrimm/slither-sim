@@ -1,4 +1,6 @@
 pub mod checkpoint;
+#[cfg(test)]
+mod collision_bounds_tests;
 mod initialization;
 #[cfg(test)]
 mod initialization_tests;
@@ -1431,6 +1433,7 @@ impl Simulator {
         self.joins[index] = self.next_join;
         self.next_join += 1;
         self.refresh_spawn_bounds(index);
+        self.buffers.invalidate_body_bounds(index);
         Ok(())
     }
     pub fn living(&self) -> usize {
@@ -1593,6 +1596,7 @@ impl Simulator {
             last_tips,
             boundary_deaths,
             bodies,
+            body_bounds,
             heads,
             order,
             candidates,
@@ -1628,9 +1632,11 @@ impl Simulator {
         // Every living slot writes its current direction during movement below.
         // Retained values are never used for a new step or a dead slot.
         heads.resize(self.snakes.len(), (Point::default(), (0.0, 0.0), 0.0));
+        body_bounds.resize(self.snakes.len(), None);
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
             let s = &mut self.snakes[i];
+            let body_len = s.body.len();
             let state = &mut self.boosts[i];
             state.held = a.boost;
             if !a.boost {
@@ -1765,6 +1771,7 @@ impl Simulator {
                 }
             }
             if let Some(anchor) = crossed_anchor(s.head, s.body[0]) {
+                body_bounds[i] = None;
                 let grow = s.fam >= 1.0;
                 if grow {
                     s.fam -= 1.0;
@@ -1774,6 +1781,10 @@ impl Simulator {
             }
             Self::update_mass(s);
             self.kiosks[i].step(s, &c.kiosk, c.dt, self.min_mass);
+            // Boost and kiosk penalties can both remove tail anchors.
+            if s.body.len() != body_len {
+                body_bounds[i] = None;
+            }
             Self::update_mass(s);
         }
         if PROFILE {
@@ -1782,16 +1793,26 @@ impl Simulator {
         }
         // Stable-slot indexing avoids searching the living list for every pair.
         bodies.clear();
-        bodies.extend(self.snakes.iter().map(|s| {
-            if !s.alive {
-                return None;
-            }
-            let mut bounds = Bounds::between(s.head, s.head);
-            for &p in &s.body {
-                bounds.include(p);
-            }
-            Some(bounds)
-        }));
+        bodies.extend(
+            self.snakes
+                .iter()
+                .zip(body_bounds.iter_mut())
+                .map(|(s, cached)| {
+                    if !s.alive {
+                        *cached = None;
+                        return None;
+                    }
+                    let mut bounds = Bounds::between(s.head, s.head);
+                    if cached.is_none() {
+                        *cached = snake_body_bounds(&s.body);
+                    }
+                    if let Some(body) = cached {
+                        bounds.include(body.min);
+                        bounds.include(body.max);
+                    }
+                    Some(bounds)
+                }),
+        );
         // Each living snake's tip, heading direction and scale, as `head_tip` and
         // `strikes` compute them, evaluated once rather than per pair. Dead
         // slots are never probed or tested.
@@ -2754,8 +2775,9 @@ impl Simulator {
 }
 
 /// Working memory kept between steps, so that small worlds do not pay for an
-/// allocation per buffer per tick. Buffers are reset or overwritten before use; no value is trusted across steps.
-/// Cloned and restored worlds start empty.
+/// allocation per buffer per tick. Scratch is reset or overwritten before use;
+/// anchor bounds alone persist until a body edit invalidates them. Cloned and
+/// restored worlds start empty.
 #[derive(Default)]
 struct StepBuffers {
     alive: Vec<usize>,
@@ -2764,6 +2786,9 @@ struct StepBuffers {
     /// Ascending slots killed by the outer wall or the pit during movement.
     boundary_deaths: Vec<(usize, DeathReason)>,
     bodies: Vec<Option<Bounds>>,
+    /// Only anchor edits invalidate these extrema; the current head is merged
+    /// each tick. Public geometry replacements invalidate their slot too.
+    body_bounds: Vec<Option<Bounds>>,
     heads: Vec<(Point, (f64, f64), f64)>,
     order: Vec<usize>,
     candidates: Vec<u32>,
@@ -2774,6 +2799,13 @@ struct StepBuffers {
     /// Ascending original indices pruned by a moving outer wall or pit edge.
     retained_food: Vec<usize>,
     prey: PreyBuffers,
+}
+impl StepBuffers {
+    fn invalidate_body_bounds(&mut self, slot: usize) {
+        if let Some(bounds) = self.body_bounds.get_mut(slot) {
+            *bounds = None;
+        }
+    }
 }
 #[derive(Default)]
 struct PreyBuffers {
@@ -2855,6 +2887,16 @@ fn sweep_misses(a: Point, b: Point, radius: f64) -> bool {
         || (a.x < -limit && b.x < -limit)
         || (a.y > limit && b.y > limit)
         || (a.y < -limit && b.y < -limit)
+}
+
+/// Anchor extrema exclude the moving head so unchanged bodies can reuse them.
+fn snake_body_bounds(body: &[Point]) -> Option<Bounds> {
+    let (&first, rest) = body.split_first()?;
+    let mut bounds = Bounds::between(first, first);
+    for &point in rest {
+        bounds.include(point);
+    }
+    Some(bounds)
 }
 
 /// Remove strictly ascending original food indices, preserving survivor order.
