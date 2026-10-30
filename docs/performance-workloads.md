@@ -97,6 +97,79 @@ Sandbox, official and Battledome registrations expand into `<id>-step` (one
 buffer through `observe_all_into`). When `perf_compare --base` targets an older
 API without it, the harness falls back to `observe_all`.
 
+## Simulation-thread catalog rows
+
+`engine-official-mature-500` and `engine-battledome-spawn-318` are optional
+`full` rows requiring `networking`. Both run the raw host's serial simulation
+tick, including per-recipient stock protocol-19 encoding and food presentation.
+There are no sockets, client decoders or bot workers. Controls, construction,
+wire draining and serialization are outside each timed interval. `--profile`
+is unavailable because the raw host tick has no phase-profile API; ordinary
+timing still reports tick percentiles. `--parallel` is rejected.
+On Linux, `timing.operationCpuSeconds` also sums process CPU around those same
+operations; it excludes setup and draining and is null on other platforms.
+
+The official row directly constructs 500 living snakes: 250 with 16 anchors,
+150 with 60, 75 with 176 and 25 with 247 (mean 64.75, p90 176, p99 247).
+They occupy disjoint concentric lanes, starting at radius 3,000 with 180-unit
+lane spacing and 600-unit gaps; adjacent body anchors span 42 units of arc.
+Tangential controls maintain the lanes. This approximates the length census
+in the [mature coverage study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md),
+without simulating hours of growth or claiming its spatial distribution.
+It retains `Config::official(500)` ecology and radius, with automatic radius
+and population sizing disabled. Setup is bounded by 500 snakes, 32,375 anchors,
+startup ecology and one raw tick. The default 144 timed ticks cover 1.008 virtual
+seconds and include the two 504 ms food updates. Longer samples rebuild this
+same scene after each 144 ticks, outside timing.
+
+The Battledome row imports only the ordered head/body geometry, mass and speed
+of the 320-slot, 318-living synthetic constant-boost fixture from the
+[spawn index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md).
+The bounded binary fixture stores little-endian f64 values: an alive flag for
+each slot, then head x/y, heading, fractional mass, speed, body count and ordered
+body x/y for living slots. It contains no session data or recording. Lives and
+timers start at zero, with exactly 18,346 fresh ambient pellets in a fixed-radius
+11,333.603134043473 Battledome. Pit, spawn band and ecology scale with that wall
+before automatic sizing is disabled. Food takes the first 18,346 admitted
+pellets from a separate seed-7 construction with 100,000 startup attempts;
+this bounded setup retains the ordinary ambient cell limit. This is a new catalog scene derived
+from that geometry, rather than an exact checkpoint continuation. Setup needs
+one untimed initial broadcast, preserving the seed-0 opening before any motion;
+normal execution never repeats the study's 642.684-second warmup.
+Every measured operation performs complete waited=0 spawn searches with RNG
+seeds 40 and 0, then one ordinary constant-boost raw tick. Search construction,
+refusal and successful pose results are all timed, but poses are not installed.
+The default sample uses 64 operations, rebuilding after each 16 ticks to bound
+drift. Reports count both search outcomes and minimum living population.
+The 317,440-byte geometry file was regenerated at revision `556e73f0`; its
+SHA-256 is part of the catalog definition. The ignored
+`regenerate_spawn_fixture` example test reproduces it with seed 7 and 15,302
+decisions, checking the selected living and anchor counts before writing. This
+slow, explicit maintenance operation is separate from catalog setup:
+
+```sh
+cargo test --release --locked --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
+```
+
+Both constructions begin with ambient food only, attach recipients before the
+first tick and process subsequent food births through the backend. This avoids
+the [missing presentation history](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-broadcast/REPORT.md#why-host-restoration-stops)
+that prevented importing a mature core checkpoint into a fresh host. These rows
+measure engine costs in prescribed synthetic worlds, not live capacity.
+
+Traces retain initial/final authoritative state, census and ordered per-tick
+wire/search results; the official 144-tick window also retains full state at
+both food boundaries. The Battledome trace uses four operations. Presentation
+and connection internals are not serialized, so parity covers these outputs
+and state boundaries. The example compiles an untimed source mirror of the
+checked-out engine with a private fixture child; the library's source and API
+are unchanged. The comparison overlay copies the measurement helpers and
+geometry, while each revision supplies its own engine code.
+
+```sh
+python -B tools/perf_compare.py --base BASE --output outputs/perf/engine-check --cases engine-official-mature-500 engine-battledome-spawn-318
+```
+
 ## Shared-policy workload
 
 `shared-forager-a4-mean-8` is a separate local-only row. It runs eight synthetic sandbox

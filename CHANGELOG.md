@@ -4,6 +4,9 @@
 
 ### Added
 
+- Reusable offline performance catalog rows for a synthetic mature 500-player
+  official world and 318-snake Battledome spawn overload, in the optional full suite.
+
 - A study of storing each player's retained food sectors in flat sorted
   arrays instead of a tree. Food-update ticks get about 0.55 ms cheaper in
   every measured pair, but the whole run isn't reliably faster: in a
