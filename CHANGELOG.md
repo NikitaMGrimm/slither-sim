@@ -2,12 +2,6 @@
 
 ## Unreleased
 
-### Changed
-
-- The fidelity toolkit now collects from local hosts only; official server
-  discovery and pilot preparation tools are removed. Earlier studies retain
-  their historical scripts and records.
-
 ### Added
 
 - A `perf_baseline` catalog row, `engine-battledome-spawn-318`, that times
@@ -29,6 +23,12 @@
   overloaded and the results are mixed. Spawn search still takes about 60% of
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
+
+### Changed
+
+- The fidelity toolkit collects from local hosts only. The tools for finding
+  outside servers and preparing pilots on them are removed; earlier studies
+  keep the scripts they used.
 
 ### Performance
 
