@@ -2,7 +2,7 @@
 //! Both hosts run this exact fixed-tick schedule through AnimatedClient and its planners.
 use crate::{
     Result,
-    frame::{Draw, Frame, MAX_EXTENT, ResourceKey},
+    frame::{Draw, Frame, MAX_EXTENT, ResourceKey, reserve_draws},
     materials::{RgbaImage, materialize},
 };
 use slither_client::{
@@ -305,8 +305,10 @@ impl Scene {
                 command_limit: 4096,
             })
             .map_err(|e| e.to_string())?;
+            reserve_draws(&mut draws, body.commands.len())?;
             draws.extend(body.commands.iter().map(Draw::from));
         }
+        reserve_draws(&mut draws, food.late.len())?;
         draws.extend(food.late.iter().map(Draw::from));
         self.identity += 1;
         Ok(Frame {

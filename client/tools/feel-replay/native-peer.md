@@ -5,7 +5,12 @@ Connect construction/open, unsplit packet ingress, CSS pointer/key input, frame
 preparation, every transport-effect acknowledgment and every issued picture's
 successful presentation. It creates no socket, window, winit loop or GPU device.
 The #299 `feel-trace` recorder supplies the observations; staged pictures retain
-their own copies through issuance and retry, before world commit.
+their own copies through issuance and retry, before world commit. Recorder-local
+identities bind successful picture acknowledgements to those observations,
+including equal-valued preparations. Recoverable draw-memory skips remain in the
+trace with `prepared: true, submitted: false, committed: false`; they increment
+neither successful-draw counter. The A1 v2 shape and flat observation ABI stay
+unchanged.
 
 This driver reproduces **A2's equal-schedule lane**: `Driver::packet` and
 `Driver::close` eagerly drain and acknowledge prepared pictures before the next

@@ -241,7 +241,7 @@ export function validateTrace(trace, schedule) {
   if (betweenLives) fail('trace.final', 'incomplete restart: still between lives');
   if (!f.completed || f.unexpectedNetwork || f.pendingEffects !== 0 || f.pendingFrames !== 0 || !same(f.atMs, schedule.durationMs)
     || f.events !== trace.events.length || f.commands !== trace.commands.length
-    || f.samples !== trace.samples.length || f.draws !== trace.samples.filter(s => s.phase === 'draw').length
+    || f.samples !== trace.samples.length || f.draws !== trace.samples.filter(s => s.phase === 'draw' && s.status.committed).length
     || f.lastBoundaryId !== schedule.boundaries.at(-1).id) fail('trace.final', 'incomplete final boundary/counters or unexpected network');
   return trace;
 }

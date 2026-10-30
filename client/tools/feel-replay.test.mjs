@@ -43,6 +43,16 @@ test('synthetic deterministic self-comparison and Wasm peers are exact', () => {
   assert.equal(run(p).status, 'exact-match');
   assert.equal(stringify(p.left), stringify(parse(stringify(p.left))));
 });
+test('v2 retains skipped draw boundaries but counts only acknowledged pictures', () => {
+  const { schedule, trace } = syntheticFixture();
+  const skipped = trace.samples.filter(s => s.phase === 'draw').at(-1);
+  Object.assign(skipped.status, { prepared: true, submitted: false, committed: false });
+  skipped.quality.successfulDraws = 1;
+  trace.final.draws = 1;
+  assert.equal(validateTrace(trace, schedule), trace);
+  trace.final.draws = 2;
+  assert.throws(() => validateTrace(trace, schedule), /incomplete final boundary\/counters/);
+});
 test('stable equal-time schedule is packet -> input -> frame, preserving source order', () => {
   const events = ['frame', 'input', 'packet', 'packet', 'input'].map((kind, i) => ({ kind, sourceId: String(i), atMs: 0 }));
   assert.deepEqual(orderEvents(events).map(e => e.sourceId), ['2', '3', '1', '4', '0']);

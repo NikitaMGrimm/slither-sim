@@ -135,8 +135,7 @@ impl Announcement {
         };
         for (mut draw, resource) in draws {
             if crate::render::clip_text(&mut draw, viewport) {
-                crate::frame::check_draw_count(frame.draws.len() + 1)?;
-                frame.draws.push(draw);
+                crate::frame::push_draw(&mut frame.draws, draw)?;
                 resources.push(resource);
             }
         }

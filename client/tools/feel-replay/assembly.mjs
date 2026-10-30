@@ -37,7 +37,7 @@ export function traceAssembly(schedule, manifest) {
     finish(state) {
       return { schema: 2, manifest, events, commands, samples, final: {
         atMs: state.atMs, events: events.length, commands: commands.length, samples: samples.length,
-        draws: draw, lastBoundaryId: samples.at(-1)?.id ?? 'missing', ...state, completed: state.completed && complete,
+        draws: successfulDraws, lastBoundaryId: samples.at(-1)?.id ?? 'missing', ...state, completed: state.completed && complete,
       } };
     },
   };

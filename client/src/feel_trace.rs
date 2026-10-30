@@ -11,6 +11,8 @@ use std::sync::{Arc, Mutex};
 /// An immutable copy of one exact core boundary, including a staged draw.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Observation {
+    /// Recorder-local identity for picture acknowledgements; absent from the flat ABI.
+    pub sequence: u64,
     /// Core boundary kind.
     pub phase: &'static str,
     /// Retained own identity, without conversion through f64.
@@ -21,6 +23,7 @@ pub struct Observation {
 
 #[derive(Debug, Default)]
 struct Journal {
+    next_sequence: u64,
     rows: Vec<Observation>,
     errors: Vec<String>,
     failed: bool,
@@ -201,11 +204,18 @@ impl Recorder {
                 }
             }
         }
+        let Some(next_sequence) = journal.next_sequence.checked_add(1) else {
+            journal.failed = true;
+            journal.errors.push("Observation identity exhausted".into());
+            return;
+        };
         let row = Observation {
+            sequence: journal.next_sequence,
             phase,
             token,
             values,
         };
+        journal.next_sequence = next_sequence;
         if phase == "draw" {
             journal.last_draw = Some(row.clone());
         }
@@ -252,6 +262,20 @@ fn projected_pupils(
 mod tests {
     use super::*;
     use crate::presentation::SingleEyeGeometry;
+
+    #[test]
+    fn observation_identity_distinguishes_equal_values_and_survives_drains() {
+        let recorder = Recorder::default();
+        let client = AnimatedClient::new(0.).unwrap();
+        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None);
+        let rows = recorder.take();
+        assert_eq!(rows[0].values, rows[1].values);
+        assert_ne!(rows[0].sequence, rows[1].sequence);
+        assert_eq!(recorder.last_draw(), Some(rows[1].clone()));
+        recorder.observe(&client, "draw", None, None);
+        assert!(recorder.take()[0].sequence > rows[1].sequence);
+    }
 
     #[test]
     fn unsupported_face_and_failed_layout_return_explicit_errors() {

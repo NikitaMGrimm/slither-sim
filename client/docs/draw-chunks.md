@@ -35,9 +35,11 @@ At the absolute bound, per-picture storage is:
 | Reused CPU vertex scratch, at most one chunk | 983,040 (0.9375 MiB) |
 | GPU vertex data across at most 32 chunks | 31,457,280 (30 MiB) |
 
-Chunk/state-vector headers, allocator and driver overhead are additional. Vec
-growth can temporarily retain spare Draw capacity below twice the logical
-record budget, and painter plans retain bounded per-command records alongside
+Chunk/state-vector headers, allocator and driver overhead are additional.
+Compositor appends and splices check the count before growing Draw storage and
+cap its geometric spare capacity at `MAX_DRAWS`, including faces, arena, text and
+late overlays. A full picture rejects the next eligible draw before a Vec can
+double beyond 64 MiB. Painter plans retain bounded per-command records alongside
 composition. The food/prey planners are limited by the remaining picture
 allowance; each body planner also retains its existing per-snake sample bound.
 These figures describe draw submission storage, not total process memory or a
@@ -75,6 +77,12 @@ The native host discards its acquired surface image and uses its existing
 `LocalGame::draw_diagnostics` records `skipped_frames` and
 `last_skipped_identity`, separately from session failure and bot observations.
 The counter saturates; it stores no unbounded diagnostic history.
+
+The native feel replay retains the core draw observation of a skipped picture
+with v2 status `prepared: true, submitted: false, committed: false`. Submission,
+picture commit, `quality.successfulDraws` and `final.draws` require an actual
+picture acknowledgement. Recorder-local identities match even equal-valued
+observations to issued pictures; they do not change the flat observation ABI.
 
 Other errors, including invalid geometry, missing resources and pixel-budget
 failures, retain their existing failure behavior. Direct renderer callers get

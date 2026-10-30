@@ -1,7 +1,7 @@
 //! CSS-pixel minimap composition. The shared core owns all map and lifecycle state.
 use crate::{
     Result,
-    frame::{Draw, Frame},
+    frame::{Draw, Frame, push_draw},
     materials::RgbaImage,
     scene::Resource,
     text::{Align, Baseline, TextCache, TextRun, TextStyle, Weight},
@@ -340,7 +340,7 @@ impl Minimap {
             let mut d = d.clone();
             d.translation = origin;
             d.effective_alpha = alpha;
-            frame.draws.push(d);
+            push_draw(&mut frame.draws, d)?;
             resources.push(r.clone());
         }
         // The DOM holder has visible overflow. Submit only the marker's outside
@@ -370,7 +370,7 @@ impl Minimap {
                 [left, top, right, bottom],
                 alpha * m.opacity,
             ) {
-                frame.draws.push(command);
+                push_draw(&mut frame.draws, command)?;
                 outside = true;
             }
         }
@@ -433,8 +433,7 @@ impl Minimap {
             if (!label.overflow_hidden || crate::render::clip_text(&mut draw, clip))
                 && crate::render::clip_text(&mut draw, viewport)
             {
-                crate::frame::check_draw_count(frame.draws.len() + 1)?;
-                frame.draws.push(draw);
+                push_draw(&mut frame.draws, draw)?;
                 resources.push(resource);
             }
         }

@@ -22,6 +22,30 @@ pub fn check_draw_count(count: usize) -> Result<()> {
     }
 }
 
+/// Admit before Vec growth, capping geometric spare capacity at the record bound.
+pub(crate) fn reserve_draws(draws: &mut Vec<Draw>, additional: usize) -> Result<()> {
+    let required = draws
+        .len()
+        .checked_add(additional)
+        .ok_or(DRAW_MEMORY_LIMIT)?;
+    check_draw_count(required)?;
+    if required > draws.capacity() {
+        let capacity = required
+            .max(draws.capacity().saturating_mul(2))
+            .min(MAX_DRAWS);
+        draws
+            .try_reserve_exact(capacity - draws.len())
+            .map_err(|_| "frame draw allocation failed")?;
+    }
+    Ok(())
+}
+
+pub(crate) fn push_draw(draws: &mut Vec<Draw>, draw: Draw) -> Result<()> {
+    reserve_draws(draws, 1)?;
+    draws.push(draw);
+    Ok(())
+}
+
 /// Recoverable picture failures, separate from session failure and bot observations.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DrawDiagnostics {
