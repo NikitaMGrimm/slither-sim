@@ -123,9 +123,13 @@ class Handler(BaseHTTPRequestHandler):
             elif action=="status":
                 result={"alive":host is not None and host.poll() is None,"unix":time.time()}
             elif action=="mode":
+                label=request["label"]
+                if not isinstance(label,str) or not re.fullmatch(r"[a-z0-9-]+",label):
+                    raise ValueError("Invalid study row label")
+                mode=request["mode"]
+                if mode not in ["off","light","trace","sched"]:
+                    raise ValueError("Invalid observation mode")
                 stop_trace()
-                label=request["label"];assert re.fullmatch(r"[a-z0-9-]+",label)
-                mode=request["mode"];assert mode in ["off","light","trace","sched"]
                 if mode=="off":(session/"RECORD").unlink(missing_ok=True)
                 else:(session/"RECORD").touch()
                 if mode in ["trace","sched"]:
@@ -146,7 +150,9 @@ class Handler(BaseHTTPRequestHandler):
                         "tickBytes":(session/"ticks.bin").stat().st_size,
                         "label":request["label"]}
             elif action=="checkpoint":
-                label=request["label"];assert re.fullmatch(r"[a-z0-9-]+",label)
+                label=request["label"]
+                if not isinstance(label,str) or not re.fullmatch(r"[a-z0-9-]+",label):
+                    raise ValueError("Invalid study row label")
                 stop_trace();(session/"RECORD").unlink(missing_ok=True);time.sleep(.3)
                 directory=root/"checkpoints"/label;directory.mkdir(parents=True)
                 for name in ["host.jsonl","telemetry.jsonl","ticks.meta.json","config.json"]:

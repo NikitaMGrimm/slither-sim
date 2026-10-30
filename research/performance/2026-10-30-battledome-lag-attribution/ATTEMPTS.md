@@ -27,3 +27,9 @@
   augmented cached result. Seven documentation checks and exact table matching
   pass remotely. All required archives were retrieved/verified before teardown;
   the 17-enabled-region audit is clean and the task key/group are deleted.
+- Post-publication CodeQL identified 13 path flows guarded by Python assertions.
+  Those guards disappear with `python -O`. Replace them with explicit validation
+  before trace mutation; two short offline boundary tests pass normally and under
+  `-O` (under one second each locally). No native/reduction work ran locally.
+  Preserve every measured archive and original source pin; this corrects the
+  future controller only and does not re-label the measured helper version.
