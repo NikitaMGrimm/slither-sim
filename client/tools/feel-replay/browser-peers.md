@@ -20,7 +20,9 @@ unstaged source. Cleanup tracks process termination from spawn, including signal
 
 `--commands` is the frozen expected control count, and `--appearance-at` the
 independently declared first own-appearance time. Neither is learned from a peer
-trace. Optional `--width`, `--height`, `--dpr` default to 960, 540, 1. Private
+trace. Optional `--width`, `--height`, `--dpr` default to 960, 540, 1; `--hz`
+declares the RAF cadence (60 by default). Freeze cadences separately and preserve
+command-count failures instead of fitting expectations to peer output. Private
 schema-1 header-free tapes use the same command with their existing immutable
 record path. `--receipt` hashes an existing acceptance receipt in place. Private
 paths, hashes, bodies, receipts and results must remain outside Git/public logs.
@@ -58,6 +60,14 @@ capabilities. WebGPU uses `LocalGameplay`, `localHost` and `installLocalInput`.
 Only its GPU I/O is replaced by a feature-gated CPU presentation sink; all resource
 preparation, gameplay, effects and presentation acknowledgments remain production
 paths. This gate does not compare pixels, GPU completion, physical input or pacing.
+
+Both peers drain recorder-local sequence identities alongside the unchanged
+numeric observation cells, plus a separate list of pictures acknowledged after
+submission and model commit. Assembly matches receipts by identity, retaining
+unacknowledged draw rows as prepared but neither submitted nor committed. It
+rejects missing receipt metadata, duplicate identities and orphan/non-draw
+acknowledgements. The runner validates the resulting status against acknowledged
+draw ordinals and retains those ordinals in the private receipt sidecar.
 
 The virtual Date/performance origin, timer/RAF history, high quality, viewport,
 resting mouse pointer and empty keys are equal before bootstrap. An optional

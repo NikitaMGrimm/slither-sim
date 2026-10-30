@@ -2,7 +2,7 @@
 use slither_client::presentation::{BodyBlend, BodyRect, HudOpacity, LeaderboardRow};
 use slither_wgpu_slice::{
     bank::Bank,
-    frame::{Draw, Frame, MAX_DRAWS},
+    frame::{DRAW_MEMORY_LIMIT, Draw, Frame, MAX_DRAWS},
     hud::{self, View},
     render,
     text::{Align, Baseline, CACHE_BYTES, CACHE_RUNS, TextRun, TextStyle, Weight},
@@ -181,12 +181,40 @@ fn a_full_or_nearly_full_frame_never_overruns_the_draw_limit() {
         effective_alpha: 1.,
         blend: BodyBlend::SourceOver,
     };
-    for count in [MAX_DRAWS, MAX_DRAWS - 1, MAX_DRAWS - 40] {
+    let hud_draws = finish(&v, &mut bank, frame([960, 540], 1.))
+        .frame
+        .draws
+        .len();
+    for count in [
+        8192,
+        32_768,
+        MAX_DRAWS - hud::MAX_DRAWS,
+        MAX_DRAWS - hud_draws,
+    ] {
         let mut f = frame([960, 540], 1.);
         f.draws = vec![draw.clone(); count];
         let out = finish(&v, &mut bank, f);
         assert!(out.frame.draws.len() <= MAX_DRAWS);
-        assert_eq!(&out.frame.draws[..count], vec![draw.clone(); count]);
+        assert!(out.frame.draws.capacity() <= MAX_DRAWS);
+        assert!(out.frame.draws[..count].iter().all(|d| *d == draw));
+    }
+    for count in [MAX_DRAWS, MAX_DRAWS - 1, MAX_DRAWS - hud_draws + 1] {
+        let mut f = frame([960, 540], 1.);
+        f.draws = vec![draw.clone(); count];
+        let resources = bank.resources(&f).unwrap();
+        assert_eq!(
+            render::finish_hud(
+                render::PreparedFrame {
+                    frame: f,
+                    resources
+                },
+                &mut bank,
+                &v
+            )
+            .err()
+            .as_deref(),
+            Some(DRAW_MEMORY_LIMIT)
+        );
     }
 }
 

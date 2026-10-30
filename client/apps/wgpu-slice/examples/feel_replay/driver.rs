@@ -9,6 +9,7 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame},
     render,
 };
+use std::collections::BTreeSet;
 
 const ENDPOINT: &str = "ws://127.0.0.1:19090/slither";
 
@@ -18,7 +19,11 @@ pub struct Driver {
     pub effects: Vec<String>,
     pub commands: Vec<Value>,
     pub receipts: Vec<Value>,
+    pub acknowledged_pictures: BTreeSet<u64>,
     pub extent: [u32; 2],
+    pub desktop: bool,
+    pub lifecycle: Vec<Value>,
+    pending_ack: Option<f64>,
     socket: Option<u32>,
     sends: usize,
     controls: bool,
@@ -34,7 +39,11 @@ impl Driver {
             effects: vec![],
             commands: vec![],
             receipts: vec![],
+            acknowledged_pictures: BTreeSet::new(),
             extent: render::backing_size([width, height])?,
+            desktop: false,
+            lifecycle: vec![],
+            pending_ack: None,
             socket: None,
             sends: 0,
             controls: false,
@@ -98,11 +107,7 @@ impl Driver {
             let Some(_picture) = self.game.take_frame() else {
                 return Ok(());
             };
-            // The issued candidate is observable before its world is committed.
-            if self.game.issued_feel_observation().is_none() && !self.recorder.has_failed() {
-                return Err("Issued picture has no observation".into());
-            }
-            self.game.presented(true)?;
+            self.present_picture()?;
         }
         if self.game.has_frame() {
             Err("Picture drain budget".into())
@@ -110,11 +115,66 @@ impl Driver {
             Ok(())
         }
     }
+    fn present_picture(&mut self) -> Result<()> {
+        let observation = self.game.issued_feel_observation().map(|row| row.sequence);
+        if observation.is_none() && !self.recorder.has_failed() {
+            return Err("Issued picture has no observation".into());
+        }
+        self.game.presented(true)?;
+        if let Some(sequence) = observation
+            && !self.acknowledged_pictures.insert(sequence)
+        {
+            return Err("Picture observation acknowledged twice".into());
+        }
+        Ok(())
+    }
     pub fn flush(&mut self, now: f64) -> Result<()> {
         self.game.observe_time(now)?;
         self.game.viewport(self.extent, 1.)?;
-        self.pictures()?;
+        if !self.desktop {
+            self.pictures()?;
+        } else {
+            self.game.service_ingress()?;
+        }
         self.drain_effects(now)
+    }
+    /// Running::frame's CPU order, after successful surface acquisition. The
+    /// authored acknowledgment models a synchronous present blocking the host;
+    /// the request scheduler queues transport/input and coalesces redraws meanwhile.
+    pub fn redraw(&mut self, now: f64, ack_at: f64) -> Result<()> {
+        if self.pending_ack.is_some() || ack_at < now || !ack_at.is_finite() {
+            return Err("Invalid desktop redraw/ack order".into());
+        }
+        self.game.viewport(self.extent, 1.)?;
+        self.flush(now)?; // service transport/effects before sampling
+        let queued = self.game.has_frame();
+        self.lifecycle
+            .push(json!({"kind":"redraw", "atMs":now, "queuedPicture":queued}));
+        self.game.begin_redraw(now, self.extent, 1.)?;
+        self.drain_effects(now)?;
+        if let Some(picture) = self.game.take_frame() {
+            self.lifecycle.push(json!({"kind":"issue", "atMs":now,
+                "identity":picture.frame.identity.to_string(), "ackMs":ack_at}));
+            self.pending_ack = Some(ack_at);
+            if ack_at == now {
+                self.ack_picture(now)?;
+            }
+        }
+        self.drain_effects(now)
+    }
+    pub fn ack_picture(&mut self, now: f64) -> Result<()> {
+        if let Some(due) = self.pending_ack.take() {
+            if due != now {
+                return Err("Desktop picture acknowledgment at wrong time".into());
+            }
+            self.present_picture()?;
+            self.drain_effects(now)?;
+        }
+        Ok(())
+    }
+    #[cfg(test)]
+    pub fn awaiting_picture(&self) -> bool {
+        self.pending_ack.is_some()
     }
     pub fn frame(&mut self, now: f64) -> Result<()> {
         self.flush(now)?;
@@ -131,6 +191,10 @@ impl Driver {
             self.controls = true;
         }
         self.game.receive(generation, bytes, now)?;
+        if self.desktop {
+            self.lifecycle
+                .push(json!({"kind":"receive", "atMs":now, "pending":self.game.feel_pending()}));
+        }
         self.drain_effects(now)?;
         self.flush(now)
     }
@@ -204,6 +268,34 @@ mod tests {
         d.drain_effects(1.).unwrap();
         assert_eq!(d.receipts.last().unwrap()["kind"], "close");
         assert_eq!(d.game.feel_pending(), [0, 0]);
+    }
+    #[test]
+    fn desktop_success_count_excludes_superseded_and_unacknowledged_pictures() {
+        let mut d = playing();
+        d.desktop = true;
+        d.recorder.take();
+        d.acknowledged_pictures.clear();
+        // Authored protocol-19 Setup, completed but superseded before display.
+        let setup = [
+            b'a', 0, 3, 232, 1, 174, 0, 100, 0, 20, 48, 2, 27, 0, 40, 5, 120, 0, 33, 0, 28, 1, 174,
+            19, 42,
+        ];
+        d.packet(&setup, 30.).unwrap();
+        d.redraw(40., 80.).unwrap();
+        assert!(d.acknowledged_pictures.is_empty());
+        assert!(d.awaiting_picture());
+        assert_eq!(
+            d.recorder
+                .take()
+                .iter()
+                .filter(|r| r.phase == "draw")
+                .count(),
+            2
+        );
+        d.ack_picture(80.).unwrap();
+        assert_eq!(d.acknowledged_pictures.len(), 1);
+        d.ack_picture(80.).unwrap();
+        assert_eq!(d.acknowledged_pictures.len(), 1);
     }
     #[test]
     fn delayed_issue_retry_and_commit_keep_the_exact_staged_snapshot() {

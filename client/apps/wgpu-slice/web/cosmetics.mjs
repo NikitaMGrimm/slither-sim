@@ -3,8 +3,10 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
   fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
   let images = new CosmeticImages();
   try {
-    for (const path of CosmeticImages.paths()) {
-      try {
+    const localBase = new URL(baseUrl);
+    if (!['http:', 'https:'].includes(localBase.protocol) || localBase.username || localBase.password
+      || (globalThis.location && localBase.origin !== globalThis.location.origin)) throw new Error('Local served cosmetics required');
+    const read = async (path, limit) => {
         const response = await request(new URL(path, baseUrl), { credentials: 'omit', redirect: 'error', signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const reader = response.body.getReader();
@@ -13,13 +15,33 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
           for (;;) {
             const { value, done } = await reader.read(); if (done) break;
             size += value.byteLength;
-            if (size > 4 * 1024 * 1024) throw new Error('Image budget');
+            if (size > limit) throw new Error('Image budget');
             chunks.push(value);
           }
         } finally { await reader.cancel(); reader.releaseLock(); }
         const bytes = new Uint8Array(size); let offset = 0;
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-        images.add(path, bytes);
+        return bytes;
+    };
+    const cosmeticPaths = CosmeticImages.paths();
+    try {
+      const manifest = await read('menu/manifest.txt', 4096);
+      const reserved = new Set(cosmeticPaths);
+      const rows = new TextDecoder('utf-8', { fatal: true }).decode(manifest).split('\n').slice(1);
+      // Match Rust's ASCII field separators and exact logical path bindings.
+      if (rows.some(row => {
+        const fields = row.split(/[\t\f\r ]+/).filter(Boolean);
+        return fields.length === 3 && reserved.has(fields[2]);
+      })) throw new Error('Menu manifest path collides with cosmetic');
+      images.manifest(manifest);
+    }
+    catch (error) {
+      if (signal?.aborted) return;
+      warn(`Menu manifest unavailable: ${String(error)}`);
+    }
+    for (const path of [...cosmeticPaths, ...images.menu_paths()]) {
+      try {
+        images.add(path, await read(path, 4 * 1024 * 1024));
       } catch (error) {
         if (signal?.aborted) return;
         warn(`Cosmetic ${path} unavailable: ${String(error)}`);

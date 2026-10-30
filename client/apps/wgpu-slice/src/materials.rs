@@ -10,6 +10,71 @@ pub struct RgbaImage {
     pub pixels: Vec<u8>,
 }
 
+/// Authored menu capsule with a two-stop gradient and a soft offset shadow.
+/// This is a small material approximation, not a CSS/Canvas layout engine.
+pub fn menu_control(
+    size: [u32; 2],
+    radius: f64,
+    colors: [[u8; 3]; 2],
+    scale: f64,
+) -> Result<RgbaImage> {
+    let [w, h] = size;
+    if w == 0
+        || h == 0
+        || w > 1024
+        || h > 256
+        || !radius.is_finite()
+        || radius < 0.
+        || !scale.is_finite()
+        || !(0.01..=3.).contains(&scale)
+    {
+        return Err("Menu control material bounds".into());
+    }
+    let pad = (12. * scale).ceil() as u32;
+    let (width, height) = (w + 2 * pad, h + 2 * pad);
+    if width > 512 || height > 512 {
+        return Err("Menu control texture budget".into());
+    }
+    let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
+    let r = radius.min(f64::from(w.min(h)) / 2.);
+    let distance = |x: f64, y: f64| {
+        let qx = (x - f64::from(w) / 2.).abs() - (f64::from(w) / 2. - r);
+        let qy = (y - f64::from(h) / 2.).abs() - (f64::from(h) / 2. - r);
+        qx.max(0.).hypot(qy.max(0.)) + qx.max(qy).min(0.) - r
+    };
+    for y in 0..height {
+        for x in 0..width {
+            let px = f64::from(x) + 0.5 - f64::from(pad);
+            let py = f64::from(y) + 0.5 - f64::from(pad);
+            let d = distance(px, py);
+            let coverage = (0.5 - d).clamp(0., 1.);
+            let shadow = (-distance(px, py - 3. * scale).max(0.).powi(2) / (18. * scale * scale))
+                .exp()
+                * 0.6;
+            let t = (py / f64::from(h)).clamp(0., 1.);
+            let mut color = [0., 0., 0., shadow];
+            over(
+                &mut color,
+                [
+                    (f64::from(colors[0][0]) * (1. - t) + f64::from(colors[1][0]) * t) / 255.,
+                    (f64::from(colors[0][1]) * (1. - t) + f64::from(colors[1][1]) * t) / 255.,
+                    (f64::from(colors[0][2]) * (1. - t) + f64::from(colors[1][2]) * t) / 255.,
+                    1.,
+                ],
+                coverage,
+                1.,
+                false,
+            );
+            pixels.extend(color.map(|v| (v * 255.).round() as u8));
+        }
+    }
+    Ok(RgbaImage {
+        width,
+        height,
+        pixels,
+    })
+}
+
 fn color(s: &str) -> Result<[f64; 4]> {
     if s.len() == 7 && s.starts_with('#') && s.is_ascii() {
         let mut out = [0., 0., 0., 1.];

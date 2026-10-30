@@ -5,67 +5,16 @@ use fontdue::{Font, FontSettings};
 use slither_client::presentation::TextMeasurement;
 use std::collections::BTreeMap;
 
-fn expand_luminance(bucket: u8) -> u8 {
-    (bucket << 5) | (bucket << 2) | (bucket >> 1)
+fn coverage_gamma(color: [u8; 3]) -> f64 {
+    let [r, g, b] = color.map(f64::from);
+    let luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.;
+    // A continuous perceptual ink-weight adjustment, not a browser raster model.
+    // Light text needs heavier edges; dark text must not receive that boost.
+    1.10 - 0.65 * luminance
 }
 
-fn luminance_bucket(color: [u8; 3]) -> usize {
-    // SkScalerContext canonicalizes RGB to three bits before reducing A8 masks
-    // to luminance, then canonicalizes that grey again (SkComputeLuminance).
-    let [r, g, b] = color.map(|c| u32::from(expand_luminance(c >> 5)));
-    (((54 * r + 183 * g + 19 * b) >> 8) >> 5) as usize
-}
-
-fn linear_srgb(value: f64) -> f64 {
-    if value <= 0.04045 {
-        value / 12.92
-    } else {
-        ((value + 0.055) / 1.055).powf(2.4)
-    }
-}
-
-fn encoded_srgb(value: f64) -> f64 {
-    if value <= 0.0031308 {
-        value * 12.92
-    } else {
-        1.055 * value.powf(1. / 2.4) - 0.055
-    }
-}
-
-fn coverage_table(bucket: u8) -> [u8; 256] {
-    // Windows Chromium uses sRGB (gamma=0 sentinel) and contrast=1.0:
-    // https://github.com/chromium/chromium/blob/dd78960ccd8a03a2fe1f629543d27783885b78e9/skia/BUILD.gn#L137-L142
-    // Skia's model guesses the encoded background as 1 - foreground, boosts
-    // coverage by c*(1-c)*contrast*linear(background), then solves for the alpha
-    // that reproduces a linear-light blend in an encoded source-over texture.
-    // https://github.com/google/skia/blob/c0c46ee9f938fa32c086bea666199686ad7cf26e/site/docs/dev/design/raster_tragedy/_index.md
-    // https://github.com/google/skia/blob/0789f2ab93b844c5f2f5a96eb80c7c8f1ef6f570/src/core/SkMaskGamma.cpp#L74-L125
-    // This is a grey-mask approximation over fontdue, not DirectWrite hinting
-    // or LCD rendering. Three-bit luminance avoids the singular middle grey.
-    let foreground = f64::from(expand_luminance(bucket)) / 255.;
-    let background = 1. - foreground;
-    let linear_foreground = linear_srgb(foreground);
-    let linear_background = linear_srgb(background);
-    const CONTRAST: f64 = 1.;
-    std::array::from_fn(|i| {
-        if i == 0 || i == 255 {
-            return i as u8;
-        }
-        let coverage = i as f64 / 255.;
-        let boosted = coverage + coverage * (1. - coverage) * CONTRAST * linear_background;
-        let encoded =
-            encoded_srgb(linear_foreground * boosted + linear_background * (1. - boosted));
-        (((encoded - background) / (foreground - background)) * 255.)
-            .round()
-            .clamp(0., 255.) as u8
-    })
-}
-
-fn coverage_lut(color: [u8; 3]) -> &'static [u8; 256] {
-    // Only 2 KiB, shared by all rasterizers. The hot pixel loop is one lookup.
-    static TABLES: std::sync::OnceLock<[[u8; 256]; 8]> = std::sync::OnceLock::new();
-    &TABLES.get_or_init(|| std::array::from_fn(|i| coverage_table(i as u8)))
-        [luminance_bucket(color)]
+fn adjusted_coverage(coverage: u8, gamma: f64) -> u8 {
+    (255. * (f64::from(coverage) / 255.).powf(gamma)).round() as u8
 }
 
 #[derive(Default)]
@@ -78,32 +27,35 @@ mod coverage_tests {
     use super::*;
 
     #[test]
-    fn preblend_preserves_endpoints_and_is_monotonic_in_every_luminance_bucket() {
-        for bucket in 0..8 {
-            let table = coverage_table(bucket);
-            assert_eq!(table[0], 0);
-            assert_eq!(table[255], 255);
-            assert!(table.windows(2).all(|p| p[0] <= p[1]));
+    fn curve_preserves_endpoints_and_monotonicity() {
+        for grey in 0..=255 {
+            let gamma = coverage_gamma([grey; 3]);
+            let values: Vec<_> = (0..=255).map(|c| adjusted_coverage(c, gamma)).collect();
+            assert_eq!(values[0], 0);
+            assert_eq!(values[255], 255);
+            assert!(values.windows(2).all(|p| p[0] <= p[1]));
         }
     }
 
     #[test]
-    fn preblend_uses_colour_luminance_for_light_and_dark_text() {
-        let dark = coverage_lut([0; 3]);
-        let grey = coverage_lut([128; 3]);
-        let light = coverage_lut([255; 3]);
-        assert_eq!([dark[64], dark[128], dark[192]], [58, 119, 185]);
-        assert_eq!([grey[64], grey[128], grey[192]], [81, 149, 207]);
-        assert_eq!([light[64], light[128], light[192]], [137, 188, 225]);
-        for i in [64, 128, 192] {
-            assert!(dark[i] <= i as u8);
-            assert!(light[i] >= i as u8);
-            assert!(dark[i] <= grey[i] && grey[i] <= light[i]);
+    fn light_text_is_heavier_than_raw_coverage() {
+        let dark = coverage_gamma([0; 3]);
+        let light = coverage_gamma([255; 3]);
+        for c in 1..255 {
+            assert!(adjusted_coverage(c, dark) <= c);
+            assert!(adjusted_coverage(c, light) >= c);
         }
-        // Skia A8 uses encoded BT.709 luminance, not max(R,G,B) or opacity.
-        assert_eq!(luminance_bucket([255, 0, 0]), 1);
-        assert_eq!(luminance_bucket([0, 255, 0]), 5);
-        assert_eq!(luminance_bucket([0, 0, 255]), 0);
+        assert!(adjusted_coverage(128, light) > 128);
+    }
+
+    #[test]
+    fn gamma_varies_continuously_with_foreground_luminance() {
+        for grey in 0..255 {
+            let change = coverage_gamma([grey; 3]) - coverage_gamma([grey + 1; 3]);
+            assert!(change > 0. && change < 0.003);
+        }
+        assert!(coverage_gamma([0, 255, 0]) < coverage_gamma([255, 0, 0]));
+        assert!(coverage_gamma([255, 0, 0]) < coverage_gamma([0, 0, 255]));
     }
 }
 
@@ -231,9 +183,6 @@ mod tests {
 struct Arial {
     font: Font,
     em_ascent: f64,
-    font_ascent: f32,
-    font_descent: f32,
-    font_line_gap: f32,
 }
 fn canvas_character(c: char) -> Option<char> {
     match c {
@@ -269,51 +218,29 @@ impl Rasterizer {
             };
             let bytes = std::fs::read(std::path::Path::new(directory).join(file))
                 .map_err(|e| format!("installed face ({file}): {e}"))?;
-            let face = ttf_parser::Face::parse(&bytes, 0)
-                .map_err(|e| format!("font metrics ({file}): {e}"))?;
-            let ascent = f64::from(face.typographic_ascender().unwrap_or(face.ascender()));
-            let descent = f64::from(face.typographic_descender().unwrap_or(face.descender()));
+            let font = Font::from_bytes(bytes, FontSettings::default())
+                .map_err(|e| format!("font ({file}): {e}"))?;
+            let metrics = font
+                .horizontal_line_metrics(1.)
+                .ok_or("font line metrics")?;
+            let ascent = f64::from(metrics.ascent);
+            let descent = f64::from(metrics.descent);
             if ascent <= descent {
-                return Err("font typographic metrics".into());
+                return Err("font line metrics".into());
             }
-            // These installed Windows faces use OS/2 usWinAscent/usWinDescent
-            // for DirectWrite/Skia's font box, not OS/2's normalized typo box.
-            // Source/rounding rationale: client/docs/panel-text.md#font-box-and-baselines.
-            let os2 = face.tables().os2.ok_or("font OS/2 metrics")?;
-            let upem = f32::from(face.units_per_em());
-            let font_ascent = f32::from(os2.windows_ascender()) / upem;
-            let font_descent = -f32::from(os2.windows_descender()) / upem;
-            let font_line_gap = f32::from(face.line_gap()) / upem;
             slot.insert(Arial {
-                font: Font::from_bytes(bytes, FontSettings::default())
-                    .map_err(|e| format!("font ({file}): {e}"))?,
+                font,
                 em_ascent: ascent / (ascent - descent),
-                font_ascent,
-                font_descent,
-                font_line_gap,
             });
         }
         Ok(&self.faces[&key])
     }
-    pub fn normal_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
-        let device = TextStyle {
-            size: f64::from(style.size as f32 * scale as f32),
-            ..style
-        };
-        let m = self.measure("", device)?;
-        // CSS normal includes the hhea line gap as well as the rounded font box.
-        // Installed-face regression: tests/announcements.rs; docs/announcements.md.
-        let gap = (device.size as f32 * self.face(device)?.font_line_gap).round();
-        Ok((m.font_ascent.round() + m.font_descent.round() + f64::from(gap)) / scale)
-    }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
         let face = self.face(style)?;
         let font = &face.font;
-        let font_ascent = style.size as f32 * face.font_ascent;
-        let font_descent = style.size as f32 * face.font_descent;
-        // Blink's AscentDescentWithHacks rounds ordinary font boxes; Canvas
-        // retains subpixels for tiny fonts (ascent <3 or total height <2).
-        let tiny = font_ascent < 3. || font_ascent + font_descent < 2.;
+        let metrics = font
+            .horizontal_line_metrics(style.size as f32)
+            .ok_or("font line metrics")?;
         let size = style.size as f32 * 4.;
         let mut pen = 0_f32;
         let mut previous = None;
@@ -345,16 +272,8 @@ impl Rasterizer {
             advance: f64::from(pen) / 4.,
             ascent,
             descent,
-            font_ascent: f64::from(if tiny {
-                font_ascent
-            } else {
-                font_ascent.round()
-            }),
-            font_descent: f64::from(if tiny {
-                font_descent
-            } else {
-                font_descent.round()
-            }),
+            font_ascent: f64::from(metrics.ascent),
+            font_descent: -f64::from(metrics.descent),
         })
     }
     #[cfg(test)]
@@ -467,7 +386,8 @@ impl Rasterizer {
             }
         }
         let mut pixels = vec![0; width * height * 4];
-        let coverage = coverage_lut(color);
+        let gamma = coverage_gamma(color);
+        let curve: [u8; 256] = std::array::from_fn(|c| adjusted_coverage(c as u8, gamma));
         for y in 0..height {
             for x in 0..width {
                 let mut sum = 0_u32;
@@ -476,8 +396,8 @@ impl Rasterizer {
                         sum += u32::from(mask[(y * SAMPLE + dy) * stride + x * SAMPLE + dx]);
                     }
                 }
-                // Preblend the final averaged coverage, before premultiplication.
-                let a = coverage[((sum + 8) / 16) as usize];
+                // Adjust the final 4x4 average before premultiplication.
+                let a = curve[((sum + 8) / 16) as usize];
                 let dst = &mut pixels[(y * width + x) * 4..][..4];
                 for i in 0..3 {
                     dst[i] = ((u16::from(color[i]) * u16::from(a) + 127) / 255) as u8;
@@ -493,9 +413,8 @@ impl Rasterizer {
             },
             offset: [f64::from(left), f64::from(top)],
             advance: f64::from(pen) / SAMPLE as f64,
-            // Canvas middle uses the em square, not hhea's taller line box.
-            // Normalize OS/2 typography to one em, at the browser's 1/64px grid.
-            middle: (px * arial.em_ascent * 64.).round() / 64. - px / 2.,
+            // Center the em square using the face's logical ascent/descent.
+            middle: px * arial.em_ascent - px / 2.,
         })
     }
 }

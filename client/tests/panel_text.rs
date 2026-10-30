@@ -329,7 +329,7 @@ fn one_cluster_over_the_cache_cap_has_an_explicit_bounded_projection() {
     assert_eq!(text.len(), 1028);
 }
 #[test]
-fn line_baselines_follow_font_struts_and_half_leading_not_varying_ink() {
+fn line_baselines_follow_centered_font_struts_not_varying_ink() {
     let f = [
         PanelTextFragment::Text("ace", style()),
         PanelTextFragment::Break,
@@ -354,7 +354,7 @@ fn line_baselines_follow_font_struts_and_half_leading_not_varying_ink() {
 }
 
 #[test]
-fn mixed_font_half_leading_precedes_the_union_of_inline_boxes() {
+fn mixed_font_maximum_ascent_and_descent_form_one_centered_strut() {
     struct MixedMetrics;
     impl TextMetrics for MixedMetrics {
         fn measure(
@@ -394,7 +394,7 @@ fn mixed_font_half_leading_precedes_the_union_of_inline_boxes() {
             fragments.reverse();
         }
         let admitted = PanelText::new(&fragments).unwrap();
-        for (height, expected) in [(32., 24.), (16., 16.)] {
+        for (height, expected) in [(32., 23.), (16., 15.)] {
             let p = layout_panel_text(
                 &PanelTextBlock {
                     text: &admitted,
@@ -423,7 +423,7 @@ fn mixed_font_half_leading_precedes_the_union_of_inline_boxes() {
 }
 
 #[test]
-fn blink_device_rounding_and_negative_leading_at_fractional_dpr() {
+fn logical_struts_and_compact_cells_at_fractional_dpr() {
     struct FontTables {
         sizes: Vec<f64>,
     }
@@ -457,16 +457,12 @@ fn blink_device_rounding_and_negative_leading_at_fractional_dpr() {
         family: TextFamily::Lucida,
         ..style()
     };
-    for (scale, mixed, lucida_y, fractional, odd_unit) in [
-        (1., 24., 22., 23., 17.),
-        (1.25, 30., 27., 30., 21.),
-        (2., 48., 43., 48., 33.),
-    ] {
+    for scale in [1., 1.25, 2.] {
         for (styles, height, expected) in [
-            (vec![arial, lucida], 32., mixed),
-            (vec![arial, lucida], 16., mixed - 8. * scale),
-            (vec![lucida], 32., lucida_y),
-            (vec![arial], 16.984375, odd_unit),
+            (vec![arial, lucida], 32., 22.90380859375),
+            (vec![arial, lucida], 16., 14.90380859375),
+            (vec![lucida], 32., 21.91064453125),
+            (vec![arial], 16.984375, 16.8125),
             (
                 vec![
                     TextStyle {
@@ -479,7 +475,7 @@ fn blink_device_rounding_and_negative_leading_at_fractional_dpr() {
                     },
                 ],
                 31.5,
-                fractional,
+                22.37249755859375,
             ),
         ] {
             let input: Vec<_> = styles
@@ -501,7 +497,11 @@ fn blink_device_rounding_and_negative_leading_at_fractional_dpr() {
                 max_runs: 48,
             };
             let p = layout_panel_text(&block, &mut metrics).unwrap();
-            assert!(p.runs.iter().all(|r| r.position[1] * scale == expected));
+            assert!(
+                p.runs
+                    .iter()
+                    .all(|r| (r.position[1] - expected).abs() < 1e-10)
+            );
             assert!(p.runs.iter().all(|r| r.clip.height == height));
             assert!(metrics.sizes.contains(&(styles[0].size * scale)));
         }

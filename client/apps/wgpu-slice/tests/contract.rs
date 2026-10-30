@@ -50,6 +50,36 @@ fn frame(draws: Vec<Draw>) -> Frame {
 fn resident() -> BTreeMap<ResourceKey, BodyAsset> {
     BTreeMap::from([(asset().into(), asset())])
 }
+
+#[test]
+fn exact_old_ceiling_and_first_chunk_overflow_convert_without_a_gpu() {
+    for count in [8192, 8193] {
+        let draws = (0..count)
+            .map(|i| Draw {
+                effective_alpha: if i % 2 == 0 { 0.25 } else { 0.75 },
+                blend: if i % 3 == 0 {
+                    BodyBlend::Lighter
+                } else {
+                    BodyBlend::SourceOver
+                },
+                ..draw()
+            })
+            .collect();
+        let quads = frame(draws).quads(&resident()).unwrap();
+        assert_eq!(quads.len(), count);
+        for (i, quad) in quads.iter().enumerate() {
+            assert_eq!(quad.vertices[0][4], if i % 2 == 0 { 0.25 } else { 0.75 });
+            assert_eq!(
+                quad.blend,
+                if i % 3 == 0 {
+                    BodyBlend::Lighter
+                } else {
+                    BodyBlend::SourceOver
+                }
+            );
+        }
+    }
+}
 #[test]
 fn only_source_over_body_shadows_and_outlines_request_black_blending() {
     let mut c = BodyImageCommand {

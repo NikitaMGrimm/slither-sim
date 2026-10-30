@@ -16,10 +16,12 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
+pub const MENU_CACHE_BYTES: usize = 4 * 1024 * 1024;
+pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
 pub const CACHE_RUNS: usize = 258;
-pub const TOTAL_CACHE_RUNS: usize = CACHE_RUNS + PANEL_CACHE_RUNS;
-pub const TOTAL_CACHE_BYTES: usize = CACHE_BYTES + PANEL_CACHE_BYTES;
+pub const TOTAL_CACHE_RUNS: usize = CACHE_RUNS + PANEL_CACHE_RUNS + MENU_CACHE_RUNS;
+pub const TOTAL_CACHE_BYTES: usize = CACHE_BYTES + PANEL_CACHE_BYTES + MENU_CACHE_BYTES;
 
 pub use slither_client::presentation::{
     PLATFORM_FONT_FAMILY as FONT_FAMILY, TextAlign as Align, TextBaseline as Baseline,
@@ -96,12 +98,26 @@ struct Content {
     family: Family,
     slant: Slant,
     clip: Option<[u64; 4]>,
-    // Exact RGB also identifies the native luminance-dependent coverage table.
+    // Exact RGB also identifies the native luminance-dependent coverage curve.
     color: [u8; 3],
     shadow: Option<[u64; 3]>,
     line_height: Option<u64>,
 }
 impl Content {
+    fn menu(run: &TextRun<'_>, scale: f64) -> Self {
+        Self {
+            text: run.text.into(),
+            max_width: None,
+            size: (run.style.size * scale).to_bits(),
+            weight: run.style.weight,
+            family: run.style.family,
+            slant: run.style.slant,
+            clip: None,
+            color: run.style.color,
+            shadow: None,
+            line_height: None,
+        }
+    }
     fn panel(run: &slither_client::presentation::PanelTextRun, scale: f64) -> Self {
         Self {
             text: run.text.clone(),
@@ -125,12 +141,19 @@ impl Content {
         }
     }
 }
+pub fn preflight_menu_totals(slots: usize, bytes: usize) -> Result<()> {
+    if slots > MENU_CACHE_RUNS || bytes > MENU_CACHE_BYTES {
+        return Err("Menu cache slot/pixel budget".into());
+    }
+    Ok(())
+}
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
     Nickname(Content),
     Hud(u8),
     Minimap,
     Panel(u8),
+    Menu(u8),
 }
 impl Key {
     #[cfg(all(test, windows))]
@@ -143,6 +166,7 @@ impl Key {
             Self::Hud(_) => 1,
             Self::Minimap => 2,
             Self::Panel(_) => 3,
+            Self::Menu(_) => 4,
         }
     }
 }
@@ -190,6 +214,66 @@ impl Default for TextCache {
     }
 }
 impl TextCache {
+    /// Menu text and authored material allocations share a separate quota.
+    /// The final frame admission runs inside `finish`, before cache publication.
+    /// Only immutable resource copies leave this transaction.
+    pub(crate) fn compose_menu<T>(
+        &mut self,
+        runs: &[TextRun<'_>],
+        scale: f64,
+        materials: (usize, usize),
+        finish: impl FnOnce(Vec<Vec<(Draw, Resource)>>) -> Result<T>,
+    ) -> Result<T> {
+        preflight_menu_totals(materials.0 + runs.len(), materials.1)?;
+        let mut staged = Self {
+            rasterizer: std::mem::take(&mut self.rasterizer),
+            next_handle: self.next_handle,
+            clock: self.clock,
+            ..Self::default()
+        };
+        // Retire changed and hidden slots together before admitting replacements.
+        // A growing early run cannot compete with an obsolete later run.
+        for (i, run) in runs.iter().enumerate() {
+            let key = Key::Menu(i as u8);
+            if let Some(entry) = self.entries.get(&key)
+                && entry.content == Content::menu(run, scale)
+            {
+                staged.entries.insert(key, entry.clone());
+                staged.bytes += entry.bytes;
+            }
+        }
+        let result = (|| {
+            let mut draws = Vec::new();
+            for (i, run) in runs.iter().enumerate() {
+                draws.push(
+                    staged
+                        .try_draw(
+                            TextRun { ..*run },
+                            scale,
+                            Some(Key::Menu(i as u8)),
+                            None,
+                            None,
+                            None,
+                        )?
+                        .1,
+                );
+            }
+            preflight_menu_totals(
+                materials.0 + staged.entries.len(),
+                materials.1 + staged.bytes,
+            )?;
+            finish(draws)
+        })();
+        self.rasterizer = std::mem::take(&mut staged.rasterizer);
+        if result.is_ok() {
+            self.entries.retain(|k, _| !matches!(k, Key::Menu(_)));
+            self.entries.extend(staged.entries);
+            self.bytes = self.entries.values().map(|e| e.bytes).sum();
+            self.next_handle = staged.next_handle;
+            self.clock = staged.clock;
+        }
+        result
+    }
     /// Fontdue/Canvas metrics are copied into the shared line breaker.
     pub fn measure_panel(
         &mut self,
@@ -197,20 +281,6 @@ impl TextCache {
         style: TextStyle,
     ) -> Result<slither_client::presentation::TextMeasurement> {
         self.rasterizer.measure(text, style)
-    }
-    /// Backend CSS-normal line box, including the face's line gap. This does not
-    /// rasterize text or put dynamic placement/opacity in cache keys.
-    pub fn normal_panel_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
-        if !scale.is_finite()
-            || scale <= 0.
-            || scale > 8192.
-            || !style.size.is_finite()
-            || style.size <= 0.
-            || style.size > 24.
-        {
-            return Err("Panel normal font scale/style".into());
-        }
-        self.rasterizer.normal_line_height(style, scale)
     }
     /// Exact deterministic native face choice, including Lucida substitutions.
     #[cfg(not(target_arch = "wasm32"))]
@@ -334,15 +404,16 @@ impl TextCache {
                         .1
                     {
                         if crate::render::clip_text(&mut draw, r.clip) {
+                            // Preserve the producer quota before growing its staged output.
+                            if draws.len()
+                                == crate::render::PANEL_PRODUCER_DRAWS
+                                    - crate::render::PANEL_CONTROL_DRAWS
+                            {
+                                return Err("Panel draw budget".into());
+                            }
                             draws.push((draw, resource));
                         }
                     }
-                }
-                // Eight draws remain for flat fills, border strips and controls.
-                if draws.len()
-                    > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS
-                {
-                    return Err("Panel draw budget".into());
                 }
                 output.push(draws);
             }
@@ -423,7 +494,7 @@ impl TextCache {
         // Prepared/queued frames already own their immutable resource copies.
         self.entries.retain(|key, _| match key {
             Key::Hud(slot) => usize::from(*slot) < spans,
-            Key::Nickname(_) | Key::Minimap | Key::Panel(_) => true,
+            Key::Nickname(_) | Key::Minimap | Key::Panel(_) | Key::Menu(_) => true,
         });
         self.bytes = self.entries.values().map(|entry| entry.bytes).sum();
     }
@@ -557,6 +628,7 @@ impl TextCache {
                 ),
                 Key::Minimap => (MINIMAP_CACHE_BYTES, 1),
                 Key::Panel(_) => (PANEL_CACHE_BYTES, PANEL_CACHE_RUNS),
+                Key::Menu(_) => (MENU_CACHE_BYTES, MENU_CACHE_RUNS),
                 Key::Nickname(_) => (
                     CACHE_BYTES
                         - HUD_CACHE_BYTES
@@ -952,6 +1024,107 @@ fn crop_center(mut raster: Raster, width: f64) -> Raster {
     raster.image.pixels = pixels;
     raster.offset[0] += f64::from(left);
     raster
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod menu_budget_tests {
+    use super::*;
+    fn run(text: &str, size: f64) -> TextRun<'_> {
+        TextRun {
+            text,
+            style: TextStyle {
+                size,
+                weight: Weight::Bold,
+                family: Family::Arial,
+                slant: Slant::Normal,
+                color: [255; 3],
+            },
+            position: [10., 30.],
+            align: Align::Left,
+            baseline: Baseline::Alphabetic,
+            alpha: 1.,
+        }
+    }
+    #[test]
+    fn menu_composition_admits_exact_byte_boundary_and_rolls_back_one_more() {
+        let mut cache = TextCache::default();
+        let runs = [run("Play", 20.)];
+        let first = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let text_bytes = cache.cached_bytes();
+        let material_bytes = MENU_CACHE_BYTES - text_bytes;
+        cache
+            .compose_menu(&runs, 1., (0, material_bytes), Ok)
+            .unwrap();
+        let next_handle = cache.next_handle;
+        let mut published = false;
+        assert!(
+            cache
+                .compose_menu(&runs, 1., (0, material_bytes + 1), |_| {
+                    published = true;
+                    Ok(())
+                })
+                .is_err()
+        );
+        assert!(!published);
+        assert_eq!(cache.next_handle, next_handle);
+        assert_eq!(cache.cached_bytes(), text_bytes);
+        let retained = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        assert_eq!(first[0][0].0.asset, retained[0][0].0.asset);
+    }
+    #[test]
+    fn menu_slots_bytes_and_failed_finish_are_transactional_and_isolated() {
+        assert!(preflight_menu_totals(64, MENU_CACHE_BYTES).is_ok());
+        assert!(preflight_menu_totals(65, 0).is_err());
+        assert!(preflight_menu_totals(0, MENU_CACHE_BYTES + 1).is_err());
+        let mut cache = TextCache::default();
+        let nickname = cache.draw(run("world", 15.), 1.).unwrap()[0].0.asset;
+        let hud = cache.draw_hud(0, run("score", 15.), 1., None).unwrap().1[0]
+            .0
+            .asset;
+        let runs: Vec<_> = (0..64).map(|_| run("Play", 20.)).collect();
+        let old = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let bytes = cache.cached_bytes();
+        let handles: Vec<_> = old.iter().flatten().map(|(d, _)| d.asset).collect();
+        assert_eq!(
+            cache
+                .entries
+                .keys()
+                .filter(|k| matches!(k, Key::Menu(_)))
+                .count(),
+            64
+        );
+        assert!(cache.compose_menu(&runs, 1., (1, 0), Ok).is_err());
+        assert!(
+            cache
+                .compose_menu(&[run("replacement", 20.)], 1., (0, 0), |_| -> Result<()> {
+                    Err("frame rejected".into())
+                })
+                .is_err()
+        );
+        let large = "M".repeat(100);
+        let big: Vec<_> = (0..16).map(|_| run(&large, 64.)).collect();
+        assert!(cache.compose_menu(&big, 1., (0, 0), Ok).is_err());
+        assert_eq!(cache.cached_bytes(), bytes);
+        let after = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        assert_eq!(
+            handles,
+            after
+                .iter()
+                .flatten()
+                .map(|(d, _)| d.asset)
+                .collect::<Vec<_>>()
+        );
+        cache.compose_menu(&[], 1., (0, 0), Ok).unwrap();
+        let assets: Vec<_> = cache
+            .entries
+            .values()
+            .flat_map(|e| e.tiles.iter().map(|t| t.resource.asset))
+            .collect();
+        assert_eq!(assets.len(), 2);
+        assert!(assets.contains(&nickname));
+        assert!(assets.contains(&hud));
+        assert!(!old[0][0].1.image.pixels.is_empty());
+    }
 }
 
 #[cfg(all(test, windows))]

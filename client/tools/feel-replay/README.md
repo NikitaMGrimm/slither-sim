@@ -115,8 +115,21 @@ Trace arrays contain:
   counts admit the core's `-1` cleanup sentinel. The camera ring has 2 x 62 f64
   values and nonnegative pending counts (see `src/presentation.rs`,
   `src/presentation/length.rs` and `src/presentation/camera.rs`).
-- `final`: duration, exact event/command/sample/draw counts and final boundary ID,
+- `final`: duration, exact event/command/sample/acknowledged-draw counts and final boundary ID,
   completion, pending effect/frame counts and unexpected network status.
+
+Draw IDs number observed preparation boundaries, including recoverably skipped
+pictures. A skipped core projection remains `prepared: true` with `submitted`
+and `committed` false; those flags and `quality.successfulDraws` require a picture
+acknowledgement. `final.draws` counts acknowledged draw samples, rather than all
+draw observations. These existing v2 fields need no new status value or shape.
+`quality.successfulDraws` must equal the cumulative committed draw count at
+every sample, including updates and skips. `validateTrace(trace, schedule,
+acknowledgedDrawIds)` optionally checks submitted/committed status against a
+host's actual picture receipts, expressed as draw ordinals. Without that external
+witness, a v2 file can establish counter/status consistency but cannot authenticate
+receipts. The browser runner supplies the witness and retains it in its receipt
+sidecar; no acknowledgement fields are added to the trace schema.
 
 Only explicitly scheduled both-peer `pre-appearance` boundaries may initially
 have `own: null`; that exception cannot resume after appearance. A scheduled

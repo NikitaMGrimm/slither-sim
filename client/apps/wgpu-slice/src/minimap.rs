@@ -1,7 +1,7 @@
 //! CSS-pixel minimap composition. The shared core owns all map and lifecycle state.
 use crate::{
     Result,
-    frame::{Draw, Frame},
+    frame::{Draw, Frame, push_draw},
     materials::RgbaImage,
     scene::Resource,
     text::{Align, Baseline, TextCache, TextRun, TextStyle, Weight},
@@ -340,7 +340,7 @@ impl Minimap {
             let mut d = d.clone();
             d.translation = origin;
             d.effective_alpha = alpha;
-            frame.draws.push(d);
+            push_draw(&mut frame.draws, d)?;
             resources.push(r.clone());
         }
         // The DOM holder has visible overflow. Submit only the marker's outside
@@ -370,7 +370,7 @@ impl Minimap {
                 [left, top, right, bottom],
                 alpha * m.opacity,
             ) {
-                frame.draws.push(command);
+                push_draw(&mut frame.draws, command)?;
                 outside = true;
             }
         }
@@ -430,13 +430,10 @@ impl Minimap {
             label.shadow_blur,
             label.size.x,
         )? {
-            if frame.draws.len() >= crate::frame::MAX_DRAWS {
-                break;
-            }
             if (!label.overflow_hidden || crate::render::clip_text(&mut draw, clip))
                 && crate::render::clip_text(&mut draw, viewport)
             {
-                frame.draws.push(draw);
+                push_draw(&mut frame.draws, draw)?;
                 resources.push(resource);
             }
         }
@@ -697,7 +694,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn label_reserve_and_full_frame_degradation_keep_the_global_limit() {
+    fn large_world_keeps_complete_label() {
         let mut map = Minimap::default();
         let mut cache = TextCache::default();
         let mut bank = crate::bank::Bank::new().unwrap();
@@ -714,8 +711,8 @@ mod tests {
         );
         for count in [
             crate::frame::MAX_DRAWS - MAX_DRAWS - crate::hud::MAX_DRAWS,
-            crate::frame::MAX_DRAWS - 1,
-            crate::frame::MAX_DRAWS,
+            32_768,
+            8192,
         ] {
             let mut f = frame(16.);
             f.draws = vec![filler.clone(); count];

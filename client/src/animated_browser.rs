@@ -517,6 +517,15 @@ impl AnimatedScene {
             .take_js()
     }
 
+    /// Actual submitted and committed pictures, matched by recorder identity.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_pictures(&self) -> Vec<String> {
+        self.feel_trace
+            .as_ref()
+            .expect("enable trace first")
+            .take_pictures_js()
+    }
+
     /// A1 completeness failures, separate from immutable numeric rows.
     #[cfg(feature = "feel-trace")]
     pub fn take_feel_trace_errors(&self) -> Vec<String> {
@@ -656,6 +665,18 @@ impl AnimatedScene {
 }
 
 impl AnimatedScene {
+    #[cfg(feature = "feel-trace")]
+    fn feel_picture(&self) -> Option<u64> {
+        self.feel_trace.as_ref()?.last_draw_sequence()
+    }
+
+    #[cfg(feature = "feel-trace")]
+    fn acknowledge_feel_picture(&self, picture: Option<u64>) {
+        if let (Some(trace), Some(sequence)) = (&self.feel_trace, picture) {
+            trace.acknowledge_picture(sequence);
+        }
+    }
+
     fn apply_appearance_factories(
         &mut self,
         bytes: &[u8],
@@ -858,6 +879,8 @@ impl AnimatedScene {
             &plan.background,
         )?
         .begin(&target, &plan.background, self.background_backdrop.as_ref())?;
+        #[cfg(feature = "feel-trace")]
+        let picture = self.feel_picture();
         plan.submit(
             frame,
             &sprites,
@@ -866,6 +889,8 @@ impl AnimatedScene {
             &self.prey_sources,
         )?;
         self.client = prepared;
+        #[cfg(feature = "feel-trace")]
+        self.acknowledge_feel_picture(picture);
         Ok(())
     }
 
@@ -891,6 +916,8 @@ impl AnimatedScene {
         let prey_sources = RefCell::new(self.prey_sources.clone());
         let mut sources = BorrowedSources::default();
         let mut plans = Vec::new();
+        #[cfg(feature = "feel-trace")]
+        let mut pictures = Vec::new();
         let mut budget = DrawBudget::default();
         let mut setup_budget = SetupDrawBudget::default();
         let appearance = |input: &crate::state::Appearance,
@@ -985,6 +1012,10 @@ impl AnimatedScene {
                     preys.observe_draw_sources(prey)?;
                 }
                 push(&mut plans, plan)?;
+                #[cfg(feature = "feel-trace")]
+                if let Some(picture) = self.feel_picture() {
+                    push(&mut pictures, picture)?;
+                }
                 Ok(())
             };
         let header = elapsed_header_kind(elapsed_header);
@@ -1038,6 +1069,10 @@ impl AnimatedScene {
             &preys,
         )?;
         self.commit_all(prepared, foods, preys)?;
+        #[cfg(feature = "feel-trace")]
+        for picture in pictures {
+            self.acknowledge_feel_picture(Some(picture));
+        }
         Ok(result)
     }
 
@@ -1079,6 +1114,8 @@ impl AnimatedScene {
         )?;
         let mut plans = Vec::new();
         push(&mut plans, plan)?;
+        #[cfg(feature = "feel-trace")]
+        let picture = self.feel_picture();
         submit_plans(
             plans,
             &target,
@@ -1091,6 +1128,8 @@ impl AnimatedScene {
             &self.prey_sources,
         )?;
         self.client = prepared;
+        #[cfg(feature = "feel-trace")]
+        self.acknowledge_feel_picture(picture);
         Ok(())
     }
 
@@ -1220,6 +1259,8 @@ impl AnimatedScene {
             &plan.background,
         )?
         .begin(&target, &plan.background, self.background_backdrop.as_ref())?;
+        #[cfg(feature = "feel-trace")]
+        let picture = self.feel_picture();
         plan.submit(
             frame,
             &sprites,
@@ -1228,6 +1269,8 @@ impl AnimatedScene {
             &self.prey_sources,
         )?;
         self.client = prepared;
+        #[cfg(feature = "feel-trace")]
+        self.acknowledge_feel_picture(picture);
         Ok(())
     }
 }

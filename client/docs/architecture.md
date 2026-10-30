@@ -44,8 +44,8 @@ fix/http-com-module-integrity, fix/http-com-live-play and feat/default-appearanc
 
 ## Shared wgpu client
 
-apps/wgpu-slice is a separate crate with its own lockfile and a path dependency
-on the core. game::LocalGame owns the shared protocol/session/input/presentation
+apps/wgpu-slice is a separate crate in the root Cargo workspace with a path
+dependency on the core. game::LocalGame owns the shared protocol/session/input/presentation
 flow. Windows uses winit and tungstenite; the browser uses WebSocket and RAF.
 Both submit ordered frames and authored materials through the same wgpu renderer.
 
@@ -60,11 +60,12 @@ Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and a
 independent lazy cache. Production `LocalGame` enables the shared [record
 announcement projection](announcements.md) on native and browser WebGPU,
 capturing immutable text draws before minimap/HUD at each Setup, ordinary and
-resize preparation. It reserves 96 announcement draws only while that captured
-view is visible (present content, projected blocks and positive opacity), including
-through the fade. Hidden views retain the existing 140-draw HUD/minimap reserve;
-visible announcements raise it to 236. Result/editor remains inactive.
-Fragment opacity multiplies the shared retained fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
+resize preparation. [Bounded vertex chunks](draw-chunks.md) preserve crowded
+world geometry without overlay reservations; producer/cache quotas remain.
+Result/editor remains inactive. Fragment opacity multiplies the shared retained
+fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
+The opt-in [menu resource layer](menu-resources.md) adds bounded authored controls
+and semantic local art; login adapters do not enable it yet.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.

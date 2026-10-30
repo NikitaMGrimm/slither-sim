@@ -258,6 +258,297 @@ fn playing() -> LocalGame {
     g
 }
 
+#[test]
+fn desktop_setup_pair_and_deferred_appearance_do_not_consume_redraws() {
+    for delay in [0., 1000. / 60., 40.] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        #[cfg(feature = "feel-trace")]
+        let traces = {
+            let traces = [
+                slither_client::feel_trace::Recorder::default(),
+                slither_client::feel_trace::Recorder::default(),
+            ];
+            game.record_feel(traces[0].clone());
+            control.record_feel(traces[1].clone());
+            traces
+        };
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), setup()]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[snake(44)]), 4.)
+                .unwrap();
+        }
+        assert!(game.client().own_snake().is_none()); // genuinely deferred
+        game.service_ingress().unwrap();
+        assert!(game.client().own_snake().is_some());
+        assert!(!game.has_frame()); // superseded pictures, not packet state
+        assert_eq!(
+            game.client().control_view(),
+            control.client().control_view()
+        );
+        let before = game.client().draw_serial();
+        let now = 1000. / 60.;
+        game.begin_redraw(now, [960, 540], 1.).unwrap();
+        assert_eq!(effects(&mut game), pump(&mut control, now));
+        let _picture = game.take_frame().unwrap();
+        assert_eq!(game.client().draw_serial(), before);
+        assert!(game.take_frame().is_none());
+        let ingress_at = now + delay / 2.;
+        let packet = bundle(&[received_food(1)]);
+        if delay != 0. {
+            game.receive(game.generation(), &packet, ingress_at)
+                .unwrap();
+            control
+                .receive(control.generation(), &packet, ingress_at)
+                .unwrap();
+            game.service_ingress().unwrap(); // outstanding picture still fences writes
+            assert!(game.client().foods().foods().is_empty());
+        }
+        game.presented(true).unwrap();
+        assert!(game.presented(true).is_err());
+        if delay == 0. {
+            game.receive(game.generation(), &packet, ingress_at)
+                .unwrap();
+            control
+                .receive(control.generation(), &packet, ingress_at)
+                .unwrap();
+        }
+        game.service_ingress().unwrap();
+        assert_eq!(game.client().draw_serial(), before + 1);
+        assert_eq!(game.client().foods().foods().len(), 1);
+        assert_eq!(
+            game.client().control_view(),
+            control.client().control_view()
+        );
+        assert!(effects(&mut game).is_empty());
+        assert!(!game.has_frame());
+        #[cfg(feature = "feel-trace")]
+        {
+            let actual = traces[0].take();
+            assert_eq!(actual, traces[1].take()); // every update, camera sample and ring cell
+            assert_eq!(actual.iter().filter(|r| r.phase == "draw").count(), 3);
+            assert_eq!(actual.iter().filter(|r| r.phase == "update").count(), 4);
+            assert_eq!(game.take_feel_ingress(), [3., 4., ingress_at]);
+        }
+    }
+}
+
+#[test]
+fn desktop_redraw_supersedes_setup_snapshots_without_resampling_them() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[setup(), snake(44), setup()]), 3.)
+            .unwrap();
+    }
+    pictures(&mut control);
+    let before = game.client().draw_serial();
+    game.begin_redraw(20., [960, 540], 1.).unwrap();
+    assert_eq!(effects(&mut game), pump(&mut control, 20.));
+    let _frame = game.take_frame().unwrap();
+    game.presented(true).unwrap();
+    assert_eq!(game.client().draw_serial(), before + 1);
+    assert_eq!(game.client(), control.client());
+}
+
+#[test]
+fn desktop_retry_keeps_issued_work_and_services_queued_ingress_after_ack() {
+    let mut game = playing();
+    let mut control = playing();
+    game.begin_redraw(40., [960, 540], 1.).unwrap();
+    assert_eq!(effects(&mut game), pump(&mut control, 40.));
+    let frame = game.take_frame().unwrap();
+    let identity = frame.frame.identity;
+    game.retry_frame(frame).unwrap();
+    for index in [1, 2] {
+        let packet = bundle(&[received_food(index)]);
+        game.receive(game.generation(), &packet, 40. + f64::from(index))
+            .unwrap();
+        control
+            .receive(control.generation(), &packet, 40. + f64::from(index))
+            .unwrap();
+    }
+    let serial = game.client().draw_serial();
+    game.begin_redraw(80., [960, 540], 1.).unwrap();
+    assert!(effects(&mut game).is_empty());
+    assert_eq!(game.client().draw_serial(), serial);
+    let frame = game.take_frame().unwrap();
+    assert_eq!(frame.frame.identity, identity);
+    game.presented(true).unwrap();
+    game.service_ingress().unwrap();
+    assert_eq!(game.client().draw_serial(), serial + 1);
+    assert_eq!(game.client(), control.client());
+    assert!(!game.has_frame());
+}
+
+#[test]
+fn desktop_superseded_setup_counts_for_quality_once_without_an_extra_draw() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[setup()]), 3.).unwrap();
+    }
+    pictures(&mut control);
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[snake(44)]), 4.)
+            .unwrap();
+    }
+    game.service_ingress().unwrap();
+    game.service_ingress().unwrap();
+    // 23 completed animation draws + reset + Setup = 25 at the first
+    // statistics update. Missing Setup would hit the <=24 fallback gate.
+    for now in (1..=23)
+        .map(|n| f64::from(n) * 40.)
+        .chain([1040., 1080., 1120.])
+    {
+        game.begin_redraw(now, [960, 540], 1.).unwrap();
+        assert_eq!(effects(&mut game), pump(&mut control, now));
+        let serial = game.client().draw_serial();
+        let _frame = game.take_frame().unwrap();
+        // Authored 40 ms ack: no new update or draw occurs while it waits.
+        game.observe_time(now + 40.).unwrap();
+        game.presented(true).unwrap();
+        assert_eq!(game.client().draw_serial(), serial + 1);
+        assert_eq!(game.quality(), control.quality());
+        assert!(game.quality().high_quality);
+        assert_eq!(game.client(), control.client());
+    }
+}
+
+#[test]
+fn setup_resize_discards_retain_quality_counts() {
+    for (zero_backing, animation_draws) in [(false, 22), (false, 23), (true, 22), (true, 23)] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), snake(44)]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        for g in [&mut game, &mut control] {
+            if zero_backing {
+                g.viewport([0, 0], 1.).unwrap();
+            }
+            g.viewport([1024, 768], 1.).unwrap();
+            g.viewport([1024, 768], 1.).unwrap();
+            assert!(!g.has_frame());
+        }
+        // Reset + Setup + 22/23 animation draws straddle the <=24 fallback
+        // threshold, catching both missing and duplicated Setup credit.
+        for now in (1..=animation_draws)
+            .map(|n| f64::from(n) * 40.)
+            .chain([1040.])
+        {
+            pump(&mut game, now);
+            pump(&mut control, now);
+        }
+        let high_quality = animation_draws == 23;
+        assert_eq!(control.quality().high_quality, high_quality);
+        assert_eq!(game.quality().high_quality, high_quality);
+        assert_eq!(
+            game.quality().low_fps_counter,
+            if high_quality { 0. } else { 1. }
+        );
+    }
+}
+
+#[test]
+fn setup_pressure_discards_retain_quality_counts() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for now in [3., 4.] {
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup()]), now).unwrap();
+        }
+        pictures(&mut control);
+    }
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[snake(44)]), 5.)
+            .unwrap();
+    }
+    // Fill the 64-packet deferral queue, then trigger pressure recovery. Both
+    // its initial Setup queue and the Setup admitted inside the drain count once.
+    for index in 0..63 {
+        for g in [&mut game, &mut control] {
+            g.receive(
+                g.generation(),
+                &bundle(&[received_food(index)]),
+                6. + f64::from(index),
+            )
+            .unwrap();
+        }
+    }
+    assert_eq!(game.client().foods().foods().len(), 63);
+    for now in (0..22).map(|n| 80. + f64::from(n) * 40.).chain([1040.]) {
+        pump(&mut game, now);
+        pump(&mut control, now);
+    }
+    assert!(control.quality().high_quality);
+    assert!(game.quality().high_quality);
+    assert_eq!(game.quality().low_fps_counter, 0.);
+}
+
+#[test]
+fn retried_setup_supersession_keeps_one_quality_credit_and_releases_its_fence() {
+    for (ingress, animation_draws) in [(false, 22), (false, 23), (true, 22), (true, 23)] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), snake(44)]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        let picture = game.take_frame().unwrap();
+        let old_identity = picture.frame.identity;
+        assert!(picture.pixel_bytes() > 0);
+        game.retry_frame(picture).unwrap(); // ownership and pixels return to the queue
+        assert!(game.has_frame());
+        assert!(game.presented(true).is_err()); // no host-owned acknowledgment remains
+        if ingress {
+            for g in [&mut game, &mut control] {
+                g.receive(g.generation(), &bundle(&[received_food(1)]), 4.)
+                    .unwrap();
+            }
+            game.service_ingress().unwrap();
+            assert!(!game.has_frame());
+            assert_eq!(game.client().foods().foods().len(), 1);
+        }
+        for now in (1..=animation_draws)
+            .map(|n| f64::from(n) * 40.)
+            .chain([1040.])
+        {
+            game.begin_redraw(now, [960, 540], 1.).unwrap();
+            assert_eq!(effects(&mut game), pump(&mut control, now));
+            let fresh = game.take_frame().unwrap();
+            assert!(fresh.frame.identity > old_identity);
+            let resources = fresh
+                .resources
+                .iter()
+                .map(|r| (r.asset.into(), r.asset))
+                .collect();
+            fresh.frame.quads(&resources).unwrap();
+            game.presented(true).unwrap();
+            assert!(!game.has_frame());
+            assert!(game.presented(true).is_err());
+        }
+        assert_eq!(game.quality().high_quality, animation_draws == 23);
+        assert_eq!(game.quality(), control.quality());
+        // Completed pictures own their Vec pixel buffers; clearing the queue
+        // drops those copies. Neither retry path leaves additional bank residency.
+        assert_eq!(game.bank.cached_sources(), control.bank.cached_sources());
+        assert_eq!(
+            game.bank.text.cached_bytes(),
+            control.bank.text.cached_bytes()
+        );
+        #[cfg(feature = "feel-trace")]
+        assert_eq!(game.feel_pending(), [0, 0]);
+    }
+}
+
 fn zero_header_preserves_readout(rank: u16, population: u16) {
     let mut g = playing();
     let before = g.hud_view();
@@ -1152,47 +1443,149 @@ fn repeated_setup_rejects_resource_heavy_snapshots_during_capture() {
 }
 
 #[test]
-fn regression_late_combined_draw_budget_is_atomic() {
+fn former_overflow_survives_production_preparation_retry_and_resize() {
     let mut g = playing();
-    let before = format!("{:?}", g.client().received());
-    let hud = g.hud_text();
-    let error = g
-        .receive(g.generation(), &late_budget_packet(), 30.)
-        .unwrap_err();
-    assert!(
-        error.contains("frame extent/scale/budget"),
-        "Expected late combined frame validation, got {error}"
-    );
-    let same_world = format!("{:?}", g.client().received()) == before;
-    let same_hud = g.hud_text() == hud;
-    let no_partial_queue = g.take_frame().is_none();
-    assert_eq!(
-        (same_world, same_hud, no_partial_queue),
-        (true, true, true),
-        "late frame/resource rejection must publish nothing"
-    );
-    // A later valid factory request must also retain the prior RNG and frame serial.
+    let applied = g.client().received().frames_applied;
+    g.receive(g.generation(), &late_budget_packet(), 30.)
+        .unwrap();
+    assert!(g.client().received().frames_applied > applied);
+    pictures(&mut g);
+    g.begin_frame(60., [960, 540], 1.).unwrap();
+    effects(&mut g);
+    let first = g
+        .take_frame()
+        .expect("former overflow must produce a picture");
+    assert!(first.frame.draws.len() > 8192);
+    let commands = first.frame.draws.clone();
+    let identity = first.frame.identity;
+    g.retry_frame(first).unwrap();
+    let retry = g.take_frame().unwrap();
+    assert_eq!(retry.frame.identity, identity);
+    assert_eq!(retry.frame.draws, commands);
+    g.retry_frame(retry).unwrap();
+    g.viewport([1200, 700], 1.).unwrap();
+    let resized = g.take_frame().unwrap();
+    assert!(resized.frame.draws.len() > 8192);
+    assert_eq!(resized.frame.extent, [1200, 700]);
+    assert!(resized.frame.identity > identity);
+    let resident = resized
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    resized.frame.quads(&resident).unwrap();
+    g.presented(true).unwrap();
+    assert_eq!(g.phase(), Phase::Playing);
+    assert!(g.failure.is_none());
+    assert_eq!(g.draw_diagnostics.skipped_frames, 0);
+}
+
+#[test]
+fn draw_memory_overflow_skips_pictures_without_stalling_ingress_or_the_session() {
+    let mut g = playing();
+    let mut commands = Vec::new();
+    // Authored single-color food in one visible sector: enough HQ commands to
+    // exceed the CPU-record envelope, without increasing texture residency.
+    for i in 0..60_000 {
+        commands.push(vec![b'F', 11, 10, 41, (i % 245) as u8, (i / 245) as u8, 20]);
+    }
+    for packet in commands.chunks(4000) {
+        g.receive(g.generation(), &bundle(packet), 30.).unwrap();
+    }
+    g.receive(g.generation(), &bundle(&[setup()]), 31.).unwrap();
+    assert!(g.take_frame().is_none());
+    assert_eq!(g.draw_diagnostics.skipped_frames, 1);
+    g.begin_frame(60., [960, 540], 1.).unwrap();
+    effects(&mut g);
+    assert!(g.take_frame().is_none());
+    assert_eq!(g.draw_diagnostics.skipped_frames, 2);
+    assert_eq!(g.phase(), Phase::Playing);
+    assert!(g.failure.is_none());
+    // A later packet is admitted immediately; the skipped work did not leave
+    // an unacknowledgeable picture or advance the successful-draw counter.
+    let applied = g.client().received().frames_applied;
+    g.receive(g.generation(), &bundle(&[board()]), 61.).unwrap();
+    assert!(g.client().received().frames_applied > applied);
+    assert!(g.draw_diagnostics.last_skipped_identity.is_some());
+    // A small viewport can render this retained world; expanding its frozen
+    // retry exceeds memory again and must commit it without a fatal present.
+    g.begin_frame(70., [100, 100], 1.).unwrap();
+    effects(&mut g);
+    let small = g.take_frame().expect("small cull should fit");
+    g.retry_frame(small).unwrap();
+    g.viewport([960, 540], 1.).unwrap();
+    assert!(g.take_frame().is_none());
+    assert_eq!(g.draw_diagnostics.skipped_frames, 3);
+    g.receive(g.generation(), &bundle(&[vec![b'w', 11, 10]]), 71.)
+        .unwrap();
+    g.begin_frame(80., [960, 540], 1.).unwrap();
+    effects(&mut g);
+    let recovered = g.take_frame().expect("smaller later world must draw again");
+    assert!(recovered.frame.draws.len() < 8192);
+    g.presented(true).unwrap();
+    assert_eq!(g.draw_diagnostics.skipped_frames, 3);
+    assert_eq!(g.phase(), Phase::Playing);
+}
+
+#[test]
+fn non_memory_rejection_after_crowded_setup_keeps_world_hud_rng_and_identity() {
+    let mut game = playing();
     let mut control = playing();
-    let packet = bundle(&[vec![b'F', 11, 10, 41, 50, 50, 20]]);
-    g.receive(g.generation(), &packet, 40.).unwrap();
-    control.receive(control.generation(), &packet, 40.).unwrap();
-    let foods = |g: &LocalGame| {
-        g.client()
+    let before = format!("{:?}", game.client().received());
+    let hud = game.hud_text();
+    let mut packet = late_budget_packet();
+    // Exceed the independent Setup snapshot limits after preparing crowded
+    // pictures. Draw-memory recovery must not swallow this late rejection.
+    packet.extend(bundle(&vec![setup(); 17]));
+    let error = game.receive(game.generation(), &packet, 30.).unwrap_err();
+    assert!(error.starts_with("Setup "), "{error}");
+    assert_eq!(format!("{:?}", game.client().received()), before);
+    assert_eq!(game.hud_text(), hud);
+    assert!(game.take_frame().is_none());
+    assert_eq!(game.draw_diagnostics.skipped_frames, 0);
+    let valid = bundle(&[vec![b'F', 11, 10, 41, 50, 50, 20]]);
+    for game in [&mut game, &mut control] {
+        game.receive(game.generation(), &valid, 40.).unwrap();
+        game.begin_frame(60., [960, 540], 1.).unwrap();
+        effects(game);
+    }
+    let foods = |game: &LocalGame| {
+        game.client()
             .foods()
             .foods()
             .iter()
             .map(|f| f.snapshot())
             .collect::<Vec<_>>()
     };
-    assert_eq!(foods(&g), foods(&control));
-    g.begin_frame(60., [960, 540], 1.).unwrap();
-    control.begin_frame(60., [960, 540], 1.).unwrap();
-    effects(&mut g);
-    effects(&mut control);
+    assert_eq!(foods(&game), foods(&control));
     assert_eq!(
-        g.take_frame().unwrap().frame.identity,
-        control.take_frame().unwrap().frame.identity
+        game.take_frame().unwrap().frame,
+        control.take_frame().unwrap().frame
     );
+}
+
+#[test]
+fn queued_setup_draw_records_share_one_memory_envelope() {
+    let mut game = playing();
+    let foods = (0..4000)
+        .map(|i| vec![b'F', 11, 10, 41, (i % 100) as u8, (i / 100) as u8, 20])
+        .collect::<Vec<_>>();
+    game.receive(game.generation(), &bundle(&foods), 30.)
+        .unwrap();
+    game.receive(game.generation(), &bundle(&vec![setup(); 12]), 31.)
+        .unwrap();
+    let mut retained = 0;
+    let mut draws = 0;
+    while let Some(picture) = game.take_frame() {
+        draws += picture.frame.draws.len();
+        retained += 1;
+        game.presented(true).unwrap();
+    }
+    assert!(game.draw_diagnostics.skipped_frames > 0);
+    assert_eq!(retained + game.draw_diagnostics.skipped_frames, 12);
+    assert!(draws <= slither_wgpu_slice::frame::MAX_DRAWS);
+    assert_eq!(game.phase(), Phase::Playing);
+    assert!(game.failure.is_none());
 }
 
 #[test]
