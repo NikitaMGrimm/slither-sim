@@ -5,7 +5,10 @@
 
 use std::{error::Error, fmt, sync::Arc};
 
-use super::{PresentationError, ScoreError, ScoreTables};
+use super::{
+    PanelText, PanelTextFragment, PresentationError, ScoreError, ScoreTables, TextFamily,
+    TextSlant, TextStyle, TextWeight,
+};
 use crate::{
     protocol::hud::{HudPacketError, parse_announcement},
     state::{HudCommandBoundary, HudCommandMarker, PresentationEvent},
@@ -126,6 +129,125 @@ pub struct AnnouncementLine {
     pub space_after: u8,
 }
 
+/// Semantic inline content. Alpha is independent of the retained panel fade.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AnnouncementTextFragment {
+    /// Literal text, never markup, using the shared panel font selection.
+    Text {
+        /// Visible text after HTML input-stream control normalization.
+        text: String,
+        /// Family, weight, slant, size and white fill.
+        style: TextStyle,
+        /// Multiply by the panel fade only at submission time.
+        alpha: f64,
+    },
+    /// An explicit line break, unlike collapsible incoming whitespace.
+    Break,
+}
+
+/// One CSS-normal block, with a separate gap following it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnnouncementTextBlock {
+    /// Ordered literal spans and explicit breaks; at most six fragments.
+    pub fragments: Vec<AnnouncementTextFragment>,
+    /// Logical pixels following this block (the quote uses five).
+    pub space_after: u8,
+}
+
+impl AnnouncementTextBlock {
+    /// Admit the complete block into bounded panel layout. Fragment alpha stays
+    /// outside raster styles; future GPU submission must retain that metadata.
+    pub fn panel_text(&self) -> Result<PanelText, &'static str> {
+        PanelText::new(
+            &self
+                .fragments
+                .iter()
+                .map(|fragment| match fragment {
+                    AnnouncementTextFragment::Text { text, style, .. } => {
+                        PanelTextFragment::Text(text, *style)
+                    }
+                    AnnouncementTextFragment::Break => PanelTextFragment::Break,
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
+/// Official record-message wording and styles, with no lifecycle opacity baked in.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AnnouncementTextView {
+    /// Quote and attribution/length, or a single length block; at most two.
+    pub blocks: Vec<AnnouncementTextBlock>,
+}
+
+/// Project the four record-message branches. Source-derived wording/typography
+/// and control handling are documented in docs/announcements.md; no HTML is used.
+pub fn project_announcement_text(content: &AnnouncementContent) -> AnnouncementTextView {
+    let span = |text: &str, size, weight, alpha| AnnouncementTextFragment::Text {
+        // The reference's escaped HTML text drops NUL and normalizes CR/CRLF.
+        // Keep the received owner untouched and do only that work in projection.
+        text: text
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
+            .replace('\0', ""),
+        style: TextStyle {
+            family: TextFamily::Arial,
+            slant: TextSlant::Italic,
+            size,
+            weight,
+            color: [255; 3],
+        },
+        alpha,
+    };
+    let normal = TextWeight::Normal;
+    let bold = TextWeight::Bold;
+    let mut blocks = Vec::new();
+    if !content.message.is_empty() {
+        blocks.push(AnnouncementTextBlock {
+            fragments: vec![
+                span("\"", 17., bold, 0.5),
+                span(&content.message, 17., bold, 1.),
+                span("\"", 17., bold, 0.5),
+            ],
+            space_after: 5,
+        });
+    }
+    let number = content.score.to_string();
+    let mut fragments = if !content.name.is_empty() {
+        if !content.message.is_empty() {
+            vec![
+                span("- ", 13., normal, 0.5),
+                span(&content.name, 13., bold, 0.75),
+                span(", today's longest", 13., normal, 0.5),
+            ]
+        } else {
+            vec![
+                span("Today's longest was ", 13., normal, 0.5),
+                span(&content.name, 13., bold, 0.75),
+            ]
+        }
+    } else if !content.message.is_empty() {
+        vec![span("- today's longest", 13., normal, 0.5)]
+    } else {
+        vec![
+            span("Today's longest: ", 13., normal, 0.5),
+            span(&number, 13., bold, 0.75),
+        ]
+    };
+    if !content.name.is_empty() || !content.message.is_empty() {
+        fragments.extend([
+            AnnouncementTextFragment::Break,
+            span("with a length of ", 13., normal, 0.5),
+            span(&number, 13., bold, 0.65),
+        ]);
+    }
+    blocks.push(AnnouncementTextBlock {
+        fragments,
+        space_after: 0,
+    });
+    AnnouncementTextView { blocks }
+}
+
 /// Backend-neutral authored text and bounded desktop placement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AnnouncementView {
@@ -143,6 +265,8 @@ pub struct AnnouncementView {
     pub height: u16,
     /// Message, attribution and length in presentation order, at most three.
     pub lines: Vec<AnnouncementLine>,
+    /// Styled projection for graphical adapters. `lines` remains a plain view.
+    pub text: AnnouncementTextView,
 }
 
 /// Constant-size history aside from one bounded retained announcement.
@@ -234,44 +358,38 @@ impl AnnouncementState {
         Ok(())
     }
 
-    /// Project safe text with authored English labels. Exact stock wording and
-    /// legacy HTML control-character parsing are outside this text-node boundary.
+    /// Project styled text and the retained plain-line view without advancing time.
     pub fn view(&self) -> AnnouncementView {
+        let text = self
+            .content()
+            .map(project_announcement_text)
+            .unwrap_or_default();
         let mut lines = Vec::new();
-        if let Some(content) = self.content() {
-            let line = |text, font_size, bold, italic, space_after| AnnouncementLine {
-                text,
-                font_size,
-                bold,
-                italic,
-                space_after,
+        for block in &text.blocks {
+            let mut line = AnnouncementLine {
+                text: String::new(),
+                font_size: 13,
+                bold: false,
+                italic: true,
+                space_after: 0,
             };
-            if !content.message.is_empty() {
-                lines.push(line(format!("\"{}\"", content.message), 17, true, true, 5));
+            for fragment in &block.fragments {
+                match fragment {
+                    AnnouncementTextFragment::Text { text, style, .. } => {
+                        if line.text.is_empty() {
+                            line.font_size = style.size as u8;
+                            line.bold = style.weight == TextWeight::Bold;
+                        }
+                        line.text.push_str(text);
+                    }
+                    AnnouncementTextFragment::Break => {
+                        lines.push(line.clone());
+                        line.text.clear();
+                    }
+                }
             }
-            if !content.name.is_empty() || !content.message.is_empty() {
-                let attribution = if content.name.is_empty() {
-                    "Anonymous player".to_owned()
-                } else {
-                    format!("By {}", content.name)
-                };
-                lines.push(line(attribution, 13, false, false, 0));
-                lines.push(line(
-                    format!("Longest today: {}", content.score),
-                    13,
-                    false,
-                    false,
-                    0,
-                ));
-            } else {
-                lines.push(line(
-                    format!("Longest today: {}", content.score),
-                    13,
-                    false,
-                    false,
-                    0,
-                ));
-            }
+            line.space_after = block.space_after;
+            lines.push(line);
         }
         AnnouncementView {
             present: self.content.is_some(),
@@ -281,6 +399,7 @@ impl AnnouncementState {
             width: 300,
             height: 228,
             lines,
+            text,
         }
     }
 }
@@ -368,7 +487,7 @@ mod tests {
             .unwrap();
         assert_eq!(state.content().unwrap().name, "");
         assert_eq!(state.content().unwrap().message.len(), 600);
-        assert_eq!(state.view().lines[1].text, "Anonymous player");
+        assert_eq!(state.view().lines[1].text, "- today's longest");
         state
             .receive(
                 &packet(1, 0xffffff, b"123456a7\xff ", b"123456 7"),
@@ -392,7 +511,7 @@ mod tests {
                 .iter()
                 .map(|line| line.text.as_str())
                 .collect::<Vec<_>>(),
-            ["\"A  B\"", "By N", "Longest today: 10"]
+            ["\"A  B\"", "- N, today's longest", "with a length of 10"]
         );
         assert_eq!(
             (
@@ -403,6 +522,191 @@ mod tests {
             ),
             (17, true, true, 5)
         );
+    }
+
+    #[test]
+    fn four_branches_have_explicit_breaks_shared_faces_and_independent_alpha() {
+        for (name, message, expected, alphas) in [
+            (
+                "N",
+                "M",
+                vec!["\"M\"", "- N, today's longest", "with a length of 10"],
+                vec![0.5, 1., 0.5, 0.5, 0.75, 0.5, 0.5, 0.65],
+            ),
+            (
+                "",
+                "M",
+                vec!["\"M\"", "- today's longest", "with a length of 10"],
+                vec![0.5, 1., 0.5, 0.5, 0.5, 0.65],
+            ),
+            (
+                "N",
+                "",
+                vec!["Today's longest was N", "with a length of 10"],
+                vec![0.5, 0.75, 0.5, 0.65],
+            ),
+            ("", "", vec!["Today's longest: 10"], vec![0.5, 0.75]),
+        ] {
+            let mut state = AnnouncementState::default();
+            state
+                .receive(
+                    &packet(1, 0xffffff, name.as_bytes(), message.as_bytes()),
+                    Some(&ScoreTables::new(1).unwrap()),
+                )
+                .unwrap();
+            let view = state.view();
+            assert_eq!(
+                view.lines
+                    .iter()
+                    .map(|l| l.text.as_str())
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(
+                (view.left, view.top, view.width, view.height),
+                (8, 4, 300, 228)
+            );
+            let mut actual = Vec::new();
+            let mut breaks = 0;
+            for (index, block) in view.text.blocks.iter().enumerate() {
+                block.panel_text().unwrap();
+                assert_eq!(
+                    block.space_after,
+                    if !message.is_empty() && index == 0 {
+                        5
+                    } else {
+                        0
+                    }
+                );
+                for fragment in &block.fragments {
+                    match fragment {
+                        AnnouncementTextFragment::Break => breaks += 1,
+                        AnnouncementTextFragment::Text { text, style, alpha } => {
+                            actual.push(*alpha);
+                            assert_eq!(style.family, TextFamily::Arial);
+                            assert_eq!(style.slant, TextSlant::Italic);
+                            assert_eq!(style.color, [255; 3]);
+                            let quote = !message.is_empty() && index == 0;
+                            assert_eq!(style.size, if quote { 17. } else { 13. });
+                            assert_eq!(
+                                style.weight,
+                                if quote || text == "N" || text == "10" {
+                                    TextWeight::Bold
+                                } else {
+                                    TextWeight::Normal
+                                }
+                            );
+                        }
+                    }
+                }
+            }
+            assert_eq!(actual, alphas);
+            assert_eq!(breaks, usize::from(!name.is_empty() || !message.is_empty()));
+            state.leaderboard(false);
+            state.advance(5., alive()).unwrap();
+            assert_eq!(
+                state.view().text,
+                view.text,
+                "fade never changes fragment styles/alpha"
+            );
+        }
+    }
+
+    #[test]
+    fn controls_are_retained_but_project_like_escaped_html_text_and_digits_are_independent() {
+        let mut state = AnnouncementState::default();
+        let tables = ScoreTables::new(1).unwrap();
+        state
+            .receive(
+                &packet(1, 0xffffff, b"\xff\0\t \r\nN\r", b"<>&\0\r\nA\rB\t\x0c\x7f"),
+                Some(&tables),
+            )
+            .unwrap();
+        assert_eq!(state.content().unwrap().name, "ÿ\0\t \r\nN\r");
+        assert_eq!(
+            state.content().unwrap().message,
+            "<>&\0\r\nA\rB\t\u{c}\u{7f}"
+        );
+        assert_eq!(state.view().lines[0].text, "\"<>&\nA\nB\t\u{c}\u{7f}\"");
+        assert_eq!(state.view().lines[1].text, "- ÿ\t \nN\n, today's longest");
+        for separator in [b'-', b' ', b'\t', 0, 255] {
+            let text = [b'1', b'2', b'3', separator, b'4', b'5', b'6', b'7'];
+            state
+                .receive(&packet(1, 0xffffff, &text, b"valid"), Some(&tables))
+                .unwrap();
+            assert_eq!(state.content().unwrap().name, "");
+            assert_eq!(state.content().unwrap().message, "valid");
+            state
+                .receive(&packet(1, 0xffffff, b"valid", &text), Some(&tables))
+                .unwrap();
+            assert_eq!(state.content().unwrap().name, "valid");
+            assert_eq!(state.content().unwrap().message, "");
+        }
+        assert_eq!(admitted_text(b"123456A789012"), "123456A789012");
+        assert_eq!(admitted_text(b"123456z7"), "123456z7");
+    }
+
+    #[test]
+    fn maximum_latin1_message_is_retained_and_panel_admission_does_not_apply_editor_cap() {
+        use super::super::{
+            BodyRect, PanelTextBlock, TextMeasurement, TextMetrics, layout_panel_text,
+        };
+        use crate::protocol::MAX_FRAME_BYTES;
+        struct Metrics;
+        impl TextMetrics for Metrics {
+            fn measure(
+                &mut self,
+                text: &str,
+                _: TextStyle,
+            ) -> Result<TextMeasurement, &'static str> {
+                Ok(TextMeasurement {
+                    advance: text.chars().count() as f64 * 10.,
+                    ascent: 13.,
+                    descent: 4.,
+                    font_ascent: 13.,
+                    font_descent: 4.,
+                })
+            }
+        }
+        for name in [vec![], vec![255; 255]] {
+            let message = vec![255; MAX_FRAME_BYTES - 8 - name.len()];
+            let mut state = AnnouncementState::default();
+            state
+                .receive(
+                    &packet(1, 0xffffff, &name, &message),
+                    Some(&ScoreTables::new(1).unwrap()),
+                )
+                .unwrap();
+            assert_eq!(
+                state.content().unwrap().message.chars().count(),
+                message.len()
+            );
+            assert_eq!(state.content().unwrap().name.chars().count(), name.len());
+            for block in &state.view().text.blocks {
+                let text = block.panel_text().unwrap();
+                let plan = layout_panel_text(
+                    &PanelTextBlock {
+                        text: &text,
+                        bounds: BodyRect {
+                            x: 8.,
+                            y: 4.,
+                            width: 300.,
+                            height: 228.,
+                        },
+                        line_height: 20.,
+                        device_scale: 1.,
+                        max_runs: 48,
+                    },
+                    &mut Metrics,
+                )
+                .unwrap();
+                assert!(plan.scanned_bytes <= super::super::PANEL_SCAN_BYTES);
+                assert!(plan.runs.len() <= 48);
+            }
+            let mut oversized = packet(1, 0xffffff, &name, &message).0;
+            oversized.push(255);
+            assert!(AnnouncementPacket::copy(&oversized).is_err());
+        }
     }
 
     #[test]

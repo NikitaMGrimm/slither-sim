@@ -1,6 +1,9 @@
 # Bounded styled panel text
 
-This is a synthetic rendering primitive, with no enabled gameplay producer.
+This is a synthetic rendering primitive, with no enabled wgpu gameplay producer.
+The shared [announcement projection](announcements.md) supplies its semantic
+blocks to Canvas and can admit each block through these types; GPU submission
+remains inactive.
 Later announcement and result/editor work can use the shared line breaker,
 `prepare_reserved` and one `draw_panel_composition` call containing all active
 panels. Its output preserves producer order so the compositor can place the

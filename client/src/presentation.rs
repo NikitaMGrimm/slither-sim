@@ -51,7 +51,8 @@ pub use accessory_request::{AccessoryRequestInput, SelectedAccessoryRequest};
 pub(crate) use announcement::AnnouncementPacket;
 pub use announcement::{
     AnnouncementContent, AnnouncementError, AnnouncementLifecycle, AnnouncementLine,
-    AnnouncementState, AnnouncementView,
+    AnnouncementState, AnnouncementTextBlock, AnnouncementTextFragment, AnnouncementTextView,
+    AnnouncementView, project_announcement_text,
 };
 pub use antenna::{
     AntennaBarrierEffect, AntennaBulbCommand, AntennaBulbGeometry, AntennaCullBounds,

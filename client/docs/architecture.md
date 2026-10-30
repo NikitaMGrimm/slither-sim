@@ -57,7 +57,9 @@ differ from Canvas; passing tests does not establish perceptual parity.
 
 Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and an
 independent lazy cache for future announcements and result/editor panels. No
-gameplay producer enables them yet; existing text quotas and draw admission stay
+wgpu gameplay producer enables them yet; the shared [record announcement
+projection](announcements.md) supplies styled blocks to the Canvas reference.
+Existing text quotas and draw admission stay
 unchanged until a producer explicitly reserves panel draws.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
