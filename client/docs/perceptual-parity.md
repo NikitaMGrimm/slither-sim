@@ -11,8 +11,10 @@ server remain exact. Visual error must never change a sent angle byte, a
 dead-zone branch or a cadence decision, including when camera projection feeds
 pointer input. Keep exact command fixtures at these boundaries.
 
-The current replay comparator remains exact until its migration lands; the
-budgets below define the intended policy, not its current executable behavior.
+Until its migration lands, the current replay comparator stays exact for
+same-core replay; cross-target mode tolerates only declared platform-math float
+differences. The budgets below define the intended policy, not its current
+executable behavior.
 
 ## Channel budgets
 
@@ -32,7 +34,7 @@ and viewport geometry retained for both peers.
 | Layer alpha/normalized visual phase | p95 ≤0.01; max ≤0.02; hidden/fully shown endpoints and visibility lifecycle remain exact. Text coverage instead uses max edge-alpha difference ≤0.08 and run ink-alpha sum within 20%. |
 | Animation/UI transitions | Picture phase within one scheduled frame, capped at 20 ms. No early semantic enable/send/focus; logical durations/holds stay unchanged. Compare irregular frames at frozen clocks. |
 | Samples, update/draw boundaries, successful pictures | Exact counts against the frozen schedule, including Setup, resize, retry and end sentinel. Distinguish prepared candidates from acknowledged pictures; internal ring/quad counts need not match. |
-| Render primitives/no-op draws | Equality is not a gate. Flag changes exceeding 5% or 8 draws, whichever is larger; declared zero-alpha deletion is acceptable with unchanged visible layers/coverage. Resource ceilings remain hard limits. |
+| Render primitives/no-op draws | Equality is not a gate. Flag a draw-count change against the baseline run above max(8, ceil(0.05 × baseline draws)); declared zero-alpha deletion is acceptable with unchanged visible layers/coverage. Resource ceilings remain hard limits. |
 | Text/menu geometry | Baseline, box and hit edges within 2 CSS px; run widths within 15% for chosen replacement fonts; announcement extent within 4 px. No clipping, overlap or truncated important text; controls/accessibility remain functional. |
 
 ## Drift detection
