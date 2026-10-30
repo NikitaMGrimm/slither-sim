@@ -31,7 +31,9 @@ try:
    time.sleep(5)
   assert p.returncode==0,'fine collector failed; retain, no retry'
  subprocess.run(['python3',str(r/'select.py'),str(r),str(r/'fine-coarse-validation.json'),name,'--coarse-window'],check=True)
- text=(r/'select.py').read_text().replace("meta['coarseStartUnix']","meta['fineStartUnix']").replace("meta['coarseEndUnix']","meta['diagnosticEndUnix']")
+ text=(r/'select.py').read_text()
+ for old,new in [("meta['coarseStartUnix']","meta['fineStartUnix']"),("meta['coarseEndUnix']","meta['diagnosticEndUnix']")]:
+  assert old in text,old;text=text.replace(old,new)
  (r/'select-fine-window.py').write_text(text,newline='\n')
  subprocess.run(['python3',str(r/'select-fine-window.py'),str(r),str(r/'fine-validation.json'),name,'--coarse-window'],check=True)
  print('FINE DIAGNOSTIC AND BOTH QUALITY WINDOWS COMPLETE',flush=True)

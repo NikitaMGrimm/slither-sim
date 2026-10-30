@@ -11,6 +11,9 @@ assert not Path('/tmp/slither-live-checkpoint-target').exists()
 assert json.loads((r/'preflight.json').read_text())['cases']['pilot-candidate-3']['holds'][0]['client']['keepsUp']
 assert json.loads((r/'controls.json').read_text())['originalFilesUnchanged']
 assert json.loads((r/'reconstruction.json').read_text())['commonClientProductionSourcesUnchanged']
+# run.py does not read the isolation gate, so refuse to time before calibration passed.
+assert json.loads((r/'calibration.json').read_text())['idleQualificationPasses']
+assert json.loads((r/'isolation-gate.json').read_text())['calibrationPasses']
 accepted=[];attempts=[];isolation_retries=0;begin=time.time();reserve=600.;limit=6*3600
 order=['base','candidate','candidate','base','base','candidate']
 def spent():

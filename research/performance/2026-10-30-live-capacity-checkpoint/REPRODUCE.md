@@ -35,6 +35,10 @@ exports, the extra post-primary coarse window, calibrated isolation and complete
 retry classification. It builds only the needed host executable per arm. No
 production checkout files change.
 
+After the recorded run, review added three refusal guards: `live_series.py`
+checks the calibration receipts, and `run_fine.py` and `fine_series.py` assert
+every source rewrite. They stop a misconfigured run and change no measurement.
+
 ## Calibration and freeze
 
 The actual run committed the calibration protocol as `b682c392` before observing
