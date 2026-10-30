@@ -18,7 +18,9 @@ const gpu = (...args) => run('cargo', [args[0], ...manifest, ...args.slice(1)], 
 try {
   node('tools/check-repository.mjs');
   node('tools/check-repository.mjs', '--history');
-  node('--test', 'tools/*.test.mjs', 'apps/wgpu-slice/tests/local-host.test.mjs');
+  node('--test', 'tools/*.test.mjs');
+  // Same app tests and concurrency as CI; several start loopback servers.
+  node('--test', '--test-concurrency=1', 'apps/wgpu-slice/tests/*.test.mjs');
   cargo('fmt', '-p', 'slither-client', '--check');
   cargo('test', '--all-targets', '--locked');
   cargo('test', '--doc', '--locked');
