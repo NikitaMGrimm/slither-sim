@@ -39,6 +39,15 @@ release = false
 name = "slither-sim-py"
 release = false
 
+# The client crates share the workspace but are never released from here.
+[[package]]
+name = "slither-client"
+release = false
+
+[[package]]
+name = "slither-wgpu-slice"
+release = false
+
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"
 protect_breaking_commits = true
