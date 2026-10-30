@@ -1,0 +1,19 @@
+{
+  "portableTarget": "x86-64",
+  "frozenCollectorCommit": "bbc7d18c9d5052903bf3b07ba4067a48e8f040d5",
+  "sameBuildAcrossRuns": true,
+  "hostBinaryIdenticalToV2": true,
+  "fullOnlineOfflineReplayIncludingTails": [
+    true,
+    true
+  ],
+  "allHostThreadsSingleVcpu": true,
+  "summedThreeThreadHeadroom": true,
+  "runtimeTestsPassed": 3,
+  "mutationControlsDetected": 3,
+  "preflightDocumentationTests": 7,
+  "postWindowReportSumIntegrity": {"selectedReportCounts": [10806, 10812], "maxFloatingPointError": 5.551115123125783e-17, "lateReportsAtLeast42ms": [0, 0]},
+  "postResultDeferralAccounting": {"run1": 0, "run2": 126, "run2CensusIntervals": 4, "gateOrSelectionChanged": false},
+  "finalDocumentationTests": {"passed": 7, "execution": "AWS generator after both windows, before teardown", "command": "python3 -B -m unittest discover -s tools -p test_documentation.py"},
+  "independentReview": "Not performed"
+}

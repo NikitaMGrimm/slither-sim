@@ -18,3 +18,37 @@ each failed as intended. Strict 70%/80%, inherited ladder/gate/token and nearest
 rank controls passed. Seven documentation tests and repository boundary checks
 passed. The target was removed. Host binary equals v2 byte-for-byte. These
 results precede the plan/harness freeze and tick-zero startup.
+
+## Run 1: complete, passes
+
+Plan/harness `bbc7d18c` was committed before tick zero. Linked-source equality,
+frozen delta bytes and copied host hash passed. Natural warmup passed the three
+bounded entry endpoints, then ten seconds settling and a full thirty-minute
+window. All gates pass: zero deferrals, final class, client/queue/generator
+headroom and CPU reconciliation. The total worker CPU includes all three live
+thread clocks. Worst one-second input-lateness p99 is 1.477652 ms. Exact online/
+offline replay includes nearest-rank tails and maxima; the closed archive was
+retrieved and hash-verified. First-pair instances/volumes were verified gone
+before launching run 2. No retiming or replacement.
+
+## Run 2: complete, fails zero-deferral gate
+
+The independent fresh on-demand pair used identical first-run host/client
+binaries and unchanged parameters, with no new build or target. Source/hash,
+same-zone, one/eight-vCPU and shutdown-deadline checks passed before tick zero.
+Entry, settling and the full thirty-minute window completed. The closed archive
+was retrieved/hash-verified and full online/offline replay matched exactly.
+
+Run 2 records **126 deferred ticks**, all inside the canonical interval. All
+other frozen gates pass; worst one-second input-lateness p99 is 1.294105 ms.
+Post-result retained-data diagnosis locates all increments in four consecutive
+census intervals around +746 to +749 seconds. It neither identifies an external
+root cause nor reclassifies/rescues the failed gate. No completed run is removed,
+no additional pair is launched and the infrastructure replacement stays unused.
+The two-run acceptance fails. Both results and all available raw evidence remain
+separate; final teardown/cost receipts accompany the report.
+
+Final audit verified all 17 enabled regions with none unavailable; task
+instances/requests/volumes, key and security group are gone. No infrastructure
+replacement was used. Conservative capped compute plus full noncompute reserve
+is $1.541553, below $3. Root README/changelog remain unchanged.
