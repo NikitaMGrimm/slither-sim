@@ -53,10 +53,11 @@ node tools/check-repository.mjs --history
 
 Run the staged guard before committing; `--history` audits history reachable from
 branches, remote-tracking branches and tags.
-Use `--pre-push [<remote>]` with Git's push input to check outgoing commits plus the
-index, trusting only that configured remote's local tracking refs as of the last
-fetch. Missing, URL or unknown destinations and overlapping remote names scan the
-tips' full history; no network is used.
+Use `--pre-push` with Git's push input to check outgoing commits plus the index,
+trusting only history the destination reported in this push. Only locally
+available advertised commits are excluded; if none are available, scan the tips'
+full history.
+No network is used.
 Do not set `core.hooksPath` in a shared multi-worktree checkout; `tools/hooks`
 remains available for single-clone opt-in.
 

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { checkEntry } from './repository-policy.mjs';
-import { checkRepository, outgoingPushTips, treeEntries } from './check-repository.mjs';
+import { checkRepository, prePushObjects, treeEntries } from './check-repository.mjs';
 
 const guard = fileURLToPath(new URL('./check-repository.mjs', import.meta.url));
 
@@ -78,15 +78,6 @@ async function withRepository(run, objectFormat = 'sha1') {
   }
 }
 
-function withRemotes(env, ...names) {
-  const configured = { ...env, GIT_CONFIG_COUNT: String(names.length) };
-  names.forEach((name, index) => {
-    configured[`GIT_CONFIG_KEY_${index}`] = `remote.${name}.url`;
-    configured[`GIT_CONFIG_VALUE_${index}`] = `https://example.invalid/synthetic-${index}.git`;
-  });
-  return configured;
-}
-
 test('an unstaged clean edit cannot conceal a forbidden staged blob', () => withRepository(async (directory, git) => {
   const file = path.join(directory, 'web/bridge.mjs');
   fs.writeFileSync(file, Buffer.from([65, 0, 66]));
@@ -123,19 +114,22 @@ test('pre-push inspects explicitly pushed history even after all local refs stop
   git(['reset', '--hard', root]);
   assert.deepEqual((await checkRepository(directory, true)).errors, []);
   const input = `refs/heads/candidate ${tip} refs/heads/candidate ${'0'.repeat(40)}\n`;
-  assert((await checkRepository(directory, false, outgoingPushTips(input))).errors.some(error => error.includes('program.js.map')));
+  assert((await checkRepository(directory, false, prePushObjects(input).tips)).errors.some(error => error.includes('program.js.map')));
   const invocation = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, input, encoding: 'utf8', env });
   assert.equal(invocation.status, 1);
   assert(invocation.stderr.includes('program.js.map'));
 }));
 
 test('pre-push accepts deletion records and rejects malformed object IDs', () => {
-  assert.deepEqual(outgoingPushTips(`(delete) ${'0'.repeat(40)} refs/heads/old ${'a'.repeat(40)}\n`), []);
-  assert.throws(() => outgoingPushTips('refs/heads/main --all refs/heads/main nope\n'), /Malformed/);
+  assert.deepEqual(prePushObjects(`(delete) ${'0'.repeat(40)} refs/heads/old ${'a'.repeat(40)}\n`), { tips: [], remoteIds: ['a'.repeat(40)] });
+  const record = `refs/heads/main ${'b'.repeat(40)} refs/heads/main ${'a'.repeat(40)}\n`;
+  assert.deepEqual(prePushObjects(record + record), { tips: ['b'.repeat(40)], remoteIds: ['a'.repeat(40)] });
+  for (const input of ['refs/heads/main --all refs/heads/main nope\n', `refs/heads/main ${'b'.repeat(40)} refs/heads/main --all\n`]) {
+    assert.throws(() => prePushObjects(input), /Malformed Git pre-push input/);
+  }
 });
 
-test('pre-push checks outgoing commits, not already-remote or unrelated history', () => withRepository(async (directory, git, env) => {
-  const configured = withRemotes(env, 'origin');
+test('pre-push excludes advertised ancestors while scanning new commits and ignoring stale tracking refs', () => withRepository(async (directory, git, env) => {
   fs.writeFileSync(path.join(directory, 'web/bridge.mjs'), '// SYNTHETIC original source\n');
   git(['add', '.']);
   git(['commit', '--quiet', '-m', 'test: synthetic root']);
@@ -145,11 +139,11 @@ test('pre-push checks outgoing commits, not already-remote or unrelated history'
   git(['add', '.']);
   git(['commit', '--quiet', '-m', 'test: synthetic outgoing artifact']);
   const forbidden = git(['rev-parse', 'HEAD']).toString().trim();
-  const input = tip => `refs/heads/candidate ${tip} refs/heads/candidate ${root}\n`;
+  const input = (tip, remoteId = root) => `refs/heads/candidate ${tip} refs/heads/candidate ${remoteId}\n`;
   assert((await checkRepository(directory, false, [forbidden])).errors.some(error => error.includes('program.js.map')));
   // Check a different index so the rejection must come from the outgoing tree.
   git(['reset', '--hard', root]);
-  const rejected = spawnSync(process.execPath, [guard, '--pre-push', 'origin'], { cwd: directory, input: input(forbidden), encoding: 'utf8', env: configured });
+  const rejected = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, input: input(forbidden), encoding: 'utf8', env });
   assert.equal(rejected.status, 1);
   assert(rejected.stderr.includes('program.js.map'));
   git(['reset', '--hard', forbidden]);
@@ -162,89 +156,68 @@ test('pre-push checks outgoing commits, not already-remote or unrelated history'
   git(['add', 'web/bridge.mjs']);
   git(['commit', '--quiet', '-m', 'test: synthetic clean outgoing commit']);
   const tip = git(['rev-parse', 'HEAD']).toString().trim();
+  git(['update-ref', 'refs/remotes/origin/main', tip]);
   assert((await checkRepository(directory, false, [tip])).errors.some(error => error.includes('program.js.map')));
-  const accepted = spawnSync(process.execPath, [guard, '--pre-push', 'origin'], { cwd: directory, input: input(tip), encoding: 'utf8', env: configured });
+  assert.deepEqual((await checkRepository(directory, false, [tip], '', [remote])).errors, []);
+  const accepted = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, input: input(tip, remote), encoding: 'utf8', env });
   assert.equal(accepted.status, 0, accepted.stderr);
   assert.match(accepted.stdout, /^Repository boundary passed: 1 indexed and historical file versions checked\.\r?\n$/);
+  for (const remoteId of [root, '0'.repeat(40)]) {
+    const full = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, input: input(tip, remoteId), encoding: 'utf8', env });
+    assert.equal(full.status, 1, full.stderr);
+    assert.match(full.stderr, /program\.js\.map/);
+  }
   assert((await checkRepository(directory, true)).errors.some(error => error.includes('program.js.map')));
+  fs.writeFileSync(path.join(directory, 'web/outgoing.js.map'), 'SYNTHETIC prohibited new commit');
+  git(['add', 'web/outgoing.js.map']);
+  git(['commit', '--quiet', '-m', 'test: synthetic prohibited new commit']);
+  const next = git(['rev-parse', 'HEAD']).toString().trim();
+  git(['reset', '--hard', tip]);
+  const outgoing = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, input: input(next, remote), encoding: 'utf8', env });
+  assert.equal(outgoing.status, 1, outgoing.stderr);
+  assert.match(outgoing.stderr, /outgoing\.js\.map/);
+  assert(!outgoing.stderr.includes('program.js.map'));
   // Even an up-to-date tip still checks the index.
   fs.writeFileSync(path.join(directory, 'web/staged.js.map'), 'SYNTHETIC staged artifact');
   git(['add', 'web/staged.js.map']);
-  assert((await checkRepository(directory, false, [remote])).errors.some(error => error.includes('staged.js.map')));
+  assert((await checkRepository(directory, false, [remote], '', [remote])).errors.some(error => error.includes('staged.js.map')));
 }));
 
-test('pre-push excludes only the receiving remote and conservatively scans unknown destinations', () => withRepository(async (directory, git, env) => {
-  fs.writeFileSync(path.join(directory, 'web/bridge.mjs'), '// SYNTHETIC two-remote root\n');
+test('missing and non-commit advertised objects are ignored without fetching', () => withRepository(async (directory, git, env) => {
+  fs.writeFileSync(path.join(directory, 'web/bridge.mjs'), '// SYNTHETIC advertised-object root\n');
   git(['add', 'web/bridge.mjs']);
-  git(['commit', '--quiet', '-m', 'test: synthetic two-remote root']);
-  const root = git(['rev-parse', 'HEAD']).toString().trim();
-  fs.writeFileSync(path.join(directory, 'web/program.js.map'), 'SYNTHETIC prohibited history on remote a');
+  git(['commit', '--quiet', '-m', 'test: synthetic advertised-object root']);
+  fs.writeFileSync(path.join(directory, 'web/program.js.map'), 'SYNTHETIC prohibited ancestor');
   git(['add', 'web/program.js.map']);
-  git(['commit', '--quiet', '-m', 'test: synthetic remote a artifact']);
+  git(['commit', '--quiet', '-m', 'test: synthetic prohibited ancestor']);
   git(['rm', '--quiet', 'web/program.js.map']);
-  git(['commit', '--quiet', '-m', 'test: synthetic clean push tip']);
+  git(['commit', '--quiet', '-m', 'test: synthetic clean tip']);
   const tip = git(['rev-parse', 'HEAD']).toString().trim();
-  git(['update-ref', 'refs/remotes/a/main', tip]);
-  git(['update-ref', 'refs/remotes/b/main', root]);
-  const input = `refs/heads/candidate ${tip} refs/heads/candidate ${root}\n`;
-  const configured = withRemotes(env, 'a', 'b');
-  const push = (remote, environment = configured) => spawnSync(process.execPath,
-    [guard, '--pre-push', ...(remote === undefined ? [] : [remote])],
-    { cwd: directory, env: environment, input, encoding: 'utf8', timeout: 5_000 });
-  const rejected = push('b');
-  assert.equal(rejected.status, 1, rejected.stderr);
-  assert.match(rejected.stderr, /program\.js\.map/);
-  const accepted = push('a');
-  assert.equal(accepted.status, 0, accepted.stderr);
-  assert.match(accepted.stdout, /Repository boundary passed: 1 indexed and historical file versions checked\./);
-  for (const remote of [undefined, 'https://example.invalid/synthetic-0.git', 'unknown', 'a*', '--all']) {
-    const result = push(remote);
+  git(['tag', '-a', 'synthetic-tag', '-m', 'SYNTHETIC non-commit exclusion']);
+  const large = Buffer.alloc(8 * 1024 * 1024, 32);
+  large.write('SYNTHETIC non-commit batch-framing fixture\n');
+  const blob = git(['hash-object', '-w', '--stdin'], large).toString().trim();
+  const tree = git(['rev-parse', 'HEAD^{tree}']).toString().trim();
+  const tag = git(['rev-parse', 'synthetic-tag']).toString().trim();
+  for (const remoteId of ['a'.repeat(40), 'a'.repeat(64), blob, tree, tag]) {
+    const input = `refs/heads/candidate ${tip} refs/heads/candidate ${remoteId}\n`;
+    const result = spawnSync(process.execPath, [guard, '--pre-push'], { cwd: directory, env, input, encoding: 'utf8', timeout: 5_000 });
+    assert.ifError(result.error);
     assert.equal(result.status, 1, result.stderr);
     assert.match(result.stderr, /program\.js\.map/);
+    assert(!result.stderr.includes('Cannot read'));
   }
-  // A configured glob-like name must not expand to remote a's namespace.
-  const literal = push('a*', withRemotes(env, 'a', 'b', 'a*'));
-  assert.equal(literal.status, 1, literal.stderr);
-  assert.match(literal.stderr, /program\.js\.map/);
-  // Option-like names remain positional values and can exclude only their own refs.
-  git(['update-ref', 'refs/remotes/--all/main', root]);
-  const optionEnv = withRemotes(env, 'a', 'b', '--all');
-  assert.equal(push('--all', optionEnv).status, 1);
-  git(['update-ref', 'refs/remotes/--all/main', tip]);
-  const option = push('--all', optionEnv);
-  assert.equal(option.status, 0, option.stderr);
-}));
-
-test('overlapping remote names scan full tip history in both prefix directions', () => withRepository(async (directory, git, env) => {
-  fs.writeFileSync(path.join(directory, 'web/bridge.mjs'), '// SYNTHETIC overlapping-remote root\n');
-  git(['add', 'web/bridge.mjs']);
-  git(['commit', '--quiet', '-m', 'test: synthetic overlapping-remote root']);
-  const root = git(['rev-parse', 'HEAD']).toString().trim();
-  fs.writeFileSync(path.join(directory, 'web/program.js.map'), 'SYNTHETIC prohibited ancestor on team/fork');
-  git(['add', 'web/program.js.map']);
-  git(['commit', '--quiet', '-m', 'test: synthetic team/fork artifact']);
-  git(['rm', '--quiet', 'web/program.js.map']);
-  git(['commit', '--quiet', '-m', 'test: synthetic clean descendant']);
-  const tip = git(['rev-parse', 'HEAD']).toString().trim();
-  git(['update-ref', 'refs/remotes/team/main', root]);
-  git(['update-ref', 'refs/remotes/team/fork/main', tip]);
-  const input = `refs/heads/candidate ${tip} refs/heads/candidate ${root}\n`;
-  const push = (remote, names) => spawnSync(process.execPath, [guard, '--pre-push', remote], {
-    cwd: directory, env: withRemotes(env, ...names), input, encoding: 'utf8', timeout: 5_000,
-  });
-  for (const remote of ['team', 'team/fork']) {
-    const result = push(remote, ['team', 'team/fork']);
-    assert.equal(result.status, 1, result.stderr);
-    assert.match(result.stderr, /program\.js\.map/);
+  // After a non-commit response, the same reader must still resolve a valid exclusion.
+  for (const ignored of ['a'.repeat(40), blob, tree, tag]) {
+    assert.deepEqual((await checkRepository(directory, false, [tip], '', [ignored, tip])).errors, []);
   }
-  // A shared text prefix without the slash delimiter is not an overlap.
-  git(['update-ref', 'refs/remotes/team/main', tip]);
-  const distinct = push('team', ['team', 'teammate']);
-  assert.equal(distinct.status, 0, distinct.stderr);
+  for (const remoteId of ['--all', 'a'.repeat(39), 'a'.repeat(65)]) {
+    await assert.rejects(checkRepository(directory, false, [tip], '', [remoteId]), /Invalid remote object ID/);
+  }
 }));
 
 test('the CLI retains the usage error for arguments outside the supported modes', () => withRepository(async (directory, git, env) => {
-  for (const args of [['--unknown'], ['a'], ['--history', 'a'], ['--pre-push', 'a', 'extra']]) {
+  for (const args of [['--unknown'], ['a'], ['--history', 'a'], ['--pre-push', 'origin'], ['--pre-push', 'a', 'extra']]) {
     const result = spawnSync(process.execPath, [guard, ...args], { cwd: directory, env, encoding: 'utf8', input: '' });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /Usage: node client\/tools\/check-repository\.mjs \[--history \| --pre-push\]/);
@@ -292,8 +265,10 @@ test('SHA-256 tips and tree object IDs retain their full width', () => withRepos
   git(['commit', '--quiet', '-m', 'test: synthetic SHA-256 root']);
   const tip = git(['rev-parse', 'HEAD']).toString().trim();
   assert.equal(tip.length, 64);
-  const tips = outgoingPushTips(`refs/heads/main ${tip} refs/heads/main ${'0'.repeat(64)}\n`);
+  const { tips } = prePushObjects(`refs/heads/main ${tip} refs/heads/main ${'0'.repeat(64)}\n`);
   assert.deepEqual(await checkRepository(directory, false, tips), { count: 1, errors: [] });
+  const update = prePushObjects(`refs/heads/main ${tip} refs/heads/main ${tip}\n`);
+  assert.deepEqual(await checkRepository(directory, false, update.tips, '', update.remoteIds), { count: 1, errors: [] });
   assert.deepEqual(await checkRepository(directory, true), { count: 1, errors: [] });
 }, 'sha256'));
 
@@ -438,15 +413,20 @@ test('batched tree enumeration equals the full per-commit ls-tree audit', () => 
   assert(result.errors.includes('nested/submodule: submodules require explicit policy review'));
 }));
 
-test('Git process count stays bounded as commits, blobs and outgoing tips grow', () => withRepository(async (directory, git, env) => {
-  const run = (label, mode, input = '', remote) => {
+test('Git process count stays bounded as commits, blobs and advertised IDs grow', () => withRepository(async (directory, git, env) => {
+  const run = (label, mode, input = '') => {
     const trace = path.join(directory, `${label}-trace.jsonl`);
-    const result = spawnSync(process.execPath, [guard, mode, ...(remote ? [remote] : [])], { cwd: directory, env: { ...withRemotes(env, 'origin'), GIT_TRACE2_EVENT: trace }, input, encoding: 'utf8', timeout: 10_000 });
+    const result = spawnSync(process.execPath, [guard, mode], { cwd: directory,
+      env: { ...env, GIT_TRACE2_EVENT: trace, GIT_TRACE2_ENV_VARS: 'GIT_NO_LAZY_FETCH' }, input, encoding: 'utf8', timeout: 10_000 });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
-    const starts = fs.readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(event => event.event === 'start');
-    assert(starts.length <= (remote ? 5 : 4), `${label}: ${starts.length} Git processes`);
+    const events = fs.readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    const starts = events.filter(event => event.event === 'start');
+    assert(starts.length <= 4, `${label}: ${starts.length} Git processes`);
     assert(!starts.some(event => event.argv.includes('--no-commit-header')));
-    assert(!starts.some(event => event.argv.some(arg => ['fetch', 'ls-remote'].includes(arg))));
+    assert(!starts.some(event => event.argv.some(arg => ['fetch', 'ls-remote', 'remote'].includes(arg))));
+    const localOnly = events.filter(event => event.event === 'def_param' && event.param === 'GIT_NO_LAZY_FETCH');
+    assert.equal(localOnly.length, starts.length);
+    assert(localOnly.every(event => event.value === '1'));
     return starts;
   };
   fs.writeFileSync(path.join(directory, 'web/root.mjs'), '// SYNTHETIC root\n');
@@ -454,9 +434,8 @@ test('Git process count stays bounded as commits, blobs and outgoing tips grow',
   git(['commit', '--quiet', '-m', 'test: synthetic root']);
   const small = run('small', '--history');
   const root = git(['rev-parse', 'HEAD']).toString().trim();
-  git(['update-ref', 'refs/remotes/origin/main', root]);
-  const pushInput = tips => tips.map(tip => `refs/heads/candidate ${tip} refs/heads/candidate ${'0'.repeat(40)}\n`).join('');
-  const scoped = run('scoped-small', '--pre-push', pushInput([root]), 'origin');
+  const pushInput = (tips, remoteIds = []) => tips.map((tip, index) => `refs/heads/candidate ${tip} refs/heads/candidate ${remoteIds[index] ?? '0'.repeat(40)}\n`).join('');
+  const update = run('update-small', '--pre-push', pushInput([root], [root]));
   const tips = [];
   for (let index = 0; index < 20; index++) {
     const name = `web/file-${index}.mjs`;
@@ -467,11 +446,8 @@ test('Git process count stays bounded as commits, blobs and outgoing tips grow',
   }
   assert.equal(run('large', '--history').length, small.length);
   assert.equal(run('outgoing', '--pre-push', pushInput(tips)).length, small.length);
-  assert.equal(run('scoped-large', '--pre-push', pushInput(tips), 'origin').length, scoped.length);
+  assert.equal(run('update-large', '--pre-push', pushInput(tips, [root, ...tips.slice(0, -1)])).length, update.length);
   const deleted = run('deleted', '--pre-push', `(delete) ${'0'.repeat(40)} refs/heads/old ${tips[0]}\n`);
   assert.equal(deleted.length, 3);
   assert(!deleted.some(event => event.argv.includes('rev-list')));
-  const scopedDeleted = run('scoped-deleted', '--pre-push', `(delete) ${'0'.repeat(40)} refs/heads/old ${tips[0]}\n`, 'origin');
-  assert.equal(scopedDeleted.length, 3);
-  assert(!scopedDeleted.some(event => event.argv.includes('remote')));
 }));

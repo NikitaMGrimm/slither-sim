@@ -4,12 +4,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkEntry } from './repository-policy.mjs';
 
+const objectIdPattern = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
 function git(directory, args) {
-  return execFileSync('git', args, { cwd: directory, maxBuffer: 32 * 1024 * 1024 });
+  return execFileSync('git', args, { cwd: directory, maxBuffer: 32 * 1024 * 1024,
+    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' } });
 }
 
 function batchReader(directory) {
-  const child = spawn('git', ['cat-file', '--batch'], { cwd: directory, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn('git', ['cat-file', '--batch'], { cwd: directory, stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' } });
   let stderr = '';
   child.stderr.on('data', bytes => { stderr += bytes; });
   child.stdin.on('error', () => {}); // A failed child is reported by its completion/output.
@@ -42,26 +46,30 @@ function batchReader(directory) {
       if (end >= 0) return Buffer.concat(parts).toString('utf8');
     }
   }
-  async function read(size) {
-    const bytes = Buffer.allocUnsafe(size);
+  async function read(size, discard = false) {
+    const bytes = discard ? undefined : Buffer.allocUnsafe(size);
     for (let used = 0; used < size;) {
       await available();
       const length = Math.min(size - used, buffer.length - offset);
-      buffer.copy(bytes, used, offset, offset + length);
+      if (bytes) buffer.copy(bytes, used, offset, offset + length);
       offset += length;
       used += length;
     }
     return bytes;
   }
   return {
-    async read(object, type) {
+    async read(object, type, optional = false) {
       child.stdin.write(`${object}\n`);
       const header = await line();
       const [, actualType, size] = header.split(' ');
+      if (optional && header === `${object} missing`) return null;
       if (!/^\d+$/.test(size)) throw new Error(`Cannot read ${type} ${object}: ${header}`);
-      const bytes = await read(Number(size));
+      const bytes = await read(Number(size), actualType !== type);
       if ((await read(1))[0] !== 10) throw new Error('Invalid git cat-file object delimiter');
-      if (actualType !== type) throw new Error(`Cannot read ${type} ${object}: ${header}`);
+      if (actualType !== type) {
+        if (optional) return null;
+        throw new Error(`Cannot read ${type} ${object}: ${header}`);
+      }
       return bytes;
     },
     async close() {
@@ -110,12 +118,12 @@ export async function* treeEntries(trees, readTree) {
 }
 
 /** Read Git blobs rather than the working tree, so unstaged edits cannot mask staged artifacts. */
-export async function checkRepository(directory, history = false, outgoingTips = [], hygieneRoot = '', remote = '') {
+export async function checkRepository(directory, history = false, outgoingTips = [], hygieneRoot = '', remoteIds = []) {
   const errors = [];
   const checked = new Set();
   let count = 0;
   let reader;
-  const readObject = (object, type) => (reader ??= batchReader(directory)).read(object, type);
+  const readObject = (object, type, optional = false) => (reader ??= batchReader(directory)).read(object, type, optional);
   async function inspect(mode, object, name) {
     const identity = `${mode}\0${object}\0${name}`;
     if (checked.has(identity)) return;
@@ -144,23 +152,19 @@ export async function checkRepository(directory, history = false, outgoingTips =
       // Tool-private namespaces (for example refs/t3 checkpoints) are never pushed,
       // so history covers only branches, remote-tracking branches and tags.
       for (const tip of outgoingTips) {
-        if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(tip)) throw new Error('Invalid outgoing object ID');
+        if (!objectIdPattern.test(tip)) throw new Error('Invalid outgoing object ID');
         await readObject(`${tip}^{commit}`, 'commit');
       }
       const exclusions = [];
-      // Trust only local tracking refs of a configured destination; otherwise scan all tip history without network access.
-      if (!history && remote) {
-        const configured = git(directory, ['remote']).toString('utf8').split('\n').filter(Boolean);
-        const overlap = configured.some(name => name !== remote
-          && (name.startsWith(`${remote}/`) || remote.startsWith(`${name}/`)));
-        // Prefix-related remote names share tracking namespaces, so scan all tip history on overlap.
-        if (configured.includes(remote) && !overlap) {
-          const literal = remote.replace(/[\\*?[\]]/g, '\\$&');
-          exclusions.push('--not', `--glob=refs/remotes/${literal}/*`);
+      // Stdin IDs report this push's destination history; local tracking refs can still point at an old URL.
+      if (!history) {
+        for (const object of new Set(remoteIds)) {
+          if (!objectIdPattern.test(object)) throw new Error('Invalid remote object ID');
+          if (!/^0+$/.test(object) && await readObject(object, 'commit', true)) exclusions.push(object);
         }
       }
       const revisions = history ? ['--branches', '--remotes', '--tags', ...outgoingTips]
-        : [...outgoingTips, ...exclusions];
+        : [...outgoingTips, ...(exclusions.length ? ['--not', ...exclusions] : [])];
       const trees = git(directory, ['rev-list', '--format=%T', ...revisions]).toString('utf8').trim().split('\n').filter(line => line && !line.startsWith('commit '));
       for await (const { mode, object, name } of treeEntries(trees, object => readObject(object, 'tree'))) {
         await inspect(mode, object, name);
@@ -172,32 +176,34 @@ export async function checkRepository(directory, history = false, outgoingTips =
   }
 }
 
-export function outgoingPushTips(input) {
+export function prePushObjects(input) {
   const tips = new Set();
+  const remoteIds = new Set();
   for (const line of input.split(/\r?\n/).filter(line => line.trim())) {
     const fields = line.trim().split(/\s+/);
-    if (fields.length !== 4 || !fields[1].match(/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/) || !fields[3].match(/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/)) {
+    if (fields.length !== 4 || !objectIdPattern.test(fields[1]) || !objectIdPattern.test(fields[3])) {
       throw new Error('Malformed Git pre-push input');
     }
     if (!/^0+$/.test(fields[1])) tips.add(fields[1]);
+    if (!/^0+$/.test(fields[3])) remoteIds.add(fields[3]);
   }
-  return [...tips];
+  return { tips: [...tips], remoteIds: [...remoteIds] };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const prePush = args[0] === '--pre-push';
-  if (!(args.length === 0 || (args.length === 1 && args[0] === '--history') || (prePush && args.length <= 2))) {
+  if (args.length > 1 || args.some(arg => !['--history', '--pre-push'].includes(arg))) {
     throw new Error('Usage: node client/tools/check-repository.mjs [--history | --pre-push]');
   }
   const history = args[0] === '--history';
-  const tips = prePush ? outgoingPushTips(fs.readFileSync(0, 'utf8')) : [];
+  const { tips, remoteIds } = prePush ? prePushObjects(fs.readFileSync(0, 'utf8')) : { tips: [], remoteIds: [] };
   // Check the whole repository from any working directory. Hygiene rules cover only this
   // tool's own project directory when it is nested inside a larger repository.
   const top = git(process.cwd(), ['rev-parse', '--show-toplevel']).toString('utf8').trim();
   const own = path.relative(top, fileURLToPath(new URL('..', import.meta.url)));
   const hygieneRoot = !own || own.startsWith('..') || path.isAbsolute(own) ? '' : `${own.split(path.sep).join('/')}/`;
-  const result = await checkRepository(top, history, tips, hygieneRoot, prePush ? args[1] : undefined);
+  const result = await checkRepository(top, history, tips, hygieneRoot, remoteIds);
   if (result.errors.length) {
     console.error(result.errors.join('\n'));
     process.exitCode = 1;
