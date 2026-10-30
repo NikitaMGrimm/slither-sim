@@ -27,6 +27,12 @@ pub enum Event {
     Failed(u32, String),
 }
 pub(crate) type Socket = WebSocket<Wire>;
+#[cfg(test)]
+#[derive(Default)]
+struct TestIo {
+    read_bytes: usize,
+    block_writes: bool,
+}
 /// An absolute handshake deadline bounds slow-drip peers and connector cancellation/join.
 pub(crate) struct Wire {
     stream: TcpStream,
@@ -34,6 +40,8 @@ pub(crate) struct Wire {
     write_blocked: bool,
     deadline: Option<Instant>,
     cancel: Arc<AtomicBool>,
+    #[cfg(test)]
+    test_io: TestIo,
 }
 impl Wire {
     fn budget(&self) -> io::Result<()> {
@@ -67,15 +75,26 @@ impl Wire {
 impl Read for Wire {
     fn read(&mut self, b: &mut [u8]) -> io::Result<usize> {
         self.budget()?;
-        match &mut self.ready {
+        let result = match &mut self.ready {
             Some(stream) => stream.read(b),
             None => self.stream.read(b),
+        };
+        #[cfg(test)]
+        if let Ok(count) = &result {
+            self.test_io.read_bytes += *count;
         }
+        result
     }
 }
 impl Write for Wire {
     fn write(&mut self, b: &[u8]) -> io::Result<usize> {
         self.budget()?;
+        // Deterministic test backpressure without filling OS send buffers.
+        #[cfg(test)]
+        if self.test_io.block_writes {
+            self.write_blocked = true;
+            return Err(ErrorKind::WouldBlock.into());
+        }
         let result = match &mut self.ready {
             Some(stream) => stream.write(b),
             None => self.stream.write(b),
@@ -244,6 +263,8 @@ pub(crate) fn connect(url: &str, cancel: &Arc<AtomicBool>, deadline: Instant) ->
         write_blocked: false,
         deadline: Some(deadline.min(Instant::now() + Duration::from_secs(2))),
         cancel: cancel.clone(),
+        #[cfg(test)]
+        test_io: TestIo::default(),
     };
     let (mut socket, _) = tungstenite::client::client_with_config(request, wire, Some(config))
         .map_err(|e| e.to_string())?;
@@ -495,6 +516,188 @@ impl Drop for Transport {
 mod tests {
     use super::*;
     use std::net::TcpListener;
+
+    fn wake_and_poll(
+        transport: &mut Transport,
+        wakes: &mpsc::Receiver<()>,
+        deadline: Instant,
+    ) -> Vec<Event> {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .expect("readiness deadline");
+        wakes
+            .recv_timeout(remaining)
+            .expect("transport must wake without redraw polling");
+        transport.poll()
+    }
+
+    fn waking_connection(endpoint: String) -> (Transport, mpsc::Receiver<()>) {
+        let (notify, wakes) = mpsc::channel();
+        let mut transport = Transport::with_wake(move || {
+            let _ = notify.send(());
+        });
+        transport
+            .execute(&Effect {
+                generation: 1,
+                id: 1,
+                kind: EffectKind::Connect(endpoint),
+            })
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let events = wake_and_poll(&mut transport, &wakes, deadline);
+            if !events.is_empty() {
+                assert!(matches!(events.as_slice(), [Event::Opened(1)]));
+                return (transport, wakes);
+            }
+        }
+    }
+
+    #[test]
+    fn partial_websocket_header_and_payload_resume_on_the_next_readiness() {
+        // ORIGINAL SYNTHETIC server frame. Exercise both a split header and a
+        // split payload; the peer cannot send the rest until the first read.
+        for split in [1, 4] {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
+            let (advance, steps) = mpsc::channel();
+            let peer = thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                stream.set_nodelay(true).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut socket = tungstenite::accept(stream).unwrap();
+                let frame = [0x82, 4, 42, 43, 44, 45];
+                for chunk in [&frame[..split], &[&frame[split..], &[0x82, 1, 99]].concat()] {
+                    steps.recv_timeout(Duration::from_secs(2)).unwrap();
+                    socket.get_mut().write_all(chunk).unwrap();
+                }
+                steps.recv_timeout(Duration::from_secs(2)).unwrap();
+            });
+            let (mut transport, wakes) = waking_connection(endpoint);
+            let before = transport
+                .socket
+                .as_ref()
+                .unwrap()
+                .get_ref()
+                .test_io
+                .read_bytes;
+            advance.send(()).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while transport
+                .socket
+                .as_ref()
+                .unwrap()
+                .get_ref()
+                .test_io
+                .read_bytes
+                < before + split
+            {
+                assert!(wake_and_poll(&mut transport, &wakes, deadline).is_empty());
+            }
+            assert_eq!(
+                transport
+                    .socket
+                    .as_ref()
+                    .unwrap()
+                    .get_ref()
+                    .test_io
+                    .read_bytes,
+                before + split
+            );
+            // A partial frame is retained, never emitted or reset on WouldBlock.
+            assert!(transport.poll().is_empty());
+            advance.send(()).unwrap();
+            let mut received = Vec::new();
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while received.len() < 2 {
+                for event in wake_and_poll(&mut transport, &wakes, deadline) {
+                    match event {
+                        Event::Binary(1, bytes) => received.push(bytes),
+                        _ => panic!("unexpected partial-frame event"),
+                    }
+                }
+            }
+            assert_eq!(received, [vec![42, 43, 44, 45], vec![99]]);
+            assert!(transport.poll().is_empty());
+            transport.close();
+            advance.send(()).unwrap();
+            peer.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn would_block_write_flushes_on_readiness_without_requeuing_the_message() {
+        // ORIGINAL SYNTHETIC peer; injected WouldBlock avoids host-dependent
+        // socket buffer saturation while exercising Transport's real send path.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
+        let (received, packets) = mpsc::channel();
+        let (finish, finished) = mpsc::channel();
+        let peer = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut socket = tungstenite::accept(stream).unwrap();
+            for _ in 0..2 {
+                let Message::Binary(bytes) = socket.read().unwrap() else {
+                    panic!("binary message required")
+                };
+                received.send(bytes.to_vec()).unwrap();
+            }
+            finished.recv_timeout(Duration::from_secs(2)).unwrap();
+        });
+        let (mut transport, wakes) = waking_connection(endpoint);
+        transport
+            .socket
+            .as_mut()
+            .unwrap()
+            .get_mut()
+            .test_io
+            .block_writes = true;
+        transport
+            .execute(&Effect {
+                generation: 1,
+                id: 2,
+                kind: EffectKind::Send(vec![42, 43]),
+            })
+            .unwrap();
+        assert!(transport.socket.as_ref().unwrap().get_ref().write_blocked);
+        assert_eq!(transport.pending_bytes, 2);
+        assert!(transport.writable);
+        transport
+            .socket
+            .as_mut()
+            .unwrap()
+            .get_mut()
+            .test_io
+            .block_writes = false;
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while transport.pending_bytes != 0 {
+            assert!(wake_and_poll(&mut transport, &wakes, deadline).is_empty());
+        }
+        assert!(!transport.writable);
+        assert!(!transport.socket.as_ref().unwrap().get_ref().write_blocked);
+        // A following marker proves the retained message was sent exactly once.
+        transport
+            .execute(&Effect {
+                generation: 1,
+                id: 3,
+                kind: EffectKind::Send(vec![99]),
+            })
+            .unwrap();
+        assert_eq!(
+            packets.recv_timeout(Duration::from_secs(2)).unwrap(),
+            [42, 43]
+        );
+        assert_eq!(packets.recv_timeout(Duration::from_secs(2)).unwrap(), [99]);
+        assert!(packets.try_recv().is_err());
+        transport.close();
+        finish.send(()).unwrap();
+        peer.join().unwrap();
+    }
 
     #[test]
     fn readiness_wakes_without_frames_drains_past_budget_and_closes_cleanly() {

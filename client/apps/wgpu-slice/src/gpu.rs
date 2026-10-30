@@ -441,7 +441,29 @@ pub fn instance() -> wgpu::Instance {
     })
 }
 
-/// Windows and browser surface owner. Loss reconfigures once; time/scene are outside this owner.
+#[derive(Debug, PartialEq, Eq)]
+enum SurfaceRecovery {
+    Retry,
+    WaitUntilVisible,
+    Reconfigure,
+}
+fn surface_recovery(failure: wgpu::CurrentSurfaceTexture) -> Result<SurfaceRecovery> {
+    match failure {
+        wgpu::CurrentSurfaceTexture::Timeout => Ok(SurfaceRecovery::Retry),
+        wgpu::CurrentSurfaceTexture::Occluded => Ok(SurfaceRecovery::WaitUntilVisible),
+        wgpu::CurrentSurfaceTexture::Outdated => Ok(SurfaceRecovery::Reconfigure),
+        // Lost invalidates the surface itself, not just its configuration. Let
+        // the host shut down in order rather than configure an invalid surface.
+        // https://docs.rs/wgpu/30.0.1/wgpu/enum.CurrentSurfaceTexture.html#variant.Lost
+        wgpu::CurrentSurfaceTexture::Lost => Err(
+            "surface lost; host stopped, scene retained; explicit surface recreation required"
+                .into(),
+        ),
+        e => Err(format!("surface stopped: {e:?}")),
+    }
+}
+
+/// Windows and browser surface owner. Time/scene are outside this owner.
 pub struct SurfaceHost {
     pub renderer: Renderer,
     surface: wgpu::Surface<'static>,
@@ -563,28 +585,16 @@ impl SurfaceHost {
         self.acquired = Some(match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t)
             | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
-            wgpu::CurrentSurfaceTexture::Occluded => {
-                self.occluded = true;
+            failure => {
+                match surface_recovery(failure)? {
+                    SurfaceRecovery::Retry => {}
+                    SurfaceRecovery::WaitUntilVisible => self.occluded = true,
+                    SurfaceRecovery::Reconfigure => {
+                        self.surface.configure(&self.renderer.device, &self.config);
+                    }
+                }
                 return Ok(false);
             }
-            wgpu::CurrentSurfaceTexture::Timeout => return Ok(false),
-            wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.renderer.device, &self.config);
-                return Ok(false);
-            }
-            // Native can reconfigure the existing surface without acknowledging
-            // or replacing the retained LocalGame picture.
-            #[cfg(not(target_arch = "wasm32"))]
-            wgpu::CurrentSurfaceTexture::Lost => {
-                self.surface.configure(&self.renderer.device, &self.config);
-                return Ok(false);
-            }
-            #[cfg(target_arch = "wasm32")]
-            wgpu::CurrentSurfaceTexture::Lost => return Err(
-                "surface lost; host stopped, scene retained; explicit surface recreation required"
-                    .into(),
-            ),
-            e => return Err(format!("surface stopped: {e:?}")),
         });
         Ok(true)
     }
@@ -648,5 +658,34 @@ impl SurfaceHost {
         }
         self.renderer.queue.present(texture);
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn surface_recovery_fails_on_lost_and_only_reconfigures_outdated() {
+        assert_eq!(
+            surface_recovery(wgpu::CurrentSurfaceTexture::Lost),
+            Err(
+                "surface lost; host stopped, scene retained; explicit surface recreation required"
+                    .into()
+            ),
+        );
+        assert_eq!(
+            surface_recovery(wgpu::CurrentSurfaceTexture::Outdated),
+            Ok(SurfaceRecovery::Reconfigure)
+        );
+        assert_eq!(
+            surface_recovery(wgpu::CurrentSurfaceTexture::Timeout),
+            Ok(SurfaceRecovery::Retry)
+        );
+        assert_eq!(
+            surface_recovery(wgpu::CurrentSurfaceTexture::Occluded),
+            Ok(SurfaceRecovery::WaitUntilVisible)
+        );
+        assert!(surface_recovery(wgpu::CurrentSurfaceTexture::Validation).is_err());
     }
 }
