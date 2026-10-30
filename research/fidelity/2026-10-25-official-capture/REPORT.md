@@ -6,6 +6,12 @@ mask leaves insufficient clean exposure. This session does not validate a latenc
 The fresh joins also leave the official spawn rejection rule unidentified.
 No simulator model, default or bot policy changed.
 
+For later remote timing evidence, see the [VPS timing study](../2026-10-26-vps-timing/REPORT.md)
+and [server timing references](../2026-10-26-server-timing-references/REPORT.md).
+The contaminated timing and unidentified spawn rule here remain unchanged.
+The historical collector/resource monitor source is retained in
+[process_monitor.ps1](process_monitor.ps1), with its original session paths.
+
 ## Collection and provenance
 
 Base: `421e384c3738e7c4d08e1eb12275733266d7a629`. The original

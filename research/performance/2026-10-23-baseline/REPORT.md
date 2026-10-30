@@ -5,6 +5,9 @@ measurements or changed conclusions. Source paths and local output addresses in
 the record refer to the original study, not this archive directory. Full raw
 outputs are local-only references, not downloadable evidence in this checkout.
 
+For current workload commands, see the [workload catalog](../../../docs/performance-workloads.md).
+This remains the historical 0.2.0 baseline.
+
 The original workload and metric definitions are [frozen in the source guide](https://github.com/NikitaMGrimm/slither-sim/blob/0ab867149da6a3f0ae3242aab4b8df6950e965eb/docs/performance.md).
 
 The [selected measurements](results.json) retain individual

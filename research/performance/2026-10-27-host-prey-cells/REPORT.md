@@ -99,12 +99,19 @@ overlay files byte-for-byte. All six Python entry points (three study tools and
 three historical children) reject `-O`. Only research/changelog integration is
 added after the measured/tested production revision.
 
+The [historical wrapper](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-27-host-prey-cells/reproduce.py)
+reuses the earlier [pickup-cache driver](../2026-10-27-pickup-cache/reproduce.py)
+with this study's default commit pins. Retrieve its exact bytes below; selected
+evidence is assembled by [select.py](select.py).
+
 ```sh
 STUDY=research/performance/2026-10-27-host-prey-cells
 OUT=/tmp/slither-prey-new
-python3 "$STUDY/reproduce.py" build "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" trace "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
+REPRODUCE="$OUT-reproduce.py"
+git show 76772d07098c884e9643783a0ba874bce0567e5e:research/performance/2026-10-27-host-prey-cells/reproduce.py > "$REPRODUCE"
+python3 "$REPRODUCE" build "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" trace "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
 python3 "$STUDY/profile.py" aee542100496b8cbc031b8ab19bb58e78bd8af2b /tmp/prey-profile-base --cpu 3 --control "$OUT/native-base/bin/study_protocols"
 python3 "$STUDY/profile.py" 2496288635d5d5fc70ed04ca71e79bf8ef111653 /tmp/prey-profile-candidate --cpu 3 --control "$OUT/native-candidate/bin/study_protocols"
 cargo test --locked --lib prey_visibility
