@@ -138,3 +138,10 @@ with the replacement generator, with the same frozen windows and definitions.
 The combined full-timer bound including the first pair is $2.352. Retire the
 original target after its closed logs are retrieved; extend no timer. A complete
 new 90+30-minute pair preserves the export reserve within the unchanged $2.50 cap.
+For recovery durability, secure the closed native source/binary/proof archive
+before timing. Each completed row additionally closes a checkpoint containing its
+probe/captures, generator qualification prefix, ICMP prefix and a member-verified
+snapshot of existing CLI logs. Download and hash-verify each immediately, keeping
+another copy on the target. These callbacks run between counted windows and do
+not alter a window, quota or selection rule. Use immediate-mode packet capture
+with a short post-run drain; retain partial old capture tails as unavailable.
