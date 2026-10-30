@@ -133,7 +133,7 @@ fn closed_profile_literals_and_dynamic_directory_url_never_evaluate_script() {
     let script = "throw Error('do not execute'); var client_version = 4242; var cpw = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]; getData('https://slither.io/i999.txt', handler);";
     let p = profile(script.as_bytes()).unwrap();
     assert_eq!(p.client_version, 4242);
-    assert_eq!(p.password, std::array::from_fn(|i| i as u8));
+    assert_eq!(p.page_echo, std::array::from_fn(|i| i as u8));
     assert_eq!(
         directory_url(script).unwrap().as_str(),
         "https://slither.io/i999.txt"

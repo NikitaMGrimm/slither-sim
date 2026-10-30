@@ -24,7 +24,7 @@ const ANTENNA_LATE_DRAW_RESERVE: usize = crate::hud::MAX_DRAWS + crate::minimap:
 /// Includes tiled text plus flat fills, borders and controls; see panel-text.md.
 pub const PANEL_PRODUCER_DRAWS: usize = 96;
 pub const PANEL_CONTROL_DRAWS: usize = 8;
-/// No current gameplay producer opts in. Future producers reserve before world
+/// Gameplay opts in to announcements. Producers reserve before world
 /// nicknames/antennas are admitted, then preflight their entire panel together.
 #[derive(Clone, Copy, Default)]
 pub struct PanelDrawReserve {
@@ -600,6 +600,48 @@ pub fn prepare_reserved(
     applied: QualitySnapshot,
     panels: PanelDrawReserve,
 ) -> Result<PreparedFrame> {
+    prepare_composed(client, bank, extent, scale, identity, applied, panels, None)
+}
+/// Production LocalGame preparation captures the announcement at this exact draw
+/// boundary, including ordered Setup callbacks, ordinary work and resize.
+pub fn prepare_gameplay(
+    client: &mut AnimatedClient,
+    bank: &mut Bank,
+    extent: [u32; 2],
+    scale: f64,
+    identity: u64,
+    applied: QualitySnapshot,
+) -> Result<PreparedFrame> {
+    let announcement = client.announcement_view();
+    // Select admission from the same snapshot submitted below. Hidden content
+    // (including Setup and the return sentinel) must not reduce world capacity.
+    let visible =
+        announcement.present && announcement.opacity > 0. && !announcement.text.blocks.is_empty();
+    prepare_composed(
+        client,
+        bank,
+        extent,
+        scale,
+        identity,
+        applied,
+        PanelDrawReserve {
+            announcement: visible,
+            result: false,
+        },
+        Some(&announcement),
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn prepare_composed(
+    client: &mut AnimatedClient,
+    bank: &mut Bank,
+    extent: [u32; 2],
+    scale: f64,
+    identity: u64,
+    applied: QualitySnapshot,
+    panels: PanelDrawReserve,
+    announcement: Option<&AnnouncementView>,
+) -> Result<PreparedFrame> {
     let logical = dimensions(extent, scale)?;
     let full_stock = bank.cosmetics.is_some();
     // Mix the draw identity before the local stream so successive draws do not
@@ -957,6 +999,14 @@ pub fn prepare_reserved(
         );
         inserted += count;
     }
+    // Optional nicknames and antennas already yielded to this reserve. Dense
+    // mandatory geometry must fail explicitly rather than consume a later panel
+    // or HUD halfway through submission (panel-text.md, aggregate resource proof).
+    if (panels.announcement || panels.result)
+        && draws.len() > MAX_DRAWS.saturating_sub(panels.late_draws())
+    {
+        return Err("frame extent/scale/budget: mandatory overlay reserve".into());
+    }
     bank.stage_text(identity, text_resources.into_values().collect())?;
     let mut frame = Frame {
         identity,
@@ -967,8 +1017,22 @@ pub fn prepare_reserved(
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
+    if let Some(view) = announcement {
+        bank.announcement
+            .append(view, &mut bank.text, &mut frame, &mut resources)?;
+    }
     bank.minimap
         .append(client, &mut bank.text, &mut frame, &mut resources)?;
+    // Mandatory overlays must fit in full; never silently truncate a panel.
+    if frame.draws.len() > MAX_DRAWS
+        || resources
+            .iter()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>()
+            > crate::bank::PIXEL_BUDGET
+    {
+        return Err("Whole-frame draw/pixel budget".into());
+    }
     Ok(PreparedFrame { frame, resources })
 }
 // Text tiles have no rotation. Intersect both the logical destination and its

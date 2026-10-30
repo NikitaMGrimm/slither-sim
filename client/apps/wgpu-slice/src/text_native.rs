@@ -1,4 +1,4 @@
-//! Windows adapter: no bundled fonts, desktop APIs or window creation.
+//! Native adapter: no bundled fonts, desktop APIs or window creation.
 use super::{Family, Raster, Slant, TextStyle, Weight};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
@@ -233,6 +233,7 @@ struct Arial {
     em_ascent: f64,
     font_ascent: f32,
     font_descent: f32,
+    font_line_gap: f32,
 }
 fn canvas_character(c: char) -> Option<char> {
     match c {
@@ -261,7 +262,12 @@ impl Rasterizer {
         let key = (style.family, style.weight, style.slant);
         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
             let file = face_name(style);
-            let bytes = std::fs::read(std::path::Path::new("C:/Windows/Fonts").join(file))
+            let directory = if cfg!(target_os = "linux") {
+                "/usr/share/fonts/truetype/dejavu"
+            } else {
+                "C:/Windows/Fonts"
+            };
+            let bytes = std::fs::read(std::path::Path::new(directory).join(file))
                 .map_err(|e| format!("installed face ({file}): {e}"))?;
             let face = ttf_parser::Face::parse(&bytes, 0)
                 .map_err(|e| format!("font metrics ({file}): {e}"))?;
@@ -277,15 +283,28 @@ impl Rasterizer {
             let upem = f32::from(face.units_per_em());
             let font_ascent = f32::from(os2.windows_ascender()) / upem;
             let font_descent = -f32::from(os2.windows_descender()) / upem;
+            let font_line_gap = f32::from(face.line_gap()) / upem;
             slot.insert(Arial {
                 font: Font::from_bytes(bytes, FontSettings::default())
                     .map_err(|e| format!("font ({file}): {e}"))?,
                 em_ascent: ascent / (ascent - descent),
                 font_ascent,
                 font_descent,
+                font_line_gap,
             });
         }
         Ok(&self.faces[&key])
+    }
+    pub fn normal_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
+        let device = TextStyle {
+            size: f64::from(style.size as f32 * scale as f32),
+            ..style
+        };
+        let m = self.measure("", device)?;
+        // CSS normal includes the hhea line gap as well as the rounded font box.
+        // Installed-face regression: tests/announcements.rs; docs/announcements.md.
+        let gap = (device.size as f32 * self.face(device)?.font_line_gap).round();
+        Ok((m.font_ascent.round() + m.font_descent.round() + f64::from(gap)) / scale)
     }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
         let face = self.face(style)?;
@@ -486,6 +505,7 @@ impl Rasterizer {
 /// accepted approximation belongs to end-screen backlog item 5, not this PR.
 /// https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc#L484-L498
 /// Missing selected files are explicit errors; no fonts are bundled or sheared.
+#[cfg(not(target_os = "linux"))]
 pub fn face_name(style: TextStyle) -> &'static str {
     match (style.family, style.weight, style.slant) {
         (Family::Lucida, _, _) => "l_10646.ttf",
@@ -493,5 +513,17 @@ pub fn face_name(style: TextStyle) -> &'static str {
         (_, Weight::Bold, Slant::Normal) => "arialbd.ttf",
         (_, Weight::Normal, Slant::Italic) => "ariali.ttf",
         (_, Weight::Bold, Slant::Italic) => "arialbi.ttf",
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn face_name(style: TextStyle) -> &'static str {
+    // CPU-only local-host CI still prepares real text resources. Linux uses
+    // its installed DejaVu faces; this probe makes no Arial/pixel parity claim.
+    match (style.weight, style.slant) {
+        (Weight::Normal, Slant::Normal) => "DejaVuSans.ttf",
+        (Weight::Bold, Slant::Normal) => "DejaVuSans-Bold.ttf",
+        (Weight::Normal, Slant::Italic) => "DejaVuSans-Oblique.ttf",
+        (Weight::Bold, Slant::Italic) => "DejaVuSans-BoldOblique.ttf",
     }
 }

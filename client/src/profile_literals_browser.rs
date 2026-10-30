@@ -29,14 +29,14 @@ impl ProfileLiteralParser {
         self.storage.parse_version(length)
     }
 
-    /// Admit exactly twenty password bytes, with no partial copied output.
-    pub fn parse_password(&mut self, length: u32) -> bool {
-        self.storage.parse_password(length)
+    /// Admit exactly twenty page echo bytes, with no partial copied output.
+    pub fn parse_page_echo(&mut self, length: u32) -> bool {
+        self.storage.parse_page_echo(length)
     }
 
-    /// Copy one fully admitted password byte or the fixed rejection sentinel -1.
-    pub fn password_byte(&self, index: u32) -> i32 {
-        self.storage.password_byte(index)
+    /// Copy one fully admitted page echo byte or the fixed rejection sentinel -1.
+    pub fn page_echo_byte(&self, index: u32) -> i32 {
+        self.storage.page_echo_byte(index)
     }
 
     /// Copy the unchanged supported protocol; this does not negotiate a connection.

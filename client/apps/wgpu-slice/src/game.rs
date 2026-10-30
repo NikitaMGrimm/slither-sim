@@ -137,11 +137,11 @@ pub fn server_endpoint(value: &str) -> Result<url::Url> {
 #[derive(Default)]
 pub struct LoginProfile {
     pub client_version: u16,
-    pub password: [u8; 20],
+    pub page_echo: [u8; 20],
 }
 impl Drop for LoginProfile {
     fn drop(&mut self) {
-        self.password.fill(0);
+        self.page_echo.fill(0);
     }
 }
 
@@ -187,6 +187,9 @@ impl LocalGame {
         client
             .enable_minimap_tracking()
             .map_err(|e| e.to_string())?;
+        client
+            .enable_announcement_tracking()
+            .map_err(|e| e.to_string())?;
         client.enable_nicknames().map_err(|e| e.to_string())?;
         let mut session = SessionPolicy::new();
         session.subscribe(2).map_err(|e| e.0)?;
@@ -199,7 +202,7 @@ impl LocalGame {
             bank: Bank::new()?,
             session,
             input: DesktopInput::new(19.).map_err(|e| e.to_string())?,
-            policy: GameplayPolicy::new(true, true, true, true, false, false),
+            policy: GameplayPolicy::new(true, true, true, true, true, false),
             hud: HudHistory::default(),
             rows: LeaderboardHistory::default(),
             projector: LeaderboardScoreProjector::new(),
@@ -305,7 +308,7 @@ impl LocalGame {
         menu.select(skin, &[])?;
         let login = protocol::encode_login(
             profile.client_version,
-            &profile.password,
+            &profile.page_echo,
             nickname,
             skin,
             None,
@@ -604,7 +607,7 @@ impl LocalGame {
             |c,_|{
                 if frames.borrow().len()>=16{return Err(Ingress("Setup draw budget".into()));}
                 serial.set(serial.get()+1);
-                let frame=render::prepare(c,&mut bank.borrow_mut(),extent,scale,serial.get(),quality).map_err(Ingress)?;
+                let frame=render::prepare_gameplay(c,&mut bank.borrow_mut(),extent,scale,serial.get(),quality).map_err(Ingress)?;
                 // HUD projection follows the complete ingress report. Reserve its
                 // bounded atlas before retaining each immutable scene snapshot.
                 let bytes=captured_pixels.get()+frame.pixel_bytes()+crate::hud::MAX_PIXEL_BYTES;
@@ -857,6 +860,14 @@ impl LocalGame {
         let actions = ClientControlActions {
             reset_world: pending.reset_world,
             reset_lag: pending.reset_lag,
+            announcement_lifecycle: self.policy.include_announcements().then_some(
+                AnnouncementLifecycle {
+                    death_pending: life.death_pending,
+                    return_active: life.return_active,
+                    return_completed: life.return_completed,
+                    return_fraction: life.return_fraction,
+                },
+            ),
             minimap_ui_fraction: self
                 .policy
                 .include_minimap(life.return_active)
@@ -968,7 +979,7 @@ impl LocalGame {
             .quality
             .update_statistics(w.now, self.draws_since_statistics, playing)
             .map_err(|e| e.to_string())?;
-        let frame = render::prepare(
+        let frame = render::prepare_gameplay(
             &mut world,
             &mut self.bank,
             w.extent,
@@ -1083,7 +1094,7 @@ impl LocalGame {
                 w.scale = scale;
                 if let Some(world) = &mut w.world {
                     self.identity += 1;
-                    let frame = render::prepare(
+                    let frame = render::prepare_gameplay(
                         world,
                         &mut self.bank,
                         extent,

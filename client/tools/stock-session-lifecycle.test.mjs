@@ -5,7 +5,7 @@ import { createStockSession } from './fixtures/session-policy-fixture.mjs';
 
 const setup = [97, ...new Array(22).fill(0), 19, 42];
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 7, password: new Uint8Array(20).fill(3), protocolVersion: 19 },
+  profile: { clientVersion: 7, pageEcho: new Uint8Array(20).fill(3), protocolVersion: 19 },
   nickname: 'Authored lifecycle', skin: 2, customSkin: new Uint8Array() });
 const stepRequest = (nowMs = 1000, delta = 1, wholeSteps = 1) => ({ nowMs, delta, wholeSteps });
 function frame(commands) {

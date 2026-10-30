@@ -1,7 +1,7 @@
 // Authored copied-record regressions; caller labels actual Wasm or test-only ABI.
 import assert from 'node:assert/strict';
 import {createStockSession} from '../web/stock-session.mjs';
-const request=()=>({endpoint:'ws://192.0.2.9:1234/slither',profile:{clientVersion:7,password:new Uint8Array(20),protocolVersion:19},nickname:'Authored copy',skin:0,customSkin:new Uint8Array()});
+const request=()=>({endpoint:'ws://192.0.2.9:1234/slither',profile:{clientVersion:7,pageEcho:new Uint8Array(20),protocolVersion:19},nickname:'Authored copy',skin:0,customSkin:new Uint8Array()});
 export function sessionPolicyRecordSmoke(wasm){let cases=0;
  for(const mode of ['nonwritable','setter']){
   const prior=Object.getOwnPropertyDescriptor(Object.prototype,'resetWorld');

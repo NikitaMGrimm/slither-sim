@@ -42,7 +42,13 @@ release = false
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"
 protect_breaking_commits = true
-# The changelog is curated by hand under Unreleased (CONTRIBUTING). Generated
-# commit titles would also list every client/ commit, which release-plz
-# attributes to the root crate since the import (#283).
-commit_parsers = [{ message = ".*", skip = true }]
+# The changelog is curated by hand under Unreleased (CONTRIBUTING), so the
+# version section adds only its heading above those entries. Generated commit
+# titles would also list every client/ commit, which release-plz attributes to
+# the root crate since the import (#283). Skipping every commit instead drops
+# the heading too (#306). The default trim removes the blank lines around the
+# heading (#309); without it, release-plz adds the one above (#311).
+trim = false
+body = """
+## [{{ version }}]{%- if release_link -%}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
+"""

@@ -34,7 +34,7 @@ There is no automatic reconnect.
 Play without a window, wanders along broad drifting arcs with a periodic boost through the
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
 (server, profile version, handshake/login/Setup, packet and frame counts, own
-length over time, exit reason). Passwords and raw packets are never printed.
+length over time, exit reason). Page echo bytes and raw packets are never printed.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and
@@ -49,6 +49,12 @@ and retained pictures. The first viewport-body encounter also saves one extra
 The deterministic autopilot keeps its existing input cadence/boost schedule;
 its slow heading drift makes the first minute travel across the map rather than
 repeat a small orbit. It does not avoid opponents or the arena edge.
+
+For GPU-free offline host/client coverage, build the separate
+`slither-client-e2e` binary and run [the local-host runner](../../docs/verification.md#offline-hostclient-end-to-end-run).
+It uses production transport and LocalGame presentation preparation with a CPU
+sink, and has no official-server mode. The desktop `--headless` option above
+continues to render offscreen through a GPU.
 
 The browser build stays simulator-only: browser fetches need CORS permission for
 the official page, script and directory, JavaScript cannot set WebSocket Origin,

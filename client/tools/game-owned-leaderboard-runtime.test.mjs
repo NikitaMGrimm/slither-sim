@@ -301,7 +301,7 @@ test('local host selects explicit accessory dispatch, ready sources and profile;
         assert.equal(initialized, true); assert.equal(begins, 0);
         assert.equal(resolveSkin, graph.wasm.api.resolve_local_skin); skinBindings++;
       },
-      profile: graph.run('({clientVersion:0,password:new Uint8Array(20),protocolVersion:19})'),
+      profile: graph.run('({clientVersion:0,pageEcho:new Uint8Array(20),protocolVersion:19})'),
       gate: { metadata:()=>metadata, claim(id) {
         assert.equal(id,metadata.id); assert.equal(++claims,1);
         const native=original.claim(armed.id);

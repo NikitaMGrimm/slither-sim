@@ -57,13 +57,14 @@ impl fmt::Display for ProtocolError {
 
 impl std::error::Error for ProtocolError {}
 
-/// Construct a login with caller-supplied version and password bytes.
+/// Construct a login with caller-supplied version and page echo bytes.
 ///
-/// Empty nicknames are allowed. No official credential or version table is
-/// embedded. Custom skin bytes are appended after the two appearance markers.
+/// The page echo is the stock page literal copied after the version.
+/// Empty nicknames are allowed. No official profile values are embedded.
+/// Custom skin bytes are appended after the two appearance markers.
 pub fn encode_login(
     client_version: u16,
-    password: &[u8; 20],
+    page_echo: &[u8; 20],
     nickname: &str,
     skin: u8,
     custom_skin: Option<&[u8]>,
@@ -78,7 +79,7 @@ pub fn encode_login(
     let mut bytes = Vec::with_capacity(28 + nickname.len() + custom_skin.len());
     bytes.extend([b's', 30]);
     bytes.extend(client_version.to_be_bytes());
-    bytes.extend(password);
+    bytes.extend(page_echo);
     bytes.extend([skin, nickname.len() as u8]);
     bytes.extend(nickname.as_bytes());
     bytes.extend([0, 255]);

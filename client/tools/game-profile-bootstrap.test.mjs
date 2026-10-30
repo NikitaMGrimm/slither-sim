@@ -149,8 +149,8 @@ test('stale preflight and invalid selected endpoint perform no acquisition; call
   await assert.rejects(h.runtime.playWithLiveProfile(invalid));assert.equal(h.counts.fetch,0);h.assertNoSocket();
   const selected={...request(),nickname:'Before',skin:3,customSkin:Uint8Array.of(7,8)};
   const observed=[];const encode=h.wasm.api.encode_login;
-  h.wasm.api.encode_login=(version,password,nickname,skin,custom)=>{
-    observed.push({nickname,skin,custom:[...custom]});return encode(version,password,nickname,skin,custom);
+  h.wasm.api.encode_login=(version,pageEcho,nickname,skin,custom)=>{
+    observed.push({nickname,skin,custom:[...custom]});return encode(version,pageEcho,nickname,skin,custom);
   };
   const work=h.runtime.playWithLiveProfile(selected);
   selected.endpoint='ws://192.0.2.10:2345/slither';selected.nickname='After';selected.skin=4;selected.customSkin.fill(0);
