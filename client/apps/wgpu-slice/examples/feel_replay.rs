@@ -195,6 +195,57 @@ fn replay(request: Value) -> Result<Value> {
     Ok(result)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn desktop_trace_reports_successes_only_after_their_ack_event() {
+        let step = |id: &str, kind: &str, now: f64| json!({"event":{"sourceId":id,"kind":kind,"scheduledMs":now,"actualMs":now}});
+        let mut startup = step("startup", "frame", 0.);
+        startup["ackAtMs"] = json!(40.);
+        let mut first_ack = step("startup-ack", "input", 40.);
+        first_ack["acknowledgment"] = json!(true);
+        let mut next = step("next", "frame", 50.);
+        next["ackAtMs"] = json!(90.);
+        let backing = slither_wgpu_slice::render::backing_size([960., 540.]).unwrap();
+        let mut request = json!({"lane":"desktop-ordering", "durationMs":50.,
+            "geometry":{"css":{"width":960.,"height":540.},
+                "backing":{"width":f64::from(backing[0]),"height":f64::from(backing[1])}},
+            "pointer":{"x":480.,"y":270.}, "steps":[startup,first_ack,next]});
+        let waiting = replay(request.clone()).unwrap();
+        assert_eq!(waiting["body"]["final"]["draws"].as_u64(), Some(1));
+        let draws: Vec<_> = waiting["body"]["samples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|s| s["phase"] == "draw")
+            .collect();
+        assert_eq!(draws.len(), 2);
+        for (id, sample) in draws.iter().enumerate() {
+            assert_eq!(sample["drawId"].as_u64(), Some(id as u64));
+            assert_eq!(
+                sample["quality"]["successfulDraws"].as_u64(),
+                Some(id as u64)
+            );
+        }
+        let mut last_ack = step("next-ack", "input", 90.);
+        last_ack["acknowledgment"] = json!(true);
+        request["steps"].as_array_mut().unwrap().push(last_ack);
+        request["durationMs"] = json!(90.);
+        let done = replay(request).unwrap();
+        assert_eq!(done["body"]["final"]["draws"].as_u64(), Some(2));
+        let ack_times: Vec<_> = done["lifecycle"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["kind"] == "presented")
+            .map(|e| e["atMs"].as_f64().unwrap())
+            .collect();
+        assert_eq!(ack_times, [40., 90.]);
+    }
+}
+
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let mut input = String::new();

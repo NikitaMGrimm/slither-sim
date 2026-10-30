@@ -24,6 +24,7 @@ pub struct Driver {
     pub desktop: bool,
     pub lifecycle: Vec<Value>,
     pub issued: Option<slither_client::feel_trace::Observation>,
+    pub successful_draws: usize,
     pending_ack: Option<f64>,
     socket: Option<u32>,
     sends: usize,
@@ -45,6 +46,7 @@ impl Driver {
             desktop: false,
             lifecycle: vec![],
             issued: None,
+            successful_draws: 0,
             pending_ack: None,
             socket: None,
             sends: 0,
@@ -168,6 +170,7 @@ impl Driver {
                 return Err("Desktop picture acknowledgment at wrong time".into());
             }
             self.game.presented(true)?;
+            self.successful_draws += 1;
             self.lifecycle.push(json!({"kind":"presented", "atMs":now}));
             self.drain_effects(now)?;
         }
@@ -268,6 +271,35 @@ mod tests {
         d.drain_effects(1.).unwrap();
         assert_eq!(d.receipts.last().unwrap()["kind"], "close");
         assert_eq!(d.game.feel_pending(), [0, 0]);
+    }
+    #[test]
+    fn desktop_success_count_excludes_superseded_and_unacknowledged_pictures() {
+        let mut d = playing();
+        d.desktop = true;
+        d.recorder.take();
+        let before = d.successful_draws;
+        // Authored protocol-19 Setup, completed but superseded before display.
+        let setup = [
+            b'a', 0, 3, 232, 1, 174, 0, 100, 0, 20, 48, 2, 27, 0, 40, 5, 120, 0, 33, 0, 28, 1, 174,
+            19, 42,
+        ];
+        d.packet(&setup, 30.).unwrap();
+        d.redraw(40., 80.).unwrap();
+        assert_eq!(d.successful_draws, before);
+        assert!(d.awaiting_picture());
+        assert_eq!(
+            d.recorder
+                .take()
+                .iter()
+                .filter(|r| r.phase == "draw")
+                .count(),
+            2
+        );
+        d.ack_picture(80.).unwrap();
+        assert_eq!(d.successful_draws, before + 1);
+        assert_eq!(d.lifecycle.last().unwrap()["atMs"].as_f64(), Some(80.));
+        d.ack_picture(80.).unwrap();
+        assert_eq!(d.successful_draws, before + 1);
     }
     #[test]
     fn delayed_issue_retry_and_commit_keep_the_exact_staged_snapshot() {

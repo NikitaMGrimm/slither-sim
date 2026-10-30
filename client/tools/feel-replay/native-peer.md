@@ -147,6 +147,9 @@ The driver uses production `service_ingress`, `begin_redraw`, effect draining,
 Setup pictures are not counted as successful presents. Their already-recorded
 core draw/camera samples remain. Work awaiting acknowledgment, pending I/O and
 host-owned pictures still fence ingress/preparation; retry does not resample.
+Draw IDs enumerate preparations; `quality.successfulDraws` and final `draws`
+count successful acknowledgments. A delayed desktop acknowledgment receives
+credit at its actual event, without adding another preparation sample.
 
 Each run executes the unchanged equal-schedule lane and a native equal-schedule
 control with the desktop lane's admitted service/sample times. The latter
