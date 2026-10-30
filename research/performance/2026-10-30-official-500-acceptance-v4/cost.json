@@ -1,0 +1,34 @@
+{
+  "kind": "Conservative launch-to-verified-cleanup on-demand compute upper bound at frozen rate caps, not final invoice",
+  "capUSD": 3,
+  "durations": [
+    {
+      "pair": 1,
+      "role": "generator",
+      "lifetimeUpperSeconds": 3881.897588,
+      "rateCapUSDPerHour": 0.5
+    },
+    {
+      "pair": 1,
+      "role": "server",
+      "lifetimeUpperSeconds": 3879.897588,
+      "rateCapUSDPerHour": 0.06
+    },
+    {
+      "pair": 2,
+      "role": "generator",
+      "lifetimeUpperSeconds": 3821.036653,
+      "rateCapUSDPerHour": 0.5
+    },
+    {
+      "pair": 2,
+      "role": "server",
+      "lifetimeUpperSeconds": 3819.036653,
+      "rateCapUSDPerHour": 0.06
+    }
+  ],
+  "computeUpperUSD": 1.1981675485999999,
+  "noncomputeReserveUSD": 0.4,
+  "totalUpperUSD": 1.5981675485999998,
+  "allAttemptsFullTimerBoundUSD": 2.1173333333333337
+}
