@@ -118,6 +118,8 @@ into a second checked-in file or changing `src/`.
 
 ```sh
 python3 build_botstorm.py EXECUTION_DIRECTORY STUDY_TOOLS_DIRECTORY
+# Optional read-only A4 view census, once for each frozen population:
+EXECUTION_DIRECTORY/bin/internal_botstorm views EXECUTION_DIRECTORY/results/1000/fixture VIEW_CENSUS.json
 python3 test_botstorm.py
 python3 run_botstorm.py EXECUTION_DIRECTORY
 python3 reduce_botstorm.py EXECUTION_DIRECTORY

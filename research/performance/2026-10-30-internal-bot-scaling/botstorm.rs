@@ -91,7 +91,34 @@ fn main() {
     let args: Vec<_> = std::env::args().collect();
     let root = Path::new(&args[2]);
     assert_eq!(fs::read_dir("/proc/self/task").unwrap().count(), 1);
-    if args[1] == "warm" {
+    if args[1] == "views" {
+        // Read-only workload census, never the center-seeking policy path.
+        let mut scene = Scene::load(root, false);
+        let before = serde_json::to_vec(&scene.world.checkpoint().unwrap()).unwrap();
+        let mut food = Vec::new();
+        let mut prey = Vec::new();
+        let mut opponents = Vec::new();
+        let mut anchors = Vec::new();
+        for phase in 0..6 {
+            scene.world.observe_selected_into(&scene.masks[phase], &mut scene.observations[phase]).unwrap();
+            for observation in scene.observations[phase].iter().flatten() {
+                food.push(observation.food.len());
+                prey.push(observation.prey.len());
+                opponents.push(observation.opponents.len());
+                anchors.push(observation.opponents.iter().map(|snake|snake.body.len()).sum::<usize>());
+            }
+        }
+        let summarize = |mut values:Vec<usize>| {
+            values.sort_unstable();
+            let q=|fraction:f64|values.get(((values.len().saturating_sub(1)) as f64*fraction).ceil() as usize).copied();
+            json!({"n":values.len(),"mean":values.iter().sum::<usize>() as f64/values.len().max(1) as f64,
+                   "p50":q(0.5),"p90":q(0.9),"p99":q(0.99),"max":q(1.0)})
+        };
+        assert_eq!(before,serde_json::to_vec(&scene.world.checkpoint().unwrap()).unwrap());
+        fs::write(&args[3],serde_json::to_vec_pretty(&json!({"food":summarize(food),"prey":summarize(prey),
+            "opponents":summarize(opponents),"opponentAnchors":summarize(anchors),
+            "scope":"read-only checkpoint census, all six selected masks; no policy decisions or physics"})).unwrap()).unwrap();
+    } else if args[1] == "warm" {
         fs::create_dir_all(root).unwrap();
         let n = args[3].parse().unwrap();
         let construction = Instant::now();

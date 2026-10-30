@@ -23,6 +23,9 @@ def mode_summary(rows):
     return {
         'windows':len(rows),'ticks':len(samples),'decisions':decisions,'observations':observations,
         'worldCpuMs':per_tick('worldCpu'),'worldWallMs':per_tick('worldWall'),
+        'totalTickWallMs':per_tick('totalWall'),
+        'totalTickWallFractionAbove7ms':sum(s['totalWall']>.007 for s in samples)/len(samples),
+        'worldCpuFractionAbove7ms':sum(s['worldCpu']>.007 for s in samples)/len(samples),
         'admissionCpuMs':per_tick('admissionCpu'),'admissionWallMs':per_tick('admissionWall'),
         'observationWallMs':per_tick('observationWall'),'decisionWallMs':per_tick('decisionWall'),
         'observationProcessCpuUsPerBot':per_bot('observationCpu',observations),
