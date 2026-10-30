@@ -1,6 +1,4 @@
 //! Offline A3 CPU peer. See tools/feel-replay/native-peer.md for the bound runner.
-#[path = "feel_replay/codec.rs"]
-mod codec;
 #[path = "feel_replay/driver.rs"]
 mod driver;
 #[path = "feel_replay/observation.rs"]
@@ -30,7 +28,9 @@ fn replay(request: Value) -> Result<Value> {
         Some("desktop-ordering") => true,
         _ => return Err("Unknown native replay lane".into()),
     };
-    if geometry["backing"] != json!({"width":d.extent[0] as f64,"height":d.extent[1] as f64}) {
+    if number(&geometry["backing"]["width"])? != f64::from(d.extent[0])
+        || number(&geometry["backing"]["height"])? != f64::from(d.extent[1])
+    {
         return Err("Backing does not match production CSS geometry policy".into());
     }
     d.play()?;
@@ -161,7 +161,7 @@ fn replay(request: Value) -> Result<Value> {
             };
             observed.insert(row.sequence, samples.len());
             samples.push(json!({"id":format!("{}-{}-{}",text(&event["sourceId"])?,row.phase,samples.len()),
-                "eventSeq":seq,"phase":row.phase,"frameId":frame,"drawId":draw_id,"atMs":now,"eligibility":eligibility,
+                "eventSeq":seq,"phase":row.phase,"frameId":frame,"drawId":draw_id,"atMs":now,"acknowledgedMs":null,"eligibility":eligibility,
                 "delta":o["delta"], "lag":{"active":session.lagging,"multiplier":o["multiplier"],
                     "pingPending":session.ping_pending,"pongAgeMs":(now-session.last_ping_ms).max(0.)},
                 "own":o["own"],"camera":o["camera"],"quality":{"requested":"high",
@@ -179,6 +179,7 @@ fn replay(request: Value) -> Result<Value> {
             }
             sample["status"]["submitted"] = json!(true);
             sample["status"]["committed"] = json!(true);
+            sample["acknowledgedMs"] = json!(now);
             if d.desktop {
                 d.lifecycle
                     .push(json!({"kind":"presented", "atMs":now, "eventSeq":seq,
@@ -200,7 +201,7 @@ fn replay(request: Value) -> Result<Value> {
         sample["quality"]["successfulDraws"] = json!(successful_draws);
     }
     let pending = d.game.feel_pending();
-    let body = json!({"schema":2,"events":events,"commands":commands,"samples":samples,
+    let body = json!({"schema":3,"events":events,"commands":commands,"samples":samples,
         "final":{"atMs":request["durationMs"],"events":events.len(),"commands":commands.len(),"samples":samples.len(),
             "draws":successful_draws,"pendingEffects":pending[0],"pendingFrames":pending[1],
             "lastBoundaryId":samples.last().map(|s|s["id"].clone()).unwrap_or(json!("missing")),
@@ -228,7 +229,7 @@ mod desktop_tests {
             json!({"event":{"sourceId":"setups","kind":"packet","actualMs":2.},"packet":bundle(&[setup(),setup()])}),
         ];
         let result = replay(json!({"geometry":{"css":{"width":960.,"height":540.},
-            "backing":{"width":backing[0] as f64,"height":backing[1] as f64}},
+            "backing":{"width":backing[0],"height":backing[1]}},
             "pointer":{"x":480.,"y":270.},"durationMs":2.,"steps":steps}))
         .unwrap();
         let draws: Vec<_> = result["body"]["samples"]
@@ -306,22 +307,15 @@ fn run() -> Result<()> {
     io::stdin()
         .read_to_string(&mut input)
         .map_err(|e| e.to_string())?;
-    let request = codec::read(&input)?;
-    let result = match args.as_slice() {
-        [] => replay(request)?,
-        // Node hashes the observed entropy and supplies the bound manifest. Rust
-        // emits the final trace without decimal serialization of observations.
-        [mode] if mode == "--assemble" => {
-            let mut body = request["body"].clone();
-            body["manifest"] = request["manifest"].clone();
-            body
-        }
-        [mode] if mode == "--codec" => request,
-        _ => {
-            return Err("Expected no args, --assemble or --codec".into());
-        }
-    };
-    print!("{}", codec::write(result)?);
+    if !args.is_empty() {
+        return Err("Expected no arguments".into());
+    }
+    let request = serde_json::from_str(&input).map_err(|e| e.to_string())?;
+    let result = replay(request)?;
+    println!(
+        "{}",
+        serde_json::to_string(&result).map_err(|e| e.to_string())?
+    );
     Ok(())
 }
 fn main() {
@@ -335,6 +329,24 @@ fn main() {
 mod tests {
     use super::*;
     use synthetic_tape::{bundle, challenge, setup, snake};
+
+    #[test]
+    fn ordinary_json_roundtrips_cadence_edges_and_unicode_keys() {
+        let values = [
+            1000. / 60.,
+            32.99999999999999,
+            33.,
+            33.00000000000001,
+            0.9999999999999999,
+        ];
+        let value = json!({"0": values, "é😀": "ordinary JSON"});
+        let text = serde_json::to_string(&value).unwrap();
+        let decoded: Value = serde_json::from_str(&text).unwrap();
+        for (i, expected) in values.iter().enumerate() {
+            assert_eq!(decoded["0"][i].as_f64().unwrap(), *expected);
+        }
+        assert!(serde_json::from_str::<Value>("{\"time\":1e999}").is_err());
+    }
 
     #[test]
     fn overflow_observation_is_retained_without_claiming_a_picture_acknowledgement() {

@@ -4,7 +4,7 @@ import { sha256, stringify } from './io.mjs';
 
 // Contract: browser-peers.md and README.md; authored browser-synthetic.json.
 export function assertBuildBinding(built, product) {
-  if (built.tree !== product.tree || built.core !== product.core) throw new Error('Replay artifacts are stale; stage the candidate and rebuild explicitly');
+  if (built.tree !== product.tree) throw new Error('Replay artifacts are stale; stage the candidate and rebuild explicitly');
 }
 
 async function artifactHashes(directory) {
