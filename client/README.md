@@ -6,18 +6,18 @@ first; mobile comes later.
 
 The shared wgpu client is in [apps/wgpu-slice](apps/wgpu-slice/README.md).
 The Canvas2D browser client remains the visual reference. Both use the Rust core.
-The server lives in the separate [slither-sim](https://github.com/NikitaMGrimm/slither-sim)
-repository.
+The server is the slither-sim crate at the repository root.
 
 ## Setup
 
 Install Rust **1.99.0**, Node.js **24**, platform C/C++ build tools, and
 **wasm-bindgen CLI 0.2.129**. The pinned Rust toolchain includes the Wasm target.
 Put wasm-bindgen on PATH or set WASM_BINDGEN to its absolute executable path.
+Run client commands from client/.
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
-git config core.hooksPath tools/hooks
+git config core.hooksPath client/tools/hooks
 ```
 
 Install a current challenge-capable slither-sim binary separately. Put it on PATH

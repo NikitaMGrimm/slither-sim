@@ -12,7 +12,10 @@ Commit original code and labelled synthetic fixtures only. The private local
 reference JS is a specification to port idiomatically. Never commit official
 code, artwork, credentials or captures; see [source and license](docs/provenance.md).
 
-Enable hooks with `git config core.hooksPath tools/hooks`. Stage and inspect your
+The root [CONTRIBUTING.md](../CONTRIBUTING.md) rules for commits, PRs and AI
+disclosure apply here too. Use the client scope, such as `feat(client):`.
+
+Enable hooks with `git config core.hooksPath client/tools/hooks`. Stage and inspect your
 diff, run `npm run check`, and describe results and unrun checks in the PR.
 Tests and CI must not contact game servers or download official source. Use the
-separate slither-sim project for manual local play.
+root slither-sim binary for manual local play.

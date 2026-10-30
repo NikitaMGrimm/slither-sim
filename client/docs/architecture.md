@@ -1,7 +1,7 @@
 # Architecture
 
 The product has three layers: a shared Rust client core, thin platform adapters,
-and renderers. The separate slither-sim repository owns server simulation.
+and renderers. The slither-sim crate at the repository root owns server simulation.
 
 | Path | Responsibility |
 | --- | --- |

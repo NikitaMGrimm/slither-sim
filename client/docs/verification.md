@@ -46,7 +46,7 @@ and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 ## Source guard
 
 ```sh
-git config core.hooksPath tools/hooks
+git config core.hooksPath client/tools/hooks
 git add <intended-files>
 node tools/check-repository.mjs
 node tools/check-repository.mjs --history
@@ -54,7 +54,8 @@ node tools/check-repository.mjs --history
 
 The guard reads Git blobs, so inspect unstaged changes separately. It blocks
 known official bundles, raw captures, credentials, prohibited binary/generated
-formats and unsafe SVGs. It complements review of authorship; it cannot identify
+formats and unsafe SVGs. Content rules cover the whole repository; format, size,
+encoding and SVG rules cover only client/. It complements review of authorship; it cannot identify
 every copied program. Never bypass hooks to push an artifact the guard rejects.
 
 ## Manual checks
