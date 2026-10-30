@@ -49,6 +49,7 @@ struct Content {
     max_width: Option<u32>,
     size: u64,
     weight: Weight,
+    // Exact RGB also identifies the native luminance-dependent coverage table.
     color: [u8; 3],
 }
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]

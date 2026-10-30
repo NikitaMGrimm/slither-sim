@@ -3,10 +3,107 @@ use super::{Raster, Weight};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
 
+fn expand_luminance(bucket: u8) -> u8 {
+    (bucket << 5) | (bucket << 2) | (bucket >> 1)
+}
+
+fn luminance_bucket(color: [u8; 3]) -> usize {
+    // SkScalerContext canonicalizes RGB to three bits before reducing A8 masks
+    // to luminance, then canonicalizes that grey again (SkComputeLuminance).
+    let [r, g, b] = color.map(|c| u32::from(expand_luminance(c >> 5)));
+    (((54 * r + 183 * g + 19 * b) >> 8) >> 5) as usize
+}
+
+fn linear_srgb(value: f64) -> f64 {
+    if value <= 0.04045 {
+        value / 12.92
+    } else {
+        ((value + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn encoded_srgb(value: f64) -> f64 {
+    if value <= 0.0031308 {
+        value * 12.92
+    } else {
+        1.055 * value.powf(1. / 2.4) - 0.055
+    }
+}
+
+fn coverage_table(bucket: u8) -> [u8; 256] {
+    // Windows Chromium uses sRGB (gamma=0 sentinel) and contrast=1.0:
+    // https://github.com/chromium/chromium/blob/152.0.7977.167/skia/BUILD.gn#L137-L142
+    // Skia's model guesses the encoded background as 1 - foreground, boosts
+    // coverage by c*(1-c)*contrast*linear(background), then solves for the alpha
+    // that reproduces a linear-light blend in an encoded source-over texture.
+    // https://skia.org/docs/dev/design/raster_tragedy/
+    // https://github.com/google/skia/blob/0789f2ab93b844c5f2f5a96eb80c7c8f1ef6f570/src/core/SkMaskGamma.cpp#L74-L125
+    // This is a grey-mask approximation over fontdue, not DirectWrite hinting
+    // or LCD rendering. Three-bit luminance avoids the singular middle grey.
+    let foreground = f64::from(expand_luminance(bucket)) / 255.;
+    let background = 1. - foreground;
+    let linear_foreground = linear_srgb(foreground);
+    let linear_background = linear_srgb(background);
+    const CONTRAST: f64 = 1.;
+    std::array::from_fn(|i| {
+        if i == 0 || i == 255 {
+            return i as u8;
+        }
+        let coverage = i as f64 / 255.;
+        let boosted = coverage + coverage * (1. - coverage) * CONTRAST * linear_background;
+        let encoded =
+            encoded_srgb(linear_foreground * boosted + linear_background * (1. - boosted));
+        (((encoded - background) / (foreground - background)) * 255.)
+            .round()
+            .clamp(0., 255.) as u8
+    })
+}
+
+fn coverage_lut(color: [u8; 3]) -> &'static [u8; 256] {
+    // Only 2 KiB, shared by all rasterizers. The hot pixel loop is one lookup.
+    static TABLES: std::sync::OnceLock<[[u8; 256]; 8]> = std::sync::OnceLock::new();
+    &TABLES.get_or_init(|| std::array::from_fn(|i| coverage_table(i as u8)))
+        [luminance_bucket(color)]
+}
+
 #[derive(Default)]
 pub struct Rasterizer {
     regular: Option<Arial>,
     bold: Option<Arial>,
+}
+
+#[cfg(test)]
+mod coverage_tests {
+    use super::*;
+
+    #[test]
+    fn preblend_preserves_endpoints_and_is_monotonic_in_every_luminance_bucket() {
+        for bucket in 0..8 {
+            let table = coverage_table(bucket);
+            assert_eq!(table[0], 0);
+            assert_eq!(table[255], 255);
+            assert!(table.windows(2).all(|p| p[0] <= p[1]));
+        }
+    }
+
+    #[test]
+    fn preblend_uses_colour_luminance_for_light_and_dark_text() {
+        let dark = coverage_lut([0; 3]);
+        let grey = coverage_lut([128; 3]);
+        let light = coverage_lut([255; 3]);
+        assert_eq!([dark[64], dark[128], dark[192]], [58, 119, 185]);
+        assert_eq!([grey[64], grey[128], grey[192]], [81, 149, 207]);
+        assert_eq!([light[64], light[128], light[192]], [137, 188, 225]);
+        for i in [64, 128, 192] {
+            assert!(dark[i] <= i as u8);
+            assert!(light[i] >= i as u8);
+            assert!(dark[i] <= grey[i] && grey[i] <= light[i]);
+        }
+        // Skia A8 uses encoded BT.709 luminance, not max(R,G,B) or opacity.
+        assert_eq!(luminance_bucket([255, 0, 0]), 1);
+        assert_eq!(luminance_bucket([0, 255, 0]), 5);
+        assert_eq!(luminance_bucket([0, 0, 255]), 0);
+    }
 }
 
 #[cfg(all(test, windows))]
@@ -275,6 +372,7 @@ impl Rasterizer {
             }
         }
         let mut pixels = vec![0; width * height * 4];
+        let coverage = coverage_lut(color);
         for y in 0..height {
             for x in 0..width {
                 let mut sum = 0_u32;
@@ -283,7 +381,8 @@ impl Rasterizer {
                         sum += u32::from(mask[(y * SAMPLE + dy) * stride + x * SAMPLE + dx]);
                     }
                 }
-                let a = ((sum + 8) / 16) as u8;
+                // Preblend the final averaged coverage, before premultiplication.
+                let a = coverage[((sum + 8) / 16) as usize];
                 let dst = &mut pixels[(y * width + x) * 4..][..4];
                 for i in 0..3 {
                     dst[i] = ((u16::from(color[i]) * u16::from(a) + 127) / 255) as u8;
