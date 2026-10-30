@@ -1,0 +1,20 @@
+//! Fixed desktop endpoint login; no acquisition or endpoint-dependent policy.
+use crate::{
+    Result,
+    game::{LocalGame, LoginProfile},
+};
+
+// Match the simulator's portable_bot fields in src/client/network.rs::login_packet.
+const PROFILE: LoginProfile = LoginProfile {
+    client_version: 291,
+    page_echo: [
+        54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106, 236, 8, 208, 136, 213, 140,
+        111,
+    ],
+};
+
+/// Interactive and headless desktop endpoints share this fixed profile; library Play stays zero.
+pub fn play(game: &mut LocalGame, endpoint: &str, nickname: &str, skin: u8) -> Result<u16> {
+    game.play_with_profile(endpoint, nickname, skin, &PROFILE)?;
+    Ok(PROFILE.client_version)
+}
