@@ -63,8 +63,8 @@
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
 - Bot vision finds nearby snakes without scanning the whole population and
   restores visible food order without walking the entire food list. In a fresh
-  10,000-snake official-density world, observation CPU falls from 123.4 to
-  42.3 microseconds per decision. Every observation and its ordering are unchanged.
+  10,000-snake official-density world, observation CPU falls from 123.0 to
+  42.6 microseconds per decision. Every observation and its ordering are unchanged.
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 
