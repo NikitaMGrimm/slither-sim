@@ -3,6 +3,11 @@
 How many real socket clients one core can serve, and where its CPU goes.
 No host or simulator code changed.
 
+For later host comparisons, see the [EPYC study](../2026-10-26-epyc-host/REPORT.md),
+[native Zen 5 study](../2026-10-27-native-zen5-bench/REPORT.md) and
+[mature capacity checkpoint](../2026-10-28-capacity-checkpoint/REPORT.md).
+Their runtimes and workloads differ; this study's failures and shared harness remain.
+
 ## Findings
 
 - On one full core (c7a.medium, AMD EPYC 9R14, no SMT), **100 clients** keep

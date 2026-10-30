@@ -21,6 +21,22 @@ pub struct PreparedFrame {
 // Nicknames are already in the scene before antenna admission. Only these
 // bounded overlay producers append draws after it; body/face draws are counted too.
 const ANTENNA_LATE_DRAW_RESERVE: usize = crate::hud::MAX_DRAWS + crate::minimap::MAX_DRAWS;
+/// Includes tiled text plus flat fills, borders and controls; see panel-text.md.
+pub const PANEL_PRODUCER_DRAWS: usize = 96;
+pub const PANEL_CONTROL_DRAWS: usize = 8;
+/// No current gameplay producer opts in. Future producers reserve before world
+/// nicknames/antennas are admitted, then preflight their entire panel together.
+#[derive(Clone, Copy, Default)]
+pub struct PanelDrawReserve {
+    pub announcement: bool,
+    pub result: bool,
+}
+impl PanelDrawReserve {
+    pub fn late_draws(self) -> usize {
+        ANTENNA_LATE_DRAW_RESERVE
+            + (usize::from(self.announcement) + usize::from(self.result)) * PANEL_PRODUCER_DRAWS
+    }
+}
 impl PreparedFrame {
     pub fn pixel_bytes(&self) -> usize {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
@@ -563,6 +579,27 @@ pub fn prepare(
     identity: u64,
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
+    prepare_reserved(
+        client,
+        bank,
+        extent,
+        scale,
+        identity,
+        applied,
+        PanelDrawReserve::default(),
+    )
+}
+/// Opt-in reservation seam. It enables no lifecycle or producer by itself.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_reserved(
+    client: &mut AnimatedClient,
+    bank: &mut Bank,
+    extent: [u32; 2],
+    scale: f64,
+    identity: u64,
+    applied: QualitySnapshot,
+    panels: PanelDrawReserve,
+) -> Result<PreparedFrame> {
     let logical = dimensions(extent, scale)?;
     let full_stock = bank.cosmetics.is_some();
     // Mix the draw identity before the local stream so successive draws do not
@@ -691,32 +728,6 @@ pub fn prepare(
         command_limit: 8192,
     })
     .map_err(|e| e.to_string())?;
-    let mut text_draws = Vec::new();
-    let mut text_resources = std::collections::BTreeMap::new();
-    for name in client.nickname_draws() {
-        use crate::text::{Align, Baseline, TextRun, TextStyle, Weight};
-        for (draw, resource) in bank.text.draw(
-            TextRun {
-                text: &name.text,
-                style: TextStyle {
-                    // The core's nickname font is fixed in backing pixels.
-                    size: name.font_size / scale,
-                    weight: Weight::Normal,
-                    color: name.color,
-                },
-                // The core mixes a fixed backing-pixel gap with world geometry;
-                // only the latter should grow when the logical frame is scaled.
-                position: [name.position.x, name.position.y - 32. + 32. / scale],
-                align: Align::Center,
-                baseline: Baseline::Middle,
-                alpha: name.alpha,
-            },
-            scale,
-        )? {
-            text_resources.insert(resource.asset.handle, resource);
-            text_draws.push(draw);
-        }
-    }
     let families = bank.bodies.clone();
     let palettes: Vec<_> = families
         .iter()
@@ -727,7 +738,7 @@ pub fn prepare(
         .collect();
     draws.extend(food.early.iter().map(Draw::from));
     draws.extend(prey_plan.early.iter().map(prey));
-    draws.extend(text_draws);
+    let nickname_index = draws.len();
     let mut snakes = Vec::new();
     let mut antennas = Vec::new();
     for prepared_snake in prepared {
@@ -891,16 +902,59 @@ pub fn prepare(
             ));
         }
     }
+    let mut text_draws = Vec::new();
+    let mut text_resources = std::collections::BTreeMap::new();
+    let nickname_budget = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
+    for name in client
+        .nickname_draws()
+        .iter()
+        .take(crate::text::MAX_NICKNAME_RUNS_PER_FRAME)
+    {
+        if text_draws.len() >= nickname_budget {
+            break;
+        }
+        use crate::text::{Align, Baseline, TextRun, TextStyle, Weight};
+        for (draw, resource) in bank.text.draw(
+            TextRun {
+                text: &name.text,
+                style: TextStyle {
+                    family: TextFamily::Arial,
+                    slant: TextSlant::Normal,
+                    // The core's nickname font is fixed in backing pixels.
+                    size: name.font_size / scale,
+                    weight: Weight::Normal,
+                    color: name.color,
+                },
+                // The core mixes a fixed backing-pixel gap with world geometry;
+                // only the latter should grow when the logical frame is scaled.
+                position: [name.position.x, name.position.y - 32. + 32. / scale],
+                align: Align::Center,
+                baseline: Baseline::Middle,
+                alpha: name.alpha,
+            },
+            scale,
+        )? {
+            if text_draws.len() < nickname_budget {
+                text_resources.insert(resource.asset.handle, resource);
+                text_draws.push(draw);
+            }
+        }
+    }
+    let nickname_count = text_draws.len();
+    draws.splice(nickname_index..nickname_index, text_draws);
     // Admit antennas against the complete non-antenna scene, then restore each
     // original barrier position (including its relation to death passes).
-    let mut remaining = MAX_DRAWS.saturating_sub(draws.len() + ANTENNA_LATE_DRAW_RESERVE);
+    let mut remaining = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
     let mut inserted = 0;
     for (index, skin, antenna) in antennas {
         let mut commands = Vec::new();
         submit_antenna(bank, &skin, &antenna, remaining, &mut commands)?;
         remaining -= commands.len();
         let count = commands.len();
-        draws.splice(index + inserted..index + inserted, commands);
+        draws.splice(
+            index + nickname_count + inserted..index + nickname_count + inserted,
+            commands,
+        );
         inserted += count;
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
@@ -913,8 +967,46 @@ pub fn prepare(
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
-    bank.minimap.append(client, &mut frame, &mut resources)?;
+    bank.minimap
+        .append(client, &mut bank.text, &mut frame, &mut resources)?;
     Ok(PreparedFrame { frame, resources })
+}
+// Text tiles have no rotation. Intersect both the logical destination and its
+// source crop, so long names cannot paint into score/rank columns or offscreen.
+pub(crate) fn clip_text(draw: &mut Draw, clip: BodyRect) -> bool {
+    let r = draw.destination;
+    let x = r.x + draw.translation[0];
+    let y = r.y + draw.translation[1];
+    let left = x.max(clip.x);
+    let top = y.max(clip.y);
+    let right = (x + r.width).min(clip.x + clip.width);
+    let bottom = (y + r.height).min(clip.y + clip.height);
+    if right <= left || bottom <= top || draw.effective_alpha <= 0. {
+        return false;
+    }
+    let mut source = draw.source.expect("text tile crop");
+    let sx = source.width / r.width;
+    let sy = source.height / r.height;
+    let source_right = (source.x + source.width).min(f64::from(draw.asset.width));
+    let source_bottom = (source.y + source.height).min(f64::from(draw.asset.height));
+    source.x = (source.x + (left - x) * sx).clamp(source.x, source_right);
+    source.y = (source.y + (top - y) * sy).clamp(source.y, source_bottom);
+    // Fractional DPR can reconstruct an edge a few ulps beyond its tile. Keep
+    // the mapped crop inside its original source before strict frame validation.
+    source.width = ((right - left) * sx).min(source_right - source.x);
+    source.height = ((bottom - top) * sy).min(source_bottom - source.y);
+    if source.width <= 0. || source.height <= 0. {
+        return false;
+    }
+    draw.source = Some(source);
+    draw.destination = BodyRect {
+        x: left,
+        y: top,
+        width: right - left,
+        height: bottom - top,
+    };
+    draw.translation = [0., 0.];
+    true
 }
 fn finish_plan(
     mut prepared: PreparedFrame,
@@ -924,24 +1016,63 @@ fn finish_plan(
     let identity = prepared.frame.identity;
     let result = (|| {
         let plan = plan?;
-        // Late overlays append to the captured scene. Re-resolving world resources
-        // here could replace pixels belonging to an earlier queued Setup picture.
-        crate::hud::rasterize(&plan, &mut bank.hud)?;
-        for panel in &plan.panels {
-            let mut command = image(
-                bank.hud.asset,
-                panel.destination.x,
-                panel.destination.y,
-                panel.destination.width,
-                panel.destination.height,
-                panel.opacity,
-            );
-            command.source = Some(panel.source());
-            prepared.frame.draws.push(command);
+        // Late overlays retain the captured scene's immutable resources. Text
+        // slots may change afterward without changing queued Setup pictures.
+        let scale = prepared.frame.viewport_scale;
+        let max_font_size = plan
+            .lines
+            .iter()
+            .flat_map(|line| &line.spans)
+            .map(|span| span.style.size)
+            .fold(0_f64, f64::max);
+        let raster_scale = scale
+            .min(crate::text::MAX_HUD_RASTER_SCALE)
+            .min(128. / max_font_size);
+        bank.text
+            .begin_hud_frame(plan.lines.iter().map(|line| line.spans.len()).sum());
+        let viewport = BodyRect {
+            x: 0.,
+            y: 0.,
+            width: f64::from(prepared.frame.extent[0]) / scale,
+            height: f64::from(prepared.frame.extent[1]) / scale,
+        };
+        let draw_limit = MAX_DRAWS.min(prepared.frame.draws.len() + crate::hud::MAX_DRAWS);
+        let mut slot = 0;
+        let mut resources = std::collections::BTreeMap::new();
+        for line in &plan.lines {
+            let mut position = line.position;
+            for span in &line.spans {
+                if prepared.frame.draws.len() >= draw_limit {
+                    break;
+                }
+                let (advance, tiles) = bank.text.draw_hud(
+                    slot,
+                    crate::text::TextRun {
+                        text: &span.text,
+                        style: span.style,
+                        position,
+                        align: line.align,
+                        baseline: crate::text::Baseline::Alphabetic,
+                        alpha: span.alpha,
+                    },
+                    raster_scale,
+                    matches!(line.align, crate::text::Align::Left)
+                        .then_some((line.clip.x + line.clip.width - position[0]).max(0.)),
+                )?;
+                slot += 1;
+                position[0] += advance;
+                for (mut draw, resource) in tiles {
+                    if prepared.frame.draws.len() >= draw_limit {
+                        break;
+                    }
+                    if clip_text(&mut draw, line.clip) && clip_text(&mut draw, viewport) {
+                        resources.insert(resource.asset.handle, resource);
+                        prepared.frame.draws.push(draw);
+                    }
+                }
+            }
         }
-        if !plan.panels.is_empty() {
-            prepared.resources.push(bank.hud.clone());
-        }
+        prepared.resources.extend(resources.into_values());
         if prepared.pixel_bytes() > crate::bank::PIXEL_BUDGET {
             return Err("Active resource pixel budget exceeded".into());
         }
@@ -974,7 +1105,7 @@ pub fn finish_hud(
     hud: &crate::hud::View,
 ) -> Result<PreparedFrame> {
     let plan = crate::hud::plan(hud, prepared.frame.extent, prepared.frame.viewport_scale);
-    finish_plan(prepared, bank, plan)
+    finish_plan(prepared, bank, plan.map_err(str::to_owned))
 }
 
 #[cfg(test)]
@@ -982,6 +1113,48 @@ mod text_staging_tests {
     //! Original synthetic pixels and failures; no fonts, GPU or server.
     use super::*;
     use crate::{materials::RgbaImage, scene::Resource};
+    #[test]
+    fn fractional_crop_rounding_cannot_escape_a_synthetic_two_pixel_tile() {
+        let asset = BodyAsset {
+            handle: crate::bank::TEXT_HANDLE_BASE + 1,
+            revision: 1,
+            width: 2,
+            height: 2,
+            status: BodyAssetStatus::Ready,
+        };
+        for scale in [1.25, 1.75, 2.75, 3.5] {
+            let mut draw = image(asset, -1. / scale, -1. / scale, 2. / scale, 2. / scale, 1.);
+            draw.translation = [8., 8.];
+            draw.source = Some(BodyRect {
+                x: 0.,
+                y: 0.,
+                width: 2.,
+                height: 2.,
+            });
+            assert!(clip_text(
+                &mut draw,
+                BodyRect {
+                    x: 8.,
+                    y: 8.,
+                    width: 50.,
+                    height: 50.
+                }
+            ));
+            let frame = Frame {
+                identity: 1,
+                tick: 0,
+                extent: [100, 100],
+                viewport_scale: scale,
+                draws: vec![draw],
+                snakes: Vec::new(),
+            };
+            assert!(
+                frame
+                    .quads(&std::collections::BTreeMap::from([(asset.into(), asset)]))
+                    .is_ok()
+            );
+        }
+    }
     fn stage(bank: &mut Bank, identity: u64) -> Frame {
         let asset = BodyAsset {
             handle: crate::bank::TEXT_HANDLE_BASE + identity,
@@ -1025,9 +1198,9 @@ mod text_staging_tests {
                     finish(frame, &mut bank, "HUD")
                 }
                 1 => {
-                    let mut plan =
+                    let plan =
                         crate::hud::plan_text("HUD", frame.extent, frame.viewport_scale).unwrap();
-                    plan.extent = [513, 512];
+                    frame.draws[0].destination.width = f64::NAN;
                     finish_plan(
                         PreparedFrame {
                             frame,

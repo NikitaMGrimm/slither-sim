@@ -119,12 +119,19 @@ separate from the final protocol matrix.
 
 ## Reproduction and limits
 
+The [historical wrapper](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-27-core-heading-geometry/reproduce.py)
+reuses the earlier [shared-food driver](../2026-10-27-shared-food-work/reproduce.py)
+with this study's default commit pins. Retrieve its exact bytes below; the
+remaining study-specific reduction is in [select.py](select.py).
+
 ```sh
 STUDY=research/performance/2026-10-27-core-heading-geometry
 OUT=/tmp/core-geometry-new
-python3 "$STUDY/reproduce.py" build "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" trace "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
+REPRODUCE="$OUT-reproduce.py"
+git show 76772d07098c884e9643783a0ba874bce0567e5e:research/performance/2026-10-27-core-heading-geometry/reproduce.py > "$REPRODUCE"
+python3 "$REPRODUCE" build "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" trace "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
 python3 "$STUDY/run_profile.py" 4cd6ce542b45e385d542d9423089d884bc314778 /tmp/core-base --cpu 3 --target /tmp/core-base-target
 python3 "$STUDY/run_profile.py" 536f8aa3636f367e2d32b48ca02a72e63b1e146a /tmp/core-candidate --cpu 3 --target /tmp/core-candidate-target
 python3 "$STUDY/check.py" 536f8aa3636f367e2d32b48ca02a72e63b1e146a /tmp/core-checks --cpu 2

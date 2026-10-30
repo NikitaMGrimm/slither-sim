@@ -30,12 +30,14 @@ mod food;
 mod food_painter;
 mod hud;
 mod hud_history;
+mod hud_text;
 mod leaderboard_history;
 mod leaderboard_score;
 mod length;
 mod minimap;
 mod mouth_face;
 mod nickname;
+mod panel_text;
 mod prey;
 mod prey_painter;
 mod quality;
@@ -49,7 +51,8 @@ pub use accessory_request::{AccessoryRequestInput, SelectedAccessoryRequest};
 pub(crate) use announcement::AnnouncementPacket;
 pub use announcement::{
     AnnouncementContent, AnnouncementError, AnnouncementLifecycle, AnnouncementLine,
-    AnnouncementState, AnnouncementView,
+    AnnouncementState, AnnouncementTextBlock, AnnouncementTextFragment, AnnouncementTextView,
+    AnnouncementView, project_announcement_text,
 };
 pub use antenna::{
     AntennaBarrierEffect, AntennaBulbCommand, AntennaBulbGeometry, AntennaCullBounds,
@@ -103,6 +106,11 @@ pub use hud::{
 pub use hud_history::{
     HudCurrent, HudFinal, HudHistory, HudHistoryEvent, HudLifecycle, HudOpacity, HudSample,
     hud_score_text,
+};
+pub use hud_text::{
+    HudTextLine, HudTextPlan, HudTextSpan, HudTextView, MAX_HUD_TEXT_SPANS, PLATFORM_FONT_FAMILY,
+    TextAlign, TextBaseline, TextFamily, TextSlant, TextStyle, TextWeight, plan_hud_diagnostic,
+    plan_hud_text,
 };
 pub use leaderboard_history::{
     LeaderboardEvent, LeaderboardEventKind, LeaderboardHistory, LeaderboardPlan, LeaderboardRawRow,
@@ -562,3 +570,5 @@ impl AngleCorrections {
         &self.ring.weights
     }
 }
+
+pub use panel_text::*;

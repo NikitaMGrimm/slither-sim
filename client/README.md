@@ -17,8 +17,13 @@ Run client commands from client/.
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
-git config core.hooksPath client/tools/hooks
+node tools/check-repository.mjs
 ```
+
+Stage intended changes and run the guard before committing. Use `--pre-push` with
+Git's push input for outgoing commits, or `--history` for a full audit. Do not set
+`core.hooksPath` in a shared multi-worktree checkout; `tools/hooks` remains
+available for single-clone opt-in.
 
 Install a current challenge-capable slither-sim binary separately. Put it on PATH
 or set SLITHER_SIM to its executable path. To supply a path directly, use

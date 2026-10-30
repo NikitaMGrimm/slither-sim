@@ -20,8 +20,9 @@ Run the commands below from client/.
 - Start with focused tests; run npm run check before delivery. See
   docs/verification.md. Report failed or unrun checks accurately.
 - Stage the intended changes and run node tools/check-repository.mjs before
-  committing; run it with --history before pushing. Enable client/tools/hooks per
-  clone.
+  committing. Use --pre-push with Git's push input for outgoing commits, or
+  --history for a full audit. Do not set core.hooksPath in a shared multi-worktree
+  checkout; tools/hooks remains available for single-clone opt-in.
 - Tests and CI use authored synthetic data and never connect to game servers or
   fetch the official client. Manual play uses a separately running local simulator.
 - Keep PRs reviewable and follow the root PR template and AI-assistance footer.

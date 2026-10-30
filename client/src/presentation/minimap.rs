@@ -553,7 +553,7 @@ pub struct MinimapLabelPlan {
     pub top_left: Point,
     /// Width and height in CSS pixels.
     pub size: Point,
-    /// Font size in CSS pixels; use Arial, Helvetica, sans-serif.
+    /// Font size in CSS pixels; use the authored Arial font stack.
     pub font_size: f64,
     /// Authored font stack for the plain server label.
     pub font_family: &'static str,
@@ -569,6 +569,17 @@ pub struct MinimapLabelPlan {
     pub shadow_offset: Point,
     /// Black text shadow blur in CSS pixels.
     pub shadow_blur: f64,
+}
+
+impl MinimapLabelPlan {
+    /// Centred alphabetic anchor of the 14px Arial CSS normal line box.
+    /// The reference DOM's baseline is 13px below the label's top edge.
+    pub fn text_anchor(&self) -> Point {
+        Point {
+            x: self.top_left.x + self.size.x / 2.,
+            y: self.top_left.y + 13.,
+        }
+    }
 }
 
 /// Build borrowed pixel layers and complete local geometry without consuming a
@@ -709,7 +720,7 @@ pub fn plan_minimap(
                     y: 37.,
                 },
                 font_size: 14.,
-                font_family: "Arial, Helvetica, sans-serif",
+                font_family: crate::presentation::PLATFORM_FONT_FAMILY,
                 text_align: "center",
                 overflow_hidden: true,
                 fill: [255; 3],

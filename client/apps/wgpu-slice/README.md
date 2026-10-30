@@ -93,26 +93,38 @@ uses OffscreenCanvas; Windows loads system Arial through fontdue (kerning, 4x
 coverage). No fonts are bundled; native coverage differs from browser hinting.
 Native C0/C1 controls use Canvas's
 whitespace/missing-glyph choices; DEL keeps its blank fallback advance.
-Raster/style failures omit labels; failed frame completion releases staged pixels.
+Nickname raster/style failures omit labels; HUD raster failures are returned to
+frame completion. Failed frame completion releases staged pixels.
 
 `text::TextCache::draw(TextRun, scale)` returns ordered draw/resource pairs for
 Arial regular/bold, RGB, size, opacity, alignment and baseline; no shadows.
-The LRU holds 256 runs / 4 MiB. Runs admit 1024 UTF-8 bytes, 1..=128 backing font
-pixels and an 8192x512 raster, tiled into 512px textures. Existing active/queued
-budgets still apply. HUD/leaderboard text conversion is a follow-up.
+The text cache holds at most 258 runs / 6 MiB: 40 replaceable HUD slots with a
+2 MiB allowance, a separate 216-run / 2 MiB nickname LRU, and one replacing
+minimap label slot with a 1 MiB allowance plus a separately keyed 1 MiB black
+shadow raster. Changing scores and server labels
+replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
+1..=128 backing font pixels and an 8192x512 raster, tiled into 512px textures.
+HUD names are rasterized only to their visible column width. HUD raster scale
+is capped at 3x independently of viewport DPR, retaining logical sizes/anchors
+and the pixel budget on denser displays. Unused HUD slots are retired each frame. Nickname work is
+limited to 128 runs per frame; text tiles share the 8192-draw frame budget.
+Existing active/queued budgets still apply.
 
 ## Scope
 
 Ordered body, early/late food and prey, paired eyes and arena are implemented
 using authored procedural materials. The HUD shows length and rank at bottom left
-and the top-ten leaderboard at top right, in a temporary 5x7 bitmap font. Complete
+and the top-ten leaderboard at top right, using the same platform text as
+nicknames. Shared Rust owns their content, typography and layout. Complete
 menus and mobile integration remain open. Material/edge rasterization differs
 from Canvas; tests do not establish visual parity or player feel.
 
 The minimap uses shared retained occupancy, crossfade, marker and session opacity
 plans, with Canvas CSS sizing and bottom/right insets across DPR changes. Its
 layers compose before holder alpha, and the marker keeps visible overflow.
-Server-label text awaits `minimap::Minimap::append_server_label` and the text adapter.
+The centred server label uses platform text with its shared style, shadow,
+normal whitespace wrapping, hidden overflow and holder fade. Its raster scale
+is capped at 3x as for the HUD.
 
 The synthetic slither-wgpu-diagnostic executable, web/diagnostic.html and examples
 are renderer development aids. Offline tests use authored synthetic packets and

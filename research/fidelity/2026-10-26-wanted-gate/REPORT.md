@@ -75,6 +75,9 @@ conditioning differs, so it is not pooled with P2.
 
 ## Decision and reproduction
 
+The retained [publication helpers](publication.py) contain the gate-selection
+and table-formatting logic for this diagnostic.
+
 Keep `MOTION_REPORT_TICKS` and both delivery profiles unchanged. The observed
 delay staircase supports the existing gate; an unconditional bypass would erase
 those waits. No rule, default, runtime behavior or historical table changes.

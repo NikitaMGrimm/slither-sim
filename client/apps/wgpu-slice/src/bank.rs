@@ -14,7 +14,6 @@ pub const PIXEL_BUDGET: usize = 64 * 1024 * 1024;
 // Each producer owns one high-nibble namespace; low bits identify its textures.
 pub const HANDLE_NAMESPACE_SIZE: u64 = 1 << 60;
 pub const BODY_HANDLE_BASE: u64 = 0x1000_0000_0000_0000;
-pub const HUD_HANDLE_BASE: u64 = 0x3000_0000_0000_0000;
 pub const TEXT_HANDLE_BASE: u64 = 0x4000_0000_0000_0000;
 pub const MINIMAP_HANDLE_BASE: u64 = 0x5000_0000_0000_0000;
 pub const COSMETIC_HANDLE_BASE: u64 = 0x6000_0000_0000_0000;
@@ -38,7 +37,6 @@ pub struct Bank {
     cache: BTreeMap<usize, Resource>,
     disks: BTreeMap<[u8; 3], BodyAsset>,
     solids: BTreeMap<[u8; 3], BodyAsset>,
-    pub hud: Resource,
     pub minimap: crate::minimap::Minimap,
     pub text: crate::text::TextCache,
     text_frames: BTreeMap<u64, Vec<Resource>>,
@@ -68,7 +66,6 @@ impl Bank {
             cache: BTreeMap::new(),
             disks: BTreeMap::new(),
             solids: BTreeMap::new(),
-            hud: crate::hud::resource(),
             minimap: crate::minimap::Minimap::default(),
             text: crate::text::TextCache::default(),
             text_frames: BTreeMap::new(),
@@ -202,11 +199,6 @@ impl Bank {
                 .filter(|r| keys.contains(&r.asset.into()))
                 .map(|r| r.image.pixels.len())
                 .sum::<usize>()
-            + if keys.contains(&self.hud.asset.into()) {
-                self.hud.image.pixels.len()
-            } else {
-                0
-            }
             + text.iter().map(|r| r.image.pixels.len()).sum::<usize>();
         if bytes > PIXEL_BUDGET {
             return Err("Active resource pixel budget exceeded".into());
@@ -233,9 +225,6 @@ impl Bank {
                 .filter(|r| keys.contains(&r.asset.into()))
                 .cloned(),
         );
-        if keys.contains(&self.hud.asset.into()) {
-            resources.push(self.hud.clone());
-        }
         if resources.len() != keys.len() {
             return Err("Unknown prepared resource".into());
         }
@@ -311,7 +300,6 @@ mod tests {
     fn texture_handle_namespaces_are_disjoint() {
         let bases = [
             BODY_HANDLE_BASE,
-            HUD_HANDLE_BASE,
             TEXT_HANDLE_BASE,
             MINIMAP_HANDLE_BASE,
             COSMETIC_HANDLE_BASE,

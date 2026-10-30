@@ -5,6 +5,8 @@ fn run(text: &str) -> TextRun<'_> {
     TextRun {
         text,
         style: TextStyle {
+            family: slither_client::presentation::TextFamily::Arial,
+            slant: slither_client::presentation::TextSlant::Normal,
             size: 15.,
             weight: Weight::Normal,
             color: [132, 182, 255],
@@ -100,6 +102,8 @@ fn native_arial_preserves_style_alpha_scale_and_evicted_frame_pixels() {
             .draw(
                 TextRun {
                     style: TextStyle {
+                        family: slither_client::presentation::TextFamily::Arial,
+                        slant: slither_client::presentation::TextSlant::Normal,
                         size: 128.,
                         weight: Weight::Normal,
                         color: [255; 3]
@@ -132,4 +136,61 @@ fn native_arial_preserves_style_alpha_scale_and_evicted_frame_pixels() {
             pair[1].0.destination.x
         );
     }
+}
+
+#[test]
+fn hud_raster_errors_are_explicit_instead_of_omitting_fields() {
+    let mut cache = TextCache::default();
+    assert!(cache.draw_hud(0, run("HUD"), 100., None).is_err());
+    assert_eq!(cache.cached_runs(), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn native_colour_separates_coverage_and_invalidates_hud_slot_pixels() {
+    let mut cache = TextCache::default();
+    let coloured = |color| TextRun {
+        style: TextStyle {
+            color,
+            ..run("Orbit Lane").style
+        },
+        ..run("Orbit Lane")
+    };
+    let (dark_draw, dark) = cache.draw(coloured([0; 3]), 1.).unwrap().remove(0);
+    let (light_draw, light) = cache.draw(coloured([255; 3]), 1.).unwrap().remove(0);
+    assert_ne!(dark_draw.asset, light_draw.asset);
+    assert_eq!(dark_draw.destination, light_draw.destination);
+    assert_eq!(dark_draw.translation, light_draw.translation);
+    let dark_alpha: Vec<_> = dark
+        .image
+        .pixels
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|p| p[3])
+        .collect();
+    let light_alpha: Vec<_> = light
+        .image
+        .pixels
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|p| p[3])
+        .collect();
+    assert_ne!(dark_alpha, light_alpha);
+    assert!(
+        dark_alpha.iter().map(|a| u64::from(*a)).sum::<u64>()
+            < light_alpha.iter().map(|a| u64::from(*a)).sum::<u64>()
+    );
+    assert_eq!(cache.cached_runs(), 2);
+    for (color, asset) in [([0; 3], dark_draw.asset), ([255; 3], light_draw.asset)] {
+        assert_eq!(cache.draw(coloured(color), 1.).unwrap()[0].0.asset, asset);
+    }
+
+    let (_, old) = cache.draw_hud(0, coloured([0; 3]), 1., None).unwrap();
+    let (_, new) = cache.draw_hud(0, coloured([255; 3]), 1., None).unwrap();
+    assert_ne!(old[0].0.asset, new[0].0.asset);
+    assert_eq!(old[0].1.image.pixels, dark.image.pixels);
+    assert_eq!(new[0].1.image.pixels, light.image.pixels);
+    assert_eq!(cache.cached_runs(), 3);
 }

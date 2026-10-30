@@ -72,6 +72,17 @@ pub struct Point {
     /// Vertical CSS displacement.
     pub y: f64,
 }
+
+/// Admit a native window-relative physical position as integer mouse CSS pixels.
+/// The host supplies finite coordinates and its positive device scale factor.
+/// Scale in Blink's f32 precision before flooring, including outside the window.
+/// See the pinned sources and synthetic regressions in tools/feel-replay/browser-peers.md.
+/// Browser hosts read DOM getters directly instead of converting twice.
+pub fn mouse_client_position(physical: [f64; 2], device_scale: f64) -> [f64; 2] {
+    let inverse_scale = 1.0_f32 / device_scale as f32;
+    physical.map(|value| f64::from(value as f32 * inverse_scale).floor())
+}
+
 /// The pointer displacement and immediate gaze angle.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PointerView {
@@ -470,6 +481,62 @@ impl DesktopInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mouse_coordinates_retain_blink_float_precision() {
+        assert_eq!(mouse_client_position([-21.0, 21.0], 1.75), [-13.0, 12.0]);
+        assert_eq!(
+            mouse_client_position([0.999999999, -1.000000001], 1.0),
+            [1.0, -1.0]
+        );
+        assert_eq!(
+            mouse_client_position([5.0, -5.0], 1.2500000001),
+            [4.0, -4.0]
+        );
+    }
+
+    #[test]
+    fn mouse_coordinates_match_authored_blink_float_sweep() {
+        // Authored synthetic golden floors for physical positions -28..=28 in
+        // steps of 7. Both axes traverse the same sweep in opposite directions.
+        for (dpr, expected) in [
+            (1.0, [-28, -21, -14, -7, 0, 7, 14, 21, 28]),
+            (1.25, [-23, -17, -12, -6, 0, 5, 11, 16, 22]),
+            (1.5, [-19, -14, -10, -5, 0, 4, 9, 14, 18]),
+            (1.75, [-16, -13, -8, -4, 0, 4, 8, 12, 16]),
+            (2.0, [-14, -11, -7, -4, 0, 3, 7, 10, 14]),
+        ] {
+            for (index, x) in (-28..=28).step_by(7).enumerate() {
+                assert_eq!(
+                    mouse_client_position([f64::from(x), f64::from(-x)], dpr),
+                    [f64::from(expected[index]), f64::from(expected[8 - index])],
+                    "DPR {dpr}, physical x {x}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn mouse_coordinates_scale_before_flooring_without_clamping() {
+        // Authored synthetic physical positions, expected CSS positions. Cover
+        // negative fractions, exact edges and the adjacent interior/exterior.
+        for (dpr, physical, expected) in [
+            (1.0, [0.75, -0.25], [0.0, -1.0]),
+            (1.0, [959.75, 539.75], [959.0, 539.0]),
+            (1.0, [960.0, 540.0], [960.0, 540.0]),
+            (1.0, [960.25, -1.25], [960.0, -2.0]),
+            (1.25, [1.0, -1.0], [0.0, -1.0]),
+            (1.25, [1199.75, 674.75], [959.0, 539.0]),
+            (1.25, [1200.0, 675.0], [960.0, 540.0]),
+            (1.25, [1200.25, -1.5], [960.0, -2.0]),
+            (2.0, [1.75, -0.25], [0.0, -1.0]),
+            (2.0, [1919.75, 1079.75], [959.0, 539.0]),
+            (2.0, [1920.0, 1080.0], [960.0, 540.0]),
+            (2.0, [1920.25, -2.25], [960.0, -2.0]),
+        ] {
+            assert_eq!(mouse_client_position(physical, dpr), expected, "DPR {dpr}");
+        }
+    }
+
     #[test]
     fn safe_integer_accumulation_boundary_is_atomic() {
         let mut input = DesktopInput::new(19.0).unwrap();

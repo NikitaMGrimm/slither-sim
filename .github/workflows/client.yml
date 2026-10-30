@@ -48,6 +48,16 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: v0-client
+          workspaces: |
+            client -> target
+            ${{ matrix.os == 'windows-latest' && 'client/apps/wgpu-slice -> ../../target/wgpu-slice-ci' || '' }}
+          # The Windows wgpu target can exceed the shared cache budget.
+          cache-targets: ${{ matrix.os != 'windows-latest' }}
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --all --check
       - run: cargo test --all-targets --locked
       - run: cargo test --doc --locked
@@ -79,12 +89,24 @@ jobs:
     name: WebAssembly build
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      # Keep target trees disjoint so cleanup uses each manifest's dependencies.
+      CARGO_TARGET_DIR: target/client-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Install pinned Rust and target
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: v0-client
+          workspaces: |
+            client -> target/client-ci
+            client/apps/wgpu-slice -> ../../target/wgpu-slice-ci
+          cache-targets: true
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'

@@ -86,8 +86,8 @@ fn receipt_ignores_playing_guard_and_freezes_score_before_later_setup_and_reset(
     )
     .unwrap();
     let view = client.announcement_view();
-    assert_eq!(view.lines[1].text, "By first");
-    assert_eq!(view.lines[2].text, "Longest today: 10");
+    assert_eq!(view.lines[1].text, "- first, today's longest");
+    assert_eq!(view.lines[2].text, "with a length of 10");
     assert_eq!(view.opacity, 0.);
     assert_eq!(calls.get(), 2);
     client.reset();
@@ -98,7 +98,10 @@ fn receipt_ignores_playing_guard_and_freezes_score_before_later_setup_and_reset(
         &calls,
     )
     .unwrap();
-    assert_eq!(client.announcement_view().lines[1].text, "By last");
+    assert_eq!(
+        client.announcement_view().lines[1].text,
+        "- last, today's longest"
+    );
 }
 
 #[test]
@@ -257,7 +260,7 @@ fn announcement_admission_uses_each_command_table_and_includes_its_last_index() 
     let score = ScoreTables::new(29).unwrap().score(2077, 1.).unwrap();
     assert_eq!(
         client.announcement_view().lines.last().unwrap().text,
-        format!("Longest today: {score}")
+        format!("with a length of {score}")
     );
 }
 
