@@ -83,7 +83,7 @@ slow-publication regression and deliberately synchronous mutation (failed as
 intended), ladder/gate/token controls, seven documentation tests and repository
 boundary checks. The bounded Cargo target was removed. During warmup, nearest-
 rank and prospective-gate controls passed after the authorized method correction.
-No Rust work ran locally or on another bench host. Final prose/receipt
+No Rust work ran locally, and the private bench host was not accessed. Final prose/receipt
 changes were checked statically; documentation tests were not rerun after AWS
 teardown. No independent review was performed.
 

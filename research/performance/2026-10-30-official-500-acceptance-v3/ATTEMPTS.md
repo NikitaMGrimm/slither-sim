@@ -7,8 +7,8 @@ noncompute reserve bound three possible pairs at $2.976. No Spot request is used
 
 The source reuses the pinned v2 implementation and corrects the per-worker CPU
 input to sum all three thread clocks. Tests/builds will run on the first fresh
-AWS generator before warmup, inside the same resource ceiling. No other bench host
-or local Rust work. Outcome/replacement records will be appended without erasure.
+AWS generator before warmup, inside the same resource ceiling. No access to the private
+bench host or local Rust work. Outcome/replacement records will be appended without erasure.
 
 The first fresh on-demand pair launched with tags, same-zone placement, one/
 eight vCPUs and verified shutdown deadlines <=92 minutes from launch. Before

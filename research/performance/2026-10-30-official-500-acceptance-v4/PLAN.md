@@ -118,7 +118,7 @@ reserve $0.40 for 10/24 GiB gp3 roots, public IPv4 and bounded artifact transfer
 **$2.117334 < $3 hard cap**. At most 512 MiB Internet artifacts, each compressed
 run archive <=150 MiB, with 100 MiB reserved for source/binaries/proofs. No extra
 build instance, Spot request, paid service or instance replacement. Preserve and
-clean a partial launch on failure. No local builds/heavy work or other bench host.
+clean a partial launch on failure. No local builds/heavy work or access to the private bench host.
 
 Retrieve/hash each full archive and additional evidence before teardown. Final
 scan of every enabled region; delete task key/group and verify task instances,

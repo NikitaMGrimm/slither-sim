@@ -8,7 +8,9 @@ Do not reinterpret failed v3 or change the acceptance gates.
 Reuse the linked v3/v2/v1/c7a/#256 staging and runner instructions from the
 [pinned v3 plan](https://github.com/NikitaMGrimm/slither-sim/blob/bbc7d18c9d5052903bf3b07ba4067a48e8f040d5/research/performance/2026-10-30-official-500-acceptance-v3/PLAN.md).
 Add v3's `check_replay.py` from `651f9526`, and overlay this study's
-`host_agent.py`, `quiet_image.py`, `host_diagnostics.py`. Keep generator code,
+`host_agent.py`, `quiet_image.py`, `host_diagnostics.py`. Copy this study's
+`check_host.py` and `diagnostics.py` into the generator's staged root, not the
+host overlay. Keep generator code,
 the nearest-rank helpers, config, socket behavior and file telemetry unchanged.
 Verify the exact portable host/client hashes in the plan. This execution reuses
 v3's verified binaries; no new Rust build or Cargo target was needed.
