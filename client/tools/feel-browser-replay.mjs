@@ -17,7 +17,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2), options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt', '--numerical-policy'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt --numerical-policy');
+  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt', '--numerical-policy', '--hz'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt --numerical-policy --hz');
   options[args[i]] = args[i + 1];
 }
 for (const key of ['--record', '--out', '--browser', '--commands', '--appearance-at']) if (!options[key]) throw new Error(`Required ${key}`);
@@ -39,7 +39,9 @@ try {
   const receipts = options['--receipt'] ? [{ path: path.resolve(options['--receipt']), sha256: sha256(await readFile(options['--receipt'])) }] : [];
   await writeFile(path.join(out, 'input-receipt.json'), stringify({ inputFile, sha256: sha256(input), receipts }));
   const record = JSON.parse(input);
-  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: Number(options['--commands']), appearanceAtMs: Number(options['--appearance-at']) });
+  const hz = Number(options['--hz'] ?? 60);
+  if (!Number.isFinite(hz) || hz <= 0) throw new Error('Positive display cadence required');
+  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: Number(options['--commands']), appearanceAtMs: Number(options['--appearance-at']), stepMs: 1000 / hz });
   await writeFile(path.join(out, 'schedule.json'), stringify(schedule)); // Frozen before either peer.
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const product = { commit: git('rev-parse', 'HEAD'), tree: git('write-tree'), core: git('write-tree', '--prefix=client/src/') };

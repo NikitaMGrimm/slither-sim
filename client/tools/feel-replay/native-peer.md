@@ -12,15 +12,12 @@ trace with `prepared: true, submitted: false, committed: false`; they increment
 neither successful-draw counter. The A1 v2 shape and flat observation ABI stay
 unchanged.
 
-This driver reproduces **A2's equal-schedule lane**: `Driver::packet` and
+The default driver reproduces **A2's equal-schedule lane**: `Driver::packet` and
 `Driver::close` eagerly drain and acknowledge prepared pictures before the next
 scheduled event. It does not reproduce the desktop host's queued-picture guard
-or one-picture-per-redraw order. In [`src/main.rs`](../../apps/wgpu-slice/src/main.rs),
-`Running::frame` skips `begin_frame` while a picture is queued and presents at
-most one picture per redraw, called from `ApplicationHandler::window_event` on
-`RedrawRequested`. Two Setup pictures and subsequent ingress can therefore
-interleave differently on desktop. Native-host ordering/backpressure belongs
-to plan items C/D; A3's equal-schedule results do not establish that parity.
+or one-picture-per-redraw order. The separate **desktop-ordering lane** below
+uses [`src/main.rs`](../../apps/wgpu-slice/src/main.rs)'s redraw lifecycle.
+Equal-schedule results alone do not establish desktop ordering parity.
 
 Run from `client/`, with Rust 1.99 and Node 24. Stage the candidate first. Builds
 are explicit and sequential; replay requires the prebuilt executable and a Canvas
@@ -123,3 +120,89 @@ The authored driver tests cover effect acknowledgments, safe command capture,
 staged/committed identity, delayed presentation and retry without resampling.
 These CPU checks do not measure rasterization, offscreen readback, GPU completion,
 desktop pacing, OS input, input-to-photon latency or perceptual parity.
+
+## Desktop ordering and presentation backpressure
+
+Build both peers as above, then freeze a Canvas run at the intended cadence.
+`--hz` defaults to 60 on the browser runner; use 144 and 240 as separate runs.
+Give every native delay a fresh output directory:
+
+```powershell
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.json --out <fresh-canvas-directory> --browser '<headless Edge executable>' --commands 7 --appearance-at 3 --hz 144
+node tools/feel-desktop-replay.mjs --record tools/feel-replay/browser-synthetic.json --wasm-run <fresh-canvas-directory> --out <fresh-desktop-directory> --commands 7 --appearance-at 3 --hz 144 --ack-ms 0
+```
+
+Repeat with `--ack-ms frame` (one display interval) and `--ack-ms 40` (a deliberate
+40 ms block at every admitted presentation). These are authored synchronous host
+blocking windows, not measured FIFO, GPU completion or scanout. One-frame delays
+end at the next authored display boundary, avoiding addition/multiplication
+rounding that could invent missed redraws. `presentation-plan.json` is frozen
+before invoking Rust. No real timer drives the game. During a block, redraws
+coalesce and input/transport waits; acknowledgment precedes service at return.
+Restart packets also wait for the authored reset-presentation/Connect barrier.
+Original scheduled packet times remain separate from service times.
+
+The driver uses production `service_ingress`, `begin_redraw`, effect draining,
+`take_frame` and `presented`, issuing at most one picture per redraw. Superseded
+Setup pictures are not counted as successful presents. Their already-recorded
+core draw/camera samples remain. Work awaiting acknowledgment, pending I/O and
+host-owned pictures still fence ingress/preparation; retry does not resample.
+Draw IDs enumerate preparations; `quality.successfulDraws` and final `draws`
+count only real successful acknowledgments, using the shared sequence/receipt
+model. As in Canvas assembly, sample counts are cumulative committed draws in
+preparation order after receipt matching. The lifecycle sidecar records a delayed
+desktop acknowledgment at its actual event, without another preparation sample.
+Memory-skipped Setup pictures neither fence ingress nor receive quality credit;
+completed Setup pictures count once toward quality whether presented or superseded.
+
+Each run executes the unchanged equal-schedule lane and a native equal-schedule
+control with the desktop lane's admitted service/sample times. The latter
+separates expected cadence/blocking effects from lifecycle artifacts; it is a CPU
+control, not another Canvas Wasm execution. `paced-core-differences.json` compares
+every sample timestamp, delta, lag, own/camera cell and command byte/time, excluding
+event IDs and presentation accounting. Full differences against the original
+Canvas and native equal lane are retained and classified without tolerance.
+
+The runner authenticates the staged candidate, executable, input, schedule and
+completed A2 trace. Its exit code checks shared cumulative draw accounting,
+recorder errors, packet/acknowledgment counts, pending work and the paced core
+control. Repeat byte equality remains diagnostic. The strict
+original A1 gate remains in `a1-comparison.json`: changed service times, skipped
+redraws, tail acknowledgments or superseded Setup submissions can fail it.
+Diagnostic success does not promote it to a pass. Draw status is recorded at the
+preparation event; the lifecycle sidecar records later issuance/acknowledgment.
+
+### Findings
+
+At base `5f41ef7e`, two queued Setup snapshots suppressed two fresh updates per
+life and deferred subsequent own appearance. The authored two-life
+motion/boost/death/restart case lost four update/draw pairs at zero ack delay:
+
+| Cadence | Added first-own ingress delay | Missing update/draw pairs |
+| --- | ---: | ---: |
+| 60 Hz | 47 ms | 4 |
+| 144 Hz | 17.833333333333336 ms | 4 |
+| 240 Hz | 9.5 ms | 4 |
+
+`service_ingress` now supersedes obsolete Setup snapshots before applying ready
+deferred packets. `begin_redraw` supersedes remaining Setup snapshots before a
+fresh frame. The desktop host uses these at its existing service/redraw
+boundaries. Shared camera and frame timing are unchanged. Scripted acknowledgment
+regressions retain every core Setup sample and compare update/camera histories,
+commands and packet state with a synchronous control, including two Setup
+commands followed by appearance before redraw.
+
+Superseded Setup draws still count exactly once toward quality's raw draw
+statistics, as on Canvas. Dropping that count at the <=24 threshold can trigger
+an earlier low-quality transition and change the subsequent face-heading target.
+The long-stall regression checks that threshold without another draw or sample.
+
+Retried Setup pictures may also be superseded after ownership returns to
+LocalGame: the queue drops their owned pixel copies, retains one quality credit,
+and leaves no acknowledgment or ingress fence. Redraw and ingress regressions
+check both sides of the quality threshold against an eager control.
+
+A private tape's frozen 60 Hz command expectation can fail at higher cadence
+even when both browser peers agree. Preserve those failures instead of learning
+an expectation from a run. These authored CPU histories establish neither
+desktop pacing nor perceptual parity.

@@ -171,6 +171,16 @@ export function safeCommand(bytes) {
   return (bytes.length === 1 && bytes[0] <= 254 && bytes[0] !== 252)
     || (bytes.length === 2 && bytes[0] === 252 && bytes[1] !== 0 && bytes[1] !== 128);
 }
+export function validateSuccessfulDraws(trace) {
+  let committedDraws = 0;
+  trace.samples.forEach((s, i) => {
+    if (s.phase === 'draw' && s.status.committed) committedDraws++;
+    if (s.quality.successfulDraws !== committedDraws) {
+      fail(`trace.samples[${i}].quality.successfulDraws`, 'expected cumulative committed draw count');
+    }
+  });
+  return committedDraws;
+}
 // Hosts may supply actual acknowledged draw ordinals as an external witness.
 // A standalone v2 file has status/counts, but cannot authenticate host receipts.
 export function validateTrace(trace, schedule, acknowledgedDrawIds) {
@@ -210,7 +220,7 @@ export function validateTrace(trace, schedule, acknowledgedDrawIds) {
     if (!schedule.boundaries.some(b => b.frameId === c.frameId)) fail(`trace.commands[${i}].frameId`, 'unknown frame');
     lastSend = c.sendMs; lastEvent = c.eventSeq;
   });
-  let appeared = false, betweenLives = false, lastOwn, committedDraws = 0;
+  let appeared = false, betweenLives = false, lastOwn;
   // Trace-wide lifecycle contract: tools/feel-replay/README.md; regressions in
   // tools/feel-replay-expiry.test.mjs. Retained expired observations may repeat.
   const retiredOwnTokens = new Set();
@@ -249,11 +259,8 @@ export function validateTrace(trace, schedule, acknowledgedDrawIds) {
     if (pictures && s.phase === 'draw' && (s.status.submitted !== pictures.has(s.drawId) || s.status.committed !== pictures.has(s.drawId))) {
       fail(`trace.samples[${i}].status`, 'picture acknowledgement mismatch');
     }
-    if (s.phase === 'draw' && s.status.committed) committedDraws++;
-    if (s.quality.successfulDraws !== committedDraws) {
-      fail(`trace.samples[${i}].quality.successfulDraws`, 'expected cumulative committed draw count');
-    }
   });
+  const committedDraws = validateSuccessfulDraws(trace);
   const f = trace.final;
   if (betweenLives) fail('trace.final', 'incomplete restart: still between lives');
   if (!f.completed || f.unexpectedNetwork || f.pendingEffects !== 0 || f.pendingFrames !== 0 || !same(f.atMs, schedule.durationMs)
