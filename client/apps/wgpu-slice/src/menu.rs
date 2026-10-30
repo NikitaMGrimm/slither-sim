@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 use crate::bank::MENU_MATERIAL_HANDLE_BASE;
 type MaterialKey = (u32, u32, u8, u64);
+const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -35,6 +36,54 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
+    /// DOM login hosts need the same page/world composition without native controls.
+    pub fn world_crossfade(extent: [u32; 2], scale: f64, world_alpha: f64) -> Result<Self> {
+        crate::render::dimensions(extent, scale)?;
+        if !world_alpha.is_finite() || !(0. ..=1.).contains(&world_alpha) {
+            return Err("Invalid world opacity".into());
+        }
+        let resource = Resource {
+            // The native material allocator starts at base + 1.
+            asset: BodyAsset {
+                handle: MENU_MATERIAL_HANDLE_BASE,
+                revision: 1,
+                width: 1,
+                height: 1,
+                status: BodyAssetStatus::Ready,
+            },
+            image: materials::RgbaImage {
+                width: 1,
+                height: 1,
+                pixels: vec![PAGE_COLOR[0], PAGE_COLOR[1], PAGE_COLOR[2], 255],
+            },
+        };
+        let backdrop = image(
+            &resource,
+            MenuRect {
+                x: 0.,
+                y: 0.,
+                width: f64::from(extent[0]) / scale,
+                height: f64::from(extent[1]) / scale,
+            },
+            1.,
+        );
+        let mut cover = backdrop.clone();
+        cover.effective_alpha = 1. - world_alpha;
+        Ok(Self {
+            frame: Frame {
+                identity: 0,
+                tick: 0,
+                extent,
+                viewport_scale: scale,
+                draws: Vec::new(),
+                snakes: Vec::new(),
+            },
+            backdrop: Some(backdrop),
+            world_cover: Some(cover),
+            resources: vec![resource],
+        })
+    }
+
     /// Diagnostic backing composition for retained comparisons. The native
     /// host submits the physical menu directly; input/IME stay in CSS pixels.
     pub fn into_backing(mut self, extent: [u32; 2]) -> Result<Self> {
@@ -198,7 +247,7 @@ impl Composition<'_> {
                     .ok_or("Menu material handle overflow")?;
                 let rgb = match kind {
                     8 => [224, 224, 255],
-                    10 => [22, 28, 34],
+                    10 => PAGE_COLOR,
                     _ => [150, 108, 213],
                 };
                 Resource {

@@ -149,8 +149,29 @@ impl LocalGameplay {
             };
             let presented = match &mut self.host {
                 GameplaySurface::Gpu(host) => {
-                    host.renderer.sync_resources(&p.resources)?;
-                    host.present(&p.frame)
+                    let session = self.game.login_session();
+                    // A close without an accepted outcome returns straight to login.
+                    let world_alpha = if session.playing || session.outcome.is_some() {
+                        session.return_fraction
+                    } else {
+                        0.
+                    };
+                    let composed = if world_alpha < 1. {
+                        let mut picture = p.clone();
+                        crate::menu::MenuFrame::world_crossfade(
+                            p.ui_frame().extent,
+                            p.ui_frame().viewport_scale,
+                            world_alpha,
+                        )?
+                        .append_to(&mut picture)?;
+                        Some(picture)
+                    } else {
+                        None
+                    };
+                    // Keep the issued picture unchanged for a presentation retry.
+                    let picture = composed.as_ref().unwrap_or(&p);
+                    host.renderer.sync_resources(&picture.resources)?;
+                    host.present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
                 }
                 #[cfg(feature = "feel-trace")]
                 GameplaySurface::Cpu => Ok(true),
@@ -437,6 +458,10 @@ impl LocalGameplay {
         let result = (|| {
             self.game.observe_time(now)?;
             self.host.resize([width, height])?;
+            if matches!(self.host, GameplaySurface::Gpu(_)) {
+                // HUD owns its opacity; the login cover must precede this layer.
+                self.game.bank.overlay_viewport = Some(([width, height], dpr));
+            }
             self.game.viewport([width, height], dpr)?;
             self.pictures()
         })();

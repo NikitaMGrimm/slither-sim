@@ -48,7 +48,8 @@ try {
           readout(text,available,failed,error){canPlay=available;status.textContent=failed?`Client unavailable: ${String(error)}`:'';}});
         const release=()=>host.call(()=>{for(const code of ['ArrowLeft','ArrowRight','ArrowUp','Space'])owner.key(code,false);owner.mouse_up();});
         artLease=loginArt({current,signal:abort.signal,pixelBudget:16*1024*1024-cosmeticBytes});
-        login=mountLogin({LoginMenu,art:artLease.art,world:canvas,isCurrent:current,available:()=>canPlay&&!!endpoint,
+        // Rust covers the world before the independently fading HUD.
+        login=mountLogin({LoginMenu,art:artLease.art,world:canvas,fadeWorld:false,isCurrent:current,available:()=>canPlay&&!!endpoint,
           playing:()=>owner.playing(),release,cancel:()=>host.call(()=>owner.stop()),
           play(nickname,quality){host.call(()=>{owner.requested_quality(quality==='high');owner.play(endpoint,nickname,0);});}});
         installLocalInput({realm:window,canvas,owner,host,start:()=>login.activate('enter'),controls:[login.button,login.quality],signal:abort.signal});

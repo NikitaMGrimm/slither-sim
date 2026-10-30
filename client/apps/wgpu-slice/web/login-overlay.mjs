@@ -1,7 +1,7 @@
 // One semantic DOM adapter for Canvas and WebGPU. All animation, normalization,
 // rectangles and Play locking come from LoginMenu; no CSS animation or timers.
 export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.document.body,
-  isCurrent = () => true, available, playing, play, release, nickname = '', art = {}, world, onEdit = () => {}, cancel = () => {} }) {
+  isCurrent = () => true, available, playing, play, release, nickname = '', art = {}, world, fadeWorld = true, onEdit = () => {}, cancel = () => {} }) {
   const document = realm.document, location = realm.location.href;
   const locationObject=realm.location, top=realm.top;
   let disposed = false, composing = false, imeEnter = false, pendingClick = false, releasePending = false, view;
@@ -127,7 +127,7 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
       last.style.fontSize=`${15*view.scale}px`;last.style.lineHeight=`${view.last[3]}px`;last.style.color='white';
       lastLabel.textContent=view.last_label?view.last_label+' ':'';lastLabel.style.opacity=view.last_label_alpha;
       lastNumber.textContent=view.last_number;lastSuffix.textContent=view.last_suffix;
-      if(world)world.style.opacity=view.world_alpha;
+      if(world)world.style.opacity=fadeWorld?view.world_alpha:1;
       for(const [node,alpha] of [[logo,view.logo_alpha],[last,view.alpha],[tips,view.tip_alpha],[holder,view.nickname_alpha],[input,view.nickname_alpha],[button,view.play_alpha],[skin,view.skin_alpha],[quality,view.alpha]]) node.style.opacity=alpha;
       logo.style.fontSize=`${40*view.scale}px`; input.style.font=`${15*view.scale}px Arial`;
       tips.style.fontSize=`${14*view.scale}px`;tips.style.lineHeight=`${view.tips[3]}px`;

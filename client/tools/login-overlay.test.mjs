@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mountLogin } from '../apps/wgpu-slice/web/login-overlay.mjs';
 
 // Authored DOM seam; exact policy is exercised by login-abi.mjs in both Wasm builds.
-function fixture(extra = {}) {
+function fixture(extra = {}, adapter = {}) {
   class Node extends EventTarget {
     style={};dataset={};children=[];textContent='';value='';disabled=false;
     appendChild(n){this.children.push(n);n.parentNode=this;return n;}setAttribute(k,v){this[k]=v;}
@@ -22,7 +22,7 @@ function fixture(extra = {}) {
     step(){return Object.fromEntries(['logo','last','tips','holder','input','play','skin','quality_rect','spinner'].map(k=>[k,[0,0,100,30]]).concat(Object.entries({visible:true,disabled:false,ordinary_controls_visible:true,last_label:'',last_number:'\u00a0',last_suffix:'',last_label_alpha:.45,alpha:1,logo_alpha:1,nickname_alpha:1,play_alpha:1,skin_alpha:1,tip_alpha:1,hover:0,press:0,scale:1,nickname:composingValue,placeholder:'Nickname',play_label:'Play',tip:'Eat',skin_label:'Change Skin',quality_label:'Graphics quality',quality:'high',spinner_visible:false,spinner_alpha:0,spinner_scale:0,spinner_time:0,...extra})));}
     free(){calls.push('free');}
   }
-  const ui=mountLogin({realm,LoginMenu:Policy,isCurrent:()=>alive,available:()=>true,playing:()=>false,play:()=>calls.push('play'),release:()=>calls.push('release')});
+  const ui=mountLogin({realm,LoginMenu:Policy,isCurrent:()=>alive,available:()=>true,playing:()=>false,play:()=>calls.push('play'),release:()=>calls.push('release'),...adapter});
   const emit=(node,type,fields={})=>{const e=new Event(type,{cancelable:true});Object.assign(e,fields);node.dispatchEvent(e);};
   return {ui,realm,emit,actions,calls,stale(){alive=false;}};
 }
@@ -70,4 +70,15 @@ test('last length is a split line and champion suppresses ordinary controls',()=
   for(const role of ['nickname','nickname-holder','play','skin'])assert.equal(node(role).style.display,'none');
   assert.equal(node('champion-pending').textContent,'Champion message handoff pending');
   f.ui.dispose();
+});
+
+test('WebGPU midpoint keeps canvas opacity at one and the independently faded HUD at one half',()=>{
+  for(const fadeWorld of [false,true]) {
+    const world={style:{opacity:1}},hudAlpha=.5;
+    const f=fixture({world_alpha:.5,alpha:.5},{world,fadeWorld});
+    f.ui.frame(16);
+    assert.equal(world.style.opacity,fadeWorld?.5:1);
+    if(!fadeWorld)assert.equal(hudAlpha*world.style.opacity,.5);
+    f.ui.dispose();
+  }
 });

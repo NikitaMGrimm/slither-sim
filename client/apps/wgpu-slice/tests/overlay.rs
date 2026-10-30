@@ -247,3 +247,34 @@ fn login_crossfade_covers_complete_world_and_hud_on_the_physical_overlay() {
     picture.frame.validate(&resident).unwrap();
     overlay.validate(&resident).unwrap();
 }
+
+#[test]
+fn webgpu_midpoint_cover_precedes_the_independently_faded_hud() {
+    let mut game = tape::playing();
+    game.bank.overlay_viewport = Some(([960, 540], 1.));
+    let mut picture = snapshot(&mut game, 100);
+    let world = picture.frame.draws.clone();
+    let overlay = picture.overlay.as_mut().unwrap();
+    for draw in &mut overlay.draws {
+        draw.effective_alpha = 0.5;
+    }
+    let hud = overlay.draws.clone();
+    assert!(!hud.is_empty());
+    slither_wgpu_slice::menu::MenuFrame::world_crossfade([960, 540], 1., 0.5)
+        .unwrap()
+        .append_to(&mut picture)
+        .unwrap();
+    assert_eq!(picture.frame.draws[1..], world);
+    assert_eq!(picture.frame.draws[0].effective_alpha, 1.);
+    let overlay = picture.overlay.as_ref().unwrap();
+    assert_eq!(overlay.draws[0].effective_alpha, 0.5);
+    assert_eq!(overlay.draws[1..], hud);
+    assert!(overlay.draws[1..].iter().all(|d| d.effective_alpha == 0.5));
+    let resident = picture
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    picture.frame.validate(&resident).unwrap();
+    overlay.validate(&resident).unwrap();
+}
