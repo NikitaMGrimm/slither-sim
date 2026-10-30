@@ -197,3 +197,13 @@ These helpers calculate report-only CPU/frame tails. No frozen acceptance gate,
 the ladder's generator headroom calculation, world, binary, cohort or timing
 changes. The historical ladder study remains untouched. This correction is
 recorded before any v2 result is reduced; it is not an outcome-based amendment.
+
+## Post-result harness limitation (no v2 gate or result repaired)
+
+Review identified that `cpuFraction` measured only the decision thread, while
+its connector and publisher share that worker's CPU. Their CPU was omitted from
+the per-worker 70%/80% gate. Whole-process telemetry cannot substitute for the
+missing per-worker sum. No v2 result was reduced and no headroom pass is claimed.
+Preserve the executed source; v3 will measure decision + connector + publisher
+CPU and gate that sum at the same 70% median / 80% p99 thresholds. This note is
+a post-result limitation, not a retrospective change to v2 or its outcome.

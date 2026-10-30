@@ -8,13 +8,9 @@ commit `55f2921594aff00044624e47a8a1f90c4ee0b073`; use its `select.py`,
 `tables.py` unchanged at the staging root. Add this study's files there. Do not
 copy v1's raw results, source-hash maps or cloud identifiers into Git.
 
-Exception for the labelled pre-reduction method correction: take
-`sharedv1/acceptance.py`, root `select.py` and `sharedv1/check_quantiles.py` from
-v1 commit `fa10b79368e4176f03287de7605d2058c5948665`. Run
-`python3 sharedv1/check_quantiles.py` before reduction. All other linked source
-stays at the original pin. The first collector keeps its original in-memory
-tails; corrected replay compares every gate and non-tail value exactly while
-allowing only declared report-tail/derived seven-ms fields to differ.
+Keep the original `sharedv1/acceptance.py` and root `select.py` staged through
+the build, initial checks and run-1 startup below. Do not stage the corrected
+helper yet: the runner imports it before starting its world.
 
 On the first fresh AWS generator, before warmup, run the portable locked build
 on the pinned main archive. `prepare.py` applies v1 and this study's generator
@@ -47,12 +43,28 @@ Connection completion records include close/connect elapsed time; ordinary and
 histogram output is serialized away from decisions, with bounded queue depth.
 Queue overflow or a worker failure fails collection rather than hiding load.
 
+After run 1 starts and its status reaches `warmup` (confirming that the running
+process has already imported the original helper), apply the labelled
+pre-reduction correction: replace `sharedv1/acceptance.py`, root `select.py`
+and `sharedv1/check_quantiles.py` with files from v1 commit
+`fa10b79368e4176f03287de7605d2058c5948665`. Run
+`python3 sharedv1/check_quantiles.py` before offline reduction. Do not restart
+run 1. It retains the original helper in memory; a new selector process imports
+the corrected helper from disk. All other linked source stays at the original
+pin. Stage the corrected files before starting run 2, as the plan specifies.
+Corrected replay compares every gate and non-tail value exactly while allowing
+only declared report-tail/derived seven-ms fields to differ.
+
 After collection, use the unchanged v1 selector/assembly/tables recipe. Keep
 both runs separate, retrieve and verify each raw archive, and verify teardown
 before launching another pair. The selector calls this study's `acceptance.py`,
 which changes only final maturity to the prospective lower bounds; start screen,
 deferrals, queues, input lateness, accounting and report-only tails are retained.
 Finish by scanning every enabled AWS region and deleting the task key/group.
+
+Historical limitation: the v2 worker headroom metric omitted connector/publisher
+CPU. This recipe reproduces that executed harness, not the corrected v3 gate.
+No v2 result was reduced or qualified; see the report's post-result limitation.
 
 ## Retained v2 evidence and limit
 

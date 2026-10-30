@@ -68,6 +68,14 @@ all final gate results are **unavailable for an eligible window**. No favorable
 partial interval is reduced or substituted. The async generator's live endpoint
 publication behavior therefore remains unqualified by this acceptance.
 
+Post-result harness limitation: the per-worker `cpuFraction` used only the
+decision thread's CPU clock. Connector and publisher threads share that
+worker's CPU but were omitted from its 70%/80% headroom gate. Process-wide
+telemetry does not repair that per-worker omission. V2 reduced no result and
+establishes no generator-headroom pass. The frozen executed harness is retained;
+v3 must sum decision, connector and publisher CPU for each worker before
+applying the unchanged thresholds.
+
 ## Verification, cost and cleanup
 
 On the first fresh AWS generator before warmup: portable build, slow-connect/
