@@ -93,7 +93,7 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
   wasm.api.HudHistory = vm.runInContext('(' + createHudHistoryDouble.toString() + ')()', f.context);
   wasm.api.LeaderboardHistory = vm.runInContext('(' + createLeaderboardHistoryDouble.toString() + ')()', f.context);
   const announcements = { enabled: 0, reads: 0, view: {
-    schema: 1, present: false, opacity: 0, left: 8, top: 4, width: 300, height: 228, lines: [],
+    schema: 1, present: false, opacity: 0, left: 8, top: 4, width: 300, height: 228, lines: [], blocks: [],
   } };
   Object.assign(wasm.api.AnimatedScene.prototype, {
     enable_announcement_tracking() { announcements.enabled++; },

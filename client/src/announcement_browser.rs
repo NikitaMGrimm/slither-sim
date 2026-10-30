@@ -2,7 +2,9 @@
 
 use wasm_bindgen::{JsCast, JsValue};
 
-use crate::presentation::{AnnouncementLifecycle, AnnouncementView};
+use crate::presentation::{
+    AnnouncementLifecycle, AnnouncementTextFragment, AnnouncementView, TextSlant, TextWeight,
+};
 
 fn invalid() -> JsValue {
     js_sys::TypeError::new("invalid announcement lifecycle").into()
@@ -75,6 +77,30 @@ fn record(fields: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
 }
 
 pub(crate) fn view(view: AnnouncementView) -> Result<JsValue, JsValue> {
+    let blocks = js_sys::Array::new();
+    for block in view.text.blocks {
+        let fragments = js_sys::Array::new();
+        for fragment in block.fragments {
+            fragments.push(&match fragment {
+                AnnouncementTextFragment::Break => record(&[("kind", "break".into())])?,
+                AnnouncementTextFragment::Text { text, style, alpha } => record(&[
+                    ("kind", "text".into()),
+                    ("text", text.into()),
+                    ("family", style.family.css().into()),
+                    ("fontSize", style.size.into()),
+                    ("bold", (style.weight == TextWeight::Bold).into()),
+                    ("italic", (style.slant == TextSlant::Italic).into()),
+                    ("alpha", alpha.into()),
+                ])?,
+            });
+        }
+        js_sys::Object::freeze(&fragments);
+        blocks.push(&record(&[
+            ("fragments", fragments.into()),
+            ("spaceAfter", block.space_after.into()),
+        ])?);
+    }
+    js_sys::Object::freeze(&blocks);
     let lines = js_sys::Array::new();
     for line in view.lines {
         lines.push(&record(&[
@@ -95,5 +121,6 @@ pub(crate) fn view(view: AnnouncementView) -> Result<JsValue, JsValue> {
         ("width", view.width.into()),
         ("height", view.height.into()),
         ("lines", lines.into()),
+        ("blocks", blocks.into()),
     ])
 }
