@@ -60,8 +60,8 @@ The existing **64 MiB active-pixel**, texture-count, queued-pixel and attachment
 limits are unchanged. Text producer limits also remain: HUD 128, minimap 12 and
 each panel 96. These bound the producers themselves; they no longer reserve
 space or reduce world capacity. There is no visibility-dependent announcement
-reserve. A future menu's 512-draw bound should likewise be a producer quota,
-with its own 64-slot / 4 MiB cache; append it in paint order and apply the final
+reserve. The opt-in menu's 512-draw bound is likewise a producer quota,
+with its own [64-slot / 4 MiB cache](menu-resources.md); append it in paint order and apply the final
 picture memory/pixel checks without subtracting 512 from the world allowance.
 
 ## Recoverable oversized pictures

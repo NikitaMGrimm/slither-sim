@@ -64,6 +64,8 @@ resize preparation. [Bounded vertex chunks](draw-chunks.md) preserve crowded
 world geometry without overlay reservations; producer/cache quotas remain.
 Result/editor remains inactive. Fragment opacity multiplies the shared retained
 fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
+The opt-in [menu resource layer](menu-resources.md) adds bounded authored controls
+and semantic local art; login adapters do not enable it yet.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
