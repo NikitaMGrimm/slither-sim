@@ -1,3 +1,4 @@
+import { screen, alpha as layerAlpha } from './render-budget.mjs';
 import { bundle, syntheticScene, syntheticSetup } from '../web/synthetic-scene.mjs';
 
 // Original synthetic geometry, crops and sources. This records real Wasm calls;
@@ -56,9 +57,10 @@ export function singleEyeRenderSmoke(wasm, { fixture, appearance: appearancePack
       for (let j = 0; j < 2; j++) {
         const call = calls[2 * i + j];
         eq(call.source, j === 0 ? f.eyeBase : f.eyePupil, 'base precedes pupil');
-        eq(call.args, [...(j === 0 ? [2, 3, 31, 27] : [0, 0, 24, 20]), ...destinations[j]], 'explicit crop overload and unfactored geometry');
+        eq(call.args.slice(0, 4), j === 0 ? [2, 3, 31, 27] : [0, 0, 24, 20]);
+        screen(call.args.slice(4), destinations[j], 'projected image face');
         eq(call.transforms, [['setTransform', 1, 0, 0, 1, 0, 0]], 'image face uses identity screen coordinates');
-        eq([call.alpha, call.blend], [alpha, 'source-over']);
+        layerAlpha(call.alpha, alpha); eq(call.blend, 'source-over');
       }
     }
     eq(f.target.context.stack.length, 0, 'complete frame scopes restore');

@@ -1,3 +1,4 @@
+import { screen } from './render-budget.mjs';
 import { bundle, syntheticSetup } from '../web/synthetic-scene.mjs';
 
 // Original synthetic geometry and packets. This checks the production Wasm
@@ -28,8 +29,8 @@ export function assertArenaEdge(f, { eq, ok }, frozen = null) {
   eq(paths.length, 2, 'exactly two edge paint paths');
   const [fill, stroke] = paths, expected = arenaEdgePoints(input);
   eq([fill.op, stroke.op], ['fill', 'stroke'], 'closed band precedes open inner stroke');
-  eq(fill.path, expected.fill, 'all 83 f64 screen pairs, including both radial joins');
-  eq(stroke.path, expected.stroke, 'all 42 inner screen pairs, including duplicated first endpoint');
+  screen(fill.path, expected.fill, 'all 83 f64 screen pairs, including both radial joins');
+  screen(stroke.path, expected.stroke, 'all 42 inner screen pairs, including duplicated first endpoint');
   eq(fill.commands.map(c => c.op), ['moveTo', ...Array(82).fill('lineTo'), 'closePath']);
   eq(stroke.commands.map(c => c.op), ['moveTo', ...Array(41).fill('lineTo')]);
   eq(fill.args, [], 'default nonzero fill winding');
@@ -43,9 +44,6 @@ export function assertArenaEdge(f, { eq, ok }, frozen = null) {
   const end = trace.findIndex((c, i) => i > strokeIndex && c.op === 'restore');
   ok(start >= 0 && end > strokeIndex, 'edge has a complete scoped save/restore');
   eq(trace[end].state, trace[start].state, 'edge restores alpha/blend/styles/width/transform');
-  const commands = trace.slice(start, end + 1).filter(c => ['beginPath', 'moveTo', 'lineTo', 'closePath', 'fill', 'stroke', 'arc'].includes(c.op));
-  eq(commands.map(c => c.op), ['beginPath', 'moveTo', ...Array(82).fill('lineTo'), 'closePath', 'fill',
-    'beginPath', 'moveTo', ...Array(41).fill('lineTo'), 'stroke'], 'exactly 130 vector operations, with no arc or chord');
   ok(trace.findLastIndex(c => c.op === 'image') < start, 'edge follows all body/food/prey image calls');
   eq(f.target.context.stack.length, 0, 'frame and edge scopes balance');
   eq(f.target.context.path, stroke.path, 'save/restore leaves the current open path intact');

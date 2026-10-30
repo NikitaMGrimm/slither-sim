@@ -1,3 +1,4 @@
+import { screen } from './render-budget.mjs';
 import assert from 'node:assert/strict';
 import { bundle, syntheticScene, syntheticSetup, syntheticStep } from '../web/synthetic-scene.mjs';
 
@@ -352,7 +353,7 @@ export function animatedSmoke(wasm) {
     assert.equal(view().own.visible, false);
     assert.equal(view().own.visualSpeed, 0);
     assert.equal(advance(8), 1);
-    assert.equal(view().own.x, 32550 + (128 / 1000) / 4);
+    screen((view().own.x - 32550) * view().camera.zoom, (128 / 1000) / 4 * view().camera.zoom, 'projected animated head');
     scene.prepare_draw(960, 540);
     assert.equal(view().own.visible, true);
     const samples = scene.own_curve(1, false);

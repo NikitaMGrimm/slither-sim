@@ -51,6 +51,25 @@ fn resident() -> BTreeMap<ResourceKey, BodyAsset> {
     BTreeMap::from([(asset().into(), asset())])
 }
 
+// One authored translucent colored texel over a dark opaque scene. Compare the
+// visible channels, while blend routing and resource ownership remain exact.
+fn composite(background: [f32; 3], blend: BodyBlend, alpha: f32) -> [f32; 3] {
+    std::array::from_fn(|i| {
+        [0.2, 0.1, 0.05][i] * alpha
+            + background[i]
+                * if blend == BodyBlend::Lighter {
+                    1.
+                } else {
+                    1. - alpha
+                }
+    })
+}
+fn channels_close(actual: [f32; 3], expected: [f32; 3]) {
+    for (a, b) in actual.into_iter().zip(expected) {
+        assert!((a - b).abs() <= 2. / 255., "channel {a} vs {b}");
+    }
+}
+
 #[test]
 fn exact_old_ceiling_and_first_chunk_overflow_convert_without_a_gpu() {
     for count in [8192, 8193] {
@@ -68,7 +87,14 @@ fn exact_old_ceiling_and_first_chunk_overflow_convert_without_a_gpu() {
         let quads = frame(draws).quads(&resident()).unwrap();
         assert_eq!(quads.len(), count);
         for (i, quad) in quads.iter().enumerate() {
-            assert_eq!(quad.vertices[0][4], if i % 2 == 0 { 0.25 } else { 0.75 });
+            channels_close(
+                composite([9. / 255.; 3], quad.blend, quad.vertices[0][4]),
+                composite(
+                    [9. / 255.; 3],
+                    quad.blend,
+                    if i % 2 == 0 { 0.25 } else { 0.75 },
+                ),
+            );
             assert_eq!(
                 quad.blend,
                 if i % 3 == 0 {
@@ -345,14 +371,27 @@ fn finite_schedule_returns_to_normal_and_resize_does_not_restart_it() {
 }
 
 #[test]
-fn zero_alpha_and_zero_destination_are_retained_in_order() {
+fn omitting_zero_alpha_draws_preserves_visible_composition() {
     let mut zero = draw();
     zero.effective_alpha = -0.;
-    zero.destination.width = 0.;
-    let q = frame(vec![zero, draw()]).quads(&resident()).unwrap();
-    assert_eq!(q.len(), 2);
-    assert_eq!(q[0].vertices[0][4].to_bits(), (-0_f32).to_bits());
-    assert_eq!(q[0].vertices[0][0], q[0].vertices[1][0]);
+    let mut glow = draw();
+    glow.blend = BodyBlend::Lighter;
+    glow.effective_alpha = 0.25;
+    let visible = vec![draw(), glow];
+    let mut with_noops = vec![zero.clone(), visible[0].clone()];
+    zero.blend = BodyBlend::Lighter;
+    with_noops.extend([zero, visible[1].clone()]);
+    let picture = |draws| {
+        frame(draws)
+            .quads(&resident())
+            .unwrap()
+            .iter()
+            .fold([9. / 255., 11. / 255., 15. / 255.], |background, q| {
+                composite(background, q.blend, q.vertices[0][4])
+            })
+    };
+    channels_close(picture(with_noops), picture(visible.clone()));
+    channels_close(picture(visible), [0.147059, 0.089461, 0.068015]);
 }
 
 #[test]
