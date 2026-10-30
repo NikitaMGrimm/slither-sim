@@ -51,27 +51,26 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           prefix-key: v0-client
+          # Both client crates are root workspace members: key on the root lockfile.
           workspaces: |
-            client -> target
-            ${{ matrix.os == 'windows-latest' && 'client/apps/wgpu-slice -> ../../target/wgpu-slice-ci' || '' }}
+            . -> target
+            ${{ matrix.os == 'windows-latest' && '. -> client/target/wgpu-slice-ci' || '' }}
           # The Windows wgpu target can exceed the shared cache budget.
           cache-targets: ${{ matrix.os != 'windows-latest' }}
           cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo fmt --all --check
+      # --all would also format the simulator crates.
+      - run: cargo fmt -p slither-client -p slither-wgpu-slice --check
       - run: cargo test --all-targets --locked
       - run: cargo test --doc --locked
       - run: cargo clippy --all-targets --locked -- -D warnings
-      - name: Format shared wgpu slice
-        if: matrix.os == 'windows-latest'
-        run: cargo fmt --manifest-path apps/wgpu-slice/Cargo.toml --check
       - name: Test shared wgpu slice offline
         if: matrix.os == 'windows-latest'
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
-          # The wgpu crate's own `dev.debug = 0` no longer applies inside the
-          # root workspace; full debug info pushed this job past 15 minutes.
+          # Root workspace profiles keep debug info, which pushed this job past
+          # 15 minutes; the wgpu builds skip it.
           CARGO_PROFILE_DEV_DEBUG: 0
           RUST_TEST_THREADS: 1
         run: cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
@@ -95,7 +94,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      # Keep target trees disjoint so cleanup uses each manifest's dependencies.
+      # Relative to the client working directory.
       CARGO_TARGET_DIR: target/client-ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -107,8 +106,8 @@ jobs:
         with:
           prefix-key: v0-client
           workspaces: |
-            client -> target/client-ci
-            client/apps/wgpu-slice -> ../../target/wgpu-slice-ci
+            . -> client/target/client-ci
+            . -> client/target/wgpu-slice-ci
           cache-targets: true
           cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}

@@ -2,7 +2,7 @@
 
 Windows desktop and browser WebGPU hosts share game::LocalGame, the root Rust
 protocol/session/input/HUD/presentation policies and a small ordered wgpu renderer.
-The crate has its own lockfile and a path dependency on the core. Canvas remains
+The crate is a member of the root Cargo workspace and depends on the core by path. Canvas remains
 the visual reference.
 
 On Windows, from the repository root, run the desktop client and a local simulator:
