@@ -1,4 +1,5 @@
-//! Thin winit 0.30 translation and injectable host capabilities. No menu renderer.
+//! Windows winit 0.30.13 translation and injectable host capabilities.
+//! Other native platforms need their own IME rule before enabling this editor.
 
 use slither_client::menu_input::{
     EditIntent, GameplayKey, HostEditEffect, MenuInputState, Movement,
@@ -33,7 +34,7 @@ impl<'a> From<&'a KeyEvent> for KeyInput<'a> {
     }
 }
 
-/// Input policy plus modifier bookkeeping; only created when a menu is shown.
+/// Windows input policy and modifier bookkeeping; created when a menu is shown.
 #[derive(Default)]
 pub struct NativeMenuInput {
     pub state: MenuInputState,
@@ -65,8 +66,34 @@ impl NativeMenuInput {
             _ => None,
         };
         let mut intents = Vec::new();
-        if let Some(key) = gameplay {
+        let process = matches!(event.logical, Key::Named(NamedKey::Process));
+        if let Some(key) = gameplay.filter(|_| !pressed || !process) {
             intents.push(EditIntent::Gameplay { key, pressed });
+        }
+        // winit 0.30.13 src/platform_impl/windows/keyboard_layout.rs:946 maps
+        // VK_PROCESSKEY to Process; src/keyboard.rs:1576-1586 gives it no text.
+        // These are IME-owned keys, never text/shortcuts.
+        // Still accept a physical Enter key-up, including a Process key-up, to
+        // release the composition Enter barrier without activating anything.
+        let enter_release = !pressed
+            && matches!(
+                event.physical,
+                PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter)
+            );
+        if enter_release {
+            intents.push(EditIntent::Enter {
+                pressed: false,
+                repeat: false,
+            });
+        }
+        if process || enter_release {
+            return NativeInputResult {
+                consumed: process || editing,
+                effects: intents
+                    .into_iter()
+                    .flat_map(|intent| self.state.apply(intent))
+                    .collect(),
+            };
         }
         let control = self.modifiers.control_key() && !self.modifiers.alt_key();
         let shift = self.modifiers.shift_key();
@@ -76,6 +103,7 @@ impl NativeMenuInput {
                 repeat: event.repeat,
             });
         } else if pressed && editing {
+            intents.push(EditIntent::UnrelatedKeyPress);
             let intent = match event.logical {
                 Key::Named(NamedKey::ArrowLeft) => Some(EditIntent::Move {
                     movement: if control {
@@ -127,11 +155,7 @@ impl NativeMenuInput {
             {
                 // Named control text such as Tab/Enter is not a single-line edit.
                 if !text.chars().any(char::is_control) {
-                    intents.push(if event.repeat {
-                        EditIntent::RepeatText(text.into())
-                    } else {
-                        EditIntent::KeyText(text.into())
-                    });
+                    intents.push(EditIntent::KeyText(text.into()));
                 }
             }
         }

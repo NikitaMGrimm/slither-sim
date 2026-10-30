@@ -136,7 +136,7 @@ impl TextEditState {
     pub fn preedit(&self) -> Option<&Preedit> {
         self.preedit.as_ref()
     }
-    /// Composition remains active across winit's empty preedit before Commit.
+    /// A non-empty preedit currently owns keyboard text.
     pub fn composing(&self) -> bool {
         self.composing
     }
@@ -288,8 +288,8 @@ pub enum EditIntent {
     Modal(bool),
     /// Keyboard-produced text (ignored while IME owns composition).
     KeyText(String),
-    /// Keyboard auto-repeat text, always independent of an IME duplicate pair.
-    RepeatText(String),
+    /// A non-Enter key press outside IME processing retires the Enter barrier.
+    UnrelatedKeyPress,
     /// Raw preedit text and optional UTF-8 byte selection.
     Preedit(String, Option<(usize, usize)>),
     /// IME enabled/disabled; Disabled cancels uncommitted text.
@@ -349,8 +349,6 @@ pub enum EditIntent {
         /// Auto-repeat.
         repeat: bool,
     },
-    /// Dispatch boundary expires duplicate text/Enter suppression after a commit.
-    EndEventBatch,
     /// Always route releases; suspend presses while editing or modal.
     Gameplay {
         /// Physical gameplay key.
@@ -413,11 +411,8 @@ pub struct MenuInputState {
     focus: Option<TextField>,
     window_focused: bool,
     modal: bool,
-    ime_enabled: bool,
     enter_held: bool,
-    commit_guard: Option<String>,
-    commit_enter_guard: bool,
-    key_text_guard: Option<(TextField, String, TextEditState)>,
+    composition_enter: bool,
     token: u64,
     pending: Option<(u64, bool)>,
     modal_focus: Option<TextField>,
@@ -430,11 +425,8 @@ impl Default for MenuInputState {
             focus: None,
             window_focused: true,
             modal: false,
-            ime_enabled: false,
             enter_held: false,
-            commit_guard: None,
-            commit_enter_guard: false,
-            key_text_guard: None,
+            composition_enter: false,
             token: 0,
             pending: None,
             modal_focus: None,
@@ -466,15 +458,9 @@ impl MenuInputState {
     fn clear_composition(&mut self) {
         self.nickname.cancel();
         self.champion.cancel();
-        self.ime_enabled = false;
-        self.clear_edit_guards();
+        self.composition_enter = false;
         self.enter_held = false;
         self.pending = None;
-    }
-    fn clear_edit_guards(&mut self) {
-        self.commit_guard = None;
-        self.key_text_guard = None;
-        self.commit_enter_guard = false;
     }
     fn releases(effects: &mut Vec<HostEditEffect>) {
         for key in [
@@ -501,20 +487,12 @@ impl MenuInputState {
     /// Reduce one copied intent and return host work.
     pub fn apply(&mut self, intent: EditIntent) -> Vec<HostEditEffect> {
         let mut effects = Vec::new();
-        let repeated = matches!(intent, EditIntent::RepeatText(_));
-        if !matches!(
-            intent,
-            EditIntent::KeyText(_)
-                | EditIntent::ImeEnabled(_)
-                | EditIntent::Preedit(..)
-                | EditIntent::ImeCommit(_)
-                | EditIntent::Enter { .. }
-                | EditIntent::Gameplay { .. }
-                | EditIntent::CursorArea { .. }
-        ) {
-            self.clear_edit_guards();
-        }
         match intent {
+            EditIntent::UnrelatedKeyPress => {
+                self.composition_enter = false;
+                self.enter_held = false;
+                return effects;
+            }
             EditIntent::Focus(focus) => {
                 if self.focus != focus {
                     self.clear_composition();
@@ -556,16 +534,6 @@ impl MenuInputState {
                 }
                 return effects;
             }
-            EditIntent::EndEventBatch => {
-                // Empty preedit can mean cancellation on hosts where Enabled is
-                // long-lived. Defer it through the adjacent Commit, then clear.
-                for editor in [&mut self.nickname, &mut self.champion] {
-                    if editor.preedit.as_ref().is_some_and(|p| p.text.is_empty()) {
-                        editor.cancel();
-                    }
-                }
-                return effects;
-            }
             _ => {}
         }
         let Some(field) = self.focus.filter(|_| self.window_focused) else {
@@ -574,76 +542,55 @@ impl MenuInputState {
         match intent {
             EditIntent::ImeEnabled(enabled) => {
                 self.pending = None;
-                self.ime_enabled = enabled;
-                if enabled {
-                    self.commit_guard = None;
-                    self.commit_enter_guard = false;
-                } else {
-                    self.key_text_guard = None;
+                if !enabled {
                     self.editor_mut(field).cancel();
                 }
             }
             EditIntent::Preedit(text, selection) => {
                 self.pending = None;
-                // A non-empty preedit begins a new edit, even if queued in the
-                // same winit batch as an earlier ordinary key or IME commit.
                 if !text.is_empty() {
-                    self.clear_edit_guards();
+                    self.composition_enter = true;
                 }
                 let selection = selection.map(|(a, c)| (boundary(&text, a), boundary(&text, c)));
                 let editor = self.editor_mut(field);
-                // Empty preedit is also the mandatory pre-Commit event, not cancellation.
-                editor.composing |= !text.is_empty();
-                editor.preedit = Some(Preedit { text, selection });
+                // Empty preedit clears the preview, including before Commit.
+                // Enter ownership is a separate flag and survives this clear.
+                editor.composing = !text.is_empty();
+                editor.preedit = if editor.composing {
+                    Some(Preedit { text, selection })
+                } else {
+                    None
+                };
             }
             EditIntent::ImeCommit(text) => {
-                self.commit_guard = None;
-                self.commit_enter_guard = false;
-                if self.ime_enabled || self.editor(field).composing() {
-                    self.pending = None;
-                    // Direct commits (for example an OS character picker) need
-                    // not have preedit. Only the preceding non-repeat edit is
-                    // eligible; a preedit start or independent edit retires it.
-                    let paired_key =
-                        self.key_text_guard
-                            .take()
-                            .filter(|(previous_field, previous_text, _)| {
-                                *previous_field == field && *previous_text == text
-                            });
-                    let paired = paired_key.is_some();
-                    if let Some((_, _, before)) = paired_key {
-                        *self.editor_mut(field) = before;
-                    }
-                    self.editor_mut(field).replace(&text);
-                    // One commit can pair with one key, never both a preceding
-                    // and a following key. The next real key must remain an edit.
-                    self.commit_guard = if paired { None } else { Some(text) };
-                    self.commit_enter_guard = true;
-                } else {
-                    self.key_text_guard = None;
-                }
+                // Windows contract, winit 0.30.13: src/window.rs:1260-1268
+                // excludes KeyboardInput during preedit. Its Windows
+                // src/platform_impl/windows/event_loop.rs:1526-1576 emits Commit
+                // from WM_IME_COMPOSITION and returns without DefWindowProc,
+                // so the result does not also produce WM_CHAR text. Insert each
+                // commit; comparing strings would merge independent edits.
+                // X11/macOS need a platform-specific rule before support.
+                self.pending = None;
+                self.editor_mut(field).replace(&text);
+                self.composition_enter = true;
             }
-            EditIntent::KeyText(text) | EditIntent::RepeatText(text) => {
-                // Inspect the next text event once, including a nonmatching key.
-                let trailing = self.commit_guard.take();
-                let duplicate = !repeated && trailing.as_deref() == Some(&text);
-                if !self.editor(field).composing() && !duplicate {
-                    self.commit_enter_guard = false;
+            EditIntent::KeyText(text) => {
+                // winit 0.30.13 src/window.rs:1260-1268 excludes these events
+                // during preedit. Ignore unexpected host text defensively while
+                // composing; it cannot replace or truncate the raw preview.
+                if !self.editor(field).composing() {
+                    self.composition_enter = false;
+                    self.enter_held = false;
                     self.pending = None;
-                    self.key_text_guard = if repeated {
-                        None
-                    } else {
-                        Some((field, text.clone(), self.editor(field).clone()))
-                    };
                     self.editor_mut(field).replace(&text);
                 }
             }
             EditIntent::Enter { pressed, repeat } => {
-                self.key_text_guard = None;
                 if !pressed {
                     self.enter_held = false;
+                    self.composition_enter = false;
                 } else {
-                    let owned = self.editor(field).composing() || self.commit_enter_guard;
+                    let owned = self.editor(field).composing() || self.composition_enter;
                     if !owned && !repeat && !self.enter_held {
                         effects.push(HostEditEffect::Activate(field));
                     }
@@ -654,7 +601,8 @@ impl MenuInputState {
             EditIntent::CancelComposition => {
                 self.pending = None;
                 self.editor_mut(field).cancel();
-                self.ime_enabled = false;
+                self.composition_enter = false;
+                self.enter_held = false;
                 effects.push(HostEditEffect::ImeAllowed(false));
                 self.ime_effects(&mut effects);
             }
@@ -738,7 +686,6 @@ impl MenuInputState {
         if self.nickname.text() != view.nickname {
             self.nickname = TextEditState::new(TextField::Nickname, &view.nickname);
             self.pending = None;
-            self.key_text_guard = None;
         }
         if intents.contains(&StartMenuIntent::FocusNickname) {
             self.apply(EditIntent::Focus(Some(TextField::Nickname)))

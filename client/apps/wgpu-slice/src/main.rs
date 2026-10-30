@@ -632,11 +632,6 @@ mod desktop {
         fn about_to_wait(&mut self, l: &ActiveEventLoop) {
             l.set_control_flow(ControlFlow::Wait);
             if let Some(r) = &mut self.running {
-                if let Some((input, _)) = &mut r.menu_input {
-                    input
-                        .state
-                        .apply(slither_client::menu_input::EditIntent::EndEventBatch);
-                }
                 if let Err(e) = r.service() {
                     self.fail(l, e);
                     return;

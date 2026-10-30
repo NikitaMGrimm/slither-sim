@@ -87,7 +87,8 @@ fn named(
     pressed: bool,
     repeat: bool,
 ) -> NativeInputResult {
-    key(native, Key::Named(name), code, Some("\r"), pressed, repeat)
+    let text = (name == NamedKey::Enter && pressed).then_some("\r");
+    key(native, Key::Named(name), code, text, pressed, repeat)
 }
 
 #[test]
@@ -158,8 +159,8 @@ fn synthetic_key_fields_use_logical_editing_physical_gameplay_and_altgr_text() {
 }
 
 #[test]
-fn ime_events_keep_raw_bytes_cancel_and_deduplicate_enter_in_both_orders() {
-    for enter_before_commit in [true, false] {
+fn windows_preedit_process_enter_commit_and_release() {
+    for release_as_process in [false, true] {
         let mut native = focused();
         native.window_event(&WindowEvent::Ime(Ime::Enabled));
         native.window_event(&WindowEvent::Ime(Ime::Preedit("😀é".into(), Some((4, 6)))));
@@ -172,42 +173,50 @@ fn ime_events_keep_raw_bytes_cancel_and_deduplicate_enter_in_both_orders() {
                 .text,
             "😀é"
         );
-        character(&mut native, "😀é", KeyCode::KeyA, Some("😀é"));
-        if enter_before_commit {
-            assert!(
-                named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false)
-                    .effects
-                    .is_empty()
-            );
-        }
+        assert!(
+            key(
+                &mut native,
+                Key::Named(NamedKey::Process),
+                KeyCode::Enter,
+                None,
+                true,
+                false
+            )
+            .effects
+            .is_empty()
+        );
         native.window_event(&WindowEvent::Ime(Ime::Preedit("".into(), None)));
         native.window_event(&WindowEvent::Ime(Ime::Commit("😀é".into())));
         native.window_event(&WindowEvent::Ime(Ime::Disabled));
-        character(&mut native, "😀é", KeyCode::KeyA, Some("😀é"));
-        if !enter_before_commit {
-            assert!(
-                named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false)
-                    .effects
-                    .is_empty()
-            );
-        }
         assert_eq!(native.state.editor(TextField::Nickname).text(), "   ");
-        native.state.apply(EditIntent::EndEventBatch);
+        // Windows provides no duplicate KeyEvent.text for the composed result.
+        let released = if release_as_process {
+            NamedKey::Process
+        } else {
+            NamedKey::Enter
+        };
         assert!(
-            named(&mut native, NamedKey::Enter, KeyCode::Enter, true, true)
-                .effects
-                .is_empty()
+            key(
+                &mut native,
+                Key::Named(released),
+                KeyCode::Enter,
+                None,
+                false,
+                false
+            )
+            .effects
+            .is_empty()
         );
-        named(&mut native, NamedKey::Enter, KeyCode::Enter, false, false);
         assert_eq!(
             named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false).effects,
             vec![HostEditEffect::Activate(TextField::Nickname)]
         );
+        named(&mut native, NamedKey::Enter, KeyCode::Enter, false, false);
         native.window_event(&WindowEvent::Ime(Ime::Enabled));
         native.window_event(&WindowEvent::Ime(Ime::Preedit("discard".into(), None)));
         named(&mut native, NamedKey::Escape, KeyCode::Escape, true, false);
+        native.window_event(&WindowEvent::Ime(Ime::Disabled));
         assert!(!native.state.editor(TextField::Nickname).composing());
-        native.window_event(&WindowEvent::Ime(Ime::Commit("late".into())));
         assert_eq!(native.state.editor(TextField::Nickname).text(), "   ");
     }
 }
@@ -362,31 +371,207 @@ fn native_text_clipboard_and_enter_feed_existing_deferred_menu_request() {
     assert!(menu.step(16., false).unwrap().is_empty());
 }
 
+fn windows_enter_commit(native: &mut NativeMenuInput, text: &str) {
+    native.window_event(&WindowEvent::Ime(Ime::Enabled));
+    native.window_event(&WindowEvent::Ime(Ime::Preedit(
+        text.into(),
+        Some((text.len(), text.len())),
+    )));
+    let process = key(
+        native,
+        Key::Named(NamedKey::Process),
+        KeyCode::Enter,
+        None,
+        true,
+        false,
+    );
+    assert!(process.consumed && process.effects.is_empty());
+    native.window_event(&WindowEvent::Ime(Ime::Preedit("".into(), None)));
+    native.window_event(&WindowEvent::Ime(Ime::Commit(text.into())));
+    native.window_event(&WindowEvent::Ime(Ime::Disabled));
+}
+
 #[test]
-fn round2_native_repeats_are_independent_of_ime_duplicate_text() {
-    for duplicate in [false, true] {
-        let mut native = focused();
-        native.window_event(&WindowEvent::Ime(Ime::Enabled));
-        native.window_event(&WindowEvent::Ime(Ime::Commit("a".into())));
-        if duplicate {
-            character(&mut native, "a", KeyCode::KeyA, Some("a"));
-        }
-        for _ in 0..2 {
-            key(
-                &mut native,
-                Key::Character("a".into()),
-                KeyCode::KeyA,
-                Some("a"),
-                true,
-                true,
-            );
-        }
-        assert_eq!(native.state.editor(TextField::Nickname).text(), "aaa");
-        assert_eq!(
-            named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false).effects,
-            vec![HostEditEffect::Activate(TextField::Nickname)]
+fn round3_windows_enter_release_then_fresh_a_inserts_both() {
+    let mut native = focused();
+    windows_enter_commit(&mut native, "a");
+    named(&mut native, NamedKey::Enter, KeyCode::Enter, false, false);
+    character(&mut native, "a", KeyCode::KeyA, Some("a"));
+    key(
+        &mut native,
+        Key::Character("a".into()),
+        KeyCode::KeyA,
+        None,
+        false,
+        false,
+    );
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "aa");
+}
+
+#[test]
+fn round3_windows_a_release_then_direct_commit_inserts_both() {
+    let mut native = focused();
+    character(&mut native, "a", KeyCode::KeyA, Some("a"));
+    key(
+        &mut native,
+        Key::Character("a".into()),
+        KeyCode::KeyA,
+        None,
+        false,
+        false,
+    );
+    native.window_event(&WindowEvent::Ime(Ime::Enabled));
+    native.window_event(&WindowEvent::Ime(Ime::Preedit("".into(), None)));
+    native.window_event(&WindowEvent::Ime(Ime::Commit("a".into())));
+    native.window_event(&WindowEvent::Ime(Ime::Disabled));
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "aa");
+}
+
+#[test]
+fn round3_windows_earlier_aa_and_aba_traces_preserve_every_edit() {
+    let mut native = focused();
+    character(&mut native, "a", KeyCode::KeyA, Some("a"));
+    key(
+        &mut native,
+        Key::Character("a".into()),
+        KeyCode::KeyA,
+        None,
+        false,
+        false,
+    );
+    windows_enter_commit(&mut native, "a");
+    named(&mut native, NamedKey::Enter, KeyCode::Enter, false, false);
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "aa");
+    let mut native = focused();
+    windows_enter_commit(&mut native, "a");
+    named(&mut native, NamedKey::Enter, KeyCode::Enter, false, false);
+    for (c, code) in [("b", KeyCode::KeyB), ("a", KeyCode::KeyA)] {
+        character(&mut native, c, code, Some(c));
+        key(
+            &mut native,
+            Key::Character(c.into()),
+            code,
+            None,
+            false,
+            false,
         );
-        native.window_event(&WindowEvent::Ime(Ime::Commit("a".into())));
-        assert_eq!(native.state.editor(TextField::Nickname).text(), "aaaa");
     }
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "aba");
+}
+
+#[test]
+fn round3_process_keys_never_insert_or_activate_shortcuts() {
+    let mut native = focused();
+    for (c, code) in [
+        ("k", KeyCode::KeyK),
+        ("e", KeyCode::KeyE),
+        ("e", KeyCode::KeyE),
+        ("p", KeyCode::KeyP),
+    ] {
+        character(&mut native, c, code, Some(c));
+        key(
+            &mut native,
+            Key::Character(c.into()),
+            code,
+            None,
+            false,
+            false,
+        );
+    }
+    native.modifiers(ModifiersState::CONTROL);
+    let process = key(
+        &mut native,
+        Key::Named(NamedKey::Process),
+        KeyCode::KeyA,
+        None,
+        true,
+        false,
+    );
+    assert!(process.consumed && process.effects.is_empty());
+    assert_eq!(native.state.editor(TextField::Nickname).selection(), (4, 4));
+    // Even an unexpected text payload must not turn Process into an edit.
+    native.modifiers(ModifiersState::CONTROL | ModifiersState::ALT);
+    let process = key(
+        &mut native,
+        Key::Named(NamedKey::Process),
+        KeyCode::KeyV,
+        Some("a"),
+        true,
+        false,
+    );
+    assert!(process.consumed && process.effects.is_empty());
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "keep");
+    native.state.apply(EditIntent::Focus(None));
+    let process = key(
+        &mut native,
+        Key::Named(NamedKey::Process),
+        KeyCode::Space,
+        None,
+        true,
+        false,
+    );
+    assert!(process.consumed && process.effects.is_empty());
+    let release = key(
+        &mut native,
+        Key::Named(NamedKey::Process),
+        KeyCode::Space,
+        None,
+        false,
+        false,
+    );
+    assert_eq!(
+        release.effects,
+        vec![HostEditEffect::Gameplay {
+            key: GameplayKey::Space,
+            pressed: false
+        }]
+    );
+}
+
+#[test]
+fn windows_plain_typing_and_repeats_work_with_ime_enabled_without_preedit() {
+    let mut native = focused();
+    native.window_event(&WindowEvent::Ime(Ime::Enabled));
+    character(&mut native, "a", KeyCode::KeyA, Some("a"));
+    for _ in 0..2 {
+        key(
+            &mut native,
+            Key::Character("a".into()),
+            KeyCode::KeyA,
+            Some("a"),
+            true,
+            true,
+        );
+    }
+    key(
+        &mut native,
+        Key::Character("a".into()),
+        KeyCode::KeyA,
+        None,
+        false,
+        false,
+    );
+    character(&mut native, "b", KeyCode::KeyB, Some("b"));
+    assert_eq!(native.state.editor(TextField::Nickname).text(), "aaab");
+    assert!(native.state.editor(TextField::Nickname).preedit().is_none());
+}
+
+#[test]
+fn windows_unrelated_key_press_clears_composition_enter_barrier() {
+    let mut native = focused();
+    windows_enter_commit(&mut native, "a");
+    // No release notification for the consumed IME Enter; a new unrelated key
+    // press is an explicit boundary even when it has no text (here Shift).
+    key(
+        &mut native,
+        Key::Named(NamedKey::Shift),
+        KeyCode::ShiftLeft,
+        None,
+        true,
+        false,
+    );
+    assert_eq!(
+        named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false).effects,
+        vec![HostEditEffect::Activate(TextField::Nickname)]
+    );
 }

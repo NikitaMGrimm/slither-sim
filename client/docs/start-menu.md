@@ -84,27 +84,38 @@ inference was incorrect. This PR adds no champion submission or wire encoding.
 Raw Unicode preedit and its optional UTF-8 byte selection stay separate from
 the committed value, field limit and undo history. Retaining raw preedit until
 commit approximates Chromium's input-event timing during composition, rather
-than establishing timing parity. Empty preedit is retained
-across winit's mandatory pre-Commit clear. An empty preview without an adjacent
-commit cancels at the dispatch boundary (also on hosts with long-lived Enabled).
+than establishing timing parity. Empty preedit immediately clears the raw
+preview, including winit's mandatory pre-Commit clear.
 Disabled, explicit cancellation,
 focus changes, modal open and blur discard uncommitted text. The OS owns Enter's
 composition commit: the core waits for `Ime::Commit`, never inserts the preview
 or activates Play/Save on that key. IME availability alone does not suppress
 ordinary key text (important for hosts with long-lived Enabled notifications).
-Text during composition is ignored. Duplicate pairing is limited to adjacent
-editing events: a direct commit without preedit can restore the preceding
-non-repeat key's selection/history, or consume the first following matching
-non-repeat key, never both. Empty preedit and IME disable notifications may
-intervene; a non-empty preedit starts a new edit and retires earlier candidates.
-A nonmatching key or any independent edit also retires the trailing candidate.
-Native text repeats are explicit independent edits, including when no duplicate
-key text follows the commit. A separate Enter barrier survives consuming a
-text duplicate, until the dispatch batch ends or independent editing starts.
-The native event loop ends the batch in `about_to_wait`. A consumed Enter stays
-held until key-up, so repeats cannot activate after the batch ends. Real OS
-ordering still needs physical-host validation; synthetic traces are not that
-acceptance.
+Windows text input follows **winit 0.30.13**: `src/window.rs:1260-1268` documents
+that the window receives no `KeyboardInput` during preedit. Its
+`src/platform_impl/windows/event_loop.rs:1526-1576` emits the composed result from
+`WM_IME_COMPOSITION` and returns without `DefWindowProc`, so it generates no
+second `WM_CHAR` text for that result. `keyboard_layout.rs:946` in the same
+Windows directory maps `VK_PROCESSKEY` to `Key::Named(Process)`;
+`src/keyboard.rs:1576-1586` gives that named key no text. These citations were
+checked against the local registry source, not inferred from synthetic events.
+
+Every `Ime::Commit` inserts and normalizes its text. `KeyEvent.text` inserts
+while not composing, including ordinary typing and repeats with IME allowed.
+Unexpected keyboard text during a non-empty preedit is ignored defensively:
+the contract excludes it, and it must not overwrite the raw preview. There is
+no string comparison for duplicate suppression or retrospective rollback.
+`Process` events never insert text or trigger shortcuts; key releases still
+clear held gameplay keys and the composition Enter state.
+
+A simple composition Enter flag suppresses the Enter that finishes composition.
+It clears on that key's release (including a physical Enter released as
+`Process`), focus loss, or the next unrelated key press. A consumed Enter stays
+held until release or an unrelated key press, so repeats cannot activate Play
+or Save. No event-batch hook controls this barrier. X11 and macOS input are unsupported
+by this Windows rule; they need a platform-specific rule before support.
+Real OS ordering still needs physical-host validation; synthetic traces are
+not that acceptance.
 
 Clipboard effects carry tokens. Focus, selection, editing and composition
 changes invalidate pending work; failed cuts retain their selection and text,
@@ -149,7 +160,7 @@ existing deferred Play effects. Browsers will use real DOM inputs separately.
 
 The authored traces in `tests/menu_input.rs` and
 `apps/wgpu-slice/tests/menu_input_native.rs` exercise offsets, normalization,
-limits, selection/history, IME lifecycle and both Enter/commit orders, injected
+limits, selection/history, Windows IME/Enter and key-release traces, injected
 clipboard success/failure, gameplay releases and login semantic snapshots.
 winit's `KeyEvent` has a private platform payload, so synthetic key events inject
 the exact public fields production extracts through `KeyInput`; no fabricated
