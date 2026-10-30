@@ -26,6 +26,10 @@
 
 ### Performance
 
+- Removing eaten food copies the surviving pellets in one pass instead of
+  rotating them through the list. In a frozen 10,000-snake world, world CPU
+  per tick falls from about 17.1 to 14.2 ms, and the 500-player catalog step
+  gets about 10% faster. Pickup results and food order are unchanged.
 - Food pickup keeps its fast grid in arenas up to a radius of about 131,000,
   official density for about 38,000 snakes, instead of 65,536 (about 9,700).
   Larger arenas fell back to a slower path: at 9,800 snakes a world step cost
