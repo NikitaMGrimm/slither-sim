@@ -200,6 +200,7 @@ transformed control edges stay within the [perceptual budget](perceptual-parity.
 Font shaping remains the metric provider's responsibility.
 The source-rationale table below retains the historical integer checkpoints;
 the label-width test now compares them with tolerances instead of emulating Blink.
+Their historical Blink pin is `4dfbf1c0f8e59669a8d578f02c258a759d5c0b70`.
 
 ## Authored numeric fixtures and source rationale
 
