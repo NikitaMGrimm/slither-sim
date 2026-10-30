@@ -372,4 +372,13 @@ fn login_menu_composes_over_the_world_picture() {
         picture.frame.quads(&resident).unwrap();
         game.presented(true).unwrap();
     }
+    game.begin_redraw(64., extent, 1.).unwrap();
+    while let Some(e) = game.effect() {
+        game.acknowledge(e.generation, e.id, true).unwrap();
+    }
+    let mut picture = game.take_frame().expect("world picture");
+    let mut menu = login.prepare_host([960, 540], 1., true, None).unwrap();
+    menu.resources[0].asset = picture.resources[0].asset;
+    menu.resources[0].asset.revision += 1;
+    assert!(menu.append_to(&mut picture).is_err());
 }

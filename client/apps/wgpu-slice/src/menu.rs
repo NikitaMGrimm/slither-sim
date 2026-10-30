@@ -70,9 +70,10 @@ impl MenuFrame {
         {
             return Err("Menu picture extent/scale mismatch".into());
         }
+        // Keyed by handle alone: the renderer keeps one revision per handle.
         let mut resources = BTreeMap::new();
         for r in picture.resources.iter().chain(&self.resources) {
-            if let Some(old) = resources.insert(frame::ResourceKey::from(r.asset), r.clone())
+            if let Some(old) = resources.insert(r.asset.handle, r.clone())
                 && old.asset != r.asset
             {
                 return Err("Menu resource handle collides with the world picture".into());
