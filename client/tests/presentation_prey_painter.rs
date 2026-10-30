@@ -312,14 +312,11 @@ fn captured_mouth_uses_current_raw_pose_and_corrections_with_left_to_right_produ
     let center_y = 20. + (my - 20.) * k;
     let scale = 1. - progress.powf(3.);
     let (_, d) = scaled(p.early[0]);
-    assert_eq!(
-        d.x.to_bits(),
-        (100. + 0.75 * center_x - 2.25 * scale).to_bits()
-    );
-    assert_eq!(
-        d.y.to_bits(),
-        (80. + 0.75 * center_y - 3.75 * scale).to_bits()
-    );
+    let expected_x = 100. + 0.75 * center_x - 2.25 * scale;
+    let expected_y = 80. + 0.75 * center_y - 3.75 * scale;
+    // Already projected CSS pixels: for one sample the p95 <=0.5px budget
+    // is stricter than the 1px maximum (docs/perceptual-parity.md).
+    assert!((d.x - expected_x).hypot(d.y - expected_y) <= 0.5);
     assert_eq!(d.width, 11.25 * scale);
 }
 

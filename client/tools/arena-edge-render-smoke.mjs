@@ -21,7 +21,7 @@ export function assertArenaEdge(f, { eq, ok }, frozen = null) {
   const input = frozen ?? { center, angle, distance, radius: snapshot.protocol == null ? null : snapshot.boundary?.displayed,
     camera: snapshot.camera, width: f.target.width, height: f.target.height };
   const trace = f.target.context.trace;
-  const paths = trace.filter(c => (c.op === 'fill' || c.op === 'stroke') && c.commands[0]?.op === 'moveTo');
+  const paths = trace.filter(c => (c.op === 'fill' || c.op === 'stroke') && c.alpha !== 0 && c.commands[0]?.op === 'moveTo');
   if (input.radius == null || !(Math.abs(input.radius - input.distance) < 4000)) {
     eq(paths, [], 'strict distance gate or absent Setup emits no edge path');
     return null;
@@ -40,9 +40,17 @@ export function assertArenaEdge(f, { eq, ok }, frozen = null) {
       'screen geometry has its own identity/source-over/constant-alpha scope');
   }
   const fillIndex = trace.indexOf(fill), strokeIndex = trace.indexOf(stroke);
-  const start = trace.findLastIndex((c, i) => i < fillIndex && c.op === 'save');
-  const end = trace.findIndex((c, i) => i > strokeIndex && c.op === 'restore');
+  const scopes = [];
+  let start = -1, end = -1;
+  for (const [i, command] of trace.entries()) {
+    if (command.op === 'save') scopes.push(i);
+    if (i === fillIndex) start = scopes.at(-1) ?? -1;
+    if (command.op === 'restore' && scopes.pop() === start && i > strokeIndex) { end = i; break; }
+  }
   ok(start >= 0 && end > strokeIndex, 'edge has a complete scoped save/restore');
+  const paints = trace.slice(start + 1, end).filter(c => c.alpha !== 0 &&
+    ['fill', 'stroke', 'fillRect', 'patternFill', 'image', 'text'].includes(c.op));
+  eq(paints, [fill, stroke], 'edge scope contains no additional visible paint');
   eq(trace[end].state, trace[start].state, 'edge restores alpha/blend/styles/width/transform');
   ok(trace.findLastIndex(c => c.op === 'image') < start, 'edge follows all body/food/prey image calls');
   eq(f.target.context.stack.length, 0, 'frame and edge scopes balance');
@@ -134,15 +142,15 @@ export function arenaEdgeRenderSmoke(wasm, { fixture, appearance, vanillaEyes, e
       // A native exception after edge submission begins leaves numeric state uncommitted.
       for (const method of ['setTransform', 'globalCompositeOperation']) {
         paint();
-        const eyeCount = f.target.context.trace.filter(c => c.op === 'fill' && c.commands[0]?.op === 'arc').length;
+        const eyeCount = f.target.context.trace.filter(c => c.op === 'fill' && c.alpha !== 0 && c.commands[0]?.op === 'arc').length;
         eq(eyeCount, 4, 'one complete paired face precedes the late fault');
         let failed = false;
         const observed = [];
         const fault = new Error(`authored late edge ${method}`);
         f.target.context.beforeCanvasCall = (name, context) => {
-          if (name === method) observed.push([context.stack.length, context.trace.filter(c => c.op === 'fill' && c.commands[0]?.op === 'arc').length]);
+          if (name === method) observed.push([context.stack.length, context.trace.filter(c => c.op === 'fill' && c.alpha !== 0 && c.commands[0]?.op === 'arc').length]);
           if (!failed && name === method && context.stack.length === 2
-            && context.trace.filter(c => c.op === 'fill' && c.commands[0]?.op === 'arc').length === eyeCount) { failed = true; throw fault; }
+            && context.trace.filter(c => c.op === 'fill' && c.alpha !== 0 && c.commands[0]?.op === 'arc').length === eyeCount) { failed = true; throw fault; }
         };
         const saved = allState();
         f.target.context.trace = [];

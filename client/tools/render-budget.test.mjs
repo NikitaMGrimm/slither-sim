@@ -15,3 +15,16 @@ test('visual budgets admit small drift and reject visible geometry/opacity regre
   assert.throws(() => heading(0.01, 0));
   assert.throws(() => transforms([['rotate', 0], ['translate', 0, 0]], [['translate', 0, 0], ['rotate', 0]]));
 });
+
+test('visual budgets reject nonfinite values and empty samples', () => {
+  for (const value of [NaN, Infinity, -Infinity]) {
+    assert.throws(() => screen(value, 0));
+    assert.throws(() => screen(0, value));
+    assert.throws(() => alpha(value, 0.5));
+    assert.throws(() => alpha(0.5, value));
+    assert.throws(() => heading(value, 0));
+    assert.throws(() => heading(0, value));
+  }
+  assert.throws(() => screen([], []));
+  assert.throws(() => alpha([], []));
+});

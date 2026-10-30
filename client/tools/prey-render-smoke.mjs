@@ -81,12 +81,14 @@ export function preyRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       f.scene.advance(now, false).free();
       eq(f.scene.prey_state().preys.map(p => p.scale), [0, 0]);
       f.quality.set_requested_mode(0); f.quality.begin_connection();
-      draw();
-      assertArenaEdge(f, { eq, ok });
-      f.quality.set_requested_mode(1); f.quality.begin_connection();
       while (now < 1280) f.scene.advance(now += 40, false).free();
       state = f.scene.prey_state();
       eq(state.preys.map(p => p.scale), [1, 1]);
+      calls = draw();
+      ok(created.every(prey => calls.some(c => c.alpha > 0 && prey.images.includes(c.source))),
+        'each full-scale prey remains visible in low quality');
+      assertArenaEdge(f, { eq, ok });
+      f.quality.set_requested_mode(1); f.quality.begin_connection();
       calls = draw();
       eq(calls.slice(0, 4).map(c => c.args.length), [2, 2, 2, 2]);
       eq(calls.slice(4).map(c => c.args.length), [2, 2, 8, 8, 2, 2, 8, 8],

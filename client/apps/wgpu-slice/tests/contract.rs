@@ -87,6 +87,11 @@ fn exact_old_ceiling_and_first_chunk_overflow_convert_without_a_gpu() {
         let quads = frame(draws).quads(&resident()).unwrap();
         assert_eq!(quads.len(), count);
         for (i, quad) in quads.iter().enumerate() {
+            // Opaque white over black exposes alpha error hidden by dark art.
+            channels_close(
+                [quad.vertices[0][4]; 3],
+                [if i % 2 == 0 { 0.25 } else { 0.75 }; 3],
+            );
             channels_close(
                 composite([9. / 255.; 3], quad.blend, quad.vertices[0][4]),
                 composite(

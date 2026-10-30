@@ -233,6 +233,7 @@ export function appearancePreviewSmoke(wasm) {
       finally { cached.endOperation(); }
       equal(cachedReads, 1); equal(prepared, beforePrepared + 1);
       const image = target.context.images.find(row => row.source === chosen);
+      equal(image.transforms[1][0], 'translate');
       screen(image.transforms[1].slice(1), [280 + wasm.stock_accessory_forward(skin, new Uint8Array()), 64]);
     }
     // Both targets remain forbidden even when explicitly admitted as the selected source.
