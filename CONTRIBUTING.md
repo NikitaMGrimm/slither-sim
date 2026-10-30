@@ -65,6 +65,11 @@ as baselines; do not loosen official tolerances.
   or clearly labelled synthetic inputs; no fresh capture required.
 - **Behavior-preserving optimizations:** demonstrate output parity on relevant
   cases; provide matched before/after measurements only when claiming performance.
+  A [comparison](docs/performance.md#compare-a-change) on the catalog rows that
+  exercise the changed code is enough, with its numbers in the PR. If no row
+  does, add one to the [workload catalog](docs/performance-workloads.md) instead
+  of a one-off harness. Reserve a dated research study for capacity and
+  live-server claims.
 - **Mechanics corrections:** cite supporting evidence and add a focused regression
   fixture. Collect more only if existing evidence cannot support the correction.
 - **New empirical or fitted claims:** follow the [research workflow](docs/research-workflow.md)
