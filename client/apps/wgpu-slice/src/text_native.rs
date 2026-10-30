@@ -183,9 +183,6 @@ mod tests {
 struct Arial {
     font: Font,
     em_ascent: f64,
-    font_ascent: f32,
-    font_descent: f32,
-    font_line_gap: f32,
 }
 fn canvas_character(c: char) -> Option<char> {
     match c {
@@ -221,51 +218,29 @@ impl Rasterizer {
             };
             let bytes = std::fs::read(std::path::Path::new(directory).join(file))
                 .map_err(|e| format!("installed face ({file}): {e}"))?;
-            let face = ttf_parser::Face::parse(&bytes, 0)
-                .map_err(|e| format!("font metrics ({file}): {e}"))?;
-            let ascent = f64::from(face.typographic_ascender().unwrap_or(face.ascender()));
-            let descent = f64::from(face.typographic_descender().unwrap_or(face.descender()));
+            let font = Font::from_bytes(bytes, FontSettings::default())
+                .map_err(|e| format!("font ({file}): {e}"))?;
+            let metrics = font
+                .horizontal_line_metrics(1.)
+                .ok_or("font line metrics")?;
+            let ascent = f64::from(metrics.ascent);
+            let descent = f64::from(metrics.descent);
             if ascent <= descent {
-                return Err("font typographic metrics".into());
+                return Err("font line metrics".into());
             }
-            // These installed Windows faces use OS/2 usWinAscent/usWinDescent
-            // for DirectWrite/Skia's font box, not OS/2's normalized typo box.
-            // Source/rounding rationale: client/docs/panel-text.md#font-box-and-baselines.
-            let os2 = face.tables().os2.ok_or("font OS/2 metrics")?;
-            let upem = f32::from(face.units_per_em());
-            let font_ascent = f32::from(os2.windows_ascender()) / upem;
-            let font_descent = -f32::from(os2.windows_descender()) / upem;
-            let font_line_gap = f32::from(face.line_gap()) / upem;
             slot.insert(Arial {
-                font: Font::from_bytes(bytes, FontSettings::default())
-                    .map_err(|e| format!("font ({file}): {e}"))?,
+                font,
                 em_ascent: ascent / (ascent - descent),
-                font_ascent,
-                font_descent,
-                font_line_gap,
             });
         }
         Ok(&self.faces[&key])
     }
-    pub fn normal_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
-        let device = TextStyle {
-            size: f64::from(style.size as f32 * scale as f32),
-            ..style
-        };
-        let m = self.measure("", device)?;
-        // CSS normal includes the hhea line gap as well as the rounded font box.
-        // Installed-face regression: tests/announcements.rs; docs/announcements.md.
-        let gap = (device.size as f32 * self.face(device)?.font_line_gap).round();
-        Ok((m.font_ascent.round() + m.font_descent.round() + f64::from(gap)) / scale)
-    }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
         let face = self.face(style)?;
         let font = &face.font;
-        let font_ascent = style.size as f32 * face.font_ascent;
-        let font_descent = style.size as f32 * face.font_descent;
-        // Blink's AscentDescentWithHacks rounds ordinary font boxes; Canvas
-        // retains subpixels for tiny fonts (ascent <3 or total height <2).
-        let tiny = font_ascent < 3. || font_ascent + font_descent < 2.;
+        let metrics = font
+            .horizontal_line_metrics(style.size as f32)
+            .ok_or("font line metrics")?;
         let size = style.size as f32 * 4.;
         let mut pen = 0_f32;
         let mut previous = None;
@@ -297,16 +272,8 @@ impl Rasterizer {
             advance: f64::from(pen) / 4.,
             ascent,
             descent,
-            font_ascent: f64::from(if tiny {
-                font_ascent
-            } else {
-                font_ascent.round()
-            }),
-            font_descent: f64::from(if tiny {
-                font_descent
-            } else {
-                font_descent.round()
-            }),
+            font_ascent: f64::from(metrics.ascent),
+            font_descent: -f64::from(metrics.descent),
         })
     }
     #[cfg(test)]
@@ -446,9 +413,8 @@ impl Rasterizer {
             },
             offset: [f64::from(left), f64::from(top)],
             advance: f64::from(pen) / SAMPLE as f64,
-            // Canvas middle uses the em square, not hhea's taller line box.
-            // Normalize OS/2 typography to one em, at the browser's 1/64px grid.
-            middle: (px * arial.em_ascent * 64.).round() / 64. - px / 2.,
+            // Center the em square using the face's logical ascent/descent.
+            middle: px * arial.em_ascent - px / 2.,
         })
     }
 }

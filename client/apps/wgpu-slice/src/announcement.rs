@@ -59,12 +59,10 @@ impl Announcement {
             if top >= bottom || output.runs.len() == 48 {
                 break;
             }
-            // Normal line height includes the font's line gap, which Canvas
-            // TextMetrics alone omits. The backend supplies measurement only.
             let mut line_height = 14_f64;
             for f in &block.fragments {
                 if let AnnouncementTextFragment::Text { style, .. } = f {
-                    line_height = line_height.max(text.normal_panel_line_height(*style, scale)?);
+                    line_height = line_height.max(style.line_height());
                 }
             }
             let (plan, sources) = layout_panel_text_with_sources(
