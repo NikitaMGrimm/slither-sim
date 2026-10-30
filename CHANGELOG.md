@@ -37,6 +37,9 @@
 
 ### Performance
 
+- Food pickup checks reuse pellet coordinates from the pickup index and resolve
+  list positions only for eaten pellets. Pickup results and event order are
+  unchanged.
 - Collision checks keep each snake's body bounds until its body changes,
   instead of rescanning every body point on every tick. In a frozen
   10,000-snake world, world CPU per tick falls from about 14.2 to 11.6 ms, and
