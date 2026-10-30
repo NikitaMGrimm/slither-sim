@@ -1,6 +1,6 @@
 {
   "execution": "First on-demand generator, before any world",
-  "frozenPlanAndDeltaCommit": "89d74121a9eecdd7b73d10b16efeb710de7a892f",
+  "frozenPlanAndDeltaCommit": "2abc874e275c7e9ed62d7cb358fc9cc8efe1d6d2",
   "runtimeCommit": "388be59aebf3108f5c510aa7269c08b67851b202",
   "sameVerifiedV3Binaries": {
     "clients": "f8424b4bd4e997c06d9d648a356f9d2ea07f3a651953474d4ae68f25ba3387fe",
@@ -16,9 +16,31 @@
   "documentationTestsPassed": 7,
   "newRustBuildsOrTests": "Not run; unchanged previously verified v3 binaries reused",
   "proofArchive": {
-    "sha256": "a740957a123ac6a71c6e9baa4ecf76cd0122f6ea792591c7cd0644d8acdb4f4e",
-    "bytes": 2050,
-    "access": "Local-only retained checks, test script, frozen bindings and pins outside repositories"
+    "kind": "v4-preflight-proofs-final.tar.gz",
+    "sha256": "ec33eabea810f7465d20a7a1a3c369b935a6648ee7264d0e9e62b886779e2462",
+    "bytes": 2067,
+    "access": "Local-only retained setup/check evidence outside repositories"
   },
-  "independentReview": "Not performed"
+  "independentReview": "Not performed",
+  "actualQuietStateVerifiedBeforeWorld": true,
+  "earlierSetupEvidence": [
+    {
+      "kind": "v4-preflight-proofs.tar.gz",
+      "sha256": "a740957a123ac6a71c6e9baa4ecf76cd0122f6ea792591c7cd0644d8acdb4f4e",
+      "bytes": 2050,
+      "access": "Local-only retained setup/check evidence outside repositories"
+    },
+    {
+      "kind": "quiet-first-prepare.tar.gz",
+      "sha256": "da59d20961d190dd69e82c735b5c151bdd0e6d810819a1deeadfae2a27c44c11",
+      "bytes": 3440,
+      "access": "Local-only retained setup/check evidence outside repositories"
+    },
+    {
+      "kind": "quiet-verifier-setup-failure.tar.gz",
+      "sha256": "1d3dc03e803d71c81f66a4f7bf291063527700e49ce0fdc8248d8e7b2c20284c",
+      "bytes": 3713,
+      "access": "Local-only retained setup/check evidence outside repositories"
+    }
+  ]
 }

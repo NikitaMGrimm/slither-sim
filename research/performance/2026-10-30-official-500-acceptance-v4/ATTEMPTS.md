@@ -34,3 +34,8 @@ snapd and its socket remain stopped/masked. The final actual-state preparation
 passes on the same instances; no deadline extension, replacement, acceptance
 window, result or gate change. Final corrected freeze/proofs supersede the
 initial pre-start receipt below, preserving the setup failures.
+
+Corrected final plan/source freeze: `2abc874e275c7e9ed62d7cb358fc9cc8efe1d6d2`. Actual quiet-state
+verification, corrected AWS module controls and all seven documentation checks
+pass before tick zero. The preflight receipt binds all earlier setup evidence
+and the final proof archive; initial masks/failed states remain retained.
