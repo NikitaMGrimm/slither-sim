@@ -22,6 +22,10 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   const logo = element('div', 'logo', 'slither');
   logo.style.cssText += 'font-weight:bold;color:#82d65b;display:flex;align-items:center;justify-content:center;text-shadow:0 4px 12px #000';
   const last = element('div', 'last-length', '\u00a0');
+  last.textContent='';last.setAttribute('role','status');
+  const lastLabel=document.createElement('span'),lastNumber=document.createElement('b'),lastSuffix=document.createElement('span');
+  last.appendChild(lastLabel);last.appendChild(lastNumber);last.appendChild(lastSuffix);
+  const champion = element('div','champion-pending');champion.setAttribute('role','status');
   const tips = element('div', 'tips');
   const holder = element('div', 'nickname-holder');
   holder.style.cssText += 'background:#4c447c;border:2px solid #000;border-radius:29px;box-shadow:0 6px 35px #0009';
@@ -99,8 +103,11 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   parent.appendChild(root);
   return {
     root, input, button, quality, activate,
-    observeSession(phase) {
-      if (!current() || !policy.observe_session(phase)) return false;
+    observeSession(session, capture) {
+      if (!current()) return false;
+      const returned=policy.observe_life(session.phase,session.outcome??'',session.playing,
+        session.deathPending,session.returnActive,session.returnFraction,capture?.score,capture?.ownToken);
+      if (!returned) return false;
       composing=imeEnter=pendingClick=false;
       releasePending=true;
       return true;
@@ -110,18 +117,25 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
       if(releasePending){releasePending=false;release();}
       measure.font='bold 20px Arial';
       // RAF's frame-start timestamp may precede mounting later in that frame.
-      view=policy.step(Math.max(0,now-started),realm.innerWidth,realm.innerHeight,measure.measureText(buttonLabel.textContent).width,available(),playing());
+      view=policy.step(Math.max(0,now-started),realm.innerWidth,realm.innerHeight,measure.measureText(policy.play_label()).width,available(),playing());
       for(const [node,key] of [[logo,'logo'],[last,'last'],[tips,'tips'],[holder,'holder'],[input,'input'],[button,'play'],[skin,'skin'],[quality,'quality_rect'],[spinner,'spinner']]) place(node,view[key]);
       root.style.display=view.visible || view.spinner_visible ? 'block':'none';
+      for(const node of [holder,input,button,skin])node.style.display=view.ordinary_controls_visible?'':'none';
+      champion.style.display=view.champion_pending?'block':'none';
+      place(champion,view.holder);champion.textContent=view.champion_label;champion.style.opacity=view.alpha;
+      champion.style.fontSize=`${15*view.scale}px`;
+      last.style.fontSize=`${15*view.scale}px`;last.style.lineHeight=`${view.last[3]}px`;last.style.color='white';
+      lastLabel.textContent=view.last_label?view.last_label+' ':'';lastLabel.style.opacity=view.last_label_alpha;
+      lastNumber.textContent=view.last_number;lastSuffix.textContent=view.last_suffix;
       if(world)world.style.opacity=view.world_alpha;
       for(const [node,alpha] of [[logo,view.logo_alpha],[last,view.alpha],[tips,view.tip_alpha],[holder,view.nickname_alpha],[input,view.nickname_alpha],[button,view.play_alpha],[skin,view.skin_alpha],[quality,view.alpha]]) node.style.opacity=alpha;
       logo.style.fontSize=`${40*view.scale}px`; input.style.font=`${15*view.scale}px Arial`;
       tips.style.fontSize=`${14*view.scale}px`;tips.style.lineHeight=`${view.tips[3]}px`;
-      button.style.fontSize=`${20*view.scale}px`;button.style.background=`linear-gradient(${view.disabled?'#4b5b54,#32413a':'#56ac81,#366c51'})`;
-      buttonLayers[0].style.opacity=view.hover;buttonLayers[1].style.opacity=view.press;buttonLabel.style.opacity=view.disabled?.45:1;
+      button.style.fontSize=`${20*view.scale}px`;button.style.background=`linear-gradient(${view.busy?'#4b5b54,#32413a':'#56ac81,#366c51'})`;
+      buttonLayers[0].style.opacity=view.hover;buttonLayers[1].style.opacity=view.press;buttonLabel.style.opacity=view.busy?.45:1;
       input.placeholder=view.placeholder;input.setAttribute('aria-label',view.placeholder);
       input.disabled=button.disabled=view.disabled; quality.disabled=view.disabled;
-      input.style.opacity=view.nickname_alpha*(view.disabled?.5:1);
+      input.style.opacity=view.nickname_alpha*(view.busy?.5:1);
       if(!composing && input.value!==view.nickname) input.value=view.nickname;
       buttonLabel.textContent=view.play_label;tips.textContent=view.tip;
       image(logo,'logo:0','slither');image(skin,'skin',view.skin_label);skin.setAttribute('aria-label',`${view.skin_label} (preview unavailable)`);

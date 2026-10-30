@@ -52,7 +52,7 @@ try {
           playing:()=>owner.playing(),release,cancel:()=>host.call(()=>owner.stop()),
           play(nickname,quality){host.call(()=>{owner.requested_quality(quality==='high');owner.play(endpoint,nickname,0);});}});
         installLocalInput({realm:window,canvas,owner,host,start:()=>login.activate('enter'),controls:[login.button,login.quality],signal:abort.signal});
-        function draw(time){if(current()){login.observeSession(owner.phase());login.frame(time);host.frame(time);raf=requestAnimationFrame(draw);}}
+        function draw(time){if(current()){host.frame(time);const state=owner.login_view();login.observeSession(state,state);login.frame(time);raf=requestAnimationFrame(draw);}}
         raf=requestAnimationFrame(draw);
       } else {owner?.free();owner=undefined;}
     }

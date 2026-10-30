@@ -265,6 +265,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
     let draw = p.frame.draws[0].clone();
     let make = |count| slither_wgpu_slice::menu::MenuFrame {
         backdrop: None,
+        world_cover: None,
         frame: slither_wgpu_slice::frame::Frame {
             draws: vec![draw.clone(); count],
             ..p.frame.clone()
@@ -333,7 +334,13 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
             let material_scale = dpr.min(3.).min(509. / (nick.width.max(nick.height) + 80.));
             let pad = (40. * material_scale).ceil() / material_scale;
-            let shape = p.frame.draws[0].destination;
+            let shape = p
+                .frame
+                .draws
+                .iter()
+                .find(|draw| draw.asset.width > 1 && draw.source.is_none())
+                .unwrap()
+                .destination;
             assert!((shape.x + pad - nick.x).abs() <= 2.);
             assert!((shape.y + pad - nick.y).abs() <= 2.);
             assert!((shape.x + shape.width - pad - nick.x - nick.width).abs() <= 2.);
@@ -477,7 +484,7 @@ fn page_backdrop_keeps_its_colour_and_opacity_through_the_crossfade() {
 }
 
 #[test]
-fn disabled_play_dims_the_normal_surface_and_label_together() {
+fn connecting_play_dims_the_whole_button_but_return_uses_its_own_alpha() {
     let mut menu = Menu::default();
     let mut text = TextCache::menu();
     let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
@@ -487,6 +494,7 @@ fn disabled_play_dims_the_normal_surface_and_label_together() {
         .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
         .unwrap();
     view.disabled = true;
+    view.phase = slither_client::start_page::MenuPhase::Connecting;
     let disabled = menu
         .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
         .unwrap();
@@ -511,6 +519,19 @@ fn disabled_play_dims_the_normal_surface_and_label_together() {
         assert_eq!(a.destination, b.destination);
         assert!((b.effective_alpha / a.effective_alpha - 0.38).abs() < 1e-12);
     }
+    view.phase = slither_client::start_page::MenuPhase::Returning;
+    let returning = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    let visible = |frame: &slither_wgpu_slice::frame::Frame| {
+        frame
+            .draws
+            .iter()
+            .filter(|draw| draw.effective_alpha > 0.)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(visible(&returning.frame), visible(&enabled.frame));
 }
 
 #[test]
@@ -545,7 +566,10 @@ fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
             .unwrap();
         assert_eq!(prepared.backdrop.is_some(), visible);
         let backdrop = prepared.backdrop.clone();
-        let controls = prepared.frame.draws.clone();
+        let mut controls = prepared.frame.draws.clone();
+        if let Some(cover) = &prepared.world_cover {
+            controls.insert(0, cover.clone());
+        }
         let mut picture = PreparedFrame {
             overlay: None,
             frame: slither_wgpu_slice::frame::Frame {

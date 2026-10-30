@@ -30,6 +30,8 @@ pub struct MenuFrame {
     pub frame: Frame,
     /// Page colour below the world, in the frame's coordinate space; absent when login is hidden.
     pub backdrop: Option<Draw>,
+    /// Crossfade cover after the world blit, before the independently fading HUD.
+    pub world_cover: Option<Draw>,
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
@@ -41,7 +43,13 @@ impl MenuFrame {
             f64::from(extent[0]) * self.frame.viewport_scale / f64::from(self.frame.extent[0]),
             f64::from(extent[1]) * self.frame.viewport_scale / f64::from(self.frame.extent[1]),
         ];
-        for draw in self.frame.draws.iter_mut().chain(&mut self.backdrop) {
+        for draw in self
+            .frame
+            .draws
+            .iter_mut()
+            .chain(&mut self.backdrop)
+            .chain(&mut self.world_cover)
+        {
             // Menu composition emits axis-aligned images, unlike world bodies.
             if draw.rotation != 0. {
                 return Err("Rotated menu host mapping".into());
@@ -66,7 +74,9 @@ impl MenuFrame {
     /// Put the page below every world draw and menu controls above them.
     /// A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
-        let count = self.frame.draws.len() + usize::from(self.backdrop.is_some());
+        let count = self.frame.draws.len()
+            + usize::from(self.backdrop.is_some())
+            + usize::from(self.world_cover.is_some());
         check_menu_draws(count)?;
         if self.frame.extent != picture.ui_frame().extent
             || self.frame.viewport_scale != picture.ui_frame().viewport_scale
@@ -93,7 +103,10 @@ impl MenuFrame {
         }
         frame::check_draw_count(picture.draw_count() + count)?;
         if let Some(overlay) = &mut picture.overlay {
-            frame::reserve_draws(&mut overlay.draws, self.frame.draws.len())?;
+            frame::reserve_draws(
+                &mut overlay.draws,
+                self.frame.draws.len() + usize::from(self.world_cover.is_some()),
+            )?;
             frame::reserve_draws(
                 &mut picture.frame.draws,
                 usize::from(self.backdrop.is_some()),
@@ -110,6 +123,13 @@ impl MenuFrame {
                 height: f64::from(picture.frame.extent[1]) / picture.frame.viewport_scale,
             };
             picture.frame.draws.insert(0, backdrop);
+        }
+        if let Some(cover) = self.world_cover {
+            if let Some(overlay) = &mut picture.overlay {
+                overlay.draws.insert(0, cover);
+            } else {
+                picture.frame.draws.push(cover);
+            }
         }
         picture.ui_frame_mut().draws.extend(self.frame.draws);
         picture.resources = std::mem::take(&mut resources).into_values().collect();
@@ -380,6 +400,13 @@ impl Menu {
         } else {
             None
         };
+        // Fade the completed canvas, not overlapping world draws. The HUD
+        // already owns its return opacity, so this cover goes before that layer.
+        let world_cover = backdrop.clone().map(|mut draw| {
+            draw.effective_alpha = a;
+            draw
+        });
+        let busy = view.phase == slither_client::start_page::MenuPhase::Connecting;
         if view.visible {
             let qr = layout.viewport_rect(E::Quality);
             if self.focus == Some(E::Quality) {
@@ -437,6 +464,71 @@ impl Menu {
                 let label = c.labels.last_mut().unwrap();
                 label.style.family = Family::Lucida;
                 label.style.color = [128, 104, 192];
+            }
+            // Center the whole line; its three runs share a box/baseline and
+            // preserve the regular prefix/punctuation and real bold number.
+            let last = &view.last_life;
+            let runs = [
+                (
+                    format!(
+                        "{}{}",
+                        last.label,
+                        if last.label.is_empty() { "" } else { " " }
+                    ),
+                    false,
+                    last.label_alpha,
+                ),
+                (last.number.clone(), true, 1.),
+                (last.suffix.to_owned(), false, 1.),
+            ];
+            let rect = layout.viewport_rect(E::LastLength);
+            let size = 15. * layout.scale;
+            let mut widths = Vec::new();
+            for (value, bold, _) in &runs {
+                let style = TextStyle {
+                    size,
+                    weight: if *bold { Weight::Bold } else { Weight::Normal },
+                    family: Family::Lucida,
+                    slant: Slant::Normal,
+                    color: [255; 3],
+                };
+                widths.push(text.measure_panel(value, style)?.advance);
+            }
+            let total: f64 = widths.iter().sum();
+            let fit = if total > rect.width {
+                rect.width / total
+            } else {
+                1.
+            };
+            let mut x = rect.x + (rect.width - total * fit) / 2.;
+            for ((value, bold, alpha), width) in runs.iter().zip(widths) {
+                if !value.is_empty() {
+                    c.label(
+                        value,
+                        MenuRect {
+                            x,
+                            width: width * fit,
+                            ..rect
+                        },
+                        size * fit,
+                        *bold,
+                        a * alpha,
+                    );
+                    let label = c.labels.last_mut().unwrap();
+                    label.align = Align::Left;
+                    label.style.color = [255; 3];
+                    label.style.family = Family::Lucida;
+                }
+                x += width * fit;
+            }
+            if view.champion_pending {
+                c.label(
+                    view.wording.champion_pending,
+                    layout.viewport_rect(E::NicknameHolder),
+                    15. * layout.scale,
+                    false,
+                    a,
+                );
             }
             if view.ordinary_controls_visible {
                 let nick = layout.viewport_rect(E::NicknameHolder);
@@ -518,10 +610,8 @@ impl Menu {
                     }
                 }
                 let play = layout.viewport_rect(E::Play);
-                let pa = a
-                    * view.play_alpha
-                    * view.play_return_alpha
-                    * if view.disabled { 0.38 } else { 1. };
+                let pa =
+                    a * view.play_alpha * view.play_return_alpha * if busy { 0.38 } else { 1. };
                 c.control(play, 0, pa)?;
                 if !view.disabled {
                     c.control(
@@ -635,7 +725,10 @@ impl Menu {
                 }
                 // The spinner is above the login's text, including the fading tips.
                 check_menu_draws(
-                    c.draws.len() + spinner_draws.len() + usize::from(backdrop.is_some()),
+                    c.draws.len()
+                        + spinner_draws.len()
+                        + usize::from(backdrop.is_some())
+                        + usize::from(world_cover.is_some()),
                 )?;
                 frame::reserve_draws(&mut c.draws, spinner_draws.len())?;
                 c.draws.extend(spinner_draws);
@@ -651,6 +744,7 @@ impl Menu {
                 Ok(MenuFrame {
                     frame,
                     backdrop,
+                    world_cover,
                     resources: resources.into_values().collect(),
                 })
             },

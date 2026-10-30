@@ -20,6 +20,35 @@ pub struct LastLifeView {
     pub label_alpha: f64,
 }
 
+/// Copied lifecycle observations; the session remains the only death clock.
+#[derive(Clone, Copy, Debug)]
+pub struct MenuSession {
+    /// Current session phase.
+    pub phase: Phase,
+    /// First accepted outcome, including after transport close.
+    pub outcome: Option<Phase>,
+    /// Gameplay remains owned through the death hold and return.
+    pub playing: bool,
+    /// The existing death hold/return is pending.
+    pub death_pending: bool,
+    /// The session's return clock is running.
+    pub return_active: bool,
+    /// Committed world alpha from that clock.
+    pub return_fraction: f64,
+}
+impl From<&crate::session_policy::View> for MenuSession {
+    fn from(view: &crate::session_policy::View) -> Self {
+        Self {
+            phase: view.phase,
+            outcome: view.outcome,
+            playing: view.playing,
+            death_pending: view.death_pending,
+            return_active: view.return_active,
+            return_fraction: view.return_fraction,
+        }
+    }
+}
+
 /// Menu visibility clock, never a replacement for SessionPolicy's lifecycle.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MenuPhase {
@@ -151,7 +180,6 @@ pub struct StartMenuState {
     replay: bool,
     champion: bool,
     last_ms: f64,
-    death_ms: f64,
     transition: f64,
     outgoing_active: bool,
     lag: f64,
@@ -188,7 +216,6 @@ impl StartMenuState {
             replay: false,
             champion: false,
             last_ms: 0.,
-            death_ms: 0.,
             transition: 0.,
             outgoing_active: false,
             lag: 1.,
@@ -280,15 +307,11 @@ impl StartMenuState {
         &mut self,
         phase: Phase,
         capture: Option<HudFinal>,
-        now_ms: f64,
     ) -> Result<bool, &'static str> {
         if !matches!(phase, Phase::Dead | Phase::Victory)
             || !matches!(self.phase, MenuPhase::World | MenuPhase::Outgoing)
         {
             return Ok(false);
-        }
-        if !now_ms.is_finite() || now_ms < self.last_ms {
-            return Err("Invalid menu death clock");
         }
         if let Some(value) = capture {
             value.score_text()?;
@@ -296,10 +319,96 @@ impl StartMenuState {
         self.last_capture = capture;
         self.replay = true;
         self.champion = phase == Phase::Victory;
-        self.death_ms = now_ms;
         self.phase = MenuPhase::DeathHold;
         self.lag = 1.;
         Ok(true)
+    }
+
+    /// Project the committed session clock. This policy never times a death,
+    /// closes a socket or resets a world. Outcome survives a transport close;
+    /// only the session's completed return enables ordinary editing and focus.
+    pub fn observe_session(
+        &mut self,
+        session: MenuSession,
+        capture: Option<HudFinal>,
+    ) -> Result<bool, &'static str> {
+        // The previous generation can still be terminal while Play is queued.
+        if self.pending_play.is_some() {
+            return Ok(false);
+        }
+        if session.playing || session.outcome.is_some() {
+            self.begin_outgoing();
+        }
+        if let Some(outcome) = session.outcome {
+            self.accepted_game_over(outcome, capture)?;
+        }
+        let mut returned = false;
+        if matches!(
+            self.phase,
+            MenuPhase::Outgoing | MenuPhase::World | MenuPhase::DeathHold | MenuPhase::Returning
+        ) {
+            self.outgoing_active = false;
+            self.transition = session.return_fraction;
+            if self.transition == 1. {
+                self.tips_active = false;
+                self.logo_alpha = 1.;
+                self.logo_reveal = 1.;
+                self.nickname_progress = 1.;
+                if self.phase == MenuPhase::Outgoing {
+                    self.phase = MenuPhase::World;
+                }
+            }
+            if matches!(self.phase, MenuPhase::DeathHold | MenuPhase::Returning) {
+                returned = !session.death_pending && self.transition == 0. && !self.champion;
+                self.observe_return(crate::session_policy::Lifecycle {
+                    death_pending: session.death_pending,
+                    return_active: session.return_active,
+                    return_completed: !session.death_pending && self.transition == 0.,
+                    return_fraction: self.transition,
+                });
+            } else if matches!(session.phase, Phase::Failed | Phase::Disconnected) {
+                self.disconnected();
+                return Ok(true);
+            }
+        }
+        Ok(returned || self.attempt_ended(session.phase))
+    }
+
+    /// Same-step lifecycle projection, also useful to offline callers. No clock
+    /// or delta is recomputed here; SessionPolicy owns the strict hold and fade.
+    pub fn observe_return(&mut self, life: crate::session_policy::Lifecycle) {
+        if !matches!(self.phase, MenuPhase::DeathHold | MenuPhase::Returning) {
+            return;
+        }
+        if life.return_active || life.return_completed {
+            self.transition = life.return_fraction;
+            self.phase = MenuPhase::Returning;
+        }
+        if life.return_completed {
+            self.phase = MenuPhase::Login;
+            self.focus_pending = !self.champion;
+        }
+    }
+
+    /// Consume focus at the host's post-session seam, including return completion.
+    pub fn take_focus_intent(&mut self) -> Option<StartMenuIntent> {
+        std::mem::take(&mut self.focus_pending).then_some(StartMenuIntent::FocusNickname)
+    }
+
+    /// A prepared return may still await picture/transport acknowledgement.
+    /// Retain its focus intent until the existing admission owner is ready.
+    pub fn step_with_admission(
+        &mut self,
+        now_ms: f64,
+        lagging: bool,
+        admission: bool,
+    ) -> Result<Vec<StartMenuIntent>, &'static str> {
+        let mut intents = self.step(now_ms, lagging)?;
+        if !self.play_enabled(admission) && intents.contains(&StartMenuIntent::FocusNickname) {
+            self.focus_pending = true;
+            intents.retain(|intent| *intent != StartMenuIntent::FocusNickname);
+        }
+        Ok(intents)
     }
 
     /// Return only the dispatched connecting attempt. A queued explicit retry
@@ -336,8 +445,7 @@ impl StartMenuState {
 
     /// Advance one animation callback at a finite monotonic clock. Frame delta is
     /// elapsed/8 clamped before lag; logo/outgoing use their separate /25 clock.
-    /// This clock only projects UI. Later integration must fence effects with the
-    /// committed SessionPolicy lifecycle; it must not reset or close a session here.
+    /// Death/return uses observe_session, never this animation clock.
     pub fn step(
         &mut self,
         now_ms: f64,
@@ -363,9 +471,8 @@ impl StartMenuState {
         self.press_alpha = overlay(self.press_alpha, self.pressed);
 
         let mut intents = Vec::new();
-        if self.focus_pending {
-            self.focus_pending = false;
-            intents.push(StartMenuIntent::FocusNickname);
+        if let Some(focus) = self.take_focus_intent() {
+            intents.push(focus);
         }
         if let Some((nickname, quality)) = self.pending_play.take() {
             intents.push(StartMenuIntent::Play { nickname, quality });
@@ -403,18 +510,6 @@ impl StartMenuState {
                 self.tip_index = Some(self.tip_index.map_or(0, |i| (i + 1) % 3));
             }
             self.tip_alpha = round5((0.5 - 0.5 * self.tip_phase.cos()).sqrt());
-        }
-        if self.phase == MenuPhase::DeathHold && now_ms - self.death_ms > 1600. {
-            self.phase = MenuPhase::Returning;
-        }
-        if self.phase == MenuPhase::Returning {
-            self.transition = (self.transition - delta * 0.004).max(0.);
-            if self.transition == 0. {
-                self.phase = MenuPhase::Login;
-                if !self.champion {
-                    intents.push(StartMenuIntent::FocusNickname);
-                }
-            }
         }
         Ok(intents)
     }

@@ -187,6 +187,32 @@ impl LocalGameplay {
     pub fn phase(&self) -> String {
         self.game.phase().label().into()
     }
+    pub fn login_view(&self) -> std::result::Result<JsValue, JsValue> {
+        let session = self.game.login_session();
+        let object = js_sys::Object::new();
+        for (name, value) in [
+            ("phase", session.phase.label().into()),
+            (
+                "outcome",
+                session.outcome.map_or(JsValue::NULL, |p| p.label().into()),
+            ),
+            ("playing", session.playing.into()),
+            ("deathPending", session.death_pending.into()),
+            ("returnActive", session.return_active.into()),
+            ("returnFraction", session.return_fraction.into()),
+        ] {
+            js_sys::Reflect::set(&object, &name.into(), &value)?;
+        }
+        if let Some(capture) = self.game.login_final() {
+            js_sys::Reflect::set(&object, &"score".into(), &capture.sample.score.into())?;
+            js_sys::Reflect::set(
+                &object,
+                &"ownToken".into(),
+                &JsValue::from(capture.sample.token.serial()),
+            )?;
+        }
+        Ok(object.into())
+    }
     pub fn playing(&self) -> bool {
         self.game.phase() == slither_client::session_policy::Phase::Playing
     }

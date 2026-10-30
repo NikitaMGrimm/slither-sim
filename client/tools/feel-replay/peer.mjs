@@ -116,7 +116,7 @@ window.replayReady = (async () => {
     api.DesktopQuality.prototype = wasm.DesktopQuality.prototype;
     runtime = await startGamePage({ initialize: async () => {}, wasmApi: api, localHost, observeInput, hudReadout: true,
       ownedHudUi: true, ownedPlayUi: true, ownedMenuUi: true, ownedAppearancePreview: true, ownedLoadingUi: true,
-      ownedLeaderboardUi: true, ownedMinimapUi: true, ownedAnnouncementUi: true, ownedEndScreenUi: true, diagnosticUi: false });
+      ownedLeaderboardUi: true, ownedMinimapUi: true, ownedAnnouncementUi: true, diagnosticUi: false });
     startSession = () => runtime.play({ endpoint, nickname: 'Replay', skin: 0, customSkin: new Uint8Array(), profile: localHost.profile });
     startSession();
   } else {

@@ -46,8 +46,7 @@ const entryNames = { 'bootstrap.mjs': 'game-bootstrap.mjs', 'runtime.mjs': 'game
   'start-page-layout.mjs': 'start-page-layout.mjs',
   'owned-leaderboard-ui.mjs': 'game-owned-leaderboard-ui.mjs',
   'owned-announcement-ui.mjs': 'game-owned-announcement-ui.mjs',
-  'owned-minimap-ui.mjs': 'game-owned-minimap-ui.mjs',
-  'owned-end-screen-ui.mjs': 'game-owned-end-screen-ui.mjs' };
+  'owned-minimap-ui.mjs': 'game-owned-minimap-ui.mjs' };
 const origin = 'https://authored-package.invalid/game/';
 
 export async function runGameModuleTest(scenario) {
@@ -121,10 +120,6 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
     },
   });
   // Test-owned generated-ABI doubles are installed before module export capture.
-  wasm.api.EndScreenProjector = vm.runInContext(`(class {
-    project() { return { schema: 1, visible: false, title: '', scoreText: '', statusText: '' }; }
-    free() {}
-  })`, f.context);
   prepareWasm?.(wasm.api, source => vm.runInContext(source, f.context));
   const sources = new Map();
   const targeting = 'apps/wgpu-slice/web/input-targeting.mjs';

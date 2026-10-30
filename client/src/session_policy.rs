@@ -152,6 +152,12 @@ pub struct View {
     pub playing: bool,
     /// Any non-close life control has committed.
     pub life_ended: bool,
+    /// First accepted death/victory, retained across transport close for login.
+    pub outcome: Option<Phase>,
+    /// Existing death hold has not completed.
+    pub death_pending: bool,
+    /// Existing return clock is reducing the world fraction.
+    pub return_active: bool,
     /// Outstanding ping crossed the strict lag threshold.
     pub lagging: bool,
     /// A ping is outstanding.
@@ -175,6 +181,7 @@ struct Controls {
     connected: bool,
     playing: bool,
     life_ended: bool,
+    outcome: Option<Phase>,
     lagging: bool,
     ping_pending: bool,
     close_requested: bool,
@@ -223,6 +230,7 @@ impl SessionPolicy {
                 connected: false,
                 playing: false,
                 life_ended: false,
+                outcome: None,
                 lagging: false,
                 ping_pending: false,
                 close_requested: false,
@@ -256,6 +264,9 @@ impl SessionPolicy {
             connected: c.connected,
             playing: c.playing,
             life_ended: c.life_ended,
+            outcome: c.outcome,
+            death_pending: c.death_ms.is_some(),
+            return_active: c.ui_phase == UiPhase::Out,
             lagging: c.lagging,
             ping_pending: c.ping_pending,
             last_ping_ms: self.last_ping_ms,
@@ -457,6 +468,7 @@ impl SessionPolicy {
                                 next.close_requested = true;
                                 next.phase = Phase::Dead
                             }
+                            next.outcome.get_or_insert(next.phase);
                         }
                     }
                 }

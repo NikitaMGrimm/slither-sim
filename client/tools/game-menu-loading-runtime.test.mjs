@@ -77,7 +77,7 @@ test('failed final owner mount keeps startup visible, removes partial constructi
       }}); graph.hudWasm();
       let attached,refusal;
       graph.f.edit.hud.controls.set('appendChild',{afterHook(parent,child){
-        if(parent.id!=='slither-client-root'||parent.children.length!==6)return;
+        if(parent.id!=='slither-client-root'||parent.children.length!==5)return;
         attached=child;
         const status=parent.children[0];
         assert.equal(graph.f.edit.hud.style(status.style).get('display'),'block','handoff must not precede the last selected owner');
@@ -88,7 +88,7 @@ test('failed final owner mount keeps startup visible, removes partial constructi
       const {startGamePage}=await graph.load('runtime.mjs');
       let thrown=false,primary;
       try{await startGamePage({initialize(){},wasmApi:graph.wasm.api,hudReadout:true,ownedHudUi:true,ownedPlayUi:true,
-        ownedLoadingUi:true,ownedEndScreenUi:true,diagnosticUi:false});}catch(error){thrown=true;primary=error;}
+        ownedLoadingUi:true,diagnosticUi:false});}catch(error){thrown=true;primary=error;}
       assert.equal(thrown,true);assert.equal(primary,mode==='throw'?undefined:refusal);assert.ok(attached);assert.ok(removed.includes(attached));
       assert.equal(projection.some(([code,mounted])=>code==='ready-not-connected'&&mounted),false);
       const root=graph.f.document.getElementById('slither-client-root');

@@ -15,8 +15,8 @@ the spinner remains while connecting. Focus changes release held turn/boost
 inputs. Window blur and stale generations cannot admit a new attempt.
 
 The Choose Server control is hidden. Change Skin is a labelled passive icon
-until the chooser arrives. Server picker, chooser, death return and animated
-logo remain known gaps. The initial final-length slot is blank.
+until the chooser arrives. Server picker, chooser and animated logo remain known gaps. The initial
+final-length slot is blank.
 
 Adapters consume the localized wording, separate last-length prefix/bold
 number/regular punctuation, geometry, reveal/transition clocks, requested quality
@@ -58,8 +58,14 @@ score. Duplicate outcomes and close-only phases cannot rewrite it. Missing
 captures stay blank; no disconnect supplies a score. Last-life content survives
 the next Play and disconnect; `EndScreenState` remains independent. Champion
 outcomes expose an explicitly incomplete handoff with ordinary controls disabled.
-PR10 must connect these projection clocks to committed SessionPolicy lifecycle
-and fence transport/reset effects there; this opt-in policy executes none itself.
+The menu follows the committed SessionPolicy hold/return fraction and retained
+accepted outcome, including after a transport close. It owns no death timer.
+The session closes/resets ordinary lives at return completion; each replay uses
+the existing explicit admission and fresh native profile preparation. Final
+length is an unbordered line with a 0.45-alpha prefix, real bold ungrouped
+number and regular punctuation. Native restores nickname focus after the
+completed picture commits. Canvas and WebGPU remain working reference tools;
+owner play and physical IME acceptance are separate.
 
 `MenuQuality` retains high/low in memory and emits best-effort storage writes;
 storage failure cannot undo a toggle. It has an independent key and does not

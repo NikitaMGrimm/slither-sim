@@ -295,6 +295,13 @@ impl LocalGame {
     pub fn phase(&self) -> Phase {
         self.session.view().phase
     }
+    /// Login reads committed command-time history and the existing session clock.
+    pub fn login_session(&self) -> slither_client::start_page::MenuSession {
+        (&self.session.view()).into()
+    }
+    pub fn login_final(&self) -> Option<slither_client::presentation::HudFinal> {
+        self.hud.final_capture
+    }
     pub fn can_play(&self) -> bool {
         matches!(
             self.phase(),

@@ -232,8 +232,12 @@ fn lifecycle_opacity_multiplies_fields_and_header_independently() {
     assert_eq!(p.lines[3].spans[0].alpha, 0.2);
     v.playing = false;
     let p = plan_hud_text(&v, [960, 540], 1.).unwrap();
-    assert_eq!(p.lines[0].spans[0].text, "CONNECTED");
-    assert_eq!(p.lines[1].spans[0].text, "Last length: 9000");
+    assert!(
+        p.lines
+            .iter()
+            .flat_map(|line| &line.spans)
+            .all(|span| { span.text != "CONNECTED" && !span.text.starts_with("Last length:") })
+    );
     v.playing = true;
     v.score = "--".into();
     let p = plan_hud_text(&v, [960, 540], 1.).unwrap();

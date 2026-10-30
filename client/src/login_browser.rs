@@ -69,6 +69,10 @@ impl LoginMenu {
     pub fn pointer(&mut self, hovered: bool, pressed: bool, admission: bool) {
         self.state.play_pointer(hovered, pressed, admission);
     }
+    /// Current label for measurement before this callback's layout.
+    pub fn play_label(&self) -> String {
+        self.state.view(false).play_label.into()
+    }
 
     /// Return after an explicitly observed transport failure.
     pub fn disconnected(&mut self) {
@@ -85,6 +89,72 @@ impl LoginMenu {
         }
     }
 
+    /// Copy only committed session metadata and HudHistory's final capture.
+    #[allow(clippy::too_many_arguments)]
+    pub fn observe_life(
+        &mut self,
+        phase: &str,
+        outcome: &str,
+        playing: bool,
+        death_pending: bool,
+        return_active: bool,
+        return_fraction: f64,
+        score: Option<f64>,
+        token: Option<u64>,
+    ) -> Result<bool, JsValue> {
+        use crate::{
+            presentation::{HudFinal, HudSample, SnakeObjectToken},
+            session_policy::Phase,
+            start_page::MenuSession,
+        };
+        let phase = match phase {
+            "ready" => Phase::Ready,
+            "opening" => Phase::Opening,
+            "challenge" => Phase::Challenge,
+            "setup" => Phase::Setup,
+            "playing" => Phase::Playing,
+            "dead" => Phase::Dead,
+            "victory" => Phase::Victory,
+            "failed" => Phase::Failed,
+            "disconnected" => Phase::Disconnected,
+            _ => return Err(JsValue::from_str("Invalid login session")),
+        };
+        let outcome = match outcome {
+            "" => None,
+            "dead" => Some(Phase::Dead),
+            "victory" => Some(Phase::Victory),
+            _ => return Err(JsValue::from_str("Invalid login outcome")),
+        };
+        if !return_fraction.is_finite() || !(0. ..=1.).contains(&return_fraction) {
+            return Err(JsValue::from_str("Invalid login fraction"));
+        }
+        let capture = match (score, token) {
+            (Some(score), Some(token)) => Some(HudFinal {
+                sample: HudSample {
+                    score,
+                    token: SnakeObjectToken::new(token)
+                        .map_err(|_| JsValue::from_str("Invalid login capture"))?,
+                },
+                exclamation: score > 1000.,
+            }),
+            (None, None) => None,
+            _ => return Err(JsValue::from_str("Invalid login capture")),
+        };
+        self.state
+            .observe_session(
+                MenuSession {
+                    phase,
+                    outcome,
+                    playing,
+                    death_pending,
+                    return_active,
+                    return_fraction,
+                },
+                capture,
+            )
+            .map_err(JsValue::from_str)
+    }
+
     /// Advance one host callback and copy geometry, clocks and deferred effects.
     #[allow(clippy::too_many_arguments)]
     pub fn step(
@@ -96,7 +166,10 @@ impl LoginMenu {
         admission: bool,
         playing: bool,
     ) -> Result<JsValue, JsValue> {
-        let intents = self.state.step(now, false).map_err(JsValue::from_str)?;
+        let intents = self
+            .state
+            .step_with_admission(now, false, admission)
+            .map_err(JsValue::from_str)?;
         // The first accepted gameplay update, never the click or socket open,
         // starts the fade and lets the spinner retire on the shared clock.
         if playing {
@@ -126,6 +199,12 @@ impl LoginMenu {
         for (key, value) in [
             ("visible", view.visible),
             ("disabled", view.disabled),
+            (
+                "busy",
+                view.phase == crate::start_page::MenuPhase::Connecting,
+            ),
+            ("ordinary_controls_visible", view.ordinary_controls_visible),
+            ("champion_pending", view.champion_pending),
             ("spinner_visible", view.spinner_visible),
             ("focus", intents.contains(&StartMenuIntent::FocusNickname)),
         ] {
@@ -134,6 +213,7 @@ impl LoginMenu {
         for (key, value) in [
             ("alpha", view.login_alpha),
             ("world_alpha", view.world_alpha),
+            ("last_label_alpha", view.last_life.label_alpha),
             (
                 "logo_alpha",
                 view.login_alpha * view.logo_alpha * view.logo_reveal,
@@ -156,6 +236,10 @@ impl LoginMenu {
         }
         for (key, value) in [
             ("nickname", view.nickname.as_str()),
+            ("last_label", view.last_life.label),
+            ("last_number", view.last_life.number.as_str()),
+            ("last_suffix", view.last_life.suffix),
+            ("champion_label", view.wording.champion_pending),
             ("placeholder", view.wording.nickname),
             ("play_label", view.play_label),
             ("tip", view.tip),

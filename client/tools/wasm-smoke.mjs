@@ -27,7 +27,6 @@ import { leaderboardScoreSmoke } from './leaderboard-score-smoke.mjs';
 import { minimapRenderSmoke } from './minimap-render-smoke.mjs';
 import { skinPolicySmoke } from './skin-policy-smoke.mjs';
 import { startPageSmoke } from './start-page-smoke.mjs';
-import { endScreenSmoke } from './end-screen-smoke.mjs';
 import { menuPreferencesSmoke } from './menu-preferences-smoke.mjs';
 import { appearancePreviewSmoke } from './appearance-preview-smoke.mjs';
 import { desktopLayoutSmoke } from './desktop-layout-smoke.mjs';
@@ -112,7 +111,6 @@ const hudHistoryResult = execFileSync(process.execPath,
 console.log('Synthetic real-Wasm HUD/leaderboard history requirements passed:',
   hudHistoryResult.split(/\r?\n/).filter(line => /^# (tests|pass|fail|skipped) /.test(line)).join(', '));
 console.log('Synthetic start-page view ABI passed:', startPageSmoke(wasm));
-endScreenSmoke(wasm);
 console.log('Synthetic Rust skin policy ABI passed:', skinPolicySmoke(wasm));
 leaderboardScoreSmoke(wasm);
 console.log('Synthetic native minimap view ABI passed:', minimapRenderSmoke(wasm));
