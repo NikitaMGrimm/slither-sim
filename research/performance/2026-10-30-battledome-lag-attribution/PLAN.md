@@ -123,3 +123,26 @@ template Change/Validation/checks plus one final Agent-assistance footer. No mer
 Rank unimplemented fixes as exact (same bytes and tick schedule) versus design;
 priority, deadline-aware egress and repayment changes are design proposals for
 the owner's local play server before a production PR.
+
+## Prospective scheduler-only follow-up after the overhead gate
+
+The all-IRQ calibration measured LIGHT 3.6563 versus TRACE 3.9256 ms of host
+CPU/tick (+7.36%, +0.2693 ms), failing the frozen 5%/0.15-ms trace gate.
+Original primaries remain LIGHT and are neither replaced nor reselected.
+Before follow-up timing, freeze a separate diagnostic series using only the
+three scheduler switch/wakeup tracepoints, omitting per-packet IRQ tracing.
+This tests a less intrusive observation method, not a runtime fix.
+
+Use the same instances, binaries, seed, clients, gates and 300/60/60-second staged
+warmup in a fresh session. Four 60-s calibration windows: LIGHT, SCHED, SCHED,
+LIGHT, with five-second settles. Apply the identical <=5% and <=0.15-ms
+host-CPU/tick overhead gate. If it passes, three 300-s scheduler-only diagnostic
+windows, each after a ten-second settle; otherwise stop without another fallback.
+Retain and report both series separately. IRQ/softirq/steal remain 10-Hz guest
+counters; exact IRQ subtraction is unavailable in this series and that ambiguity
+must be stated. A scheduler-only trace can identify socket overlap and enqueue to
+dispatch time without claiming an exact split of timer delay versus IRQ/steal.
+No extra low-coverage window is needed if this diagnostic series runs.
+
+The unchanged 130-minute timers and combined $3 cap cover this series. No
+instance, timer extension, new production source or behavior change is required.
