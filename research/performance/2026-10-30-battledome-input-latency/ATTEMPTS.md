@@ -85,3 +85,8 @@
 
 - The final remote documentation check rejected Windows-default encoded prose.
   Rewrote the new report/index as UTF-8 and reran remotely; no measured data changed.
+
+- Cleanup initially expected all four instance records still to be returned.
+  The two retired records had aged out of DescribeInstances; retained retirement
+  receipts and the all-region scan cover them. Current instances terminated
+  after verified retrieval, followed by key/group deletion and the clean scan.

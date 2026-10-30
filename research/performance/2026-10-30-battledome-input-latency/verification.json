@@ -1,0 +1,28 @@
+{
+  "scope": "Research helpers; no production source changes",
+  "nativeProbeTests": {
+    "passed": 3,
+    "wrongWantedMutationDetected": true,
+    "restoredProbePassed": true
+  },
+  "inheritedBoostRegressionPassed": true,
+  "reducerTestsPassed": 6,
+  "documentationTestsPassed": 7,
+  "execution": "AWS only; local metadata editing and archive download checks",
+  "fullRustGroup": "Not rerun; research-only changes, runtime src verified unchanged",
+  "independentReview": "Not performed",
+  "logs": {
+    "documentation-check.log": "3fb0223b8640cd82b40bcecae0a501012adffe0ce8b2a3894fdf28b98e08ca22",
+    "reducer-check.log": "62cfbeb2911bb226088bfb0918eb4b05008ea70b20bce854ee2ca8a564bd37a5"
+  },
+  "analysisArchiveRetrieval": {
+    "complete": true,
+    "allMembersVerified": true,
+    "requiredSourcesVerified": true,
+    "componentArchivesVerified": 5,
+    "archiveBytes": 77078,
+    "archiveSha256": "b1ede541a8b84ebc5658462c2df4dc60229045c9aacca3003e494d3b2c80e9ce",
+    "manifestSha256": "e8e148ee13d6da741ddd0d4785b4fa7e06644cce2141c4412b267f122fc88a2b",
+    "verifiedBeforeTeardown": true
+  }
+}

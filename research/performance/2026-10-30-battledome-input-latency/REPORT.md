@@ -236,5 +236,10 @@ Combined conservative allocation bound **$2.352333**, including both Spot pairs,
 the interrupted generator and $0.65 noncompute allowance, below the $2.50 cap.
 This is a bound, not an invoice. No timer was extended. Each instance had an
 in-guest shutdown timer, terminate-on-shutdown and DeleteOnTermination storage.
-Final cleanup receipt is appended after verified retrieval and the enabled-region
-scan; see `cleanup.json` and `cost.json` for the completed state.
+The [final cleanup](cleanup.json), completed at 04:43 UTC, scanned all 17 enabled
+regions: zero nonterminated instances, all volumes, active/open Spot requests and
+Elastic IPs. Both current instances were confirmed terminated; the two retired
+instances were no longer returned after earlier retirement. The task key pair and
+security group were deleted, and protected resources were untouched. The local
+private key was deleted. [Cost](cost.json) includes all attempts;
+[verification](verification.json) records proof and archive-retrieval checks.
