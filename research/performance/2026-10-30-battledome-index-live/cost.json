@@ -1,0 +1,16 @@
+{
+  "kind": "Conservative launch-to-confirmed-termination compute bound, not invoice",
+  "terminationConfirmedUTC": "2026-10-30T01:41:48.294367+00:00",
+  "lifetimeMinutesRoundedUp": {
+    "generator": 106,
+    "server": 106
+  },
+  "computeAtBidCapsUSD": 0.9893333333333333,
+  "noncomputeAllowanceUSD": 0.65,
+  "failedLaunchComputeUSD": 0,
+  "replacementComputeUSD": 0,
+  "combinedBoundUSD": 1.6393333333333333,
+  "fullTimerBoundUSD": 2.1620000000000004,
+  "capUSD": 3,
+  "unrelatedBuilderExcluded": true
+}

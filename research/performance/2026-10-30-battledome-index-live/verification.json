@@ -1,0 +1,78 @@
+{
+  "primaryWindows": 6,
+  "primaryWindowsPerArmAndSeat": {
+    "320/base": 2,
+    "320/candidate": 2,
+    "480/base": 1,
+    "480/candidate": 1
+  },
+  "calibrationWindows": 14,
+  "notMeasured": [
+    640
+  ],
+  "onlineRangesReproduced": true,
+  "allCanonicalTaskClocksReconcile": true,
+  "maximumClockTaskDifferenceMs": 0.0029248302405644466,
+  "allBoundaryInventoriesPresent": true,
+  "allGeneratorAndQueueGatesPass": true,
+  "minimumLivingTickBoostShareIncludingCalibration": 0.993798176093801,
+  "maximumPrimaryWorkerCpuP99Fraction": 0.2797216201415803,
+  "worstPrimaryInputP99Ms": 34.852908,
+  "primaryCollectorCpuMsPerTickRange": [
+    0.05151523815572305,
+    0.08021012508149017
+  ],
+  "allHostThreadsPinnedToCpuZero": true,
+  "humanSeats": 0,
+  "oneSharedClientBinaryForBothArms": true,
+  "nativeBoostHeadingRuleRegressionsPassed": 2,
+  "frozenPlanCommit": "4f7f44f1",
+  "wholeWindowZeroUsesEnclosingCensusGuard": true,
+  "noLocalNativeWorkOrSshGuest": true,
+  "sourcePins": "selected-results.json only; one source manifest digest per arm",
+  "spawnAndPhysicsSourceExactlyMatchEachRuntime": {
+    "base": {
+      "src/physics.rs": true,
+      "src/spawn/safety.rs": true,
+      "src/spawn/safety/head_tests.rs": true
+    },
+    "candidate": {
+      "src/physics.rs": true,
+      "src/spawn/safety.rs": true,
+      "src/spawn/safety/head_tests.rs": true,
+      "src/spawn/safety/index.rs": true,
+      "src/spawn/safety/index_tests.rs": true
+    }
+  },
+  "syntheticControlsLogSha256": "269e5049fa79e95cfe4304a927e253985d6353c37ebb748da82ba3c1b708c21d",
+  "timingDiagnosticControls": {
+    "unitsAndQuantilesPass": true,
+    "partialTailIgnored": true,
+    "shortBlockRejected": true,
+    "negativeCounterRejected": true
+  },
+  "assemblerMutationControlsPassed": [
+    "archiveSha256 mismatch rejected",
+    "status mismatch rejected",
+    "requiredSourcesVerified mismatch rejected",
+    "selected row archive mismatch rejected",
+    "hold sourceArchiveSha256 mismatch rejected",
+    "hold originalOnlineDeferredTicks mismatch rejected",
+    "hold canonicalDeferredTicks mismatch rejected",
+    "hold boundaryCoverageComplete mismatch rejected",
+    "hold enclosingCensusDeferredTicks mismatch rejected",
+    "hold holds mismatch rejected",
+    "master pin arms.base.runtime mismatch rejected",
+    "master pin arms.base.archiveSha256 mismatch rejected",
+    "master pin arms.base.instrumentedManifestSha256 mismatch rejected",
+    "master pin arms.base.clientSourceSha256 mismatch rejected",
+    "master pin arms.base.binaries.host mismatch rejected",
+    "master pin sharedClientSha256 mismatch rejected"
+  ],
+  "allPrimaryArchivesMatchOwnSelectionAndCompleteReceipt": true,
+  "independentReview": false,
+  "rustChecks": "Both portable release builds and treatment regressions on AWS; full Rust group inapplicable to this research-only change",
+  "documentationCheck": "7 documentation tests passed on AWS; every generated table matches the report exactly",
+  "cleanupReceipt": "cleanup.json; 17 enabled regions scanned, zero task instances/volumes/active Spot requests; security group handed to maintainer while unrelated builder remains attached",
+  "documentationLogSha256": "f630fae07ae8812c2df9ae68ce819f343ca2a6c9adc49843c7204c730c7225e7"
+}

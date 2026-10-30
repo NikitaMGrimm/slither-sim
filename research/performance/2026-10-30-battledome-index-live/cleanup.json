@@ -1,0 +1,48 @@
+{
+  "complete": true,
+  "scope": "Task cleanup complete except maintainer-approved security-group handoff; global inventory is not empty",
+  "verifiedUTC": "2026-10-30T01:43:58.933194+00:00",
+  "explicitProfile": "slither-bench",
+  "bothTaskInstancesTerminated": true,
+  "taskNonterminatedInstances": 0,
+  "taskRemainingVolumes": 0,
+  "taskOpenOrActiveSpotRequests": 0,
+  "taskKeyPairDeleted": true,
+  "taskSecurityGroupDeleted": false,
+  "securityGroupDisposition": "Left in place at maintainer direction because the catalog-rows worker builder remains attached. Maintainer deletes it after that instance terminates. Future latency round uses a fresh group.",
+  "protectedAndUnrelatedResourcesUntouched": true,
+  "scan": {
+    "regionsAttempted": 17,
+    "regionsFullyScanned": 17,
+    "regionsUnavailable": 0,
+    "disabledRegionsNotScanned": 17,
+    "nonterminatedInstances": 1,
+    "openOrActiveSpotRequests": 1,
+    "availableVolumes": 0,
+    "allVolumes": 1,
+    "elasticIPs": 0,
+    "taskKeyPairs": 0,
+    "taskSecurityGroups": 1,
+    "projectKeyPairs": 0,
+    "projectSecurityGroups": 1
+  },
+  "unrelatedActiveResources": {
+    "instances": 1,
+    "instanceType": "c7a.2xlarge",
+    "openOrActiveSpotRequests": 1,
+    "volumes": 1,
+    "availableVolumes": 0
+  },
+  "finalArchiveRetrieval": {
+    "complete": true,
+    "allManifestMembersVerified": true,
+    "archiveBytes": 10838265,
+    "archiveSha256": "765946fcea161fd8880f0de856200710ad8e2994d9e95bb074cb1346687b08f1",
+    "manifestSha256": "a9bd22a7ce80e702ee787fb4df5f737b6c65f26b7af81ccc35aca0c6f162d8fc",
+    "readyUTC": "2026-10-30T01:37:23.004978+00:00",
+    "requiredSourcesVerified": true,
+    "verifiedBeforeTeardown": true,
+    "rowArchivesVerified": 6,
+    "buildSourceArchiveVerified": true
+  }
+}
