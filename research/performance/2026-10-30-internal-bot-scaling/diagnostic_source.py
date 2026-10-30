@@ -3,11 +3,14 @@
 AUDIT = r'''
 // Reconstruction uses post-step circle fields: food/prey gains change fam,
 // not head, heading, speed, segments or alive. Ambient births follow pickup.
-fn pickup_guard_after_step(world: &slither_sim::Simulator) -> Value {
+fn pickup_guard_after_step(world: &slither_sim::Simulator, before: (usize, f64)) -> Value {
     let picked = world.pickup_events().unwrap().iter()
         .filter(|event| matches!(event.item, slither_sim::PickupItem::Food(_))).count();
     let ambient = world.food_spawn_events().unwrap().iter().filter(|event| event.source.is_none()).count();
     let food = (world.food().len() + picked).checked_sub(ambient).unwrap();
+    let nonambient = world.food_spawn_events().unwrap().iter().filter(|event| event.source.is_some()).count();
+    assert_eq!(before.1.to_bits(),world.radius().to_bits(),"Audit requires the frozen rows' unchanged radius");
+    assert_eq!(food,before.0+nonambient,"Independent food conservation at pickup entry");
     let mut lo = [i64::MAX; 2];let mut hi = [i64::MIN; 2];
     let mut area = 0usize;let mut regular = true;let mut circles = 0usize;
     if food>0 {
@@ -31,7 +34,8 @@ fn pickup_guard_after_step(world: &slither_sim::Simulator) -> Value {
         "foodGuardLimit":food_limit,"fixedCellLimit":1048576,"regularGeometry":regular,
         "declineFixedCells":a,"declineFoodLength":b,"declineCoverArea":c,
         "dense":dense,"indexed":indexed,"path":if dense {"dense"} else if indexed {"hashed indexed"} else {"linear"},
-        "foodPickups":picked,"ambientBirths":ambient,"finalFoodLen":world.food().len()})
+        "foodPickups":picked,"ambientBirths":ambient,"finalFoodLen":world.food().len(),
+        "foodBeforeWorld":before.0,"nonAmbientBirths":nonambient,"foodConservationVerified":true})
 }
 '''
 
@@ -53,10 +57,13 @@ def instrument(text):
             anchor=f'        let {clock} = Instant::now();\n        let c = cpu(3);\n        {following}'
             assert text.count(anchor)==1,(variable,phase,'start')
             text=text.replace(anchor,f'        {variable}.{phase}_start_monotonic = cpu(1);\n'+anchor)
+            if phase=='world':
+                anchor=f'        {variable}.world_start_monotonic = cpu(1);'
+                text=text.replace(anchor,'        let pickup_audit_before = (self.world.food().len(), self.world.radius());\n'+anchor)
             anchor=f'        {variable}.{phase}_wall = {clock}.elapsed().as_secs_f64();'
             assert text.count(anchor)==1,(variable,phase,'end')
             text=text.replace(anchor,anchor+f'\n        {variable}.{phase}_end_monotonic = cpu(1);')
             if phase=='world':
                 anchor=f'        {variable}.world_end_monotonic = cpu(1);'
-                text=text.replace(anchor,anchor+f'\n        {variable}.pickup_guard = Some(pickup_guard_after_step(&self.world));')
+                text=text.replace(anchor,anchor+f'\n        {variable}.pickup_guard = Some(pickup_guard_after_step(&self.world, pickup_audit_before));')
     return text+AUDIT

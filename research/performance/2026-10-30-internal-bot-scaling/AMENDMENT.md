@@ -57,3 +57,8 @@ The normal worlds are within the finite geometry/u32-count guards; retain those
 checks too. This adds no timing run and changes no `src/` file. Event-recording
 overhead inside step and audit work outside it are included in the separately
 reported diagnostic/primary instrumentation ratios.
+
+Also save food length and radius before step. These frozen rows keep radius
+unchanged; assert that. Independently require reconstructed pickup-entry food
+to equal pre-step food plus non-ambient birth events. This checks the start/
+end conservation equations in every audited tick without another run.
