@@ -2866,17 +2866,9 @@ fn compact_food(food: &mut Vec<Food>, removed: impl Iterator<Item = usize>) {
         let kept = end - read;
         let gap = read - write;
         if gap != 0 && kept != 0 {
-            if gap <= kept {
-                // Move a survivor range at once, leaving removed items after it.
-                // The untouched suffix still has its original pellet indices.
-                food[write..end].rotate_left(gap);
-            } else {
-                // Rotating a large gap for each tiny survivor range can become
-                // quadratic. Move only survivors here, bounding work by O(len).
-                for offset in 0..kept {
-                    food.swap(write + offset, read + offset);
-                }
-            }
+            // Food is Copy and removed values are discarded. Copy only the
+            // survivors; overlap is safe and the unread suffix stays intact.
+            food.copy_within(read..end, write);
         }
         write += kept;
         read = end + 1;
@@ -3164,7 +3156,7 @@ mod food_pickup_order_tests {
                 assert_eq!(bits(&actual), bits(&expected), "len {len}, mask {mask}");
             }
         }
-        // Cover long rotations and large gaps with tiny survivor ranges.
+        // Cover long survivor ranges and large gaps with tiny survivor ranges.
         for removed in [
             vec![],
             vec![0],
