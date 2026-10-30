@@ -17,6 +17,10 @@ pub const BODY_HANDLE_BASE: u64 = 0x1000_0000_0000_0000;
 pub const TEXT_HANDLE_BASE: u64 = 0x4000_0000_0000_0000;
 pub const MINIMAP_HANDLE_BASE: u64 = 0x5000_0000_0000_0000;
 pub const COSMETIC_HANDLE_BASE: u64 = 0x6000_0000_0000_0000;
+pub const MENU_MATERIAL_HANDLE_BASE: u64 = 0x7000_0000_0000_0000;
+// Menus have their own text cache and are composed over the world picture,
+// so their text cannot count up from the world's TEXT_HANDLE_BASE.
+pub const MENU_TEXT_HANDLE_BASE: u64 = 0x8000_0000_0000_0000;
 #[derive(Clone)]
 pub struct Family {
     pub variants: Vec<BodyAssetUse>,
@@ -307,6 +311,8 @@ mod tests {
             TEXT_HANDLE_BASE,
             MINIMAP_HANDLE_BASE,
             COSMETIC_HANDLE_BASE,
+            MENU_MATERIAL_HANDLE_BASE,
+            MENU_TEXT_HANDLE_BASE,
         ];
         for (i, base) in bases.iter().enumerate() {
             assert_eq!(base % HANDLE_NAMESPACE_SIZE, 0);
