@@ -1,0 +1,19 @@
+{
+  "execution": "First on-demand generator, before tick zero",
+  "portableLockedReleaseBuildPassed": true,
+  "runtimeTestsPassed": 3,
+  "liveInFlightHelperCpuIncluded": true,
+  "synchronousDispatchMutationDetected": true,
+  "backgroundCpuOmissionMutationDetected": true,
+  "decisionOnlyHeadroomGateMutationDetected": true,
+  "strict70And80PercentBoundariesPassed": true,
+  "linkedLadderControlsPassed": true,
+  "inheritedGateControlsPassed": true,
+  "nearestRankControlsPassed": true,
+  "metricTokenControlsPassed": true,
+  "cargoTargetRemoved": true,
+  "documentationTestsPassed": 7,
+  "repositoryBoundaryPassed": true,
+  "hostBinaryIdenticalToV2": true,
+  "independentReview": "Not performed"
+}
