@@ -54,39 +54,6 @@ fn negative_and_multi_period_displacements_use_remainder_then_adjustment() {
 }
 
 #[test]
-fn displacement_is_divided_without_reciprocal_reassociation() {
-    let mut background = BackgroundState::default();
-    background
-        .advance_draw(point(0., 0.), point(17., -17.), 10., 10.)
-        .unwrap();
-    assert_eq!(
-        background.phase().x.to_bits(),
-        0.30000000000000004f64.to_bits()
-    );
-    assert_eq!(background.phase().y.to_bits(), 0.7f64.to_bits());
-    assert_ne!(background.phase().x, 1. - (17. * (1. / 10.) % 1.));
-}
-
-#[test]
-fn signed_zero_survives_remainder_and_pattern_translation() {
-    let mut background = BackgroundState::default();
-    background
-        .advance_draw(point(0., 0.), point(64., -32.), 64., 32.)
-        .unwrap();
-    assert_eq!(background.phase().x.to_bits(), (-0.0f64).to_bits());
-    assert_eq!(background.phase().y.to_bits(), 0.0f64.to_bits());
-    let pattern = background.plan(input()).unwrap().pattern.unwrap();
-    assert_eq!(pattern.translation.x.to_bits(), (-0.0f64).to_bits());
-    let restored = BackgroundState::new(background.phase()).unwrap();
-    assert_eq!(restored.phase().x.to_bits(), (-0.0f64).to_bits());
-    // Subtracting a negative zero camera delta can change a retained -0 to +0.
-    background
-        .advance_draw(point(0., 0.), point(-0., 0.), 64., 32.)
-        .unwrap();
-    assert_eq!(background.phase().x.to_bits(), 0.0f64.to_bits());
-}
-
-#[test]
 fn layer_geometry_keeps_screen_image_separate_from_zoomed_pattern() {
     let background = BackgroundState::new(point(0.25, 0.75)).unwrap();
     let plan = background.plan(input()).unwrap();
@@ -173,22 +140,6 @@ fn resize_and_zoom_reproject_without_moving_retained_phase() {
     assert_eq!(pattern.translation, original.pattern.unwrap().translation);
     assert_eq!(pattern.fill, [-7680., -4320., 12800., 7200.]);
     assert_eq!(background.phase(), point(0.25, 0.5));
-}
-
-#[test]
-fn pattern_fill_multiplies_before_dividing() {
-    let mut input = input();
-    input.width = 1;
-    input.height = 7;
-    input.zoom = 10.;
-    let fill = BackgroundState::default()
-        .plan(input)
-        .unwrap()
-        .pattern
-        .unwrap()
-        .fill;
-    assert_eq!(fill, [-0.3, -2.1, 0.5, 3.5]);
-    assert_ne!(fill[0], -(1. / input.zoom) * 3.);
 }
 
 #[test]

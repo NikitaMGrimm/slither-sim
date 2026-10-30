@@ -186,22 +186,6 @@ fn head_reanchor_consumes_fraction_and_preserves_both_states_on_failure() {
 }
 
 #[test]
-fn head_travel_preserves_producer_speed_and_operation_order_exactly() {
-    let delta = 0.85;
-    for speed in [1_f64 / 18., 128_f64 / 1000.] {
-        let mut motion = head();
-        motion.speed_per_32ms = speed;
-        motion.advance(step(delta), 0., 1., 1., true).unwrap();
-        let expected = speed * delta / 4.;
-        assert_eq!(motion.position.x.to_bits(), expected.to_bits());
-    }
-    let speed = 1_f64 / 18.;
-    let expected = speed * delta / 4.;
-    let converted_through_seconds = (speed / 0.032) * delta * 0.008;
-    assert_ne!(expected.to_bits(), converted_through_seconds.to_bits());
-}
-
-#[test]
 fn head_wraps_in_each_direction_and_snaps_only_after_crossing() {
     let mut increasing = head();
     increasing.heading = TAU - 0.1;

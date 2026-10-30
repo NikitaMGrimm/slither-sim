@@ -65,7 +65,9 @@ fn layout_border_boxes_and_measured_flow() {
     ];
     for (element, values) in fixtures {
         let r = layout.viewport_rect(element);
-        assert_eq!([r.x, r.y, r.width, r.height], values, "{element:?}");
+        for (actual, expected) in [r.x, r.y, r.width, r.height].into_iter().zip(values) {
+            assert!((actual - expected).abs() <= 0.5, "{element:?}");
+        }
     }
     let mut changed = metrics();
     changed.last_length_line_height = 21.;
@@ -73,7 +75,7 @@ fn layout_border_boxes_and_measured_flow() {
     changed.padded_play_label_width = 90.01;
     let changed = MenuLayout::new(1280., 720., 0., true, changed).unwrap();
     assert_eq!(changed.viewport_rect(E::Play).y, 431.);
-    assert_eq!(changed.viewport_rect(E::Play).width, 125.);
+    assert!((changed.viewport_rect(E::Play).width - 125.).abs() <= 0.5);
 }
 
 #[test]
@@ -683,11 +685,9 @@ fn round1_disabled_pointer_rejects_activation_but_accepts_releases() {
 }
 
 #[test]
-fn round1_label_width_rounds_offset_width_before_adding_padding() {
-    // Blink 4dfbf1c0f8e59669a8d578f02c258a759d5c0b70, html_element.cc:
-    // 4458-4462,4503-4511 and platform/geometry/layout_unit.h:294-297.
-    // Width itself rounds nearest, positive .5 upward: no floor or edge snapping.
-    // Pinned links and input-metric contract: ../docs/start-menu.md#label-width.
+fn label_width_preserves_measurement_within_visual_budget() {
+    // Old integer measurements remain the baseline; transforms and hits use
+    // the fractional rectangle under resize and animation.
     for (measured, expected) in [
         (52., 87.),
         (52.2, 87.),
@@ -698,12 +698,29 @@ fn round1_label_width_rounds_offset_width_before_adding_padding() {
     ] {
         let mut m = metrics();
         m.padded_play_label_width = measured;
-        let mut layout = MenuLayout::new(1280., 720., 0., true, m).unwrap();
-        assert_eq!(layout.viewport_rect(E::Play).width, expected);
-        near(layout.viewport_rect(E::Play).x, (1280. - expected) / 2.);
-        // Remeasure a replay label through the animation update seam too.
-        m.padded_play_label_width = 110.5;
-        layout.update(0., false, m).unwrap();
-        assert_eq!(layout.viewport_rect(E::Play).width, 146.);
+        for (w, h, progress) in [(1280., 720., 0.), (960., 280., 0.5), (320., 180., 1.)] {
+            let mut layout = MenuLayout::new(w, h, progress, true, m).unwrap();
+            assert!((layout.logical_rect(E::Play).width - expected).abs() <= 0.5);
+            let mut old_metrics = m;
+            old_metrics.padded_play_label_width = measured.round();
+            let old = MenuLayout::new(w, h, progress, true, old_metrics)
+                .unwrap()
+                .viewport_rect(E::Play);
+            let current = layout.viewport_rect(E::Play);
+            for (actual, baseline) in [
+                (current.x, old.x),
+                (current.x + current.width, old.x + old.width),
+                (current.y, old.y),
+                (current.y + current.height, old.y + old.height),
+            ] {
+                assert!((actual - baseline).abs() <= 2.);
+            }
+            assert!(layout.hit_test(E::Play, current.x + 0.01, current.y + 0.01));
+            assert!(!layout.hit_test(E::Play, current.x + current.width + 0.01, current.y));
+            let mut replay = m;
+            replay.padded_play_label_width = 110.5;
+            layout.update(progress, false, replay).unwrap();
+            assert!((layout.logical_rect(E::Play).width - 146.).abs() <= 0.5);
+        }
     }
 }

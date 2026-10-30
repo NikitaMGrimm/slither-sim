@@ -3,7 +3,6 @@
 use std::f64::consts::{PI, TAU};
 
 use super::{PresentationError, finite};
-use crate::math::{cos, sin};
 use crate::state::{Appearance, MAX_BODY_POINTS, Point, Setup};
 
 /// Samples in each body's x, y, edge-length, and spacing correction channel.
@@ -225,7 +224,8 @@ impl BodyGeometry {
             return Err(PresentationError);
         }
         let weights = std::array::from_fn(|index| {
-            (0.5 * (1. - cos(PI * (BODY_SAMPLES - 1 - index) as f64 / (BODY_SAMPLES - 1) as f64)))
+            (0.5 * (1.
+                - (PI * (BODY_SAMPLES - 1 - index) as f64 / (BODY_SAMPLES - 1) as f64).cos()))
                 as f32
         });
         let spacing = std::array::from_fn(|index| {
@@ -285,8 +285,8 @@ impl BodyGeometry {
             None => {
                 let angle = f64::from(next_direction.ok_or(PresentationError)?) * (TAU / 65_536.);
                 Point {
-                    x: last.position.x + cos(angle) * self.segment_length,
-                    y: last.position.y + sin(angle) * self.segment_length,
+                    x: last.position.x + angle.cos() * self.segment_length,
+                    y: last.position.y + angle.sin() * self.segment_length,
                 }
             }
         };

@@ -3,7 +3,7 @@
 use std::f64::consts::PI;
 
 use super::{BodyPoint, MAX_RETAINED_BODY_POINTS, PresentationError, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Independent retention limit for the active curve, including its terminal sample.
 pub const MAX_CURVE_SAMPLES: usize = 65_536;
@@ -109,7 +109,7 @@ fn midpoint(a: Point, b: Point) -> Result<Point, PresentationError> {
     point(a.x + (b.x - a.x) * 0.5, a.y + (b.y - a.y) * 0.5)
 }
 
-/// Chained interpolation preserves the scalar rounding of a quadratic traversal.
+/// Evaluate the quadratic with de Casteljau interpolation.
 fn quadratic(a: Point, control: Point, b: Point, t: f64) -> Result<Point, PresentationError> {
     let left = point(a.x + (control.x - a.x) * t, a.y + (control.y - a.y) * t)?;
     let right = point(
@@ -238,7 +238,7 @@ impl Scratch {
                         previous.y + (next.sampled.y - previous.y) * along / edge,
                     )?;
                     let original = self.vertices[index].sampled;
-                    let restoration = math::pow(index as f64 / count as f64, 2.);
+                    let restoration = (index as f64 / count as f64).powf(2.);
                     p.x += (original.x - p.x) * restoration;
                     p.y += (original.y - p.y) * restoration;
                     finite(&[p.x, p.y])?;
@@ -455,9 +455,9 @@ pub(super) fn single_anchor_eye_target(
         second.position.x - first.position.x,
         second.position.y - first.position.y,
     )?;
-    let angle = math::atan2(delta.y, delta.x) as f32;
-    finite(&[f64::from(angle)])?;
-    Ok(f64::from(angle) + PI)
+    let angle = delta.y.atan2(delta.x);
+    finite(&[angle])?;
+    Ok(angle + PI)
 }
 
 fn sample_curve_inner(
@@ -599,6 +599,7 @@ fn sample_curve_inner(
     let mut samples = Vec::with_capacity(scratch.vertices.len());
     let mut previous = head;
     let mut distance_cursor_seed = None;
+    let mut target_eye_heading = raw_heading;
     for (index, vertex) in scratch.vertices.iter().enumerate() {
         let p = vertex.position;
         let angle = if index == 0 {
@@ -606,8 +607,11 @@ fn sample_curve_inner(
         } else {
             let delta = point(p.x - previous.x, p.y - previous.y)?;
             distance_cursor_seed = Some(delta);
-            math::atan2(delta.y, delta.x)
+            delta.y.atan2(delta.x)
         };
+        if index == 1 {
+            target_eye_heading = Some(angle + PI);
+        }
         let sample = CurveSample {
             x: p.x as f32,
             y: p.y as f32,
@@ -619,12 +623,10 @@ fn sample_curve_inner(
         samples.push(sample);
         previous = p;
     }
-    let target_eye_heading = if samples.len() >= 2 {
+    if samples.len() >= 2 {
         samples[0].angle = samples[1].angle;
-        f64::from(samples[1].angle) + PI
-    } else {
-        raw_heading.ok_or(PresentationError)?
-    };
+    }
+    let target_eye_heading = target_eye_heading.ok_or(PresentationError)?;
     Ok(CurveOutput {
         samples,
         point_spacing: spacing,

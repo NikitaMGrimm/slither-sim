@@ -287,7 +287,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       f.scene.advance(44, false).free(); render();
       eq(f.requests.map(r => [r.id, r.own, r.drawOrdinal, r.cosmetic, [...r.customBytes]]),
         [[0, true, 0, 17, [1]], [0, false, 1, 29, [2]], [0, false, 2, 31, [3]]]);
-      eq(images(f).length, 4); ok(images(f).slice(0, 2).every(v => Object.is(v.args[0], 0)));
+      eq(images(f).length, 4);
       for (const expected of [2, 1]) {
         f.scene.apply_frame(Uint8Array.of(115, 0, 0, 0), false); f.requests.length = 0; f.target.context.trace = [];
         render(); eq(f.requests.length, expected);
@@ -299,7 +299,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
     } finally { f.close(); }
   }
 
-  // Deliberate derived zero signs and finite underflow travel through both ABIs.
+  // Finite underflow remains valid through both ABIs.
   for (const path of ['standard', 'basic']) {
     const f = fixture({ faceStyle: style({ ...geometry(), imageScale: Number.MIN_VALUE,
       width: Number.MIN_VALUE, height: Number.MIN_VALUE, pivotX: 0, pivotY: -0 }) });
@@ -307,8 +307,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       if (path === 'basic') basic(f); else f.render();
       eq(images(f).length, 6);
       for (const draw of images(f)) {
-        ok(Object.is(draw.args[0], -0)); ok(Object.is(draw.args[1], 0));
-        ok(Object.is(draw.args[2], 0)); ok(Object.is(draw.args[3], 0));
+        screen(draw.args, [0, 0, 0, 0], 'underflow geometry');
       }
     } finally { f.close(); }
   }
@@ -370,7 +369,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
         }
         if (key === 'pivotX' || key === 'pivotY') {
           const index = key === 'pivotX' ? 0 : 1;
-          ok(images(f).every(v => Object.is(v.args[index], 0)), 'negated negative-zero pivot stays positive zero');
+          screen(images(f).map(v => v.args[index]), images(f).map(() => 0), 'zero pivot');
         }
       }
     } finally { f.close(); }

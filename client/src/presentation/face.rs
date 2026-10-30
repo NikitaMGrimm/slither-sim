@@ -3,7 +3,7 @@
 use std::f64::consts::{FRAC_PI_2, PI};
 
 use super::{BodyRect, EyeLayoutInput, PresentationError, StandardEyeGeometry, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Complete numeric style for the supported ordinary paired face. No asset or
 /// host identifier is retained here; both side images share one draw-time use.
@@ -142,8 +142,8 @@ impl PairedSideGeometry {
         }
         let multiplier = (view.scale * view.zoom) * self.image_scale;
         let lateral = self.lateral * view.scale + self.lateral_bias;
-        let forward_x = (math::cos(heading) * self.forward) * view.scale;
-        let forward_y = (math::sin(heading) * self.forward) * view.scale;
+        let forward_x = (heading.cos() * self.forward) * view.scale;
+        let forward_y = (heading.sin() * self.forward) * view.scale;
         let destination = BodyRect {
             x: -self.pivot_x * multiplier,
             y: -self.pivot_y * multiplier,
@@ -161,8 +161,8 @@ impl PairedSideGeometry {
             destination.height,
         ])?;
         let side = |angle: f64, rotation: f64| -> Result<PairedSideLayout, PresentationError> {
-            let local_x = forward_x + math::cos(angle) * lateral;
-            let local_y = forward_y + math::sin(angle) * lateral;
+            let local_x = forward_x + angle.cos() * lateral;
+            let local_y = forward_y + angle.sin() * lateral;
             let translation = Point {
                 x: view.viewport_half.x
                     + ((local_x + view.corrected_head.x) - view.camera.x) * view.zoom,

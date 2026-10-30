@@ -1,7 +1,6 @@
 //! Double-precision boundary samples with connection-gated whole-step consumption.
 
 use super::{PI, PresentationError, finite};
-use crate::math;
 
 /// Number of absolute-radius samples in the boundary ring.
 pub const BOUNDARY_SAMPLES: usize = 56;
@@ -34,7 +33,7 @@ impl BoundaryRadius {
         validate_radius(radius)?;
         Ok(Self {
             weights: std::array::from_fn(|index| {
-                0.5 * (1. - math::cos(PI * index as f64 / (BOUNDARY_SAMPLES - 1) as f64))
+                0.5 * (1. - (PI * index as f64 / (BOUNDARY_SAMPLES - 1) as f64).cos())
             }),
             samples: [radius; BOUNDARY_SAMPLES],
             displayed: radius,

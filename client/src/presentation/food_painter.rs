@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{math, state::Point};
+use crate::state::Point;
 
 use super::{
     BodyAlpha, BodyAsset, BodyBlend, BodyPaintQuality, BodyPaintView, BodyRect, FoodInstance,
@@ -396,7 +396,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
         )?;
         if detailed {
             let alpha = (if q.blend == 1. { 1. } else { q.blend })
-                * (0.5 + 0.5 * math::cos(food.animation_phase / 13.))
+                * (0.5 + 0.5 * (food.animation_phase / 13.).cos())
                 * food.fade;
             recorder.image(
                 food,
@@ -437,7 +437,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
                     y: dy * t * v.zoom + v.half_height,
                 };
                 if food.scale != 1. {
-                    alpha *= math::pow(food.scale, 0.25);
+                    alpha *= food.scale.powf(0.25);
                 }
                 if q.blend != 1. {
                     alpha *= q.blend;
@@ -449,7 +449,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
                     pass,
                     source,
                     center,
-                    alpha * (0.5 + 0.5 * math::cos(food.animation_phase / 13.)) * food.fade,
+                    alpha * (0.5 + 0.5 * (food.animation_phase / 13.).cos()) * food.fade,
                 )?;
             }
         }

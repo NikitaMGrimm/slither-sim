@@ -2,7 +2,7 @@
 
 use std::{error::Error, f64::consts::PI, fmt};
 
-use crate::{math, state::Point};
+use crate::state::Point;
 
 use super::AntennaBarrierEffect;
 
@@ -795,7 +795,7 @@ pub fn plan_standard_body_with_antenna(
     let divisor = if style.detailed_segments { 12. } else { 4. };
     let outer_alpha = BodyAlpha::assign(input.entry_alpha, input.entry_alpha);
     if boosted {
-        let expansion = math::pow(boost, 0.5);
+        let expansion = boost.powf(0.5);
         let size = 1.5 * zoom * line * (1. + (62. / 32. - 1.) * expansion);
         for i in (0..n)
             .rev()
@@ -806,7 +806,7 @@ pub fn plan_standard_body_with_antenna(
                 d * opacity
                     * expansion
                     * 0.38
-                    * (0.6 + 0.4 * math::cos(i as f64 / divisor - 1.15 * v.boost_phase)),
+                    * (0.6 + 0.4 * (i as f64 / divisor - 1.15 * v.boost_phase).cos()),
                 outer_alpha.effective,
             );
             p.draw(i, OuterBoost, p.glow(i), square(p.swell(i, size)), alpha)?;
@@ -913,7 +913,7 @@ pub fn plan_standard_body_with_antenna(
                 d * opacity
                     * glow_opacity
                     * input.quality.blend
-                    * (0.5 + 0.5 * math::cos(i as f64 / divisor - v.boost_phase)),
+                    * (0.5 + 0.5 * (i as f64 / divisor - v.boost_phase).cos()),
                 root_alpha.effective,
             );
             p.draw(
@@ -941,7 +941,7 @@ pub fn plan_standard_body_with_antenna(
         }
     };
     if v.dead {
-        let envelope = (0.15 + 0.15 * math::sin(5. * PI * v.death).abs()) * math::sin(PI * v.death);
+        let envelope = (0.15 + 0.15 * (5. * PI * v.death).sin().abs()) * (PI * v.death).sin();
         let size = zoom * line;
         for i in (0..n)
             .rev()
@@ -949,7 +949,7 @@ pub fn plan_standard_body_with_antenna(
         {
             let d = p.visit(i)?;
             let alpha = BodyAlpha::assign(
-                d * envelope * (0.6 + 0.4 * math::cos(i as f64 / 4. - 15. * v.death)),
+                d * envelope * (0.6 + 0.4 * (i as f64 / 4. - 15. * v.death).cos()),
                 death_scope_alpha,
             );
             p.draw(

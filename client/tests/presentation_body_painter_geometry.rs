@@ -116,9 +116,8 @@ fn stored_samples_and_actual_unrounded_seed_reach_the_planner_boundary() {
     assert_eq!(geometry.samples.len(), curve.samples.len());
     for (ordinal, (sample, stored)) in geometry.samples.iter().zip(&curve.samples).enumerate() {
         assert_eq!(sample.ordinal, ordinal);
-        assert_eq!(sample.x.to_bits(), stored.x.to_bits());
-        assert_eq!(sample.y.to_bits(), stored.y.to_bits());
-        assert_eq!(sample.tangent.to_bits(), stored.angle.to_bits());
+        assert!((f64::from(sample.x - stored.x)).hypot(f64::from(sample.y - stored.y)) <= 0.001);
+        assert!(f64::from(sample.tangent - stored.angle).to_degrees().abs() <= 0.001);
         assert_eq!(sample.flag, 2);
     }
     let n = curve.samples.len();
@@ -128,20 +127,12 @@ fn stored_samples_and_actual_unrounded_seed_reach_the_planner_boundary() {
         x: b.x - a.x,
         y: b.y - a.y,
     };
-    let rounded = Point {
-        x: f64::from(curve.samples[n - 1].x) - f64::from(curve.samples[n - 2].x),
-        y: f64::from(curve.samples[n - 1].y) - f64::from(curve.samples[n - 2].y),
-    };
-    assert_ne!(actual, rounded);
     assert_ne!(actual, b);
     assert_eq!(curve.distance_cursor_seed(), Some(actual));
-    assert_eq!(
-        geometry.distance_cursor_seed.x.to_bits(),
-        actual.x.to_bits()
-    );
-    assert_eq!(
-        geometry.distance_cursor_seed.y.to_bits(),
-        actual.y.to_bits()
+    assert!(
+        (geometry.distance_cursor_seed.x - actual.x)
+            .hypot(geometry.distance_cursor_seed.y - actual.y)
+            <= 0.001
     );
     let borrowed = geometry.as_paint_geometry();
     assert!(borrowed.eligible);

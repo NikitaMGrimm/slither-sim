@@ -3,7 +3,7 @@
 use std::f64::consts::{FRAC_PI_2, TAU};
 
 use super::{FrameStep, PresentationError, Turn, finite, signed_angle};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 const EASING: [f32; 250] = {
     let mut table = [0.; 250];
@@ -154,8 +154,8 @@ impl StandardEyeState {
             }
         }
         let target = Point {
-            x: math::cos(next.gaze_heading) * pupil_travel,
-            y: math::sin(next.gaze_heading) * pupil_travel,
+            x: next.gaze_heading.cos() * pupil_travel,
+            y: next.gaze_heading.sin() * pupil_travel,
         };
         next.pupil.x = approach(next.pupil.x, target.x, step.delta / 6.);
         next.pupil.y = approach(next.pupil.y, target.y, step.delta / 6.);
@@ -341,16 +341,16 @@ impl StandardEyeGeometry {
         let pair = |side: f64| -> Result<EyePair, PresentationError> {
             Ok(EyePair {
                 eye: screen(Point {
-                    x: math::cos(face_heading) * forward + math::cos(side) * (separation + 0.5),
-                    y: math::sin(face_heading) * forward + math::sin(side) * (separation + 0.5),
+                    x: face_heading.cos() * forward + side.cos() * (separation + 0.5),
+                    y: face_heading.sin() * forward + side.sin() * (separation + 0.5),
                 })?,
                 pupil: screen(Point {
-                    x: math::cos(face_heading) * (forward + 0.5)
+                    x: face_heading.cos() * (forward + 0.5)
                         + pupil.x * view.scale
-                        + math::cos(side) * separation,
-                    y: math::sin(face_heading) * (forward + 0.5)
+                        + side.cos() * separation,
+                    y: face_heading.sin() * (forward + 0.5)
                         + pupil.y * view.scale
-                        + math::sin(side) * separation,
+                        + side.sin() * separation,
                 })?,
             })
         };

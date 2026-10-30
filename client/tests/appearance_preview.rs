@@ -221,8 +221,6 @@ fn preview_accessory_reuses_exact_explicit_and_cached_forward_static_layout() {
                 )
                 .unwrap();
             assert_eq!(actual, expected);
-            assert_eq!(actual.destination.x.to_bits(), (-0_f64).to_bits());
-            assert_eq!(actual.destination.y.to_bits(), 0_f64.to_bits());
             assert_eq!(actual.destination.width, 18.);
             assert_eq!(actual.alpha, 1.);
             assert_eq!(

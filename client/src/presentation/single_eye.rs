@@ -3,7 +3,7 @@
 use super::{
     BodyRect, EyeLayoutInput, MouthFaceGeometry, PairedFaceGeometry, PresentationError, finite,
 };
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Authoritative numeric face family. Image sources belong to the draw caller.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -139,11 +139,11 @@ impl SingleEyeGeometry {
             return Err(PresentationError);
         }
         let forward = 3. * view.scale;
-        let base_x = math::cos(face_heading) * forward;
-        let base_y = math::sin(face_heading) * forward;
+        let base_x = face_heading.cos() * forward;
+        let base_y = face_heading.sin() * forward;
         let pupil_forward = forward + 0.15;
-        let pupil_x = math::cos(face_heading) * pupil_forward + pupil.x * view.scale;
-        let pupil_y = math::sin(face_heading) * pupil_forward + pupil.y * view.scale;
+        let pupil_x = face_heading.cos() * pupil_forward + pupil.x * view.scale;
+        let pupil_y = face_heading.sin() * pupil_forward + pupil.y * view.scale;
         finite(&[forward, base_x, base_y, pupil_forward, pupil_x, pupil_y])?;
         let destination = |x: f64, y: f64, size: f64| -> Result<BodyRect, PresentationError> {
             let size = view.scale * size;
