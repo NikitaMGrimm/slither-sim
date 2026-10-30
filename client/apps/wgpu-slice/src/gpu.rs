@@ -4,7 +4,7 @@ use crate::{
     frame::{Frame, ResourceKey},
     scene::Resource,
 };
-use slither_client::presentation::{BodyAsset, BodyAssetStatus, BodyBlend};
+use slither_client::presentation::{BodyAsset, BodyAssetStatus};
 use std::{
     collections::BTreeMap,
     sync::{
@@ -13,6 +13,10 @@ use std::{
     },
 };
 use wgpu::util::DeviceExt;
+
+#[path = "draw_runs.rs"]
+mod draw_runs;
+use draw_runs::{DrawState, Pipeline, draw_runs};
 
 struct Texture {
     asset: BodyAsset,
@@ -402,27 +406,32 @@ impl Renderer {
                 ..Default::default()
             });
             pass.set_vertex_buffer(0, buffer.slice(..));
-            for (i, q) in quads.iter().enumerate() {
-                let texture = &self.textures[&q.key];
-                pass.set_pipeline(
-                    if q.black_effect && texture.black && q.blend == BodyBlend::SourceOver {
-                        &self.black_over
-                    } else if q.blend == BodyBlend::Lighter {
-                        &self.lighter
-                    } else {
-                        &self.over
-                    },
-                );
-                pass.set_bind_group(
-                    0,
-                    if q.repeat {
-                        &texture.repeat_bind
-                    } else {
-                        &texture.bind
-                    },
-                    &[],
-                );
-                pass.draw(i as u32 * 6..i as u32 * 6 + 6, 0..1);
+            let states = quads
+                .iter()
+                .map(|q| DrawState::new(q, self.textures[&q.key].black));
+            let mut previous: Option<DrawState> = None;
+            for (state, vertices) in draw_runs(states) {
+                if previous.is_none_or(|p| p.pipeline != state.pipeline) {
+                    pass.set_pipeline(match state.pipeline {
+                        Pipeline::BlackOver => &self.black_over,
+                        Pipeline::Lighter => &self.lighter,
+                        Pipeline::Over => &self.over,
+                    });
+                }
+                if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
+                    let texture = &self.textures[&state.key];
+                    pass.set_bind_group(
+                        0,
+                        if state.repeat {
+                            &texture.repeat_bind
+                        } else {
+                            &texture.bind
+                        },
+                        &[],
+                    );
+                }
+                pass.draw(vertices, 0..1);
+                previous = Some(state);
             }
         }
         self.queue.submit([encoder.finish()]);
