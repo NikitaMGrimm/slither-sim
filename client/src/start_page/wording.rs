@@ -37,6 +37,10 @@ pub struct MenuWording {
     pub quality_high: &'static str,
     /// Authored low-quality value for accessibility, independent of Debug output.
     pub quality_low: &'static str,
+    /// Authored accessible busy status while connecting.
+    pub connecting: &'static str,
+    /// Authored accessible status while the champion handoff is incomplete.
+    pub champion_pending: &'static str,
 }
 
 impl MenuLocale {
@@ -61,6 +65,8 @@ impl MenuLocale {
                 graphics_quality: "Graphics quality",
                 quality_high: "High",
                 quality_low: "Low",
+                connecting: "Connecting",
+                champion_pending: "Champion message handoff pending",
                 play: "Play",
                 play_again: "Play Again",
                 nickname: "Nickname",
@@ -77,6 +83,8 @@ impl MenuLocale {
                 graphics_quality: "Grafikqualität",
                 quality_high: "Hoch",
                 quality_low: "Niedrig",
+                connecting: "Verbindung wird hergestellt",
+                champion_pending: "Übermittlung der Champion-Nachricht ausstehend",
                 play: "Spielen",
                 play_again: "Play Again",
                 nickname: "Nickname",
@@ -93,6 +101,8 @@ impl MenuLocale {
                 graphics_quality: "Qualité graphique",
                 quality_high: "Élevée",
                 quality_low: "Faible",
+                connecting: "Connexion en cours",
+                champion_pending: "Transmission du message du champion en attente",
                 play: "Jouer",
                 play_again: "Jouer",
                 nickname: "Surnom",
@@ -109,6 +119,8 @@ impl MenuLocale {
                 graphics_quality: "Qualidade gráfica",
                 quality_high: "Alta",
                 quality_low: "Baixa",
+                connecting: "Conectando",
+                champion_pending: "Envio da mensagem do campeão pendente",
                 play: "Joga",
                 play_again: "Joga",
                 nickname: "Apelido",

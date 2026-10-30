@@ -288,6 +288,8 @@ pub enum EditIntent {
     Modal(bool),
     /// Keyboard-produced text (ignored while IME owns composition).
     KeyText(String),
+    /// Keyboard auto-repeat text, always independent of an IME duplicate pair.
+    RepeatText(String),
     /// Raw preedit text and optional UTF-8 byte selection.
     Preedit(String, Option<(usize, usize)>),
     /// IME enabled/disabled; Disabled cancels uncommitted text.
@@ -414,6 +416,7 @@ pub struct MenuInputState {
     ime_enabled: bool,
     enter_held: bool,
     commit_guard: Option<String>,
+    commit_enter_guard: bool,
     key_text_guard: Option<(TextField, String, TextEditState)>,
     token: u64,
     pending: Option<(u64, bool)>,
@@ -430,6 +433,7 @@ impl Default for MenuInputState {
             ime_enabled: false,
             enter_held: false,
             commit_guard: None,
+            commit_enter_guard: false,
             key_text_guard: None,
             token: 0,
             pending: None,
@@ -463,10 +467,14 @@ impl MenuInputState {
         self.nickname.cancel();
         self.champion.cancel();
         self.ime_enabled = false;
-        self.commit_guard = None;
-        self.key_text_guard = None;
+        self.clear_edit_guards();
         self.enter_held = false;
         self.pending = None;
+    }
+    fn clear_edit_guards(&mut self) {
+        self.commit_guard = None;
+        self.key_text_guard = None;
+        self.commit_enter_guard = false;
     }
     fn releases(effects: &mut Vec<HostEditEffect>) {
         for key in [
@@ -493,6 +501,7 @@ impl MenuInputState {
     /// Reduce one copied intent and return host work.
     pub fn apply(&mut self, intent: EditIntent) -> Vec<HostEditEffect> {
         let mut effects = Vec::new();
+        let repeated = matches!(intent, EditIntent::RepeatText(_));
         if !matches!(
             intent,
             EditIntent::KeyText(_)
@@ -501,8 +510,9 @@ impl MenuInputState {
                 | EditIntent::ImeCommit(_)
                 | EditIntent::Enter { .. }
                 | EditIntent::Gameplay { .. }
+                | EditIntent::CursorArea { .. }
         ) {
-            self.key_text_guard = None;
+            self.clear_edit_guards();
         }
         match intent {
             EditIntent::Focus(focus) => {
@@ -547,7 +557,6 @@ impl MenuInputState {
                 return effects;
             }
             EditIntent::EndEventBatch => {
-                self.commit_guard = None;
                 // Empty preedit can mean cancellation on hosts where Enabled is
                 // long-lived. Defer it through the adjacent Commit, then clear.
                 for editor in [&mut self.nickname, &mut self.champion] {
@@ -566,12 +575,21 @@ impl MenuInputState {
             EditIntent::ImeEnabled(enabled) => {
                 self.pending = None;
                 self.ime_enabled = enabled;
-                if !enabled {
+                if enabled {
+                    self.commit_guard = None;
+                    self.commit_enter_guard = false;
+                } else {
+                    self.key_text_guard = None;
                     self.editor_mut(field).cancel();
                 }
             }
             EditIntent::Preedit(text, selection) => {
                 self.pending = None;
+                // A non-empty preedit begins a new edit, even if queued in the
+                // same winit batch as an earlier ordinary key or IME commit.
+                if !text.is_empty() {
+                    self.clear_edit_guards();
+                }
                 let selection = selection.map(|(a, c)| (boundary(&text, a), boundary(&text, c)));
                 let editor = self.editor_mut(field);
                 // Empty preedit is also the mandatory pre-Commit event, not cancellation.
@@ -579,36 +597,53 @@ impl MenuInputState {
                 editor.preedit = Some(Preedit { text, selection });
             }
             EditIntent::ImeCommit(text) => {
+                self.commit_guard = None;
+                self.commit_enter_guard = false;
                 if self.ime_enabled || self.editor(field).composing() {
                     self.pending = None;
                     // Direct commits (for example an OS character picker) need
-                    // not have preedit. Roll back identical key text from this
-                    // batch so either event order produces one undoable edit.
-                    if let Some((_, _, before)) =
+                    // not have preedit. Only the preceding non-repeat edit is
+                    // eligible; a preedit start or independent edit retires it.
+                    let paired_key =
                         self.key_text_guard
                             .take()
                             .filter(|(previous_field, previous_text, _)| {
                                 *previous_field == field && *previous_text == text
-                            })
-                    {
+                            });
+                    let paired = paired_key.is_some();
+                    if let Some((_, _, before)) = paired_key {
                         *self.editor_mut(field) = before;
                     }
                     self.editor_mut(field).replace(&text);
-                    self.commit_guard = Some(text);
+                    // One commit can pair with one key, never both a preceding
+                    // and a following key. The next real key must remain an edit.
+                    self.commit_guard = if paired { None } else { Some(text) };
+                    self.commit_enter_guard = true;
+                } else {
+                    self.key_text_guard = None;
                 }
             }
-            EditIntent::KeyText(text) => {
-                if !self.editor(field).composing() && self.commit_guard.as_deref() != Some(&text) {
+            EditIntent::KeyText(text) | EditIntent::RepeatText(text) => {
+                // Inspect the next text event once, including a nonmatching key.
+                let trailing = self.commit_guard.take();
+                let duplicate = !repeated && trailing.as_deref() == Some(&text);
+                if !self.editor(field).composing() && !duplicate {
+                    self.commit_enter_guard = false;
                     self.pending = None;
-                    self.key_text_guard = Some((field, text.clone(), self.editor(field).clone()));
+                    self.key_text_guard = if repeated {
+                        None
+                    } else {
+                        Some((field, text.clone(), self.editor(field).clone()))
+                    };
                     self.editor_mut(field).replace(&text);
                 }
             }
             EditIntent::Enter { pressed, repeat } => {
+                self.key_text_guard = None;
                 if !pressed {
                     self.enter_held = false;
                 } else {
-                    let owned = self.editor(field).composing() || self.commit_guard.is_some();
+                    let owned = self.editor(field).composing() || self.commit_enter_guard;
                     if !owned && !repeat && !self.enter_held {
                         effects.push(HostEditEffect::Activate(field));
                     }
@@ -867,9 +902,9 @@ pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<
             "status",
             AccessibleRole::Status,
             if view.champion_pending {
-                "Champion message handoff pending"
+                view.wording.champion_pending
             } else {
-                "Connecting"
+                view.wording.connecting
             }
             .into(),
             String::new(),

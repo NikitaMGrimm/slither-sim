@@ -73,9 +73,9 @@ Selection intents clamp invalid byte positions backwards to a scalar boundary.
 
 Typing, paste and IME commit all replace the selection, normalize the complete
 result and apply the field limit. Nicknames reuse #300's inclusive 32..127 UTF-16
-unit rule and 24-unit cap: DEL survives and an emoji becomes two spaces, even at
-the last available unit. Champion editing uses the same ASCII substitution with
-a 140-unit cap: each surrogate becomes a space, including unit 140 when the
+unit rule and 24-unit cap: DEL survives and an emoji becomes two spaces, or one
+space at unit 24 when the limit splits the pair. Champion editing uses the same
+ASCII substitution with a 140-unit cap: each surrogate becomes a space, including unit 140 when the
 limit splits a pair. This follows the private
 `source/20b-skins-and-cosmetics.js:528-537` input handler; Save repeats substitution
 and truncation at `source/06-login-and-hud.js:321-323`. The plan's earlier Unicode
@@ -92,13 +92,19 @@ focus changes, modal open and blur discard uncommitted text. The OS owns Enter's
 composition commit: the core waits for `Ime::Commit`, never inserts the preview
 or activates Play/Save on that key. IME availability alone does not suppress
 ordinary key text (important for hosts with long-lived Enabled notifications).
-Text during composition is ignored; an identical trailing `KeyEvent.text` and
-Enter are suppressed for the commit's dispatch batch. Direct commits without
-preedit also deduplicate earlier identical key text in that batch, restoring
-the prior selection/history before applying the one committed edit. The native event loop
-ends that batch in `about_to_wait`. A consumed Enter stays held until key-up,
-so repeats cannot activate after the batch ends. Real OS ordering still needs
-physical-host validation; synthetic traces are not that acceptance.
+Text during composition is ignored. Duplicate pairing is limited to adjacent
+editing events: a direct commit without preedit can restore the preceding
+non-repeat key's selection/history, or consume the first following matching
+non-repeat key, never both. Empty preedit and IME disable notifications may
+intervene; a non-empty preedit starts a new edit and retires earlier candidates.
+A nonmatching key or any independent edit also retires the trailing candidate.
+Native text repeats are explicit independent edits, including when no duplicate
+key text follows the commit. A separate Enter barrier survives consuming a
+text duplicate, until the dispatch batch ends or independent editing starts.
+The native event loop ends the batch in `about_to_wait`. A consumed Enter stays
+held until key-up, so repeats cannot activate after the batch ends. Real OS
+ordering still needs physical-host validation; synthetic traces are not that
+acceptance.
 
 Clipboard effects carry tokens. Focus, selection, editing and composition
 changes invalidate pending work; failed cuts retain their selection and text,
@@ -129,6 +135,8 @@ Skin, server and graphics-quality names and high/low values come from the shared
 names/values are authored: the source image links at `site/index.html:288-301`
 and `347-350` provide neither alt nor title text. They are not claimed as official
 translations. Each locale has a projection test covering both quality states.
+Connecting and incomplete champion-handoff status names are also authored in
+the same table and covered in each locale's projection test.
 
 The native adapter maps winit 0.30 logical editing keys, physical gameplay keys,
 modifiers (including Windows AltGr), IME and focus events. The host executes

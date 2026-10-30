@@ -238,6 +238,122 @@ fn direct_ime_commit_without_preedit_deduplicates_key_text_in_either_order() {
 }
 
 #[test]
+fn round2_new_composition_keeps_the_previous_ordinary_edit() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        let mut input = editor(field, "");
+        input.apply(EditIntent::KeyText("a".into()));
+        input.apply(EditIntent::ImeEnabled(true));
+        input.apply(EditIntent::Preedit("a".into(), Some((1, 1))));
+        input.apply(EditIntent::Preedit("".into(), None));
+        input.apply(EditIntent::ImeCommit("a".into()));
+        assert_eq!(text(&input, field), "aa");
+        input.apply(EditIntent::Undo);
+        assert_eq!(text(&input, field), "a");
+    }
+}
+
+#[test]
+fn round2_trailing_duplicate_is_consumed_and_independent_edits_retire_it() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        for keys in [vec!["a", "b", "a"], vec!["b", "a"], vec!["a", "a", "a"]] {
+            let mut input = editor(field, "");
+            input.apply(EditIntent::ImeEnabled(true));
+            input.apply(EditIntent::ImeCommit("a".into()));
+            for key in &keys {
+                input.apply(EditIntent::KeyText((*key).into()));
+            }
+            assert_eq!(
+                text(&input, field),
+                if keys.contains(&"b") { "aba" } else { "aaa" }
+            );
+        }
+        let mut input = editor(field, "");
+        input.apply(EditIntent::ImeEnabled(true));
+        input.apply(EditIntent::ImeCommit("a".into()));
+        input.apply(EditIntent::Move {
+            movement: Movement::Home,
+            extend: false,
+        });
+        input.apply(EditIntent::KeyText("a".into()));
+        assert_eq!(text(&input, field), "aa");
+    }
+}
+
+#[test]
+fn round2_direct_commit_pair_does_not_consume_a_third_matching_key() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        let mut input = editor(field, "");
+        input.apply(EditIntent::ImeEnabled(true));
+        input.apply(EditIntent::KeyText("a".into()));
+        input.apply(EditIntent::ImeCommit("a".into()));
+        input.apply(EditIntent::KeyText("a".into()));
+        assert_eq!(text(&input, field), "aa");
+    }
+}
+
+#[test]
+fn round2_interleaved_compositions_and_unpaired_commits_preserve_history() {
+    let field = TextField::Champion;
+    let mut input = editor(field, "");
+    input.apply(EditIntent::ImeEnabled(true));
+    input.apply(EditIntent::ImeCommit("a".into()));
+    input.apply(EditIntent::KeyText("a".into()));
+    input.apply(EditIntent::Preedit("a".into(), None));
+    input.apply(EditIntent::Preedit("".into(), None));
+    input.apply(EditIntent::ImeCommit("a".into()));
+    input.apply(EditIntent::KeyText("a".into()));
+    input.apply(EditIntent::KeyText("b".into()));
+    input.apply(EditIntent::KeyText("a".into()));
+    assert_eq!(text(&input, field), "aaba");
+    for expected in ["aab", "aa", "a", ""] {
+        input.apply(EditIntent::Undo);
+        assert_eq!(text(&input, field), expected);
+    }
+    // No matching KeyText for either commit; a new composition is a new edit.
+    input.apply(EditIntent::ImeCommit("a".into()));
+    input.apply(EditIntent::Preedit("a".into(), None));
+    input.apply(EditIntent::Preedit("".into(), None));
+    input.apply(EditIntent::ImeCommit("a".into()));
+    input.apply(EditIntent::EndEventBatch);
+    input.apply(EditIntent::KeyText("a".into()));
+    assert_eq!(text(&input, field), "aaa");
+}
+
+#[test]
+fn round2_consuming_text_duplicate_keeps_composition_enter_suppressed() {
+    let mut input = editor(TextField::Nickname, "");
+    input.apply(EditIntent::ImeEnabled(true));
+    input.apply(EditIntent::ImeCommit("a".into()));
+    input.apply(EditIntent::KeyText("a".into()));
+    assert!(input.apply(enter(true, false)).is_empty());
+    input.apply(EditIntent::EndEventBatch);
+    assert!(input.apply(enter(true, true)).is_empty());
+    input.apply(enter(false, false));
+    assert_eq!(
+        input.apply(enter(true, false)),
+        vec![HostEditEffect::Activate(TextField::Nickname)]
+    );
+}
+
+#[test]
+fn round2_nickname_last_unit_documentation_matches_surrogate_limit() {
+    for (prefix_units, spaces) in [(22, 2), (23, 1)] {
+        let value = editor(TextField::Nickname, &("n".repeat(prefix_units) + "😀"));
+        assert_eq!(
+            text(&value, TextField::Nickname),
+            "n".repeat(prefix_units) + &" ".repeat(spaces)
+        );
+    }
+    let docs = include_str!("../docs/start-menu.md")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(docs.contains(
+        "an emoji becomes two spaces, or one space at unit 24 when the limit splits the pair."
+    ));
+}
+
+#[test]
 fn incremental_typing_stops_at_utf16_limit_and_selected_text_remains_replaceable() {
     for (field, limit) in [(TextField::Nickname, 24), (TextField::Champion, 140)] {
         let mut input = editor(field, "");
@@ -597,7 +713,7 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
         AccessibleNode {
             id: "status",
             role: AccessibleRole::Status,
-            name: "Connecting".into(),
+            name: "Connexion en cours".into(),
             value: "".into(),
             focused: false,
             enabled: true,
@@ -610,7 +726,12 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
     assert!(login_accessibility(&menu.view(true), &input).is_empty());
 }
 
-fn assert_accessible_locale(locale: MenuLocale, names: [&str; 3], values: [&str; 2]) {
+fn assert_accessible_locale(
+    locale: MenuLocale,
+    names: [&str; 3],
+    values: [&str; 2],
+    statuses: [&str; 2],
+) {
     // Authored expected wording, tested independently of the wording table.
     for (quality, expected_value) in [
         (MenuQuality::High, values[0]),
@@ -628,6 +749,22 @@ fn assert_accessible_locale(locale: MenuLocale, names: [&str; 3], values: [&str;
             );
         }
     }
+    let mut menu = StartMenuState::new(locale, false, MenuQuality::High);
+    menu.action(MenuAction::Play, true);
+    let status = |menu: &StartMenuState| {
+        login_accessibility(&menu.view(true), &MenuInputState::default())
+            .into_iter()
+            .find(|node| node.id == "status")
+            .unwrap()
+    };
+    assert_eq!(status(&menu).name, statuses[0]);
+    menu.step(0., false).unwrap();
+    assert!(menu.begin_outgoing());
+    assert!(
+        menu.accepted_game_over(slither_client::session_policy::Phase::Victory, None, 10.)
+            .unwrap()
+    );
+    assert_eq!(status(&menu).name, statuses[1]);
 }
 
 #[test]
@@ -636,6 +773,7 @@ fn english_accessible_button_names_and_quality_values() {
         MenuLocale::English,
         ["Change Skin", "Choose Server", "Graphics quality"],
         ["High", "Low"],
+        ["Connecting", "Champion message handoff pending"],
     );
 }
 
@@ -645,6 +783,10 @@ fn german_accessible_button_names_and_quality_values() {
         MenuLocale::German,
         ["Skin ändern", "Server wählen", "Grafikqualität"],
         ["Hoch", "Niedrig"],
+        [
+            "Verbindung wird hergestellt",
+            "Übermittlung der Champion-Nachricht ausstehend",
+        ],
     );
 }
 
@@ -658,6 +800,10 @@ fn french_accessible_button_names_and_quality_values() {
             "Qualité graphique",
         ],
         ["Élevée", "Faible"],
+        [
+            "Connexion en cours",
+            "Transmission du message du champion en attente",
+        ],
     );
 }
 
@@ -667,5 +813,6 @@ fn portuguese_accessible_button_names_and_quality_values() {
         MenuLocale::Portuguese,
         ["Mudar aparência", "Escolher servidor", "Qualidade gráfica"],
         ["Alta", "Baixa"],
+        ["Conectando", "Envio da mensagem do campeão pendente"],
     );
 }

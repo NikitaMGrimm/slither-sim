@@ -127,7 +127,11 @@ impl NativeMenuInput {
             {
                 // Named control text such as Tab/Enter is not a single-line edit.
                 if !text.chars().any(char::is_control) {
-                    intents.push(EditIntent::KeyText(text.into()));
+                    intents.push(if event.repeat {
+                        EditIntent::RepeatText(text.into())
+                    } else {
+                        EditIntent::KeyText(text.into())
+                    });
                 }
             }
         }

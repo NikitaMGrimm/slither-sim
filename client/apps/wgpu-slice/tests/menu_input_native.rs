@@ -361,3 +361,32 @@ fn native_text_clipboard_and_enter_feed_existing_deferred_menu_request() {
     );
     assert!(menu.step(16., false).unwrap().is_empty());
 }
+
+#[test]
+fn round2_native_repeats_are_independent_of_ime_duplicate_text() {
+    for duplicate in [false, true] {
+        let mut native = focused();
+        native.window_event(&WindowEvent::Ime(Ime::Enabled));
+        native.window_event(&WindowEvent::Ime(Ime::Commit("a".into())));
+        if duplicate {
+            character(&mut native, "a", KeyCode::KeyA, Some("a"));
+        }
+        for _ in 0..2 {
+            key(
+                &mut native,
+                Key::Character("a".into()),
+                KeyCode::KeyA,
+                Some("a"),
+                true,
+                true,
+            );
+        }
+        assert_eq!(native.state.editor(TextField::Nickname).text(), "aaa");
+        assert_eq!(
+            named(&mut native, NamedKey::Enter, KeyCode::Enter, true, false).effects,
+            vec![HostEditEffect::Activate(TextField::Nickname)]
+        );
+        native.window_event(&WindowEvent::Ime(Ime::Commit("a".into())));
+        assert_eq!(native.state.editor(TextField::Nickname).text(), "aaaa");
+    }
+}
