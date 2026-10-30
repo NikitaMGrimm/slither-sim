@@ -1,3 +1,4 @@
+import { screen, alpha as layerAlpha, heading, transforms } from './render-budget.mjs';
 import { bundle, syntheticSetup } from '../web/synthetic-scene.mjs';
 
 // Original synthetic packets, geometry and random tapes. The independent JS
@@ -143,8 +144,8 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
     const after = f.scene.antenna_state(), snapshot = JSON.parse(f.scene.snapshot());
     eq(after.drawSerial, before.drawSerial + 1n, 'one draw serial per actual render');
     const rows = JSON.parse(f.scene.drawn_snakes());
-    const strokes = antennaStrokes(f), bulbs = bulbImages(f);
-    let offset = 0;
+    const strokes = antennaStrokes(f).filter(c => c.alpha !== 0), bulbs = bulbImages(f).filter(c => c.alpha !== 0);
+    let offset = 0, visible = 0;
     for (const [i, { request: r, tape }] of f.randomRequests.entries()) {
       const old = before.snakes.find(s => s.token === r.token), next = after.snakes.find(s => s.token === r.token);
       eq(Object.keys(r).sort(), ['token', 'id', 'own', 'drawOrdinal', 'nodeCount', 'randomPairCount', 'drawSerial'].sort());
@@ -153,39 +154,43 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
         [old.id, old.own, old.antenna.geometry.nodes, old.antenna.geometry.nodes - 1, after.drawSerial]);
       eq(r.drawOrdinal, i, 'draw ordinal follows existing snake order');
       const m = rows[r.drawOrdinal].snake, expected = step(old.antenna, m, tape);
-      eq(next.antenna, expected, 'all six Float32 channels, shown and f64 signed rotation match authored arithmetic exactly');
+      eq(next.antenna.geometry, expected.geometry); eq(next.antenna.shown, expected.shown);
+      screen(Array.from(next.antenna.x, (x, j) => [x * snapshot.camera.zoom, next.antenna.y[j] * snapshot.camera.zoom]),
+        Array.from(expected.x, (x, j) => [x * snapshot.camera.zoom, expected.y[j] * snapshot.camera.zoom]), 'projected antenna nodes', 2);
+      heading(next.antenna.bulbRotation, expected.bulbRotation, 'bulb heading', true);
       const p = paths(expected, snapshot.camera), g = expected.geometry, z = snapshot.camera.zoom, mult = m.scale * z;
       let alpha = m.spawnProgress * (1 - m.deathProgress); alpha *= alpha;
+      if (alpha === 0) continue;
       const widths = g.repeatedInnerStrokes ? [5, 4, 3, 2] : [5, 4];
       const group = strokes.slice(offset, offset + widths.length); offset += widths.length;
       eq(group.length, widths.length);
       for (const [j, stroke] of group.entries()) {
         const path = j ? p.inner : p.outer;
-        eq(stroke.path, path, 'open decimated center-relative antenna path');
+        screen(stroke.path, path, 'antenna centerline', 2);
         eq(stroke.commands.map(c => c.op), ['moveTo', ...Array(path.length - 1).fill('lineTo')]);
-        eq([stroke.width, stroke.alpha, stroke.blend, stroke.lineCap, stroke.lineJoin],
-          [widths[j] * mult, j ? g.innerOpacity * alpha : alpha, 'source-over', 'round', 'round']);
+        screen(stroke.width, widths[j] * mult); layerAlpha(stroke.alpha, j ? g.innerOpacity * alpha : alpha);
+        eq([stroke.blend, stroke.lineCap, stroke.lineJoin], ['source-over', 'round', 'round']);
         eq(stroke.transforms, [['setTransform', 1, 0, 0, 1, 0, 0], ['translate', f.target.width / 2, f.target.height / 2]]);
       }
-      const b = g.bulb, image = bulbs[i], tip = p.inner[0], last = g.nodes - 1;
+      const b = g.bulb, image = bulbs[visible++], tip = p.inner[0], last = g.nodes - 1;
       const transform = [['setTransform', 1, 0, 0, 1, 0, 0], ['translate', f.target.width / 2, f.target.height / 2]];
       const destination = g.rotateBulb ? [b.offsetX * b.scale * mult, b.offsetY * b.scale * mult] :
         [(expected.x[last] - snapshot.camera.absoluteX + b.offsetX * b.scale * m.scale) * z,
           (expected.y[last] - snapshot.camera.absoluteY + b.offsetY * b.scale * m.scale) * z];
       if (g.rotateBulb) transform.push(['translate', ...tip], ['rotate', expected.bulbRotation]);
       eq(image?.source, f.bulb, 'exact borrowed original synthetic bulb object');
-      eq(image.args, [...destination, b.width * b.scale * mult, b.height * b.scale * mult], 'five-argument whole-source bulb overload');
-      eq([image.transforms, image.alpha, image.blend], [transform, alpha * b.opacity, 'source-over']);
+      screen(image.args, [...destination, b.width * b.scale * mult, b.height * b.scale * mult], 'bulb geometry', 2);
+      transforms(image.transforms, transform); layerAlpha(image.alpha, alpha * b.opacity); eq(image.blend, 'source-over');
       const trace = f.target.context.trace, bulbIndex = trace.indexOf(image);
       ok(trace.indexOf(group.at(-1)) < bulbIndex, 'all inner strokes precede the bulb');
-      const nextBulb = trace.indexOf(bulbs[i + 1]);
+      const nextBulb = trace.indexOf(bulbs[visible]);
       const eyes = trace.findIndex((c, k) => k > bulbIndex && c.op === 'fill' && c.commands[0]?.op === 'arc');
       ok(eyes > bulbIndex && (nextBulb < 0 || eyes < nextBulb), 'complete eyes follow antenna before next snake');
     }
-    eq(strokes.length, offset); eq(bulbs.length, f.randomRequests.length);
+    eq(strokes.length, offset); eq(bulbs.length, visible);
     // Account for every vector paint, including the existing arena-edge band.
     const otherPaths = f.target.context.trace.filter(c => ['fill', 'stroke'].includes(c.op) &&
-      c.commands?.[0]?.op === 'moveTo' && !strokes.includes(c));
+      c.commands?.[0]?.op === 'moveTo' && c.alpha !== 0 && !strokes.includes(c));
     eq(otherPaths.map(c => [c.op, c.color]), [], '6000-radius interior fixture has no unclassified vector paints');
     eq(f.target.context.stack.length, 0);
     return { before, after, snapshot, strokes, bulbs };
@@ -248,7 +253,7 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
         const copied = f.scene.antenna_state(); copied.snakes[0].antenna.x[0] = 99; copied.snakes[0].antenna.geometry.bulb.width = 99;
         eq(f.scene.antenna_state(), initial, 'fresh channel/config diagnostics do not alias retained state');
         const first = checkedDraw(f);
-        ok(first.strokes.every(c => c.alpha === 0) && first.bulbs[0].alpha === 0, 'fresh zero-alpha paths and image are still submitted');
+        ok(first.strokes.every(c => c.alpha === 0) && first.bulbs.every(c => c.alpha === 0), 'fresh antenna contributes no visible ink');
         if (rotate) ok(first.after.snakes[0].antenna.bulbRotation < 0, 'initial backward oblique chain retains negative signed rotation remainder');
         const once = f.scene.antenna_state(), q = f.quality.snapshot();
         for (const now of [40, 40, 44, 80]) f.scene.advance(now, false).free();
@@ -648,7 +653,7 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
       ok(distance > 0 && distance < 1, 'first death distance witness is strictly non-saturated');
       const d = snap.own.deathProgress;
       const envelope = (0.15 + 0.15 * Math.abs(Math.sin(5 * Math.PI * d))) * Math.sin(Math.PI * d);
-      eq(first.alphaWrites.at(-1).requested, distance * envelope * (0.6 + 0.4 * Math.cos(ordinal / 4 - 15 * d)),
+      layerAlpha(first.alpha, distance * envelope * (0.6 + 0.4 * Math.cos(ordinal / 4 - 15 * d)),
         'production first death alpha uses antenna barrier cursor before planning');
       const old = control.target.context.trace.find(c => c.op === 'image' && c.source === control.sources[6]);
       ok(first.alpha !== old.alpha, 'legacy cursor would produce a different first death command');

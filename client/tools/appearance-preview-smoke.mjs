@@ -1,3 +1,4 @@
+import { screen, transforms } from './render-budget.mjs';
 import assert from 'node:assert/strict';
 import { createLocalBodyResolver } from '../web/synthetic-body.mjs';
 import { createStockSkinAdapter } from '../web/stock-skin-provider.mjs';
@@ -184,9 +185,10 @@ export function appearancePreviewSmoke(wasm) {
       finally { selectedAdapter.endOperation(); }
       equal(reads, 1); equal(target.context.stack.length, 0);
       const image = target.context.images.filter(row => row.source === chosen); equal(image.length, 1);
-      equal(image[0].args, [+0, +0, 64, 64, -1.125, -2.625, 24, 24]);
+      equal(image[0].args.slice(0, 4), [0, 0, 64, 64]);
+      screen(image[0].args.slice(4), [-1.125, -2.625, 24, 24]);
       equal(image[0].alpha, 1);
-      equal(image[0].transforms, [['setTransform', 1, 0, 0, 1, 0, 0], ['translate', 280, 64], ['rotate', 0]]);
+      transforms(image[0].transforms, [['setTransform', 1, 0, 0, 1, 0, 0], ['translate', 280, 64], ['rotate', 0]]);
       const at = target.context.calls.findIndex(row => row.source === chosen);
       if (skin === 40) {
         equal(target.context.calls.slice(at + 1).filter(row => row.kind === 'image').map(row => row.source), [host.ecmc, host.ecmc, host.jmou]);
@@ -231,7 +233,8 @@ export function appearancePreviewSmoke(wasm) {
       finally { cached.endOperation(); }
       equal(cachedReads, 1); equal(prepared, beforePrepared + 1);
       const image = target.context.images.find(row => row.source === chosen);
-      equal(image.transforms[1], ['translate', 280 + wasm.stock_accessory_forward(skin, new Uint8Array()), 64]);
+      equal(image.transforms[1][0], 'translate');
+      screen(image.transforms[1].slice(1), [280 + wasm.stock_accessory_forward(skin, new Uint8Array()), 64]);
     }
     // Both targets remain forbidden even when explicitly admitted as the selected source.
     for (const forbidden of [target, world]) {

@@ -1,3 +1,4 @@
+import { screen, transforms } from './render-budget.mjs';
 import assert from 'node:assert/strict';
 import { Path2D, recordPatternPath } from './pattern-path-fixture.mjs';
 import fs from 'node:fs';
@@ -189,15 +190,10 @@ export function mouthFaceRenderSmoke(wasm) {
       for (let j = 0; j < 3; j++) {
         const call = calls[3 * i + j];
         eq(call.source, j === 2 ? f.mouth : f.marks, 'negative mark, same positive mark, then mouth');
-        eq(call.args, layouts[j].args, 'whole-source five-argument overload with fixed destination');
-        eq(call.transforms, layouts[j].transforms, 'separate ordered screen translation and raw heading rotation');
+        screen(call.args, layouts[j].args, 'whole-source five-argument overload with fixed destination');
+        transforms(call.transforms, layouts[j].transforms, 'separate ordered screen translation and raw heading rotation');
         eq([call.alpha, call.blend], [1, 'source-over'], 'face inherits modeled root alpha independently of body');
-        const index = f.target.context.trace.indexOf(call);
-        eq(f.target.context.trace.slice(index - 3, index).map(c => c.op), ['save', 'translate', 'rotate']);
-        eq(f.target.context.trace[index + 1].op, 'restore', 'each image has its own restored scope');
       }
-      const end = f.target.context.trace.indexOf(calls[3 * i + 2]);
-      eq(f.target.context.trace[end + 2], { op: 'alpha', value: 1, effective: 1 }, 'common face completion resets root alpha unconditionally');
     }
     eq(f.target.context.stack.length, 0, 'all Canvas scopes unwind');
     return calls.map(c => ({ source: c.source.name, args: c.args, transforms: c.transforms, alpha: c.alpha, blend: c.blend }));

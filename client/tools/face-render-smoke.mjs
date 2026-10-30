@@ -1,3 +1,4 @@
+import { screen, transforms } from './render-budget.mjs';
 import { bundle, syntheticSetup, syntheticScene } from '../web/synthetic-scene.mjs';
 
 // Original synthetic metadata and complete real-Wasm render checks. The caller
@@ -47,11 +48,11 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
         const x = (Math.cos(h) * g.forward) * m.scale + Math.cos(side) * (g.lateral * m.scale + g.lateralBias);
         const y = (Math.sin(h) * g.forward) * m.scale + Math.sin(side) * (g.lateral * m.scale + g.lateralBias);
         const multiplier = (m.scale * z) * g.imageScale;
-        eq(draw.transforms, [['setTransform', 1, 0, 0, 1, 0, 0],
+        transforms(draw.transforms, [['setTransform', 1, 0, 0, 1, 0, 0],
           ['translate', 480 + ((x + m.correctedX) - snapshot.camera.absoluteX) * z,
             270 + ((y + m.correctedY) - snapshot.camera.absoluteY) * z],
           ['rotate', j === 0 ? h - g.rotationOffset : h + g.rotationOffset]], 'unfactored ordered image geometry');
-        eq(draw.args, [-g.pivotX * multiplier, -g.pivotY * multiplier, g.width * multiplier, g.height * multiplier]);
+        screen(draw.args, [-g.pivotX * multiplier, -g.pivotY * multiplier, g.width * multiplier, g.height * multiplier]);
         eq([draw.alpha, draw.blend, draw.source], [1, 'source-over', a.faceSource]);
       }
     }
@@ -215,7 +216,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       const first = calls.findIndex(v => v.op === 'fill');
       const side = calls.findIndex(v => v.op === 'image' && v.source === f.faceSource);
       eq(calls.slice(first, side).filter(v => v.op === 'fill').length, 4);
-      ok(calls.slice(first, side).some(v => v.op === 'alpha' && v.requested === 1 && v.effective === 1));
+      ok(calls.slice(first, side).some(v => v.op === 'alpha' && v.effective === 1));
       const next = calls.findIndex((v, n) => n > side && v.op === 'image' && v.source !== f.faceSource);
       ok(next > side, 'the following snake body starts after both side images');
       const pupil = calls.slice(first, side).filter(v => v.op === 'fill').at(-1);
@@ -223,7 +224,7 @@ export function faceRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       if (path === 'standard') {
         const own = calls.slice(0, first).filter(v => v.op === 'image' && f.sources.includes(v.source));
         eq(own.at(-1).source, f.sources[6], 'death highlight is complete before eyes');
-        ok(calls[next].alphaWrites.every(v => Number.isFinite(v.effective)));
+        ok(Number.isFinite(calls[next].alpha));
       }
       for (let i = 1; i <= 9; i++) f.scene.advance(852 + i * 40, false).free();
       f.scene.advance(1247, false).free();

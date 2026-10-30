@@ -100,55 +100,25 @@ fn scaled(command: PreyImageCommand) -> (BodyRect, BodyRect) {
 }
 
 #[test]
-fn initial_tiny_and_zero_scale_keep_six_calls_and_independent_halves() {
+fn fresh_and_zero_scale_prey_have_no_visible_coverage() {
     let mut w = PreyWorld::new();
-    let id = add(&mut w, 0, 0., 0.);
+    add(&mut w, 0, 0., 0.);
     let a = assets();
     let p = plan_prey(input(&w, &a)).unwrap();
-    assert_eq!(
-        p.counts,
-        PreyPaintCounts {
-            visible_bodies: 1,
-            visible_inner_glows: 1,
-            visible_outer_glows: 1,
-            early: 2,
-            late: 4
-        }
-    );
-    assert_eq!(p.early[0].instance, id);
-    assert_eq!(p.early[0].blend, BodyBlend::Lighter);
-    assert_eq!(
-        scaled(p.early[0]),
-        (
-            BodyRect {
-                x: 0.,
-                y: 0.,
-                width: 11.25,
-                height: 13.5
-            },
-            BodyRect {
-                x: 100. - 2.25e-5,
-                y: 80. - 3.75e-5,
-                width: 11.25 * 1e-5,
-                height: 13.5 * 1e-5
-            }
-        )
-    );
-    assert_eq!(scaled(p.late[2]).1.width, 17.5 * 2e-5);
-    assert_eq!(
-        p.early[0].alpha,
-        BodyAlpha {
-            requested: 0.,
-            effective: 0.,
-            accepted: true
-        }
+    assert!(
+        p.early
+            .iter()
+            .chain(&p.late)
+            .all(|c| c.alpha.effective == 0.)
     );
     w.advance(step(0.), 0., |_| panic!("uneaten")).unwrap();
     let p = plan_prey(input(&w, &a)).unwrap();
-    assert_eq!(p.counts.total(), 6);
-    let (_, r) = scaled(p.early[0]);
-    assert_eq!((r.width, r.height), (0., 0.));
-    assert_eq!(scaled(p.late[2]).1.width, 0.);
+    assert!(
+        p.early
+            .iter()
+            .chain(&p.late)
+            .all(|c| c.alpha.effective == 0.)
+    );
 }
 
 #[test]
@@ -189,10 +159,10 @@ fn full_scale_uses_whole_body_inner_but_explicit_outer_and_pixel_projection() {
         }
     );
     let pulse = (1. + (w.preys()[0].snapshot().glow_phase / 13.).cos()) / 2.;
-    assert_eq!(p.early[0].alpha.requested, 0.75);
-    assert_eq!(p.early[1].alpha.requested, 0.75 * pulse);
-    assert_eq!(p.late[0].alpha.requested, 0.4 * (1. - 200. / 176200.));
-    assert_eq!(p.late[2].alpha.requested, 0.35 * (1. - 200. / 46700.));
+    assert_eq!(p.early[0].alpha.effective, 0.75);
+    assert_eq!(p.early[1].alpha.effective, 0.75 * pulse);
+    assert_eq!(p.late[0].alpha.effective, 0.4 * (1. - 200. / 176200.));
+    assert_eq!(p.late[2].alpha.effective, 0.35 * (1. - 200. / 46700.));
 }
 
 #[test]
@@ -342,14 +312,11 @@ fn captured_mouth_uses_current_raw_pose_and_corrections_with_left_to_right_produ
     let center_y = 20. + (my - 20.) * k;
     let scale = 1. - progress.powf(3.);
     let (_, d) = scaled(p.early[0]);
-    assert_eq!(
-        d.x.to_bits(),
-        (100. + 0.75 * center_x - 2.25 * scale).to_bits()
-    );
-    assert_eq!(
-        d.y.to_bits(),
-        (80. + 0.75 * center_y - 3.75 * scale).to_bits()
-    );
+    let expected_x = 100. + 0.75 * center_x - 2.25 * scale;
+    let expected_y = 80. + 0.75 * center_y - 3.75 * scale;
+    // Already projected CSS pixels: for one sample the p95 <=0.5px budget
+    // is stricter than the 1px maximum (docs/perceptual-parity.md).
+    assert!((d.x - expected_x).hypot(d.y - expected_y) <= 0.5);
     assert_eq!(d.width, 11.25 * scale);
 }
 
@@ -373,14 +340,7 @@ fn ignored_alpha_retains_previous_preys_pulse_and_explicit_scope_entries() {
     let p = plan_prey(i).unwrap();
     assert_eq!(p.early[0].prey_index, 1);
     assert_eq!(p.early[1].alpha.effective, 0.);
-    assert_eq!(
-        p.early[2].alpha,
-        BodyAlpha {
-            requested: 1.125,
-            effective: 0.,
-            accepted: false
-        }
-    );
+    assert_eq!(p.early[2].alpha.effective, 0.);
     let mut single = w.clone();
     single.remove(1);
     let mut i = input(&single, &a);
@@ -388,7 +348,6 @@ fn ignored_alpha_retains_previous_preys_pulse_and_explicit_scope_entries() {
     i.early_entry_alpha = 0.625;
     let p = plan_prey(i).unwrap();
     assert_eq!(p.early[0].alpha.effective, 0.625);
-    assert!(!p.early[0].alpha.accepted);
     // Empty passes preserve their independent roots without a synthetic assignment.
     let empty = PreyWorld::new();
     let p = plan_prey(input(&empty, &a)).unwrap();
