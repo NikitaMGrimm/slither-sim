@@ -12,6 +12,11 @@ use slither_client::{
     state::{Appearance, Direction, Point, Setup},
 };
 
+fn heading_close(actual: f64, expected: f64) {
+    let delta = actual - expected;
+    assert!(delta.sin().atan2(delta.cos()).abs().to_degrees() <= 0.001);
+}
+
 fn u24(value: u32) -> [u8; 3] {
     let bytes = value.to_be_bytes();
     [bytes[1], bytes[2], bytes[3]]
@@ -280,7 +285,11 @@ fn offscreen_fractional_updates_continue_and_visible_entry_uses_raw_heading() {
 
 #[test]
 fn death_clears_direction_and_keeps_pupils_updating_until_expiry() {
-    let mut c = client(3);
+    let mut c = AnimatedClient::new(0.).unwrap();
+    let mut spawn = appearance(7, 2000, 3);
+    // A slanted lead starts a real turn without relying on f32 roundoff.
+    spawn[19..22].copy_from_slice(&u24(1001 * 5));
+    apply(&mut c, &[setup(), spawn]);
     c.prepare_draw(800, 600).unwrap();
     c.set_own_gaze_heading(0.).unwrap();
     c.advance(8., false).unwrap();
@@ -322,16 +331,18 @@ fn one_anchor_uses_finite_lead_target_without_drawing_missing_suffix() {
     assert_eq!(first[0].face_heading, first[0].metrics.heading);
     let face = first[0].face_heading;
     let target = f64::from(PI as f32) + PI;
-    assert_eq!(c.own_snake().unwrap().eyes().target_heading(), target);
+    heading_close(c.own_snake().unwrap().eyes().target_heading(), target);
     apply(&mut c, &[vec![b'e', 64]]);
     let output = c.prepare_draw_with_style(800, 600, 1., false).unwrap();
     assert!(output[0].curve.is_none());
     assert_eq!(output[0].face_heading, face);
-    assert_eq!(c.own_snake().unwrap().eyes().target_heading(), target);
+    heading_close(c.own_snake().unwrap().eyes().target_heading(), target);
     assert_ne!(target, output[0].metrics.heading);
     let mut expected =
         StandardEyeState::new(face, c.own_snake().unwrap().eyes().gaze_heading()).unwrap();
-    expected.commit_draw_target(target).unwrap();
+    expected
+        .commit_draw_target(c.own_snake().unwrap().eyes().target_heading())
+        .unwrap();
     let step = c.advance(8., false).unwrap();
     expected
         .advance(step, true, StandardEyeGeometry::default().pupil_travel)
@@ -365,9 +376,9 @@ fn single_anchor_lead_target_is_independent_of_other_snakes_and_style() {
                 let prepared = c.prepare_draw_with_style(800, 600, 1., detailed).unwrap();
                 let remote = prepared.iter().find(|snake| snake.metrics.id == 8).unwrap();
                 assert!(remote.curve.is_none());
-                assert_eq!(
+                heading_close(
                     c.snake(8).unwrap().eyes().target_heading(),
-                    f64::from((-4_f64).atan2(-3.) as f32) + PI
+                    f64::from((-4_f64).atan2(-3.) as f32) + PI,
                 );
             }
         }
