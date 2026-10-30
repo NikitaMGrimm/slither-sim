@@ -109,6 +109,11 @@ time from that phase for its lower bound, and capping at total world CPU for
 its upper bound. These separate bounds are not additive. Report instrumentation
 cost against the same ordinary continuations and preserve unbracketed work.
 
+`segmentTests` is the sum of candidate body lengths after the outer bounds
+check, incremented before `strikes_scaled`; it is not a count of executed edge
+distance tests, which may return early. Keep that distinction when comparing
+work growth with CPU growth.
+
 Memory is whole-process RSS/high-water RSS, not allocated bytes or a component
 allocator census. Loaded-fixture memory can retain checkpoint parsing allocations;
 simulation-only mode also holds its replay tape. Decision-mode initial memory is
