@@ -52,7 +52,8 @@ jobs:
           fi
           # The checked-out merge commit's first parent is the base branch head.
           files=$(git diff --name-only HEAD^1 HEAD)
-          echo "sim=$(grep -qv '^client/' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # client.yml is the client's own reusable workflow; it runs no sim job.
+          echo "sim=$(grep -qvE '^(client/|\.github/workflows/client\.yml$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "client=$(grep -qE '^(client/|\.github/workflows/client\.yml$|\.gitattributes$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   lint:
