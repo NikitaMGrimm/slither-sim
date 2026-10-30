@@ -110,7 +110,7 @@ export async function* treeEntries(trees, readTree) {
 }
 
 /** Read Git blobs rather than the working tree, so unstaged edits cannot mask staged artifacts. */
-export async function checkRepository(directory, history = false, outgoingTips = [], hygieneRoot = '') {
+export async function checkRepository(directory, history = false, outgoingTips = [], hygieneRoot = '', remote = '') {
   const errors = [];
   const checked = new Set();
   let count = 0;
@@ -147,8 +147,14 @@ export async function checkRepository(directory, history = false, outgoingTips =
         if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/.test(tip)) throw new Error('Invalid outgoing object ID');
         await readObject(`${tip}^{commit}`, 'commit');
       }
+      const exclusions = [];
+      // Trust only local tracking refs of a configured destination; otherwise scan all tip history without network access.
+      if (!history && remote && git(directory, ['remote']).toString('utf8').split('\n').includes(remote)) {
+        const literal = remote.replace(/[\\*?[\]]/g, '\\$&');
+        exclusions.push('--not', `--glob=refs/remotes/${literal}/*`);
+      }
       const revisions = history ? ['--branches', '--remotes', '--tags', ...outgoingTips]
-        : [...outgoingTips, '--not', '--remotes'];
+        : [...outgoingTips, ...exclusions];
       const trees = git(directory, ['rev-list', '--format=%T', ...revisions]).toString('utf8').trim().split('\n').filter(line => line && !line.startsWith('commit '));
       for await (const { mode, object, name } of treeEntries(trees, object => readObject(object, 'tree'))) {
         await inspect(mode, object, name);
@@ -174,17 +180,20 @@ export function outgoingPushTips(input) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.some(arg => !['--history', '--pre-push'].includes(arg))) throw new Error('Usage: node client/tools/check-repository.mjs [--history | --pre-push]');
-  const history = args.includes('--history');
-  const tips = args.includes('--pre-push') ? outgoingPushTips(fs.readFileSync(0, 'utf8')) : [];
+  const prePush = args[0] === '--pre-push';
+  if (!(args.length === 0 || (args.length === 1 && args[0] === '--history') || (prePush && args.length <= 2))) {
+    throw new Error('Usage: node client/tools/check-repository.mjs [--history | --pre-push]');
+  }
+  const history = args[0] === '--history';
+  const tips = prePush ? outgoingPushTips(fs.readFileSync(0, 'utf8')) : [];
   // Check the whole repository from any working directory. Hygiene rules cover only this
   // tool's own project directory when it is nested inside a larger repository.
   const top = git(process.cwd(), ['rev-parse', '--show-toplevel']).toString('utf8').trim();
   const own = path.relative(top, fileURLToPath(new URL('..', import.meta.url)));
   const hygieneRoot = !own || own.startsWith('..') || path.isAbsolute(own) ? '' : `${own.split(path.sep).join('/')}/`;
-  const result = await checkRepository(top, history, tips, hygieneRoot);
+  const result = await checkRepository(top, history, tips, hygieneRoot, prePush ? args[1] : undefined);
   if (result.errors.length) {
     console.error(result.errors.join('\n'));
     process.exitCode = 1;
-  } else console.log(`Repository boundary passed: ${result.count} indexed${history || args.includes('--pre-push') ? ' and historical' : ''} file versions checked.`);
+  } else console.log(`Repository boundary passed: ${result.count} indexed${history || prePush ? ' and historical' : ''} file versions checked.`);
 }
