@@ -47,8 +47,8 @@ from actual native request-tagged observations, independently of Wasm. Native
 input mapping reuses A2's normalized CSS coordinates/physical-mouse expansion and
 the production browser target-admission predicate. It calls the real LocalGame
 methods and does not establish OS/DOM event routing or physical-input parity.
-Semantic socket IDs match A2; sidecar receipts retain every real Rust effect's
-generation/ID and acknowledgment time. Negotiation/login bytes are discarded.
+Semantic socket IDs match A2; the `effects` array in `native-observations.json`
+retains every real Rust effect's generation/ID and acknowledgment time. Negotiation/login bytes are discarded.
 
 Rust writes `feel-f64-v1` directly from raw binary64 values (including signed
 zero), with A1's sorted keys and formatting. Node hashes the entropy/artifacts
@@ -70,7 +70,9 @@ documents and final traces. `repeat-comparison.json` requires A1 exact parity an
 identical document bytes. `comparison.json` uses A1 `cross-target`, while
 `exact-comparison.json` disables numerical allowances on those same traces;
 `summary.json` reports exact/numerical/failing channels and `differences.json`
-retains all differences even when a provenance/completeness gate fails. An exact
+retains all differences even when the comparison's provenance/completeness gate
+fails. Earlier build, input, Wasm-trace, schedule or startup binding failures stop
+before comparison and write only `failure.txt`. An exact
 channel is a local observation result, not a pass through a failed global gate.
 
 The native runner adopts only the Wasm manifest's **predeclared** numerical policy;
