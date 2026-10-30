@@ -17,6 +17,9 @@ use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 use crate::bank::MENU_MATERIAL_HANDLE_BASE;
+// Reserved menu-material handles; the generic allocator starts above them.
+const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
+const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 type MaterialKey = (u32, u32, u8, u64);
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 
@@ -43,9 +46,8 @@ impl MenuFrame {
             return Err("Invalid world opacity".into());
         }
         let resource = Resource {
-            // The native material allocator starts at base + 1.
             asset: BodyAsset {
-                handle: MENU_MATERIAL_HANDLE_BASE,
+                handle: PAGE_HANDLE,
                 revision: 1,
                 width: 1,
                 height: 1,
@@ -368,9 +370,8 @@ impl Composition<'_> {
                 .checked_add(1)
                 .ok_or("Spinner revision overflow")?;
             Resource {
-                // Generic menu materials allocate strictly above this reserved handle.
                 asset: BodyAsset {
-                    handle: MENU_MATERIAL_HANDLE_BASE,
+                    handle: SPINNER_HANDLE,
                     revision: self.spinner_revision,
                     width: side,
                     height: side,
@@ -427,7 +428,7 @@ impl Menu {
         let mut c = Composition {
             old: &self.materials,
             materials: BTreeMap::new(),
-            next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
+            next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
             scale: dpr.min(3.),
             draws: Vec::new(),

@@ -692,3 +692,28 @@ fn spinner_raster_phase_and_revision_follow_shared_time() {
         resumed.resources[0].asset
     );
 }
+
+#[test]
+fn page_crossfade_and_menu_materials_never_share_a_handle() {
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    view.spinner_visible = true;
+    let menu = Menu::default()
+        .prepare(
+            &mut TextCache::menu(),
+            &view,
+            &layout(),
+            [1280, 720],
+            1.,
+            None,
+            0,
+        )
+        .unwrap();
+    let page = slither_wgpu_slice::menu::MenuFrame::world_crossfade([1280, 720], 1., 0.5).unwrap();
+    for r in &page.resources {
+        assert!(
+            menu.resources
+                .iter()
+                .all(|m| m.asset.handle != r.asset.handle)
+        );
+    }
+}
