@@ -47,3 +47,9 @@
   preserve primary-state parity and compare all three guard traces. No source
   hook, production edit or extra timing run is introduced. The original
   checkpoint-only census remains separately labelled.
+- The detached 10k retry reached its original guard at 34,000 ticks: 238 virtual
+  seconds, 7,378.16 wall seconds including the census-boundary overshoot and
+  checkpoint work. All 10,000 slots were alive; mean body length was 51.3174,
+  p90 73, p99 87, food 515,400. It did not pass the original ecology screen.
+  Under the maintainer amendment, that final checkpoint proceeds to verification
+  and the normal counted windows, labelled unsettled. No warmup extension ran.
