@@ -79,27 +79,61 @@ impl FoodSubscriptions {
             if unchanged {
                 continue;
             }
-            for sector in held.sectors.drain(..) {
-                self.counts[usize::from(sector)] -= 1;
-                if self.counts[usize::from(sector)] == 0 {
-                    self.sectors.remove(&sector);
-                    retired.insert(sector);
+            {
+                let mut old = held.sectors.iter().copied().peekable();
+                let mut new = interest
+                    .into_iter()
+                    .flat_map(SectorInterest::subscribed)
+                    .map(|&sector| u16::from_be_bytes(sector))
+                    .peekable();
+                loop {
+                    let sector = match (old.peek(), new.peek()) {
+                        (Some(&old), Some(&new)) => old.min(new),
+                        (Some(&old), None) => old,
+                        (None, Some(&new)) => new,
+                        (None, None) => break,
+                    };
+                    let was = old.next_if(|&old| old == sector).is_some();
+                    let is = new.next_if(|&new| new == sector).is_some();
+                    let count = &mut self.counts[usize::from(sector)];
+                    match (was, is) {
+                        (true, true) => {
+                            // The old walk temporarily removed this owner. A
+                            // sole owner therefore still records re-entry, even
+                            // though membership/counts need no actual change.
+                            if *count == 1 {
+                                self.entered.insert(sector);
+                            }
+                        }
+                        (true, false) => {
+                            *count -= 1;
+                            if *count == 0 {
+                                self.sectors.remove(&sector);
+                                retired.insert(sector);
+                            }
+                        }
+                        (false, true) => {
+                            if *count == 0 {
+                                self.sectors.insert(sector);
+                                self.entered.insert(sector);
+                            }
+                            *count += 1;
+                        }
+                        (false, false) => unreachable!("sector came from one of the lists"),
+                    }
                 }
             }
             // Retain the identity strongly: a closed/replaced connection cannot
             // have its old address reused while this snapshot still names it.
             held.revision = revision.cloned();
+            held.sectors.clear();
             if let Some(interest) = interest {
-                for &sector in interest.subscribed() {
-                    let sector = u16::from_be_bytes(sector);
-                    let count = &mut self.counts[usize::from(sector)];
-                    if *count == 0 {
-                        self.sectors.insert(sector);
-                        self.entered.insert(sector);
-                    }
-                    *count += 1;
-                    held.sectors.push(sector);
-                }
+                held.sectors.extend(
+                    interest
+                        .subscribed()
+                        .iter()
+                        .map(|&sector| u16::from_be_bytes(sector)),
+                );
             }
         }
         self.held.truncate(len);
@@ -1705,3 +1739,7 @@ mod tests {
 #[cfg(test)]
 #[path = "food/held_tests.rs"]
 mod held_tests;
+
+#[cfg(test)]
+#[path = "food/subscription_tests.rs"]
+mod subscription_tests;
