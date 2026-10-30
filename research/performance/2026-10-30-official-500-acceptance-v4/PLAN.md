@@ -1,7 +1,7 @@
 # Official-500 acceptance v4: frozen plan
 
 One authorized quiet-image confirmation series, registered before provisioning
-or tick zero. Failed [v3](../2026-10-30-official-500-acceptance-v3/REPORT.md)
+or tick zero. Failed [v3](https://github.com/NikitaMGrimm/slither-sim/blob/651f9526b038714c7487f4e74db4b240f7a0113d/research/performance/2026-10-30-official-500-acceptance-v3/REPORT.md)
 remains failed: run 2 had 126 deferrals, with about 1.43 CPU-seconds of other
 user work during a four-second zero-idle episode. The process is unidentified.
 This prospective environment change cannot rescue or reclassify v3.
