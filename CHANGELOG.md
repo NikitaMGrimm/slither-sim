@@ -26,6 +26,11 @@
 
 ### Performance
 
+- Food pickup keeps its fast grid in arenas up to a radius of about 131,000,
+  official density for about 38,000 snakes, instead of 65,536 (about 9,700).
+  Larger arenas fell back to a slower path: at 9,800 snakes a world step cost
+  about 58 times as much as at 9,700. Pickup results are unchanged
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-27-population-scaling/REPORT.md#uncapped-10k-censored-with-a-pickup-algorithm-cliff)).
 - Battledome spawn searches now check each candidate spot only against
   nearby snakes, using a grid built on demand in arenas with at least 32
   snakes. Every verdict, spawn position and output byte is unchanged. In a
