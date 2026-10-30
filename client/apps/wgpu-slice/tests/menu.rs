@@ -389,38 +389,43 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
 #[test]
 fn logo_paints_its_aspect_ratio_without_changing_the_flow_holder() {
     use slither_client::menu_layout::MenuElement as E;
-    let mut images = Images::default();
-    images
-        .add("menu/logo.png", &png_rect(450, 135, [80, 200, 100, 255]))
-        .unwrap();
-    let art = Cosmetics::from_images(images, None).unwrap();
-    let asset = art.menu_art(MenuArt::Logo(0)).unwrap().asset;
     let view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
     let layout = layout();
     let holder = layout.viewport_rect(E::Logo);
-    let p = Menu::default()
-        .prepare(
-            &mut TextCache::menu(),
-            &view,
-            &layout,
-            [1280, 720],
-            1.,
-            Some(&art),
-            0,
-        )
-        .unwrap();
-    let logo = p
-        .frame
-        .draws
-        .iter()
-        .find(|d| d.asset == asset)
-        .unwrap()
-        .destination;
-    assert_eq!(
-        (logo.x, logo.y, logo.width),
-        (holder.x, holder.y, holder.width)
-    );
-    assert_eq!(logo.height, logo.width * 135. / 450.);
+    let room = layout.viewport_rect(E::LastLength).y - holder.y;
+    for (w, h) in [(450, 135), (450, 450)] {
+        let mut images = Images::default();
+        images
+            .add("menu/logo.png", &png_rect(w, h, [80, 200, 100, 255]))
+            .unwrap();
+        let art = Cosmetics::from_images(images, None).unwrap();
+        let asset = art.menu_art(MenuArt::Logo(0)).unwrap().asset;
+        let p = Menu::default()
+            .prepare(
+                &mut TextCache::menu(),
+                &view,
+                &layout,
+                [1280, 720],
+                1.,
+                Some(&art),
+                0,
+            )
+            .unwrap();
+        let logo = p
+            .frame
+            .draws
+            .iter()
+            .find(|d| d.asset == asset)
+            .unwrap()
+            .destination;
+        assert_eq!(logo.y, holder.y);
+        assert!((logo.width * f64::from(h) - logo.height * f64::from(w)).abs() < 1e-9);
+        assert!((logo.x + logo.width / 2. - holder.x - holder.width / 2.).abs() < 1e-9);
+        assert!(logo.height <= room);
+        if h == 135 {
+            assert_eq!(logo.width, holder.width);
+        }
+    }
     assert_eq!(holder.height, 115.);
 }
 

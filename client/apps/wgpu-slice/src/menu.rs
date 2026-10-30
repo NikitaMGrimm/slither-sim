@@ -355,11 +355,17 @@ impl Menu {
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha * view.logo_reveal;
             if let Some(art) = cosmetics.and_then(|p| p.menu_art(MenuArt::Logo(logo_frame))) {
+                // Local art may be taller than the 450x135 original; it must
+                // not paint over the rows below the holder.
+                let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
+                let room = layout.viewport_rect(E::LastLength).y - logo.y;
+                let fit = (room / natural).min(1.);
                 c.art(
                     art,
                     MenuRect {
-                        height: logo.width * f64::from(art.asset.height)
-                            / f64::from(art.asset.width),
+                        x: logo.x + logo.width * (1. - fit) / 2.,
+                        width: logo.width * fit,
+                        height: natural * fit,
                         ..logo
                     },
                     logo_alpha,
