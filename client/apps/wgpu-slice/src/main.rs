@@ -400,9 +400,17 @@ mod desktop {
                 for draw in &mut picture.frame.draws {
                     draw.effective_alpha *= view.world_alpha;
                 }
-                self.login
-                    .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                    .append_to(&mut picture)?;
+                let mut menu = self.login.prepare_host(
+                    physical,
+                    dpr,
+                    admission,
+                    self.game.menu_cosmetics(),
+                )?;
+                if view.visible {
+                    // Keep the page backdrop below the world so its fade is applied once.
+                    picture.frame.draws.insert(0, menu.frame.draws.remove(0));
+                }
+                menu.append_to(&mut picture)?;
                 let effects = self.login.cursor_area()?;
                 self.edit_effects(effects);
                 Some(picture)

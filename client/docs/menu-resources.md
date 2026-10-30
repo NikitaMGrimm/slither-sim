@@ -13,8 +13,12 @@ use this same mapping and final linear blit before offscreen readback.
 A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
-Authored Play capsules use two-stop vertical gradients, soft shadows and
-normal/hover/pressed/disabled states. Nickname boxes, plain skin icons, tips,
+Authored Play capsules use eased vertical gradients and dim the normal surface
+and label together when disabled. Nickname uses one bordered purple surface with
+a broad shadow; tips and nickname use Lucida Sans Unicode on Windows, while Play
+keeps Arial Bold. The opaque `#161C22` page backdrop sits below the fading world;
+the world clear is unchanged. Logo art keeps its image aspect inside the unchanged
+flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
 text logo fallback and a green/purple dotted spinner approximate the controls
 at gameplay size. Spinner dots follow shared time/scale/opacity, approximating
 ribbons. A static logo uses shared reveal/opacity timing; it does not reproduce
