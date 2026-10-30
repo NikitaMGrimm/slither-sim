@@ -5,6 +5,7 @@ import fnmatch
 import io
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -56,7 +57,13 @@ class CheckRunnerTests(unittest.TestCase):
         for features in ([], ["--features", "networking"], ["--features", "parallel"]):
             self.assertIn(check.clippy("--no-default-features", *features), lint)
         # Feature checks build the root package alone, never with the whole workspace.
-        self.assertTrue(all("--workspace" not in command for command in lint if "--no-default-features" in command))
+        self.assertTrue(all("-p" not in command for command in lint if "--no-default-features" in command))
+
+    def test_no_command_selects_the_client_crates(self):
+        for group in check.GROUPS:
+            for command in check.commands(group):
+                self.assertNotIn("--workspace", command)
+                self.assertNotIn("--all", command)
 
     def test_job_summary_records_each_command_until_the_failure(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -68,7 +75,8 @@ class CheckRunnerTests(unittest.TestCase):
                 self.assertEqual(check.main(["lint"]), 3)
             rows = summary.read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(rows), 2 + 2 + 1)
-        self.assertRegex(rows[2], r"^\| lint \| `cargo fmt --all --check` \| \d+\.\d \| ok \|$")
+        first = re.escape(" ".join(check.commands("lint")[0]))
+        self.assertRegex(rows[2], rf"^\| lint \| `{first}` \| \d+\.\d \| ok \|$")
         self.assertTrue(rows[3].endswith("| exit 3 |"))
         self.assertIn("[lint] ", output.getvalue())
 

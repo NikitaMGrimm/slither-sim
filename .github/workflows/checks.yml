@@ -56,8 +56,9 @@ jobs:
           files=$(git diff --name-only HEAD^1 HEAD)
           # client.yml is the client's own reusable workflow; it runs no sim job.
           echo "sim=$(grep -qvE '^(client/|\.github/workflows/client\.yml$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "client=$(grep -qE '^(client/|\.github/workflows/client\.yml$|\.gitattributes$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          # Host or client code, either lockfile, or this workflow.
+          # The root manifest and lock also resolve the client crates.
+          echo "client=$(grep -qE '^(client/|\.github/workflows/client\.yml$|\.gitattributes$|Cargo\.(toml|lock)$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # Host or client code, the manifests and lock, or this workflow.
           echo "e2e=$(grep -qE '^(src/|Cargo\.(toml|lock)$|client/(src/|apps/wgpu-slice/|tools/e2e-local-host|Cargo\.|rust-toolchain)|\.github/workflows/checks\.yml$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   lint:

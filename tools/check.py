@@ -25,15 +25,21 @@ def clippy(*features):
     return ["cargo", "clippy", "--all-targets", *features, "--locked", "--", "-D", "warnings"]
 
 
+# The simulator's packages by name. The client crates share the workspace but
+# have their own toolchain and checks (client.yml), and their desktop binaries
+# don't build on Linux, so no command here selects the whole workspace.
+SIM_PACKAGES = ("-p", "slither-sim", "-p", "slither-sim-ffi", "-p", "slither-sim-py")
+
+
 def commands(group):
     if group == "rust":
         return commands("lint") + commands("test")
     if group == "lint":
-        # Without -p or --workspace, the root package builds alone, so the C ABI
+        # Without -p, the root package builds alone, so the C ABI
         # crate's `parallel` dependency cannot re-enable a feature under test.
         return [
-            ["cargo", "fmt", "--all", "--check"],
-            clippy("--workspace"),
+            ["cargo", "fmt", *SIM_PACKAGES, "--check"],
+            clippy(*SIM_PACKAGES),
             clippy("--no-default-features"),
             clippy("--no-default-features", "--features", "bot"),
             clippy("--no-default-features", "--features", "networking"),
@@ -72,7 +78,7 @@ def commands(group):
         return [
             # Build first with every job; the fidelity tests and smoke runs reuse it.
             # maturin builds the Python extension below, with its interpreter.
-            ["cargo", "build", "--locked", "--workspace", "--exclude", "slither-sim-py"],
+            ["cargo", "build", "--locked", "-p", "slither-sim", "-p", "slither-sim-ffi"],
             suite("tools", "test_*.py"),
             # Complementary halves, so the long end-to-end comparison test runs
             # beside the rest of the fidelity suite, including transport parity.
