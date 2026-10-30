@@ -1167,6 +1167,10 @@ impl LocalGame {
     /// Native DOM siblings use CSS coordinates and physical rasters independently
     /// of the capped game canvas, including resizes that keep the same backing.
     pub fn window_viewport(&mut self, physical: [u32; 2], dpr: f64) -> Result<[u32; 2]> {
+        if physical.contains(&0) {
+            self.viewport([0, 0], 1.)?;
+            return Ok([0, 0]);
+        }
         render::dimensions(physical, dpr)?;
         let overlay = Some((physical, dpr));
         if self.bank.overlay_viewport != overlay {

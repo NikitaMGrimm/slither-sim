@@ -163,3 +163,28 @@ fn setup_retry_and_resize_keep_immutable_overlay_with_its_picture() {
     assert_eq!(saved.unwrap().extent, [3840, 2160]);
     game.presented(true).unwrap();
 }
+
+#[test]
+fn zero_window_suspends_and_restoring_the_same_size_resumes_frames() {
+    let mut game = tape::playing();
+    let physical = [960, 540];
+    let backing = game.window_viewport(physical, 1.).unwrap();
+    game.begin_redraw(30., backing, 1.).unwrap();
+    tape::effects(&mut game);
+    let pending = game.take_frame().unwrap();
+    game.retry_frame(pending).unwrap();
+
+    assert_eq!(game.window_viewport([0, 0], 1.).unwrap(), [0, 0]);
+    assert!(game.take_frame().is_none());
+
+    assert_eq!(game.window_viewport(physical, 1.).unwrap(), backing);
+    let restored = game.take_frame().unwrap();
+    assert_eq!(restored.frame.extent, backing);
+    assert_eq!(restored.overlay.as_ref().unwrap().extent, physical);
+    game.presented(true).unwrap();
+
+    game.begin_redraw(50., backing, 1.).unwrap();
+    tape::effects(&mut game);
+    assert!(game.take_frame().is_some());
+    game.presented(true).unwrap();
+}
