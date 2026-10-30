@@ -1,0 +1,62 @@
+{
+  "rows": [
+    {
+      "label": "01-solo",
+      "seats": 1,
+      "evidenceStatus": "unverified",
+      "reason": "First generator reclaimed; complete probe/capture checkpoint survives but generator qualification and ICMP sources do not",
+      "sourceArchiveSha256": "d5073577ee14b2fc65ae2dbf1421fc4017fb675e37fc4fa39ac720c02ce70d57",
+      "attempts": 803,
+      "confirmed": 803,
+      "inputToEffectMs": {
+        "n": 803,
+        "min": 0.4703650000124071,
+        "mean": 4.434600072229623,
+        "p50": 4.467390000002069,
+        "p95": 7.468746000000692,
+        "p99": 7.845529999997325,
+        "max": 8.003291999997941
+      },
+      "censored": {}
+    },
+    {
+      "label": "02-80",
+      "seats": 80,
+      "evidenceStatus": "unverified",
+      "reason": "First generator reclaimed; complete probe/capture checkpoint survives but generator qualification and ICMP sources do not",
+      "sourceArchiveSha256": "035e582a4d24eb0c356883552dc11bd755342b666fb38763b474448be7ac9601",
+      "attempts": 776,
+      "confirmed": 776,
+      "inputToEffectMs": {
+        "n": 776,
+        "min": 1.5318849999630402,
+        "mean": 5.091595632731422,
+        "p50": 4.938358000003973,
+        "p95": 8.31448100001353,
+        "p99": 8.626644000003125,
+        "max": 8.838586000024407
+      },
+      "censored": {}
+    },
+    {
+      "label": "03-160",
+      "seats": 160,
+      "evidenceStatus": "unverified",
+      "reason": "First generator reclaimed; complete probe/capture checkpoint survives but generator qualification and ICMP sources do not",
+      "sourceArchiveSha256": "f95c5dc8b1083597ab2593be3d0142a2a4e3ddf18d66b26d5c877e4188f7b1e3",
+      "attempts": 784,
+      "confirmed": 784,
+      "inputToEffectMs": {
+        "n": 784,
+        "min": 1.2496510000232774,
+        "mean": 5.781275713009861,
+        "p50": 5.837714999998411,
+        "p95": 9.065644000003203,
+        "p99": 9.567484999990938,
+        "max": 9.84612700000298
+      },
+      "censored": {}
+    }
+  ],
+  "firstAttempt320": "unavailable; no retained raw artifact"
+}
