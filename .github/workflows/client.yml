@@ -64,29 +64,35 @@ jobs:
       - run: cargo test --all-targets --locked
       - run: cargo test --doc --locked
       - run: cargo clippy --all-targets --locked -- -D warnings
+      # Without a target cache, one-core builds and unoptimized raster/layout
+      # tests used 10-12.5 of this job's 15 minutes. The wgpu steps use all four
+      # runner cores and opt-level 1, which keeps debug assertions and overflow
+      # checks. The steps share one profile so the build reuses test artifacts.
       - name: Test shared wgpu slice offline
         if: matrix.os == 'windows-latest'
         env:
-          CARGO_BUILD_JOBS: 1
+          CARGO_BUILD_JOBS: 4
           CARGO_TARGET_DIR: target/wgpu-slice-ci
-          # Root workspace profiles keep debug info, which pushed this job past
-          # 15 minutes; the wgpu builds skip it.
+          # Root workspace profiles keep debug info; the wgpu builds skip it.
           CARGO_PROFILE_DEV_DEBUG: 0
+          CARGO_PROFILE_DEV_OPT_LEVEL: 1
           RUST_TEST_THREADS: 1
         run: cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
       - name: Check shared wgpu Windows host
         if: matrix.os == 'windows-latest'
         env:
-          CARGO_BUILD_JOBS: 1
+          CARGO_BUILD_JOBS: 4
           CARGO_TARGET_DIR: target/wgpu-slice-ci
           CARGO_PROFILE_DEV_DEBUG: 0
+          CARGO_PROFILE_DEV_OPT_LEVEL: 1
         run: cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --all-targets -- -D warnings
       - name: Build shared wgpu Windows executable
         if: matrix.os == 'windows-latest'
         env:
-          CARGO_BUILD_JOBS: 1
+          CARGO_BUILD_JOBS: 4
           CARGO_TARGET_DIR: target/wgpu-slice-ci
           CARGO_PROFILE_DEV_DEBUG: 0
+          CARGO_PROFILE_DEV_OPT_LEVEL: 1
         run: cargo build --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop
 
   wasm:
