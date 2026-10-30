@@ -198,16 +198,8 @@ impl Renderer {
         if self.lost.load(Ordering::SeqCst) {
             return Err("GPU device lost; host stopped, scene retained".into());
         }
-        // Only local background art needs the decoder's larger dimension bound.
-        // Keep every other producer's limit and all resident byte budgets.
-        let max_dimension = if crate::cosmetics::BackgroundArt::ALL
-            .iter()
-            .any(|art| art.handle() == a.handle)
-        {
-            1024
-        } else {
-            512
-        };
+        // WebGL2's 2048px downlevel cap keeps the future WebGL2 extension path valid.
+        let max_dimension = wgpu::Limits::downlevel_webgl2_defaults().max_texture_dimension_2d;
         if a.status != BodyAssetStatus::Ready
             || a.width == 0
             || a.height == 0
