@@ -45,6 +45,18 @@ test('only the self-contained project logo and icon are permitted as vector asse
   assert(checkEntry('assets/other.svg', logo).length > 0);
 });
 
+test('content rules cover the whole repository while hygiene rules cover only the client root', () => {
+  const binary = Buffer.from([0x47, 0x49, 0x46, 0x00]);
+  assert.deepEqual(checkEntry('assets/banner.gif', binary, '100644', undefined, 'client/'), []);
+  assert.deepEqual(checkEntry('tests/fixtures/large.json', Buffer.alloc(600 * 1024, 32), '100644', undefined, 'client/'), []);
+  assert(checkEntry('client/assets/banner.gif', binary, '100644', undefined, 'client/').some(error => error.includes('format')));
+  assert(checkEntry('research/game1107249518.js', Buffer.from('SYNTHETIC'), '100644', undefined, 'client/').some(error => error.includes('artifact name')));
+  assert(checkEntry('research/raw/input.txt', Buffer.from('SYNTHETIC'), '100644', undefined, 'client/').some(error => error.includes('directory')));
+  const logo = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0H4"/></svg>');
+  assert.deepEqual(checkEntry('client/assets/logo.svg', logo, '100644', undefined, 'client/'), []);
+  assert(checkEntry('client/assets/other.svg', logo, '100644', undefined, 'client/').length > 0);
+});
+
 function withRepository(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-client-guard-'));
   const git = args => execFileSync('git', args, { cwd: directory, stdio: 'pipe' });

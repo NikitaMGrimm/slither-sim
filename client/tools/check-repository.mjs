@@ -9,7 +9,7 @@ function git(directory, args) {
 }
 
 /** Read Git blobs rather than the working tree, so unstaged edits cannot mask staged artifacts. */
-export function checkRepository(directory, history = false, outgoingTips = []) {
+export function checkRepository(directory, history = false, outgoingTips = [], hygieneRoot = '') {
   const errors = [];
   const checked = new Set();
   let count = 0;
@@ -22,7 +22,7 @@ export function checkRepository(directory, history = false, outgoingTips = []) {
       return;
     }
     const bytes = git(directory, ['cat-file', 'blob', object]);
-    errors.push(...checkEntry(name, bytes, mode));
+    errors.push(...checkEntry(name, bytes, mode, undefined, hygieneRoot));
     count++;
   }
   const staged = git(directory, ['ls-files', '--stage', '-z']).toString('utf8').split('\0').filter(Boolean);
@@ -70,10 +70,15 @@ export function outgoingPushTips(input) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.some(arg => !['--history', '--pre-push'].includes(arg))) throw new Error('Usage: node tools/check-repository.mjs [--history | --pre-push]');
+  if (args.some(arg => !['--history', '--pre-push'].includes(arg))) throw new Error('Usage: node client/tools/check-repository.mjs [--history | --pre-push]');
   const history = args.includes('--history') || args.includes('--pre-push');
   const tips = args.includes('--pre-push') ? outgoingPushTips(fs.readFileSync(0, 'utf8')) : [];
-  const result = checkRepository(process.cwd(), history, tips);
+  // Check the whole repository from any working directory. Hygiene rules cover only this
+  // tool's own project directory when it is nested inside a larger repository.
+  const top = git(process.cwd(), ['rev-parse', '--show-toplevel']).toString('utf8').trim();
+  const own = path.relative(top, fileURLToPath(new URL('..', import.meta.url)));
+  const hygieneRoot = !own || own.startsWith('..') || path.isAbsolute(own) ? '' : `${own.split(path.sep).join('/')}/`;
+  const result = checkRepository(top, history, tips, hygieneRoot);
   if (result.errors.length) {
     console.error(result.errors.join('\n'));
     process.exitCode = 1;
