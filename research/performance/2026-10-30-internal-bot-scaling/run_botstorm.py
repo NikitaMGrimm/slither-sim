@@ -7,7 +7,7 @@ import subprocess
 import sys
 import threading
 import time
-from run import digest, emit
+from run import CHILD_TIMEOUT_SECONDS, digest, emit
 
 
 WARMUP_BACKSTOP_SECONDS=7800
@@ -84,7 +84,7 @@ def execute(root):
         for window in range(-1,5):
             path=output/f'window-{window}.json'
             emit('botstorm-measurement-start',population=n,window=window)
-            subprocess.run([str(binary),'measure',str(fixture),'512','plain',str(path)],check=True)
+            subprocess.run([str(binary),'measure',str(fixture),'512','plain',str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
             row=json.loads(path.read_text())
             work=tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])
             if reference is None:reference=row['finalStateSha256'];reference_work=work
@@ -92,7 +92,7 @@ def execute(root):
             if window>=0:rates.append(512/row['wallSeconds'])
             emit('botstorm-measurement-end',population=n,window=window)
         path=output/'profile.json'
-        subprocess.run([str(binary),'measure',str(fixture),'512','profile',str(path)],check=True)
+        subprocess.run([str(binary),'measure',str(fixture),'512','profile',str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
         row=json.loads(path.read_text())
         assert row['finalStateSha256']==reference
         assert tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])==reference_work
