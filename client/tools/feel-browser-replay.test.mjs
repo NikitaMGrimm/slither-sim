@@ -54,6 +54,14 @@ test('authored fractional control retains subpixel dispatches and a complete fro
   assert.equal(record.inputs[1].encoding, 'dom-event');
   assert.equal(record.inputs[2].encoding, undefined);
 });
+test('authored isolated-pointer fixture has no mousemove paired with its first movement', () => {
+  const record = JSON.parse(readFileSync(new URL('./feel-replay/browser-pointer-only-synthetic.json', import.meta.url)));
+  assert.match(record.provenance, /AUTHORED SYNTHETIC/);
+  const { schedule } = buildSchedule(record, { expectedCommands: 4, appearanceAtMs: 3 });
+  assert.deepEqual([schedule.events.length, schedule.boundaries.length, schedule.durationMs], [30, 45, 300]);
+  assert.deepEqual(record.inputs.filter(input => input.at === 10).map(input => input.type), ['pointermove']);
+});
+
 test('coordinator drains and acknowledges each identical event before the next', async () => {
   const { schedule } = syntheticFixture(), calls = [];
   const peers = ['canvas', 'wgpu'].map(name => ({ name, async step(e, data, seq) { calls.push([name, seq, data]); return { seq, sourceId: e.sourceId, atMs: e.atMs }; } }));

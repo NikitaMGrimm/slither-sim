@@ -29,10 +29,10 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
     });
     if (down) event.preventDefault();
   }
-  // Canvas and the official client consume MouseEvent coordinates. Reading the
-  // same getters admits integer CSS positions without inventing a rounding rule
-  // for PointerEvents. Both release families still clear boost, including over UI.
-  listen(realm, 'mousemove', event => pointer(event, false));
+  // Match Canvas's two movement admissions: a compatibility mousemove overwrites
+  // the fractional pointer position when present. An isolated pointermove still
+  // reaches gameplay. Press uses mouse coordinates; releases only clear boost.
+  for (const type of ['pointermove', 'mousemove']) listen(realm, type, event => pointer(event, false));
   for (const type of ['pointerdown', 'mousedown']) listen(realm, type, event => {
     pendingMouseUp = undefined;
     if (type === 'mousedown' && event.button === 0) pointer(event, true);

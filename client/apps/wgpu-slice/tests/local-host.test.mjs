@@ -164,22 +164,23 @@ test('blur retains compatibility pairing, while a new suppressed press starts a 
   }
 });
 
-test('pointer and compatibility mouse events submit each movement, press and release once', () => {
+test('movement pairs follow Canvas admissions; press and release submit once', () => {
   const f = inputFixture();
   for (const type of ['pointermove', 'mousemove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) f.fire(f.canvas, type);
-  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 600, 150, 800, 600, true], ['release']]);
+  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 600, 150, 800, 600, false],
+    ['pointer', 600, 150, 800, 600, true], ['release']]);
   const mouse = inputFixture({ pointerEvents: false });
   for (const type of ['mousemove', 'mousedown', 'mouseup']) mouse.fire(mouse.overlay, type);
-  assert.deepEqual(mouse.calls, f.calls);
+  assert.deepEqual(mouse.calls, f.calls.slice(1));
 });
 
-test('movement and press admit only mouse coordinates; release never changes the pointer', () => {
+test('compatibility movement overwrites pointer coordinates; press uses mouse; release only clears boost', () => {
   const f = inputFixture();
   // Authored DOM doubles supply the values exposed by Chromium's respective
   // getters. The browser fractional fixture exercises real DOM getters too.
   assert.equal(f.fire(f.overlay, 'pointermove', { clientX: 620.75, clientY: 180.5 }).defaultPrevented, false);
   assert.equal(f.fire(f.overlay, 'pointerdown', { clientX: 620.75, clientY: 180.5 }).defaultPrevented, false);
-  assert.deepEqual(f.calls, []);
+  assert.deepEqual(f.calls, [['pointer', 600.75, 150.5, 800, 600, false]]);
   f.fire(f.overlay, 'mousemove', { clientX: 620, clientY: 180 });
   assert.equal(f.fire(f.overlay, 'mousedown', { clientX: 621, clientY: 181 }).defaultPrevented, true);
   assert.equal(f.boosting, true);
@@ -188,9 +189,26 @@ test('movement and press admit only mouse coordinates; release never changes the
   f.fire(f.textarea, 'mouseup', { clientX: 900, clientY: 400 });
   assert.equal(f.boosting, false);
   assert.deepEqual(f.policy.snapshot().pointer, point);
-  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 601, 151, 800, 600, true], ['release']]);
+  assert.deepEqual(f.calls, [['pointer', 600.75, 150.5, 800, 600, false], ['pointer', 600, 150, 800, 600, false],
+    ['pointer', 601, 151, 800, 600, true], ['release']]);
   f.fire(f.canvas, 'mousedown', { button: 1 });
-  assert.equal(f.calls.length, 3);
+  assert.equal(f.calls.length, 4);
+});
+
+test('isolated pointer movement reaches gameplay without a compatibility mousemove', () => {
+  for (const pointerType of ['pen', 'touch', 'mouse']) {
+    const f = inputFixture();
+    // Authored stream: a canceled pointer press has no compatibility mouse
+    // events. Movement must still follow Canvas without admitting the press.
+    f.fire(f.overlay, 'pointerdown', { pointerType, defaultPrevented: true });
+    f.fire(f.overlay, 'pointermove', { pointerType, clientX: 620.75, clientY: 180.5 });
+    assert.deepEqual(f.calls, [['pointer', 600.75, 150.5, 800, 600, false]], pointerType);
+    assert.equal(f.boosting, false);
+    for (const target of [f.input, f.textarea, f.editable, f.button]) {
+      f.fire(target, 'pointermove', { pointerType });
+    }
+    assert.equal(f.calls.length, 1);
+  }
 });
 function fixture(make) {
   const log = [], sockets = [], queue = [];
