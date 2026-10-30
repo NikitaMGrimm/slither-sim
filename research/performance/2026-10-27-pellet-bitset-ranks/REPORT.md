@@ -317,12 +317,19 @@ study-entrypoint optimization-rejection checks pass. Other platforms await CI.
 
 ## Reproduction and limits
 
+The [historical wrapper](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-27-pellet-bitset-ranks/reproduce.py)
+reuses the earlier [shared-food driver](../2026-10-27-shared-food-work/reproduce.py)
+with this study's default commit pins. Retrieve its exact bytes below rather
+than using another study's defaults.
+
 ```sh
 STUDY=research/performance/2026-10-27-pellet-bitset-ranks
 OUT=/tmp/pellet-ranks-new
-python3 "$STUDY/reproduce.py" build "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" trace "$PWD" "$OUT" --cpu 3
-python3 "$STUDY/reproduce.py" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
+REPRODUCE="$OUT-reproduce.py"
+git show 76772d07098c884e9643783a0ba874bce0567e5e:research/performance/2026-10-27-pellet-bitset-ranks/reproduce.py > "$REPRODUCE"
+python3 "$REPRODUCE" build "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" trace "$PWD" "$OUT" --cpu 3
+python3 "$REPRODUCE" count "$PWD" "$OUT" --cpu 3 --perf /path/to/perf
 python3 "$STUDY/run_profile.py" 194d13047775cca92e2a7f5163e9fdd28e918073 /tmp/rank-base --cpu 3 --target /tmp/rank-profile-target
 python3 "$STUDY/run_profile.py" 81c3e503ea657f5e9416910bb4d9c8841efb9774 /tmp/rank-candidate --cpu 3 --target /tmp/rank-profile-target
 python3 "$STUDY/check.py" 47e416a3eacc99163a3af12fa5eb11af317f9e28 /tmp/rank-checks --cpu 2

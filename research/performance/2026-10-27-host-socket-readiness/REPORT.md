@@ -99,6 +99,9 @@ general bandwidth estimate. M/V bytes are shared in both protocols.
 
 ## Validation and reproduction
 
+The retained [per-thread counter](thread_counter.py) measures Linux user
+instructions, separately from wall time or CPU-time estimates.
+
 Full Linux Rust group passes, 44 focused server tests. Removing the buffered-input
 bypass fails the 33-message regression. Tests also cover fragmented/pipelined
 upgrade budgets, timeouts, due output, FD input/drain/hangup/error and fallback.

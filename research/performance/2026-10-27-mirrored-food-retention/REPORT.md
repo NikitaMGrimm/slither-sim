@@ -89,6 +89,9 @@ p90/p99, maxima, paired tick-ratio distributions and schedule checks are in JSON
 
 ## Reproduction and limits
 
+The [result selector](select.py) checks the retained raw inputs and assembles
+the published summaries and source bindings.
+
 ```sh
 STUDY=research/performance/2026-10-27-mirrored-food-retention
 OUT=/tmp/retention-new

@@ -28,7 +28,14 @@ and candidate `d781ff000d2dfee10627ab1b8a4c07bfff3638c0`. Archive each with
 `harness.patch` there; its files are execution helpers, not production changes.
 The candidate's production change and oracle are already in its archive.
 The original research-only delivery retained the measured code and oracle in
-`rejected-bounded.patch`, now [measured-bounded.patch](measured-bounded.patch).
+`rejected-bounded.patch`, now the [archived measured patch](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-29-compact-snake-history/measured-bounded.patch).
+From the repository root, retrieve its exact historical bytes into the external
+execution directory:
+
+```sh
+git show 76772d07098c884e9643783a0ba874bce0567e5e:research/performance/2026-10-29-compact-snake-history/measured-bounded.patch > /path/to/external-output/measured-bounded.patch
+```
+
 It reconstructs that code and oracle on the base. Apply either pilot patch
 on top of that bounded implementation to recover its container, reusing the
 same oracle. Reverse the pilot patch before switching to the other layout.

@@ -11,6 +11,10 @@ retain the explicitly **short-body** results below for provisional next-step
 ranking. This study changes no production code or checkpoint contract.
 [Plan and amendments](PLAN.md), [selected results and pins](results.json).
 
+For later mature-host measurements, see [mature body coverage bounds](../2026-10-28-mature-covered-bounds/REPORT.md).
+That study warms the complete backend from tick zero; it does not make this
+checkpoint-restoration attempt succeed.
+
 ## Construction and retained failures
 
 The comparison target is the 2,281-seat world's screened mean/p90/p99

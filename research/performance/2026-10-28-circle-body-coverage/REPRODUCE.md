@@ -80,7 +80,15 @@ payload; driver hashes identify the historical wrappers separately.
 ## Exploratory selection and instruction-IP diagnosis
 
 The circle pilot adds a conservative circle-to-block rejection after
-the existing square rejection; `circle.patch` preserves it against the baseline.
+the existing square rejection; the [archived circle patch](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-28-circle-body-coverage/circle.patch)
+preserves it against the baseline. The production change landed in
+[PR #253](https://github.com/NikitaMGrimm/slither-sim/pull/253).
+For exact historical patch bytes, run from the repository root:
+
+```sh
+git show 76772d07098c884e9643783a0ba874bce0567e5e:research/performance/2026-10-28-circle-body-coverage/circle.patch > /path/to/external-output/circle.patch
+```
+
 Its complete measured-window bytes and fork/parent references must match the
 baseline. Its warm stream was not recorded, and its single exploratory count is
 not a qualified five-pair performance claim. Both candidates use the same mature
