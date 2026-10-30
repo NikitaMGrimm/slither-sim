@@ -100,7 +100,7 @@ These runs do not identify the specific process responsible for v3’s 1.43 CPU-
 
 ## Verification and reproduction
 
-Per-run AWS preflight: exact v3 portable binary hashes and committed collection delta, focused syntax/service-target/protected-unit/runtime-mask-state controls, live all-process/full-proc-stat samples, inherited summed-headroom/class/gate/nearest-rank controls and seven documentation checks. The focused public check is byte-identical to the retained pre-world script. No independent review, new local Rust work or instabox access.
+Per-run AWS preflight: exact v3 portable binary hashes and committed collection delta, focused syntax/service-target/protected-unit/runtime-mask-state controls, live all-process/full-proc-stat samples, inherited summed-headroom/class/gate/nearest-rank controls and seven documentation checks. The focused public check is byte-identical to the retained pre-world script. No independent review, new local Rust work or other bench host.
 
 Both full online/offline results are compared before selection, including every tail and maximum; four deliberate p50/p99/p99.9/max perturbations are detected per run. [Run-1 replay](run-1-replay.json), [run-2 replay](run-2-replay.json), [proof bindings](preflight.json). No omitted fields, tolerance or changed gate.
 

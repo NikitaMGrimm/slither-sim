@@ -102,7 +102,7 @@ artifact Internet transfer <=512 MiB. The $0.40 reserve covers six public IPv4
 allocations (<$0.05 over the bound), 34 GiB/pair of gp3 storage for these short
 lifetimes, bounded Internet artifact egress and a margin. No extra build instance.
 All first-pair tests happen before warmup on its generator, inside this budget.
-No local Rust/heavy work; no instabox access. No competing work during timing.
+No local Rust/heavy work and no other bench host. No competing work during timing.
 
 Retrieve/hash each archive; terminate task instances and verify task volumes
 gone before another pair. At the end delete task key/security group and scan

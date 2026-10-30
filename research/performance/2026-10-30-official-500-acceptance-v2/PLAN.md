@@ -117,7 +117,7 @@ the prospective gate controls, token controls and docs checks. After these pass,
 commit this final plan and harness, record the commit in execution receipts, and
 verify staged source/binary identities before starting tick zero. Building and
 these tests use the first generator within its existing lifetime/budget, not an
-extra instance. No instabox access or local Rust work.
+extra instance. No other bench host or local Rust work.
 
 ## Unchanged collection, gates and stop rule
 

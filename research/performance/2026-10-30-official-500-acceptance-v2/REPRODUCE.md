@@ -32,7 +32,7 @@ other-seat decisions in 650 ms with no lateness reaching 42 ms. The mutation
 executes those jobs synchronously and must fail. These are synthetic generator
 contract checks, not host capacity evidence. Commit the final plan/harness after
 these checks and before starting any host world. Verify the staged files match
-that commit. No instabox or local Rust work is permitted.
+that commit. No other bench host or local Rust work is permitted.
 
 Follow the frozen plan for both fresh pairs and the unchanged one-second gate,
 including boundary-overlapping reports. Run the metric normalizer before
