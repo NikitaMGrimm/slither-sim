@@ -379,7 +379,8 @@ traces match for each row. #331's discarded/counted/profiled worlds also equal
 the original main state over the same 512 ticks. This establishes the measured
 continuations only, not a universal exactness proof for that external PR.
 Seventeen method tests and both raw-data reducers pass; the report's twelve
-tables are regenerated/checked from the selected JSON. No production Rust
+tables are regenerated/checked from the selected JSON; all seven offline
+documentation tests pass. Source/privacy and whitespace checks pass. No production Rust
 source changes; no full Rust check group was needed or run for this report.
 
 Qualified A4 warmups first passed at 86k/86k/90k ticks but saved at
@@ -404,4 +405,6 @@ transferred copy is hash-verified before source cleanup.
 
 Only study tooling, selected evidence and the research index row change. No
 CHANGELOG entry, runtime change or deployment. No AWS resources or external game
-servers were used. Guest cleanup/release is recorded after the verified transfer.
+servers were used. The local archive size/hash passed before deletion. [Cleanup](cleanup.json)
+confirms no study processes remain and its guest target, source and archives
+were removed at 18:45 UTC. The guest is released.
