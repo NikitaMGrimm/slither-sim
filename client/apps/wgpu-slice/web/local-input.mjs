@@ -29,13 +29,13 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
     });
     if (down) event.preventDefault();
   }
-  // Use one movement/press family so pointer + compatibility mouse events do not
-  // submit twice. Both release families may clear a press, including over UI.
-  const family = typeof realm.PointerEvent === 'function' ? 'pointer' : 'mouse';
-  listen(realm, `${family}move`, event => pointer(event, false));
+  // Canvas and the official client consume MouseEvent coordinates. Reading the
+  // same getters admits integer CSS positions without inventing a rounding rule
+  // for PointerEvents. Both release families still clear boost, including over UI.
+  listen(realm, 'mousemove', event => pointer(event, false));
   for (const type of ['pointerdown', 'mousedown']) listen(realm, type, event => {
     pendingMouseUp = undefined;
-    if (type === `${family}down` && event.button === 0) pointer(event, true);
+    if (type === 'mousedown' && event.button === 0) pointer(event, true);
     else observeInput?.(event, 'filtered-family-or-button');
   });
   listen(realm, 'pointerup', release);

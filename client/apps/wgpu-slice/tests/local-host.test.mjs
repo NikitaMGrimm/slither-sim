@@ -59,19 +59,19 @@ function inputFixture({ pointerEvents = true, observeInput } = {}) {
 
 test('read-only receipts retain filtered events and compatibility releases', () => {
   const receipts = [], f = inputFixture({ observeInput: (event, stage) => receipts.push([event.type, stage]) });
-  f.fire(f.textarea, 'pointerdown');
+  f.fire(f.textarea, 'mousedown');
   f.fire(f.canvas, 'pointerup'); f.fire(f.input, 'mouseup');
-  assert.deepEqual(receipts, [['pointerdown', 'received'], ['pointerdown', 'filtered-target'],
+  assert.deepEqual(receipts, [['mousedown', 'received'], ['mousedown', 'filtered-target'],
     ['pointerup', 'received'], ['pointerup', 'gameplay'], ['mouseup', 'received'], ['mouseup', 'filtered-compatibility']]);
   assert.equal(f.calls.filter(call => call[0] === 'release').length, 1);
 });
 
 test('window capture tracks canvas and overlay coordinates in the game viewport', () => {
   const f = inputFixture();
-  f.fire(f.canvas, 'pointermove'); f.fire(f.overlay, 'pointermove');
+  f.fire(f.canvas, 'mousemove'); f.fire(f.overlay, 'mousemove');
   assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 600, 150, 800, 600, false]]);
-  f.fire(f.overlay, 'pointerdown'); assert.equal(f.boosting, true);
-  f.abort.abort(); f.fire(f.canvas, 'pointermove'); assert.equal(f.calls.length, 3);
+  f.fire(f.overlay, 'mousedown'); assert.equal(f.boosting, true);
+  f.abort.abort(); f.fire(f.canvas, 'mousemove'); assert.equal(f.calls.length, 3);
 });
 
 test('input, textarea and inherited contenteditable suppress presses and keep editing defaults', () => {
@@ -80,7 +80,7 @@ test('input, textarea and inherited contenteditable suppress presses and keep ed
     for (const code of ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape']) {
       assert.equal(f.fire(target, 'keydown', { code }).defaultPrevented, false);
     }
-    for (const type of ['pointermove', 'pointerdown']) assert.equal(f.fire(target, type).defaultPrevented, false);
+    for (const type of ['pointermove', 'pointerdown', 'mousemove', 'mousedown']) assert.equal(f.fire(target, type).defaultPrevented, false);
   }
   assert.deepEqual(f.calls, []); assert.equal(f.starts, 0); assert.equal(f.stops, 0);
 });
@@ -92,7 +92,9 @@ test('button Space and Enter retain activation defaults without gameplay press o
     assert.equal(f.fire(f.button, 'keyup', { code }).defaultPrevented, false);
   }
   assert.deepEqual(f.calls, [['key', 'Space', false], ['key', 'Enter', false]]);
-  f.fire(f.button, 'pointerdown'); assert.equal(f.boosting, false);
+  for (const type of ['pointermove', 'pointerdown', 'mousemove', 'mousedown']) f.fire(f.button, type);
+  assert.equal(f.boosting, false);
+  assert.deepEqual(f.calls, [['key', 'Space', false], ['key', 'Enter', false]]);
   assert.equal(f.starts, 0);
   f.fire(f.canvas, 'keydown', { code: 'Enter' }); assert.equal(f.starts, 1);
   f.fire(f.canvas, 'keydown', { code: 'Escape' }); assert.equal(f.stops, 1);
@@ -103,7 +105,7 @@ test('canvas presses release over editors and controls for both pointer and mous
   const f = inputFixture();
   for (const target of [f.input, f.textarea, f.editable, f.button, f.overlay]) {
     for (const type of ['pointerup', 'mouseup', 'pointercancel']) {
-      f.fire(f.canvas, 'pointerdown'); assert.equal(f.boosting, true);
+      f.fire(f.canvas, 'mousedown'); assert.equal(f.boosting, true);
       assert.equal(f.fire(target, type).defaultPrevented, false); assert.equal(f.boosting, false);
     }
     for (const [code, field] of [['Space', 'boostKeyHeld'], ['ArrowLeft', 'leftHeld'], ['ArrowRight', 'rightHeld'], ['ArrowUp', 'boostKeyHeld']]) {
@@ -116,7 +118,7 @@ test('canvas presses release over editors and controls for both pointer and mous
 test('blur and visibility loss preserve input policy until genuine releases arrive', () => {
   const f = inputFixture();
   for (const type of ['blur', 'visibilitychange']) {
-    f.fire(f.canvas, 'pointerdown'); f.fire(f.canvas, 'keydown', { code: 'Space' });
+    f.fire(f.canvas, 'mousedown'); f.fire(f.canvas, 'keydown', { code: 'Space' });
     f.fire(f.canvas, 'keydown', { code: 'ArrowLeft' });
     f.document.hidden = false; f.fire(f.document, 'visibilitychange'); assert.equal(f.boosting, true);
     f.document.hidden = true; f.fire(type === 'blur' ? f.realm : f.document, type);
@@ -169,6 +171,26 @@ test('pointer and compatibility mouse events submit each movement, press and rel
   const mouse = inputFixture({ pointerEvents: false });
   for (const type of ['mousemove', 'mousedown', 'mouseup']) mouse.fire(mouse.overlay, type);
   assert.deepEqual(mouse.calls, f.calls);
+});
+
+test('movement and press admit only mouse coordinates; release never changes the pointer', () => {
+  const f = inputFixture();
+  // Authored DOM doubles supply the values exposed by Chromium's respective
+  // getters. The browser fractional fixture exercises real DOM getters too.
+  assert.equal(f.fire(f.overlay, 'pointermove', { clientX: 620.75, clientY: 180.5 }).defaultPrevented, false);
+  assert.equal(f.fire(f.overlay, 'pointerdown', { clientX: 620.75, clientY: 180.5 }).defaultPrevented, false);
+  assert.deepEqual(f.calls, []);
+  f.fire(f.overlay, 'mousemove', { clientX: 620, clientY: 180 });
+  assert.equal(f.fire(f.overlay, 'mousedown', { clientX: 621, clientY: 181 }).defaultPrevented, true);
+  assert.equal(f.boosting, true);
+  const point = { ...f.policy.snapshot().pointer };
+  f.fire(f.textarea, 'pointerup', { clientX: 900.75, clientY: 400.5 });
+  f.fire(f.textarea, 'mouseup', { clientX: 900, clientY: 400 });
+  assert.equal(f.boosting, false);
+  assert.deepEqual(f.policy.snapshot().pointer, point);
+  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 601, 151, 800, 600, true], ['release']]);
+  f.fire(f.canvas, 'mousedown', { button: 1 });
+  assert.equal(f.calls.length, 3);
 });
 function fixture(make) {
   const log = [], sockets = [], queue = [];

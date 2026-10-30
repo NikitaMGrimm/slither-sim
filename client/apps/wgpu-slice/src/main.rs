@@ -517,7 +517,10 @@ mod desktop {
                     WindowEvent::ScaleFactorChanged { .. } => r.schedule.invalidate(),
                     WindowEvent::CursorMoved { position, .. } => {
                         let d = r.window.scale_factor();
-                        r.cursor = [position.x / d, position.y / d];
+                        r.cursor = slither_client::desktop_input::mouse_client_position(
+                            [position.x, position.y],
+                            d,
+                        );
                         r.pointer(false)?;
                     }
                     WindowEvent::MouseInput {

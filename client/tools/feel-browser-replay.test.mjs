@@ -39,6 +39,21 @@ test('DOM normalization preserves both families and maps explicit peer targets',
   for (const peer of ['canvas-wasm', 'webgpu-wasm']) for (const target of ['overlay', 'input', 'textarea', 'editable', 'button']) assert.equal(targetFor(peer, target), `#replay-${target}`);
   assert.throws(() => normalizeInput({ type: 'mousemove', x: 1.1, y: 0 }), /normalized pointer/);
 });
+
+test('authored fractional control retains subpixel dispatches and a complete frozen schedule', () => {
+  const record = JSON.parse(readFileSync(new URL('./feel-replay/browser-fractional-synthetic.json', import.meta.url)));
+  assert.match(record.provenance, /AUTHORED SYNTHETIC/);
+  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: 4, appearanceAtMs: 3 });
+  assert.deepEqual([schedule.events.length, schedule.boundaries.length, schedule.durationMs], [31, 45, 300]);
+  assert.equal(schedule.boundaries.filter(b => b.phase === 'draw').length, 22);
+  for (const input of deliveries.filter(row => /^(pointer|mouse)/.test(row?.type))) {
+    const point = normalizeInput(input, { width: 961, height: 541 });
+    assert.notEqual(point.x, Math.floor(point.x));
+    assert.notEqual(point.y, Math.floor(point.y));
+  }
+  assert.equal(record.inputs[1].encoding, 'dom-event');
+  assert.equal(record.inputs[2].encoding, undefined);
+});
 test('coordinator drains and acknowledges each identical event before the next', async () => {
   const { schedule } = syntheticFixture(), calls = [];
   const peers = ['canvas', 'wgpu'].map(name => ({ name, async step(e, data, seq) { calls.push([name, seq, data]); return { seq, sourceId: e.sourceId, atMs: e.atMs }; } }));
