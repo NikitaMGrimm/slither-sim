@@ -18,6 +18,19 @@ Record both summaries, output-state identity and elapsed/CPU overhead ratios.
 Sampled timing is never substituted for a primary observation. If 10,000's
 warmup is censored, label that diagnostic's ecology explicitly unqualified.
 
+Before diagnostic execution, add one matched `StepProfile` continuation after
+the plain and sampled continuations. Require the same final state, retain its
+overhead ratio and CPU phase bounds, and keep its operation counts. The plain
+diagnostic's observation, decision and world costs remain a single diagnostic
+window, explicitly separate from five-window primary rows. This also provides
+a bounded cost profile if 10k never qualifies; it does not relabel that ecology.
+
+The read-only checkpoint census also computes the dense pickup grid's rectangle,
+cover-area and food-relative limits using public `physics::pickup_circle` and
+the frozen source's 128-unit cells. This is snapshot geometry, not an observed
+branch trace: each real step builds circles after movement and deaths. Combine
+it with sampled stacks and `StepProfile` work counts before diagnosing a fallback.
+
 Retain only tick-operation stacks for phase attribution; identify loading and
 priming separately. Retain unresolvable/unwound samples. Use source lines and
 inlined functions to separate index construction, food-order restoration,

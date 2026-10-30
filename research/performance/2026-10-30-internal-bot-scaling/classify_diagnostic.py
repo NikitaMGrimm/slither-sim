@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import re
 import sys
+from run import digest
+from reduce import mode_summary, phase_summary
 
 
 def records(path):
@@ -43,6 +45,8 @@ def classify(root):
     }
     overhead=json.loads((root/'diagnostic/overhead.json').read_text())
     result={'attribution':'sampled user CPU, source context; inclusive subfunctions assigned once; not removable shares',
+            'pins':json.loads((root/'diagnostic/pins.json').read_text()),
+            'classifierSha256':digest(Path(__file__)),
             'sourceRanges':ranges,'windows':[]}
     for n in [1000,10000]:
         all_samples=collections.Counter();phases=collections.Counter();observations=collections.Counter()
@@ -72,7 +76,13 @@ def classify(root):
         def shares(counts,total):
             return {key:{'sampleNanoseconds':value,'share':value/total if total else None}
                     for key,value in counts.most_common()}
+        ordinary=json.loads((root/f'diagnostic/{n}-ordinary.json').read_text())
+        profiled=json.loads((root/f'diagnostic/{n}-phases.json').read_text())
+        assert ordinary['finalStateSha256']==profiled['finalStateSha256']
         result['windows'].append({'population':n,'overhead':next(v for v in overhead if v['population']==n),
+             'unsampledDiagnosticCosts':mode_summary([ordinary]),
+             'stepProfileDiagnostic':phase_summary(profiled,[ordinary]),
+             'initialCensus':ordinary['initial'],'finalCensus':ordinary['final'],
              'lostSamples':int(lost[1].replace(',','')) if lost else None,'coverage':dict(all_samples),
              'operationPhases':shares(phases,all_samples['operation']),
              'observationBuckets':shares(observations,phases['observation'])})

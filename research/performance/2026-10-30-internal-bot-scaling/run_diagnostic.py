@@ -66,10 +66,13 @@ def execute(root):
                             '--stdio','--no-children','-g','none','--percent-limit','0.5'],stdout=out,check=True)
         a=json.loads(ordinary.read_text());b=json.loads(profiled.read_text())
         assert a['finalStateSha256']==b['finalStateSha256']
+        phase_path=output/f'{n}-phases.json'
+        subprocess.run([str(binary),'measure',str(fixture),'serial','512','profile',str(phase_path)],check=True)
+        assert json.loads(phase_path.read_text())['finalStateSha256']==a['finalStateSha256']
         reference=directory/'verify-serial.json'
         if reference.exists():assert a['finalStateSha256']==json.loads(reference.read_text())['finalStateSha256']
         qualification=json.loads((directory/'warm-qualification.json').read_text())
-        summaries.append({'population':n,'stabilized':qualification['stabilized'],
+        summaries.append({'population':n,'fixtureAttempt':directory.name,'stabilized':qualification['stabilized'],
                           'ordinaryProcessCpuSeconds':a['processCpuSeconds'],
                           'sampledProcessCpuSeconds':b['processCpuSeconds'],
                           'cpuRatio':b['processCpuSeconds']/a['processCpuSeconds'],

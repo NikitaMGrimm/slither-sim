@@ -99,6 +99,26 @@ fn main() {
         let mut prey = Vec::new();
         let mut opponents = Vec::new();
         let mut anchors = Vec::new();
+        let mut lo = [i64::MAX; 2];
+        let mut hi = [i64::MIN; 2];
+        let mut area = 0usize;
+        let mut regular = true;
+        let mut circles = 0usize;
+        for snake in scene.world.snakes().iter().filter(|s| s.alive) {
+            let (center, radius) = slither_sim::physics::pickup_circle(
+                snake.head, snake.heading, snake.speed, snake.segments);
+            regular &= radius >= 0.0 && center.x.abs() + radius <= 1048576.0
+                && center.y.abs() + radius <= 1048576.0;
+            let lower = [((center.x-radius-1e-9)/128.0).floor() as i64,
+                         ((center.y-radius-1e-9)/128.0).floor() as i64];
+            let upper = [((center.x+radius+1e-9)/128.0).floor() as i64,
+                         ((center.y+radius+1e-9)/128.0).floor() as i64];
+            for axis in 0..2 { lo[axis]=lo[axis].min(lower[axis]);hi[axis]=hi[axis].max(upper[axis]); }
+            area=area.saturating_add(((upper[0]-lower[0]+1)*(upper[1]-lower[1]+1)) as usize);
+            circles+=1;
+        }
+        let cells = if circles==0 { 0 } else { ((hi[0]-lo[0]+1)*(hi[1]-lo[1]+1)) as usize };
+        let food_limit = scene.world.food().len().saturating_mul(4).max(4096);
         for phase in 0..6 {
             scene.world.observe_selected_into(&scene.masks[phase], &mut scene.observations[phase]).unwrap();
             for observation in scene.observations[phase].iter().flatten() {
@@ -117,6 +137,11 @@ fn main() {
         assert_eq!(before,serde_json::to_vec(&scene.world.checkpoint().unwrap()).unwrap());
         fs::write(&args[3],serde_json::to_vec_pretty(&json!({"food":summarize(food),"prey":summarize(prey),
             "opponents":summarize(opponents),"opponentAnchors":summarize(anchors),
+            "pickupGridSnapshot":{"circles":circles,"cellSize":128,"rectangleCells":cells,
+                "totalCoverCells":area,"fixedCellLimit":1048576,"foodRelativeCellLimit":food_limit,
+                "regularGeometry":regular,
+                "fitsDenseGridGuards":regular && cells<=1048576.min(food_limit) && area<=1048576,
+                "scope":"read-only checkpoint pickup circles; actual step builds after movement and deaths"},
             "scope":"read-only checkpoint census, all six selected masks; no policy decisions or physics"})).unwrap()).unwrap();
     } else if args[1] == "warm" {
         fs::create_dir_all(root).unwrap();
