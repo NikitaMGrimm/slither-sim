@@ -1,0 +1,78 @@
+{
+  "scope": "Full requested-window covering census bracket; no exclusions",
+  "deferredTicks": 126,
+  "events": [
+    {
+      "beforeTick": 301000,
+      "afterTick": 301100,
+      "beforeOffsetSeconds": 745.8482403755188,
+      "afterOffsetSeconds": 746.819682598114,
+      "deferredDelta": 29,
+      "censusWallGapSeconds": 0.9714422225952148,
+      "completedTickSeconds": 0.7000000000000001
+    },
+    {
+      "beforeTick": 301100,
+      "afterTick": 301200,
+      "beforeOffsetSeconds": 746.819682598114,
+      "afterOffsetSeconds": 747.8064846992493,
+      "deferredDelta": 40,
+      "censusWallGapSeconds": 0.9868021011352539,
+      "completedTickSeconds": 0.7000000000000001
+    },
+    {
+      "beforeTick": 301200,
+      "afterTick": 301300,
+      "beforeOffsetSeconds": 747.8064846992493,
+      "afterOffsetSeconds": 748.8277280330658,
+      "deferredDelta": 47,
+      "censusWallGapSeconds": 1.0212433338165283,
+      "completedTickSeconds": 0.7000000000000001
+    },
+    {
+      "beforeTick": 301300,
+      "afterTick": 301400,
+      "beforeOffsetSeconds": 748.8277280330658,
+      "afterOffsetSeconds": 749.4112071990967,
+      "deferredDelta": 10,
+      "censusWallGapSeconds": 0.5834791660308838,
+      "completedTickSeconds": 0.7000000000000001
+    }
+  ],
+  "largestBracketedBusyWallTicks": [
+    {
+      "tick": 301112,
+      "simulationCpuMs": 2.94369,
+      "socketCpuMs": 2.24467,
+      "bracketedBusyWallMs": 23.640264
+    },
+    {
+      "tick": 301176,
+      "simulationCpuMs": 4.83002,
+      "socketCpuMs": 4.01609,
+      "bracketedBusyWallMs": 18.596489
+    },
+    {
+      "tick": 301248,
+      "simulationCpuMs": 5.2064,
+      "socketCpuMs": 3.08398,
+      "bracketedBusyWallMs": 16.124358
+    },
+    {
+      "tick": 301108,
+      "simulationCpuMs": 2.58133,
+      "socketCpuMs": 2.65118,
+      "bracketedBusyWallMs": 15.835056
+    },
+    {
+      "tick": 301256,
+      "simulationCpuMs": 2.79021,
+      "socketCpuMs": 3.53664,
+      "bracketedBusyWallMs": 15.671556
+    }
+  ],
+  "clientFrameGapMaxMs": 238.007,
+  "clientFrameExcessP99Ms": 883.503,
+  "clientFrameExcessMaxMs": 1142.652,
+  "limits": "Busy wall brackets the tick body/handoff, not every wait between ticks. Retained counters do not identify a scheduler, kernel, storage or hypervisor cause."
+}

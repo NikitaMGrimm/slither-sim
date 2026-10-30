@@ -97,14 +97,14 @@ fn death_through_draw_expiry_and_restart_keep_complete_observations() {
     assert!(!recorder.has_failed());
     let rows = recorder.take();
     assert_eq!(rows.len(), 42);
-    let expired: Vec<_> = rows.iter().filter(|r| r.values[137] == 1.).collect();
+    let expired: Vec<_> = rows.iter().filter(|r| r.values[11] == 1.).collect();
     assert!(!expired.is_empty());
-    // Camera prefix is 13 + 124 cells. Expired own retains all raw channels
+    // Camera prefix is 11 cells. Expired own retains semantic channels/body
     // but omits the six head/pupil projection cells skipped by production draw.
     assert!(
         expired
             .iter()
-            .all(|r| r.values[138] >= 1. && r.values.len() == 405)
+            .all(|r| r.values[12] >= 1. && r.values.len() == 38 + 2 * r.values[37] as usize)
     );
     client.reset();
     client
@@ -120,7 +120,7 @@ fn death_through_draw_expiry_and_restart_keep_complete_observations() {
     assert!(
         restarted
             .iter()
-            .all(|r| r.values[137] == 0. && r.values.len() == 411)
+            .all(|r| r.values[11] == 0. && r.values.len() == 44 + 2 * r.values[37] as usize)
     );
 }
 

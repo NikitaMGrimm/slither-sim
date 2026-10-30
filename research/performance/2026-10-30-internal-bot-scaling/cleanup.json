@@ -1,0 +1,10 @@
+{
+  "verifiedAtUtc": "2026-10-30T18:45:27.441824+00:00",
+  "taskProcessesRemaining": 0,
+  "taskSourceAndTargetRemoved": true,
+  "taskGuestArchivesRemoved": true,
+  "localArchiveSha256": "6207e45561438ed30bf55f688982dcb2b15c33daeeb24e8763cf1012354906fd",
+  "localArchiveSizeAndHashVerifiedBeforeRemoval": true,
+  "guestReleased": true,
+  "awsResourcesUsed": false
+}

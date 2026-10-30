@@ -1,3 +1,4 @@
+import { screen, transforms, alpha } from './render-budget.mjs';
 import assert from 'node:assert/strict';
 import { Path2D, recordPatternPath } from './pattern-path-fixture.mjs';
 import { bundle, syntheticScene, syntheticSetup } from '../web/synthetic-scene.mjs';
@@ -150,11 +151,12 @@ export async function staticAccessoryRenderSmoke(wasm, options = {}) {
     const draws = images(f); eq(draws.length, selected.length);
     for (let i = 0; i < selected.length; i++) {
       const m = selected[i].snake, h = m.eyes.heading, z = camera.zoom, D = g.forward * m.scale, M = (m.scale * z) * g.imageScale;
-      eq(draws[i].transforms, [['setTransform', 1, 0, 0, 1, 0, 0],
+      transforms(draws[i].transforms, [['setTransform', 1, 0, 0, 1, 0, 0],
         ['translate', f.target.width / 2 + ((Math.cos(h) * D + m.correctedX) - camera.absoluteX) * z,
           f.target.height / 2 + ((Math.sin(h) * D + m.correctedY) - camera.absoluteY) * z], ['rotate', h]], 'W01/W02 ordered translation, captured heading and no gaze');
-      eq(draws[i].args, [0, 0, 20, 12, (-M) * g.pivotX, (-M) * g.pivotY, M * 20, M * 12], 'W03/W06 explicit origin crop');
-      const base = m.spawnProgress * (1 - m.deathProgress); eq(draws[i].alpha, base * base, 'W07 squared spawn/death');
+      eq(draws[i].args.slice(0, 4), [0, 0, 20, 12]);
+      screen(draws[i].args.slice(4), [(-M) * g.pivotX, (-M) * g.pivotY, M * 20, M * 12], 'projected accessory');
+      const base = m.spawnProgress * (1 - m.deathProgress); alpha(draws[i].alpha, base * base, 'W07 squared spawn/death');
       eq(draws[i].blend, 'source-over');
     }
     eq(f.target.context.stack.length, 0); cases++;

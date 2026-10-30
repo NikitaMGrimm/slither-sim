@@ -10,7 +10,6 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame, LoginProfile},
     gpu::{Renderer, instance},
     native::{Event, Transport},
-    official::Preparation,
 };
 use std::{
     collections::BTreeSet,
@@ -556,43 +555,20 @@ fn terminal_reason(phase: Phase) -> Option<&'static str> {
 
 pub fn run(
     options: Options,
-    endpoint: Option<&str>,
-    official: bool,
-    server: Option<&str>,
+    endpoint: &str,
     nickname: &str,
     skin: u8,
     cosmetics: Option<slither_wgpu_slice::cosmetics::Cosmetics>,
 ) -> Result<()> {
     let started = Instant::now();
     let mut summary = Summary {
-        server: endpoint
-            .map(str::to_owned)
-            .or_else(|| server.map(str::to_owned)),
+        server: Some(endpoint.to_owned()),
         ..Default::default()
     };
     let result = (|| {
         output_directory(&options.frames)?;
         let gpu = Offscreen::new()?;
-        let (endpoint, profile) = if official {
-            let mut preparation = Preparation::start(server.map(str::to_owned))?;
-            loop {
-                if started.elapsed() >= options.duration {
-                    preparation.cancel();
-                    return Err("duration reached during acquisition".into());
-                }
-                if let Some(result) = preparation.poll() {
-                    let prepared = result?;
-                    break (prepared.endpoint, prepared.profile);
-                }
-                thread::sleep(Duration::from_millis(10));
-            }
-        } else {
-            (
-                endpoint.ok_or("Headless endpoint required")?.into(),
-                LoginProfile::default(),
-            )
-        };
-        summary.server = Some(endpoint.clone());
+        let profile = LoginProfile::default();
         summary.version = Some(profile.client_version);
         if started.elapsed() >= options.duration {
             return Err("duration reached before Play".into());
@@ -601,7 +577,7 @@ pub fn run(
         if let Some(cosmetics) = cosmetics {
             game.configure_cosmetics(cosmetics)?;
         }
-        game.play_with_profile(&endpoint, nickname, skin, &profile)?;
+        game.play_with_profile(endpoint, nickname, skin, &profile)?;
         drop(profile);
         Host {
             game,

@@ -11,10 +11,8 @@ server remain exact. Visual error must never change a sent angle byte, a
 dead-zone branch or a cadence decision, including when camera projection feeds
 pointer input. Keep exact command fixtures at these boundaries.
 
-Until its migration lands, the current replay comparator stays exact for
-same-core replay; cross-target mode tolerates only declared platform-math float
-differences. The budgets below define the intended policy, not its current
-executable behavior.
+The offline replay comparator implements the budgets below as `feel-perceptual-v1`
+with plain-JSON schedule/trace v3 and manifest v2.
 
 ## Channel budgets
 

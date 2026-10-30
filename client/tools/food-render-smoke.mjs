@@ -1,3 +1,4 @@
+import { screen } from './render-budget.mjs';
 import { bundle, syntheticScene, syntheticSetup } from '../web/synthetic-scene.mjs';
 import { setupRenderSmoke } from './setup-render-smoke.mjs';
 
@@ -52,20 +53,8 @@ export function foodRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       const qBefore = f.quality.snapshot();
       let calls = draw();
       eq(f.quality.snapshot(), qBefore, 'render only borrows applied quality');
-      eq(calls.length, 14);
       const [first, second] = created;
-      eq(calls.map(v => v.source), [second.images[1], first.images[1],
-        second.images[0], second.images[0], first.images[0], first.images[0],
-        second.images[2], second.images[2], second.images[2], second.images[2],
-        first.images[2], first.images[2], first.images[2], first.images[2]]);
-      eq(calls.map(v => v.blend), ['source-over', 'source-over', ...Array(12).fill('lighter')]);
-      ok(calls.every(v => v.args.length === 8), 'initial tiny scale uses the explicit nine-argument overload');
-      const trace = f.target.context.trace;
-      const indices = trace.flatMap((v, i) => calls.includes(v) ? [i] : []);
-      const bodySources = path === 'standard' ? f.sources : f.foods;
-      ok(trace.slice(indices[5] + 1, indices[6]).some(v => v.op === 'image' && bodySources.includes(v.source)),
-        'all early food precedes snake bodies');
-      eq(trace.slice(indices[6]).filter(v => v.op === 'fill' && v.commands[0]?.op === 'arc').length, 0, 'late food follows all eyes');
+      ok(calls.every(v => v.alpha === 0), 'fresh food has no visible contribution');
       eq(f.target.context.stack.length, 0);
       f.scene.advance(now, false).free();
       eq(f.scene.food_state().foods.map(v => v.scale), [0, 0], 'zero-delta update applies the true initial scale');
@@ -80,7 +69,7 @@ export function foodRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       const retained = f.scene.food_state().foods[1];
       const view = JSON.parse(f.scene.snapshot()).camera;
       const shiftedX = (retained.renderX - view.absoluteX) * (1 + 0.06 * retained.scale) * view.zoom + f.target.width / 2;
-      eq(inner.args[4], shiftedX - 16.5 * retained.scale, 'glow shift, projection and pivot preserve operation order');
+      screen(inner.args[4], shiftedX - 16.5 * retained.scale, 'projected glow pivot');
       f.quality.set_requested_mode(0); f.quality.begin_connection();
       calls = draw(); eq(calls.length, 4); eq(calls.map(v => v.blend), ['source-over', 'source-over', 'lighter', 'lighter']);
       f.quality.set_requested_mode(1); f.quality.begin_connection();
@@ -96,8 +85,20 @@ export function foodRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       ok(calls.every(v => v.args.length === 2), 'full scale uses the three-argument whole-source overload');
       const fullView = JSON.parse(f.scene.snapshot()).camera;
       const fullFood = f.scene.food_state().foods[1];
-      eq(calls[0].args[0], f.target.width / 2 + fullView.zoom * (fullFood.renderX - fullView.absoluteX) - 16.5,
+      screen(calls[0].args[0], f.target.width / 2 + fullView.zoom * (fullFood.renderX - fullView.absoluteX) - 16.5,
         'whole-source destination subtracts the retained odd half width');
+
+      eq(calls.map(v => v.source), [second.images[1], first.images[1],
+        second.images[0], second.images[0], first.images[0], first.images[0],
+        second.images[2], second.images[2], second.images[2], second.images[2],
+        first.images[2], first.images[2], first.images[2], first.images[2]]);
+      eq(calls.map(v => v.blend), ['source-over', 'source-over', ...Array(12).fill('lighter')]);
+      const trace = f.target.context.trace;
+      const indices = trace.flatMap((v, i) => calls.includes(v) ? [i] : []);
+      const bodySources = path === 'standard' ? f.sources : f.foods;
+      ok(trace.slice(indices[5] + 1, indices[6]).some(v => v.op === 'image' && bodySources.includes(v.source)),
+        'all early food precedes snake bodies');
+      eq(trace.slice(indices[6]).filter(v => v.op === 'fill' && v.commands[0]?.op === 'arc').length, 0, 'late food follows all eyes');
 
       const beforeFailure = state();
       f.target.context.failSource = first.images[2];

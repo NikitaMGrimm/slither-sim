@@ -74,8 +74,25 @@ export function preyRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       eq(f.scene.prey_state(), state, 'prey diagnostics and typed arrays are copied');
       const beforeDraw = f.scene.prey_state();
       let calls = draw();
-      eq(calls.length, 12, lane + ': two prey submit every zero-alpha call');
       eq(f.scene.prey_state(), beforeDraw, 'draw does not consume prey state or corrections');
+      ok(calls.every(c => c.alpha === 0), 'fresh prey has no visible contribution');
+      eq(f.target.context.stack.length, 0);
+
+      f.scene.advance(now, false).free();
+      eq(f.scene.prey_state().preys.map(p => p.scale), [0, 0]);
+      f.quality.set_requested_mode(0); f.quality.begin_connection();
+      while (now < 1280) f.scene.advance(now += 40, false).free();
+      state = f.scene.prey_state();
+      eq(state.preys.map(p => p.scale), [1, 1]);
+      calls = draw();
+      ok(created.every(prey => calls.some(c => c.alpha > 0 && prey.images.includes(c.source))),
+        'each full-scale prey remains visible in low quality');
+      assertArenaEdge(f, { eq, ok });
+      f.quality.set_requested_mode(1); f.quality.begin_connection();
+      calls = draw();
+      eq(calls.slice(0, 4).map(c => c.args.length), [2, 2, 2, 2]);
+      eq(calls.slice(4).map(c => c.args.length), [2, 2, 8, 8, 2, 2, 8, 8],
+        'full body/inner use whole-source overload; outer always uses nine arguments');
       eq(calls.map(c => c.source), [
         created[1].images[1], created[1].images[1], created[0].images[1], created[0].images[1],
         ...Array(4).fill(created[1].images[4]), ...Array(4).fill(created[0].images[4]),
@@ -92,21 +109,6 @@ export function preyRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, ok
       ok(last(foods[0].images[2]) < index(created[1].images[4]),
         'food early < prey early < snakes/eyes < food late < prey late');
       assertArenaEdge(f, { eq, ok });
-      eq(f.target.context.stack.length, 0);
-
-      f.scene.advance(now, false).free();
-      eq(f.scene.prey_state().preys.map(p => p.scale), [0, 0]);
-      f.quality.set_requested_mode(0); f.quality.begin_connection();
-      eq(draw().length, 12, 'prey calls survive LQ/blend-zero food suppression');
-      assertArenaEdge(f, { eq, ok });
-      f.quality.set_requested_mode(1); f.quality.begin_connection();
-      while (now < 1280) f.scene.advance(now += 40, false).free();
-      state = f.scene.prey_state();
-      eq(state.preys.map(p => p.scale), [1, 1]);
-      calls = draw();
-      eq(calls.slice(0, 4).map(c => c.args.length), [2, 2, 2, 2]);
-      eq(calls.slice(4).map(c => c.args.length), [2, 2, 8, 8, 2, 2, 8, 8],
-        'full body/inner use whole-source overload; outer always uses nine arguments');
       const beforeReset = allState(), beforeTrace = f.target.context.trace.slice();
       rejects(() => f.scene.render(f.target, ...f.foods, f.background, 1, false));
       eq(allState(), beforeReset); eq(f.target.context.trace, beforeTrace);
