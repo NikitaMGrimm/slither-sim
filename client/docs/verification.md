@@ -28,7 +28,7 @@ it does not replace the other OS job.
 ```sh
 npm test
 cargo test --locked --test protocol
-cargo fmt --all --check
+cargo fmt -p slither-client -p slither-wgpu-slice --check
 cargo test --all-targets --locked
 cargo test --doc --locked
 cargo clippy --all-targets --locked -- -D warnings
@@ -40,8 +40,8 @@ cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
 The ABI smoke helpers are shared regression coverage, not standalone network
 probes. Tests use explicit authored doubles or real generated Wasm as labelled.
 Run the ABI suite again after changing Rust/browser boundaries. For wgpu, the
-full check command uses one build job and target/wgpu-slice-check to limit memory
-and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
+full check command uses one build job, no debug info and target/wgpu-slice-check
+to limit memory and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 
 The pure Node [feel replay contract](../tools/feel-replay/README.md) defines
 offline schedules, manifests and bit-preserving trace comparison. Run
@@ -56,8 +56,8 @@ reports; it opens no window and does not measure GPU or desktop pacing.
 
 ## Offline host/client end-to-end run
 
-Build each crate separately (no shared workspace or lockfile), from the repository
-root. Set `CARGO_BUILD_JOBS=2`; run these builds sequentially:
+Build from the repository root with `CARGO_BUILD_JOBS=2` (and
+`CARGO_PROFILE_DEV_DEBUG=0` for the client probe); run these builds sequentially:
 
 ```sh
 cargo build --release --locked

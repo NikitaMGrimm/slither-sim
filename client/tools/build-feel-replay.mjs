@@ -15,8 +15,9 @@ const source = () => {
 await rebuildArtifacts('dist/feel-replay', async () => {
   const built = source();
   if (execFileSync(bindgen, ['--version'], { encoding: 'utf8' }).trim() !== 'wasm-bindgen 0.2.129') throw new Error('wasm-bindgen 0.2.129 required');
-  for (const [name, manifest, dir] of [['slither_client', 'Cargo.toml', 'canvas'], ['slither_wgpu_slice', 'apps/wgpu-slice/Cargo.toml', 'gpu']]) {
-    execFileSync('cargo', ['build', '--locked', '--lib', '--features', 'feel-trace', '--target', 'wasm32-unknown-unknown', '--manifest-path', manifest], { env, stdio: 'inherit' });
+  // Only wgpu builds without debug info, as its pre-workspace profile did.
+  for (const [name, manifest, dir, debug] of [['slither_client', 'Cargo.toml', 'canvas', {}], ['slither_wgpu_slice', 'apps/wgpu-slice/Cargo.toml', 'gpu', { CARGO_PROFILE_DEV_DEBUG: '0' }]]) {
+    execFileSync('cargo', ['build', '--locked', '--lib', '--features', 'feel-trace', '--target', 'wasm32-unknown-unknown', '--manifest-path', manifest], { env: { ...env, ...debug }, stdio: 'inherit' });
     execFileSync(bindgen, [path.join(env.CARGO_TARGET_DIR, `wasm32-unknown-unknown/debug/${name}.wasm`),
       '--target', 'web', '--out-dir', `dist/feel-replay/${dir}`, '--out-name', name, '--no-typescript'], { stdio: 'inherit' });
   }
