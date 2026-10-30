@@ -3,7 +3,7 @@ import { parse, scheduleHash, stringify } from './io.mjs';
 
 export function syntheticFixture() {
   const schedule = {
-    schema: 1, label: 'synthetic contract exercise', durationMs: 10,
+    schema: 2, label: 'synthetic contract exercise', durationMs: 10,
     events: [
       { sourceId: 'packet-0', kind: 'packet', atMs: 0 },
       { sourceId: 'input-0', kind: 'input', atMs: 0 },
@@ -31,7 +31,7 @@ export function syntheticFixture() {
   };
   const zero = { x: 0, y: 0 };
   const own = {
-    token: 'synthetic-own-1', rawHead: { x: 1, y: 2 }, correctedHead: { x: 1, y: 2 },
+    token: 'synthetic-own-1', expired: false, deathProgress: 0, rawHead: { x: 1, y: 2 }, correctedHead: { x: 1, y: 2 },
     rawHeading: 1, correctedHeading: 1, wantedHeading: 1, gaze: 1,
     pupils: { left: zero, right: zero }, offsets: { x: 1, y: 0, fraction: 0, heading: 0 },
     speed: 2, visualSpeed: 2, boost: false, boostPhase: 0,
@@ -41,7 +41,7 @@ export function syntheticFixture() {
     projected: Object.fromEntries(['backing', 'css'].map(k => [k, { head: zero, pupils: [zero, zero] }])),
   };
   const trace = {
-    schema: 1, manifest,
+    schema: 2, manifest,
     events: schedule.events.map((e, seq) => ({
       seq, sourceId: e.sourceId, kind: e.kind, scheduledMs: e.atMs, actualMs: e.atMs,
       target: e.kind === 'input' ? 'canvas' : 'host', type: e.kind === 'input' ? 'pointermove' : e.kind,

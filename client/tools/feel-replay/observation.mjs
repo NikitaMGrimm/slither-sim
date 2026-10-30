@@ -9,7 +9,7 @@ export function observation([phase, token, cells], geometry) {
   camera.targetZoom = camera.zoom;
   let own = null;
   if (token !== null) {
-    own = { token, rawHead: point(), correctedHead: point(), rawHeading: n(), correctedHeading: n(),
+    own = { token, expired: !!n(), deathProgress: n(), rawHead: point(), correctedHead: point(), rawHeading: n(), correctedHeading: n(),
       wantedHeading: n(), gaze: n(), pupils: { left: point() } };
     // Both eyes share the retained eased pupil vector; their projected centers differ.
     own.pupils.right = { ...own.pupils.left };
@@ -19,10 +19,13 @@ export function observation([phase, token, cells], geometry) {
     own.rings = { head: { index: n(), pending: n() }, angle: { index: n(), pending: n() }, length: { index: n(), pending: n() } };
     camera.targetZoom = n();
     for (const [name, count] of [['head', 159], ['angle', 26], ['length', 53]]) own.rings[name].values = list(count);
-    const backing = { head: point(), pupils: [point(), point()] };
-    const cssPoint = p => ({ x: p.x * geometry.css.width / geometry.backing.width,
-      y: p.y * geometry.css.height / geometry.backing.height });
-    own.projected = { backing, css: { head: cssPoint(backing.head), pupils: backing.pupils.map(cssPoint) } };
+    own.projected = null;
+    if (!own.expired) {
+      const backing = { head: point(), pupils: [point(), point()] };
+      const cssPoint = p => ({ x: p.x * geometry.css.width / geometry.backing.width,
+        y: p.y * geometry.css.height / geometry.backing.height });
+      own.projected = { backing, css: { head: cssPoint(backing.head), pupils: backing.pupils.map(cssPoint) } };
+    }
   }
   if (i !== v.length) throw new Error('Unknown core observation cells');
   return { phase, delta, multiplier, own, camera };

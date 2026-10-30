@@ -1,4 +1,9 @@
-# Offline feel replay contract (v1)
+# Offline feel replay contract (v2)
+
+Schedule/trace v2 adds explicit retained-own expiry and a declared `between-lives`
+state. Manifests and raw replay-input tapes remain schema 1. V1 artifacts remain immutable;
+read them with their pinned earlier revision, without rewriting or auto-upgrading
+them. The bit-preserving file encoding is unchanged.
 
 This pure Node contract supports later Canvas/WebGPU (A2) and native CPU (A3)
 peers. It does not launch peers, build artifacts, read a capture format, schedule
@@ -101,11 +106,22 @@ Trace arrays contain:
 - `final`: duration, exact event/command/sample/draw counts and final boundary ID,
   completion, pending effect/frame counts and unexpected network status.
 
-Only explicitly scheduled both-peer `pre-appearance` boundaries may have `own:
-null`; that exception cannot resume after appearance. Missing own elsewhere,
+Only explicitly scheduled both-peer `pre-appearance` boundaries may initially
+have `own: null`; that exception cannot resume after appearance. A scheduled
+`between-lives` interval also permits null, but only after an observed expired
+own, and the next own must have a new token. Missing own elsewhere,
 missing fields/times, duplicate IDs, wrong order/counts, unfinished work,
 unexpected network or send/present failures fail completeness before comparison.
 Do not resample or insert draws to obtain an observation.
+
+An expired retained own remains an `own` object with raw `deathProgress >= 1`
+and `expired: true`. The production shared draw preparation removes it from the
+draw collection; Canvas and WebGPU therefore skip its head/face instead of
+clamping death progress. Trace v2 records `projected: null` for that skip, retaining
+all stored head/pupil/correction channels. Only expired own may have null
+projection, expired must agree with death progress, and an expired token cannot
+revive. Live/fading own still requires the complete projected geometry.
+Unsupported face families continue to fail closed, including after expiry.
 
 ## Match criteria
 

@@ -17,7 +17,7 @@ export function packetTypes(body) {
 export function validateRecord(record) {
   if (record?.schema !== 1 || record.framing !== 'header-free' || !Array.isArray(record.packets)
     || !Number.isFinite(record.durationMs) || record.durationMs < 0) throw new Error('Expected schema-1 header-free record');
-  for (const rows of [record.packets, record.inputs ?? []]) {
+  for (const rows of [record.packets, record.inputs ?? [], record.controls ?? []]) {
     let previous = 0;
     for (const row of rows) {
       if (!Number.isFinite(row.at) || row.at < previous || row.at > record.durationMs) throw new Error('Invalid record time');
@@ -29,6 +29,17 @@ export function validateRecord(record) {
     packetTypes(packet.body);
   }
   for (const input of record.inputs ?? []) normalizeInput(input);
+  for (const control of record.controls ?? []) {
+    if (!['close', 'play'].includes(control.action)) throw new Error('Unsupported session control');
+  }
+  let previousGap = -1;
+  for (const gap of record.betweenLives ?? []) {
+    if (![gap.fromMs, gap.untilMs].every(Number.isFinite) || gap.fromMs <= previousGap || gap.untilMs <= gap.fromMs || gap.untilMs > record.durationMs
+      || !(record.controls ?? []).some(c => c.action === 'close' && c.at === gap.fromMs)
+      || !(record.controls ?? []).some(c => c.action === 'play' && c.at > gap.fromMs && c.at < gap.untilMs)
+      || !record.packets.some(p => p.at === gap.untilMs && packetTypes(p.body).includes(115))) throw new Error('Declared between-lives close/Play/appearance interval required');
+    previousGap = gap.untilMs;
+  }
   return record;
 }
 export function normalizeInput(input, { width = 960, height = 540 } = {}) {
@@ -49,8 +60,10 @@ export function buildSchedule(record, { expectedCommands, appearanceAtMs, stepMs
   validateRecord(record);
   if (!Number.isFinite(stepMs) || stepMs <= 0 || !Number.isFinite(appearanceAtMs) || appearanceAtMs < 0) throw new Error('Explicit frame interval and appearance expectation required');
   if (record.packets.some(p => p.at === 0)) throw new Error('Packet at origin precedes the scheduled startup/Connect acknowledgment');
+  if ((record.betweenLives ?? []).some(g => g.fromMs <= appearanceAtMs)) throw new Error('Between-lives interval must follow initial own');
   const rows = [...record.packets.map((p, index) => ({ sourceId: `packet-${index}`, kind: 'packet', atMs: p.at, data: p })),
-    ...(record.inputs ?? []).map((p, index) => ({ sourceId: `input-${index}`, kind: 'input', atMs: p.at, data: p }))];
+    ...(record.inputs ?? []).map((p, index) => ({ sourceId: `input-${index}`, kind: 'input', atMs: p.at, data: p })),
+    ...(record.controls ?? []).map((p, index) => ({ sourceId: `control-${index}`, kind: p.action === 'close' ? 'packet' : 'input', atMs: p.at, data: { control: p.action } }))];
   // One initial reset/Connect RAF on BOTH peers, at the declared clock origin.
   rows.push({ sourceId: 'startup-frame', kind: 'frame', atMs: 0, data: null });
   for (let f = 0; f * stepMs <= record.durationMs; f++) rows.push({ sourceId: `frame-${f}`, kind: 'frame', atMs: f * stepMs, data: null });
@@ -60,15 +73,16 @@ export function buildSchedule(record, { expectedCommands, appearanceAtMs, stepMs
   const boundaries = [];
   ordered.forEach((event, eventSeq) => {
     const phases = event.kind === 'frame' ? ['update', 'draw']
-      : event.kind === 'packet' ? [...packetTypes(event.data.body).filter(t => t === 97).map(() => 'draw'),
+      : event.data?.control ? [] : event.kind === 'packet' ? [...packetTypes(event.data.body).filter(t => t === 97).map(() => 'draw'),
         ...(packetTypes(event.data.body).includes(54) ? [] : ['update'])]
         : event.data.type === 'resize' ? ['draw'] : [];
     for (const phase of phases) boundaries.push({ id: `${event.sourceId}-${phase}-${boundaries.length}`, eventSeq, phase,
       frameId: frame, drawId: phase === 'draw' ? draw++ : null, atMs: event.atMs,
-      eligibility: event.atMs < appearanceAtMs ? 'pre-appearance' : 'own' });
+      eligibility: event.atMs < appearanceAtMs ? 'pre-appearance'
+        : (record.betweenLives ?? []).some(g => event.atMs >= g.fromMs && event.atMs < g.untilMs) ? 'between-lives' : 'own' });
     if (event.kind === 'frame') frame++;
   });
-  const schedule = validateSchedule({ schema: 1, label, durationMs: record.durationMs,
+  const schedule = validateSchedule({ schema: 2, label, durationMs: record.durationMs,
     events: ordered.map(({ sourceId, kind, atMs }) => ({ sourceId, kind, atMs })), boundaries, expectedCommands });
   return { schedule, deliveries: ordered.map(e => e.data) };
 }

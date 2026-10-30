@@ -115,11 +115,23 @@ impl Recorder {
         let token = client.own_token().map(|t| t.serial());
         if let Some(snake) = client.own_snake() {
             let m = snake.metrics();
+            // prepare_draw_antenna_resolved_staged excludes expired snakes from
+            // both production renderers. Retain their stored channels, but emit
+            // no projected draw positions. Unsupported families still fail closed.
+            if !matches!(snake.active_face_geometry(), FaceGeometry::Paired(_)) {
+                journal.failed = true;
+                journal
+                    .errors
+                    .push(format!("{phase}: unsupported face layout"));
+                return;
+            }
             let h = snake.head_corrections();
             let a = snake.angle_corrections();
             let l = snake.length();
             let pupil = snake.eyes().pupil();
             values.extend([
+                f64::from(m.expired),
+                m.death_progress,
                 m.raw_head.x,
                 m.raw_head.y,
                 m.corrected_head.x,
@@ -152,38 +164,40 @@ impl Recorder {
             values.extend(h.samples().iter().flatten().map(|v| f64::from(*v)));
             values.extend(a.samples().iter().map(|v| f64::from(*v)));
             values.extend(l.samples().iter().map(|v| f64::from(*v)));
-            let half = Point {
-                x: f64::from(journal.extent[0]) / 2.,
-                y: f64::from(journal.extent[1]) / 2.,
-            };
-            values.extend([
-                half.x + (m.corrected_head.x - position.x) * camera.zoom(),
-                half.y + (m.corrected_head.y - position.y) * camera.zoom(),
-            ]);
-            // Fail closed BEFORE publishing a partial numeric row. A1 requires
-            // both projected pupils (contract/fixture links at module entry).
-            match projected_pupils(
-                snake.active_face_geometry(),
-                snake.eyes().heading(),
-                pupil,
-                EyeLayoutInput {
-                    corrected_head: m.corrected_head,
-                    camera: position,
-                    viewport_half: half,
-                    scale: m.scale,
-                    zoom: camera.zoom(),
-                    death_progress: m.death_progress,
-                },
-            ) {
-                Ok(pupils) => {
-                    for p in pupils {
-                        values.extend([p.x, p.y]);
+            if !m.expired {
+                let half = Point {
+                    x: f64::from(journal.extent[0]) / 2.,
+                    y: f64::from(journal.extent[1]) / 2.,
+                };
+                values.extend([
+                    half.x + (m.corrected_head.x - position.x) * camera.zoom(),
+                    half.y + (m.corrected_head.y - position.y) * camera.zoom(),
+                ]);
+                // Fail closed BEFORE publishing a partial numeric row. A1 requires
+                // both projected pupils (contract/fixture links at module entry).
+                match projected_pupils(
+                    snake.active_face_geometry(),
+                    snake.eyes().heading(),
+                    pupil,
+                    EyeLayoutInput {
+                        corrected_head: m.corrected_head,
+                        camera: position,
+                        viewport_half: half,
+                        scale: m.scale,
+                        zoom: camera.zoom(),
+                        death_progress: m.death_progress,
+                    },
+                ) {
+                    Ok(pupils) => {
+                        for p in pupils {
+                            values.extend([p.x, p.y]);
+                        }
                     }
-                }
-                Err(reason) => {
-                    journal.failed = true;
-                    journal.errors.push(format!("{phase}: {reason}"));
-                    return;
+                    Err(reason) => {
+                        journal.failed = true;
+                        journal.errors.push(format!("{phase}: {reason}"));
+                        return;
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ export function traceAssembly(schedule, manifest) {
   const events = [], commands = [], samples = [];
   let frame = 0, draw = 0, successfulDraws = 0;
   let complete = true;
+  let appeared = false;
   return {
     append(ack) {
       const eventSeq = events.length;
@@ -13,16 +14,18 @@ export function traceAssembly(schedule, manifest) {
       events.push(event);
       for (const sent of ack.commands) {
         if (!safeCommand(sent.bytes)) throw new Error('Unsafe command in peer output');
-        const effectId = `send-1-${commands.length}`;
+        const effectId = sent.effectId ?? `send-1-${commands.length}`;
         event.effectIds.push(effectId);
         commands.push({ seq: commands.length, eventSeq, frameId: frame, effectId, ...sent });
       }
       for (const row of ack.observations) {
         const o = observation(row, ack.geometry);
+        const eligibility = o.own !== null ? 'own' : appeared ? 'between-lives' : 'pre-appearance';
+        if (o.own !== null) appeared = true;
         const drawId = o.phase === 'draw' ? draw++ : null;
         if (o.phase === 'draw' && !ack.failed) successfulDraws++;
         samples.push({ id: `${ack.sourceId}-${o.phase}-${samples.length}`, eventSeq, phase: o.phase,
-          frameId: frame, drawId, atMs: ack.atMs, eligibility: o.own === null ? 'pre-appearance' : 'own',
+          frameId: frame, drawId, atMs: ack.atMs, eligibility,
           delta: o.delta, lag: { active: ack.lag.active, multiplier: o.multiplier,
             pingPending: ack.lag.pingPending, pongAgeMs: ack.lag.pongAgeMs },
           own: o.own, camera: o.camera, quality: { requested: 'high', active: ack.highQuality ? 'high' : 'low', successfulDraws },
@@ -32,7 +35,7 @@ export function traceAssembly(schedule, manifest) {
       if (event.kind === 'frame') frame++;
     },
     finish(state) {
-      return { schema: 1, manifest, events, commands, samples, final: {
+      return { schema: 2, manifest, events, commands, samples, final: {
         atMs: state.atMs, events: events.length, commands: commands.length, samples: samples.length,
         draws: draw, lastBoundaryId: samples.at(-1)?.id ?? 'missing', ...state, completed: state.completed && complete,
       } };

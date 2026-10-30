@@ -11,7 +11,7 @@ const settle = () => new Promise(resolve => {
   channel.port1.onmessage = () => { channel.port1.close(); channel.port2.close(); resolve(); };
   channel.port2.postMessage(null);
 });
-let activeSocket, runtime, owner, host, scene, quality, raf, seq = -1, failed = false, sendFailed = false;
+let activeSocket, runtime, owner, host, scene, quality, raf, startSession, seq = -1, failed = false, sendFailed = false;
 let currentCommands = [], receipts = [], random = [], rng = 17, blocked = 0;
 let currentEffects = [], socketGeneration = 0;
 const recorderErrors = [];
@@ -48,7 +48,7 @@ class ReplaySocket extends EventTarget {
   send(value) {
     if (this.readyState !== 1) { sendFailed = true; throw new Error('Replay socket closed'); }
     const bytes = Array.from(new Uint8Array(value.buffer ?? value, value.byteOffset ?? 0, value.byteLength));
-    if (this.controls && safeCommand(bytes)) currentCommands.push({ bytes, decisionMs: clock.now(), sendMs: clock.now(), ackMs: clock.now(), succeeded: true });
+    if (this.controls && safeCommand(bytes)) currentCommands.push({ effectId: `socket-${this.generation}-send-${this.sends++}`, bytes, decisionMs: clock.now(), sendMs: clock.now(), ackMs: clock.now(), succeeded: true });
     else this.effect(`negotiation-${this.sends++}`);
     // Challenge/login bytes are neither forwarded nor retained.
   }
@@ -117,7 +117,8 @@ window.replayReady = (async () => {
     runtime = await startGamePage({ initialize: async () => {}, wasmApi: api, localHost, observeInput, hudReadout: true,
       ownedHudUi: true, ownedPlayUi: true, ownedMenuUi: true, ownedAppearancePreview: true, ownedLoadingUi: true,
       ownedLeaderboardUi: true, ownedMinimapUi: true, ownedAnnouncementUi: true, ownedEndScreenUi: true, diagnosticUi: false });
-    runtime.play({ endpoint, nickname: 'Replay', skin: 0, customSkin: new Uint8Array(), profile: localHost.profile });
+    startSession = () => runtime.play({ endpoint, nickname: 'Replay', skin: 0, customSkin: new Uint8Array(), profile: localHost.profile });
+    startSession();
   } else {
     const wasm = await import('/gpu/slither_wgpu_slice.js'); await wasm.default();
     const { localHost } = await import('/apps/wgpu-slice/web/local-host.mjs');
@@ -126,7 +127,7 @@ window.replayReady = (async () => {
     owner = wasm.LocalGameplay.replay(clock.now());
     const extent = () => { const [w, h] = wasm.game_backing_size(canvas.clientWidth, canvas.clientHeight); canvas.width = w; canvas.height = h; return [w, h, 1]; };
     host = localHost({ owner, socket: url => new WebSocket(url), now: clock.now, extent, readout(_text, _canPlay, error) { if (error) failed = true; } });
-    const start = () => host.call(() => owner.play(endpoint, 'Replay', 0));
+    const start = startSession = () => host.call(() => owner.play(endpoint, 'Replay', 0));
     installLocalInput({ realm: window, canvas, owner, host, start, observeInput, controls: [document.querySelector('#replay-button')], signal: new AbortController().signal });
     const tick = time => { host.frame(time); raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick); start();
@@ -144,7 +145,18 @@ window.replayStep = async (event, data, ordinal) => {
   clock.advance(event.atMs);
   let observed = { target: 'host', type: event.kind, coordinates: null, code: null,
     trusted: false, repeat: false, buttons: 0, focused: document.hasFocus(), visibility: document.visibilityState };
-  if (event.kind === 'packet') {
+  if (data?.control) {
+    observed.type = data.control;
+    // Lifecycle controls use the same production Play API as startup and the
+    // real socket-close listeners. They never inject DesktopInput or pretend
+    // to be DOM events. Their frozen gap is declared in the synthetic fixture.
+    if (data.control === 'play') startSession();
+    else {
+      if (!activeSocket || activeSocket.readyState !== 1) throw new Error('Close before socket ready');
+      activeSocket.readyState = 3; activeSocket.effect('remote-closed');
+      activeSocket.emit('close', new CloseEvent('close'));
+    }
+  } else if (event.kind === 'packet') {
     if (!activeSocket || activeSocket.readyState !== 1) throw new Error('Packet before socket ready');
     const bytes = Uint8Array.from(atob(data.body), c => c.charCodeAt(0));
     if (packetTypes(data.body).includes(97)) activeSocket.controls = true;
@@ -159,7 +171,7 @@ window.replayStep = async (event, data, ordinal) => {
   recorderErrors.push(...observationErrors.map(reason => ({ seq, reason })));
   return stringify({ seq, sourceId: event.sourceId, atMs: clock.now(), observations, observationErrors, commands: currentCommands, effects: currentEffects,
     event: { seq, sourceId: event.sourceId, kind: event.kind, scheduledMs: event.atMs, actualMs: clock.now(),
-      ...observed, target: event.kind === 'input' ? (data.target ?? 'surface') : observed.target },
+      ...observed, target: event.kind === 'input' && !data?.control ? (data.target ?? 'surface') : observed.target },
     geometry: geometry(), ...metadata(), failed, sendFailed });
 };
 window.replayFinish = () => stringify({ atMs: clock.now(), completed: !failed && !recorderErrors.length, unexpectedNetwork: blocked !== 0,

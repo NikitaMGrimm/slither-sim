@@ -8,7 +8,7 @@ Chromium. Builds are explicit; replay requires the prebuilt artifacts.
 $env:CARGO_BUILD_JOBS='2'
 $env:WASM_BINDGEN='<absolute wasm-bindgen 0.2.129 executable>'
 node tools/build-feel-replay.mjs
-node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 4 --appearance-at 3
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 7 --appearance-at 3
 ```
 
 Stage intended source changes before the explicit build. Its receipt binds the
@@ -25,9 +25,9 @@ schema-1 header-free tapes use the same command with their existing immutable
 record path. `--receipt` hashes an existing acceptance receipt in place. Private
 paths, hashes, bodies, receipts and results must remain outside Git/public logs.
 
-The authored synthetic fixture includes challenge negotiation, an unsplit envelope
-with two Setup commands, an own appearance, pointer and compatibility mouse
-movement, boost, editor-filtered keys and pong. `npm test` covers pure schedule,
+The authored synthetic v3 fixture includes two challenge negotiations, unsplit
+Setup pairs, own appearances, pointer/compatibility movement, boost, editor keys,
+pong and death through expiry followed by a restart. `npm test` covers pure schedule,
 coordination, mapping, assembly and deliberate faults. Browser runs are manual
 local checks; they are not required by browserless CI. Additional focused Rust
 checks are:
@@ -66,6 +66,20 @@ precede the initial Connect acknowledgment. Packet/input/frame ties retain A1
 ordering, and an explicit final frame covers the complete declared duration.
 Each event drains synchronous effects and queued ingress before acknowledgment.
 The perpetual next RAF is reported separately from unfinished model work.
+
+Authored lifecycle `controls` are separate from DOM `inputs`: `close` emits a
+transport close through the real socket listeners, and `play` invokes the same
+production Play API used at startup. They do not inject DesktopInput or masquerade
+as physical input. A frozen `betweenLives` interval names that close, following
+Play, and next appearance. Its missing-own samples are legal only after observed
+expiry; resumed own must have a new token. Unscheduled absence still fails.
+
+The shared production draw preparation removes expired snakes from the draw
+collection before either renderer plans a face. The recorder follows that skip:
+retained own data includes raw `deathProgress`/`expired`, and `projected` is null
+only for expired own. It does not clamp expired progress or invent an invisible
+face. [Contract v2](README.md) makes these states explicit; old artifacts stay
+immutable and require their pinned v1 reader.
 
 Normalized coordinates become real DOM events at explicit per-peer selectors.
 The named manifest normalization `chromium-primary-mouse-compat-v1` treats legacy

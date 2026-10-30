@@ -20,12 +20,14 @@ test('stale prebuilt artifacts fail closed against the staged source tree', () =
 });
 test('schedule is frozen before peers, ties retain unsplit packet order and complete tail', () => {
   const record = JSON.parse(readFileSync(new URL('./feel-replay/browser-synthetic.json', import.meta.url)));
-  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: 4, appearanceAtMs: 3 });
+  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: 7, appearanceAtMs: 3 });
   assert.equal(schedule.events.at(-1).atMs, record.durationMs);
   assert.equal(schedule.boundaries.at(-1).atMs, record.durationMs);
   assert.equal(deliveries.filter(x => x?.body).length, record.packets.length);
-  assert.equal(schedule.boundaries.filter(b => b.phase === 'draw' && schedule.events[b.eventSeq].kind === 'packet').length, 2);
-  assert.equal(schedule.boundaries.filter(b => b.phase === 'update' && schedule.events[b.eventSeq].kind === 'packet').length, 3);
+  assert.equal(schedule.boundaries.filter(b => b.phase === 'draw' && schedule.events[b.eventSeq].kind === 'packet').length, 4);
+  assert.equal(schedule.boundaries.filter(b => b.phase === 'update' && schedule.events[b.eventSeq].kind === 'packet').length, 8);
+  assert(schedule.boundaries.some(b => b.eligibility === 'between-lives'));
+  assert(schedule.boundaries.filter(b => b.atMs >= 942).every(b => b.eligibility === 'own'));
   assert.deepEqual(packetTypes(btoa(String.fromCharCode(0, 1, 97, 33, 112))), [97, 112]);
   assert.throws(() => packetTypes('AA=='), /Invalid envelope/);
 });

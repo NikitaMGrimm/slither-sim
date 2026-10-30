@@ -2,14 +2,7 @@
 //! Authored synthetic boundary identity checks; no sockets or GPU.
 use slither_client::{feel_trace::Recorder, presentation::AnimatedClient};
 
-#[test]
-fn unsupported_face_records_an_error_without_publishing_a_partial_row() {
-    use slither_client::{
-        presentation::{
-            ClientPresentationError, FaceGeometry, FacePresentation, MouthFaceGeometry,
-        },
-        protocol::ElapsedHeader,
-    };
+fn authored_own() -> Vec<u8> {
     // Authored synthetic Setup and own appearance, same grammar as the browser fixture.
     let u24 = |n: u32| [(n >> 16) as u8, (n >> 8) as u8, n as u8];
     let mut setup = vec![97];
@@ -35,20 +28,30 @@ fn unsupported_face_records_an_error_without_publishing_a_partial_row() {
     own.extend(u24(4780));
     own.extend(u24(5000));
     own.extend([151, 127, 0, 0]);
-    let bytes: Vec<u8> = [setup, own]
+    [setup, own]
         .into_iter()
         .flat_map(|p| {
             let mut v = (p.len() as u16).to_be_bytes().to_vec();
             v.extend(p);
             v
         })
-        .collect();
+        .collect()
+}
+
+#[test]
+fn unsupported_face_records_an_error_without_publishing_a_partial_row() {
+    use slither_client::{
+        presentation::{
+            ClientPresentationError, FaceGeometry, FacePresentation, MouthFaceGeometry,
+        },
+        protocol::ElapsedHeader,
+    };
     let trace = Recorder::default();
     let mut client = AnimatedClient::new(0.).unwrap();
     client.record_feel(trace.clone());
     client
         .apply_frame_with_face_presentation::<ClientPresentationError, _>(
-            &bytes,
+            &authored_own(),
             ElapsedHeader::Absent,
             |_| {
                 Ok(FacePresentation {
@@ -65,6 +68,60 @@ fn unsupported_face_records_an_error_without_publishing_a_partial_row() {
     assert!(trace.has_failed());
     assert_eq!(client.received().frames_applied, 1);
     assert_eq!(client.draw_serial(), 0);
+}
+
+#[test]
+fn death_through_draw_expiry_and_restart_keep_complete_observations() {
+    use slither_client::protocol::ElapsedHeader;
+    let recorder = Recorder::default();
+    let mut client = AnimatedClient::new(0.).unwrap();
+    client.record_feel(recorder.clone());
+    client
+        .apply_frame(&authored_own(), ElapsedHeader::Absent)
+        .unwrap();
+    let first = client.own_token().unwrap();
+    client
+        .apply_frame(&[115, 0, 7, 1], ElapsedHeader::Absent)
+        .unwrap();
+    for frame in 1..=20 {
+        client.advance(f64::from(frame) * 40., false).unwrap();
+        client.prepare_draw(1500, 845).unwrap();
+    }
+    let own = client.own_snake().unwrap().metrics();
+    assert!(own.death_progress >= 1. && own.expired);
+    assert!(client.drawn_own_snake().is_none());
+    assert!(
+        recorder.take_errors().is_empty(),
+        "expiry must follow the production draw skip"
+    );
+    assert!(!recorder.has_failed());
+    let rows = recorder.take();
+    assert_eq!(rows.len(), 42);
+    let expired: Vec<_> = rows.iter().filter(|r| r.values[137] == 1.).collect();
+    assert!(!expired.is_empty());
+    // Camera prefix is 13 + 124 cells. Expired own retains all raw channels
+    // but omits the six head/pupil projection cells skipped by production draw.
+    assert!(
+        expired
+            .iter()
+            .all(|r| r.values[138] >= 1. && r.values.len() == 405)
+    );
+    client.reset();
+    client
+        .apply_frame(&authored_own(), ElapsedHeader::Absent)
+        .unwrap();
+    client.advance(840., false).unwrap();
+    client.prepare_draw(1500, 845).unwrap();
+    assert_ne!(client.own_token().unwrap(), first);
+    assert!(!client.own_snake().unwrap().metrics().expired);
+    assert!(!recorder.has_failed());
+    let restarted = recorder.take();
+    assert_eq!(restarted.len(), 3);
+    assert!(
+        restarted
+            .iter()
+            .all(|r| r.values[137] == 0. && r.values.len() == 411)
+    );
 }
 
 #[test]

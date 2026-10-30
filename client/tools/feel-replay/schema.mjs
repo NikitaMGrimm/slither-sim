@@ -1,4 +1,4 @@
-// Authored offline contract, version 1. No packet bodies or runtime adapters.
+// Authored offline contract: schedule/trace v2, manifest v1. No packet bodies.
 const nullable = schema => ({ nullable: schema });
 const list = (schema, length) => ({ list: schema, ...(length === undefined ? {} : { length }) });
 const choice = (...values) => ({ choice: values });
@@ -9,10 +9,10 @@ const geometry = { css: extent, backing: extent, surface: extent, dpr: 'positive
 const boundary = {
   id: 'string', eventSeq: 'uint', phase: choice('update', 'draw', 'prepare', 'submit', 'commit'),
   frameId: 'uint', drawId: nullable('uint'), atMs: 'time',
-  eligibility: choice('own', 'pre-appearance'),
+  eligibility: choice('own', 'pre-appearance', 'between-lives'),
 };
 export const scheduleSchema = {
-  schema: choice(1), label: 'string', durationMs: 'time',
+  schema: choice(2), label: 'string', durationMs: 'time',
   events: list({ sourceId: 'string', kind: choice('packet', 'input', 'frame'), atMs: 'time' }),
   boundaries: list(boundary), expectedCommands: 'uint',
 };
@@ -31,7 +31,7 @@ export const manifestSchema = {
   numericalPolicy: numericalPolicySchema,
 };
 const own = {
-  token: 'string', rawHead: point('world'), correctedHead: point('world'),
+  token: 'string', expired: 'boolean', deathProgress: 'number', rawHead: point('world'), correctedHead: point('world'),
   rawHeading: 'radians', correctedHeading: 'radians', wantedHeading: 'radians', gaze: 'radians',
   pupils: { left: point('number'), right: point('number') },
   offsets: { x: 'f32', y: 'f32', fraction: 'f32', heading: 'f32' },
@@ -39,11 +39,11 @@ const own = {
   size: { segments: 'uint', fraction: 'number', length: 'number' },
   // Stored rings stay exact even in the numerical lane; only current offsets get a ULP cap.
   rings: { head: ring(53, 3), angle: ring(26), length: ring(53) },
-  projected: { backing: { head: point('number'), pupils: list(point('number'), 2) },
-    css: { head: point('number'), pupils: list(point('number'), 2) } },
+  projected: nullable({ backing: { head: point('number'), pupils: list(point('number'), 2) },
+    css: { head: point('number'), pupils: list(point('number'), 2) } }),
 };
 export const traceSchema = {
-  schema: choice(1), manifest: manifestSchema,
+  schema: choice(2), manifest: manifestSchema,
   events: list({
     seq: 'uint', sourceId: 'string', kind: choice('packet', 'input', 'frame'),
     scheduledMs: 'time', actualMs: 'time', target: 'string', type: 'string',
@@ -196,16 +196,25 @@ export function validateTrace(trace, schedule) {
     if (!schedule.boundaries.some(b => b.frameId === c.frameId)) fail(`trace.commands[${i}].frameId`, 'unknown frame');
     lastSend = c.sendMs; lastEvent = c.eventSeq;
   });
-  let appeared = false;
+  let appeared = false, betweenLives = false, lastOwn;
   trace.samples.forEach((s, i) => {
     const b = schedule.boundaries[i];
     for (const key of Object.keys(boundary)) if (!same(s[key], b[key])) fail(`trace.samples[${i}].${key}`, 'boundary order/identity/time mismatch');
     if (s.atMs < trace.events[s.eventSeq].actualMs) fail(`trace.samples[${i}].atMs`, 'boundary before actual ingress');
     if (s.eligibility === 'pre-appearance') {
       if (appeared || s.own !== null) fail(`trace.samples[${i}].own`, 'pre-appearance absence required');
+    } else if (s.eligibility === 'between-lives') {
+      if (!appeared || !lastOwn?.expired || s.own !== null) fail(`trace.samples[${i}].own`, 'between-lives absence requires prior expired own');
+      betweenLives = true;
     } else {
       if (s.own === null) fail(`trace.samples[${i}].own`, 'missing own at eligible boundary');
+      if (betweenLives && s.own.token === lastOwn.token) fail(`trace.samples[${i}].own`, 'restart must use a new own token');
+      if (s.own.deathProgress < 0 || s.own.expired !== (s.own.deathProgress >= 1)) fail(`trace.samples[${i}].own`, 'expired state must match death progress');
+      if (lastOwn?.token === s.own.token && lastOwn.expired && !s.own.expired) fail(`trace.samples[${i}].own`, 'expired own cannot revive');
+      if (s.own.expired !== (s.own.projected === null)) fail(`trace.samples[${i}].own.projected`, 'only expired own skips projection');
       appeared = true;
+      betweenLives = false;
+      lastOwn = s.own;
       // Fixed ring geometry and signed cleanup sentinel are shared core constants:
       // src/presentation.rs Head/AngleCorrections and presentation/length.rs.
       for (const [name, slots] of [['head', 53], ['angle', 26], ['length', 53]]) {
