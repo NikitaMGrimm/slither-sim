@@ -567,3 +567,104 @@ fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
         assert_eq!(&picture.frame.draws[first_world + world.len()..], controls);
     }
 }
+
+#[test]
+fn spinner_raster_phase_and_revision_follow_shared_time() {
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    view.visible = false;
+    view.spinner_visible = true;
+    view.spinner_alpha = 0.6;
+    view.spinner_scale = 0.9;
+    let mut previous = None;
+    for dpr in [1., 2., 3.] {
+        for (time, phase) in [
+            (0., 0.),
+            (44., 1.),
+            (88., 2.),
+            (125., 2.840909090909091),
+            (276.4601535159018, std::f64::consts::TAU),
+        ] {
+            view.spinner_time = time;
+            let extent = [(1280. * dpr) as u32, (720. * dpr) as u32];
+            let p = menu
+                .prepare(&mut text, &view, &layout(), extent, dpr, None, 0)
+                .unwrap();
+            assert_eq!((p.frame.draws.len(), p.resources.len()), (1, 1));
+            let resource = &p.resources[0];
+            let draw = &p.frame.draws[0];
+            assert!(draw.corners.is_none());
+            assert_eq!(draw.effective_alpha, 0.6);
+            assert_eq!(
+                (resource.asset.width, resource.asset.height),
+                ((128. * dpr) as u32, (128. * dpr) as u32)
+            );
+            if let Some((handle, revision)) = previous {
+                assert_eq!(resource.asset.handle, handle);
+                assert!(resource.asset.revision > revision);
+            }
+            previous = Some((resource.asset.handle, resource.asset.revision));
+            // A ray just beyond the pinched tail crosses green at every phase,
+            // independently of the radial wobble. Alpha lives on the one quad.
+            let angle = phase + 0.25;
+            let green = (25..=41).any(|radius| {
+                let x = ((64. + 1.25 * f64::from(radius) * angle.cos()) * dpr) as usize;
+                let y = ((64. + f64::from(radius) * angle.sin()) * dpr) as usize;
+                let px = &resource.image.pixels[(y * resource.image.width as usize + x) * 4..][..4];
+                px[1] > px[0] && px[1] > px[2] && px[3] > 32
+            });
+            assert!(green, "time={time}, dpr={dpr}");
+            assert!(
+                resource
+                    .image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .any(|p| p[3] > 0 && p[3] < 255)
+            );
+            assert!(
+                resource
+                    .image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|p| p[..3].iter().all(|v| *v <= p[3]))
+            );
+            let frozen = menu
+                .prepare(&mut text, &view, &layout(), extent, dpr, None, 0)
+                .unwrap();
+            assert_eq!(frozen.resources[0].asset, resource.asset);
+        }
+    }
+    let revision = previous.unwrap().1;
+    view.spinner_visible = false;
+    let hidden = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert!(hidden.resources.is_empty() && hidden.frame.draws.is_empty());
+    view.spinner_visible = true;
+    let resumed = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert_eq!(resumed.resources[0].asset.handle, previous.unwrap().0);
+    assert_eq!(resumed.resources[0].asset.revision, revision + 1);
+    view.spinner_alpha = 0.3;
+    view.spinner_scale = 0.5;
+    let faded = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert_eq!(faded.resources[0].asset, resumed.resources[0].asset);
+    assert_eq!(faded.frame.draws[0].effective_alpha, 0.3);
+    assert_eq!(faded.frame.draws[0].destination.width, 64.);
+    view.visible = true;
+    let menu_frame = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert_eq!(
+        menu_frame.frame.draws.last().unwrap().asset,
+        resumed.resources[0].asset
+    );
+}

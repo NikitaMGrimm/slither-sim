@@ -123,6 +123,7 @@ pub struct Menu {
     pub skin_pressed: bool,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
 }
 struct Label {
     text: String,
@@ -135,6 +136,7 @@ struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
     scale: f64,
     draws: Vec<Draw>,
     art: Vec<Resource>,
@@ -285,6 +287,43 @@ impl Composition<'_> {
         self.art.push(resource.clone());
         Ok(())
     }
+    fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
+        let side = (128. * self.scale).ceil() as u32;
+        let key = (side, side, 6, view.spinner_time.to_bits());
+        let resource = if let Some(old) = self.old.get(&key) {
+            old.clone()
+        } else {
+            let pixels = materials::menu_spinner(view.spinner_time, side)?;
+            self.spinner_revision = self
+                .spinner_revision
+                .checked_add(1)
+                .ok_or("Spinner revision overflow")?;
+            Resource {
+                // Generic menu materials allocate strictly above this reserved handle.
+                asset: BodyAsset {
+                    handle: MENU_MATERIAL_HANDLE_BASE,
+                    revision: self.spinner_revision,
+                    width: side,
+                    height: side,
+                    status: BodyAssetStatus::Ready,
+                },
+                image: pixels,
+            }
+        };
+        let width = 128. * view.spinner_scale;
+        self.push(image(
+            &resource,
+            MenuRect {
+                x: r.x + (r.width - width) / 2.,
+                y: r.y + (r.height - width) / 2.,
+                width,
+                height: width,
+            },
+            view.spinner_alpha,
+        ))?;
+        self.materials.insert(key, resource);
+        Ok(())
+    }
 }
 impl Menu {
     /// Raster scale is bounded at 3x. Geometry comes only from the core layout;
@@ -320,6 +359,7 @@ impl Menu {
             old: &self.materials,
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
+            spinner_revision: self.spinner_revision,
             scale: dpr.min(3.),
             draws: Vec::new(),
             art: Vec::new(),
@@ -534,27 +574,11 @@ impl Menu {
                 }
             }
         }
+        let spinner_start = c.draws.len();
         if view.spinner_visible {
-            let r = layout.viewport_rect(E::Spinner);
-            let center = [r.x + r.width / 2., r.y + r.height / 2.];
-            for n in 0..16 {
-                let phase = n as f64 * std::f64::consts::TAU / 16. + view.spinner_time * 0.05;
-                let radius = 40. * view.spinner_scale;
-                let side = 10. * view.spinner_scale;
-                if side > 0. {
-                    c.control(
-                        MenuRect {
-                            x: center[0] + radius * phase.cos() - side / 2.,
-                            y: center[1] + radius * phase.sin() - side / 2.,
-                            width: side,
-                            height: side,
-                        },
-                        if n < 8 { 6 } else { 7 },
-                        view.spinner_alpha * (0.35 + 0.65 * n as f64 / 15.),
-                    )?;
-                }
-            }
+            c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
+        let spinner_draws = c.draws.split_off(spinner_start);
         let material_bytes = c
             .materials
             .values()
@@ -609,7 +633,12 @@ impl Menu {
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
-                check_menu_draws(c.draws.len() + usize::from(backdrop.is_some()))?;
+                // The spinner is above the login's text, including the fading tips.
+                check_menu_draws(
+                    c.draws.len() + spinner_draws.len() + usize::from(backdrop.is_some()),
+                )?;
+                frame::reserve_draws(&mut c.draws, spinner_draws.len())?;
+                c.draws.extend(spinner_draws);
                 let frame = Frame {
                     identity: 0,
                     extent,
@@ -627,6 +656,7 @@ impl Menu {
             },
         )?;
         self.next_handle = c.next_handle;
+        self.spinner_revision = c.spinner_revision;
         self.materials = c.materials;
         Ok(result)
     }

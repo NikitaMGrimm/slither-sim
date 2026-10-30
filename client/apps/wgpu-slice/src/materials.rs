@@ -10,6 +10,105 @@ pub struct RgbaImage {
     pub pixels: Vec<u8>,
 }
 
+/// Source-derived ribbon geometry, filled once per path with nonzero winding.
+/// Coverage is analytic in x and sampled on four subpixel scanlines in y.
+/// The 128 CSS-pixel canvas clips the paths before the host applies scale/opacity.
+pub fn menu_spinner(time: f64, side: u32) -> Result<RgbaImage> {
+    use std::f64::consts::PI;
+    if !time.is_finite() || time < 0. || !(1..=384).contains(&side) {
+        return Err("Spinner raster bounds".into());
+    }
+    let scale = f64::from(side) / 128.;
+    let point = |radius: f64, angle: f64| {
+        let (sin, cos) = angle.sin_cos();
+        [
+            (64. + 1.25 * radius * cos) * scale,
+            (64. + radius * sin) * scale,
+        ]
+    };
+    let mut image = RgbaImage {
+        width: side,
+        height: side,
+        pixels: vec![0; side as usize * side as usize * 4],
+    };
+    for (offset, color) in [(0., [96, 255, 112]), (PI, [152, 80, 255])] {
+        let edge = |index: u32, sign: f64| {
+            let progress = f64::from(index) / 256.;
+            let radius = 32. + 5. * (offset + time / 6. + 8. * progress).cos();
+            let half_width = 8. * progress + if index == 256 { 10. } else { 0. };
+            point(
+                radius + sign * half_width,
+                offset + time / 44. + 0.8 * PI * progress,
+            )
+        };
+        let mut path: Vec<_> = (0..=256).map(|i| edge(i, 1.)).collect();
+        path.push(point(32., offset + time / 44. + 0.95 * PI));
+        path.extend((0..=256).rev().map(|i| edge(i, -1.)));
+        fill_nonzero(&mut image, &path, color);
+    }
+    Ok(image)
+}
+
+fn fill_nonzero(image: &mut RgbaImage, path: &[[f64; 2]], color: [u8; 3]) {
+    let width = image.width as usize;
+    let mut coverage = vec![0.; width];
+    let mut crossings = Vec::with_capacity(path.len());
+    for y in 0..image.height as usize {
+        coverage.fill(0.);
+        for sub in 0..4 {
+            let scan = y as f64 + (f64::from(sub) + 0.5) / 4.;
+            crossings.clear();
+            for (a, b) in path
+                .iter()
+                .zip(path.iter().cycle().skip(1))
+                .take(path.len())
+            {
+                if (a[1] <= scan && b[1] > scan) || (b[1] <= scan && a[1] > scan) {
+                    crossings.push((
+                        a[0] + (scan - a[1]) * (b[0] - a[0]) / (b[1] - a[1]),
+                        if b[1] > a[1] { 1 } else { -1 },
+                    ));
+                }
+            }
+            crossings.sort_by(|a, b| a.0.total_cmp(&b.0));
+            let (mut winding, mut left) = (0, 0_f64);
+            for &(right, change) in &crossings {
+                if winding != 0 {
+                    let start = left.max(0.).floor() as usize;
+                    let end = right.max(0.).ceil().min(width as f64) as usize;
+                    for (x, a) in coverage.iter_mut().enumerate().take(end).skip(start) {
+                        *a += (right.min(x as f64 + 1.) - left.max(x as f64)).clamp(0., 1.) / 4.;
+                    }
+                }
+                winding += change;
+                left = right;
+            }
+        }
+        for (x, a) in coverage
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, a)| *a > 0.)
+        {
+            let pixel = &mut image.pixels[(y * width + x) * 4..][..4];
+            let mut dst = std::array::from_fn(|i| f64::from(pixel[i]) / 255.);
+            over(
+                &mut dst,
+                [
+                    f64::from(color[0]) / 255.,
+                    f64::from(color[1]) / 255.,
+                    f64::from(color[2]) / 255.,
+                    1.,
+                ],
+                a.min(1.),
+                1.,
+                false,
+            );
+            pixel.copy_from_slice(&dst.map(|v| (v * 255.).round() as u8));
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum MenuSurface {
     Play,
@@ -414,4 +513,23 @@ fn winding(points: &[[f64; 2]], x: f64, y: f64) -> i32 {
         }
     }
     n
+}
+
+#[cfg(test)]
+mod spinner_tests {
+    use super::*;
+
+    #[test]
+    fn nonzero_fill_covers_a_fold_once_with_antialiasing() {
+        // Authored synthetic square traversed twice in the same direction.
+        let path = [[1.5, 1.5], [6.5, 1.5], [6.5, 6.5], [1.5, 6.5]].repeat(2);
+        let mut image = RgbaImage {
+            width: 8,
+            height: 8,
+            pixels: vec![0; 8 * 8 * 4],
+        };
+        fill_nonzero(&mut image, &path, [96, 255, 112]);
+        assert_eq!(&image.pixels[(3 * 8 + 3) * 4..][..4], &[96, 255, 112, 255]);
+        assert_eq!(&image.pixels[(3 * 8 + 1) * 4..][..4], &[48, 128, 56, 128]);
+    }
 }
