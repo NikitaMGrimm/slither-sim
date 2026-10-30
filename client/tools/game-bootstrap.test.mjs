@@ -19,6 +19,7 @@ import { createStockEntityAssets } from '../web/stock-food-provider.mjs';
 import { desktopBackingSize } from '../web/desktop-layout.mjs';
 import { desktopBackingOracle } from './fixtures/desktop-layout-fixture.mjs';
 import { createStockGameplay } from './fixtures/stock-gameplay-fixture.mjs';
+import { admitsBrowserInput } from '../apps/wgpu-slice/web/input-targeting.mjs';
 import { bindStockHudDom } from '../web/stock-hud-dom.mjs';
 import { projectHudView } from '../web/stock-hud-view.mjs';
 import { createStockAccessoryRequest, hasFailedStockAccessoryRequest } from '../web/stock-accessory-request.mjs';
@@ -44,7 +45,7 @@ after(() => {
 const gateSource = readFileSync(new URL('./fixtures/game-gate.js', import.meta.url), 'utf8');
 const bootstrapSource = readFileSync(new URL('../web/game-runtime.mjs', import.meta.url), 'utf8');
 const bootstrap = new Script('(() => {\n' + bootstrapSource.replace(/^import .+;\r?$/gm, '').replace(/^export /gm, '') + '\nreturn (options = {}) => startGamePage({ initialize: init, wasmApi: wasm, ...options });\n})();');
-const startGamePage = bootstrap.runInNewContext({ createStockHostSnapshot, assertStockHostCapture, createStockSkinAdapter, isUnsupportedStockAccessoryFace,
+const startGamePage = bootstrap.runInNewContext({ admitsBrowserInput, createStockHostSnapshot, assertStockHostCapture, createStockSkinAdapter, isUnsupportedStockAccessoryFace,
   createStockAccessoryRequest, hasFailedStockAccessoryRequest, createStockClient, createStockEntityAssets, desktopBackingSize, createStockGameplay, bindStockHudDom, projectHudView,
   init: async () => {}, wasm: {} });
 
@@ -1067,7 +1068,7 @@ test('nickname owner rejects closed-grammar violations without getters, then, co
 
 test('nickname owner accepts its actual current realm record through the unbound factory', async () => {
   const f = fixture(); f.host(); f.complete(); const wasm = wasmDouble(f);
-  Object.assign(f.realm, { createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace, createStockClient,
+  Object.assign(f.realm, { admitsBrowserInput, createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace, createStockClient,
     createStockEntityAssets, desktopBackingSize, createStockGameplay, init: async () => {}, wasm: wasm.api });
   f.realm.startRuntime = bootstrap.runInContext(f.context);
   const runtime = await f.realm.startRuntime({ realm: f.realm, wasmApi: wasm.api });
@@ -1446,7 +1447,7 @@ function hudOwnerHarness({ group = true } = {}) {
   };
   const nodes = (scope = 'readout-and-final') => ({ __proto__: null, schema: 1, document: h.f.document, mount,
     textPolicy: 'authored', readout, final: scope === 'readout' ? null : final });
-  const ownerContext = createContext({ createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace,
+  const ownerContext = createContext({ admitsBrowserInput, createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace,
     createStockClient, createStockEntityAssets, desktopBackingSize, init: async () => {}, wasm: {},
     createStockGameplay(options) {
       gameplayOptions = options; hooks.gameplayOptions?.(options);
@@ -2003,7 +2004,7 @@ test('actual captured native HUD group composes with explicit bootstrap in the s
     };
     const decode = wasm.api.decode_frame;
     wasm.api.decode_frame = bytes => { opcode = bytes[0]; return decode(bytes); };
-    Object.assign(f.context, { createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace, createStockClient, createStockEntityAssets,
+    Object.assign(f.context, { admitsBrowserInput, createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace, createStockClient, createStockEntityAssets,
       desktopBackingSize, createStockGameplay, bindStockHudDom, projectHudView, init: async () => {}, wasm: {} });
     // Keep the actual initializer in the gate's current realm; this explicitly selected path does not auto-enter.
     const explicit = bootstrap.runInContext(f.context);
@@ -2237,7 +2238,7 @@ function requestRuntimeFixture({complete=true,constructorError,readerError,failC
   const proto=wasm.api.AnimatedScene.prototype;
   proto.render_standard_with_accessory_presentation_at_size=proto.render_standard_with_face_presentation_at_size;
   proto.apply_frame_and_render_standard_with_accessory_presentation_and_prey=proto.apply_frame_and_render_standard_with_face_presentation_and_prey;
-  const start=bootstrap.runInNewContext({createStockHostSnapshot(options){counts.reader++;if(failReader)throw readerError;return createStockHostSnapshot(options);},
+  const start=bootstrap.runInNewContext({admitsBrowserInput,createStockHostSnapshot(options){counts.reader++;if(failReader)throw readerError;return createStockHostSnapshot(options);},
     assertStockHostCapture,createStockSkinAdapter,isUnsupportedStockAccessoryFace,createStockAccessoryRequest,hasFailedStockAccessoryRequest,
     createStockClient,createStockEntityAssets,desktopBackingSize,createStockGameplay,bindStockHudDom,projectHudView,init(){},wasm:wasm.api});
   const pending=start({realm:f.realm});

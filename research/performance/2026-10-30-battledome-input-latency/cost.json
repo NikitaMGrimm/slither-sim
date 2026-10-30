@@ -1,0 +1,13 @@
+{
+  "kind": "Conservative full-allocation bound across both Spot pairs, not invoice",
+  "firstGeneratorMinutesUpperBound": 53,
+  "firstGeneratorAtBidCapUSD": 0.44166666666666665,
+  "firstTargetFullTimerUSD": 0.12199999999999998,
+  "replacementGeneratorFullTimerUSD": 1.0166666666666666,
+  "replacementTargetFullTimerUSD": 0.12199999999999998,
+  "noncomputeAllowanceUSD": 0.65,
+  "combinedBoundUSD": 2.352333333333333,
+  "capUSD": 2.5,
+  "instances": 4,
+  "timersExtended": false
+}

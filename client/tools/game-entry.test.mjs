@@ -64,7 +64,7 @@ test('actual default graph mounts HUD, Play and leaderboard with one claim, scen
     assert.equal(leaderboardMount.children.length, 4);
     assert.equal(minimapMount.children.length, 5);
     assert.equal(endScreenMount.children.length, 3);
-    assert.equal(announcementMount.children.length, 3);
+    assert.equal(announcementMount.children.length, 2, 'rich announcement has quote and attribution/length blocks');
     assert.equal(graph.minimap.enabled, 1); assert.equal(graph.minimap.reads.length, 1);
     assert.equal(graph.f.edit.ownedPlay.buttonState(playMount.children[2]).disabled, true);
     assert.equal(graph.f.edit.hud.character(playMount.children[3].children[0].children[0]).data, 'Play unavailable on this page.');

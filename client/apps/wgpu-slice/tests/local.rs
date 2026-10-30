@@ -6,6 +6,71 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame, loopback_endpoint},
     render,
 };
+#[path = "../src/scheduling.rs"]
+mod native_scheduling;
+
+#[test]
+fn native_wakes_ingest_before_frames_and_retry_ack_commits_only_once() {
+    use std::{
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
+    let mut schedule = native_scheduling::Schedule::default();
+    let mut game = playing();
+    let mut control = playing();
+    let now = Instant::now();
+    schedule.activity(true);
+    assert!(schedule.request_redraw(now));
+    assert!(schedule.begin_redraw(now));
+    game.begin_frame(40., [960, 540], 1.).unwrap();
+    effects(&mut game);
+    let retained = game.take_frame().unwrap();
+    let identity = retained.frame.identity;
+    game.retry_frame(retained).unwrap();
+    schedule.retry(now);
+    pump(&mut control, 40.);
+
+    // Authored fake transport: its wake is handled without a redraw. Ingress
+    // remains deferred behind the retained picture, in LocalGame's own FIFO.
+    let (sender, receiver) = mpsc::channel();
+    for index in [1, 2] {
+        sender
+            .send((bundle(&[received_food(index)]), 40. + f64::from(index)))
+            .unwrap();
+    }
+    for (packet, time) in receiver.try_iter() {
+        game.receive(game.generation(), &packet, time).unwrap();
+        control
+            .receive(control.generation(), &packet, time)
+            .unwrap();
+    }
+    assert!(!schedule.request_redraw(now + Duration::from_millis(2)));
+    assert_eq!(game.client().foods().foods().len(), 1);
+    assert_eq!(control.client().foods().foods().len(), 3);
+
+    let retry = now + Duration::from_millis(100);
+    assert!(schedule.request_redraw(retry));
+    assert!(schedule.begin_redraw(retry));
+    let retained = game.take_frame().unwrap();
+    assert_eq!(retained.frame.identity, identity);
+    game.presented(true).unwrap();
+    schedule.presented();
+    assert!(!schedule.begin_redraw(retry));
+    assert!(game.presented(true).is_err());
+    assert!(schedule.request_redraw(retry));
+    assert!(schedule.begin_redraw(retry));
+    pump(&mut game, 160.);
+    pump(&mut control, 160.);
+    assert_eq!(
+        format!("{:?}", game.client().foods().foods()),
+        format!("{:?}", control.client().foods().foods())
+    );
+    assert_eq!(
+        game.client().control_view().own.unwrap().raw_head,
+        control.client().control_view().own.unwrap().raw_head
+    );
+    assert_eq!(game.hud_text(), control.hud_text());
+}
 fn u24(n: u32) -> [u8; 3] {
     let b = n.to_be_bytes();
     [b[1], b[2], b[3]]
@@ -676,7 +741,17 @@ fn zero_resize_retry_retains_generation_state_and_pending_world() {
     g.begin_frame(40., [960, 540], 1.).unwrap();
     effects(&mut g);
     let p = g.take_frame().unwrap();
-    let hud_draws = p.frame.draws[p.frame.draws.len() - 2..].to_vec();
+    let hud = |frame: &Frame| {
+        frame
+            .draws
+            .iter()
+            .filter(|draw| draw.asset.handle >> 60 == 4 && draw.translation == [0., 0.])
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let hud_draws = hud(&p.frame);
+    #[cfg(windows)]
+    assert!(!hud_draws.is_empty());
     g.retry_frame(p).unwrap();
     g.viewport([0, 0], 1.).unwrap();
     assert!(g.take_frame().is_none());
@@ -685,7 +760,27 @@ fn zero_resize_retry_retains_generation_state_and_pending_world() {
     let p = g.take_frame().unwrap();
     assert_eq!(p.frame.extent, [1920, 1080]);
     assert_eq!(p.frame.viewport_scale, 2.);
-    assert_eq!(&p.frame.draws[p.frame.draws.len() - 2..], &hud_draws);
+    let resized = hud(&p.frame);
+    assert_eq!(resized.len(), hud_draws.len());
+    for (before, after) in hud_draws.iter().zip(&resized) {
+        assert_eq!(before.effective_alpha, after.effective_alpha);
+        // DPR requires new font rasters. Coverage bounds can round by a logical
+        // pixel, while the shared anchors and lifecycle state stay unchanged.
+        for (a, b) in [
+            (before.destination.x, after.destination.x),
+            (before.destination.y, after.destination.y),
+            (
+                before.destination.x + before.destination.width,
+                after.destination.x + after.destination.width,
+            ),
+            (
+                before.destination.y + before.destination.height,
+                after.destination.y + after.destination.height,
+            ),
+        ] {
+            assert!((a - b).abs() <= 1., "before={before:?}, after={after:?}");
+        }
+    }
     g.presented(true).unwrap();
     assert_eq!(g.generation(), generation);
     assert_eq!(g.phase(), Phase::Playing);
@@ -1153,6 +1248,7 @@ fn nicknames_reach_ordered_frames_with_retained_tint_and_draw_clock_fade() {
     g.receive(g.generation(), &bundle(&[setup()]), 3.75)
         .unwrap();
     pictures(&mut g);
+    let cached_runs = g.bank.text.cached_runs();
     let mut own_alpha = 0.;
     let mut remote_alpha = 0.;
     for i in 0..205 {
@@ -1167,7 +1263,7 @@ fn nicknames_reach_ordered_frames_with_retained_tint_and_draw_clock_fade() {
             .frame
             .draws
             .iter()
-            .position(|d| d.asset.handle >= 0x4000_0000_0000_0000)
+            .position(|d| d.asset.handle >> 60 == 4 && d.translation != [0., 0.])
             .unwrap();
         let body = p
             .frame
@@ -1193,7 +1289,7 @@ fn nicknames_reach_ordered_frames_with_retained_tint_and_draw_clock_fade() {
     }
     assert!(own_alpha < remote_alpha);
     assert_eq!(remote_alpha, 0.5);
-    assert_eq!(g.bank.text.cached_runs(), 2); // appearance-owned tint varies
+    assert_eq!(g.bank.text.cached_runs(), cached_runs); // HUD slots share the cache
 }
 
 #[cfg(windows)]
@@ -1230,7 +1326,7 @@ fn nickname_anchor_keeps_fixed_backing_gap_at_each_dpr_and_zoom() {
                 .frame
                 .draws
                 .iter()
-                .find(|d| d.asset.handle >= 0x4000_0000_0000_0000)
+                .find(|d| d.asset.handle >> 60 == 4 && d.translation != [0., 0.])
                 .unwrap();
             assert!((label.translation[0] * scale - head_x).abs() < 1e-9);
             let gap = label.translation[1] * scale - head_y;
@@ -1267,7 +1363,7 @@ fn long_nickname_keeps_backing_size_and_session_at_high_dpr() {
             .frame
             .draws
             .iter()
-            .filter(|d| d.asset.handle >= 0x4000_0000_0000_0000)
+            .filter(|d| d.asset.handle >> 60 == 4 && d.translation != [0., 0.])
             .collect();
         assert!(
             labels.len() > 1,

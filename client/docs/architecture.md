@@ -51,9 +51,16 @@ Both submit ordered frames and authored materials through the same wgpu renderer
 
 Play opens a simulator endpoint or, natively with `--official`, an official
 server chosen from the live directory; there is no automatic reconnect. The
-renderer covers body, food, prey, paired eyes, arena and a small bitmap HUD.
+renderer covers body, food, prey, paired eyes, arena and platform text for nicknames, the HUD and leaderboard.
 Image faces, antennas and complete menus remain incomplete. Rasterization can
 differ from Canvas; passing tests does not establish perceptual parity.
+
+Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and an
+independent lazy cache for future announcements and result/editor panels. No
+wgpu gameplay producer enables them yet; the shared [record announcement
+projection](announcements.md) supplies styled blocks to the Canvas reference.
+Existing text quotas and draw admission stay
+unchanged until a producer explicitly reserves panel draws.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
