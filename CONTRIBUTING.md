@@ -92,7 +92,9 @@ Preserve third-party license notices. For external data, note its source and any
 sharing restrictions in `REPORT.md`.
 
 A maintainer reviews the current revision and evidence before merging. Required
-CI must pass with latest main; new commits need relevant checks and renewed review.
+CI must pass; new commits need relevant checks and renewed review. PRs may merge
+behind main: the client and simulator change mostly separate files, main reruns
+every check after each merge, and releases wait for main's run.
 Auto-merge can then finish an approved PR. Independent agent review is useful
 evidence, but agents cannot approve their GitHub account's own PR. The owner-authorized
 [release automation](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md) can merge compatible patch release PRs
