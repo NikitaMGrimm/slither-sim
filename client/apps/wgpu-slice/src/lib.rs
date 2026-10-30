@@ -8,6 +8,8 @@ pub mod game;
 pub mod gpu;
 pub mod hud;
 pub mod materials;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod menu_input_native;
 pub mod minimap;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;

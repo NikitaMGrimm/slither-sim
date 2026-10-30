@@ -1,0 +1,596 @@
+//! Authored synthetic editor/event traces; no OS input, clipboard or window.
+use slither_client::{
+    desktop_input::{DesktopInput, OwnInput},
+    menu_input::*,
+    menu_preferences::MenuQuality,
+    start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
+};
+
+fn editor(field: TextField, text: &str) -> MenuInputState {
+    let mut input = MenuInputState::default();
+    input.apply(EditIntent::Focus(Some(field)));
+    input.apply(EditIntent::KeyText(text.into()));
+    input
+}
+fn text(input: &MenuInputState, field: TextField) -> &str {
+    input.editor(field).text()
+}
+fn enter(pressed: bool, repeat: bool) -> EditIntent {
+    EditIntent::Enter { pressed, repeat }
+}
+fn paste(input: &mut MenuInputState, value: Result<String, String>) -> Vec<HostEditEffect> {
+    let effects = input.apply(EditIntent::Paste);
+    let HostEditEffect::ReadClipboard(token) = effects[0] else {
+        panic!("expected read")
+    };
+    input.apply(EditIntent::ClipboardRead {
+        token,
+        result: value,
+    })
+}
+
+#[test]
+fn utf8_utf16_offsets_reject_interior_bytes_and_surrogates() {
+    let s = "a😀e\u{301}界";
+    for (byte, unit) in [(0, 0), (1, 1), (5, 3), (6, 4), (8, 5), (11, 6)] {
+        assert_eq!(byte_to_utf16(s, byte), Some(unit));
+        assert_eq!(utf16_to_byte(s, unit), Some(byte));
+    }
+    for byte in [2, 3, 4, 7, 9, 10, 12, usize::MAX] {
+        assert_eq!(byte_to_utf16(s, byte), None);
+    }
+    for unit in [2, 7, usize::MAX] {
+        assert_eq!(utf16_to_byte(s, unit), None);
+    }
+    assert_eq!(utf16_to_byte("", 0), Some(0));
+}
+
+#[test]
+fn normalization_is_identical_for_typing_paste_and_ime_commit() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        let raw = "x\0\u{7f}é😀e\u{301}界".repeat(30);
+        let typed = editor(field, &raw);
+        let mut pasted = editor(field, "");
+        assert!(paste(&mut pasted, Ok(raw.clone())).is_empty());
+        let mut ime = editor(field, "");
+        ime.apply(EditIntent::Preedit(raw.clone(), None));
+        assert_eq!(text(&ime, field), "");
+        assert_eq!(ime.editor(field).preedit().unwrap().text, raw);
+        ime.apply(EditIntent::ImeCommit(raw));
+        assert_eq!(text(&typed, field), text(&pasted, field));
+        assert_eq!(text(&typed, field), text(&ime, field));
+        let limit = if field == TextField::Nickname {
+            24
+        } else {
+            140
+        };
+        assert!(text(&typed, field).encode_utf16().count() <= limit);
+    }
+    assert_eq!(
+        text(
+            &editor(TextField::Nickname, "a\né\u{7f}😀"),
+            TextField::Nickname
+        ),
+        "a  \u{7f}  "
+    );
+    assert_eq!(
+        text(
+            &editor(TextField::Nickname, &("n".repeat(23) + "😀")),
+            TextField::Nickname
+        ),
+        "n".repeat(23) + " "
+    );
+    assert_eq!(
+        text(
+            &editor(TextField::Champion, &("c".repeat(139) + "😀")),
+            TextField::Champion
+        ),
+        "c".repeat(139)
+    );
+    assert_eq!(
+        text(
+            &editor(TextField::Champion, &("c".repeat(138) + "😀x")),
+            TextField::Champion
+        ),
+        "c".repeat(138) + "😀"
+    );
+    assert_eq!(
+        text(
+            &editor(TextField::Champion, "é😀e\u{301}"),
+            TextField::Champion
+        ),
+        "é😀e\u{301}"
+    );
+}
+
+#[test]
+fn selection_replacement_normalizes_the_whole_result_then_limits() {
+    let mut input = editor(TextField::Nickname, "abcdefghijklmnopqrstuvwx");
+    input.apply(EditIntent::Select {
+        anchor: 1,
+        caret: 3,
+    });
+    paste(&mut input, Ok("😀z".into()));
+    assert_eq!(
+        text(&input, TextField::Nickname),
+        "a  zdefghijklmnopqrstuvw"
+    );
+    assert_eq!(input.editor(TextField::Nickname).selection(), (4, 4));
+}
+
+#[test]
+fn ime_preedit_empty_commit_enter_and_duplicate_text_are_separate() {
+    let mut input = editor(TextField::Champion, "old");
+    input.apply(EditIntent::SelectAll);
+    input.apply(EditIntent::ImeEnabled(true));
+    input.apply(EditIntent::Preedit("界😀".into(), Some((3, 7))));
+    assert_eq!(
+        input
+            .editor(TextField::Champion)
+            .preedit()
+            .unwrap()
+            .selection,
+        Some((3, 7))
+    );
+    assert_eq!(text(&input, TextField::Champion), "old");
+    input.apply(EditIntent::KeyText("界😀".into()));
+    assert!(input.apply(enter(true, false)).is_empty());
+    input.apply(EditIntent::Preedit("".into(), None));
+    assert!(input.editor(TextField::Champion).composing());
+    input.apply(EditIntent::ImeCommit("界😀".into()));
+    input.apply(EditIntent::ImeEnabled(false));
+    input.apply(EditIntent::KeyText("界😀".into()));
+    assert_eq!(text(&input, TextField::Champion), "界😀");
+    input.apply(EditIntent::EndEventBatch);
+    assert!(input.apply(enter(true, true)).is_empty());
+    input.apply(enter(false, false));
+    assert_eq!(
+        input.apply(enter(true, false)),
+        vec![HostEditEffect::Activate(TextField::Champion)]
+    );
+    assert!(input.apply(enter(true, false)).is_empty());
+    input.apply(EditIntent::Undo);
+    assert_eq!(text(&input, TextField::Champion), "old");
+}
+
+#[test]
+fn ime_commit_before_enter_does_not_activate_and_cancel_never_commits() {
+    let mut input = editor(TextField::Nickname, "a");
+    input.apply(EditIntent::Preedit("é".into(), Some((1, usize::MAX))));
+    assert_eq!(
+        input
+            .editor(TextField::Nickname)
+            .preedit()
+            .unwrap()
+            .selection,
+        Some((0, 2))
+    );
+    input.apply(EditIntent::ImeCommit("é".into()));
+    input.apply(EditIntent::ImeEnabled(false));
+    assert!(input.apply(enter(true, false)).is_empty());
+    assert_eq!(text(&input, TextField::Nickname), "a ");
+    input.apply(EditIntent::Preedit("discard".into(), None));
+    input.apply(EditIntent::CancelComposition);
+    assert_eq!(text(&input, TextField::Nickname), "a ");
+    assert!(!input.editor(TextField::Nickname).composing());
+    input.apply(EditIntent::Preedit("also discard".into(), None));
+    input.apply(EditIntent::ImeEnabled(false));
+    assert!(input.editor(TextField::Nickname).preedit().is_none());
+    // IME Enabled is availability on some platforms, not proof of composition.
+    input.apply(EditIntent::ImeEnabled(true));
+    input.apply(EditIntent::EndEventBatch);
+    input.apply(EditIntent::KeyText("z".into()));
+    assert_eq!(text(&input, TextField::Nickname), "a z");
+    input.apply(EditIntent::Preedit("cancel without Disabled".into(), None));
+    input.apply(EditIntent::Preedit("".into(), None));
+    input.apply(EditIntent::EndEventBatch);
+    assert!(!input.editor(TextField::Nickname).composing());
+    input.apply(EditIntent::KeyText("x".into()));
+    assert_eq!(text(&input, TextField::Nickname), "a zx");
+}
+
+#[test]
+fn direct_ime_commit_without_preedit_deduplicates_key_text_in_either_order() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        for text_first in [true, false] {
+            let mut input = editor(field, "old");
+            input.apply(EditIntent::EndEventBatch);
+            input.apply(EditIntent::SelectAll);
+            input.apply(EditIntent::ImeEnabled(true));
+            if text_first {
+                input.apply(EditIntent::KeyText("😀".into()));
+            }
+            input.apply(EditIntent::ImeCommit("😀".into()));
+            if !text_first {
+                input.apply(EditIntent::KeyText("😀".into()));
+            }
+            assert_eq!(
+                text(&input, field),
+                if field == TextField::Nickname {
+                    "  "
+                } else {
+                    "😀"
+                }
+            );
+            input.apply(EditIntent::Undo);
+            assert_eq!(text(&input, field), "old");
+        }
+    }
+}
+
+#[test]
+fn incremental_typing_stops_at_utf16_limit_and_selected_text_remains_replaceable() {
+    for (field, limit) in [(TextField::Nickname, 24), (TextField::Champion, 140)] {
+        let mut input = editor(field, "");
+        for _ in 0..limit + 2 {
+            input.apply(EditIntent::KeyText("n".into()));
+        }
+        assert_eq!(text(&input, field), "n".repeat(limit));
+        input.apply(EditIntent::KeyText("😀".into()));
+        assert_eq!(text(&input, field), "n".repeat(limit));
+        input.apply(EditIntent::Select {
+            anchor: 0,
+            caret: 2,
+        });
+        input.apply(EditIntent::KeyText("😀".into()));
+        let prefix = if field == TextField::Nickname {
+            "  "
+        } else {
+            "😀"
+        };
+        assert_eq!(
+            text(&input, field),
+            prefix.to_owned() + &"n".repeat(limit - 2)
+        );
+        assert_eq!(text(&input, field).encode_utf16().count(), limit);
+    }
+}
+
+#[test]
+fn selections_arrows_shift_home_end_deletion_and_history() {
+    let field = TextField::Champion;
+    let mut input = editor(field, "a😀e\u{301} z");
+    input.apply(EditIntent::Move {
+        movement: Movement::Home,
+        extend: false,
+    });
+    input.apply(EditIntent::Move {
+        movement: Movement::Right,
+        extend: true,
+    });
+    input.apply(EditIntent::Move {
+        movement: Movement::Right,
+        extend: true,
+    });
+    assert_eq!(input.editor(field).selection(), (0, 5));
+    input.apply(EditIntent::Move {
+        movement: Movement::Left,
+        extend: false,
+    });
+    assert_eq!(input.editor(field).selection(), (0, 0));
+    input.apply(EditIntent::Move {
+        movement: Movement::End,
+        extend: true,
+    });
+    input.apply(EditIntent::KeyText("new".into()));
+    assert_eq!(text(&input, field), "new");
+    input.apply(EditIntent::Undo);
+    assert_eq!(input.editor(field).selection(), (0, 10));
+    input.apply(EditIntent::Redo);
+    assert_eq!(text(&input, field), "new");
+    input.apply(EditIntent::Backspace);
+    assert_eq!(text(&input, field), "ne");
+    input.apply(EditIntent::Undo);
+    assert_eq!(input.editor(field).selection(), (3, 3));
+    input.apply(EditIntent::Move {
+        movement: Movement::Home,
+        extend: false,
+    });
+    input.apply(EditIntent::Delete);
+    assert_eq!(text(&input, field), "ew");
+    input.apply(EditIntent::Undo);
+    input.apply(EditIntent::KeyText("x".into()));
+    input.apply(EditIntent::Redo);
+    assert_eq!(text(&input, field), "xnew");
+}
+
+#[test]
+fn combining_marks_and_words_use_explicit_scalar_boundaries() {
+    let field = TextField::Champion;
+    let mut input = editor(field, "hi  e\u{301} 😀");
+    input.apply(EditIntent::Move {
+        movement: Movement::WordLeft,
+        extend: false,
+    });
+    assert_eq!(input.editor(field).selection(), (8, 8));
+    input.apply(EditIntent::Move {
+        movement: Movement::WordLeft,
+        extend: false,
+    });
+    assert_eq!(input.editor(field).selection(), (4, 4));
+    input.apply(EditIntent::Move {
+        movement: Movement::WordRight,
+        extend: false,
+    });
+    assert_eq!(input.editor(field).selection(), (8, 8));
+    input.apply(EditIntent::Select {
+        anchor: 7,
+        caret: 7,
+    });
+    input.apply(EditIntent::Backspace);
+    assert_eq!(text(&input, field), "hi  e 😀");
+    input.apply(EditIntent::Select {
+        anchor: 999,
+        caret: 8,
+    });
+    assert_eq!(input.editor(field).selection(), (10, 6));
+}
+
+#[test]
+fn clipboard_failure_is_reported_cut_is_transactional_and_stale_results_are_ignored() {
+    let field = TextField::Nickname;
+    let mut input = editor(field, "copy me");
+    input.apply(EditIntent::SelectAll);
+    let effects = input.apply(EditIntent::Cut);
+    let HostEditEffect::WriteClipboard { token, ref text } = effects[0] else {
+        panic!()
+    };
+    assert_eq!(text, "copy me");
+    assert_eq!(
+        input.apply(EditIntent::ClipboardWritten {
+            token,
+            result: Err("busy".into())
+        }),
+        vec![HostEditEffect::ClipboardFailed("busy".into())]
+    );
+    assert_eq!(input.editor(field).text(), "copy me");
+    let effects = input.apply(EditIntent::Cut);
+    let HostEditEffect::WriteClipboard { token, .. } = effects[0] else {
+        panic!()
+    };
+    input.apply(EditIntent::ClipboardWritten {
+        token,
+        result: Ok(()),
+    });
+    assert_eq!(input.editor(field).text(), "");
+    input.apply(EditIntent::Undo);
+    assert_eq!(input.editor(field).text(), "copy me");
+    let effects = input.apply(EditIntent::Paste);
+    let HostEditEffect::ReadClipboard(token) = effects[0] else {
+        panic!()
+    };
+    input.apply(EditIntent::Focus(Some(TextField::Champion)));
+    input.apply(EditIntent::ClipboardRead {
+        token,
+        result: Ok("wrong field".into()),
+    });
+    assert_eq!(input.editor(TextField::Champion).text(), "");
+    assert_eq!(
+        paste(&mut input, Err("unavailable".into())),
+        vec![HostEditEffect::ClipboardFailed("unavailable".into())]
+    );
+    input.apply(EditIntent::Focus(Some(field)));
+    let effects = input.apply(EditIntent::Cut);
+    let HostEditEffect::WriteClipboard { token, .. } = effects[0] else {
+        panic!()
+    };
+    input.apply(EditIntent::Move {
+        movement: Movement::Home,
+        extend: false,
+    });
+    input.apply(EditIntent::ClipboardWritten {
+        token,
+        result: Ok(()),
+    });
+    assert_eq!(input.editor(field).text(), "copy me");
+}
+
+fn gameplay() -> DesktopInput {
+    let mut game = DesktopInput::new(19.).unwrap();
+    game.set_own(
+        OwnInput {
+            wanted_heading: 0.,
+            gaze_heading: 0.,
+            dead: false,
+            turn_rate: 0.03,
+            size_turn_factor: 1.,
+            speed_turn_factor: 1.,
+            requested_boost: false,
+            sent_boost: false,
+        },
+        false,
+    )
+    .unwrap();
+    game
+}
+fn deliver(game: &mut DesktopInput, effects: Vec<HostEditEffect>) {
+    for effect in effects {
+        match effect {
+            HostEditEffect::Gameplay { key, pressed } => {
+                game.key(key.name(), pressed);
+            }
+            HostEditEffect::ReleasePointerBoost => game.mouse_up(),
+            _ => {}
+        }
+    }
+}
+#[test]
+fn focus_modal_and_blur_clear_held_turn_and_boost_without_changing_legacy_policy() {
+    for boundary in [
+        EditIntent::Focus(Some(TextField::Nickname)),
+        EditIntent::Modal(true),
+        EditIntent::WindowFocused(false),
+    ] {
+        let mut game = gameplay();
+        let mut input = MenuInputState::default();
+        for key in [
+            GameplayKey::Left,
+            GameplayKey::Right,
+            GameplayKey::Up,
+            GameplayKey::Space,
+        ] {
+            deliver(
+                &mut game,
+                input.apply(EditIntent::Gameplay { key, pressed: true }),
+            );
+        }
+        assert!(game.view().left_held && game.view().right_held && game.view().boost_key_held);
+        deliver(&mut game, input.apply(boundary));
+        assert!(!game.view().left_held && !game.view().right_held && !game.view().boost_key_held);
+        assert!(!game.view().own.unwrap().requested_boost);
+        assert!(
+            input
+                .apply(EditIntent::Gameplay {
+                    key: GameplayKey::Left,
+                    pressed: true
+                })
+                .is_empty()
+        );
+        assert_eq!(
+            input.apply(EditIntent::Gameplay {
+                key: GameplayKey::Left,
+                pressed: false
+            }),
+            vec![HostEditEffect::Gameplay {
+                key: GameplayKey::Left,
+                pressed: false
+            }]
+        );
+    }
+    let mut input = editor(TextField::Nickname, "name");
+    input.apply(EditIntent::Preedit("discard".into(), None));
+    input.apply(EditIntent::Modal(true));
+    assert_eq!(input.focus(), None);
+    input.apply(EditIntent::Modal(false));
+    assert_eq!(input.focus(), Some(TextField::Nickname));
+    assert!(!input.editor(TextField::Nickname).composing());
+}
+
+#[test]
+fn menu_focus_and_enter_keep_deferred_play_and_admission_authority() {
+    let mut menu = StartMenuState::new(MenuLocale::English, false, MenuQuality::High);
+    let mut input = MenuInputState::default();
+    let intents = menu.step(0., false).unwrap();
+    input.sync_menu(&menu.view(true), &intents);
+    assert_eq!(input.focus(), Some(TextField::Nickname));
+    input.apply_menu(EditIntent::KeyText("é😀 name".into()), &mut menu, true);
+    input.apply_menu(EditIntent::Preedit("候補".into(), None), &mut menu, true);
+    input.apply_menu(enter(true, false), &mut menu, true);
+    assert!(menu.step(8., false).unwrap().is_empty());
+    input.apply_menu(EditIntent::ImeCommit("x".into()), &mut menu, true);
+    input.apply_menu(enter(false, false), &mut menu, true);
+    input.apply_menu(EditIntent::EndEventBatch, &mut menu, true);
+    input.apply_menu(enter(true, false), &mut menu, true);
+    assert_eq!(input.focus(), None);
+    assert_eq!(
+        menu.step(16., false).unwrap(),
+        vec![StartMenuIntent::Play {
+            nickname: "    namex".into(),
+            quality: MenuQuality::High
+        }]
+    );
+    assert!(menu.step(24., false).unwrap().is_empty());
+    let mut blocked = StartMenuState::new(MenuLocale::English, false, MenuQuality::High);
+    input.apply_menu(enter(true, false), &mut blocked, false);
+    assert!(
+        blocked
+            .step(0., false)
+            .unwrap()
+            .iter()
+            .all(|i| !matches!(i, StartMenuIntent::Play { .. }))
+    );
+    blocked.action(MenuAction::Play, false);
+    assert!(!blocked.view(false).spinner_visible);
+}
+
+#[test]
+fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
+    let mut menu = StartMenuState::new(MenuLocale::French, false, MenuQuality::High);
+    menu.edit_nickname(&"Ada".encode_utf16().collect::<Vec<_>>());
+    let mut input = MenuInputState::default();
+    input.sync_menu(&menu.view(true), &[StartMenuIntent::FocusNickname]);
+    let nodes = login_accessibility(&menu.view(true), &input);
+    assert_eq!(
+        nodes
+            .iter()
+            .map(|n| (
+                n.id,
+                n.role,
+                n.name.as_str(),
+                n.value.as_str(),
+                n.focused,
+                n.enabled,
+                n.actions.len()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "nickname",
+                AccessibleRole::TextInput,
+                "Surnom",
+                "Ada",
+                true,
+                true,
+                2
+            ),
+            ("play", AccessibleRole::Button, "Jouer", "", false, true, 1),
+            (
+                "skin",
+                AccessibleRole::Button,
+                "Change Skin",
+                "",
+                false,
+                true,
+                1
+            ),
+            (
+                "server",
+                AccessibleRole::Button,
+                "Choose Server",
+                "",
+                false,
+                true,
+                1
+            ),
+            (
+                "quality",
+                AccessibleRole::Button,
+                "Graphics quality",
+                "High",
+                false,
+                true,
+                1
+            ),
+        ]
+    );
+    assert_eq!(
+        nodes[0].actions,
+        vec![
+            AccessibleAction::FocusNickname,
+            AccessibleAction::EditNickname
+        ]
+    );
+    assert_eq!(
+        nodes[1].actions,
+        vec![AccessibleAction::Menu(MenuAction::Play)]
+    );
+    menu.action(MenuAction::Play, true);
+    let busy = login_accessibility(&menu.view(true), &input);
+    assert!(busy[..5].iter().all(|n| !n.enabled && !n.focused));
+    assert_eq!(
+        busy[5],
+        AccessibleNode {
+            id: "status",
+            role: AccessibleRole::Status,
+            name: "Connecting".into(),
+            value: "".into(),
+            focused: false,
+            enabled: true,
+            actions: vec![]
+        }
+    );
+    menu.step(8., false).unwrap();
+    assert!(menu.begin_outgoing());
+    menu.step(600., false).unwrap();
+    assert!(login_accessibility(&menu.view(true), &input).is_empty());
+}
