@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assertWasmTraceBinding, nativeSteps, channelResults } from './feel-replay/native.mjs';
-import { sha256 } from './feel-replay/io.mjs';
+import { nativeSteps } from './feel-replay/native.mjs';
 import { buildSchedule } from './feel-replay/schedule.mjs';
 import { syntheticFixture } from './feel-replay/synthetic.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
@@ -62,25 +61,13 @@ test('native fractional input follows mouse presses, both move admissions and CS
   assert.deepEqual(steps[8].actions, []);
 });
 
-test('channel report retains exact channels and never promotes unexplained floats', () => {
+test('native and browser comparisons use the same perceptual policy', () => {
   const { schedule, trace: left } = syntheticFixture();
   const right = structuredClone(left);
   right.manifest.peer = 'native';
-  right.samples[1].camera.x += 1e-10;
-  const report = compareTraces(left, right, schedule, { mode: 'cross-target' });
-  const result = channelResults(left, right, report);
-  assert.equal(result.channels.find(c => c.channel === 'commands').status, 'exact');
-  assert.equal(result.channels.find(c => c.channel === 'camera').status, 'failing');
-  assert.equal(report.passed, false);
-  assert.equal(result.rows.length, 1);
-});
-
-test('Wasm operand must be the trace its completed A2 run wrote', () => {
-  // ORIGINAL SYNTHETIC bytes; only the binding is under test.
-  const bytes = '{"synthetic":"wasm trace"}';
-  assertWasmTraceBinding({ traceSha256: { 'canvas-wasm': sha256(bytes) } }, bytes);
-  assert.throws(() => assertWasmTraceBinding({ traceSha256: { 'canvas-wasm': sha256(bytes) } }, bytes + ' '), /differs/);
-  assert.throws(() => assertWasmTraceBinding({ traceSha256: { 'webgpu-wasm': sha256(bytes) } }, bytes), /regenerate A2/);
-  assert.throws(() => assertWasmTraceBinding({}, bytes), /regenerate A2/);
-  assert.throws(() => assertWasmTraceBinding(undefined, bytes), /regenerate A2/);
+  right.manifest.source.commit = 'e'.repeat(40);
+  right.samples[1].camera.x += 0.1;
+  const report = compareTraces(left, right, schedule);
+  assert.equal(report.passed, true);
+  assert(report.channels.find(c => c.channel.endsWith('.camera.position')).max > 0);
 });

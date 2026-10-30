@@ -1,4 +1,4 @@
-//! Decode the #299 flat recorder ABI, matching observation.mjs without a JSON round trip.
+//! Decode the v3 flat recorder ABI, matching observation.mjs.
 use serde_json::{Value, json};
 use slither_client::feel_trace::Observation;
 
@@ -12,17 +12,14 @@ pub fn decode(row: &Observation, geometry: &Value) -> Result<Value, String> {
     fn point(n: &mut impl FnMut() -> Result<f64, String>) -> Result<Value, String> {
         Ok(json!({"x":n()?, "y":n()?}))
     }
-    fn list(n: &mut impl FnMut() -> Result<f64, String>, count: usize) -> Result<Value, String> {
-        (0..count).map(|_| n().map(Value::from)).collect()
-    }
     let delta = json!({"raw":n()?, "lagged":n()?, "steps":n()?, "doubledSteps":n()?});
     let multiplier = n()?;
-    let mut camera = json!({"x":n()?, "y":n()?, "offset":point(&mut n)?, "index":n()?,
-        "pending":n()?, "follow":n()? != 0., "zoom":n()?, "ring":list(&mut n, 124)?});
+    let mut camera =
+        json!({"x":n()?, "y":n()?, "offset":point(&mut n)?, "follow":n()? != 0., "zoom":n()?});
     camera["targetZoom"] = camera["zoom"].clone();
     let mut own = Value::Null;
     if let Some(token) = row.token {
-        own = json!({"token":token.to_string(), "expired":n()? != 0., "deathProgress":n()?,
+        own = json!({"token":token.to_string(), "expired":n()? != 0., "deathProgress":n()?, "spawnProgress":n()?, "opacity":n()?,
             "rawHead":point(&mut n)?, "correctedHead":point(&mut n)?, "rawHeading":n()?,
             "correctedHeading":n()?, "wantedHeading":n()?, "gaze":n()?,
             "pupils":{"left":point(&mut n)?}});
@@ -33,12 +30,14 @@ pub fn decode(row: &Observation, geometry: &Value) -> Result<Value, String> {
         own["boost"] = json!(n()? != 0.);
         own["boostPhase"] = json!(n()?);
         own["size"] = json!({"segments":n()?, "fraction":n()?, "length":n()?});
-        own["rings"] = json!({"head":{"index":n()?, "pending":n()?},
-            "angle":{"index":n()?, "pending":n()?}, "length":{"index":n()?, "pending":n()?}});
         camera["targetZoom"] = json!(n()?);
-        for (name, count) in [("head", 159), ("angle", 26), ("length", 53)] {
-            own["rings"][name]["values"] = list(&mut n, count)?;
+        let count = n()?;
+        if count.fract() != 0. || !(0. ..=100_000.).contains(&count) {
+            return Err("Invalid body count".into());
         }
+        own["body"] = (0..count as usize)
+            .map(|_| point(&mut n))
+            .collect::<Result<Value, _>>()?;
         own["projected"] = Value::Null;
         if own["expired"] == false {
             let head = point(&mut n)?;

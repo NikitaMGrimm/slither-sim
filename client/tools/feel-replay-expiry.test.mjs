@@ -36,10 +36,10 @@ function appendLives(f, states) {
   return f;
 }
 
-test('v2 retains expired own, skips projection, and admits a declared restart with a new token', () => {
+test('v3 retains expired own, skips projection, and admits a declared restart with a new token', () => {
   const { schedule, trace } = lifecycle();
-  assert.equal(schedule.schema, 2); assert.equal(trace.schema, 2);
-  assert.equal(compareTraces(trace, trace, schedule).status, 'exact-match');
+  assert.equal(schedule.schema, 3); assert.equal(trace.schema, 3);
+  assert.equal(compareTraces(trace, trace, schedule).status, 'perceptual-match');
   assert.equal(parse(stringify(trace)).samples[2].own.projected, null);
 });
 test('completeness rejects completion between lives even in identical peers', () => {
@@ -69,12 +69,12 @@ test('completeness rejects reuse of a displaced token that never expired', () =>
   assert.equal(compareTraces(trace, trace, schedule).status, 'invalid');
 });
 
-test('v2 admits multiple restarts with fresh tokens and repeated retained-expired observations', () => {
+test('v3 admits multiple restarts with fresh tokens and repeated retained-expired observations', () => {
   const { schedule, trace } = appendLives(lifecycle(), [
     ['synthetic-own-2', true], ['synthetic-own-2', true], [null],
     ['synthetic-own-3'], ['synthetic-own-3', true], [null], ['synthetic-own-4'],
   ]);
-  assert.equal(compareTraces(trace, trace, schedule).status, 'exact-match');
+  assert.equal(compareTraces(trace, trace, schedule).status, 'perceptual-match');
 });
 
 for (const [name, mutate] of [
@@ -96,12 +96,12 @@ for (const [name, mutate] of [
   assert.equal(compareTraces(f.trace, f.trace, f.schedule).status, 'invalid');
 });
 test('expired raw ABI has no invented draw cells and still decodes stored channels', () => {
-  const camera = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, ...Array(124).fill(0)];
-  const cells = [...camera, 1, 1.1, ...Array(28 + 238).fill(0)];
+  const camera = [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1];
+  const cells = [...camera, 1, 1.1, ...Array(25).fill(0)];
   const { trace } = syntheticFixture();
   const o = observation(['draw', 'own-1', cells], trace.manifest.geometry);
   assert(o.own.expired); assert.equal(o.own.deathProgress, 1.1);
-  assert.equal(o.own.projected, null); assert.equal(o.own.rings.head.values.length, 159);
+  assert.equal(o.own.projected, null); assert.deepEqual(o.own.body, []);
   assert.throws(() => observation(['draw', 'own-1', cells.slice(0, -1)], trace.manifest.geometry), /Truncated/);
 });
 test('browser fixture freezes the close/Play/appearance gap independently of peer output', () => {

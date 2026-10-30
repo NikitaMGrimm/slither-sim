@@ -1,18 +1,17 @@
 # Offline browser peers (A2)
 
 This is a measuring instrument, with no feel-policy correction. Run from
-`client/`, using Rust 1.99, Node 24, wasm-bindgen 0.2.129 and installed Edge or
-Chromium. Builds are explicit; replay requires the prebuilt artifacts.
+`client/`, using Rust 1.99, Node 24, wasm-bindgen 0.2.129 and installed Chrome. Builds are explicit; replay requires the prebuilt artifacts.
 
 ```powershell
 $env:CARGO_BUILD_JOBS='2'
 $env:WASM_BINDGEN='<absolute wasm-bindgen 0.2.129 executable>'
 node tools/build-feel-replay.mjs
-node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 7 --appearance-at 3
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.json --out <fresh-directory-outside-repository> --browser 'C:/Program Files/Google/Chrome/Application/chrome.exe' --commands 7 --appearance-at 3
 ```
 
 Stage intended source changes before the explicit build. Its receipt binds the
-artifacts to the staged tree/core and the hashes of every completed binding,
+artifacts to the staged tree and the hashes of every completed binding,
 Wasm binary and generated snippet. The previous receipt is invalidated before
 building; interrupted rebuilds leave no authenticating receipt. Replay checks the
 hashes before launching either peer and rejects stale/replaced artifacts or
@@ -26,12 +25,6 @@ command-count failures instead of fitting expectations to peer output. Private
 schema-1 header-free tapes use the same command with their existing immutable
 record path. `--receipt` hashes an existing acceptance receipt in place. Private
 paths, hashes, bodies, receipts and results must remain outside Git/public logs.
-
-Optional `--numerical-policy <feel-f64-v1-policy-file>` validates and freezes a
-cross-target declaration before either peer starts. Both Wasm manifests retain
-that declaration for a later native comparison; their own same-core comparison
-still requires exact equality. Omit it for the default null policy. See the
-[policy version and cause requirements](README.md#match-criteria).
 
 The authored synthetic v3 fixture includes two challenge negotiations, unsplit
 Setup pairs, own appearances, pointer/compatibility movement, boost, editor keys,
@@ -61,8 +54,8 @@ Only its GPU I/O is replaced by a feature-gated CPU presentation sink; all resou
 preparation, gameplay, effects and presentation acknowledgments remain production
 paths. This gate does not compare pixels, GPU completion, physical input or pacing.
 
-Both peers drain recorder-local sequence identities alongside the unchanged
-numeric observation cells, plus a separate list of pictures acknowledged after
+Both peers drain recorder-local sequence identities alongside the v3
+numeric semantic observation cells, plus a separate list of pictures acknowledged after
 submission and model commit. Assembly matches receipts by identity, retaining
 unacknowledged draw rows as prepared but neither submitted nor committed. It
 rejects missing receipt metadata, duplicate identities and orphan/non-draw
@@ -75,7 +68,7 @@ resting mouse pointer and empty keys are equal before bootstrap. An optional
 It restores the legacy mouse's integer CSS position. Otherwise the fallback is
 the integer CSS viewport center, including at odd dimensions. Startup uses those
 CSS coordinates directly through DOM events, avoiding a divide/multiply round
-trip. The manifest records the source and actual coordinate bits. Both peers receive
+trip. The run retains the admitted startup coordinates. Both peers receive
 one scheduled reset/Connect RAF and then the ordinary frame at time zero; there
 is no one-sided warmup. Packets at time zero are rejected because they would
 precede the initial Connect acknowledgment. Packet/input/frame ties retain A1
@@ -94,8 +87,8 @@ The shared production draw preparation removes expired snakes from the draw
 collection before either renderer plans a face. The recorder follows that skip:
 retained own data includes raw `deathProgress`/`expired`, and `projected` is null
 only for expired own. It does not clamp expired progress or invent an invisible
-face. [Contract v2](README.md) makes these states explicit; old artifacts stay
-immutable and require their pinned v1 reader.
+face. [Contract v3](README.md) makes these states explicit; old artifacts stay
+immutable and require their pinned old reader.
 
 Normalized coordinates become real DOM events at explicit per-peer selectors.
 The named manifest normalization `chromium-primary-mouse-compat-v1` treats legacy
@@ -128,7 +121,7 @@ shared semantic IDs; sidecars retain actual DOM target IDs. The authored
 path checks the first gaze/command without subsequent input masking startup:
 
 ```sh
-node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-startup-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 1 --appearance-at 3 --width 961 --height 541
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-startup-synthetic.json --out <fresh-directory-outside-repository> --browser 'C:/Program Files/Google/Chrome/Application/chrome.exe' --commands 1 --appearance-at 3 --width 961 --height 541
 ```
 
 ## Mouse coordinate admission (B2)
@@ -163,7 +156,7 @@ compatibility mapping. Its independently frozen expectation is four commands;
 it is a DOM-listener regression, not a physical-input or perceptual claim:
 
 ```sh
-node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-fractional-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 4 --appearance-at 3 --width 961 --height 541
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-fractional-synthetic.json --out <fresh-directory-outside-repository> --browser 'C:/Program Files/Google/Chrome/Application/chrome.exe' --commands 4 --appearance-at 3 --width 961 --height 541
 ```
 
 The authored `browser-pointer-only-synthetic.json` removes the first paired
@@ -171,7 +164,7 @@ mousemove, leaving fractional pointer movement isolated until the next input.
 It freezes the same four-command expectation, with 30 events and 45 boundaries:
 
 ```sh
-node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-pointer-only-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 4 --appearance-at 3 --width 961 --height 541
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-pointer-only-synthetic.json --out <fresh-directory-outside-repository> --browser 'C:/Program Files/Google/Chrome/Application/chrome.exe' --commands 4 --appearance-at 3 --width 961 --height 541
 ```
 
 `feel-trace` is absent from ordinary builds, including its fields, hooks and CPU
@@ -186,19 +179,9 @@ closed: the recorder emits an explicit error and no partial numeric row. The
 trace is marked incomplete, and receipts/comparison errors retain the reason.
 The current full-path fixtures use paired eyes.
 
-The browser applies the A1 writer (`io.mjs` re-exports its browser-safe codec) to
-raw native Numbers before CDP transport. No plain JSON round trip loses signed
-zero. `schedule.json`, peer manifests/traces and `comparison.json` use A1 encoding.
-All tracked client sources and generated bindings are hashed. The manifest records
-HEAD plus the staged candidate tree/core; stage intended changes before running
-and retain that distinction when the candidate is not yet committed.
-
-`compareTraces` runs unchanged in same-core mode. Completeness and entropy can
-fail before numeric comparison. `differences.json` additionally retains every
-exact state/event/command/binding difference, without tolerances or a pass
-decision. This diagnostic report never overrides the A1 result. Entropy receipts
-observe the page RNG and the production WebGPU factory RNG independently; the
-same numeric seed is not an equal-entropy claim. Stream mismatch remains a
-failure for later E work. Host input differences belong to B and presentation
-lifecycle changes to D. Known failures are evidence, not an invitation to alter
-the measuring gate.
+Both peers emit ordinary finite-number JSON before CDP transport. The embedded
+manifest records source identity and built binding checksums, not per-file source
+hashes or startup float-bit strings. The one perceptual comparator reports all
+channel metrics and violations in `comparison.json`; `summary.json` retains
+counts and metrics. Same-peer reruns use the same envelopes. No exact report or
+byte-identical repeat is required. Historical evidence remains at pinned revisions.

@@ -1,20 +1,10 @@
 import { normalizeInput } from './schedule.mjs';
 import { mouseReplay } from './input.mjs';
 import { admitsBrowserInput } from '../../apps/wgpu-slice/web/input-targeting.mjs';
-import { differences } from './differences.mjs';
-import { sha256 } from './io.mjs';
 
 // Native has no DOM. Reuse A2's CSS/physical-mouse normalization and production
 // admission predicate, retaining the observed compatibility event independently
 // of the actual LocalGame method calls. This lane does not test OS input routing.
-// A2 writes summary.json last, after its input/receipt rechecks, with the hash of each
-// trace it wrote. Requiring it binds the Wasm operand to that completed browser run.
-export function assertWasmTraceBinding(summary, traceBytes) {
-  const expected = summary?.traceSha256?.['canvas-wasm'];
-  if (typeof expected !== 'string') throw new Error('Wasm run has no completed A2 trace binding; regenerate A2');
-  if (expected !== sha256(traceBytes)) throw new Error('Wasm trace differs from the one its A2 run wrote');
-}
-
 export function nativeSteps(schedule, deliveries, area) {
   let actions, pendingMouseUp;
   const dispatch = mouseReplay(n => {
@@ -58,30 +48,4 @@ export function nativeSteps(schedule, deliveries, area) {
     return { event: { seq, ...e, scheduledMs: e.atMs, actualMs: e.atMs, ...observed,
       trusted: false, focused: true, visibility: 'visible', effectIds: [] }, actions, ...extra };
   }).map(({ event: { atMs, ...event }, ...step }) => ({ event, ...step }));
-}
-
-export function channelResults(left, right, report) {
-  const channel = path => {
-    if (!path.startsWith('samples[')) return path.split(/[.[]/)[0];
-    const parts = path.replace(/^samples\[\d+\]\./, '').split(/[.[]/);
-    if (parts[0] === 'own') return `own.${parts[1] ?? 'presence'}`;
-    return parts[0];
-  };
-  const names = ['manifest', 'events', 'commands', 'boundary', 'delta', 'lag', 'camera', 'quality', 'geometry', 'status', 'final',
-    ...['presence', 'token', 'expired', 'deathProgress', 'rawHead', 'correctedHead', 'rawHeading', 'correctedHeading', 'wantedHeading',
-      'gaze', 'pupils', 'offsets', 'speed', 'visualSpeed', 'boost', 'boostPhase', 'size', 'rings', 'projected'].map(n => `own.${n}`)];
-  const rows = differences(left, right);
-  const tolerated = new Set(report.nonExactFloats.filter(r => r.tolerated).map(r => r.path));
-  const failures = new Set(report.mismatches.map(r => r.path));
-  const counts = new Map(names.map(n => [n, { channel: n, status: 'exact', differences: 0, numerical: 0, failing: 0 }]));
-  for (const row of rows) {
-    let name = channel(row.path);
-    if (!counts.has(name)) name = row.path.startsWith('samples[') ? 'boundary' : name;
-    if (!counts.has(name)) counts.set(name, { channel: name, status: 'exact', differences: 0, numerical: 0, failing: 0 });
-    const c = counts.get(name); c.differences++;
-    if (tolerated.has(row.path) && !failures.has(row.path) && !report.errors.length) c.numerical++;
-    else c.failing++;
-    c.status = c.failing ? 'failing' : 'numerical';
-  }
-  return { channels: [...counts.values()], rows };
 }

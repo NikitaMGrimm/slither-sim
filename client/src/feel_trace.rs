@@ -143,12 +143,9 @@ impl Recorder {
             position.y,
             offset.x,
             offset.y,
-            c.index() as f64,
-            c.pending() as f64,
             f64::from(camera.follows()),
             camera.zoom(),
         ];
-        values.extend(c.samples().iter().flatten().copied());
         let token = client.own_token().map(|t| t.serial());
         if let Some(snake) = client.own_snake() {
             let m = snake.metrics();
@@ -164,11 +161,12 @@ impl Recorder {
             }
             let h = snake.head_corrections();
             let a = snake.angle_corrections();
-            let l = snake.length();
             let pupil = snake.eyes().pupil();
             values.extend([
                 f64::from(m.expired),
                 m.death_progress,
+                m.spawn_progress,
+                (m.spawn_progress * (1. - m.death_progress).max(0.)).powi(2),
                 m.raw_head.x,
                 m.raw_head.y,
                 m.corrected_head.x,
@@ -190,17 +188,15 @@ impl Recorder {
                 m.logical_segments as f64,
                 m.fam,
                 m.displayed_length,
-                h.index() as f64,
-                f64::from(h.pending()),
-                a.index() as f64,
-                f64::from(a.pending()),
-                l.index() as f64,
-                f64::from(l.pending()),
                 0.64285 + 0.514285714 / ((m.logical_segments as f64 + 16.) / 36.).max(1.),
             ]);
-            values.extend(h.samples().iter().flatten().map(|v| f64::from(*v)));
-            values.extend(a.samples().iter().map(|v| f64::from(*v)));
-            values.extend(l.samples().iter().map(|v| f64::from(*v)));
+            // Semantic centerline only; correction storage is private to presentation.
+            values.push(snake.body().points().len() as f64);
+            for p in snake.body().points() {
+                let position = p.position();
+                let offset = p.position_offset();
+                values.extend([position.x + offset.x, position.y + offset.y]);
+            }
             if !m.expired {
                 let half = Point {
                     x: f64::from(journal.extent[0]) / 2.,
@@ -256,7 +252,7 @@ impl Recorder {
         journal.rows.push(row);
     }
 
-    /// Copy into JS native Numbers before the A1 writer; never plain JSON.
+    /// Copy numeric observations and decimal identities into JS.
     #[cfg(target_arch = "wasm32")]
     pub fn take_js(&self) -> js_sys::Array {
         self.take()

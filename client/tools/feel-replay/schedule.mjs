@@ -82,8 +82,8 @@ export function buildSchedule(record, { expectedCommands, appearanceAtMs, stepMs
         : (record.betweenLives ?? []).some(g => event.atMs >= g.fromMs && event.atMs < g.untilMs) ? 'between-lives' : 'own' });
     if (event.kind === 'frame') frame++;
   });
-  const schedule = validateSchedule({ schema: 2, label, durationMs: record.durationMs,
-    events: ordered.map(({ sourceId, kind, atMs }) => ({ sourceId, kind, atMs })), boundaries, expectedCommands });
+  const schedule = validateSchedule({ schema: 3, label, durationMs: record.durationMs,
+    events: ordered.map(({ sourceId, kind, atMs }) => ({ sourceId, kind, atMs })), boundaries, pictures: boundaries.filter(b => b.phase === 'draw').map(b => b.drawId), expectedCommands });
   return { schedule, deliveries: ordered.map(e => e.data) };
 }
 export async function coordinate(schedule, deliveries, peers, acknowledge) {
