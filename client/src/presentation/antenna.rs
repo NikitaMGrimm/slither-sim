@@ -4,7 +4,6 @@ use std::{
     error::Error,
     f64::consts::{PI, TAU},
     fmt,
-    sync::OnceLock,
 };
 
 use super::{BodyPaintView, BodyRect};
@@ -463,7 +462,7 @@ impl AntennaDrawRequest {
             let mut qy = f64::from(s.y[j - 1]);
             qx += pair[0] * 2. - 1.;
             qy += pair[1] * 2. - 1.;
-            let phi = lookup_angle(f64::from(s.x[j]) - qx, f64::from(s.y[j]) - qy)?;
+            let phi = link_angle(f64::from(s.x[j]) - qx, f64::from(s.y[j]) - qy)?;
             qx += math::cos(phi) * 4. * scale;
             qy += math::sin(phi) * 4. * scale;
             s.velocity_x[j] = (f64::from(s.velocity_x[j]) + (qx - f64::from(s.x[j])) * 0.1) as f32;
@@ -479,7 +478,7 @@ impl AntennaDrawRequest {
                 return Err(AntennaError::Arithmetic);
             }
             if distance > 4. * scale {
-                let phi = lookup_angle(dx, dy)?;
+                let phi = link_angle(dx, dy)?;
                 s.x[j] = (f64::from(s.x[j - 1]) + math::cos(phi) * 4. * scale) as f32;
                 s.y[j] = (f64::from(s.y[j - 1]) + math::sin(phi) * 4. * scale) as f32;
             }
@@ -621,37 +620,24 @@ fn append(path: &mut Vec<Point>, point: Point) -> Result<(), AntennaError> {
     Ok(())
 }
 
-fn lookup_angle(dx: f64, dy: f64) -> Result<f64, AntennaError> {
-    let multiplier = [
-        (-4., 4., 32.),
-        (-8., 8., 16.),
-        (-16., 16., 8.),
-        (-127., 127., 1.),
-    ]
-    .into_iter()
-    .find(|&(low, high, _)| dx >= low && dx < high && dy >= low && dy < high)
-    .map(|(_, _, m)| m);
-    if let Some(m) = multiplier {
-        // The bounded shifted operands are nonnegative: these casts are ToInt32.
-        let x = (dx * m + 128.) as usize;
-        let y = (dy * m + 128.) as usize;
-        static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
-        let table = TABLE.get_or_init(|| {
-            (0..65536)
-                .map(|i| math::atan2((i >> 8) as f64 - 128., (i & 255) as f64 - 128.) as f32)
-                .collect()
-        });
-        // A component just below the strict upper bound can round to 256 after
-        // shifting. Preserve the combined index; an absent cell is arithmetic
-        // failure rather than a clamped angle or a native indexing panic.
-        table
-            .get((y << 8) | x)
-            .copied()
-            .map(f64::from)
-            .ok_or(AntennaError::Arithmetic)
-    } else {
-        Ok(math::atan2(dy, dx))
+fn link_angle(dx: f64, dy: f64) -> Result<f64, AntennaError> {
+    // Quantization stays: S8 direct atan2 max 24.949 px, bulb 179.986°; the ±π flip reverses bulb easing.
+    for (bound, multiplier) in [(4., 32.), (8., 16.), (16., 8.), (127., 1.)] {
+        if dx >= -bound && dx < bound && dy >= -bound && dy < bound {
+            let x = (dx * multiplier + 128.) as usize;
+            let y = (dy * multiplier + 128.) as usize;
+            // A rounded endpoint can carry into the next grid row, including
+            // an absent final row. Preserve that boundary without indexing.
+            let index = (y << 8) | x;
+            if index >= 65536 {
+                return Err(AntennaError::Arithmetic);
+            }
+            return Ok(f64::from(
+                ((index >> 8) as f64 - 128.).atan2((index & 255) as f64 - 128.) as f32,
+            ));
+        }
     }
+    Ok(dy.atan2(dx))
 }
 
 #[cfg(test)]
@@ -702,8 +688,9 @@ mod tests {
             }),
         }
     }
+
     #[test]
-    fn lookup_thresholds_to_int32_and_host_fallback_are_exact() {
+    fn quantized_band_edges_and_atan2_fallback() {
         let quantized = |dx: f64, dy: f64, m: f64| {
             let x = (dx * m + 128.) as i32;
             let y = (dy * m + 128.) as i32;
@@ -721,27 +708,27 @@ mod tests {
             (-0.03126, 0.03126, 32.),
         ] {
             assert_eq!(
-                lookup_angle(dx, dy).unwrap().to_bits(),
+                link_angle(dx, dy).unwrap().to_bits(),
                 quantized(dx, dy, m).to_bits()
             );
             assert_eq!(
-                lookup_angle(dy, dx).unwrap().to_bits(),
+                link_angle(dy, dx).unwrap().to_bits(),
                 quantized(dy, dx, m).to_bits()
             );
         }
         for (dx, dy) in [(127., 0.1249), (-127.000001, 0.1249), (0.1249, 127.)] {
             assert_eq!(
-                lookup_angle(dx, dy).unwrap().to_bits(),
+                link_angle(dx, dy).unwrap().to_bits(),
                 dy.atan2(dx).to_bits()
             );
         }
         assert_ne!(
-            lookup_angle(-0.03126, 0.03126).unwrap(),
+            link_angle(-0.03126, 0.03126).unwrap(),
             0.03126_f64.atan2(-0.03126)
         );
         let below_four = f64::from_bits(4_f64.to_bits() - 1);
         assert!(matches!(
-            lookup_angle(below_four, below_four),
+            link_angle(below_four, below_four),
             Err(AntennaError::Arithmetic)
         ));
     }
@@ -764,7 +751,7 @@ mod tests {
         let initial_y = i.corrected_head.y as f32;
         let qx0 = f64::from(root as f32);
         let qy0 = f64::from(initial_y);
-        let angle = lookup_angle(f64::from(initial_x) - qx0, f64::from(initial_y) - qy0).unwrap();
+        let angle = link_angle(f64::from(initial_x) - qx0, f64::from(initial_y) - qy0).unwrap();
         let target_x = qx0 + angle.cos() * 4.;
         let target_y = qy0 + angle.sin() * 4.;
         let vx = (0.375 + (target_x - f64::from(initial_x)) * 0.1) as f32;
@@ -774,7 +761,7 @@ mod tests {
         let dx = f64::from(expected_x) - qx0;
         let dy = f64::from(expected_y) - qy0;
         if (dx * dx + dy * dy).sqrt() > 4. {
-            let angle = lookup_angle(dx, dy).unwrap();
+            let angle = link_angle(dx, dy).unwrap();
             expected_x = (qx0 + angle.cos() * 4.) as f32;
             expected_y = (qy0 + angle.sin() * 4.) as f32;
         }
@@ -802,7 +789,7 @@ mod tests {
         g.rotate_bulb = false;
         let mut s = AntennaState::from_appearance(g, Point { x: 0., y: 0. }).unwrap();
         s.data.shown = true;
-        // An exact horizontal four-unit chain points along table angle zero.
+        // An exact horizontal four-unit chain points along angle zero.
         for j in 0..8 {
             s.data.x[j] = j as f32 * 4.;
         }
