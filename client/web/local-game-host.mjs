@@ -4,6 +4,7 @@ import { copyAuthoredSourceRecipes } from './authored-source-recipes.mjs';
 import { createLocalBodyResolver } from './synthetic-body.mjs';
 import { createSyntheticFoodResolver } from './synthetic-food.mjs';
 import { createSyntheticPreyResolver } from './synthetic-prey.mjs';
+import { admitsBrowserInput, isEditorTarget } from '../apps/wgpu-slice/web/input-targeting.mjs';
 
 const freeze = Object.freeze;
 const apply = Reflect.apply;
@@ -36,7 +37,7 @@ export function captureLocalGameDocument(realm) {
 }
 
 /** Browser plumbing and original stand-ins for the same game runtime on localhost. */
-export async function createLocalGameHost({ realm = globalThis, endpoint, sourceFactory, sourceRecipes } = {}) {
+export async function createLocalGameHost({ realm = globalThis, endpoint, sourceFactory, sourceRecipes, observeInput } = {}) {
   const documentFence = captureLocalGameDocument(realm);
   const document = realm.document, location = realm.location;
   endpoint = loopbackEndpoint(endpoint);
@@ -291,16 +292,17 @@ export async function createLocalGameHost({ realm = globalThis, endpoint, source
         && isCurrentDocument() && playControl === control;
     };
     const deliver = event => {
+      observeInput?.(event, 'received');
       if (!isCurrentDocument()) return;
       // Editing keeps native defaults and never becomes steering or boost input.
-      const editable = event.target instanceof Input
-        || (typeof TextArea === 'function' && event.target instanceof TextArea) || event.target?.isContentEditable;
+      const editable = isEditorTarget(event.target, Input, TextArea);
       // A release belongs to the game input owner even after the pointer/focus
       // moves into an editor. Editing keeps its native default behavior.
-      if (editable && !['input', 'mouseup', 'pointerup', 'keyup', 'blur'].includes(event.type)) return;
+      if (!admitsBrowserInput(event, { editor: editable })) { observeInput?.(event, 'filtered-editor'); return; }
       if (!editable && ['keydown', 'keyup'].includes(event.type)
         && ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)
         && !nativePlayDefault(event)) preventDefault(event);
+      observeInput?.(event, 'routed');
       inputRoute?.(event);
     };
     for (const type of ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove',

@@ -19,9 +19,10 @@ test('default announcement publication uses Rust views without a second draw or 
     assert.equal(graph.announcements.enabled, 1); assert.equal(graph.announcements.reads, 1);
     assert.equal(style(holder).get('display'), 'none'); assert.equal(runtime.diagnostics().draws, 0);
     graph.announcements.view = { schema: 1, present: true, opacity: .4, left: 8, top: 4, width: 300, height: 228,
-      lines: [{ text: '"<tag> & text"', fontSize: 17, bold: true, italic: true, spaceAfter: 5 },
-        { text: 'By synthetic player', fontSize: 13, bold: false, italic: false, spaceAfter: 0 },
-        { text: 'Longest today: 10', fontSize: 13, bold: false, italic: false, spaceAfter: 0 }] };
+      blocks: [{ spaceAfter: 5, fragments: [{ kind: 'text', text: '"<tag> & text"',
+        family: 'Arial, Helvetica Neue, Helvetica, sans-serif', fontSize: 17, bold: true, italic: true, alpha: 1 }] },
+      { spaceAfter: 0, fragments: [{ kind: 'text', text: "- synthetic player, today's longest",
+        family: 'Arial, Helvetica Neue, Helvetica, sans-serif', fontSize: 13, bold: false, italic: true, alpha: .5 }] }] };
     const [id, callback] = graph.f.raf.entries().next().value; graph.f.raf.delete(id); callback(16);
     assert.equal(graph.announcements.reads, 2); assert.equal(runtime.diagnostics().draws, 1);
     assert.equal(style(holder).get('display'), 'block'); assert.equal(style(holder).get('opacity'), '0.4');
@@ -30,7 +31,7 @@ test('default announcement publication uses Rust views without a second draw or 
       >= graph.announcements.view.top + graph.announcements.view.height,
     'the visible diagnostic status is below the announcement rectangle');
     assert.notEqual(diagnostic.hidden, true, 'diagnostic text remains available');
-    assert.equal(graph.f.edit.hud.character(holder.children[0].children[0]).data, '"<tag> & text"');
+    assert.equal(graph.f.edit.hud.character(holder.children[0].children[0].children[0]).data, '"<tag> & text"');
     assert.equal(style(end).get('display'), 'block');
     assert.deepEqual(end.children.map(node => graph.f.edit.hud.character(node.children[0]).data),
       ['Separate end title', 'Separate final score', 'Separate end status']);

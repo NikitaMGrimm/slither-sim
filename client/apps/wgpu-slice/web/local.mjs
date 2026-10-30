@@ -1,5 +1,6 @@
 import init, { LocalGameplay, game_backing_size, CosmeticImages } from './pkg/slither_wgpu_slice.js';
 import { localHost } from './local-host.mjs';
+import { installLocalInput } from './local-input.mjs';
 import { loadCosmetics } from './cosmetics.mjs';
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
@@ -11,7 +12,6 @@ const skin = document.getElementById('skin');
 let host, owner, raf, disposed = false;
 const abort = new AbortController();
 const listen = (node, type, fn) => node.addEventListener(type, fn, { signal: abort.signal });
-const editable = e => e.target instanceof HTMLInputElement;
 listen(document.querySelector('form'), 'submit', e => e.preventDefault());
 function extent() {
   const [w, h] = game_backing_size(canvas.clientWidth, canvas.clientHeight);
@@ -62,22 +62,7 @@ try {
       });
       listen(play, 'click', start);
       listen(stop, 'click', () => host.call(() => owner.stop()));
-      listen(window, 'keydown', e => {
-        if (editable(e)) return;
-        if (e.code === 'Enter' && !e.repeat) { if (owner.can_play()) start(); }
-        else if (e.code === 'Escape') host.call(() => owner.stop());
-        else host.call(() => { if (owner.key(e.code, true)) e.preventDefault(); });
-      });
-      listen(window, 'keyup', e => host.call(() => { if (owner.key(e.code, false) && !editable(e)) e.preventDefault(); }));
-      listen(window, 'blur', () => host.call(() => owner.blur()));
-      listen(document, 'visibilitychange', () => { if (document.hidden) host.call(() => owner.blur()); });
-      function pointer(e, down) {
-        host.call(() => { const r = canvas.getBoundingClientRect(); if (r.width && r.height) owner.pointer(e.clientX - r.left, e.clientY - r.top, r.width, r.height, down); });
-      }
-      listen(canvas, 'pointermove', e => pointer(e, false));
-      listen(canvas, 'pointerdown', e => { if (e.button === 0) { pointer(e, true); e.preventDefault(); } });
-      listen(window, 'pointerup', () => host.call(() => owner.mouse_up()));
-      listen(window, 'pointercancel', () => host.call(() => owner.mouse_up()));
+      installLocalInput({ realm: window, canvas, owner, host, start, controls: [play, stop], signal: abort.signal });
       function draw(time) { if (!disposed) { host.frame(time); raf = requestAnimationFrame(draw); } }
       raf = requestAnimationFrame(draw);
     }

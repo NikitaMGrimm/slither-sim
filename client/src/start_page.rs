@@ -1,5 +1,12 @@
 //! Authored start/ready view policy, independent of browser and session ownership.
 
+mod menu;
+mod wording;
+pub use menu::{
+    LastLifeView, MenuAction, MenuPhase, StartMenuIntent, StartMenuState, StartMenuView,
+};
+pub use wording::{MenuLocale, MenuWording, normalize_nickname, normalize_nickname_units};
+
 /// A copied Play-panel projection. It grants no connection or replay authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StartPageView {

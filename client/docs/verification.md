@@ -43,14 +43,31 @@ Run the ABI suite again after changing Rust/browser boundaries. For wgpu, the
 full check command uses one build job and target/wgpu-slice-check to limit memory
 and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 
+The pure Node [feel replay contract](../tools/feel-replay/README.md) defines
+offline schedules, manifests and bit-preserving trace comparison. Run
+`node --test tools/feel-replay.test.mjs tools/feel-browser-replay.test.mjs` for
+authored synthetic fault checks. The [browser peer command](../tools/feel-replay/browser-peers.md)
+uses prebuilt, feature-gated Wasm in background headless Edge/Chromium and a CPU
+GPU-boundary sink. It is a separate local run, not part of npm test or proof of
+pixel, physical-input or perceptual parity.
+
 ## Source guard
 
 ```sh
-git config core.hooksPath client/tools/hooks
 git add <intended-files>
 node tools/check-repository.mjs
 node tools/check-repository.mjs --history
 ```
+
+Run the staged guard before committing; `--history` audits history reachable from
+branches, remote-tracking branches and tags.
+Use `--pre-push` with Git's push input to check outgoing commits plus the index,
+trusting only history the destination reported in this push. Only locally
+available advertised commits are excluded; if none are available, scan the tips'
+full history.
+No network is used.
+Do not set `core.hooksPath` in a shared multi-worktree checkout; `tools/hooks`
+remains available for single-clone opt-in.
 
 The guard reads Git blobs, so inspect unstaged changes separately. It blocks
 known official bundles, raw captures, credentials, prohibited binary/generated

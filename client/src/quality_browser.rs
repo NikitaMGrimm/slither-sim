@@ -101,4 +101,10 @@ impl DesktopQuality {
             self.inner.last_statistics_ms()
         )
     }
+
+    /// Read-only offline metadata without a JSON numeric round trip.
+    #[cfg(feature = "feel-trace")]
+    pub fn feel_high_quality(&self) -> bool {
+        self.inner.snapshot().high_quality
+    }
 }

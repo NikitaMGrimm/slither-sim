@@ -493,9 +493,9 @@ fn named_plain_and_image_faces_resolve_text_and_cosmetics_together() {
     }
 }
 
-fn crowd_client(bank: &Bank, skin: u8) -> AnimatedClient {
+fn crowd_client(bank: &Bank, skin: u8, count: u16) -> AnimatedClient {
     let packets: Vec<_> = std::iter::once(setup())
-        .chain((1u16..=100).map(|id| {
+        .chain((1u16..=count).map(|id| {
             let mut packet = spawn(skin, 255);
             packet[1..3].copy_from_slice(&id.to_be_bytes());
             // Short contiguous bodies keep this focused on eye draw cost.
@@ -536,7 +536,7 @@ fn crowd_client(bank: &Bank, skin: u8) -> AnimatedClient {
 fn hundred_alive_outlined_snakes_with_hud_and_minimap_fit_the_draw_budget() {
     let mut bank = Bank::new().unwrap();
     bank.cosmetics = Some(cosmetics(None));
-    let mut c = crowd_client(&bank, 41);
+    let mut c = crowd_client(&bank, 41, 100);
     let prepared = render::prepare(&mut c, &mut bank, [960, 540], 1., 1, quality()).unwrap();
     assert_eq!(c.nickname_draws().len(), 100);
     #[cfg(windows)]
@@ -573,7 +573,7 @@ fn hundred_alive_outlined_snakes_with_hud_and_minimap_fit_the_draw_budget() {
 fn antenna_crowd_skips_whole_antennas_and_preserves_hud_and_minimap() {
     let mut bank = Bank::new().unwrap();
     bank.cosmetics = Some(cosmetics(None));
-    let mut c = crowd_client(&bank, 37);
+    let mut c = crowd_client(&bank, 37, 100);
     let prepared = render::prepare(&mut c, &mut bank, [960, 540], 1., 1, quality()).unwrap();
     assert_eq!(prepared.frame.snakes.len(), 100);
     assert!(
@@ -597,6 +597,37 @@ fn antenna_crowd_skips_whole_antennas_and_preserves_hud_and_minimap() {
         .count();
     assert!((1..100).contains(&admitted), "admitted {admitted} antennas");
     finish_crowd(prepared, &mut bank);
+}
+
+#[cfg(windows)]
+#[test]
+fn crowded_nicknames_share_the_bounded_frame_with_all_hud_rows() {
+    for count in [150, 160] {
+        let mut bank = Bank::new().unwrap();
+        bank.cosmetics = Some(cosmetics(None));
+        let mut client = crowd_client(&bank, 0, count);
+        let prepared =
+            render::prepare(&mut client, &mut bank, [960, 540], 1., 1, quality()).unwrap();
+        assert_eq!(client.nickname_draws().len(), usize::from(count));
+        let labels = prepared
+            .frame
+            .draws
+            .iter()
+            .filter(|d| d.asset.handle >> 60 == 4)
+            .count();
+        assert!(labels <= slither_wgpu_slice::text::MAX_NICKNAME_RUNS_PER_FRAME);
+        if count == 150 {
+            assert_eq!(
+                labels,
+                slither_wgpu_slice::text::MAX_NICKNAME_RUNS_PER_FRAME
+            );
+        }
+        // The denser scene must retain all overlay text even when world draws
+        // leave less room for nicknames than the per-frame run allowance.
+        finish_crowd(prepared, &mut bank);
+        assert!(bank.text.cached_runs() <= slither_wgpu_slice::text::CACHE_RUNS);
+        assert!(bank.text.cached_bytes() <= slither_wgpu_slice::text::CACHE_BYTES);
+    }
 }
 
 fn finish_crowd(prepared: render::PreparedFrame, bank: &mut Bank) {
@@ -627,6 +658,7 @@ fn finish_crowd(prepared: render::PreparedFrame, bank: &mut Bank) {
             .collect(),
         message: None,
     };
+    let world_draws = prepared.frame.draws.len();
     let prepared = render::finish_hud(prepared, bank, &view).unwrap();
     assert!(
         prepared
@@ -640,9 +672,10 @@ fn finish_crowd(prepared: render::PreparedFrame, bank: &mut Bank) {
             .frame
             .draws
             .iter()
-            .filter(|d| d.asset == bank.hud.asset)
+            .skip(world_draws)
+            .filter(|d| d.asset.handle >> 60 == 4)
             .count(),
-        2
+        37
     );
     assert!(prepared.frame.draws.len() <= MAX_DRAWS);
     let resident = prepared

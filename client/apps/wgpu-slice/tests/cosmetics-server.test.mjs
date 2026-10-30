@@ -14,6 +14,7 @@ test('external cosmetics are served only when configured; paths and Host stay bo
     const snippet = 'pkg/snippets/slither-client-0000000000000000/web/stock-hud-contract.mjs';
     await mkdir(path.dirname(path.join(root, snippet)), { recursive: true });
     await writeFile(path.join(root, snippet), 'export const synthetic = true;');
+    for (const name of ['local-input.mjs', 'input-targeting.mjs']) await writeFile(path.join(root, name), 'export const synthetic = true;');
     for (const configured of [false, true]) {
       const server = createServer({ webDir: root, ...(configured ? { cosmeticsDir: root, accessory: 30 } : {}) }); servers.push(server);
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -28,6 +29,7 @@ test('external cosmetics are served only when configured; paths and Host stay bo
       assert.equal(wrongHost, 403);
       assert.equal((await fetch(`${base}/Cargo.toml`)).status, 404);
       assert.equal((await fetch(`${base}/${snippet}`)).status, 200);
+      for (const name of ['local-input.mjs', 'input-targeting.mjs']) assert.equal((await fetch(`${base}/${name}`)).status, 200);
     }
   } finally {
     await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve))));

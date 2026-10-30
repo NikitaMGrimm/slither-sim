@@ -4,7 +4,11 @@ fn main() {}
 #[cfg(not(target_arch = "wasm32"))]
 mod headless;
 #[cfg(not(target_arch = "wasm32"))]
+mod scheduling;
+#[cfg(not(target_arch = "wasm32"))]
 mod desktop {
+    use crate::scheduling::Schedule;
+    use slither_client::session_policy::Phase;
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
@@ -19,10 +23,12 @@ mod desktop {
     use winit::{
         application::ApplicationHandler,
         event::{ElementState, MouseButton, WindowEvent},
-        event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+        event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
         keyboard::{KeyCode, PhysicalKey},
         window::{Window, WindowId},
     };
+    #[derive(Debug)]
+    pub struct TransportWake;
     #[derive(Default)]
     pub struct Options {
         endpoint: Option<String>,
@@ -144,6 +150,13 @@ mod desktop {
         preparation: Option<Preparation>,
         nickname: String,
         skin: u8,
+        schedule: Schedule,
+        occluded: bool,
+        surface_occluded: bool,
+        title: String,
+        discovery_poll: Option<Instant>,
+        handshake_wake: Option<Instant>,
+        pacing_log: Option<(Instant, u32, Instant, f64)>,
     }
     impl Running {
         fn effects(&mut self) -> Result<()> {
@@ -152,50 +165,27 @@ mod desktop {
                     return Ok(());
                 };
                 if matches!(&e.kind, slither_wgpu_slice::game::EffectKind::Connect(_)) {
+                    // SessionPolicy's strict >3333ms construction deadline must
+                    // still be observed while the window has stopped drawing.
+                    let constructed = Instant::now();
                     self.game.construct(
                         e.generation,
                         e.id,
-                        self.started.elapsed().as_secs_f64() * 1000.,
+                        constructed.duration_since(self.started).as_secs_f64() * 1000.,
                     )?;
+                    self.handshake_wake = Some(constructed + Duration::from_millis(3334));
                 }
                 match self.transport.execute(&e) {
                     Ok(()) => self.game.acknowledge(e.generation, e.id, true)?,
-                    Err(error) => self.game.fail(&error),
+                    Err(error) => {
+                        self.transport.close();
+                        self.game.fail(&error);
+                    }
                 }
             }
             Err("Effect drain budget".into())
         }
-        fn pictures(&mut self) -> Result<()> {
-            for _ in 0..16 {
-                self.game
-                    .observe_time(self.started.elapsed().as_secs_f64() * 1000.)?;
-                let Some(p) = self.game.take_frame() else {
-                    return Ok(());
-                };
-                if let Err(e) = self.host.renderer.sync_resources(&p.resources) {
-                    self.game.presented(false)?;
-                    return Err(e);
-                }
-                match self.host.present_scaled(&p.frame) {
-                    Ok(true) => self.game.presented(true)?,
-                    Ok(false) => {
-                        self.game.retry_frame(p)?;
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        self.game.presented(false)?;
-                        return Err(e);
-                    }
-                }
-                self.effects()?;
-            }
-            if self.game.has_frame() {
-                Err("Frame drain budget".into())
-            } else {
-                Ok(())
-            }
-        }
-        fn frame(&mut self) -> Result<()> {
+        fn service(&mut self) -> Result<()> {
             if let Some(preparation) = &mut self.preparation
                 && let Some(result) = preparation.poll()
             {
@@ -219,13 +209,15 @@ mod desktop {
                     }
                 }
             }
-            let size = self.window.inner_size();
-            let physical = [size.width, size.height];
-            let dpr = self.window.scale_factor();
-            let extent =
-                slither_wgpu_slice::render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
-            self.host.resize(physical)?;
-            self.game.viewport(extent, 1.)?;
+            self.discovery_poll = if self.preparation.is_some() {
+                Some(
+                    self.discovery_poll
+                        .filter(|t| *t > Instant::now())
+                        .unwrap_or_else(|| Instant::now() + Duration::from_millis(50)),
+                )
+            } else {
+                None
+            };
             for event in self.transport.poll() {
                 match event {
                     Event::Opened(g) => {
@@ -252,15 +244,22 @@ mod desktop {
                     }
                 }
                 self.effects()?;
-                self.pictures()?;
             }
-            self.effects()?;
-            self.pictures()?;
             self.game
-                .begin_frame(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
+                .observe_time(self.started.elapsed().as_secs_f64() * 1000.)?;
             self.effects()?;
-            self.pictures()?;
-            self.window.set_title(&format!(
+            let active = !matches!(
+                self.game.phase(),
+                Phase::Ready | Phase::Failed | Phase::Disconnected
+            );
+            self.schedule.activity(active);
+            if !matches!(
+                self.game.phase(),
+                Phase::Opening | Phase::Challenge | Phase::Setup
+            ) {
+                self.handshake_wake = None;
+            }
+            let title = format!(
                 "SlitherClient | {}{} | MSAA{}",
                 if self.preparation.is_some() {
                     "Acquiring official profile/server | "
@@ -269,8 +268,104 @@ mod desktop {
                 },
                 self.game.hud_text().replace('\n', " | "),
                 self.host.renderer.sample_count
-            ));
+            );
+            if self.title != title {
+                self.window.set_title(&title);
+                self.title = title;
+            }
             Ok(())
+        }
+        fn visibility(&mut self) {
+            let s = self.window.inner_size();
+            self.schedule.visibility(
+                !self.occluded
+                    && !self.surface_occluded
+                    && s.width != 0
+                    && s.height != 0
+                    && self.window.is_minimized() != Some(true),
+            );
+        }
+        fn frame(&mut self) -> Result<()> {
+            let size = self.window.inner_size();
+            let physical = [size.width, size.height];
+            let dpr = self.window.scale_factor();
+            let extent =
+                slither_wgpu_slice::render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
+            self.host.resize(physical)?;
+            self.game.viewport(extent, 1.)?;
+            if !self.host.prepare_present()? {
+                if self.host.is_occluded() {
+                    self.surface_occluded = true;
+                    self.visibility();
+                } else {
+                    self.schedule.retry(Instant::now());
+                }
+                return Ok(());
+            }
+            // FIFO may have waited. Ingest everything now available before
+            // sampling the next frame; receive() retains its own deferral rules.
+            self.service()?;
+            if !self.game.has_frame() {
+                self.game
+                    .begin_frame(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
+                self.effects()?;
+            }
+            let Some(p) = self.game.take_frame() else {
+                self.host.discard_acquired();
+                self.schedule.retry(Instant::now());
+                return Ok(());
+            };
+            if let Err(e) = self.host.renderer.sync_resources(&p.resources) {
+                self.game.presented(false)?;
+                return Err(e);
+            }
+            self.window.pre_present_notify();
+            match self.host.present_scaled(&p.frame) {
+                Ok(true) => {
+                    self.game.presented(true)?;
+                    self.schedule.presented();
+                    self.log_present();
+                }
+                Ok(false) => {
+                    self.game.retry_frame(p)?;
+                    self.schedule.retry(Instant::now());
+                }
+                Err(e) => {
+                    self.game.presented(false)?;
+                    return Err(e);
+                }
+            }
+            self.effects()?;
+            Ok(())
+        }
+        fn log_present(&mut self) {
+            if let Some((since, count, last, max_gap)) = &mut self.pacing_log {
+                let now = Instant::now();
+                if *count == 0 {
+                    *since = now;
+                    *last = now;
+                }
+                *max_gap = max_gap.max(now.duration_since(*last).as_secs_f64() * 1000.);
+                *last = now;
+                *count += 1;
+                let seconds = now.duration_since(*since).as_secs_f64();
+                if seconds >= 2. {
+                    eprintln!(
+                        "native pacing: {:.1} presents/s, max gap {:.2}ms; monitor {:.1}Hz (submission, not scanout)",
+                        f64::from(*count) / seconds,
+                        *max_gap,
+                        f64::from(
+                            self.window
+                                .current_monitor()
+                                .and_then(|m| m.refresh_rate_millihertz())
+                                .unwrap_or(0)
+                        ) / 1000.
+                    );
+                    *since = now;
+                    *count = 0;
+                    *max_gap = 0.;
+                }
+            }
         }
         fn pointer(&mut self, down: bool) -> Result<()> {
             let s = self.window.inner_size();
@@ -291,6 +386,7 @@ mod desktop {
         options: Options,
         running: Option<Running>,
         failure: Option<String>,
+        proxy: EventLoopProxy<TransportWake>,
     }
     impl App {
         fn fail(&mut self, l: &ActiveEventLoop, e: String) {
@@ -302,7 +398,11 @@ mod desktop {
             }
             l.exit();
         }
-        fn open(l: &ActiveEventLoop, options: &Options) -> Result<Running> {
+        fn open(
+            l: &ActiveEventLoop,
+            options: &Options,
+            proxy: EventLoopProxy<TransportWake>,
+        ) -> Result<Running> {
             let mut game = LocalGame::new(0.)?;
             if let Some(directory) = &options.cosmetics_dir {
                 game.configure_cosmetics(slither_wgpu_slice::cosmetics::Cosmetics::directory(
@@ -332,22 +432,39 @@ mod desktop {
                 window,
                 host,
                 game,
-                transport: Transport::default(),
+                transport: Transport::with_wake(move || {
+                    let _ = proxy.send_event(TransportWake);
+                }),
                 started: Instant::now(),
                 cursor: [480., 270.],
                 preparation: None,
                 nickname: String::new(),
                 skin: 0,
+                schedule: Schedule::default(),
+                occluded: false,
+                surface_occluded: false,
+                title: String::new(),
+                discovery_poll: None,
+                handshake_wake: None,
+                pacing_log: std::env::var_os("SLITHER_FRAME_PACING")
+                    .map(|_| (Instant::now(), 0, Instant::now(), 0.)),
             })
         }
     }
-    impl ApplicationHandler for App {
+    impl ApplicationHandler<TransportWake> for App {
         fn resumed(&mut self, l: &ActiveEventLoop) {
             if self.running.is_none() {
-                match Self::open(l, &self.options) {
+                match Self::open(l, &self.options, self.proxy.clone()) {
                     Ok(r) => self.running = Some(r),
                     Err(e) => self.fail(l, e),
                 }
+            }
+        }
+        fn user_event(&mut self, l: &ActiveEventLoop, _: TransportWake) {
+            if let Some(r) = &mut self.running
+                && let Err(e) = r.service()
+            {
+                self.fail(l, e);
             }
         }
         fn window_event(&mut self, l: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
@@ -365,8 +482,29 @@ mod desktop {
                         r.transport.close();
                         l.exit();
                     }
-                    WindowEvent::RedrawRequested => r.frame()?,
+                    WindowEvent::RedrawRequested => {
+                        // An OS exposure can resume a surface that reported
+                        // occlusion even where winit has no Occluded event.
+                        if r.surface_occluded {
+                            r.surface_occluded = false;
+                            r.schedule.invalidate();
+                        }
+                        r.visibility();
+                        if r.schedule.begin_redraw(Instant::now()) {
+                            r.frame()?;
+                        }
+                    }
+                    WindowEvent::Occluded(occluded) => {
+                        r.occluded = occluded;
+                        if !occluded {
+                            r.surface_occluded = false;
+                        }
+                        r.visibility();
+                    }
                     WindowEvent::Resized(s) => {
+                        r.surface_occluded = false;
+                        r.schedule.invalidate();
+                        r.visibility();
                         r.host.resize([s.width, s.height])?;
                         r.game.viewport(
                             slither_wgpu_slice::render::backing_size([
@@ -376,9 +514,13 @@ mod desktop {
                             1.,
                         )?;
                     }
+                    WindowEvent::ScaleFactorChanged { .. } => r.schedule.invalidate(),
                     WindowEvent::CursorMoved { position, .. } => {
                         let d = r.window.scale_factor();
-                        r.cursor = [position.x / d, position.y / d];
+                        r.cursor = slither_client::desktop_input::mouse_client_position(
+                            [position.x, position.y],
+                            d,
+                        );
                         r.pointer(false)?;
                     }
                     WindowEvent::MouseInput {
@@ -393,6 +535,11 @@ mod desktop {
                         }
                     }
                     WindowEvent::Focused(false) => r.game.blur(),
+                    WindowEvent::Focused(true) => {
+                        r.surface_occluded = false;
+                        r.visibility();
+                        r.schedule.invalidate();
+                    }
                     WindowEvent::KeyboardInput { event, .. } => {
                         let down = event.state == ElementState::Pressed;
                         match event.physical_key {
@@ -412,6 +559,7 @@ mod desktop {
                                             &self.options.nickname,
                                             self.options.skin,
                                         )?;
+                                        r.schedule.activity(true);
                                     } else {
                                         eprintln!("Use --official or --endpoint before Play");
                                     }
@@ -423,6 +571,7 @@ mod desktop {
                                 }
                                 r.game.stop();
                                 r.effects()?;
+                                r.schedule.invalidate();
                             }
                             PhysicalKey::Code(code) => {
                                 let name = match code {
@@ -446,12 +595,24 @@ mod desktop {
             }
         }
         fn about_to_wait(&mut self, l: &ActiveEventLoop) {
-            if let Some(r) = &self.running {
-                r.window.request_redraw();
+            l.set_control_flow(ControlFlow::Wait);
+            if let Some(r) = &mut self.running {
+                if let Err(e) = r.service() {
+                    self.fail(l, e);
+                    return;
+                }
+                r.visibility();
+                if r.schedule.request_redraw(Instant::now()) {
+                    r.window.request_redraw();
+                }
+                if let Some(deadline) = [r.schedule.deadline(), r.discovery_poll, r.handshake_wake]
+                    .into_iter()
+                    .flatten()
+                    .min()
+                {
+                    l.set_control_flow(ControlFlow::WaitUntil(deadline));
+                }
             }
-            l.set_control_flow(ControlFlow::WaitUntil(
-                Instant::now() + Duration::from_millis(16),
-            ));
         }
     }
     pub fn run(mut options: Options) -> Result<()> {
@@ -476,11 +637,14 @@ mod desktop {
                 cosmetics,
             );
         }
-        let event_loop = EventLoop::new().map_err(|e| e.to_string())?;
+        let event_loop = EventLoop::<TransportWake>::with_user_event()
+            .build()
+            .map_err(|e| e.to_string())?;
         let mut app = App {
             options,
             running: None,
             failure: None,
+            proxy: event_loop.create_proxy(),
         };
         event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
         app.running.take();
