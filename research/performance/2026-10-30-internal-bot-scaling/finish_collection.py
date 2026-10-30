@@ -23,6 +23,16 @@ def execute(root,study,source_archive):
     except (FileNotFoundError,ProcessLookupError):pass
     events=[json.loads(line) for line in (root/'after-primary.log').read_text().splitlines() if line.startswith('{')]
     assert events[-1]['event']=='post-count-complete','Controller failed; inspect retained logs'
+    if (study/'POSTFIX_PLAN.md').exists():
+        pid=int((root/'postfix-331.pid').read_text())
+        try:
+            args=(Path('/proc')/str(pid)/'cmdline').read_bytes()
+            assert b'postfix_331.py' in args
+            descriptor=os.pidfd_open(pid);wait=select.poll();wait.register(descriptor,select.POLLIN)
+            emit('waiting-for-postfix');wait.poll();os.close(descriptor)
+        except (FileNotFoundError,ProcessLookupError):pass
+        events=[json.loads(line) for line in (root/'postfix-331.log').read_text().splitlines() if line.startswith('{')]
+        assert events[-1]['event']=='postfix-complete','Post-fix supplement failed; inspect retained logs'
     checks=[]
     commands=[('method-tests',[sys.executable,'-B','-m','unittest','discover','-s',str(study),'-p','test_*.py']),
               ('a4-reduction',[sys.executable,str(study/'reduce.py'),str(root)]),
@@ -41,6 +51,7 @@ def execute(root,study,source_archive):
     omit={'finish-collection.log','archive-ready.json','archive-manifest.json'}
     files=[path for path in sorted(root.rglob('*')) if path.is_file()
            and not path.is_symlink() and not any(part in excluded for part in path.relative_to(root).parts)
+           and not path.is_relative_to(root/'postfix-331/source')
            and path.name not in omit]
     records=[{'name':'execution/'+p.relative_to(root).as_posix(),'sha256':digest(p),'bytes':p.stat().st_size} for p in files]
     records.append({'name':'runtime-source.tar','sha256':digest(source_archive),'bytes':source_archive.stat().st_size})
