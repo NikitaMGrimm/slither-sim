@@ -41,8 +41,9 @@ Check both on your own server before relying on it.
 ### Size the server
 
 In our test, one core of an AWS c7a.medium kept up with 500 fully grown bot
-players on plain protocol-19 WebSockets (no TLS) for 30 minutes. A tick used about 4.8 ms of its 7 ms
-on average, and about 7.1 ms on the food update every 72 ticks
+players on plain protocol-19 WebSockets (no TLS) for 30 minutes. A tick used
+about 4.8 ms of its 7 ms on average, and about 7.1 ms on the food update every
+72 ticks
 ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-30-official-500-acceptance-v4/REPORT.md)).
 Other work on the same core can still make the server fall behind: in an
 earlier run, other work on the machine took 1.4 s of CPU within 4 s and the
