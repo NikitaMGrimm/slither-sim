@@ -10,6 +10,7 @@ const routes = new Map([
   ['/scene/pkg/slither_client_bg.wasm', ['dist/web/slither_client_bg.wasm', 'application/wasm']],
   ['/game/host.css', ['web/game-host.css', 'text/css; charset=utf-8']],
   ['/assets/logo.svg', ['assets/logo.svg', 'image/svg+xml']],
+  ['/apps/wgpu-slice/web/input-targeting.mjs', ['apps/wgpu-slice/web/input-targeting.mjs', 'text/javascript; charset=utf-8']],
   ...[['bootstrap', 'game-bootstrap'], ['runtime', 'game-runtime'],
     ['owned-hud-ui', 'game-owned-hud-ui'], ['owned-play-ui', 'game-owned-play-ui'],
     ['owned-appearance-ui', 'game-owned-appearance-ui'],

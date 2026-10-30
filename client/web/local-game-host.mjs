@@ -4,6 +4,7 @@ import { copyAuthoredSourceRecipes } from './authored-source-recipes.mjs';
 import { createLocalBodyResolver } from './synthetic-body.mjs';
 import { createSyntheticFoodResolver } from './synthetic-food.mjs';
 import { createSyntheticPreyResolver } from './synthetic-prey.mjs';
+import { admitsBrowserInput, isEditorTarget } from '../apps/wgpu-slice/web/input-targeting.mjs';
 
 const freeze = Object.freeze;
 const apply = Reflect.apply;
@@ -293,11 +294,10 @@ export async function createLocalGameHost({ realm = globalThis, endpoint, source
     const deliver = event => {
       if (!isCurrentDocument()) return;
       // Editing keeps native defaults and never becomes steering or boost input.
-      const editable = event.target instanceof Input
-        || (typeof TextArea === 'function' && event.target instanceof TextArea) || event.target?.isContentEditable;
+      const editable = isEditorTarget(event.target, Input, TextArea);
       // A release belongs to the game input owner even after the pointer/focus
       // moves into an editor. Editing keeps its native default behavior.
-      if (editable && !['input', 'mouseup', 'pointerup', 'keyup', 'blur'].includes(event.type)) return;
+      if (!admitsBrowserInput(event, { editor: editable })) return;
       if (!editable && ['keydown', 'keyup'].includes(event.type)
         && ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)
         && !nativePlayDefault(event)) preventDefault(event);

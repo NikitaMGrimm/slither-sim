@@ -2,6 +2,121 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { localHost } from '../web/local-host.mjs';
+import { installLocalInput } from '../web/local-input.mjs';
+
+// Authored event-path/DOM doubles, not physical input or browser default actions.
+function inputFixture({ pointerEvents = true } = {}) {
+  const listeners = new Map(), calls = [], held = new Set();
+  function node(parent) {
+    const value = { parent, addEventListener(type, handler, options) {
+      assert.equal(options.capture, true);
+      const entries = listeners.get(value) ?? [];
+      entries.push({ type, handler, signal: options.signal }); listeners.set(value, entries);
+    } };
+    return value;
+  }
+  const realm = node(), document = node(realm), canvas = node(document), overlay = node(document);
+  const button = node(document), input = node(document), textarea = node(document), editable = node(document);
+  class Input { static [Symbol.hasInstance](target) { return target === input; } }
+  class TextArea { static [Symbol.hasInstance](target) { return target === textarea; } }
+  Object.assign(realm, { document, HTMLInputElement: Input, HTMLTextAreaElement: TextArea,
+    ...(pointerEvents ? { PointerEvent: class {} } : {}) });
+  editable.isContentEditable = true;
+  canvas.getBoundingClientRect = () => ({ left: 20, top: 30, width: 800, height: 600 });
+  let boosting = false, starts = 0, stops = 0;
+  const owner = {
+    pointer(...args) { calls.push(['pointer', ...args]); if (args[4]) boosting = true; },
+    mouse_up() { calls.push(['release']); boosting = false; },
+    key(code, down) {
+      calls.push(['key', code, down]);
+      if (!['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp'].includes(code)) return false;
+      if (down) held.add(code); else held.delete(code);
+      return true;
+    },
+    blur() { calls.push(['blur']); boosting = false; held.clear(); },
+    can_play: () => true, stop() { stops++; },
+  };
+  const abort = new AbortController();
+  installLocalInput({ realm, canvas, owner, host: { call: fn => fn() }, start: () => starts++, controls: [button], signal: abort.signal });
+  function fire(target, type, properties = {}) {
+    const event = { target, type, button: 0, clientX: 620, clientY: 180, defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; }, ...properties };
+    const path = []; for (let current = target; current; current = current.parent) path.unshift(current);
+    for (const current of path) for (const entry of listeners.get(current) ?? []) {
+      if (entry.type === type && !entry.signal.aborted) entry.handler(event);
+    }
+    return event;
+  }
+  return { realm, document, canvas, overlay, button, input, textarea, editable, owner, abort, fire, calls, held,
+    get boosting() { return boosting; }, get starts() { return starts; }, get stops() { return stops; } };
+}
+
+test('window capture tracks canvas and overlay coordinates in the game viewport', () => {
+  const f = inputFixture();
+  f.fire(f.canvas, 'pointermove'); f.fire(f.overlay, 'pointermove');
+  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 600, 150, 800, 600, false]]);
+  f.fire(f.overlay, 'pointerdown'); assert.equal(f.boosting, true);
+  f.abort.abort(); f.fire(f.canvas, 'pointermove'); assert.equal(f.calls.length, 3);
+});
+
+test('input, textarea and inherited contenteditable suppress presses and keep editing defaults', () => {
+  const f = inputFixture();
+  for (const target of [f.input, f.textarea, f.editable]) {
+    for (const code of ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape']) {
+      assert.equal(f.fire(target, 'keydown', { code }).defaultPrevented, false);
+    }
+    for (const type of ['pointermove', 'pointerdown']) assert.equal(f.fire(target, type).defaultPrevented, false);
+  }
+  assert.deepEqual(f.calls, []); assert.equal(f.starts, 0); assert.equal(f.stops, 0);
+});
+
+test('button Space and Enter retain activation defaults without gameplay press or shortcut', () => {
+  const f = inputFixture();
+  for (const code of ['Space', 'Enter']) {
+    assert.equal(f.fire(f.button, 'keydown', { code }).defaultPrevented, false);
+    assert.equal(f.fire(f.button, 'keyup', { code }).defaultPrevented, false);
+  }
+  assert.deepEqual(f.calls, [['key', 'Space', false], ['key', 'Enter', false]]);
+  f.fire(f.button, 'pointerdown'); assert.equal(f.boosting, false);
+  assert.equal(f.starts, 0);
+  f.fire(f.canvas, 'keydown', { code: 'Enter' }); assert.equal(f.starts, 1);
+  f.fire(f.canvas, 'keydown', { code: 'Escape' }); assert.equal(f.stops, 1);
+  assert.equal(f.fire(f.canvas, 'keydown', { code: 'Space' }).defaultPrevented, true);
+});
+
+test('canvas presses release over editors and controls for both pointer and mouse release', () => {
+  const f = inputFixture();
+  for (const target of [f.input, f.textarea, f.editable, f.button, f.overlay]) {
+    for (const type of ['pointerup', 'mouseup', 'pointercancel']) {
+      f.fire(f.canvas, 'pointerdown'); assert.equal(f.boosting, true);
+      assert.equal(f.fire(target, type).defaultPrevented, false); assert.equal(f.boosting, false);
+    }
+    for (const code of ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp']) {
+      f.fire(f.canvas, 'keydown', { code }); assert.equal(f.held.has(code), true);
+      f.fire(target, 'keyup', { code }); assert.equal(f.held.has(code), false);
+    }
+  }
+});
+
+test('blur and visibility loss clear mouse boost and held keys', () => {
+  const f = inputFixture();
+  for (const type of ['blur', 'visibilitychange']) {
+    f.fire(f.canvas, 'pointerdown'); f.fire(f.canvas, 'keydown', { code: 'Space' });
+    f.fire(f.canvas, 'keydown', { code: 'ArrowLeft' });
+    f.document.hidden = false; f.fire(f.document, 'visibilitychange'); assert.equal(f.boosting, true);
+    f.document.hidden = true; f.fire(type === 'blur' ? f.realm : f.document, type);
+    assert.equal(f.boosting, false); assert.equal(f.held.size, 0);
+  }
+});
+
+test('pointer and compatibility mouse events submit each movement, press and release once', () => {
+  const f = inputFixture();
+  for (const type of ['pointermove', 'mousemove', 'pointerdown', 'mousedown', 'pointerup', 'mouseup']) f.fire(f.canvas, type);
+  assert.deepEqual(f.calls, [['pointer', 600, 150, 800, 600, false], ['pointer', 600, 150, 800, 600, true], ['release']]);
+  const mouse = inputFixture({ pointerEvents: false });
+  for (const type of ['mousemove', 'mousedown', 'mouseup']) mouse.fire(mouse.overlay, type);
+  assert.deepEqual(mouse.calls, f.calls);
+});
 function fixture(make) {
   const log = [], sockets = [], queue = [];
   let generation = 1, next = 9007199254740999n, time = 123;
