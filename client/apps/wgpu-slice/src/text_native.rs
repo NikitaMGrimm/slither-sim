@@ -420,6 +420,7 @@ impl Rasterizer {
         }
         let mut pixels = vec![0; width * height * 4];
         let gamma = coverage_gamma(color);
+        let curve: [u8; 256] = std::array::from_fn(|c| adjusted_coverage(c as u8, gamma));
         for y in 0..height {
             for x in 0..width {
                 let mut sum = 0_u32;
@@ -429,7 +430,7 @@ impl Rasterizer {
                     }
                 }
                 // Adjust the final 4x4 average before premultiplication.
-                let a = adjusted_coverage(((sum + 8) / 16) as u8, gamma);
+                let a = curve[((sum + 8) / 16) as usize];
                 let dst = &mut pixels[(y * width + x) * 4..][..4];
                 for i in 0..3 {
                     dst[i] = ((u16::from(color[i]) * u16::from(a) + 127) / 255) as u8;
