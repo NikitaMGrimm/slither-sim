@@ -569,9 +569,7 @@ fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
 }
 
 #[test]
-fn spinner_ribbon_phase_follows_shared_time_with_stable_colour_resources() {
-    use slither_client::menu_layout::MenuElement as E;
-    use std::f64::consts::TAU;
+fn spinner_raster_phase_and_revision_follow_shared_time() {
     let mut menu = Menu::default();
     let mut text = TextCache::menu();
     let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
@@ -579,71 +577,94 @@ fn spinner_ribbon_phase_follows_shared_time_with_stable_colour_resources() {
     view.spinner_visible = true;
     view.spinner_alpha = 0.6;
     view.spinner_scale = 0.9;
-    let layout = layout();
-    let r = layout.viewport_rect(E::Spinner);
-    let center = [r.x + r.width / 2., r.y + r.height / 2.];
-    let mut previous_assets = None;
-    for (time, phase) in [
-        (0., 0.),
-        (44., 1.),
-        (88., 2.),
-        (125., 2.840909090909091),
-        (276.4601535159018, TAU),
-    ] {
-        view.spinner_time = time;
-        let p = menu
-            .prepare(&mut text, &view, &layout, [1280, 720], 1., None, 0)
-            .unwrap();
-        assert_eq!(p.resources.len(), 2);
-        let assets: Vec<_> = p.resources.iter().map(|r| r.asset).collect();
-        if let Some(previous) = &previous_assets {
-            assert_eq!(&assets, previous);
-        }
-        previous_assets = Some(assets);
-        for (color, offset) in [
-            ([96, 255, 112, 255], 0.),
-            ([152, 80, 255, 255], std::f64::consts::PI),
+    let mut previous = None;
+    for dpr in [1., 2., 3.] {
+        for (time, phase) in [
+            (0., 0.),
+            (44., 1.),
+            (88., 2.),
+            (125., 2.840909090909091),
+            (276.4601535159018, std::f64::consts::TAU),
         ] {
-            let resource = p
-                .resources
-                .iter()
-                .find(|r| r.image.pixels == color)
+            view.spinner_time = time;
+            let extent = [(1280. * dpr) as u32, (720. * dpr) as u32];
+            let p = menu
+                .prepare(&mut text, &view, &layout(), extent, dpr, None, 0)
                 .unwrap();
-            assert_eq!((resource.asset.width, resource.asset.height), (1, 1));
-            let draw = p
-                .frame
-                .draws
-                .iter()
-                .find(|d| d.asset == resource.asset)
-                .unwrap();
-            let tail = draw.corners.unwrap()[0];
-            let angle = (tail[1] - center[1]).atan2((tail[0] - center[0]) / 1.25);
-            let error = (angle - phase - offset)
-                .sin()
-                .atan2((angle - phase - offset).cos());
-            assert!(
-                error.abs() < 1e-10,
-                "time={time} phase={phase} angle={angle}"
+            assert_eq!((p.frame.draws.len(), p.resources.len()), (1, 1));
+            let resource = &p.resources[0];
+            let draw = &p.frame.draws[0];
+            assert!(draw.corners.is_none());
+            assert_eq!(draw.effective_alpha, 0.6);
+            assert_eq!(
+                (resource.asset.width, resource.asset.height),
+                ((128. * dpr) as u32, (128. * dpr) as u32)
             );
-        }
-        assert!(p.frame.draws.iter().all(|d| d.effective_alpha == 0.6));
-        p.frame
-            .validate(
-                &p.resources
+            if let Some((handle, revision)) = previous {
+                assert_eq!(resource.asset.handle, handle);
+                assert!(resource.asset.revision > revision);
+            }
+            previous = Some((resource.asset.handle, resource.asset.revision));
+            // A ray just beyond the pinched tail crosses green at every phase,
+            // independently of the radial wobble. Alpha lives on the one quad.
+            let angle = phase + 0.25;
+            let green = (25..=41).any(|radius| {
+                let x = ((64. + 1.25 * f64::from(radius) * angle.cos()) * dpr) as usize;
+                let y = ((64. + f64::from(radius) * angle.sin()) * dpr) as usize;
+                let px = &resource.image.pixels[(y * resource.image.width as usize + x) * 4..][..4];
+                px[1] > px[0] && px[1] > px[2] && px[3] > 32
+            });
+            assert!(green, "time={time}, dpr={dpr}");
+            assert!(
+                resource
+                    .image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
                     .iter()
-                    .map(|r| (r.asset.into(), r.asset))
-                    .collect(),
-            )
-            .unwrap();
+                    .any(|p| p[3] > 0 && p[3] < 255)
+            );
+            assert!(
+                resource
+                    .image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|p| p[..3].iter().all(|v| *v <= p[3]))
+            );
+            let frozen = menu
+                .prepare(&mut text, &view, &layout(), extent, dpr, None, 0)
+                .unwrap();
+            assert_eq!(frozen.resources[0].asset, resource.asset);
+        }
     }
+    let revision = previous.unwrap().1;
+    view.spinner_visible = false;
+    let hidden = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert!(hidden.resources.is_empty() && hidden.frame.draws.is_empty());
+    view.spinner_visible = true;
+    let resumed = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert_eq!(resumed.resources[0].asset.handle, previous.unwrap().0);
+    assert_eq!(resumed.resources[0].asset.revision, revision + 1);
+    view.spinner_alpha = 0.3;
+    view.spinner_scale = 0.5;
+    let faded = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    assert_eq!(faded.resources[0].asset, resumed.resources[0].asset);
+    assert_eq!(faded.frame.draws[0].effective_alpha, 0.3);
+    assert_eq!(faded.frame.draws[0].destination.width, 64.);
     view.visible = true;
-    let p = menu
-        .prepare(&mut text, &view, &layout, [1280, 720], 1., None, 0)
+    let menu_frame = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
         .unwrap();
-    let purple = p
-        .resources
-        .iter()
-        .find(|r| r.image.pixels == [152, 80, 255, 255])
-        .unwrap();
-    assert_eq!(p.frame.draws.last().unwrap().asset, purple.asset);
+    assert_eq!(
+        menu_frame.frame.draws.last().unwrap().asset,
+        resumed.resources[0].asset
+    );
 }

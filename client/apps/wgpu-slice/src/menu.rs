@@ -123,6 +123,7 @@ pub struct Menu {
     pub skin_pressed: bool,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
 }
 struct Label {
     text: String,
@@ -135,6 +136,7 @@ struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
     scale: f64,
     draws: Vec<Draw>,
     art: Vec<Resource>,
@@ -175,8 +177,6 @@ impl Composition<'_> {
                     .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
                 let rgb = match kind {
-                    6 => [96, 255, 112],
-                    7 => [152, 80, 255],
                     8 => [224, 224, 255],
                     10 => [22, 28, 34],
                     _ => [150, 108, 213],
@@ -287,61 +287,41 @@ impl Composition<'_> {
         self.art.push(resource.clone());
         Ok(())
     }
-    fn ribbon_quad(&mut self, corners: [[f64; 2]; 4], kind: u8, alpha: f64) -> Result<()> {
-        // All segments share two cached solid texels; deformation uploads only vertices.
-        self.solid(
-            MenuRect {
-                x: 0.,
-                y: 0.,
-                width: 1.,
-                height: 1.,
-            },
-            kind,
-            alpha,
-        )?;
-        self.draws.last_mut().unwrap().corners = Some(corners);
-        Ok(())
-    }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
-        use std::f64::consts::PI;
-        let center = [r.x + r.width / 2., r.y + r.height / 2.];
-        // Shared time advances by elapsed_ms / 8: time/44 turns once in ~2.21s.
-        let phase = view.spinner_time / 44.;
-        let project = |radius: f64, angle: f64| {
-            let (sin, cos) = angle.sin_cos();
-            [
-                center[0] + 1.25 * radius * cos * view.spinner_scale,
-                center[1] + radius * sin * view.spinner_scale,
-            ]
-        };
-        for (offset, kind) in [(0., 6), (PI, 7)] {
-            let edge = |progress: f64, head: bool| {
-                let radius = 32. + 5. * (offset + view.spinner_time / 6. + 8. * progress).cos();
-                let half_width = 8. * progress + if head { 10. } else { 0. };
-                let angle = offset + phase + 0.8 * PI * progress;
-                [
-                    project(radius + half_width, angle),
-                    project(radius - half_width, angle),
-                ]
-            };
-            let mut previous = edge(0., false);
-            // 32 strips per ribbon bound work and keep curvature smooth at menu size.
-            for segment in 1..=32 {
-                let next = edge(f64::from(segment) / 32., segment == 32);
-                self.ribbon_quad(
-                    [previous[0], next[0], next[1], previous[1]],
-                    kind,
-                    view.spinner_alpha,
-                )?;
-                previous = next;
+        let side = (128. * self.scale).ceil() as u32;
+        let key = (side, side, 6, view.spinner_time.to_bits());
+        let resource = if let Some(old) = self.old.get(&key) {
+            old.clone()
+        } else {
+            let pixels = materials::menu_spinner(view.spinner_time, side)?;
+            self.spinner_revision = self
+                .spinner_revision
+                .checked_add(1)
+                .ok_or("Spinner revision overflow")?;
+            Resource {
+                // Generic menu materials allocate strictly above this reserved handle.
+                asset: BodyAsset {
+                    handle: MENU_MATERIAL_HANDLE_BASE,
+                    revision: self.spinner_revision,
+                    width: side,
+                    height: side,
+                    status: BodyAssetStatus::Ready,
+                },
+                image: pixels,
             }
-            let tip = project(32., offset + phase + 0.8 * PI * 1.1875);
-            self.ribbon_quad(
-                [previous[0], tip, previous[1], previous[1]],
-                kind,
-                view.spinner_alpha,
-            )?;
-        }
+        };
+        let width = 128. * view.spinner_scale;
+        self.push(image(
+            &resource,
+            MenuRect {
+                x: r.x + (r.width - width) / 2.,
+                y: r.y + (r.height - width) / 2.,
+                width,
+                height: width,
+            },
+            view.spinner_alpha,
+        ))?;
+        self.materials.insert(key, resource);
         Ok(())
     }
 }
@@ -379,6 +359,7 @@ impl Menu {
             old: &self.materials,
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
+            spinner_revision: self.spinner_revision,
             scale: dpr.min(3.),
             draws: Vec::new(),
             art: Vec::new(),
@@ -675,6 +656,7 @@ impl Menu {
             },
         )?;
         self.next_handle = c.next_handle;
+        self.spinner_revision = c.spinner_revision;
         self.materials = c.materials;
         Ok(result)
     }

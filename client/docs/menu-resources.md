@@ -25,11 +25,15 @@ use the physical overlay. A hidden login emits no backdrop, even while the
 spinner remains. Hosts can take it for a separate world layer before composing
 a physical-resolution menu overlay. Logo art keeps its image aspect inside the
 unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
-and a text logo fallback approximate the controls at gameplay size. The spinner
-uses two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
+and a text logo fallback approximate the controls at gameplay size. The spinner uses
+two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
-scale/opacity unchanged. Bounded geometry uses 32 strips and one arrow-tip
-triangle per ribbon, sharing two cached solid texels; no per-frame rasterization.
+scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
+into one premultiplied antialiased raster at 128 CSS pixels times DPR (capped at
+384 pixels per side). One quad applies scale and alpha to the complete canvas,
+including folded/overlapping portions. A stable menu-material handle advances
+revision when time or raster size changes; frozen frames reuse their image.
+Hidden spinners allocate and rasterize nothing.
 A static logo uses shared reveal/opacity timing; it does not reproduce animated
 strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
