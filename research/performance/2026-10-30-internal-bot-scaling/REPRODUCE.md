@@ -194,6 +194,11 @@ debug context resolves them. Inclusive observations are a separate budget.
 These samples support ranking, not a replacement throughput measurement or a
 proven exact speedup. The original 8,192-byte/no-timestamp diagnostic proposal
 was superseded before collection; measured instrumentation costs are retained.
+The final classifier uses the outermost simulator callsite for inlined helpers:
+a hash helper's grid-setup definition is also used during pickup queries.
+The private archive retains the earlier classifier/output; reclassification
+changed labels only, preserving guards, slow-tick identities and clock data.
+
 
 The read-only `grid` mode constructs no observations. It reports checkpoint
 geometry separately from the diagnostic's per-tick audit. In the latter, public

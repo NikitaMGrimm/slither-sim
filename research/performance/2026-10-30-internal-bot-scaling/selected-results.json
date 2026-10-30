@@ -20,7 +20,7 @@
       "serialParallelTapesEqual": true
     }
   },
-  "reducerSha256": "d4f5d7df8a8fc8764db0cdffafc1cdb8f2c8056f667d834593d318e477429ed2",
+  "reducerSha256": "94a4e2de4afc6071783df46fa7d2a33bfee9ef16c5c3b6e74ef2e28cc82d3e33",
   "method": {
     "cadenceTicks": 6,
     "stagger": "(tick + slot) % 6 == 0",
@@ -166,6 +166,7 @@
         "killScoreSeconds": null,
         "minScore": null
       },
+      "savedCheckpointTick": 87000,
       "finalCensus": {
         "maxLength": 260,
         "meanLength": 95.804,
@@ -1415,6 +1416,7 @@
         "killScoreSeconds": null,
         "minScore": null
       },
+      "savedCheckpointTick": 87000,
       "finalCensus": {
         "maxLength": 246,
         "meanLength": 94.7668,
@@ -2664,6 +2666,7 @@
         "killScoreSeconds": null,
         "minScore": null
       },
+      "savedCheckpointTick": 91000,
       "finalCensus": {
         "maxLength": 230,
         "meanLength": 96.8968,
@@ -3878,6 +3881,7 @@
         "killScoreSeconds": null,
         "minScore": null
       },
+      "savedCheckpointTick": 34000,
       "guardedCounting": {
         "scope": "final guarded checkpoint; ecology unsettled; no extra warmup",
         "masterPinsSha256": "2fbd47bc43efeb12fede35948c05336fa5da599c2c22aeee04e863712c4f3261",

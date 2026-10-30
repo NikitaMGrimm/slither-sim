@@ -41,7 +41,9 @@ def header(record):
 def world_phase(record,scope,ranges):
     if scope=='admission':return 'spawn/admission'
     if any(name in record for name in ['::EaterGrid::build','9EaterGrid5build']):return 'pickup grid construction'
-    for line in map(int,re.findall(r'/src/simulator\.rs:(\d+)',record)):
+    # An inlined bucket helper is defined in setup but also called by queries.
+    # Prefer its outermost step callsite, rather than the helper's definition.
+    for line in reversed(list(map(int,re.findall(r'/src/simulator\.rs:(\d+)',record)))):
         if ranges['pickup grid construction'][0]<=line<=ranges['pickup grid construction'][1]:
             return 'pickup grid construction'
         for label,(first,last) in ranges.items():

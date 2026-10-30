@@ -35,6 +35,7 @@ class StackClassification(unittest.TestCase):
         ranges={'movement':(100,200),'food pickup/cache':(300,400),'pickup grid construction':(300,320)}
         self.assertEqual(world_phase('/work/src/simulator.rs:305','world',ranges),'pickup grid construction')
         self.assertEqual(world_phase('/work/src/simulator.rs:340','world',ranges),'food pickup/cache')
+        self.assertEqual(world_phase('/work/src/simulator.rs:305\n/work/src/simulator.rs:340','world',ranges),'food pickup/cache')
         self.assertEqual(world_phase('unknown','admission',ranges),'spawn/admission')
         self.assertEqual(world_phase('unknown','world',ranges),'unresolved world / clock brackets')
 

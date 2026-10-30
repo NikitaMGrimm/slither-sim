@@ -72,3 +72,19 @@
   seconds later than the first qualifying census. These states are retained
   as run, without performance-based reselection. The original plan's literal
   first-qualifying-checkpoint wording was not met; both ticks remain public.
+- Final source-context review found an inlined hash helper could be labelled
+  by its grid-setup definition instead of its outer pickup-query callsite.
+  Corrected the classifier, added a focused regression and reclassified the
+  existing stacks. Guard records, slow-tick identities, CPU samples, phase-clock
+  bounds and censuses are unchanged. The earlier classifier/output and first
+  archive receipt are retained in the final private archive. No timing reran.
+- All baseline stages and the separate #331 supplement completed. Botstorm
+  12k missed the frozen real-time trigger, so 6k and 9k ran in that order.
+  Its grid box never exceeded the original cap, so no botstorm #331 row ran.
+  Every selected continuation passed final-state identity. Seventeen method
+  tests and both reducers passed before the final archive was closed and
+  every member verified; source cleanup waits for verified download.
+- One final audit command failed because the guest lacks `rg`; a subsequent
+  quoted inline Python command was mangled by Windows/SSH quoting. Neither
+  executed measurement work. Small selected JSON files were transferred
+  instead, and local assertions verified the old/new attribution invariants.
