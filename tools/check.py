@@ -38,6 +38,7 @@ def commands(group):
             clippy("--no-default-features", "--features", "bot"),
             clippy("--no-default-features", "--features", "networking"),
             clippy("--no-default-features", "--features", "parallel"),
+            clippy("--no-default-features", "--features", "perf-internals"),
         ]
     if group == "test":
         return [
@@ -52,6 +53,7 @@ def commands(group):
             # toolchain, including the 1.99 it declares.
             ["cargo", "check", "-p", "slither-sim-py", "--all-targets", "--locked"],
             ["cargo", "run", "--locked", "--example", "basic"],
+            ["cargo", "test", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
         ]
     if group == "tools":
         target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))

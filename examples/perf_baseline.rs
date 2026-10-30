@@ -3,6 +3,15 @@
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
 //! Socket rows reuse host_load; all connections stay on loopback.
+use slither_sim::{
+    Action, Config, DeathEvent, DeathReason, Observation, Point, Simulator, physics,
+};
+#[cfg(feature = "perf-internals")]
+#[path = "support/catalog_backend.rs"]
+mod catalog_backend;
+#[path = "support/catalog_worlds.rs"]
+mod catalog_worlds;
+use catalog_worlds::EngineWorld;
 #[cfg(feature = "networking")]
 #[allow(dead_code)]
 #[path = "host_load.rs"]
@@ -16,10 +25,7 @@ use runtime::LegacyState;
 #[path = "support/state.rs"]
 mod checkpoint_state;
 use serde_json::{Value, json};
-use slither_sim::{
-    Action, Config, DeathEvent, DeathReason, Observation, Point, Simulator, physics,
-    profiling::{StepProfile, WorldStats},
-};
+use slither_sim::profiling::{StepProfile, WorldStats};
 use std::{
     collections::{BTreeMap, VecDeque},
     f64::consts::{FRAC_PI_2, PI, TAU},
@@ -224,6 +230,7 @@ struct ClientScenario {
 }
 
 enum Registration {
+    Engine(EngineWorld, Operation),
     Legacy(Legacy, Operation),
     Scenario(Scenario),
     Client(ClientScenario),
@@ -342,10 +349,12 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::SharedPolicy(op(500, 16, Full)),
     Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
+    Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
 ];
 
 #[derive(Clone, Copy)]
 enum Driver {
+    Engine(EngineWorld),
     Legacy(Legacy),
     Scenario {
         scenario: &'static Scenario,
@@ -359,6 +368,7 @@ enum Driver {
 impl Driver {
     fn mode(self) -> &'static str {
         match self {
+            Driver::Engine(world) => world.mode(),
             Driver::Legacy(Legacy::Portable | Legacy::Protocol)
             | Driver::Client(_)
             | Driver::SharedPolicy => "client",
@@ -370,6 +380,7 @@ impl Driver {
 
     fn operation(self) -> &'static str {
         match self {
+            Driver::Engine(world) => world.operation(),
             Driver::Legacy(case) => case.operation(),
             Driver::Scenario { bot: false, .. } => "step",
             Driver::Scenario { bot: true, .. } => "step+observe",
@@ -390,7 +401,8 @@ impl Driver {
     fn networking(self) -> bool {
         matches!(
             self,
-            Driver::Legacy(Legacy::Portable | Legacy::Protocol)
+            Driver::Engine(_)
+                | Driver::Legacy(Legacy::Portable | Legacy::Protocol)
                 | Driver::Client(_)
                 | Driver::SharedPolicy
                 | Driver::Socket(..)
@@ -399,6 +411,7 @@ impl Driver {
 
     fn synthetic(self) -> Option<&'static str> {
         match self {
+            Driver::Engine(world) => Some(world.synthetic()),
             Driver::Socket(..) => Some(
                 "loopback socket clients; scripted circles and reconnects, no bot workers; 1 s warmup",
             ),
@@ -415,6 +428,7 @@ impl Driver {
 
     fn definition(self) -> Result<Value, String> {
         Ok(match self {
+            Driver::Engine(world) => world.definition(),
             Driver::Socket(clients, battledome) => json!({
                 "clients": clients, "config": socket_config(clients, battledome),
                 "warmupSeconds": 1, "driver": "separate socket-driver process; circle commands every 100 ms; reconnect on death; capacity refusals retry after 100 ms; all clients connected at window boundaries; up to 5 s untimed admission wait",
@@ -495,6 +509,11 @@ fn catalog() -> Vec<Workload> {
     let mut workloads = Vec::new();
     for registration in REGISTRATIONS {
         match registration {
+            Registration::Engine(world, operation) => workloads.push(Workload {
+                name: world.name().into(),
+                driver: Driver::Engine(*world),
+                operation: *operation,
+            }),
             Registration::Socket(name, clients, battledome, operation) => {
                 workloads.push(Workload {
                     name: (*name).into(),
@@ -548,7 +567,7 @@ fn catalog_json() -> Result<Value, String> {
         .map(|workload| {
             let driver = workload.driver;
             Ok(json!({
-                "available": cfg!(feature = "networking") || !driver.networking(),
+                "available": if matches!(driver, Driver::Engine(_)) { cfg!(feature = "perf-internals") } else { cfg!(feature = "networking") || !driver.networking() },
                 "definition": driver.definition()?, "iterations": workload.operation.iterations,
                 "legacy": matches!(driver, Driver::Legacy(_)), "mode": driver.mode(),
                 "name": workload.name, "operation": driver.operation(), "profile": driver.profile(),
@@ -2201,6 +2220,10 @@ fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
     #[cfg(feature = "networking")]
     let cpu = host_load::cpu_seconds();
     let result = match args.driver {
+        #[cfg(feature = "perf-internals")]
+        Driver::Engine(world) => catalog_worlds::run(args, world, out)?,
+        #[cfg(not(feature = "perf-internals"))]
+        Driver::Engine(_) => return Err("engine rows require the perf-internals feature".into()),
         Driver::Legacy(
             Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody | Legacy::Observe,
         ) => run_core(args, out)?,
@@ -2397,7 +2420,9 @@ mod tests {
                     assert!(scenario.population > 1 && scenario.epoch > 0);
                     assert!(scenario.clearance >= 0.0);
                 }
-                Registration::SharedPolicy(_) | Registration::Socket(..) => {}
+                Registration::Engine(..)
+                | Registration::SharedPolicy(_)
+                | Registration::Socket(..) => {}
                 Registration::Client(client) => {
                     client.world.config().validate().unwrap();
                     assert!((1..=500).contains(&client.agents));
@@ -2441,10 +2466,15 @@ mod tests {
                     | "shared-forager-a4-mean-8"
                     | "host-official-500"
                     | "host-battledome-80"
+                    | "engine-battledome-spawn-318"
             );
             assert_eq!(
                 workload["available"],
-                cfg!(feature = "networking") || !networking
+                if workload["name"].as_str().unwrap().starts_with("engine-") {
+                    cfg!(feature = "perf-internals")
+                } else {
+                    cfg!(feature = "networking") || !networking
+                }
             );
         }
     }

@@ -61,6 +61,8 @@ default = ["networking", "parallel"]
 bot = []
 networking = ["bot", "dep:tungstenite"]
 parallel = ["dep:rayon"]
+# Benchmark harness only: hidden internals with no stability or semver promise.
+perf-internals = ["networking"]
 
 [[bin]]
 name = "slither-sim"

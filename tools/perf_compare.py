@@ -402,7 +402,8 @@ def run_base(args):
     output.mkdir(parents=True, exist_ok=False)
     started = time.perf_counter()
     try:
-        builds = perf_build.prepare_local(ROOT, args.base, output)
+        options = {"cargo_args": ("--features", args.features)} if args.features else {}
+        builds = perf_build.prepare_local(ROOT, args.base, output, **options)
         window = time.perf_counter()
         deadline = window + args.max_wall_seconds if args.max_wall_seconds is not None else None
         budget = {"deadline": deadline} if deadline is not None else {}
@@ -474,11 +475,14 @@ def main(argv=None):
                         help="catalog names from `perf_baseline --list` in any suite, or perf_observation "
                              "cases; replaces the suite selection")
     parser.add_argument("--no-profiles", action="store_true", help="skip step profiles in --base mode")
+    parser.add_argument("--features", help="Cargo features for both --base builds (for example perf-internals)")
     args = parser.parse_args(argv)
     if (args.baseline is None) != (args.candidate is None):
         parser.error("--baseline and --candidate are used together")
     if args.base is not None and args.candidate is not None:
         parser.error("--base replaces --baseline/--candidate")
+    if args.features and args.base is None:
+        parser.error("--features requires --base; copied executables retain their build features")
     if not 1 <= args.repeats <= 10:
         parser.error("repeats must be 1..10")
     if args.max_wall_seconds is not None and (
