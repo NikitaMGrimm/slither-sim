@@ -21,6 +21,10 @@ pub struct Driver {
     pub receipts: Vec<Value>,
     pub acknowledged_pictures: BTreeSet<u64>,
     pub extent: [u32; 2],
+    pub desktop: bool,
+    pub lifecycle: Vec<Value>,
+    pub issued: Option<slither_client::feel_trace::Observation>,
+    pending_ack: Option<f64>,
     socket: Option<u32>,
     sends: usize,
     controls: bool,
@@ -38,6 +42,10 @@ impl Driver {
             receipts: vec![],
             acknowledged_pictures: BTreeSet::new(),
             extent: render::backing_size([width, height])?,
+            desktop: false,
+            lifecycle: vec![],
+            issued: None,
+            pending_ack: None,
             socket: None,
             sends: 0,
             controls: false,
@@ -122,8 +130,51 @@ impl Driver {
     pub fn flush(&mut self, now: f64) -> Result<()> {
         self.game.observe_time(now)?;
         self.game.viewport(self.extent, 1.)?;
-        self.pictures()?;
+        if !self.desktop {
+            self.pictures()?;
+        } else {
+            self.game.service_ingress()?;
+        }
         self.drain_effects(now)
+    }
+    /// Running::frame's CPU order, after successful surface acquisition. The
+    /// authored acknowledgment models a synchronous present blocking the host;
+    /// the request scheduler queues transport/input and coalesces redraws meanwhile.
+    pub fn redraw(&mut self, now: f64, ack_at: f64) -> Result<()> {
+        if self.pending_ack.is_some() || ack_at < now || !ack_at.is_finite() {
+            return Err("Invalid desktop redraw/ack order".into());
+        }
+        self.game.viewport(self.extent, 1.)?;
+        self.flush(now)?; // service transport/effects before sampling
+        let queued = self.game.has_frame();
+        self.lifecycle
+            .push(json!({"kind":"redraw", "atMs":now, "queuedPicture":queued}));
+        self.game.begin_redraw(now, self.extent, 1.)?;
+        self.drain_effects(now)?;
+        if let Some(picture) = self.game.take_frame() {
+            self.issued = self.game.issued_feel_observation().cloned();
+            self.lifecycle.push(json!({"kind":"issue", "atMs":now,
+                "identity":picture.frame.identity.to_string(), "ackMs":ack_at}));
+            self.pending_ack = Some(ack_at);
+            if ack_at == now {
+                self.ack_picture(now)?;
+            }
+        }
+        self.drain_effects(now)
+    }
+    pub fn ack_picture(&mut self, now: f64) -> Result<()> {
+        if let Some(due) = self.pending_ack.take() {
+            if due != now {
+                return Err("Desktop picture acknowledgment at wrong time".into());
+            }
+            self.game.presented(true)?;
+            self.lifecycle.push(json!({"kind":"presented", "atMs":now}));
+            self.drain_effects(now)?;
+        }
+        Ok(())
+    }
+    pub fn awaiting_picture(&self) -> bool {
+        self.pending_ack.is_some()
     }
     pub fn frame(&mut self, now: f64) -> Result<()> {
         self.flush(now)?;
@@ -140,6 +191,10 @@ impl Driver {
             self.controls = true;
         }
         self.game.receive(generation, bytes, now)?;
+        if self.desktop {
+            self.lifecycle
+                .push(json!({"kind":"receive", "atMs":now, "pending":self.game.feel_pending()}));
+        }
         self.drain_effects(now)?;
         self.flush(now)
     }

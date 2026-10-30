@@ -252,6 +252,8 @@ mod desktop {
             self.game
                 .observe_time(self.started.elapsed().as_secs_f64() * 1000.)?;
             self.effects()?;
+            self.game.service_ingress()?;
+            self.effects()?;
             let active = !matches!(
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
@@ -309,11 +311,9 @@ mod desktop {
             // FIFO may have waited. Ingest everything now available before
             // sampling the next frame; receive() retains its own deferral rules.
             self.service()?;
-            if !self.game.has_frame() {
-                self.game
-                    .begin_frame(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
-                self.effects()?;
-            }
+            self.game
+                .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
+            self.effects()?;
             let Some(p) = self.game.take_frame() else {
                 self.host.discard_acquired();
                 self.schedule.retry(Instant::now());

@@ -258,6 +258,167 @@ fn playing() -> LocalGame {
     g
 }
 
+#[test]
+fn desktop_setup_pair_and_deferred_appearance_do_not_consume_redraws() {
+    for delay in [0., 1000. / 60., 40.] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        #[cfg(feature = "feel-trace")]
+        let traces = {
+            let traces = [
+                slither_client::feel_trace::Recorder::default(),
+                slither_client::feel_trace::Recorder::default(),
+            ];
+            game.record_feel(traces[0].clone());
+            control.record_feel(traces[1].clone());
+            traces
+        };
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), setup()]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[snake(44)]), 4.)
+                .unwrap();
+        }
+        assert!(game.client().own_snake().is_none()); // genuinely deferred
+        game.service_ingress().unwrap();
+        assert!(game.client().own_snake().is_some());
+        assert!(!game.has_frame()); // superseded pictures, not packet state
+        assert_eq!(
+            game.client().control_view(),
+            control.client().control_view()
+        );
+        let before = game.client().draw_serial();
+        let now = 1000. / 60.;
+        game.begin_redraw(now, [960, 540], 1.).unwrap();
+        assert_eq!(effects(&mut game), pump(&mut control, now));
+        let _picture = game.take_frame().unwrap();
+        assert_eq!(game.client().draw_serial(), before);
+        assert!(game.take_frame().is_none());
+        let ingress_at = now + delay / 2.;
+        let packet = bundle(&[received_food(1)]);
+        if delay != 0. {
+            game.receive(game.generation(), &packet, ingress_at)
+                .unwrap();
+            control
+                .receive(control.generation(), &packet, ingress_at)
+                .unwrap();
+            game.service_ingress().unwrap(); // outstanding picture still fences writes
+            assert!(game.client().foods().foods().is_empty());
+        }
+        game.presented(true).unwrap();
+        assert!(game.presented(true).is_err());
+        if delay == 0. {
+            game.receive(game.generation(), &packet, ingress_at)
+                .unwrap();
+            control
+                .receive(control.generation(), &packet, ingress_at)
+                .unwrap();
+        }
+        game.service_ingress().unwrap();
+        assert_eq!(game.client().draw_serial(), before + 1);
+        assert_eq!(game.client().foods().foods().len(), 1);
+        assert_eq!(
+            game.client().control_view(),
+            control.client().control_view()
+        );
+        assert!(effects(&mut game).is_empty());
+        assert!(!game.has_frame());
+        #[cfg(feature = "feel-trace")]
+        {
+            let actual = traces[0].take();
+            assert_eq!(actual, traces[1].take()); // every update, camera sample and ring cell
+            assert_eq!(actual.iter().filter(|r| r.phase == "draw").count(), 3);
+            assert_eq!(actual.iter().filter(|r| r.phase == "update").count(), 4);
+            assert_eq!(game.take_feel_ingress(), [3., 4., ingress_at]);
+        }
+    }
+}
+
+#[test]
+fn desktop_redraw_supersedes_setup_snapshots_without_resampling_them() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[setup(), snake(44), setup()]), 3.)
+            .unwrap();
+    }
+    pictures(&mut control);
+    let before = game.client().draw_serial();
+    game.begin_redraw(20., [960, 540], 1.).unwrap();
+    assert_eq!(effects(&mut game), pump(&mut control, 20.));
+    let _frame = game.take_frame().unwrap();
+    game.presented(true).unwrap();
+    assert_eq!(game.client().draw_serial(), before + 1);
+    assert_eq!(game.client(), control.client());
+}
+
+#[test]
+fn desktop_retry_keeps_issued_work_and_services_queued_ingress_after_ack() {
+    let mut game = playing();
+    let mut control = playing();
+    game.begin_redraw(40., [960, 540], 1.).unwrap();
+    assert_eq!(effects(&mut game), pump(&mut control, 40.));
+    let frame = game.take_frame().unwrap();
+    let identity = frame.frame.identity;
+    game.retry_frame(frame).unwrap();
+    for index in [1, 2] {
+        let packet = bundle(&[received_food(index)]);
+        game.receive(game.generation(), &packet, 40. + f64::from(index))
+            .unwrap();
+        control
+            .receive(control.generation(), &packet, 40. + f64::from(index))
+            .unwrap();
+    }
+    let serial = game.client().draw_serial();
+    game.begin_redraw(80., [960, 540], 1.).unwrap();
+    assert!(effects(&mut game).is_empty());
+    assert_eq!(game.client().draw_serial(), serial);
+    let frame = game.take_frame().unwrap();
+    assert_eq!(frame.frame.identity, identity);
+    game.presented(true).unwrap();
+    game.service_ingress().unwrap();
+    assert_eq!(game.client().draw_serial(), serial + 1);
+    assert_eq!(game.client(), control.client());
+    assert!(!game.has_frame());
+}
+
+#[test]
+fn desktop_superseded_setup_counts_for_quality_once_without_an_extra_draw() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[setup()]), 3.).unwrap();
+    }
+    pictures(&mut control);
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[snake(44)]), 4.)
+            .unwrap();
+    }
+    game.service_ingress().unwrap();
+    game.service_ingress().unwrap();
+    // 23 completed animation draws + reset + Setup = 25 at the first
+    // statistics update. Missing Setup would hit the <=24 fallback gate.
+    for now in (1..=23)
+        .map(|n| f64::from(n) * 40.)
+        .chain([1040., 1080., 1120.])
+    {
+        game.begin_redraw(now, [960, 540], 1.).unwrap();
+        assert_eq!(effects(&mut game), pump(&mut control, now));
+        let serial = game.client().draw_serial();
+        let _frame = game.take_frame().unwrap();
+        // Authored 40 ms ack: no new update or draw occurs while it waits.
+        game.observe_time(now + 40.).unwrap();
+        game.presented(true).unwrap();
+        assert_eq!(game.client().draw_serial(), serial + 1);
+        assert_eq!(game.quality(), control.quality());
+        assert!(game.quality().high_quality);
+        assert_eq!(game.client(), control.client());
+    }
+}
+
 fn zero_header_preserves_readout(rank: u16, population: u16) {
     let mut g = playing();
     let before = g.hud_view();

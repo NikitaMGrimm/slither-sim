@@ -150,6 +150,8 @@ pub struct LocalGame {
     trace: Option<slither_client::feel_trace::Recorder>,
     #[cfg(feature = "feel-trace")]
     issued_observation: Option<slither_client::feel_trace::Observation>,
+    #[cfg(feature = "feel-trace")]
+    ingress_observations: Vec<f64>,
     client: AnimatedClient,
     pub bank: Bank,
     session: SessionPolicy,
@@ -199,6 +201,8 @@ impl LocalGame {
             trace: None,
             #[cfg(feature = "feel-trace")]
             issued_observation: None,
+            #[cfg(feature = "feel-trace")]
+            ingress_observations: Vec::new(),
             client,
             bank: Bank::new()?,
             session,
@@ -244,6 +248,11 @@ impl LocalGame {
     #[cfg(feature = "feel-trace")]
     pub fn issued_feel_observation(&self) -> Option<&slither_client::feel_trace::Observation> {
         self.issued_observation.as_ref()
+    }
+    /// Original receive times of successfully applied envelopes; no packet data.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_ingress(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.ingress_observations)
     }
     pub fn client(&self) -> &AnimatedClient {
         &self.client
@@ -541,6 +550,52 @@ impl LocalGame {
         }
         Ok(())
     }
+    /// Service deferred ingress after the host's transport/effect drain. Setup
+    /// pictures are immutable snapshots of already committed packet state, so
+    /// newer ingress may supersede them. Work awaiting presentation and issued
+    /// pictures still fence writes to the committed world.
+    pub fn service_ingress(&mut self) -> Result<()> {
+        if self.work.is_some() || self.inflight != 0 || !self.effects.is_empty() {
+            return Ok(());
+        }
+        while let Some((generation, bytes, now)) = self.deferred.pop_front() {
+            self.deferred_bytes -= bytes.len();
+            if self.active(generation) {
+                self.supersede_setup_frames()?;
+                self.ingest(&bytes, now)?;
+            }
+            if !self.effects.is_empty() {
+                break;
+            }
+        }
+        Ok(())
+    }
+    /// Desktop redraws sample fresh world state instead of spending a display
+    /// interval on each queued Setup snapshot. Their core draw/camera samples
+    /// have already happened at ingress; never prepare them again. See the
+    /// desktop-ordering lane in tools/feel-replay/native-peer.md.
+    pub fn begin_redraw(&mut self, now: f64, extent: [u32; 2], scale: f64) -> Result<()> {
+        self.observe_time(now)?;
+        self.viewport(extent, scale)?;
+        self.service_ingress()?;
+        if self.work.is_none() && self.inflight == 0 && self.effects.is_empty() {
+            self.supersede_setup_frames()?;
+        }
+        self.begin_frame(now, extent, scale)
+    }
+    fn supersede_setup_frames(&mut self) -> Result<()> {
+        // Canvas counts each completed Setup draw even when a later draw replaces
+        // it before display. Keep quality's raw draw count as well as its already
+        // consumed camera sample; these removed pictures cannot be counted by ack.
+        let draws = u32::try_from(self.packet_frames.len())
+            .map_err(|_| "Quality draw counter exhausted")?;
+        self.draws_since_statistics = self
+            .draws_since_statistics
+            .checked_add(draws)
+            .ok_or("Quality draw counter exhausted")?;
+        self.packet_frames.clear();
+        Ok(())
+    }
     fn ingest(&mut self, bytes: &[u8], now: f64) -> Result<()> {
         let mut session = self.session.clone();
         session.receive_bytes(bytes.len()).map_err(|e| e.0)?;
@@ -553,7 +608,12 @@ impl LocalGame {
             let reply = solve_challenge(&decoded.commands[0][1..]).map_err(|e| e.to_string())?;
             self.session = session;
             self.enqueue(EffectKind::Send(reply), After::None)?;
-            return self.enqueue(EffectKind::Send(self.login.clone()), After::Challenged);
+            self.enqueue(EffectKind::Send(self.login.clone()), After::Challenged)?;
+            #[cfg(feature = "feel-trace")]
+            if self.trace.is_some() {
+                self.ingress_observations.push(now);
+            }
+            return Ok(());
         }
         for c in &decoded.commands {
             if session
@@ -780,6 +840,10 @@ impl LocalGame {
         self.rng = rng.get();
         self.packet_frames.extend(pictures);
         self.draw_diagnostics = diagnostics.into_inner();
+        #[cfg(feature = "feel-trace")]
+        if self.trace.is_some() {
+            self.ingress_observations.push(now);
+        }
         Ok(())
     }
     /// Probe only the existing transactional clock callback; intentionally abort before entity update.

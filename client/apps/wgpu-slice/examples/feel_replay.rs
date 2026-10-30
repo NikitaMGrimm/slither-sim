@@ -24,6 +24,11 @@ fn replay(request: Value) -> Result<Value> {
     let w = number(&geometry["css"]["width"])?;
     let h = number(&geometry["css"]["height"])?;
     let mut d = driver::Driver::new(w, h)?;
+    d.desktop = match request["lane"].as_str() {
+        None | Some("equal-schedule") => false,
+        Some("desktop-ordering") => true,
+        _ => return Err("Unknown native replay lane".into()),
+    };
     if geometry["backing"] != json!({"width":d.extent[0] as f64,"height":d.extent[1] as f64}) {
         return Err("Backing does not match production CSS geometry policy".into());
     }
@@ -53,7 +58,18 @@ fn replay(request: Value) -> Result<Value> {
         let now = number(&event["actualMs"])?;
         d.effects.clear();
         d.commands.clear();
-        if let Some(bytes) = step["packet"].as_array() {
+        d.issued = None;
+        if step["skippedRedraw"] == true {
+            d.lifecycle
+                .push(json!({"kind":"blocked-redraw", "atMs":now}));
+        } else if step["acknowledgment"] == true {
+            d.ack_picture(now)?;
+        } else if let Some(bytes) = step["packet"].as_array() {
+            if d.desktop {
+                d.lifecycle.push(
+                    json!({"kind":"transport", "scheduledMs":event["scheduledMs"], "atMs":now}),
+                );
+            }
             let bytes: Vec<u8> = bytes
                 .iter()
                 .map(|b| {
@@ -73,7 +89,11 @@ fn replay(request: Value) -> Result<Value> {
             d.play()?;
             d.flush(now)?;
         } else if event["kind"] == "frame" {
-            d.frame(now)?;
+            if d.desktop {
+                d.redraw(now, number(&step["ackAtMs"])?)?;
+            } else {
+                d.frame(now)?;
+            }
         } else {
             for action in step["actions"].as_array().ok_or("Expected input actions")? {
                 match text(&action["kind"])? {
@@ -114,6 +134,12 @@ fn replay(request: Value) -> Result<Value> {
             commands.push(command);
         }
         let session = d.game.feel_session();
+        if d.desktop {
+            for received in d.game.take_feel_ingress() {
+                d.lifecycle
+                    .push(json!({"kind":"ingest", "receivedMs":received, "atMs":now}));
+            }
+        }
         for row in d.recorder.take() {
             let o = observation::decode(&row, geometry)?;
             let eligibility = if !o["own"].is_null() {
@@ -160,7 +186,13 @@ fn replay(request: Value) -> Result<Value> {
             "draws":successful_draws,"pendingEffects":pending[0],"pendingFrames":pending[1],
             "lastBoundaryId":samples.last().map(|s|s["id"].clone()).unwrap_or(json!("missing")),
             "completed":d.game.failure.is_none() && !d.recorder.has_failed(),"unexpectedNetwork":false}});
-    Ok(json!({"body":body,"random":d.recorder.take_random(),"effects":d.receipts,"errors":errors}))
+    let mut result =
+        json!({"body":body,"random":d.recorder.take_random(),"effects":d.receipts,"errors":errors});
+    if d.desktop {
+        result["lane"] = json!("desktop-ordering");
+        result["lifecycle"] = json!(d.lifecycle);
+    }
+    Ok(result)
 }
 
 fn run() -> Result<()> {
