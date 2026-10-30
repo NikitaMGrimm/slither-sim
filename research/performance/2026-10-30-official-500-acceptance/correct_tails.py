@@ -43,6 +43,8 @@ def strip(value):
     for key in ['frameGapMs','gapResidualMs','frameExcessMs']:result['client'].pop(key)
     return v
 assert strip(data)==strip(before)
+# A rerun on already-corrected input would overwrite the receipt with no changes.
+assert changes,'input is already corrected; recreate prior-selected.json from 55f29215'
 receipt={'label':'Post-result nearest-rank correction matching the frozen plan; gates and outcome unchanged','archiveSha256':digest,'largestAbsoluteChangeMs':max((v['absoluteChangeMs'] for v in changes),default=0),'changes':changes,'allNonTailFieldsIdentical':True,'historicalLadderUnchanged':True}
 a.selected.write_text(json.dumps(data,indent=2)+'\n',newline='\n');a.receipt.write_text(json.dumps(receipt,indent=2)+'\n',newline='\n')
 print(json.dumps(receipt))
