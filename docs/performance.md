@@ -128,9 +128,10 @@ why it is not reused across steps.
 With at least 256 snakes and eight observers, a batch also builds a bounds tree
 to skip distant snakes. Very long bodies need only one tree entry. Candidates
 are restored to world order before the unchanged visibility predicate runs;
-extreme or nonfinite bounds retain the original per-snake check. At 262,144 food
-items, an additional bit per food-mark word skips empty words when restoring
-food order. Both indexes live only for the batch's immutable world borrow.
+extreme or nonfinite bounds retain the original per-snake check. Those batches
+with at least 262,144 food items also use an additional bit per food-mark word
+to skip empty words when restoring food order. Both indexes live only for the
+batch's immutable world borrow.
 
 ## Controller transport
 

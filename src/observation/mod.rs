@@ -294,11 +294,14 @@ impl<'a> Observer<'a> {
         // batches by 2-5%. The scan variant keeps their indexed branches out.
         // Five paired immutable official trials: summaries reduced observation
         // CPU from 25.0 to 20.6 us at 264k food, and 74.7 to 41.6 us at 1.06M.
-        match (snakes.is_some(), self.world.food.len() >= 262_144) {
-            (false, false) => self.visit_indexed::<false, false>(index, marks, sink, snakes),
-            (false, true) => self.visit_indexed::<false, true>(index, marks, sink, snakes),
-            (true, false) => self.visit_indexed::<true, false>(index, marks, sink, snakes),
-            (true, true) => self.visit_indexed::<true, true>(index, marks, sink, snakes),
+        // Eight-observer observe-sparse was 3% slower in five pairs: its visible
+        // indices are already clustered. Keep summaries to large indexed batches.
+        match snakes {
+            None => self.visit_indexed::<false, false>(index, marks, sink, snakes),
+            Some(_) if self.world.food.len() >= 262_144 => {
+                self.visit_indexed::<true, true>(index, marks, sink, snakes)
+            }
+            Some(_) => self.visit_indexed::<true, false>(index, marks, sink, snakes),
         }
     }
     #[inline(always)]

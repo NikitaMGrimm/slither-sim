@@ -350,7 +350,7 @@ fn official_worlds_all_selected_and_sightings_match_with_reused_buffers() {
 
 #[test]
 fn large_food_marks_keep_order_and_clear_summaries_across_resizes() {
-    let snakes: Vec<_> = (0..8)
+    let snakes: Vec<_> = (0..256)
         .map(|i| {
             let head = Point {
                 x: i as f64 * 4000.,
@@ -390,13 +390,16 @@ fn large_food_marks_keep_order_and_clear_summaries_across_resizes() {
                 vision,
             };
             let observer = Observer::new(w, 8);
+            let tree = observer.snake_index(8);
             for i in 0..8 {
                 let expected = scan(w, i);
                 let mut seen = Sighting::default();
-                observer.visit(i, &mut marks, &mut seen, None).unwrap();
+                observer
+                    .visit(i, &mut marks, &mut seen, tree.as_ref())
+                    .unwrap();
                 assert_eq!(seen.food, expected.food);
                 observer
-                    .observe_into(i, &mut marks, &mut slot, None)
+                    .observe_into(i, &mut marks, &mut slot, tree.as_ref())
                     .unwrap();
                 equal_observation(slot.as_ref().unwrap(), &materialize(w, i, &expected));
                 assert!(marks.iter().all(|&word| word == 0));
