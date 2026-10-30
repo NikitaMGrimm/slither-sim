@@ -197,6 +197,9 @@ export function validateTrace(trace, schedule) {
     lastSend = c.sendMs; lastEvent = c.eventSeq;
   });
   let appeared = false, betweenLives = false, lastOwn;
+  // Trace-wide lifecycle contract: tools/feel-replay/README.md; regressions in
+  // tools/feel-replay-expiry.test.mjs. Retained expired observations may repeat.
+  const retiredOwnTokens = new Set();
   trace.samples.forEach((s, i) => {
     const b = schedule.boundaries[i];
     for (const key of Object.keys(boundary)) if (!same(s[key], b[key])) fail(`trace.samples[${i}].${key}`, 'boundary order/identity/time mismatch');
@@ -208,9 +211,11 @@ export function validateTrace(trace, schedule) {
       betweenLives = true;
     } else {
       if (s.own === null) fail(`trace.samples[${i}].own`, 'missing own at eligible boundary');
-      if (betweenLives && s.own.token === lastOwn.token) fail(`trace.samples[${i}].own`, 'restart must use a new own token');
       if (s.own.deathProgress < 0 || s.own.expired !== (s.own.deathProgress >= 1)) fail(`trace.samples[${i}].own`, 'expired state must match death progress');
-      if (lastOwn?.token === s.own.token && lastOwn.expired && !s.own.expired) fail(`trace.samples[${i}].own`, 'expired own cannot revive');
+      const retainedExpired = !betweenLives && lastOwn?.token === s.own.token && s.own.expired;
+      if (retiredOwnTokens.has(s.own.token) && !retainedExpired) fail(`trace.samples[${i}].own`, 'retired or expired own token cannot be reused or revived');
+      if (lastOwn && lastOwn.token !== s.own.token) retiredOwnTokens.add(lastOwn.token);
+      if (s.own.expired) retiredOwnTokens.add(s.own.token);
       if (s.own.expired !== (s.own.projected === null)) fail(`trace.samples[${i}].own.projected`, 'only expired own skips projection');
       appeared = true;
       betweenLives = false;
@@ -229,6 +234,7 @@ export function validateTrace(trace, schedule) {
     }
   });
   const f = trace.final;
+  if (betweenLives) fail('trace.final', 'incomplete restart: still between lives');
   if (!f.completed || f.unexpectedNetwork || f.pendingEffects !== 0 || f.pendingFrames !== 0 || !same(f.atMs, schedule.durationMs)
     || f.events !== trace.events.length || f.commands !== trace.commands.length
     || f.samples !== trace.samples.length || f.draws !== trace.samples.filter(s => s.phase === 'draw').length

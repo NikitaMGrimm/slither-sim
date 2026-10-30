@@ -109,7 +109,9 @@ Trace arrays contain:
 Only explicitly scheduled both-peer `pre-appearance` boundaries may initially
 have `own: null`; that exception cannot resume after appearance. A scheduled
 `between-lives` interval also permits null, but only after an observed expired
-own, and the next own must have a new token. Missing own elsewhere,
+own, and the next own must have a token never previously retired or expired in
+the trace. Completion while still between lives is invalid; v2 has no declared
+end-between-lives schedule exception. Missing own elsewhere,
 missing fields/times, duplicate IDs, wrong order/counts, unfinished work,
 unexpected network or send/present failures fail completeness before comparison.
 Do not resample or insert draws to obtain an observation.
@@ -120,7 +122,10 @@ draw collection; Canvas and WebGPU therefore skip its head/face instead of
 clamping death progress. Trace v2 records `projected: null` for that skip, retaining
 all stored head/pupil/correction channels. Only expired own may have null
 projection, expired must agree with death progress, and an expired token cannot
-revive. Live/fading own still requires the complete projected geometry.
+revive. Repeated observations of the same retained expired own remain valid.
+Replacing an own retires its token even if it never expired; retired tokens
+cannot return in any state after later lives. Live/fading own still requires
+the complete projected geometry.
 Unsupported face families continue to fail closed, including after expiry.
 
 ## Match criteria

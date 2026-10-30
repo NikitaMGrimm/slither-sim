@@ -17,12 +17,66 @@ function lifecycle() {
   f.trace.manifest.scheduleSha256 = scheduleHash(f.schedule);
   return f;
 }
+function appendLives(f, states) {
+  const liveOwn = f.trace.samples[4].own;
+  for (const [token, expired = false] of states) {
+    const b = { ...f.schedule.boundaries.at(-1), id: `lifecycle-${f.schedule.boundaries.length}`,
+      phase: 'update', drawId: null, eligibility: token === null ? 'between-lives' : 'own' };
+    const sample = parse(stringify(f.trace.samples[4]));
+    Object.assign(sample, b, { own: token === null ? null : {
+      ...parse(stringify(liveOwn)), token, expired, deathProgress: expired ? 1.1 : 0,
+      projected: expired ? null : liveOwn.projected,
+    } });
+    f.schedule.boundaries.push(b);
+    f.trace.samples.push(sample);
+  }
+  f.trace.final.samples = f.trace.samples.length;
+  f.trace.final.lastBoundaryId = f.schedule.boundaries.at(-1).id;
+  f.trace.manifest.scheduleSha256 = scheduleHash(f.schedule);
+  return f;
+}
+
 test('v2 retains expired own, skips projection, and admits a declared restart with a new token', () => {
   const { schedule, trace } = lifecycle();
   assert.equal(schedule.schema, 2); assert.equal(trace.schema, 2);
   assert.equal(compareTraces(trace, trace, schedule).status, 'exact-match');
   assert.equal(parse(stringify(trace)).samples[2].own.projected, null);
 });
+test('completeness rejects completion between lives even in identical peers', () => {
+  const { schedule, trace } = lifecycle();
+  schedule.boundaries[4].eligibility = 'between-lives';
+  Object.assign(trace.samples[4], { eligibility: 'between-lives', own: null });
+  trace.manifest.scheduleSha256 = scheduleHash(schedule);
+  const result = compareTraces(trace, trace, schedule);
+  assert.equal(result.status, 'invalid');
+  assert.equal(result.errors.length, 2);
+  assert(result.errors.every(error => /trace.final:.*between lives/.test(error)));
+});
+
+for (const expired of [false, true]) test(`completeness rejects an old token returning ${expired ? 'expired' : 'live'} after two restarts`, () => {
+  const { schedule, trace } = appendLives(lifecycle(), [
+    ['synthetic-own-2', true], [null], ['synthetic-own-1', expired],
+  ]);
+  const result = compareTraces(trace, trace, schedule);
+  assert.equal(result.status, 'invalid');
+  assert.equal(result.errors.length, 2);
+  assert(result.errors.every(error => /retired or expired own token/.test(error)));
+});
+
+test('completeness rejects reuse of a displaced token that never expired', () => {
+  const { schedule, trace } = lifecycle();
+  trace.samples[1].own.token = trace.samples[4].own.token;
+  assert.equal(compareTraces(trace, trace, schedule).status, 'invalid');
+});
+
+test('v2 admits multiple restarts with fresh tokens and repeated retained-expired observations', () => {
+  const { schedule, trace } = appendLives(lifecycle(), [
+    ['synthetic-own-2', true], ['synthetic-own-2', true], [null],
+    ['synthetic-own-3'], ['synthetic-own-3', true], [null], ['synthetic-own-4'],
+  ]);
+  assert.equal(compareTraces(trace, trace, schedule).status, 'exact-match');
+});
+
 for (const [name, mutate] of [
   ['missing live own', f => { f.trace.samples[1].own = null; }],
   ['missing expired own', f => { f.trace.samples[2].own = null; }],
