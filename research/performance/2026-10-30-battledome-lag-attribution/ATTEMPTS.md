@@ -21,3 +21,9 @@
   or relax the frozen >20-ms episode definition. The ordinary full reducer and
   the bounded augmentation path call the same function; scheduler events need
   not be decoded again to append this diagnostic.
+
+- Both series completed with all generator gates passing. No Spot interruption
+  or rejected generator occurred. Full final-row re-reduction equals the
+  augmented cached result. Seven documentation checks and exact table matching
+  pass remotely. All required archives were retrieved/verified before teardown;
+  the 17-enabled-region audit is clean and the task key/group are deleted.

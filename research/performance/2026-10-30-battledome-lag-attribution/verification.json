@@ -1,3 +1,39 @@
 {
-  "status": "Pending final archive retrieval and cleanup; replaced before publication"
+  "researchOnly": true,
+  "nativeObserverBuildPassed": true,
+  "smokeThreadCountersPassed": true,
+  "focusedReducerTestsPassed": 7,
+  "documentationTestsPassed": 7,
+  "reportTablesExact": true,
+  "all16GeneratorGatesPass": true,
+  "fullReductionEqualsAugmentedRow": true,
+  "fullRustGroup": "Not rerun for research-only checkout changes; PR CI separate",
+  "execution": "AWS only for native work and reductions; no shared guest",
+  "independentReview": "Not performed",
+  "analysisSourceManifestSha256": "0437f756b9cfaf07000366d9d4354ed0ea370d8a8c3f112bfeead5015800e0f0",
+  "retrieval": {
+    "requiredSourcesVerified": true,
+    "verifiedBeforeTeardown": true,
+    "rowArchives": 16,
+    "nativeAndFollowupSourcesSecuredBeforeTiming": true,
+    "targetTransitionArchiveVerified": true,
+    "analysisArchive": {
+      "complete": true,
+      "allMembersVerified": true,
+      "requiredSourcesVerified": true,
+      "archiveBytes": 165212,
+      "archiveSha256": "f82ad4a531467c727973f49b0a92415d950916252e215dc7e1abe5eb126a173e",
+      "manifestSha256": "6ff9aa78897dec36cb8bcac475ce6dc90febbc9d2fbe28c0d041cd5641e68a14"
+    },
+    "extrasArchive": {
+      "complete": true,
+      "allMembersVerified": true,
+      "requiredSourcesVerified": true,
+      "archiveBytes": 1993941,
+      "archiveSha256": "d64eeefbcf05981997f7b5c071b6cccdbcb9845a0ccaf7da0a07598f3516c67e",
+      "manifestSha256": "4ff660e3a85bd0d56288ddbda32a1a7ad67d77a6e611991e17f48100515c0a6b"
+    }
+  },
+  "cleanupComplete": true,
+  "cleanupReceiptsAppendedAfterAnalysisArchive": true
 }

@@ -1,3 +1,16 @@
 {
-  "status": "Pending final archive retrieval and cleanup; replaced before publication"
+  "kind": "Conservative launch-to-cleanup bound at bid caps, not invoice",
+  "lifetimeMinutesRoundedUp": {
+    "generator": 105,
+    "server": 105
+  },
+  "computeAtBidCapsUSD": 0.98,
+  "noncomputeAllowanceUSD": 0.65,
+  "combinedBoundUSD": 1.63,
+  "fullTimerAllocationBoundUSD": 1.882,
+  "capUSD": 3,
+  "instances": 2,
+  "spotOnly": true,
+  "timersExtended": false,
+  "allAttemptsIncluded": true
 }

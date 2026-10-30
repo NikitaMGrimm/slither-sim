@@ -266,8 +266,12 @@ historical observation overhead are hypotheses, not established explanations.
 
 Archive readiness is written only after closure/member verification; download
 size/hash checks precede deletion/termination. See [verification](verification.json),
-[cost](cost.json), and [cleanup](cleanup.json). Final all-region cleanup and its
-cost receipt are appended after verified source retrieval. The conservative
+[cost](cost.json), and [cleanup](cleanup.json). Cleanup completed at 06:36 UTC after verified source retrieval. All 17 enabled
+regions were scanned: zero nonterminated instances, all volumes, active/open
+Spot requests and Elastic IPs. Both task instances are terminated, their key pair
+and security group deleted, and the local private key removed. The launch-to-
+cleanup upper bound is **$1.63**, including $0.65 noncompute reserve; this is not
+an invoice. Cleanup receipts were appended after closing the analysis archive. The conservative
 full-timer allocation bound is $1.882, including the $0.65 noncompute reserve,
 below the combined $3 cap. One Spot pair is used for builds, both series and
 reductions, with 130-minute self-terminate deadlines; no timer is extended and
