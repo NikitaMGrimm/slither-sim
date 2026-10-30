@@ -144,6 +144,10 @@ commit, without a production patch file.
 
 ## Checks, incidents and retained material
 
+The [socket table helper](socket_tables.py) recomputes both the earlier
+500-player counts and this study's eight-client syscall witness from their
+respective selected results.
+
 Focused food tests pass, including retirement plus unchanged-listing pickup
 and fresh-state listing delivery. Each of three separate source mutations fails
 at runtime as intended: lost unchanged-handle pickup, ignored listing change,

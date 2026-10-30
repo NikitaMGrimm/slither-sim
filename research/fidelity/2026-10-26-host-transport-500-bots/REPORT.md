@@ -6,6 +6,11 @@ not establish consistently official-like transport at the target load. The
 sparse baseline fails median frame cadence in all three repetitions. No host
 behavior or tolerance is changed.
 
+For later analysis of these captures, see [sparse-view cadence](../2026-10-26-sparse-view-cadence/REPORT.md).
+The separate [500-bot qualification](../../performance/2026-10-26-500-bot-qualification/REPORT.md)
+addresses CPU and delivery grades; it does not replace this study's failed
+held-out packet-timing result.
+
 ## Question and scope
 
 Does the protocol-19 host meet the existing near-server official transport

@@ -5,6 +5,12 @@ bursts remain unexplained.** This research-only record preserves the prototype;
 production sources are unchanged. No latency/capacity improvement is claimed.
 No hold was replaced or excluded. [Selected results](results.json), [plan](PLAN.md).
 
+For a later independent attempt, also rejected, see
+[gateway pass costs](../2026-10-29-gateway-pass-cost/REPORT.md).
+The seven pairs and unexplained bursts here remain counterevidence. The retained
+[native series runner](native-series.py) records the smoke/pair ordering and
+validity gates; it refuses to overwrite completed holds.
+
 Measured runtime: `4532a76f22958ae3abcca801e90edd30ed9f466f` ->
 `e10a20abb4f2b2fc072560787e20d918954a31ba`. [prototype.patch](prototype.patch)
 is their exact runtime/test diff. Apply it to base

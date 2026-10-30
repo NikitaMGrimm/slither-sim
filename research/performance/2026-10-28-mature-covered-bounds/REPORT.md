@@ -195,6 +195,10 @@ Next candidates ranked by remaining mature parent budgets, not predicted savings
 
 ## Pins, reproduction, budget and limits
 
+The retained [stream comparer](compare.py) checks complete raw bytes, including
+mutation controls. The [preload probes](preload-probes.py) preserve the short
+launch/calibration validation before the long retry.
+
 Base is merged #251 main `6e02fefefb447991d24cf0c3385d5eb8ac6c62ff`.
 Bounds runtime is `50220958c900782d53cb225949bf25165709c371`.
 #249 cohorts use `d127acd1f0e9db2100c8a1dd5c2fa43e2deff506` and

@@ -1,8 +1,9 @@
 # PR comparison statistics, October 24, 2026
 
-Status: v1, adopted for the advisory PR comparison; new runs use
-[protocol v2](../../../docs/maintainers/performance-statistics-v2.md) since
-2026-10-25. Design and synthetic reference vectors only; no new simulator
+Status: v1, adopted for the advisory PR comparison. For later runs, the v1
+procedure is superseded by [protocol v2](../../../docs/maintainers/performance-statistics-v2.md)
+since 2026-10-25; its frozen contract and reference vectors remain historical
+evidence. Design and synthetic reference vectors only; no new simulator
 measurements. Hosted-runner calibration pending.
 
 ## Question
