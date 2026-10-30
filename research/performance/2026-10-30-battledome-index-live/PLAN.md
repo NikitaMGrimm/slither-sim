@@ -70,3 +70,10 @@ maps. Terminate task resources, cancel their Spot requests, remove task key/grou
 and scan all enabled regions for instances, open/active Spot requests, volumes,
 Elastic IPs and task resources. Keep cloud identifiers, addresses and host names
 private. Template study PR with footer, no merge.
+
+Implementation clarification before the first 320-seat primary: the inherited
+online reducer also trims to complete 100-tick blocks. Prove the already-frozen
+whole-marked-window zero with the last census before its start and first census
+after its end, as well as online/canonical zeros. A nonzero enclosing difference
+or missing boundary coverage cannot prove a hold; it does not discard a row or
+claim all enclosing deferrals occurred inside the exact marked interval.
