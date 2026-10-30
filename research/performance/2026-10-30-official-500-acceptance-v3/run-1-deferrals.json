@@ -1,0 +1,41 @@
+{
+  "scope": "Full requested-window covering census bracket; no exclusions",
+  "deferredTicks": 0,
+  "events": [],
+  "largestBracketedBusyWallTicks": [
+    {
+      "tick": 362952,
+      "simulationCpuMs": 4.996034,
+      "socketCpuMs": 2.678872,
+      "bracketedBusyWallMs": 12.070202
+    },
+    {
+      "tick": 448666,
+      "simulationCpuMs": 2.750372,
+      "socketCpuMs": 2.126594,
+      "bracketedBusyWallMs": 11.719441
+    },
+    {
+      "tick": 362951,
+      "simulationCpuMs": 2.639031,
+      "socketCpuMs": 2.279882,
+      "bracketedBusyWallMs": 10.386422
+    },
+    {
+      "tick": 277238,
+      "simulationCpuMs": 2.387292,
+      "socketCpuMs": 3.171153,
+      "bracketedBusyWallMs": 9.632318
+    },
+    {
+      "tick": 405648,
+      "simulationCpuMs": 7.551157,
+      "socketCpuMs": 2.684552,
+      "bracketedBusyWallMs": 9.573099
+    }
+  ],
+  "clientFrameGapMaxMs": 231.851,
+  "clientFrameExcessP99Ms": 3.505,
+  "clientFrameExcessMaxMs": 17.845,
+  "limits": "Busy wall brackets the tick body/handoff, not every wait between ticks. Retained counters do not identify a scheduler, kernel, storage or hypervisor cause."
+}
