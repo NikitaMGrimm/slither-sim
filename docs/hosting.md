@@ -45,9 +45,9 @@ players on plain protocol-19 WebSockets (no TLS) for 30 minutes. A tick used
 about 4.8 ms of its 7 ms on average, and about 7.1 ms on the food update every
 72 ticks
 ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-30-official-500-acceptance-v4/REPORT.md)).
-Other work on the same core can still make the server fall behind: in an
-earlier run, other work on the machine took 1.4 s of CPU within 4 s and the
-server deferred 126 ticks
+Anything else running on that core can still make the server fall behind: in
+an earlier run, non-server work took 1.4 s of CPU within 4 s and the server
+deferred 126 ticks
 ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-30-official-500-acceptance-v3/REPORT.md)).
 Keep other work off that core while players are on, for example by scheduling
 package updates for quiet hours.
