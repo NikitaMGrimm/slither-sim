@@ -108,18 +108,19 @@ impl LoginMenu {
             nickname_baseline_space: 4.,
             padded_play_label_width: label_width + 20.,
         };
-        if self.layout.is_none() || self.extent != [width, height] {
-            self.layout = Some(
-                MenuLayout::new(width, height, view.transition, view.tips_visible, metrics)
-                    .map_err(JsValue::from_str)?,
-            );
-            self.extent = [width, height];
-        } else {
-            self.layout
-                .as_mut()
-                .expect("initialized extent")
-                .update(view.transition, view.tips_visible, metrics)
-                .map_err(JsValue::from_str)?;
+        match self.layout.as_mut() {
+            Some(layout) if self.extent == [width, height] => {
+                layout
+                    .update(view.transition, view.tips_visible, metrics)
+                    .map_err(JsValue::from_str)?;
+            }
+            _ => {
+                self.layout = Some(
+                    MenuLayout::new(width, height, view.transition, view.tips_visible, metrics)
+                        .map_err(JsValue::from_str)?,
+                );
+                self.extent = [width, height];
+            }
         }
         let object = js_sys::Object::new();
         for (key, value) in [
