@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { stringify } from './codec.mjs';
+import { stringify } from './json.mjs';
 
 // Subscribe at spawn time, before Browser.close or a signal can end the process.
 // See browser-peers.md (cleanup) and browser-synthetic.json (offline run).

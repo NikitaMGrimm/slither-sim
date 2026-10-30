@@ -1,4 +1,4 @@
-import { differences } from './differences.mjs';
+import { scheduleHash } from './io.mjs';
 
 // Authored synchronous-present windows, frozen before executing LocalGame.
 // Missed redraws coalesce; transport and input wait for the host to return.
@@ -45,40 +45,27 @@ export function desktopSteps(steps, delayMs, oneFrame = false) {
     .map((s, seq) => ({ ...s, event: { ...s.event, seq } }));
 }
 
-export function classifyPath(path) {
-  if (/^manifest\./.test(path)) return 'binding';
-  if (/^commands/.test(path)) return 'command bytes or times';
-  if (/^events/.test(path)) return 'event/service timing or effects';
-  if (/^final/.test(path)) return 'completion/counts';
-  if (/\.camera\.ring\[/.test(path)) return 'camera ring';
-  if (/\.camera\./.test(path)) return 'camera samples';
-  if (/^samples(\[\d+\])?$/.test(path) || /\.(atMs|eventSeq|frameId|drawId|id|phase|eligibility)$/.test(path)) return 'update/draw timing or missing boundary';
-  if (/\.status\.|\.quality\./.test(path)) return 'presentation accounting';
-  return 'world/input state at boundary';
-}
-
-// Retain ALL exact differences. This diagnostic never replaces A1's frozen
-// completeness/provenance gate, nor learns expectations from a candidate trace.
-export function desktopComparison(left, right) {
-  const rows = differences(left, right).map(row => ({ ...row, classification: classifyPath(row.path) }));
-  const classes = {};
-  for (const row of rows) classes[row.classification] = (classes[row.classification] ?? 0) + 1;
-  const frames = trace => trace.samples.filter(s => s.phase === 'update' && trace.events[s.eventSeq].kind === 'frame');
-  const firstOwn = trace => trace.samples.find(s => s.own !== null)?.atMs ?? null;
-  return { classes, rows, counts: [left, right].map(trace => ({ events: trace.events.length,
-    commands: trace.commands.length, samples: trace.samples.length, draws: trace.final.draws,
-    preparedDraws: trace.samples.filter(s => s.phase === 'draw').length,
-    frameUpdates: frames(trace).length, firstOwnMs: firstOwn(trace), pending: [trace.final.pendingEffects, trace.final.pendingFrames] })) };
-}
-
-// Compare the actual sample/command histories independently of host event IDs
-// and presentation receipts. Kept alongside, never instead of, the full report.
-export function coreHistoryComparison(left, right) {
-  const history = trace => ({ manifest: {}, events: [], final: {},
-    commands: trace.commands.map(({ bytes, decisionMs, sendMs, ackMs }) => ({ bytes, decisionMs, sendMs, ackMs })),
-    samples: trace.samples.map(({ phase, atMs, delta, lag, own, camera, geometry }) => ({ phase, atMs, delta, lag, own, camera, geometry })) });
-  const rows = differences(history(left), history(right)).map(row => ({ ...row, classification: classifyPath(row.path) }));
-  const classes = {};
-  for (const row of rows) classes[row.classification] = (classes[row.classification] ?? 0) + 1;
-  return { exact: rows.length === 0, classes, rows };
+// Authored zero-delay desktop receipt policy: packet Setup candidates are
+// superseded before the next fresh redraw (#323). Freeze before candidate I/O;
+// all preparation rows and their numeric observations remain untouched.
+export function desktopExpectation(baseline, frozen) {
+  const schedule = structuredClone(frozen);
+  schedule.pictures = frozen.pictures.filter(id => {
+    const b = frozen.boundaries.find(b => b.phase === 'draw' && b.drawId === id);
+    return frozen.events[b.eventSeq].kind !== 'packet';
+  });
+  const trace = structuredClone(baseline), pictures = new Set(schedule.pictures);
+  let count = 0;
+  for (const s of trace.samples) {
+    if (s.phase === 'draw' && !pictures.has(s.drawId)) {
+      s.status.submitted = s.status.committed = false;
+      s.acknowledgedMs = null;
+    }
+    if (s.phase === 'draw' && s.status.committed) count++;
+    s.quality.successfulDraws = count;
+  }
+  trace.final.draws = count;
+  trace.manifest.scheduleSha256 = scheduleHash(schedule);
+  trace.manifest.input.label += ' + authored desktop receipt expectation';
+  return { schedule, trace };
 }

@@ -44,15 +44,15 @@ full check command uses one build job, no debug info and target/wgpu-slice-check
 to limit memory and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 
 The pure Node [feel replay contract](../tools/feel-replay/README.md) defines
-offline schedules, manifests and bit-preserving trace comparison. Run
+offline schedules, lightweight manifests and perceptual trace comparison.
+See [perceptual parity](perceptual-parity.md) for channel budgets and acceptance. Run
 `node --test tools/feel-replay.test.mjs tools/feel-browser-replay.test.mjs` for
 authored synthetic fault checks. The [browser peer command](../tools/feel-replay/browser-peers.md)
-uses prebuilt, feature-gated Wasm in background headless Edge/Chromium and a CPU
+uses prebuilt, feature-gated Wasm in background headless Chrome and a CPU
 GPU-boundary sink. It is a separate local run, not part of npm test or proof of
 pixel, physical-input or perceptual parity.
 The [native CPU peer](../tools/feel-replay/native-peer.md) adds feature-gated
-LocalGame driver tests, bit-exact native repeats and native/Wasm cross-target
-reports; it opens no window and does not measure GPU or desktop pacing.
+LocalGame driver tests and the same native/Wasm perceptual comparator; it opens no window and does not measure GPU or desktop pacing.
 
 The wgpu [draw-chunk contract](draw-chunks.md) documents the draw-memory bound,
 recoverable picture skips and native/browser correctness evidence limits.

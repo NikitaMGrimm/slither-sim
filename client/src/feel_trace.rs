@@ -4,9 +4,15 @@
 //! [browser peers](../tools/feel-replay/browser-peers.md) and the authored
 //! [synthetic fixture](../tools/feel-replay/browser-synthetic.json).
 
-use crate::presentation::{AnimatedClient, EyeLayoutInput, FaceGeometry, FrameStep};
+use crate::presentation::{
+    AnimatedClient, BodyPaintSample, EyeLayoutInput, FaceGeometry, FrameStep,
+};
 use crate::state::Point;
 use std::sync::{Arc, Mutex};
+
+/// Trace capacity for the complete prepared centerline, in original sample order.
+/// Larger production draws fail the measuring run; no point may be omitted.
+pub const MAX_BODY_TRACE_POINTS: usize = 8193;
 
 /// An immutable copy of one exact core boundary, including a staged draw.
 #[derive(Clone, Debug, PartialEq)]
@@ -117,6 +123,7 @@ impl Recorder {
         phase: &'static str,
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
+        body: Option<&[BodyPaintSample]>,
     ) {
         let mut journal = self.0.lock().expect("trace journal");
         if phase == "draw" {
@@ -143,12 +150,9 @@ impl Recorder {
             position.y,
             offset.x,
             offset.y,
-            c.index() as f64,
-            c.pending() as f64,
             f64::from(camera.follows()),
             camera.zoom(),
         ];
-        values.extend(c.samples().iter().flatten().copied());
         let token = client.own_token().map(|t| t.serial());
         if let Some(snake) = client.own_snake() {
             let m = snake.metrics();
@@ -164,11 +168,12 @@ impl Recorder {
             }
             let h = snake.head_corrections();
             let a = snake.angle_corrections();
-            let l = snake.length();
             let pupil = snake.eyes().pupil();
             values.extend([
                 f64::from(m.expired),
                 m.death_progress,
+                m.spawn_progress,
+                (m.spawn_progress * (1. - m.death_progress).max(0.)).powi(2),
                 m.raw_head.x,
                 m.raw_head.y,
                 m.corrected_head.x,
@@ -190,17 +195,29 @@ impl Recorder {
                 m.logical_segments as f64,
                 m.fam,
                 m.displayed_length,
-                h.index() as f64,
-                f64::from(h.pending()),
-                a.index() as f64,
-                f64::from(a.pending()),
-                l.index() as f64,
-                f64::from(l.pending()),
                 0.64285 + 0.514285714 / ((m.logical_segments as f64 + 16.) / 36.).max(1.),
             ]);
-            values.extend(h.samples().iter().flatten().map(|v| f64::from(*v)));
-            values.extend(a.samples().iter().map(|v| f64::from(*v)));
-            values.extend(l.samples().iter().map(|v| f64::from(*v)));
+            // Copy the actual prepared painter positions, never anchors or a
+            // second sampling pass. The flat ABI uses backing pixels; both
+            // decoders convert these to CSS pixels (feel-replay/README.md).
+            let body = body.unwrap_or_default();
+            if body.len() > MAX_BODY_TRACE_POINTS {
+                journal.failed = true;
+                journal.errors.push(format!(
+                    "{phase}: prepared body has {} points; trace limit is {MAX_BODY_TRACE_POINTS}",
+                    body.len()
+                ));
+                return;
+            }
+            values.push(body.len() as f64);
+            for sample in body {
+                values.extend([
+                    f64::from(journal.extent[0]) / 2.
+                        + (f64::from(sample.x) - position.x) * camera.zoom(),
+                    f64::from(journal.extent[1]) / 2.
+                        + (f64::from(sample.y) - position.y) * camera.zoom(),
+                ]);
+            }
             if !m.expired {
                 let half = Point {
                     x: f64::from(journal.extent[0]) / 2.,
@@ -256,7 +273,7 @@ impl Recorder {
         journal.rows.push(row);
     }
 
-    /// Copy into JS native Numbers before the A1 writer; never plain JSON.
+    /// Copy numeric observations and decimal identities into JS.
     #[cfg(target_arch = "wasm32")]
     pub fn take_js(&self) -> js_sys::Array {
         self.take()
@@ -302,13 +319,13 @@ mod tests {
     fn observation_identity_distinguishes_equal_values_and_survives_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None);
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let rows = recorder.take();
         assert_eq!(rows[0].values, rows[1].values);
         assert_ne!(rows[0].sequence, rows[1].sequence);
         assert_eq!(recorder.last_draw(), Some(rows[1].clone()));
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         assert!(recorder.take()[0].sequence > rows[1].sequence);
     }
 
@@ -316,9 +333,9 @@ mod tests {
     fn pictures_acknowledge_only_the_submitted_identity_across_row_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let skipped = recorder.last_draw_sequence().unwrap();
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let submitted = recorder.last_draw_sequence().unwrap();
         assert_eq!(recorder.take().len(), 2);
         assert!(recorder.take_pictures().is_empty());
