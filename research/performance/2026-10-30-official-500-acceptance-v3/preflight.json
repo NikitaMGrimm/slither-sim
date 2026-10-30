@@ -15,5 +15,21 @@
   "documentationTestsPassed": 7,
   "repositoryBoundaryPassed": true,
   "hostBinaryIdenticalToV2": true,
-  "independentReview": "Not performed"
+  "independentReview": "Not performed",
+  "binding": {
+    "testedHarnessSourceCommit": "bbc7d18c9d5052903bf3b07ba4067a48e8f040d5",
+    "sourceBindingMethod": "Retained pre-start frozen-harness digests match all four study modules in this commit; linked inputs use PLAN pins. Commit was made after tests, before tick zero.",
+    "runtimeCommit": "388be59aebf3108f5c510aa7269c08b67851b202",
+    "instrumentedRustAggregateSha256": "e63fb3faff687b8742305335211329c85a097a3c6a86961e1e395e37f911378d",
+    "binaries": {
+      "clients": "f8424b4bd4e997c06d9d648a356f9d2ea07f3a651953474d4ae68f25ba3387fe",
+      "host": "d7ddbc80efcd0c0b5fb8e1d61d3931eb3aaf3c64b40171fb8687b533a184c780"
+    },
+    "proofArchive": {
+      "sha256": "3d5258b23edebd7df000720b5c957db60345f2deab0f9bd1857f408d7a63bf25",
+      "bytes": 7580,
+      "access": "Local-only retained preflight logs and pins outside repositories"
+    },
+    "preflightTestExecutableHashes": "Unavailable; test executables/hashes were not retained in the proof archive. Host/client binary hashes are retained and verified."
+  }
 }

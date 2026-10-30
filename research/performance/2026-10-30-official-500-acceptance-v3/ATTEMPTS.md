@@ -26,8 +26,7 @@ frozen delta bytes and copied host hash passed. Natural warmup passed the three
 bounded entry endpoints, then ten seconds settling and a full thirty-minute
 window. All gates pass: zero deferrals, final class, client/queue/generator
 headroom and CPU reconciliation. The total worker CPU includes all three live
-thread clocks. Worst one-second input-lateness p99 is 1.477652 ms. Exact online/
-offline replay includes nearest-rank tails and maxima; the closed archive was
+thread clocks. Worst one-second input-lateness p99 is 1.477652 ms. Exact online/offline replay includes nearest-rank tails and maxima; the closed archive was
 retrieved and hash-verified. First-pair instances/volumes were verified gone
 before launching run 2. No retiming or replacement.
 
@@ -52,3 +51,31 @@ Final audit verified all 17 enabled regions with none unavailable; task
 instances/requests/volumes, key and security group are gone. No infrastructure
 replacement was used. Conservative capped compute plus full noncompute reserve
 is $1.541553, below $3. Root README/changelog remain unchanged.
+
+## Post-result review verification (no new timing)
+
+The inherited selector omits declared report tails from its comparison. The
+v3 `check_replay.py` now compares the complete result with no omitted fields
+and was run separately on both retained archives; both match exactly, including
+all tails/maxima. Each run detects deliberate p50/p99/p99.9/max perturbations.
+Receipts: [run 1](run-1-replay.json), [run 2](run-2-replay.json). The original
+standalone full-comparison command/receipt was not retained; these are explicit
+post-result checks, not a claim that the inherited selector enforced it.
+
+The tested study modules bind to source commit
+`bbc7d18c9d5052903bf3b07ba4067a48e8f040d5`: all four retained pre-start source
+digests match that commit. It was committed after checks, before tick zero;
+linked inputs remain pinned in the plan. The retained preflight pins bind the
+instrumented Rust aggregate to
+`e63fb3faff687b8742305335211329c85a097a3c6a86961e1e395e37f911378d`,
+host binary to
+`d7ddbc80efcd0c0b5fb8e1d61d3931eb3aaf3c64b40171fb8687b533a184c780` and
+client binary to
+`f8424b4bd4e997c06d9d648a356f9d2ea07f3a651953474d4ae68f25ba3387fe`.
+Retained host/client files match those digests. The local-only preflight archive
+(logs and pins, outside repositories) is 7,580 bytes, SHA-256
+`3d5258b23edebd7df000720b5c957db60345f2deab0f9bd1857f408d7a63bf25`.
+Preflight test-executable hashes are unavailable: neither the executables nor
+their hashes were retained. See [structured binding](preflight.json).
+
+No selected values, frozen plans, gates or outcomes changed.

@@ -14,7 +14,7 @@ Reuse [the c7a ladder](../2026-10-29-c7a-mature-capacity/REPRODUCE.md) and [#256
 
 The plan and tested harness were frozen in `bbc7d18c` before either world. Per-worker CPU is the sum of live decision + connector + publisher CPU clocks, including in-flight jobs and thread overhead, over the same report interval. Each component is in the raw CLIENT reports; the existing strict median <70% / p99 <80% gate consumes the sum. Reconnects/close handshakes and report serialization remain off decision loops.
 
-Both online and offline CPU/frame report tails use nearest rank from startup, using v1 maintainer helpers at `fff66d0a6e26f9552be2ea3ffc4c6c32c106a354`. Full online/offline replay, including all tails/maxima, matched for each run before selection. Preserve the unchanged ladder headroom quantile calculation. World CPU is aligned simulation + socket user/kernel per tick, over complete interior 100-tick blocks; never add component quantiles. Maintenance uses the unchanged absolute 504 ms epoch. Deferrals use the exterior covering census bracket and final class the first census at/after the end. Actual client histogram intervals and boundary offsets remain selected.
+Both online and offline CPU/frame report tails use nearest rank from startup, using v1 maintainer helpers at `fff66d0a6e26f9552be2ea3ffc4c6c32c106a354`. Full online/offline replay, including all tails/maxima, matches in the explicit post-result checks below. The inherited selector alone did not enforce tail equality; the original standalone comparison receipt was not retained. Preserve the unchanged ladder headroom quantile calculation. World CPU is aligned simulation + socket user/kernel per tick, over complete interior 100-tick blocks; never add component quantiles. Maintenance uses the unchanged absolute 504 ms epoch. Deferrals use the exterior covering census bracket and final class the first census at/after the end. Actual client histogram intervals and boundary offsets remain selected.
 
 ## Results
 
@@ -291,6 +291,23 @@ instrumentation change, AWS resource or v4 run is created by this diagnosis.
 AWS preflight: portable build, three actual-module runtime tests including live helper clocks before jobs finish, strict summed-headroom boundaries, inherited ladder/gate/token/nearest-rank controls, seven docs tests and repository boundary. Synchronous dispatch, omitted helper CPU and decision-only headroom mutations each failed as intended. The one bounded target was removed; run 2 reuses the verified first binaries. No local Rust work or instabox access; no independent review.
 
 Stage the pinned linked files and commands in [PLAN.md](PLAN.md). After each complete archive, run the v2 selector with corrected v1 helpers, retaining each result separately. Require exact reduce_window replay against the retained online window before selection. Then run the linked v1 `assemble.py selected-results.json RUN1_SELECTED.json RUN2_SELECTED.json` and set only `platform.market` to `On-demand` for this market; do not change run data. The linked v1 `tables.py selected-results.json` recomputes the four CPU/cadence tables. The gate table reads `result.gates`; the headroom table shows the min/max of the six `client.workerCpuFraction` medians/p99 values multiplied by 100, plus `client.worstInputP99Ms`. This study adds no duplicate harness. Full raw logs/binaries/cloud inventories are local-only outside Git; selected archive digests do not make them public.
+
+**Post-result review correction:** [check_replay.py](check_replay.py) compares the
+entire freshly reduced result with the retained online result, without dropping
+or rounding any field. Run it before selection when reproducing; for this study
+the new explicit check was run after publication on both unchanged archives.
+[Run 1](run-1-replay.json) and [run 2](run-2-replay.json) match completely and
+detect deliberate p50/p99/p99.9/max changes. No measured result changes.
+
+```sh
+python3 check_replay.py PINNED_STAGED_HARNESS PRIVATE_RUN_ARCHIVE.tar.gz run-replay.json
+```
+
+The [preflight binding](preflight.json) records tested source commit, aggregate
+instrumented source identity, host/client binary hashes and retained proof
+archive digest/access. [Attempts](ATTEMPTS.md#post-result-review-verification-no-new-timing)
+states how the pre-start source matches the committed modules and explicitly
+marks the unretained test-executable hashes unavailable.
 
 For each privately retained extracted run, the two small post-result reductions
 recompute the headroom integrity receipt and deferral table without changing
