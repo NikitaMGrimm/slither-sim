@@ -117,3 +117,24 @@ Dated study, selected values and recomputing helpers; reuse earlier tools by lin
 Probe source is a reusable research helper staged as a Cargo example remotely,
 excluded from the shipped crate. Research index row only, no changelog entry.
 PR template Change/Validation/checks and one final assistance footer; do not merge.
+
+## Prospective interruption recovery, before replacement timing
+
+The first generator was reclaimed after counting and before final retrieval.
+Keep its verified solo/80/160 checkpoints as the primaries; its unretained 320
+is unavailable. Use one replacement Spot generator, within the original cap,
+to replay the loaded world's same scheduled prehistory: 300 s at 80, 360 s at
+80, 60+360 s at 160, 60+360 s at 320. Only the final 320 window is a replacement
+primary; the repeated 80/160 windows are calibration. No primary is chosen by
+its numbers. Keep the same pristine runtime, native probe and load client;
+repair capture shutdown for future collection, retaining original capture limits.
+Keep the original target and its unchanged deadline. Do not extend either timer.
+
+Before any replacement timing, a completeness audit found that those checkpoints
+lack the original generator-wide qualification and ICMP logs. They are retained
+as supplementary/unqualified data, not primary rows. This supersedes the preceding
+recovery selection: repeat all four primary rows on a fresh Spot target paired
+with the replacement generator, with the same frozen windows and definitions.
+The combined full-timer bound including the first pair is $2.352. Retire the
+original target after its closed logs are retrieved; extend no timer. A complete
+new 90+30-minute pair preserves the export reserve within the unchanged $2.50 cap.
