@@ -46,10 +46,9 @@ protect_breaking_commits = true
 # version section adds only its heading above those entries. Generated commit
 # titles would also list every client/ commit, which release-plz attributes to
 # the root crate since the import (#283). Skipping every commit instead drops
-# the heading too (#306). The default trim would join the heading to the lines
-# around it (#309), so the body keeps its own blank lines.
+# the heading too (#306). The default trim removes the blank lines around the
+# heading (#309); without it, release-plz adds the one above (#311).
 trim = false
 body = """
-
 ## [{{ version }}]{%- if release_link -%}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
 """
