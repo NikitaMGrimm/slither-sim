@@ -36,6 +36,7 @@ jobs:
     outputs:
       sim: ${{ steps.diff.outputs.sim }}
       client: ${{ steps.diff.outputs.client }}
+      e2e: ${{ steps.diff.outputs.e2e }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,6 +49,7 @@ jobs:
           if [ "$EVENT" != pull_request ]; then
             echo "sim=true" >> "$GITHUB_OUTPUT"
             echo "client=true" >> "$GITHUB_OUTPUT"
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The checked-out merge commit's first parent is the base branch head.
@@ -55,6 +57,8 @@ jobs:
           # client.yml is the client's own reusable workflow; it runs no sim job.
           echo "sim=$(grep -qvE '^(client/|\.github/workflows/client\.yml$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "client=$(grep -qE '^(client/|\.github/workflows/client\.yml$|\.gitattributes$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # Host or client code, either lockfile, or this workflow.
+          echo "e2e=$(grep -qE '^(src/|Cargo\.(toml|lock)$|client/(src/|apps/wgpu-slice/|tools/e2e-local-host|Cargo\.|rust-toolchain)|\.github/workflows/checks\.yml$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   lint:
     name: Lint (ubuntu-latest)
@@ -145,6 +149,43 @@ jobs:
     if: needs.changes.outputs.client == 'true'
     uses: ./.github/workflows/client.yml
 
+  # The production client plays a short session against a local
+  # `slither-sim host`, so a protocol break in either lane fails here. The runner
+  # binds 127.0.0.1 only and never contacts outside servers.
+  e2e:
+    name: Host/client end to end
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      # client/rust-toolchain.toml selects this toolchain for the client build.
+      - run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          prefix-key: v0-e2e
+          workspaces: |
+            . -> target
+            client/apps/wgpu-slice -> ../../target/wgpu-slice-e2e
+          cache-bin: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The headless client prepares text with the DejaVu faces.
+      - run: test -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf || { sudo apt-get update && sudo apt-get install -y fonts-dejavu-core; }
+      - run: cargo build --release --locked
+      - name: Build the headless client
+        working-directory: client
+        run: cargo build --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-client-e2e --target-dir target/wgpu-slice-e2e
+      - run: node client/tools/e2e-local-host.mjs --host-bin target/release/slither-sim --client-bin client/target/wgpu-slice-e2e/debug/slither-client-e2e
+
   # Content rules (no official client artifacts, keys or source maps) cover the
   # whole repository, so this runs on every change.
   guard:
@@ -163,7 +204,7 @@ jobs:
   required:
     name: Required checks
     if: always()
-    needs: [changes, lint, test, tools, client, guard]
+    needs: [changes, lint, test, tools, client, e2e, guard]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
@@ -177,9 +218,11 @@ jobs:
           TEST_RESULT: ${{ needs.test.result }}
           TOOLS_RESULT: ${{ needs.tools.result }}
           CLIENT_RESULT: ${{ needs.client.result }}
+          E2E: ${{ needs.changes.outputs.e2e }}
+          E2E_RESULT: ${{ needs.e2e.result }}
         run: |
           # A job may be skipped only when its area is unchanged.
           ok() { [ "$1" = success ] || { [ "$1" = skipped ] && [ "$2" = false ]; }; }
           test "$CHANGES_RESULT" = success && test "$GUARD_RESULT" = success &&
             ok "$LINT_RESULT" "$SIM" && ok "$TEST_RESULT" "$SIM" && ok "$TOOLS_RESULT" "$SIM" &&
-            ok "$CLIENT_RESULT" "$CLIENT"
+            ok "$CLIENT_RESULT" "$CLIENT" && ok "$E2E_RESULT" "$E2E"
