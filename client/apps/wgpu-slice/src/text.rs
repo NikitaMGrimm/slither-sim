@@ -198,6 +198,20 @@ impl TextCache {
     ) -> Result<slither_client::presentation::TextMeasurement> {
         self.rasterizer.measure(text, style)
     }
+    /// Backend CSS-normal line box, including the face's line gap. This does not
+    /// rasterize text or put dynamic placement/opacity in cache keys.
+    pub fn normal_panel_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
+        if !scale.is_finite()
+            || scale <= 0.
+            || scale > 8192.
+            || !style.size.is_finite()
+            || style.size <= 0.
+            || style.size > 24.
+        {
+            return Err("Panel normal font scale/style".into());
+        }
+        self.rasterizer.normal_line_height(style, scale)
+    }
     /// Exact deterministic native face choice, including Lucida substitutions.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn native_face(style: TextStyle) -> &'static str {
@@ -212,6 +226,23 @@ impl TextCache {
         panels: &[PanelSubmission<'_>],
         scale: f64,
     ) -> Result<PanelDraws> {
+        self.draw_panel_composition_with_run_alphas(panels, scale, &[])
+    }
+    /// Optional per-run opacity metadata, separate from immutable raster keys.
+    pub fn draw_panel_composition_with_run_alphas(
+        &mut self,
+        panels: &[PanelSubmission<'_>],
+        scale: f64,
+        alphas: &[&[f64]],
+    ) -> Result<PanelDraws> {
+        if !alphas.is_empty()
+            && (alphas.len() != panels.len()
+                || panels.iter().zip(alphas).any(|(p, a)| {
+                    a.len() != p.plan.runs.len() || a.iter().any(|v| !(0. ..=1.).contains(v))
+                }))
+        {
+            return Err("Panel run opacity metadata".into());
+        }
         if !scale.is_finite() || scale <= 0. {
             return Err("Invalid panel scale".into());
         }
@@ -272,7 +303,7 @@ impl TextCache {
         staged.bytes = staged.entries.values().map(|e| e.bytes).sum();
         let result = (|| {
             let mut output = Vec::new();
-            for p in panels {
+            for (producer, p) in panels.iter().enumerate() {
                 let (base, _) = p.group.slots();
                 let mut draws = Vec::new();
                 for (i, r) in p.plan.runs.iter().enumerate() {
@@ -292,7 +323,7 @@ impl TextCache {
                                 position: r.position,
                                 align: Align::Left,
                                 baseline: Baseline::Alphabetic,
-                                alpha: p.alpha,
+                                alpha: p.alpha * alphas.get(producer).map_or(1., |a| a[i]),
                             },
                             scale,
                             Some(Key::Panel(base + i as u8)),
