@@ -374,6 +374,19 @@ fn marker_projection_stays_within_one_tenth_pixel_of_old_ties() {
 }
 
 #[test]
+fn diagonal_marker_ties_stay_within_one_tenth_pixel() {
+    let mut map = map();
+    apply(&mut map, &[b'M', 0, 2]);
+    let mut update = input(200., 0.);
+    update.center = Some(0.);
+    update.displayed_radius = Some(1.);
+    update.own_raw_head = Some(Point { x: -6.25, y: -6.25 });
+    map.advance(update, Some(201.)).unwrap();
+    let marker = map.view().marker;
+    assert!((marker.x - -0.2).hypot(marker.y - -0.2) <= 0.1);
+}
+
+#[test]
 fn invalid_used_numbers_and_missing_fresh_sample_preserve_state() {
     let mut map = map();
     apply(&mut map, &[b'M', 0, 2, 64]);

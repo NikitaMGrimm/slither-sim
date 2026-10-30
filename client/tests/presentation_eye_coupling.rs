@@ -351,6 +351,21 @@ fn one_anchor_uses_finite_lead_target_without_drawing_missing_suffix() {
 }
 
 #[test]
+fn straight_tail_targets_preserve_the_antipodal_turn_for_one_or_many_anchors() {
+    for points in [1, 3] {
+        let mut c = client(points);
+        c.prepare_draw_with_style(800, 600, 1., false).unwrap();
+        let target = c.own_snake().unwrap().eyes().target_heading();
+        let mut eyes = StandardEyeState::new(PI, 0.).unwrap();
+        eyes.commit_draw_target(target).unwrap();
+        eyes.advance(c.advance(8., false).unwrap(), true, 2.3)
+            .unwrap();
+        assert_eq!(eyes.turn(), Turn::Decreasing, "anchors={points}");
+        assert!(eyes.heading() < PI);
+    }
+}
+
+#[test]
 fn single_anchor_lead_target_is_independent_of_other_snakes_and_style() {
     for predecessor_points in [0, 2, 12] {
         for detailed in [false, true] {

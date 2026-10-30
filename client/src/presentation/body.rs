@@ -3,7 +3,10 @@
 use std::f64::consts::{PI, TAU};
 
 use super::{PresentationError, finite};
-use crate::{math, state::{Appearance, MAX_BODY_POINTS, Point, Setup}};
+use crate::{
+    math,
+    state::{Appearance, MAX_BODY_POINTS, Point, Setup},
+};
 
 /// Samples in each body's x, y, edge-length, and spacing correction channel.
 pub const BODY_SAMPLES: usize = 53;

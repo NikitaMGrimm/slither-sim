@@ -38,6 +38,7 @@ import { profileLiteralsSmoke } from './profile-literals-smoke.mjs';
 import { playAdmissionSmoke } from './play-admission-smoke.mjs';
 import { menuLoadingSmoke } from './menu-loading-smoke.mjs';
 import { desktopInputSmoke } from './desktop-input-smoke.mjs';
+import { projectedInputSmoke } from './projected-input-smoke.mjs';
 import { desktopInputLifetimeSmoke } from './desktop-input-lifetime-smoke.mjs';
 
 // Entirely synthetic ABI integration; no reference files or network are used.
@@ -97,6 +98,7 @@ console.log('Synthetic runtime Play requirements with real Rust admission passed
   playAdmissionResult.split(/\r?\n/).filter(line => /^# (tests|pass|fail|skipped) /.test(line)).join(', '));
 console.log('Synthetic appearance preview ABI passed:', appearancePreviewSmoke(wasm));
 console.log('Synthetic real-Wasm desktop input equivalence passed:', desktopInputSmoke(wasm));
+console.log('Synthetic real-Wasm projected input controls passed:', projectedInputSmoke(wasm));
 console.log('Synthetic real-Wasm desktop input release passed:', desktopInputLifetimeSmoke(wasm));
 const inputRequirements = execFileSync(process.execPath,
   ['--test', '--test-reporter=tap', fileURLToPath(new URL('./client-input.test.mjs', import.meta.url))],

@@ -289,7 +289,8 @@ impl MinimapState {
             }
             let radius = f64::from(self.dimension.unwrap()) / 2.;
             let project = |coordinate: f64| {
-                (10. * (radius + 12. + radius * (coordinate - center) / boundary - 7.) + 0.5).floor()
+                (10. * (radius + 12. + radius * (coordinate - center) / boundary - 7.) + 0.5)
+                    .floor()
                     / 10.
             };
             let position = Point {
