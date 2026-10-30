@@ -58,7 +58,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses authored zero credentials for simulators. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -590,7 +590,8 @@ mod desktop {
                                         r.preparation =
                                             Some(Preparation::start(self.options.server.clone())?);
                                     } else if let Some(endpoint) = &self.options.endpoint {
-                                        r.game.play(
+                                        slither_wgpu_slice::endpoint_login::play(
+                                            &mut r.game,
                                             endpoint,
                                             &self.options.nickname,
                                             self.options.skin,

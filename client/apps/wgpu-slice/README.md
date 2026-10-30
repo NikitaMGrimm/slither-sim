@@ -17,6 +17,10 @@ Enter starts Play, Escape stops; pointer/arrows/Space and mouse boost feed the
 shared input policy. No connection starts until Play, and reconnect is explicit.
 Use `--endpoint ws://host:port/slither` for a simulator elsewhere.
 
+Desktop `--endpoint` sends a fixed official-format login (the same values as the
+simulator's portable_bot), for compatibility with custom server implementations
+that copied the official login.
+
 ## Official servers
 
 `--official` plays on the official servers (native only). Each Play fetches the

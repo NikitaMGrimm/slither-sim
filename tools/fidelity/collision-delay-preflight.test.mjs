@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { interval, compare, analyticControls } from './collision-delay-preflight.mjs';
 import { DelayBot, TailTrial, intruder } from './slither-collision-delay.mjs';
-import { decodeList } from './collision-delay-scout.mjs';
 
 test('specified peer-rewind positive and current-state negative controls separate at planned N', () => {
   const result = analyticControls();
@@ -54,14 +53,4 @@ test('persistent staging retains third-party exclusion without ending the pair',
   assert.equal(trial.update(performance.now(), poses, poses, bots, 10), null);
   assert.equal(trial.phase, 'rendezvous'); assert.equal(trial.interruptions.length, 1);
   assert.equal(events[0].reason, 'third_party');
-});
-
-test('discovery decoder transcribes bytes without making upstream ping sockets', () => {
-  const bytes = [0, 127, 0, 0, 1, ...Array(16).fill(0), 1, 188, 0, 17, 2, 0, 1];
-  let encoded = 'a', offset = 0;
-  for (const byte of bytes) for (const nibble of [byte >> 4, byte & 15]) {
-    encoded += String.fromCharCode(97 + (nibble + offset) % 26); offset += 7;
-  }
-  assert.deepEqual(decodeList(encoded), [{ listedIndex: 0, active: true, ip: '127.0.0.1', port: 444, advertisedCount: 17 }]);
-  assert.throws(() => decodeList(encoded.slice(0, -1)), /truncated/);
 });

@@ -4,6 +4,8 @@
 pub mod announcement;
 pub mod bank;
 pub mod cosmetics;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod endpoint_login;
 pub mod frame;
 pub mod game;
 pub mod gpu;

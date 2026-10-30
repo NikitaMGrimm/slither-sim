@@ -2,15 +2,14 @@
 // research/fidelity/2026-10-26-collision-pilot/plan.json and REPORT.md.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isIP } from 'node:net';
 import { Bot, Recorder, headingDanger, splitFrame, splitPayload, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseServer } from './slither-headless.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
 export const C = Object.freeze({ tickMs: 25, freshMs: 350, gapMs: 100,
   agreement: 25, guard: 600, rim: 900, matchSpeed: .05, heading: .16,
   stageMs: 45000, runMs: 12000, holdMs: 1500, observeMs: 1000,
-  maxPopulation: 100, factors: Object.freeze([1.3, 1.1, .9, .7]) });
+  factors: Object.freeze([1.3, 1.1, .9, .7]) });
 const angleError = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 export const radius = n => 14.5 * Math.min(6, Math.max(1, 1 + (n - 2) / 106));
@@ -297,28 +296,22 @@ export function stageSteering(bot, control, now) {
 }
 
 export function validateOptions(opts) {
-  const { out, server, seconds = 600, allowOutside = false, plan } = opts;
-  const [ip, portText, extra] = (server ?? '').split(':'), port = Number(portText);
-  if (!out || isIP(ip) !== 4 || extra !== undefined || !Number.isInteger(port) || port < 1 || port > 65535 ||
-      !Number.isFinite(seconds) || seconds < 1 || seconds > 600) throw Error('use --out, IPv4:port, and 1..600 seconds');
-  const local = ip.startsWith('127.');
-  if (opts.localCycle && !local) throw Error('localCycle is loopback-only');
-  const dataOrigin = plan ? JSON.parse(fs.readFileSync(plan)).dataOrigin : null;
-  if (local && dataOrigin && dataOrigin !== 'local-simulator') throw Error('loopback requires local-simulator provenance');
-  if (!local && !(allowOutside && dataOrigin === 'official-server'))
-    throw Error('outside connections require --allow-outside yes and an official-server plan');
-  return { ...opts, seconds, ip, port, local, origin: validateOrigin(opts.origin) };
+  const { out, server, seconds = 600 } = opts;
+  const { ip, port } = parseServer(server);
+  if (!out || !Number.isFinite(seconds) || seconds < 1 || seconds > 600)
+    throw Error('use --out, IPv4:port, and 1..600 seconds');
+  return { ...opts, seconds, ip, port, origin: validateOrigin(opts.origin) };
 }
 
 export async function recordPair(opts, signal) {
   if (signal?.aborted) return [];
-  const { out, server, seconds, ip, port, local, origin } = validateOptions(opts);
+  const { out, server, seconds, ip, port, origin } = validateOptions(opts);
   if (fs.existsSync(out)) throw Error(`refusing to overwrite ${out}`);
   const batch = createCaptureBatch({ scenario: 'paired-collision', server, seconds,
     ...(opts.localCycle ? { localCycle: true } : {}), plan: opts.plan, origin }, 2, SOURCE);
   const bots = [], recorders = [], results = [];
   let completed = false, failure, trial, timer, deadline, abort;
-  let ordinal = 0, state = 'join-first', observedUntil = null, lastTick = performance.now(), stagingFailures = 0;
+  let ordinal = 0, state = 'join-first', observedUntil = null, lastTick = performance.now();
   const emit = row => recorders.forEach(r => r.meta(row));
   const connect = i => bots[i].connect({ ip, port });
   try {
@@ -327,7 +320,7 @@ export async function recordPair(opts, signal) {
       const nick = `Collision ${index}`;
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'paired-collision', botIndex: index,
-        dataOrigin: local ? 'local-simulator' : batch.dataOrigin,
+        dataOrigin: batch.dataOrigin,
         wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec); bots.push(new CollisionBot({ nick, serverBody: true, origin }, index, rec));
     }
@@ -349,24 +342,17 @@ export async function recordPair(opts, signal) {
           } else if (state === 'join-second' && poses.every(Boolean)) state = 'trial';
           if (state.startsWith('join') && now - joinAt > C.stageMs) throw Error('join timeout');
           if (state === 'trial') {
-            const populationOK = local || poses.every(p => p?.population !== null && p?.population !== undefined);
-            if (!local && poses.some(p => p?.population > C.maxPopulation)) throw Error('population gate: choose a quieter server');
             const intruder = thirdParty(bots, poses);
-            if (populationOK) trial.update(now, poses, { gap, intruder,
+            trial.update(now, poses, { gap, intruder,
               deaths: bots.map(b => b.world.dead) });
             if (poses.some((p, i) => p && bots[i].world.radius -
                 Math.hypot(p.x - bots[i].world.grd, p.y - bots[i].world.grd) < C.rim))
               trial.end(now, 'arena_margin');
             if (now - joinAt > C.stageMs + C.runMs) {
-              // The frozen plan stops, rather than rejoins, a server whose population stays unknown.
-              if (!local && bots.some(b => b.population === null))
-                throw Error('population gate: no leaderboard within pair budget');
               trial.end(now, 'pair_timeout');
             }
             if (trial.phase === 'done') {
               results.push(trial.result); state = 'observe'; observedUntil = now + C.observeMs;
-              stagingFailures = trial.result.reasons.includes('staging_timeout') ||
-                trial.result.reasons.includes('pair_timeout') ? stagingFailures + 1 : 0;
             }
           }
           if (state === 'observe' && now >= observedUntil) {
@@ -376,7 +362,6 @@ export async function recordPair(opts, signal) {
             for (const b of bots) b.ws?.close(); state = 'closing';
           }
           if (state === 'closing' && bots.every(b => !b.ws)) {
-            if (!local && stagingFailures >= 3) throw Error('pilot stop: three consecutive staging timeouts');
             if (opts.localCycle && ordinal === 11) { resolve(); return; }
             trial = new Trial(++ordinal, emit); state = 'join-first'; joinAt = now;
             connect(trial.spec.first);
@@ -410,16 +395,15 @@ export async function recordPair(opts, signal) {
 }
 
 export function parseArgs(argv) {
-  const allowed = new Set(['--out', '--server', '--seconds', '--plan', '--origin', '--allow-outside']);
+  const allowed = new Set(['--out', '--server', '--seconds', '--plan', '--origin']);
   const values = {};
   for (let i = 0; i < argv.length; i += 2) {
     if (!allowed.has(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--') || argv[i] in values)
       throw Error(`invalid or repeated option: ${argv[i]}`);
     values[argv[i]] = argv[i + 1];
   }
-  if (values['--allow-outside'] && values['--allow-outside'] !== 'yes') throw Error('use --allow-outside yes');
   return { out: values['--out'], server: values['--server'], seconds: Number(values['--seconds'] ?? 600),
-    plan: values['--plan'], origin: values['--origin'], allowOutside: values['--allow-outside'] === 'yes' };
+    plan: values['--plan'], origin: values['--origin'] };
 }
 if (process.argv[1]?.endsWith('slither-paired-collision.mjs'))
   runCollectorCli(signal => recordPair(parseArgs(process.argv.slice(2)), signal));

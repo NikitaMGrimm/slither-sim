@@ -24,6 +24,13 @@
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
 
+### Changed
+
+- The fidelity collectors no longer find servers. They connect to the address
+  you give them with the standard protocol-19 login. The tools that found
+  outside servers and prepared pilots on them are removed; earlier studies keep
+  the scripts they used.
+
 ### Performance
 
 - Removing eaten food copies the surviving pellets in one pass instead of
