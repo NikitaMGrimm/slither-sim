@@ -25,9 +25,11 @@ export async function readCosmetic(directory, relative) {
   const root=await realpath(directory);
   const contained=async name=>{
     const candidate=path.resolve(root,name);
-    if(candidate!==root && !candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+    // Roots are directories, never served files. Require a descendant so the
+    // prefix guard dominates every candidate filesystem call (including realpath).
+    if(!candidate.startsWith(root+path.sep))throw new Error('Escaped root');
     const file=await realpath(candidate);
-    if(file!==root && !file.startsWith(root+path.sep))throw new Error('Escaped root');
+    if(!file.startsWith(root+path.sep))throw new Error('Escaped root');
     return file;
   };
   if(relative!=='menu/manifest.txt'&&!/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative)){
@@ -60,9 +62,10 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     try {
       if(cosmetic){const bytes=await readCosmetic(cosmeticsDir,relative);send(200,types[path.extname(relative)]??'text/plain',bytes);return;}
       const root=await realpath(webDir), candidate=path.resolve(root,relative);
-      if(candidate!==root && !candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+      // As above, require a descendant before touching the candidate path.
+      if(!candidate.startsWith(root+path.sep))throw new Error('Escaped root');
       const file=await realpath(candidate);
-      if(file!==root && !file.startsWith(root+path.sep))throw new Error('Escaped root');
+      if(!file.startsWith(root+path.sep))throw new Error('Escaped root');
       const bytes=await readFile(file);
       send(200, types[path.extname(file)] ?? 'application/octet-stream', bytes);
     } catch { send(404, 'text/plain', 'Unavailable'); }
