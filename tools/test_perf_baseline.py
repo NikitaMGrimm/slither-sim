@@ -366,17 +366,14 @@ class SharedPolicyTrace(unittest.TestCase):
             self.assertEqual(trace["end"]["operations"], iterations)
             with gzip.open(root / (workload.name + ".jsonl.gz"), "rb") as source:
                 self.assertTrue(any(json.loads(line).get("kind") == "epoch" for line in source))
-            for name in ("engine-official-mature-500", "engine-battledome-spawn-318"):
-                if name == "engine-official-mature-500":
-                    code = perf_build.command(
-                        ["cargo", "build", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
-                        perf_baseline.ROOT, log, dict(os.environ), timeout=180)
-                    self.assertEqual(code, 0, log.read_text(encoding="utf-8", errors="replace"))
-                with self.subTest(case=name):
-                    workload, = perf_baseline.load_catalog(binary).select([name])
-                    self.assertFalse(workload.legacy)
-                    trace = perf_baseline.capture_trace(binary, name, 1, root, terminal=True)
-                    self.assertEqual(trace["end"]["operations"], 1)
+            code = perf_build.command(
+                ["cargo", "build", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
+                perf_baseline.ROOT, log, dict(os.environ), timeout=180)
+            self.assertEqual(code, 0, log.read_text(encoding="utf-8", errors="replace"))
+            workload, = perf_baseline.load_catalog(binary).select(["engine-battledome-spawn-318"])
+            self.assertFalse(workload.legacy)
+            trace = perf_baseline.capture_trace(binary, workload.name, 1, root, terminal=True)
+            self.assertEqual(trace["end"]["operations"], 1)
 
 
 class ProcessFailures(unittest.TestCase):

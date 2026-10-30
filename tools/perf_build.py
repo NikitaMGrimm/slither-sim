@@ -25,7 +25,6 @@ TESTS = ("movement_turns", "physics")
 HARNESS = ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs",
            "examples/support/catalog_worlds.rs", "examples/support/catalog_backend.rs",
            "examples/support/catalog_spawn.bin", "examples/perf_baseline.rs",
-           "examples/support/catalog_mature.bin",
            "examples/perf_observation.rs", "examples/perf_client_retained.rs", "examples/perf_session.rs", "examples/perf_radius.rs",
            "examples/fidelity_metrics.rs", "examples/host_load.rs", "tests/support/mod.rs", *(f"tests/{name}.rs" for name in TESTS))
 FIXTURES = "tests/fixtures"

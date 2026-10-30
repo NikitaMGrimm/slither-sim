@@ -27,7 +27,7 @@ first, arrange a quiet window and record interruptions/background activity.
 | `--base REF` | Named runtime baseline; the candidate is the current working tree. |
 | `--suite ci` / `--suite full` | Choose the catalog suite; `ci` is the default. |
 | `--cases NAME ...` | Select explicit workloads; unknown names fail before measurement. |
-| `--features FEATURES` | Enable the same Cargo features on both `--base` builds; engine rows need `perf-internals`. |
+| `--features FEATURES` | Enable the same Cargo features on both `--base` builds; the Battledome row needs `perf-internals` (hidden benchmark-harness internals, no stability or semver promise). |
 | `--repeats N` | Measured pairs after one untallied warmup; default 5. |
 | `--no-profiles` | Skip separate instrumented runs. |
 | `--max-wall-seconds N` | Bound measurement time after builds; see below. |

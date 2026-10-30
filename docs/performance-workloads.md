@@ -32,7 +32,7 @@ cargo run --release --locked --example perf_baseline -- --list
   `step+observe`.
 - `profile`: whether `--profile` is supported.
 - `available`: false when a required feature (`networking`, or `perf-internals`
-  for engine rows) is absent. The row is still listed; running it fails.
+  for the engine row) is absent. The row is still listed; running it fails.
 - `legacy`: true only for the six historical cases.
 - `synthetic`: null, or what is synthetic about the scene.
 - `definition`: the resolved scene, including the serialized `Config`. A changed
@@ -97,38 +97,19 @@ Sandbox, official and Battledome registrations expand into `<id>-step` (one
 buffer through `observe_all_into`). When `perf_compare --base` targets an older
 API without it, the harness falls back to `observe_all`.
 
-## Simulation-thread catalog rows
+## Simulation-thread catalog row
 
-`engine-official-mature-500` and `engine-battledome-spawn-318` are optional
-`full` rows requiring `perf-internals` (which enables `networking`). Both run the raw host's serial simulation
-tick, including per-recipient stock protocol-19 encoding and food presentation.
+`engine-battledome-spawn-318` is an optional `full` row requiring
+`perf-internals` (which enables `networking`). This public Cargo feature exists
+only for the benchmark harness: its internals are hidden and carry no stability
+or semver promise. It is off by default. The row runs the raw host's serial
+simulation tick, including per-recipient stock protocol-19 encoding and food presentation.
 There are no sockets, client decoders or bot workers. Controls, construction,
 wire draining and serialization are outside each timed interval. `--profile`
 is unavailable because the raw host tick has no phase-profile API; ordinary
 timing still reports tick percentiles. `--parallel` is rejected.
 On Linux, `timing.operationCpuSeconds` also sums process CPU around those same
 operations; it excludes setup and draining and is null on other platforms.
-
-The official row uses a 469,712-byte geometry fixture selected from the synthetic
-fully grown world used by the [compact-history study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-compact-snake-history/REPORT.md).
-It retains 499 ordered heads/bodies and masses (27,610 anchors, p90 176, p99 247),
-starts new lives at cruise speed, and admits a normal newborn for the one dead
-slot. Replacement placement tries at most 720 tangent poses at 95% of the arena
-radius, with 300-unit clearance. No checkpoint timers, food or session history
-are imported. The definition records the source checkpoint and geometry hashes.
-The ignored `regenerate_mature_fixture` test reads `SLITHER_MATURE_CHECKPOINT`,
-verifies that source hash and reproduces the selected bytes.
-
-The row keeps the official 500-player radius, uses 20 prey and the first 28,897
-fresh ambient pellets, and disables automatic radius/population sizing. Direct
-A4-mean controls run every six ticks outside timing. Setup is bounded by the
-fixture, normal startup ecology, replacement search and 144 warmup ticks; it
-does not simulate hours of growth. Warmup builds real recipient food and snake
-history. The default 1,296 timed ticks use nine 144-tick epochs, each covering
-1.008 virtual seconds and two 504 ms food updates. Rebuilding between epochs
-is outside timing. The 144-tick trace covers one complete epoch, including both
-food updates. These are fresh synthetic lives with reference geometry, rather
-than a continuation of the original world.
 
 The Battledome row imports only the ordered head/body geometry, mass and speed
 of the 320-slot, 318-living synthetic constant-boost fixture from the
@@ -143,13 +124,15 @@ pellets from a separate seed-7 construction with `foodCount=100000` before
 pit-area scaling (at most 100,000 attempts); this bounded setup retains the
 ordinary ambient cell limit. This is a new catalog scene derived
 from that geometry, rather than an exact checkpoint continuation. Setup needs
-one untimed initial broadcast, preserving the seed-0 opening before any motion;
+one untimed initial broadcast, preserving the seed-0 opening before any motion,
+and measured about 0.067 seconds in the validation run;
 normal execution never repeats the study's 642.684-second warmup.
 Every measured operation performs complete waited=0 spawn searches with RNG
 seeds 40 and 0, then one ordinary constant-boost raw tick. Search construction,
 refusal and successful pose results are all timed, but poses are not installed.
 The default sample uses 192 operations, rebuilding after each 16 ticks to bound
-drift. Reports count both search outcomes and minimum living population.
+drift. Each epoch lasts 112 virtual milliseconds, before the first food-update
+tick. Reports count both search outcomes and minimum living population.
 The 317,440-byte geometry file was regenerated at revision `556e73f0`; its
 SHA-256 is part of the catalog definition. The ignored
 `regenerate_spawn_fixture` example test reproduces it with seed 7 and 15,302
@@ -160,15 +143,13 @@ slow, explicit maintenance operation is separate from catalog setup:
 cargo test --release --locked --features perf-internals --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
 ```
 
-Both constructions begin with ambient food only, attach recipients before the
-first tick and process subsequent food births through the backend. This avoids
-the [missing presentation history](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-broadcast/REPORT.md#why-host-restoration-stops)
-that prevented importing a mature core checkpoint into a fresh host. These rows
-measure engine costs in prescribed synthetic worlds, not live capacity.
+The construction begins with ambient food only, attaches recipients before the
+first tick and processes subsequent food births through the backend. This avoids
+missing presentation history. The row measures engine cost in a prescribed
+synthetic world, not live capacity.
 
 Traces retain initial/final authoritative state, census and ordered per-tick
-wire/search results; the official 144-tick window also retains full state at
-both food boundaries. The Battledome trace uses four operations. Presentation
+wire/search results. The trace uses four operations. Presentation
 and connection internals are not serialized, so parity covers these outputs
 and state boundaries. Public checkpoint/state adapters construct the core;
 minimal hidden library hooks attach recipients, advance raw ticks and run
@@ -179,15 +160,11 @@ each revision supplies its own library. Historical bases predating the hooks
 need the same explicitly recorded hook-only patch on both sides.
 
 ```sh
-python -B tools/perf_compare.py --base BASE --features perf-internals --output outputs/perf/engine-check --cases engine-official-mature-500 engine-battledome-spawn-318
+python -B tools/perf_compare.py --base BASE --features perf-internals --output outputs/perf/engine-check --cases engine-battledome-spawn-318
 ```
 
-For separate Linux `perf record` diagnostics, `SLITHER_PERF_CONTROL` and
-`SLITHER_PERF_ACK` name the FIFOs passed to perf's `--control=fifo:CONTROL,ACK`
-with `--delay=-1`. `SLITHER_PERF_TICKS=ordinary`, `food` or `all` enables sampling
-only around selected timed operations. Leave these variables unset for timing;
-control synchronization adds overhead. Census reports include mean known snakes,
-held food entries per recipient, body points and minimum living population.
+Census reports include mean known snakes, held food entries per recipient,
+body points and minimum living population.
 
 ## Shared-policy workload
 

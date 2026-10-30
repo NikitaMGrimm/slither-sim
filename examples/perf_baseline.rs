@@ -349,7 +349,6 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::SharedPolicy(op(500, 16, Full)),
     Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
-    Registration::Engine(EngineWorld::MatureOfficial, op(1296, 144, Full)),
     Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
 ];
 
@@ -2467,7 +2466,6 @@ mod tests {
                     | "shared-forager-a4-mean-8"
                     | "host-official-500"
                     | "host-battledome-80"
-                    | "engine-official-mature-500"
                     | "engine-battledome-spawn-318"
             );
             assert_eq!(

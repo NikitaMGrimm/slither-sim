@@ -4,9 +4,8 @@
 
 ### Added
 
-- Reusable offline performance catalog rows for a synthetic mature 500-player
-  official world and 318-snake Battledome spawn overload, using the optional
-  `perf-internals` feature in the full suite.
+- An optional offline performance catalog row for synthetic 318-snake
+  Battledome spawn overload.
 
 - A study of storing each player's retained food sectors in flat sorted
   arrays instead of a tree. Food-update ticks get about 0.55 ms cheaper in

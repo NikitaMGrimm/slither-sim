@@ -25,7 +25,6 @@ on:
       - examples/support/catalog_worlds.rs
       - examples/support/catalog_backend.rs
       - examples/support/catalog_spawn.bin
-      - examples/support/catalog_mature.bin
       - examples/perf_session.rs
       - examples/perf_radius.rs
       - examples/fidelity_metrics.rs

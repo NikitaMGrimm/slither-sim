@@ -1,4 +1,4 @@
-//! Opt-in seams for offline catalog fixtures; normal host operations stay in the library.
+//! Hidden benchmark-harness seams, with no stability or semver promise.
 use super::super::{RawSimulator, SimulationConfig};
 use crate::client::latency::Random;
 use crate::{Action, Point, Simulator};
@@ -57,17 +57,6 @@ impl RawWorld {
     pub fn search(&mut self, seed: u64) -> Result<(Vec<Point>, f64), String> {
         self.0.backend.spawn_random = Random::new(seed);
         self.0.backend.spawn_pose_waited(usize::MAX, 0.)
-    }
-
-    pub fn food_epoch(&self) -> u64 {
-        self.0.backend.food_epoch
-    }
-
-    pub fn food_update_next(&self) -> bool {
-        let b = &self.0.backend;
-        (((b.tick + 1) as f64 * b.world.config().dt / crate::client::visibility::CLEANUP_SECONDS)
-            .floor() as u64)
-            > b.food_epoch
     }
 
     pub fn composition(&self) -> (usize, usize, usize) {
