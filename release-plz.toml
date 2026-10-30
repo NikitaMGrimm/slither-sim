@@ -42,3 +42,7 @@ release = false
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"
 protect_breaking_commits = true
+# The changelog is curated by hand under Unreleased (CONTRIBUTING). Generated
+# commit titles would also list every client/ commit, which release-plz
+# attributes to the root crate since the import (#283).
+commit_parsers = [{ message = ".*", skip = true }]
