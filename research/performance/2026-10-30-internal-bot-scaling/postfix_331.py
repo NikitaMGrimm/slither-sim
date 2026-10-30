@@ -25,17 +25,19 @@ def wait_for(pid,expected):
 
 def execute(root,study):
     root=Path(root).resolve();study=Path(study).resolve()
+    controller_sha=digest(Path(__file__))
     os.sched_setaffinity(0,{3})
     (root/'postfix-331.pid').write_text(str(os.getpid())+'\n')
     emit('postfix-waiting-for-baseline')
     wait_for(int((root/'after-primary.pid').read_text()),b'after_primary.py')
+    assert digest(Path(__file__))==controller_sha,'Restart a waiting controller if its source changes'
     status=json.loads((root/'post-count-status.json').read_text())
     assert status and all(row['exit']==0 for row in status),'Baseline stages must complete successfully first'
     diagnostic=json.loads((root/'diagnostic/selected.json').read_text())
     assert len(diagnostic['windows'])==3
     from reduce import mode_summary, phase_summary, verify_master
     reducer_sha=digest(Path(__file__).with_name('reduce.py'))
-    verify_master(root)
+    master=verify_master(root)
     output=root/'postfix-331';output.mkdir(exist_ok=False)
     archive=output/'source.tar.gz'
     url=f'https://codeload.github.com/NikitaMGrimm/slither-sim/tar.gz/{HEAD}'
@@ -46,6 +48,7 @@ def execute(root,study):
     with tarfile.open(archive,'r:gz') as bundle:bundle.extractall(container,filter='data')
     roots=list(container.iterdir());assert len(roots)==1 and roots[0].is_dir()
     source=roots[0]
+    assert not any((source/'.cargo'/name).exists() for name in ['config','config.toml']), 'Inspect any new Cargo source-root configuration'
     old_names={p.relative_to(root/'src').as_posix() for p in (root/'src').rglob('*') if p.is_file()}
     new_names={p.relative_to(source/'src').as_posix() for p in (source/'src').rglob('*') if p.is_file()}
     assert old_names==new_names
@@ -66,6 +69,7 @@ def execute(root,study):
     for key in ['RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CARGO_PROFILE_RELEASE_DEBUG']:env.pop(key,None)
     for key,tool in [('RUSTC','rustc'),('RUSTDOC','rustdoc')]:
         env[key]=subprocess.check_output(['rustup','which',tool],text=True).strip()
+    assert subprocess.check_output([env['RUSTC'],'-Vv'],text=True)==master['rustc']
     trees=[]
     for label,path in [('main',root),('candidate',source)]:
         command=['cargo','tree','--locked','--no-default-features','--features','bot,parallel','-p','slither-sim',
@@ -97,7 +101,7 @@ def execute(root,study):
         binary=root/'target/release/examples'/name
         saved=root/'bin'/name;shutil.copy2(binary,saved);binaries[original]=saved
     pins={'head':HEAD,'sourceArchiveUrl':url,'sourceArchiveSha256':digest(archive),
-        'masterPinsSha256':digest(root/'measurement-pins.json'),'controllerSha256':digest(Path(__file__)),
+        'masterPinsSha256':digest(root/'measurement-pins.json'),'controllerSha256':controller_sha,
         'reducerSha256':reducer_sha,
         'planSha256':digest(study/'POSTFIX_PLAN.md'),
         'executionSourceManifestSha256':digest(output/'execution-source-manifest.txt'),

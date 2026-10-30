@@ -206,3 +206,29 @@ post-count work. `finish_collection.py` waits for that controller, runs tests an
 reducers, creates a closed archive, verifies every member against its manifest,
 and writes `archive-ready.json` last. It never deletes sources. Download only
 after that receipt exists; check the downloaded SHA-256 before guest cleanup.
+
+## Requested post-fix supplement
+
+[POSTFIX_PLAN.md](POSTFIX_PLAN.md) pins external PR #331's head and the separate
+world-only replay. Main-revision rows are never replaced. `postfix_331.py` waits
+for all baseline stages and attribution, then downloads that public source head,
+checks that runtime source differs only in the grid cap, verifies the selected
+dependency package versions and portable profile, and builds distinct examples
+in the existing task-owned target. Main binaries are preserved in `bin/`.
+
+It reuses the same 10k checkpoint/tape: one discarded candidate window, five
+counted world-only replays and a separate phase diagnostic. One additional
+matched main world-only phase diagnostic uses the original binary; its original
+plain windows remain the reference. All final-state bytes must match the main
+reference. The botstorm candidate runs only if its baseline box ever exceeds
+2^20 cells. The main guard trace decides that trigger, not performance selection.
+
+```sh
+python3 postfix_331.py EXECUTION_DIRECTORY STUDY_TOOLS_DIRECTORY
+```
+
+The helper writes `postfix-331/selected-results.json`. The archive finisher also
+waits for its successful completion. The candidate's expanded source tree is
+excluded from the raw archive; the complete pinned source archive, preparation
+script, execution manifest and copied binaries are included. No study source
+change is applied to `src/` in the contribution worktree.

@@ -53,3 +53,10 @@
   p90 73, p99 87, food 515,400. It did not pass the original ecology screen.
   Under the maintainer amendment, that final checkpoint proceeds to verification
   and the normal counted windows, labelled unsettled. No warmup extension ran.
+- During baseline 10k counting, the maintainer requested a separate post-fix
+  replay using external #331. POSTFIX_PLAN.md pins head `a6511aad` before its
+  timing. Local source inspection confirms its simulator source differs only
+  in the grid-cap constant plus comments/tests; Cargo's additional changes
+  import the client workspace. The supplement verifies the selected simulator
+  dependency tree/profile before building. It waits for baseline attribution,
+  and the archive finisher waits for it. The baseline run is untouched.
