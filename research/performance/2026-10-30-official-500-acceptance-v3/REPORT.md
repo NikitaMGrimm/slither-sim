@@ -101,8 +101,9 @@ measured interval, not a boundary-only effect. They appear in four consecutive
 The largest bracketed busy-wall tick is 301,112: **23.640264 ms wall** versus
 **5.188360 ms aligned world CPU** (2.943690 simulation + 2.244670 socket).
 CPU tails therefore do not explain every wall delay. The bracket covers the
-tick body/handoff, not every wait between ticks. No retained scheduler/kernel/
-storage/hypervisor trace identifies the root cause; none is asserted here.
+tick body/handoff, not every wait between ticks. The retained host counters
+identify competing user CPU during this episode, as detailed below; they do
+not identify the responsible process or each tick's blocking/preemption site.
 
 Run 2 frame-gap p99 remains 27.952 ms, while frame-excess p99 is 883.503 ms
 (maximum 1,142.652 ms). **Inference:** the latter is consistent with the
@@ -110,6 +111,180 @@ Run 2 frame-gap p99 remains 27.952 ms, while frame-excess p99 is 883.503 ms
 every frame gap is almost a second. Steal is reported, not an exclusion.
 The failed gate remains failed regardless of this diagnostic; no interval is
 trimmed, reclassified as infrastructure or replaced.
+
+### Host CPU: measured and derived
+
+The post-result [host reduction](stall.py), [run-1 receipt](run-1-stall.json)
+and [run-2 receipt](run-2-stall.json) use the retained archives only. Sample
+end offsets below are relative to each requested window start. Each row is
+the delta from the preceding sample, not an instantaneous utilization reading.
+All CPU values are seconds. The collector and HTTP observer are **one Python
+process**, counted once. Only it and the server have interval task counters.
+
+| Run 2 sample end s | Elapsed s | Server process | Simulation thread | Socket thread | Observer process |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 745.275 | 1.016 | 0.67 | 0.34 | 0.32 | 0.02 |
+| 746.306 | 1.031 | 0.54 | 0.30 | 0.25 | 0.00 |
+| 747.334 | 1.028 | 0.53 | 0.29 | 0.24 | 0.01 |
+| 748.370 | 1.036 | 0.51 | 0.28 | 0.23 | 0.01 |
+| 749.398 | 1.028 | 0.69 | 0.38 | 0.32 | 0.01 |
+| 750.408 | 1.011 | 0.75 | 0.39 | 0.35 | 0.01 |
+
+Server-main CPU is 0.00 s in every displayed interval. The receipts also retain
+observer main/helper thread deltas; these generic thread names do not identify
+which helper handled collection versus a particular HTTP request. Process and
+thread sums can differ by counter rounding and sequential reads. No process
+identity is published.
+
+| Run 2 sample end s | Core user | Core system | Core softirq | Core idle | Other user CPU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 745.275 | 0.36 | 0.32 | 0.11 | 0.19 | 0.04 |
+| 746.306 | 0.70 | 0.23 | 0.11 | 0.00 | 0.41 |
+| 747.334 | 0.61 | 0.31 | 0.10 | 0.00 | 0.30 |
+| 748.370 | 0.69 | 0.23 | 0.11 | 0.00 | 0.41 |
+| 749.398 | 0.66 | 0.26 | 0.11 | 0.00 | 0.31 |
+| 750.408 | 0.36 | 0.28 | 0.12 | 0.22 | -0.01 |
+
+Core nice, iowait, irq and steal deltas are **zero in every displayed interval**.
+The one-core `/proc/stat` counters advance in 10 ms quanta. These sequential
+snapshots cannot rule out shorter events; the -10 ms residual illustrates their
+rounding/edge error. Other user CPU is core user minus server user minus
+observer user. Use user only: task system accounting can also charge softirq
+execution, so subtracting total task CPU from core user+system would misattribute
+it. IRQ/softirq are not added to aligned world CPU.
+
+For the four consecutive sample ends in [746, 750) s:
+
+| Run | Actual sampled span s | Server CPU s | Observer CPU s | Other user CPU s | Core idle s | Core user / system / softirq s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 745.760–749.799 | 2.85 | 0.04 | 0.03 | 1.04 | 1.78 / 0.81 / 0.44 |
+| 2 | 745.275–749.398 | 2.27 | 0.03 | **1.43** | **0.00** | 2.66 / 1.03 / 0.43 |
+
+**Inference:** non-server, non-observer user work competed for the sole vCPU
+during run 2's slowdown. About 1.43 CPU-seconds over 4.123 wall seconds is far
+beyond counter-edge error; server CPU falls and idle disappears. Softirq is
+similar to run 1, and neither observer CPU nor reported steal spikes. This
+supports CPU contention as the episode's explanation, rather than attributing
+it to simulation CPU, but does not prove every delayed tick was preempted.
+Run 1's equivalent relative-time samples have idle headroom and no deferrals.
+The +746 s references are 16:23:09.855 UTC for run 1 and 17:19:36.187 UTC for
+run 2 on October 30. No retained scheduler trace, continuous all-process CPU,
+context-switch counters, runnable-task count, run-queue length or per-task I/O
+counters can identify the competitor or its wakeup cause.
+
+### Host image services: measured presence, unknown trigger
+
+Both boundary `ps` inventories show `snapd`, `amazon-ssm-agent`,
+`systemd-journald`, `cron`, `rsyslogd` and `unattended-upgrade-shutdown` in both
+runs. The last is a shutdown waiter, not evidence that an upgrade ran. `fwupd`
+is absent at run 2's start and present at its end (lifetime `ps` CPU 0.1%);
+it is absent at both run-1 boundaries. **Inference:** firmware-refresh work
+is a plausible image-service lead, not an identified culprit. Lifetime CPU and
+presence thirty minutes apart cannot place it at the stall or account for the
+1.43 CPU-seconds. A short-lived process could also disappear before the end.
+
+No apt-daily job, active unattended-upgrade job, fstrim, man-db or cloud-init
+command is observed in these two boundary inventories. Their timer/service
+enablement and execution **remain unknown**: no host journal, systemd unit
+status or `systemctl list-timers` output was retained. Neither run can be
+matched to a timer firing at the event's wall-clock time. Boundary process
+presence is not systemd active/enabled state.
+
+**Source-verified:** the retained provisioning/launch scripts do not disable or
+mask these services or timers. Host user-data installs the shutdown deadline
+and study directory only. The dependency-install/build script runs on the
+generator, not the host; it is not a host apt job during the episode. The
+verified 90-minute self-termination deadline is well after the episode, not
+an observed shutdown trigger. No claim about default-image timer schedules
+substitutes for a missing journal.
+
+### Blocking I/O: source-verified path and limits
+
+The [pinned runtime server](https://github.com/NikitaMGrimm/slither-sim/blob/388be59aebf3108f5c510aa7269c08b67851b202/src/client/server.rs)
+is `388be59a`, not the newer runtime in the reporting checkout. Its ordinary
+socket I/O is nonblocking. Instrumentation adds
+synchronous `eprintln!` calls: simulation `CAPACITY` and `CENSUS` every 100 ticks,
+and socket `SOCKET` reports about once per second. Main-thread `--stats 1`
+also writes stderr synchronously. These calls can wait on the stderr lock and
+on regular-file writes. The observer launches the server with stdout and
+stderr redirected to **the regular file `host.log`**, not a pipe; it tails that
+file and serves chunks over HTTP. Generator `host-stream.log` is a downstream
+copy. A slow HTTP reader cannot fill a server stdout pipe, because none exists.
+
+The [linked observer](../2026-10-29-c7a-mature-capacity/host_agent.py)
+separately writes and flushes its telemetry file about once per
+second. A slow EBS-backed write, dirty-page throttling or stderr lock contention
+is possible in principle; there is no retained syscall-duration/block-I/O trace
+to test it directly. Sampled iowait is zero throughout the event, which supplies
+no positive evidence for storage blocking but cannot exclude it while competing
+work keeps the core runnable. `finish_tick` samples busy wall before its own
+CAPACITY emission and before CENSUS; those writes can delay the next scheduler
+opportunity outside that tick's busy-wall bracket. No inference that the
+23.640 ms tick itself was a log write is justified. The measured extra user CPU
+is the stronger lead; a specific logging stall remains **unknown**.
+
+### Deferral rule: repeated delays, not one 18 ms stall
+
+**Source-verified:** in `Simulation::due_ticks` at runtime `388be59a`,
+`scheduled = floor(elapsed / 0.007)` and
+`backlog = scheduled - (completed + deferred)`, saturating at zero. The limit
+is `ceil(0.25 / 0.007) = 36` ticks. Only backlog **greater than 36** defers the
+excess; the earliest such integer backlog is 37 scheduled ticks (259 ms).
+Each outer pass then executes at most eight catch-up ticks. Eight is a burst
+limit, not the deferral threshold. Deferral shifts world/link time behind wall
+time instead of skipping physics steps. A solitary extra 18 ms, starting on
+schedule, cannot cross this threshold or explain 126 deferred ticks.
+
+The retained 100-tick blocks show a sequence of long ticks and loss of progress:
+
+| Ticks | World CPU sum ms | Bracketed wall sum ms | Ticks with wall >10 ms | Max wall ms |
+| --- | ---: | ---: | ---: | ---: |
+| 300901–301000 | 479.306 | 865.671 | 29 | 14.977 |
+| 301001–301100 | 506.418 | 965.544 | 40 | 13.690 |
+| 301101–301200 | 503.068 | 982.035 | 48 | 23.640 |
+| 301201–301300 | 501.181 | 1011.673 | 52 | 16.124 |
+| 301301–301400 | 478.098 | 581.510 | 11 | 13.406 |
+| 301401–301500 | 476.281 | 391.096 | 0 | 8.978 |
+
+The four blocks containing deferral increments include **151 ticks over 10 ms**;
+slowdown starts in the preceding block, before backlog reaches the cap. For
+comparison, all seven retained run-1 blocks ending at 300900 through 301500
+have zero ticks over 10 ms. Run 2's four census intervals take 3.563 wall
+seconds to complete 400 ticks (2.800 simulation seconds) and defer another
+0.882 seconds, drawing down about 0.119 seconds of previously accumulated
+backlog by their end. This is consistent with repeated contention building
+backlog, repeated clipping at the cap, and subsequent catch-up. Exact per-call
+defer times and off-CPU sites are not recorded; the 29/40/47/10 counts locate
+increments to census intervals only. The largest individual tick is not the
+whole episode.
+
+### Implications for a separately planned v4 (not run)
+
+The data point to host-image/background contention but do not name its source.
+Before another acceptance attempt, v4 would retain full unit/timer inventories
+and a timestamped journal, and sample **all** processes' cumulative CPU with
+PID/start-time identity, plus `/proc/stat` context switches/runnable tasks,
+per-thread scheduling/wait counters and I/O counters. A bounded scheduler trace
+triggered by backlog would distinguish preemption from blocking; collector CPU
+would still count on the host core.
+
+An explicitly frozen benchmark-image policy would quiesce optional maintenance:
+mask present `apt-daily.timer`, `apt-daily-upgrade.timer`, `fwupd-refresh.timer`,
+`fstrim.timer` and `man-db.timer`, stop/wait for their jobs, and stop optional
+snap refresh/SSM work for the window, recording actual units and states rather
+than assuming those names exist. Keep required networking/timekeeping, safety
+deadlines and ordinary logging services, and preserve their CPU accounting.
+Because service policy changes the tested environment, disclose it before
+timing; do not retroactively relabel v3 as an infrastructure replacement.
+This is preventive control, not proof any named service caused v3's failure.
+
+To remove the possible harness I/O path, v4 would capture research telemetry in
+a preallocated, memory-backed buffer sized for the full window, count its CPU
+and memory, and persist it after timing, with overflow failing collection.
+Keep timestamps, observations and gates unchanged and explicitly verify the
+new collection path before freezing it. A bounded/drop policy must never
+silently omit evidence or introduce a producer-blocking pipe. No such image,
+instrumentation change, AWS resource or v4 run is created by this diagnosis.
 
 ## Verification and reproduction
 
@@ -125,6 +300,19 @@ selection, gates or measured values:
 python3 check_reports.py PRIVATE_EXTRACTED_RUN run-headroom.json
 python3 deferrals.py PRIVATE_EXTRACTED_RUN run-deferrals.json
 ```
+
+The added post-result host reductions run directly on the unchanged private
+archives (run 1 and run 2 separately), in seconds with standard-library Python
+3.11+. They publish selected counters and safe service labels only:
+
+```sh
+python3 stall.py PRIVATE_RUN_ARCHIVE.tar.gz run-stall.json
+```
+
+Both receipts bind to the existing archive SHA-256 values. This follow-up uses
+short local retained-data reductions and documentation checks only; no Rust
+build/test, guest access, AWS call/spend or new timing. The frozen plan, measured
+selected results, failure and cost/cleanup receipts are unchanged.
 
 ## Cost and cleanup
 
