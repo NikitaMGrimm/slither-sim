@@ -289,6 +289,9 @@ impl LocalGame {
         self.bank.cosmetics = Some(cosmetics);
         Ok(())
     }
+    pub fn menu_cosmetics(&self) -> Option<&crate::cosmetics::Cosmetics> {
+        self.bank.cosmetics.as_ref()
+    }
     pub fn phase(&self) -> Phase {
         self.session.view().phase
     }

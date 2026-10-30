@@ -75,7 +75,7 @@ function harness({ rejectPacket = false, createError, subscriber = {}, wasmChang
       packets.push({ bytes: [...bytes], timed });
     },
     state(value) { states.push(value); subscriber.state?.(value); },
-    error(error) { errors.push(error); subscriber.error?.(error); },
+    error(error,wasPlaying) { errors.push(error); subscriber.error?.(error,wasPlaying); },
   });
   const step = (ms = clock, delta = 1, wholeSteps = 1) => session.afterStep({ nowMs: ms, delta, wholeSteps });
   const tick = (...args) => { const action = step(...args); session.commitControl(); return action; };
@@ -450,4 +450,17 @@ test('notification callbacks may observe but cannot consume native actions or cl
   } } });
   session = h.session; h.connected(); session.close();
   assert.equal(h.errors.length, 0); assert.equal(h.sockets[0].closes, 1);
+});
+
+test('socket error notification retains playing from before the terminal reset',()=>{
+  for(const playing of [false,true]) {
+    const observations=[];
+    const h=harness({subscriber:{error(error,wasPlaying){observations.push({error,wasPlaying});}}});
+    if(playing)h.connected();else h.start();
+    assert.equal(h.session.snapshot().playing,playing);
+    const primary=Error('Synthetic socket failure');h.sockets[0].onerror(primary);
+    assert.equal(h.session.snapshot().playing,false);
+    assert.deepEqual(observations,[{error:primary,wasPlaying:playing}]);
+    assert.equal(h.sockets[0].closes,1);
+  }
 });

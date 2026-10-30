@@ -1,15 +1,24 @@
-# Opt-in start menu core
+# Start menu
 
-The opt-in wgpu [resource layer](menu-resources.md) consumes this projection.
-Adapters do not mount it yet; its authored visuals use perceptual acceptance.
+All three product entries open on the shared login. Native uses `NativeLogin`,
+`MenuFrame` and the PR2 editor; Canvas and WebGPU use the same
+`apps/wgpu-slice/web/login-overlay.mjs` semantic DOM adapter. `LoginMenu` exports
+the copied core projection in both Wasm builds. Real input/button elements own
+browser editing, IME, clipboard and accessibility; Rust owns normalization,
+once-only Play, styles' state, transformed geometry and animation clocks.
 
-`start_page::StartMenuState` publishes copied `StartMenuView` values and
-`StartMenuIntent` effects. `MenuLayout` takes logical viewport pixels and measured
-text/inline-flow metrics; no world backing size or DPR enters its geometry.
-Existing Canvas `project_start_page`, preferences, bindings and adapters are
-unchanged. No new Wasm binding is needed until an adapter consumes this API.
+`StartMenuState` emits a frozen Play request on the next menu update. Each host
+then uses its existing explicit route/profile/session admission. Initial native
+CLI values seed the login; neither startup nor quality/skin interaction opens
+a game socket. The first accepted gameplay update starts the outgoing fade;
+the spinner remains while connecting. Focus changes release held turn/boost
+inputs. Window blur and stale generations cannot admit a new attempt.
 
-Adapters later consume the localized wording, separate last-length prefix/bold
+The Choose Server control is hidden. Change Skin is a labelled passive icon
+until the chooser arrives. Server picker, chooser, death return and animated
+logo remain known gaps. The initial final-length slot is blank.
+
+Adapters consume the localized wording, separate last-length prefix/bold
 number/regular punctuation, geometry, reveal/transition clocks, requested quality
 and deferred Play/focus/link/storage intents. Measure the padded label again when
 Play becomes Play Again. Nickname holder dimensions include the CSS border; its
@@ -57,7 +66,7 @@ storage failure cannot undo a toggle. It has an independent key and does not
 modify adaptive `QualityState` or migrate the existing appearance record.
 
 Logo assets/curve settling, renderer styles, chooser/builder/server modal policy,
-champion editing/acknowledgement and all adapter activation remain later work.
+champion editing/acknowledgement remain later work.
 Incoming/API skin 65 and the existing chooser are untouched; the later official
 chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
 
@@ -163,13 +172,13 @@ Connecting and incomplete champion-handoff status names are also authored in
 the same table and covered in each locale's projection test.
 
 The native adapter maps winit 0.30 logical editing keys, physical gameplay keys,
-modifiers (including Windows AltGr), IME and focus events. The host executes
-IME admission, normal purpose, logical candidate rectangles and clipboard work
-outside core borrows. `main.rs` has an optional hook initialized to `None`:
-there is no visible menu, window startup change, enabled editor or new draw.
-The later compositor must initialize/synchronize the menu and editor, supply
-the measured caret rectangle and clock/focus/admission intents, and consume the
-existing deferred Play effects. Browsers will use real DOM inputs separately.
+modifiers (including Windows AltGr), IME and focus events. `NativeLogin` supplies
+measured caret/candidate geometry and draws committed selection/raw preedit.
+Tab/Shift+Tab routes nickname, Play and quality; pointer input uses core hit
+rectangles. A Play pointer gesture during preedit cannot cancel it and submit
+the older name. Commit first, then activate Play. The host executes IME and
+clipboard effects outside core borrows. No UI toolkit or accessibility bridge
+is added; physical-host IME and screen-reader acceptance remains open.
 
 The authored traces in `tests/menu_input.rs` and
 `apps/wgpu-slice/tests/menu_input_native.rs` exercise offsets, normalization,
@@ -180,7 +189,7 @@ the exact public fields production extracts through `KeyInput`; no fabricated
 platform payload or unsafe constructor is used. IME and focus tests use actual
 `WindowEvent` values. No test opens a window, real clipboard, IME or server.
 Real OS candidate placement, IME/keyboard interaction and screen readers remain
-unverified. Native accessibility bridging and browser inputs are later PRs.
+unverified. Native accessibility bridging remains later work; browser inputs are real DOM controls.
 
 ## Label width
 

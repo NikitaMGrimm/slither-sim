@@ -163,3 +163,29 @@ fn pending_connection_phases_are_busy_until_setup_or_a_terminal_change() {
         assert_eq!(Policy::status(phase, true), 2);
     }
 }
+
+#[test]
+fn only_local_pre_game_transport_failures_are_retryable() {
+    use slither_client::gameplay_policy::GameplayPolicy;
+    for local in [false, true] {
+        let policy = GameplayPolicy::new(false, false, local, false, false, false);
+        for phase in ["ready", "opening", "failed", "disconnected"] {
+            for playing in [false, true] {
+                for reason in [
+                    "socket-error",
+                    "socket-construction",
+                    "session-failed",
+                    "renderer",
+                ] {
+                    assert_eq!(
+                        policy.retry_transport_failure(phase, playing, reason),
+                        local
+                            && !playing
+                            && phase == "failed"
+                            && matches!(reason, "socket-error" | "socket-construction")
+                    );
+                }
+            }
+        }
+    }
+}

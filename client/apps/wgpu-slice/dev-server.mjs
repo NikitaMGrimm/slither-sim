@@ -20,6 +20,26 @@ export async function readImage(handle, limit = IMAGE_LIMIT) {
   if (size > limit) throw new Error('Image budget');
   return bytes.subarray(0, size);
 }
+// Shared by the two loopback hosts; caller has already validated the URL path.
+export async function readCosmetic(directory, relative) {
+  const root=await realpath(directory);
+  const contained=async name=>{
+    const candidate=path.resolve(root,name);
+    // Roots are directories, never served files. Require a descendant so the
+    // prefix guard dominates every candidate filesystem call (including realpath).
+    if(!candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+    const file=await realpath(candidate);
+    if(!file.startsWith(root+path.sep))throw new Error('Escaped root');
+    return file;
+  };
+  if(relative!=='menu/manifest.txt'&&!/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative)){
+    let allowed=DEFAULT_MENU_PATHS;
+    try{const handle=await open(await contained('menu/manifest.txt'),'r');try{allowed=menuPaths(await readImage(handle,MANIFEST_LIMIT));}finally{await handle.close();}}catch{ /* Same fallback paths as the decoder. */ }
+    if(!allowed.includes(relative))throw new Error('Unknown menu art');
+  }
+  const handle=await open(await contained(relative),'r');
+  try{return await readImage(handle,relative==='menu/manifest.txt'?MANIFEST_LIMIT:IMAGE_LIMIT);}finally{await handle.close();}
+}
 export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir, accessory = -1, simulatorPort } = {}) {
   if (!Number.isInteger(accessory) || accessory < -1 || accessory > 31) throw new Error('Accessory must be -1 or 0..31');
   if (simulatorPort !== undefined && (!Number.isInteger(simulatorPort) || simulatorPort < 1 || simulatorPort > 65535)) throw new Error('Invalid simulator port');
@@ -27,7 +47,7 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     const send = (status, type, bytes) => { res.writeHead(status, { 'Content-Type': type }); res.end(req.method === 'HEAD' ? undefined : bytes); };
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'${simulatorPort ? ` ws://127.0.0.1:${simulatorPort}` : ''}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
+    res.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'${simulatorPort ? ` ws://127.0.0.1:${simulatorPort}` : ''}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
     if (req.headers.host !== `127.0.0.1:${server.address()?.port}`) { send(403, 'text/plain', 'Loopback host required'); return; }
     if (!['GET', 'HEAD'].includes(req.method)) { send(405, 'text/plain', 'GET or HEAD required'); return; }
     const resource = (req.url ?? '').split('?')[0];
@@ -38,28 +58,15 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     const cosmetic = resource.startsWith('/cosmetics/');
     const relative = cosmetic ? resource.slice('/cosmetics/'.length) : resource === '/' ? 'index.html' : resource.slice(1);
     if (cosmetic && !cosmeticsDir) { send(404, 'text/plain', 'Unavailable'); return; }
-    if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|local-input\.mjs|input-targeting\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
+    if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|local-input\.mjs|login-overlay\.mjs|login-art\.mjs|menu-art\.mjs|input-targeting\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
     try {
-      const root = await realpath(cosmetic ? cosmeticsDir : webDir);
-      if (cosmetic && relative !== 'menu/manifest.txt' && !/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative)) {
-        let allowed = DEFAULT_MENU_PATHS;
-        try {
-          const manifest = await realpath(path.join(root, 'menu/manifest.txt'));
-          const escaped = path.relative(root, manifest);
-          if (escaped === '..' || escaped.startsWith(`..${path.sep}`) || path.isAbsolute(escaped)) throw new Error('Escaped root');
-          const handle = await open(manifest, 'r');
-          try { allowed = menuPaths(await readImage(handle, MANIFEST_LIMIT)); } finally { await handle.close(); }
-        } catch { /* Missing/malformed manifests use the same authored fallback paths as Rust. */ }
-        if (!allowed.includes(relative)) throw new Error('Unknown menu art');
-      }
-      const file = await realpath(path.join(root, relative));
-      const escaped = path.relative(root, file);
-      if (escaped === '..' || escaped.startsWith(`..${path.sep}`) || path.isAbsolute(escaped)) throw new Error('Escaped root');
-      let bytes;
-      if (cosmetic) {
-        const handle = await open(file, 'r');
-        try { bytes = await readImage(handle, relative === 'menu/manifest.txt' ? MANIFEST_LIMIT : IMAGE_LIMIT); } finally { await handle.close(); }
-      } else bytes = await readFile(file);
+      if(cosmetic){const bytes=await readCosmetic(cosmeticsDir,relative);send(200,types[path.extname(relative)]??'text/plain',bytes);return;}
+      const root=await realpath(webDir), candidate=path.resolve(root,relative);
+      // As above, require a descendant before touching the candidate path.
+      if(!candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+      const file=await realpath(candidate);
+      if(!file.startsWith(root+path.sep))throw new Error('Escaped root');
+      const bytes=await readFile(file);
       send(200, types[path.extname(file)] ?? 'application/octet-stream', bytes);
     } catch { send(404, 'text/plain', 'Unavailable'); }
   });

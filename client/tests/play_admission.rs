@@ -100,3 +100,20 @@ fn only_local_terminal_observations_offer_return_and_only_commit_releases_it() {
         }
     }
 }
+
+#[test]
+fn failed_attempt_return_requires_local_acceptance_and_a_new_explicit_play() {
+    for local in [false, true] {
+        let mut admission = slither_client::play_admission::PlayAdmission::new(local, true);
+        assert!(!admission.attempt_return_ready("failed"));
+        assert!(admission.accept());
+        assert!(!admission.attempt_return_ready("ready"));
+        assert_eq!(admission.attempt_return_ready("failed"), local);
+        if local {
+            admission.complete_return().unwrap();
+            assert!(!admission.accepted());
+            assert!(admission.accept());
+            assert!(!admission.accept());
+        }
+    }
+}

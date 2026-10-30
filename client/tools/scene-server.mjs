@@ -2,9 +2,11 @@ import http from 'node:http';
 import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readCosmetic } from '../apps/wgpu-slice/dev-server.mjs';
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 const routes = new Map([
+  ...['login-overlay','login-art','menu-art'].map(name => [`/game/${name}.mjs`, [`apps/wgpu-slice/web/${name}.mjs`, 'text/javascript; charset=utf-8']]),
   ['/', ['web/game.html', 'text/html; charset=utf-8']],
   ['/scene/pkg/slither_client.js', ['dist/web/slither_client.js', 'text/javascript; charset=utf-8']],
   ['/scene/pkg/slither_client_bg.wasm', ['dist/web/slither_client_bg.wasm', 'application/wasm']],
@@ -43,19 +45,20 @@ export function sceneArguments(args) {
   const seen = new Set();
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index];
-    if (!['--port', '--simulator-port'].includes(flag) || seen.has(flag) || args[index + 1] === undefined) {
+    if (!['--port', '--simulator-port', '--cosmetics-dir'].includes(flag) || seen.has(flag) || args[index + 1] === undefined) {
       throw new Error('Usage: node tools/scene-server.mjs [--port <0..65535>] [--simulator-port <1..65535>]');
     }
     seen.add(flag);
-    result[flag === '--port' ? 'port' : 'simulatorPort'] = portNumber(args[index + 1], flag === '--port');
+    if(flag==='--cosmetics-dir') result.cosmeticsDir=args[index+1];
+    else result[flag === '--port' ? 'port' : 'simulatorPort'] = portNumber(args[index + 1], flag === '--port');
   }
   return result;
 }
 
 /** An unbound, exact-route server; requests require its literal loopback Host. */
-export function createSceneServer({ simulatorPort, root = projectRoot } = {}) {
+export function createSceneServer({ simulatorPort, cosmeticsDir, root = projectRoot } = {}) {
   const simulatorUrl = simulatorPort === undefined ? null : `ws://127.0.0.1:${portNumber(simulatorPort)}/slither`;
-  const csp = `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'${simulatorUrl ? ` ${simulatorUrl}` : ''}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`;
+  const csp = `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'${simulatorUrl ? ` ${simulatorUrl}` : ''}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`;
   const server = http.createServer(async (request, response) => {
     response.setHeader('Content-Security-Policy', csp);
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -80,6 +83,12 @@ export function createSceneServer({ simulatorPort, root = projectRoot } = {}) {
     if (resource === '/scene/config.json') {
       send(200, 'application/json', JSON.stringify({ simulatorUrl })); return;
     }
+    if(resource.startsWith('/cosmetics/') && cosmeticsDir) {
+      try {const bytes=await readCosmetic(cosmeticsDir,resource.slice('/cosmetics/'.length));
+        send(200,resource.endsWith('.txt')?'text/plain':resource.endsWith('.jpg')?'image/jpeg':'image/png',bytes);
+      } catch {send(404,'text/plain','Optional art unavailable');}
+      return;
+    }
     const snippet = /^\/(?:scene|game)\/pkg\/(snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.exec(resource);
     const route = routes.get(resource) ?? (snippet
       ? [`dist/web/${snippet[1]}`, 'text/javascript; charset=utf-8'] : undefined);
@@ -97,8 +106,8 @@ export function createSceneServer({ simulatorPort, root = projectRoot } = {}) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const { port, simulatorPort } = sceneArguments(process.argv.slice(2));
-    const server = createSceneServer({ simulatorPort });
+    const { port, simulatorPort, cosmeticsDir } = sceneArguments(process.argv.slice(2));
+    const server = createSceneServer({ simulatorPort, cosmeticsDir });
     server.on('error', () => { console.error('Scene server could not bind loopback'); process.exitCode = 1; });
     server.listen(port, '127.0.0.1', () => console.log(`Scene: http://127.0.0.1:${server.address().port}/`));
   } catch (error) { console.error(error.message); process.exitCode = 1; }

@@ -11,11 +11,11 @@ test('default announcement publication uses Rust views without a second draw or 
         api.EndScreenProjector = run(`(class { project() { return { schema: 1, visible: true,
           title: 'Separate end title', scoreText: 'Separate final score', statusText: 'Separate end status' }; } free() {} })`);
       } });
-    graph.hudWasm();
+    graph.hudWasm();graph.stubLogin();
     const entry = await graph.load('bootstrap.mjs'), runtime = await entry.gamePageRuntime;
-    const root = graph.f.document.getElementById('slither-client-root'), holder = root.children.at(-1);
+    const root = graph.f.document.getElementById('slither-client-root'), holder = root.children[7];
     const style = node => graph.f.edit.hud.style(node.style);
-    const end = root.children.at(-2); assert.notEqual(end, holder);
+    const end = root.children[6]; assert.notEqual(end, holder);
     assert.equal(graph.announcements.enabled, 1); assert.equal(graph.announcements.reads, 1);
     assert.equal(style(holder).get('display'), 'none'); assert.equal(runtime.diagnostics().draws, 0);
     graph.announcements.view = { schema: 1, present: true, opacity: .4, left: 8, top: 4, width: 300, height: 228,

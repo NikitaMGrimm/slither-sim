@@ -11,6 +11,8 @@ pub enum MenuArt {
     Skin,
     Builder,
     Cosmetic,
+    QualityHigh,
+    QualityLow,
 }
 impl MenuArt {
     fn ordinal(self) -> u64 {
@@ -19,6 +21,8 @@ impl MenuArt {
             Self::Skin => 32,
             Self::Builder => 33,
             Self::Cosmetic => 34,
+            Self::QualityHigh => 35,
+            Self::QualityLow => 36,
         }
     }
 }
@@ -53,12 +57,22 @@ impl Default for MenuManifest {
                 revision: 1,
                 path: "menu/cosmetic.png".into(),
             },
+            MenuArtEntry {
+                art: MenuArt::QualityHigh,
+                revision: 1,
+                path: "menu/quality-high.png".into(),
+            },
+            MenuArtEntry {
+                art: MenuArt::QualityLow,
+                revision: 1,
+                path: "menu/quality-low.png".into(),
+            },
         ])
     }
 }
 impl MenuManifest {
     /// UTF-8 lines: `menu-art-v1`, then `role revision relative-path`.
-    /// Roles are logo:0..31, skin, builder, cosmetic; paths are local PNG/JPEG.
+    /// Roles are logo:0..31, skin, builder, cosmetic, quality-high/low.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MANIFEST_LIMIT {
             return Err("Menu manifest byte budget".into());
@@ -72,7 +86,7 @@ impl MenuManifest {
         let mut entries: Vec<MenuArtEntry> = Vec::new();
         let cosmetic_paths = paths();
         for line in lines.filter(|s| !s.is_empty()) {
-            if entries.len() == 35 {
+            if entries.len() == 37 {
                 return Err("Menu manifest entry budget".into());
             }
             let fields: Vec<_> = line.split_ascii_whitespace().collect();
@@ -83,6 +97,8 @@ impl MenuManifest {
                 "skin" => MenuArt::Skin,
                 "builder" => MenuArt::Builder,
                 "cosmetic" => MenuArt::Cosmetic,
+                "quality-high" => MenuArt::QualityHigh,
+                "quality-low" => MenuArt::QualityLow,
                 s => MenuArt::Logo(
                     s.strip_prefix("logo:")
                         .and_then(|n| n.parse::<u8>().ok())

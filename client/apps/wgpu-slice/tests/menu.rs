@@ -14,6 +14,35 @@ use std::io::Cursor;
 fn png(size: u32, color: [u8; 4]) -> Vec<u8> {
     png_rect(size, size, color)
 }
+#[test]
+fn quality_roles_use_independent_default_bindings_and_reject_server() {
+    let manifest = MenuManifest::default();
+    assert!(
+        manifest
+            .0
+            .iter()
+            .any(|e| e.art == MenuArt::QualityHigh && e.path == "menu/quality-high.png")
+    );
+    assert!(
+        manifest
+            .0
+            .iter()
+            .any(|e| e.art == MenuArt::QualityLow && e.path == "menu/quality-low.png")
+    );
+    assert!(MenuManifest::parse(b"menu-art-v1\nserver 1 menu/server.png").is_err());
+    let mut images = Images::default();
+    images
+        .add("menu/quality-high.png", &png(16, [10, 20, 30, 255]))
+        .unwrap();
+    images
+        .add("menu/quality-low.png", &png(16, [30, 20, 10, 255]))
+        .unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    assert_ne!(
+        art.menu_art(MenuArt::QualityHigh).unwrap().asset.handle,
+        art.menu_art(MenuArt::QualityLow).unwrap().asset.handle
+    );
+}
 fn png_rect(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
     image::RgbaImage::from_pixel(width, height, image::Rgba(color))
@@ -48,6 +77,7 @@ fn manifests_reject_malformed_duplicates_and_escaping_paths() {
     for s in [
         "",
         "menu-art-v2",
+        "\u{feff}menu-art-v1\nlogo:0 1 menu/logo.png",
         "menu-art-v1\nlogo:32 1 menu/a.png",
         "menu-art-v1\nskin 0 menu/a.png",
         "menu-art-v1\nskin 1 ../a.png",

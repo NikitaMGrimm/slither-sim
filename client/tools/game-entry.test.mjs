@@ -24,7 +24,7 @@ test('local setup failures are visible and retain their original rejection', asy
   });
 });
 
-test('actual default graph mounts HUD, Play and leaderboard with one claim, scene and RAF', async () => {
+test('default graph composes one login renderer with HUD and leaderboard on one scene and RAF', async () => {
   await runGameModuleTest(async ({ assert, createGraph }) => {
     let release;
     const projector = { created: 0, freed: 0 };
@@ -33,12 +33,11 @@ test('actual default graph mounts HUD, Play and leaderboard with one claim, scen
       prepareWasm(api, run) {
         api.LeaderboardScoreProjector = run('(counts => class { constructor() { counts.created++; } project() { throw Error("No startup score projection expected"); } free() { counts.freed++; } })')(projector);
       } });
-    const hud = graph.hudWasm();
+    const hud = graph.hudWasm();graph.stubLogin();
     const entry = await graph.load('bootstrap.mjs');
     assert.notEqual(graph.f.gate.metadata().code, 'held'); assert.equal(graph.counts.initialize, 1);
     const startup = graph.f.document.getElementById('slither-client-status');
-    assert.equal(startup.children[0].children[1].localName, 'progress');
-    assert.equal(graph.f.edit.hud.character(startup.children[0].children[0]).data, 'Loading client…');
+    assert.equal(startup.textContent,'SlitherClient: Loading');
     assert.equal(graph.wasm.calls.includes('scene'), false);
     await assert.rejects(entry.startGamePage(), /Armed document-start gate/);
     assert.notEqual(graph.f.gate.metadata().code, 'held');
@@ -53,31 +52,25 @@ test('actual default graph mounts HUD, Play and leaderboard with one claim, scen
     assert.equal(graph.f.sockets, 0); assert.equal(graph.f.original, 0);
     assert.equal(hud.tracking, 1); assert.equal(hud.scoreReads, 0); assert.equal(projector.created, 1);
     const root = graph.f.document.getElementById('slither-client-root');
-    assert.equal(root.children.length, 9, 'existing scene nodes plus HUD, Play, leaderboard, minimap, end-screen and announcement mounts');
-    const [hudMount, playMount, leaderboardMount, minimapMount, endScreenMount, announcementMount] = root.children.slice(3);
-    assert.equal(hudMount.children.length, 2); assert.equal(playMount.children.length, 5);
-    assert.equal(playMount.children[4].children.length, 15, 'default menu keeps three labels and eleven action buttons, followed by one passive preview');
-    assert.equal(graph.f.document.getElementById('slither-client-reload').hidden, true);
-    assert.equal(graph.f.edit.hud.style(playMount.children[0].style).get('display'), 'none');
-    assert.equal(graph.f.edit.hud.style(playMount.children[1].style).get('display'), 'block');
-    assert.equal(graph.f.edit.hud.style(playMount.children[2].style).get('display'), 'block');
+    assert.equal(root.children.length, 9, 'scene, HUD, leaderboard, minimap, end-screen, announcement and login mounts');
+    const [hudMount,leaderboardMount,minimapMount,endScreenMount,announcementMount,loginMount]=root.children.slice(3);
+    assert.equal(hudMount.children.length,2);assert.equal(graph.login.mounts,1);assert.equal(loginMount.children.length,0,'login renderer boundary is explicitly doubled');
+    assert.equal(graph.f.document.getElementById('slither-client-reload').hidden,true);
     assert.equal(leaderboardMount.children.length, 4);
     assert.equal(minimapMount.children.length, 5);
     assert.equal(endScreenMount.children.length, 3);
     assert.equal(announcementMount.children.length, 2, 'rich announcement has quote and attribution/length blocks');
     assert.equal(graph.minimap.enabled, 1); assert.equal(graph.minimap.reads.length, 1);
-    assert.equal(graph.f.edit.ownedPlay.buttonState(playMount.children[2]).disabled, true);
-    assert.equal(graph.f.edit.hud.character(playMount.children[3].children[0].children[0]).data, 'Play unavailable on this page.');
     assert.equal(graph.f.edit.hud.style(startup.style).get('display'), 'none');
-    assert.equal(graph.previewCalls.filter(row => row[0] === 'select').length, 1);
-    assert.equal(graph.previewCalls.filter(row => row[0] === 'render').length, 0);
+    assert.equal(graph.previewCalls.length,0,'login does not enable the old chooser');
     graph.f.flush();
-    assert.equal(graph.previewCalls.filter(row => row[0] === 'render').length, 1);
+    assert.equal(graph.previewCalls.length,0);
     assert.equal(runtime.diagnostics().captureHeld, false);
     const repeated = await graph.load('bootstrap.mjs');
     assert.equal(repeated.gamePageRuntime, entry.gamePageRuntime);
     assert.equal(await repeated.gamePageRuntime, runtime); assert.notEqual(graph.f.gate.metadata().code, 'held');
     runtime.dispose(); runtime.dispose(); assert.equal(graph.f.raf.size, 0);
+    assert.equal(graph.login.disposed,1);
     assert.equal(root.children.length, 3); assert.equal(projector.freed, 1);
     assert.equal(graph.wasm.counts().sceneFrees, 1); assert.equal(graph.wasm.counts().qualityFrees, 1);
   });
@@ -143,11 +136,11 @@ test('unarmed default entry exports undefined and keeps initialization quiet', a
   });
 });
 
-test('default wrapper honors explicit dependencies and always selects all owned UI options', async () => {
+test('default wrapper honors explicit dependencies and selects login with shared HUD owners', async () => {
   await runGameModuleTest(async ({ assert, createGraph }) => {
     const graph = createGraph({ armed: false, hudNative: true, ownedHudNative: true,
       ownedPlayNative: true, leaderboardNative: true, minimapNative: true });
-    const entry = await graph.load('bootstrap.mjs'); graph.arm();
+    graph.stubLogin();const entry = await graph.load('bootstrap.mjs'); graph.arm();
     const hud = graph.hudWasm(); let initialized = 0, projectors = 0;
     graph.wasm.api.LeaderboardScoreProjector = graph.run('(created => class { constructor() { created(); } project() { throw Error("Unexpected projection"); } free() {} })')(() => { projectors++; });
     const runtime = await entry.startGamePage({ realm: graph.f.realm, initialize() { initialized++; },
