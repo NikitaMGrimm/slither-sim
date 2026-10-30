@@ -22,7 +22,8 @@ def execute(root,study):
     for path in Path('/proc').glob('[0-9]*/cmdline'):
         try:
             args=path.read_bytes().split(b'\0')
-            if b'run.py' in args and str(root).encode() in args:candidates.append(int(path.parent.name))
+            if any(arg.rsplit(b'/',1)[-1] in [b'run.py',b'restart_primary.py'] for arg in args) and str(root).encode() in args:
+                candidates.append(int(path.parent.name))
         except (FileNotFoundError,PermissionError,ProcessLookupError):pass
     if candidates:
         assert len(candidates)==1

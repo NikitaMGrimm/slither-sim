@@ -59,6 +59,13 @@ and the qualification receipt. The world checkpoint includes the full world;
 Policies have reusable scratch, with no learned/per-bot memory. Staggering uses
 six sparse buffers so unselected slots do not discard another phase's storage.
 
+The original collection lost its controller during early 10k warmup, before a
+checkpoint existed. Its partial log remains in `results/10000-interrupted`.
+`restart_primary.py` invokes the unchanged frozen runner on a fresh 10k output
+root and moves its completed result back; it does not rerun the completed smaller
+populations. This recovery is not needed for a clean reproduction. Run controllers
+detached from SSH, with durable stdout/stderr, so a connection loss cannot stop them.
+
 At the frozen checkpoint it verifies a complete 512-tick serial and parallel
 continuation and makes the replay tape. Then it runs one discarded triplet and
 five alternating serial/parallel pairs with a simulation-only replay around each

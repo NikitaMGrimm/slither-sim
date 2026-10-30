@@ -16,6 +16,18 @@ def records(path):
         if record:yield ''.join(record)
 
 
+def operation_phase(record):
+    if not any(name in record for name in ['5Scene4tick','::Scene::tick']):return None
+    for phase,names in [
+        ('A4',['3bot6kernel','7Forager6decide','::bot::kernel::','::bot::Forager::decide']),
+        ('observation',['11observation','::observation::']),
+        ('admission',['5Scene9admission','::Scene::admission']),
+        ('world',['9simulator','::simulator::']),
+    ]:
+        if any(name in record for name in names):return phase
+    return 'other operation'
+
+
 def classify(root):
     root=Path(root)
     lines=(root/'src/observation/mod.rs').read_text().splitlines()
@@ -38,25 +50,23 @@ def classify(root):
             match=re.search(r':\s+(\d+) cpu-clock:u:',record.splitlines()[0])
             if not match:continue
             weight=int(match[1]);all_samples['all']+=weight
-            if '5Scene4tick' not in record:
+            phase=operation_phase(record)
+            if phase is None:
                 all_samples['outside operation or unwound']+=weight
                 continue
             all_samples['operation']+=weight
-            if '3bot6kernel' in record or '7Forager6decide' in record:phase='A4'
-            elif '11observation' in record:phase='observation'
-            elif '9admission' in record:phase='admission'
-            elif '9simulator' in record:phase='world'
-            else:phase='other operation'
             phases[phase]+=weight
             if phase=='observation':
-                if '8FoodGrid3new' in record:label='food grid construction'
-                elif '8Observer3new' in record:label='other shared-index construction'
+                if any(name in record for name in ['8FoodGrid3new','::FoodGrid::new']):label='food grid construction'
+                elif any(name in record for name in ['8Observer3new','::Observer::new']):label='other shared-index construction'
                 else:
                     matches=re.findall(r'/src/observation/mod\.rs:(\d+)',record)
                     line=int(matches[0]) if matches else None
                     label=next((key for key,(first,last) in ranges.items() if line is not None and first<=line<=last),
                                'other observation / copying / unresolved source')
                 observations[label]+=weight
+        assert all_samples['all']>0,'No recognized cpu-clock periods; inspect perf script format'
+        assert all_samples['operation']>0,'No tick stacks recognized; inspect symbols/unwinding'
         report=(root/f'diagnostic/{n}-report.txt').read_text()
         lost=re.search(r'Total Lost Samples:\s*([\d,]+)',report)
         def shares(counts,total):

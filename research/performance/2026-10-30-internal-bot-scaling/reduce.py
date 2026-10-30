@@ -4,6 +4,28 @@ import math
 from pathlib import Path
 import statistics
 import sys
+from run import digest
+
+
+def verify_master(root):
+    root=Path(root)
+    pins=json.loads((root/'measurement-pins.json').read_text())
+    manifest=root/'execution-source-manifest.txt'
+    assert digest(manifest)==pins['executionManifestSha256']
+    for line in manifest.read_text().splitlines():
+        name,expected=line.split('\0')
+        assert digest(root/name)==expected,('source mismatch',name)
+    for name,key in [('run.py','runnerSha256'),('PLAN.md','planSha256'),
+                     ('Cargo.lock','cargoLockSha256'),('build-final.log','buildLogSha256')]:
+        assert digest(root/name)==pins[key],name
+    binaries=[root/'bin/internal_scaling',root/'target/release/examples/internal_scaling']
+    assert any(path.exists() and digest(path)==pins['binarySha256'] for path in binaries)
+    return pins
+
+
+def verify_fixture(directory,qualification):
+    assert digest(directory/'fixture/world.json')==qualification['fixtureSha256']
+    assert digest(directory/'fixture/meta.json')==qualification['metaSha256']
 
 
 def population_directory(root,n):
@@ -89,7 +111,7 @@ def phase_summary(row,ordinary):
 
 def reduce(root):
     root=Path(root)
-    selected={'pins':json.loads((root/'measurement-pins.json').read_text()),
+    selected={'pins':verify_master(root),'reducerSha256':digest(Path(__file__)),
               'method':{'cadenceTicks':6,'stagger':'(tick + slot) % 6 == 0',
                         'timing':'Timing::default(): all lag and processing fields zero',
                         'world':'Config::official(N), unchanged adaptive radius/density, no wire radius cap',
@@ -98,11 +120,13 @@ def reduce(root):
     for n in [1000,2500,5000,10000]:
         directory=population_directory(root,n)
         qualification=json.loads((directory/'warm-qualification.json').read_text())
+        verify_fixture(directory,qualification)
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         population={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config}
         if directory.name.endswith('-continuation'):
             original=root/'results'/str(n)
+            verify_fixture(original,json.loads((original/'warm-qualification.json').read_text()))
             population['priorCensoredAttempt']={
                 'qualification':json.loads((original/'warm-qualification.json').read_text()),
                 'census':json.loads((original/'fixture/census.json').read_text())}
@@ -113,6 +137,8 @@ def reduce(root):
         serial=json.loads((directory/'verify-serial.json').read_text())
         parallel=json.loads((directory/'verify-parallel.json').read_text())
         assert serial['actionSha256']==parallel['actionSha256']
+        assert digest(directory/'verify-serial.tape')==digest(directory/'verify-parallel.tape')
+        assert digest(directory/'fixture/tape.bin')==digest(directory/'verify-serial.tape')
         reference=serial['finalStateSha256']
         reference_work=tuple(sum(s[key] for s in serial['samples']) for key in ['admitted','refused','poses'])
         population['parity']={'serialParallelActionSha256':serial['actionSha256'],

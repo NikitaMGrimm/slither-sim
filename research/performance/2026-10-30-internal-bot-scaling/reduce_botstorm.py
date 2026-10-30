@@ -3,16 +3,20 @@ import json
 from pathlib import Path
 import statistics
 import sys
-from reduce import phase_summary, stats
+from reduce import phase_summary, stats, verify_fixture
+from run import digest
 
 
 def summarize(root):
     root=Path(root)
     result={'build':json.loads((root/'botstorm-build.json').read_text()),
+            'reducerSha256':digest(Path(__file__)),
             'method':{'policy':'own-head center steering; staggered every six ticks; no observation or boost',
                       'reportedReference':'a community server\u2019s reported 12k-snake world; reported, not measured here',
                       'referenceHardwareAndTickRate':'unknown; older unspecified tick rate',
                       'rateUnit':'per virtual simulation second unless named wall'},'populations':[]}
+    assert digest(root/'measurement-pins.json')==result['build']['masterPinsSha256']
+    assert digest(root/'bin/internal_botstorm')==result['build']['binarySha256']
     for n in [12000,6000,9000]:
         directory=root/'botstorm-results'/str(n)
         receipt=directory/'qualification.json'
@@ -20,6 +24,7 @@ def summarize(root):
             result['populations'].append({'population':n,'status':'not measured','reason':'optional cost gate or incomplete attempt; see attempts'})
             continue
         qualification=json.loads(receipt.read_text())
+        verify_fixture(directory,qualification)
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         out={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config,
