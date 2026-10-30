@@ -53,6 +53,7 @@ try {
   for (const peer of peers) {
     const finish = parse(await peer.page.evaluate('window.replayFinish()'));
     observationFailures.push(...finish.recorderErrors.map(e => `${peer.name}.recorder[${e.seq}]: ${e.reason}`));
+    if (finish.recorderErrors.length) throw new Error(observationFailures.join('\n'));
     const randomStream = finish.random;
     const manifest = await buildManifest({ schedule, artifactFiles, inputFile, source: product,
       input: { label: 'offline schema-1 input', sha256: null }, peer: peer.name,

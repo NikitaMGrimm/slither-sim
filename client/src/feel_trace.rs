@@ -10,9 +10,9 @@ use crate::presentation::{
 use crate::state::Point;
 use std::sync::{Arc, Mutex};
 
-/// Frozen telemetry stride over prepared painter samples; always include the tail.
-/// At MAX_CURVE_SAMPLES this retains at most 8,193 points. See the replay contract.
-pub const BODY_TRACE_STRIDE: usize = 8;
+/// Trace capacity for the complete prepared centerline, in original sample order.
+/// Larger production draws fail the measuring run; no point may be omitted.
+pub const MAX_BODY_TRACE_POINTS: usize = 8193;
 
 /// An immutable copy of one exact core boundary, including a staged draw.
 #[derive(Clone, Debug, PartialEq)]
@@ -201,16 +201,21 @@ impl Recorder {
             // second sampling pass. The flat ABI uses backing pixels; both
             // decoders convert these to CSS pixels (feel-replay/README.md).
             let body = body.unwrap_or_default();
-            let indices: Vec<_> = (0..body.len())
-                .filter(|i| i % BODY_TRACE_STRIDE == 0 || i + 1 == body.len())
-                .collect();
-            values.push(indices.len() as f64);
-            for i in indices {
+            if body.len() > MAX_BODY_TRACE_POINTS {
+                journal.failed = true;
+                journal.errors.push(format!(
+                    "{phase}: prepared body has {} points; trace limit is {MAX_BODY_TRACE_POINTS}",
+                    body.len()
+                ));
+                return;
+            }
+            values.push(body.len() as f64);
+            for sample in body {
                 values.extend([
                     f64::from(journal.extent[0]) / 2.
-                        + (f64::from(body[i].x) - position.x) * camera.zoom(),
+                        + (f64::from(sample.x) - position.x) * camera.zoom(),
                     f64::from(journal.extent[1]) / 2.
-                        + (f64::from(body[i].y) - position.y) * camera.zoom(),
+                        + (f64::from(sample.y) - position.y) * camera.zoom(),
                 ]);
             }
             if !m.expired {

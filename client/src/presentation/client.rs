@@ -4223,8 +4223,8 @@ mod resolved_draw_tests {
 
     #[cfg(feature = "feel-trace")]
     #[test]
-    fn feel_body_records_prepared_curve_and_detects_displacement_without_anchor_changes() {
-        use crate::feel_trace::{BODY_TRACE_STRIDE, Recorder};
+    fn feel_body_records_every_prepared_point_and_rejects_overbound_output() {
+        use crate::feel_trace::{MAX_BODY_TRACE_POINTS, Recorder};
         let recorder = Recorder::default();
         let mut client = AnimatedClient::new(0.).unwrap();
         client.record_feel(recorder.clone());
@@ -4247,54 +4247,60 @@ mod resolved_draw_tests {
             .as_ref()
             .unwrap()
             .samples;
-        let indices: Vec<_> = (0..body.len())
-            .filter(|i| i % BODY_TRACE_STRIDE == 0 || i + 1 == body.len())
-            .collect();
-        assert!(!indices.is_empty());
-        assert_eq!(baseline.values[37] as usize, indices.len());
-        for (j, &i) in indices.iter().enumerate() {
+        assert!(body.len() > 4);
+        assert_eq!(baseline.values[37] as usize, body.len());
+        for (j, sample) in body.iter().enumerate() {
             assert_eq!(
                 baseline.values[38 + j * 2],
-                750. + (f64::from(body[i].x) - client.camera().position().x)
+                750. + (f64::from(sample.x) - client.camera().position().x)
                     * client.camera().zoom()
             );
             assert_eq!(
                 baseline.values[39 + j * 2],
                 422.5
-                    + (f64::from(body[i].y) - client.camera().position().y)
-                        * client.camera().zoom()
+                    + (f64::from(sample.y) - client.camera().position().y) * client.camera().zoom()
             );
         }
         let anchors = client.own_snake().unwrap().body().points().to_vec();
         let mut shifted = body.clone();
-        for sample in &mut shifted {
-            sample.x += 16.;
-        }
+        shifted[4].x += 16.;
         recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&shifted));
         let mutant = recorder.take().pop().unwrap();
         assert_eq!(client.own_snake().unwrap().body().points(), anchors);
         assert_eq!(&baseline.values[..38], &mutant.values[..38]);
-        let end = 38 + 2 * indices.len();
+        let end = 38 + 2 * body.len();
         assert_eq!(&baseline.values[end..], &mutant.values[end..]);
-        for j in 0..indices.len() {
+        for j in 0..body.len() {
             let displacement = mutant.values[38 + j * 2] - baseline.values[38 + j * 2];
-            assert!((displacement - 16. * client.camera().zoom()).abs() < 1e-10);
-            assert!(
-                displacement * 960. / 1500. > 1.,
-                "CSS-pixel body budget must fail"
-            );
+            if j == 4 {
+                assert!((displacement - 16. * client.camera().zoom()).abs() < 1e-10);
+                assert!(
+                    displacement * 960. / 1500. > 1.,
+                    "localized kink must fail the CSS-pixel budget"
+                );
+            } else {
+                assert_eq!(displacement, 0.);
+            }
         }
-        // The hard production sample cap plus stride bounds telemetry, including
-        // the tail even when its ordinal does not fall on the stride.
-        let mut bounded = vec![body[0]; super::super::MAX_CURVE_SAMPLES];
+        // The entire bounded output is retained; an oversized draw fails loudly.
+        let mut bounded = vec![body[0]; MAX_BODY_TRACE_POINTS];
         bounded.last_mut().unwrap().x += 32.;
         recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
         let row = recorder.take().pop().unwrap();
-        assert_eq!(row.values[37], 8193.);
+        assert_eq!(row.values[37] as usize, MAX_BODY_TRACE_POINTS);
         let tail = bounded.last().unwrap();
         assert_eq!(
-            row.values[38 + 8192 * 2],
+            row.values[38 + (MAX_BODY_TRACE_POINTS - 1) * 2],
             750. + (f64::from(tail.x) - client.camera().position().x) * client.camera().zoom()
+        );
+        bounded.push(body[0]);
+        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        assert!(recorder.has_failed());
+        assert!(recorder.last_draw().is_none());
+        assert!(recorder.take().is_empty());
+        assert_eq!(
+            recorder.take_errors(),
+            ["draw: prepared body has 8194 points; trace limit is 8193"]
         );
     }
 

@@ -246,22 +246,26 @@ test('identical unsafe own segment counts fail their own range guard', () => {
   assert.equal(run(p).status, 'invalid');
 });
 
-test('prepared curve displacement in the flat ABI fails body budget without moving anchors/head', () => {
+test('localized prepared curve kink in the flat ABI fails body budget without moving anchors/head', () => {
   const p = peers(), geometry = p.left.manifest.geometry, zoom = 1;
   // Camera + semantic own prefix, one prepared backing-pixel point, head/pupils.
   const cells = [0, 0, 0, 0, 1, 1, 2, 0, 0, 1, zoom,
     0, 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2, 0, 2, 1,
     1, 750, 422.5, 750, 422.5, 750, 422.5, 750, 422.5];
+    const pointCount = 17;
+  cells.splice(37, 3, pointCount, ...Array.from({ length: pointCount }, (_, i) => [750 + i, 422.5]).flat());
   const baseline = observation(['draw', 'synthetic-own-1', cells], geometry);
-  const shifted = [...cells]; shifted[38] += 16 * zoom;
+  const shifted = [...cells]; shifted[38 + 4 * 2] += 16 * zoom;
   const candidate = observation(['draw', 'synthetic-own-1', shifted], geometry);
+  assert.equal(baseline.own.body.length, 17);
+  for (let i = 0; i < 17; i++) if (i !== 4) assert.deepEqual(candidate.own.body[i], baseline.own.body[i]);
   assert.deepEqual(candidate.own.rawHead, baseline.own.rawHead);
   assert.deepEqual(candidate.own.correctedHead, baseline.own.correctedHead);
   for (const [trace, own] of [[p.left, baseline.own], [p.right, candidate.own]]) trace.samples[2].own = own;
   const report = run(p);
   assert.equal(report.passed, false);
-  const body = report.channels.find(c => c.channel === 'samples[].own.body[0]');
-  assert.equal(body.max, candidate.own.body[0].x - baseline.own.body[0].x);
+  const body = report.channels.find(c => c.channel === 'samples[].own.body[4]');
+  assert.equal(body.max, candidate.own.body[4].x - baseline.own.body[4].x);
   assert(body.max > 1);
 });
 test('prepared body trace limit and draw-only shape fail closed', () => {
@@ -270,4 +274,143 @@ test('prepared body trace limit and draw-only shape fail closed', () => {
   assert.throws(() => validateTrace(p.right, p.schedule), /at most 8193/);
   p.right = structuredClone(p.left); p.right.samples[1].own.body = [{ x: 1, y: 2 }];
   assert.throws(() => validateTrace(p.right, p.schedule), /prepared body only/);
+});
+
+
+for (const space of ['css', 'backing']) for (const axis of ['width', 'height']) test('zero ' + space + '.' + axis + ' is valid trace data but invalid positional comparison', () => {
+  const p = peers();
+  for (const trace of [p.left, p.right]) {
+    trace.manifest.geometry[space][axis] = 0;
+    for (const s of trace.samples) s.geometry[space][axis] = 0;
+    assert.doesNotThrow(() => validateTrace(trace, p.schedule));
+  }
+  // In particular, equal camera x and a zero backing width used to produce
+  // 0*Infinity => NaN and hide this unrelated y displacement.
+  assert.equal(p.left.samples[0].camera.x, p.right.samples[0].camera.x);
+  p.right.samples[0].camera.y += 1000;
+  const report = run(p);
+  assert.equal(report.status, 'invalid');
+  assert.equal(report.passed, false);
+  assert(report.errors.some(e => e.includes('geometry.' + space + '.' + axis + ': positive extent required')));
+  assert.doesNotThrow(() => stringify(report));
+});
+test('surface-only zero extent preserves usable CSS/backing positional checks', () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) {
+    t.manifest.geometry.surface = { width: 0, height: 0 };
+    for (const s of t.samples) s.geometry.surface = { width: 0, height: 0 };
+  }
+  assert(run(p).passed);
+  p.right.samples[0].camera.y += 1000;
+  assert(!run(p).passed);
+});
+test('a NaN error row from finite arithmetic fails with finite norm and RMS summaries', () => {
+  const p = history();
+  for (const t of [p.left, p.right]) for (const s of t.samples) {
+    s.camera.zoom = Number.MIN_VALUE;
+    s.geometry.css.width = 1;
+    s.geometry.backing.width = Number.MAX_SAFE_INTEGER;
+  }
+  p.left.samples[39].camera.x = -Number.MAX_VALUE;
+  p.right.samples[39].camera.x = Number.MAX_VALUE;
+  const s = p.left.samples[39];
+  const rawError = (p.right.samples[39].camera.x - s.camera.x) * (s.camera.zoom * s.geometry.css.width / s.geometry.backing.width);
+  assert(Number.isNaN(rawError), 'overflowed delta times underflowed positive projection creates a NaN error row');
+  const report = run(p), channel = report.channels.find(c => c.channel === 'samples[].camera.position');
+  assert.equal(report.status, 'mismatch');
+  assert.equal(channel.max, Number.MAX_VALUE);
+  assert(channel.rms > channel.threshold.max);
+  assert(channel.lastQuarterRms > channel.threshold.max);
+  for (const field of ['max', 'p95', 'rms', 'firstQuarterRms', 'lastQuarterRms']) assert(Number.isFinite(channel[field]), field);
+  assert.doesNotThrow(() => stringify(report));
+});
+for (const [field, endpoint] of [['deathProgress', 0], ['spawnProgress', 0], ['spawnProgress', 1], ['opacity', 0], ['opacity', 1]]) test(field + ' endpoint ' + endpoint + ' failure belongs to its metric channel', () => {
+  const p = peers();
+  p.left.samples[1].own[field] = endpoint;
+  p.right.samples[1].own[field] = endpoint + (endpoint === 0 ? 1e-6 : -1e-6);
+  const report = run(p), channel = report.channels.find(c => c.channel === 'samples[].own.' + field);
+  assert.equal(report.passed, false);
+  assert.equal(channel.firstFailure.path, 'samples[1].own.' + field + '.endpoint');
+  assert.equal(channel.firstFailure.reason, 'exact channel');
+  assert.deepEqual(channel.firstFailure, report.firstFailure);
+});
+
+
+test('extreme finite zoom with an unchanged axis is rejected before scaling', () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) for (const s of t.samples) s.camera.zoom = Number.MAX_VALUE;
+  p.right.samples[0].camera.y += 1;
+  assert.equal(p.left.samples[0].camera.x, p.right.samples[0].camera.x);
+  const report = run(p);
+  assert.equal(report.status, 'invalid');
+  assert(report.errors.some(e => e.includes('camera.zoom: required zoom')));
+  assert.doesNotThrow(() => stringify(report));
+  assert.doesNotThrow(() => validate(16, 'zoom'));
+  assert.throws(() => validate(16 + 1e-9, 'zoom'), /required zoom/);
+});
+test('maximum admitted zoom still detects a changed axis with an unchanged other axis', () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) for (const s of t.samples) s.camera.zoom = 16;
+  assert(run(p).passed);
+  p.right.samples[0].camera.y += 2 * p.right.samples[0].geometry.backing.height / (16 * p.right.samples[0].geometry.css.height);
+  const report = run(p);
+  assert.equal(report.status, 'mismatch');
+  assert(report.channels.find(c => c.channel === 'samples[].camera.position').max > 1);
+});
+for (const sign of [-1, 1]) test('three finite maximum errors produce serializable signed mean and CLI failure, sign ' + sign, async () => {
+  const p = history();
+  p.schedule.events = p.schedule.events.slice(0, 3);
+  p.schedule.boundaries = p.schedule.boundaries.slice(0, 3);
+  p.schedule.pictures = [0, 1, 2]; p.schedule.durationMs = 40;
+  for (const t of [p.left, p.right]) {
+    t.events = t.events.slice(0, 3); t.samples = t.samples.slice(0, 3);
+    t.manifest.geometry.css = { ...t.manifest.geometry.backing };
+    t.manifest.scheduleSha256 = scheduleHash(p.schedule);
+    Object.assign(t.final, { atMs: 40, events: 3, samples: 3, draws: 3, lastBoundaryId: p.schedule.boundaries.at(-1).id });
+    for (const s of t.samples) { s.geometry.css = { ...s.geometry.backing }; s.camera.x = 0; }
+  }
+  for (const s of p.right.samples) s.camera.x = sign * Number.MAX_VALUE;
+  const report = run(p), channel = report.channels.find(c => c.channel === 'samples[].camera.position');
+  assert.equal(report.status, 'mismatch');
+  assert.equal(channel.signedMean.x, sign * Number.MAX_VALUE);
+  assert.equal(channel.rms, Number.MAX_VALUE);
+  assert.doesNotThrow(() => stringify(report));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'feel-report-mean-'));
+  try {
+    const files = ['schedule', 'left', 'right'].map(n => path.join(dir, n + '.json'));
+    for (const [i, value] of [p.schedule, p.left, p.right].entries()) await writeFile(files[i], stringify(value));
+    const output = spawnSync(process.execPath, [cli, ...files], { encoding: 'utf8', timeout: 10000 });
+    assert.equal(output.status, 1, output.stderr);
+    assert.equal(parse(output.stdout).status, 'mismatch');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+test('CLI rejects zero CSS width even when all derived errors would be finite', async () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) {
+    t.manifest.geometry.css.width = 0;
+    for (const s of t.samples) s.geometry.css.width = 0;
+  }
+  p.right.samples[0].camera.x += 1e9;
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'feel-report-zero-css-'));
+  try {
+    const files = ['schedule', 'left', 'right'].map(n => path.join(dir, n + '.json'));
+    for (const [i, value] of [p.schedule, p.left, p.right].entries()) await writeFile(files[i], stringify(value));
+    const output = spawnSync(process.execPath, [cli, ...files], { encoding: 'utf8', timeout: 10000 });
+    assert.equal(output.status, 1, output.stderr);
+    const report = parse(output.stdout);
+    assert.equal(report.status, 'invalid');
+    assert(report.errors.some(e => e.includes('geometry.css.width')));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('finite per-axis errors whose norm overflows still fail and serialize', () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) for (const s of t.samples) s.geometry.css = { ...s.geometry.backing };
+  p.left.samples[0].camera.x = p.left.samples[0].camera.y = 0;
+  p.right.samples[0].camera.x = p.right.samples[0].camera.y = Number.MAX_VALUE;
+  assert.equal(Math.hypot(Number.MAX_VALUE, Number.MAX_VALUE), Infinity);
+  const report = run(p), channel = report.channels.find(c => c.channel === 'samples[].camera.position');
+  assert.equal(report.status, 'mismatch');
+  assert.equal(channel.max, Number.MAX_VALUE);
+  assert.doesNotThrow(() => stringify(report));
 });

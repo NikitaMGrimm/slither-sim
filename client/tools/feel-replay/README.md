@@ -54,12 +54,13 @@ Login/handshake bytes are excluded. Samples retain raw/predicted head, headings,
 prepared body centerline in CSS pixels, pupil positions, offsets, speed/size, spawn/death/boost
 phases, body opacity, camera, zoom, quality, geometry and preparation status.
 The body channel copies the actual own-body painter samples at draw preparation,
-with fixed stride eight (ordinals 0, 8, 16, ...) plus the final tail sample: at most
-8,193 points from the production 65,536-sample cap. The flat ABI projects prepared
-world positions to backing pixels; both decoders convert to CSS pixels before
-comparison. Updates, culled/expired bodies and preparations without a body carry
-an empty list. Anchors are not recorded. This fixed spatial sampling can miss
-changes confined to omitted ordinals; it never realigns or resamples two traces.
+in original order, including every prepared point. The trace limit is 8,193
+points per own-body draw; larger outputs mark the measuring run incomplete and
+emit an explicit recorder error rather than omitting points. The production
+65,536-sample rendering limit is unchanged. The flat ABI projects prepared world
+positions to backing pixels; both decoders convert to CSS pixels. Updates,
+culled/expired bodies and preparations without a body carry an empty list.
+Anchors are not recorded, and no spatial subsampling is performed.
 Production correction rings remain private; their cells, cursors and pending
 counters are absent from this schema and both flat-ABI decoders.
 
@@ -89,6 +90,17 @@ camera diagnostics convert using declared zoom/backing geometry; prepared body
 points are already CSS pixels. Camera and
 projected head are independent channels. Positions use p95 ≤0.5 px/max ≤1 px;
 headings use shortest wrapped differences with p95 ≤0.25°/max ≤0.5°.
+Zero CSS/backing extents remain valid trace observations (for example minimized
+windows), but positional comparisons require positive width and height in both
+spaces. A zero extent makes the comparison invalid even when both peers have
+identical geometry; no positional match is inferred for an undefined projection.
+Surface-only zero extents do not affect these conversions. NaN or infinite
+arithmetic errors saturate to a finite failing magnitude, never an accepted zero.
+Replay zoom must be finite and within (0, 16], a generous instrumentation ceiling
+above production camera targets. Together with positive safe-integer extents,
+this bounds the projection scale. Per-axis/norm overflows still fail. Report means
+and bias windows sum normalized components before restoring scale, so even extreme
+finite failures remain valid, serializable JSON.
 Zoom must pass absolute 0.0005, relative 0.001 and diagonal viewport-edge 1 px
 limits independently. Spawn/death/boost phase and body opacity use p95 0.01/max
 0.02; hidden/fully-shown endpoints and visibility remain exact. Spawn/death phase
@@ -103,7 +115,8 @@ thresholds, 500 ms sustained-bias flag and quarter RMS. Vector means retain both
 signed components. Bias above half the hard maximum for at least 500 ms is a
 flag. Last-quarter RMS minus first-quarter RMS above half the maximum fails when
 both quarters have at least 10 eligible draws. Each metric's limits are evaluated
-independently. Reports retain all violations and the first failing boundary.
+independently. Reports retain all violations and the first failing boundary. Exact endpoint
+violations are attributed to their parent numeric channel as well.
 
 See [browser peers](browser-peers.md) and [native/desktop peers](native-peer.md)
 for production paths and executable commands. No exact-only report, platform-math

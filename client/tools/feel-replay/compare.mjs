@@ -4,7 +4,9 @@ import { scheduleHash } from './io.mjs';
 const position = { unit: 'CSS px', p95: 0.5, max: 1 };
 const heading = { unit: 'degrees', p95: 0.25, max: 0.5 };
 const phase = { unit: 'normalized phase', p95: 0.01, max: 0.02 };
-const finiteError = value => Number.isFinite(value) ? value : Math.sign(value) * Number.MAX_VALUE;
+// Nonfinite arithmetic is a failure, including NaN (whose sign is also NaN).
+// Keep the failure report finite JSON; norm and RMS use this same saturation.
+const finiteError = value => Number.isFinite(value) ? value : value < 0 ? -Number.MAX_VALUE : Number.MAX_VALUE;
 const norm = values => finiteError(Math.hypot(...values));
 const rms = rows => {
   const max = rows.reduce((max, r) => Math.max(max, r.error), 0);
@@ -27,6 +29,13 @@ export function compareTraces(left, right, schedule) {
   for (const [name, trace] of [['left', left], ['right', right]]) {
     try {
       validateTrace(trace, schedule);
+      // Zero extents are valid minimized/resize observations, but do not define
+      // a CSS-pixel projection. Never turn an unavailable position into a match.
+      trace.samples.forEach((sample, i) => {
+        for (const space of ['css', 'backing']) for (const axis of ['width', 'height']) {
+          if (sample.geometry[space][axis] === 0) throw new Error(`trace.samples[${i}].geometry.${space}.${axis}: positive extent required for positional comparison`);
+        }
+      });
       if (trace.manifest.scheduleSha256 !== scheduleHash(schedule)) throw new Error('manifest.scheduleSha256: schedule hash mismatch');
     } catch (error) { errors.push(name + '.' + error.message); }
   }
@@ -106,7 +115,12 @@ export function compareTraces(left, right, schedule) {
   for (const { rows, ...budget } of metrics.values()) {
     const sorted = rows.map(r => r.error).sort((a, b) => a - b);
     const p95 = sorted[Math.ceil(rows.length * 0.95) - 1];
-    const mean = rows[0].signed.map((_, i) => rows.reduce((sum, r) => sum + r.signed[i] / rows.length, 0));
+    // Sum dimensionless components, then restore scale only after averaging.
+    // Dividing MAX_VALUE by n before summing can still round up to Infinity.
+    const scales = rows[0].signed.map((_, i) => rows.reduce((max, r) => Math.max(max, Math.abs(r.signed[i])), 0));
+    const normalized = (value, i) => scales[i] === 0 ? 0 : value / scales[i];
+    const restoreMean = (sum, i, count) => finiteError(scales[i] * Math.max(-1, Math.min(1, sum / count)));
+    const mean = scales.map((_, i) => restoreMean(rows.reduce((sum, r) => sum + normalized(r.signed[i], i), 0), i, rows.length));
     const draws = rows.filter(r => r.draw), quarter = Math.floor(draws.length / 4);
     const firstQuarterRms = quarter >= 10 ? rms(draws.slice(0, quarter)) : null;
     const lastQuarterRms = quarter >= 10 ? rms(draws.slice(-quarter)) : null;
@@ -114,12 +128,12 @@ export function compareTraces(left, right, schedule) {
     const sum = Array(rows[0].signed.length).fill(0);
     for (let end = 0; end < rows.length; end++) {
       if (rows[end].error <= budget.max / 2) { start = end + 1; sum.fill(0); continue; }
-      rows[end].signed.forEach((v, i) => { sum[i] += v / rows.length; });
+      rows[end].signed.forEach((v, i) => { sum[i] += normalized(v, i); });
       while (start < end && rows[end].atMs - rows[start + 1].atMs >= 500) {
-        rows[start++].signed.forEach((v, i) => { sum[i] -= v / rows.length; });
+        rows[start++].signed.forEach((v, i) => { sum[i] -= normalized(v, i); });
       }
       if (rows[end].atMs - rows[start].atMs >= 500
-        && norm(sum.map(v => v * rows.length / (end - start + 1))) > budget.max / 2) bias500ms = true;
+        && norm(sum.map((v, i) => restoreMean(v, i, end - start + 1))) > budget.max / 2) bias500ms = true;
     }
     if (budget.p95 !== undefined && p95 > budget.p95) {
       for (const row of rows.filter(r => r.error > budget.p95)) mismatches.push({ path: row.path, reason: 'p95', error: row.error, p95, threshold: budget.p95 });
@@ -135,7 +149,7 @@ export function compareTraces(left, right, schedule) {
   mismatches.sort((a, b) => (Number(a.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1) - Number(b.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1)));
   for (const channel of channels) {
     const paths = channelPaths.get(channel.channel);
-    if (paths) channel.firstFailure = mismatches.find(m => paths.has(m.path)) ?? null;
+    if (paths) channel.firstFailure = mismatches.find(m => paths.has(m.path.replace(/\.endpoint$/, ''))) ?? null;
   }
   return result(channels);
 }

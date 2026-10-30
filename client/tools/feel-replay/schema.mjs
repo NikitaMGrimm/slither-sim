@@ -4,6 +4,8 @@ const list = (schema, length) => ({ list: schema, ...(length === undefined ? {} 
 const choice = (...values) => ({ choice: values });
 const point = type => ({ x: type, y: type });
 const extent = { width: 'uint', height: 'uint' };
+// Above production camera targets; also bounds zoom * safe-integer CSS extents.
+export const MAX_REPLAY_ZOOM = 16;
 const geometry = { css: extent, backing: extent, surface: extent, dpr: 'positive' };
 const boundary = {
   id: 'string', eventSeq: 'uint', phase: choice('update', 'draw', 'prepare', 'submit', 'commit'),
@@ -72,6 +74,7 @@ export function validate(value, schema, path = '$') {
       if (schema === 'unit') ok &&= value >= 0 && value <= 1;
       if (schema === 'time') ok &&= value >= 0;
       if (schema === 'positive' || schema === 'zoom') ok &&= value > 0;
+      if (schema === 'zoom') ok &&= value <= MAX_REPLAY_ZOOM;
       if (schema === 'int') ok &&= Number.isSafeInteger(value);
       if (schema === 'uint' || schema === 'byte') ok &&= Number.isSafeInteger(value) && value >= 0;
       if (schema === 'byte') ok &&= value <= 255;
