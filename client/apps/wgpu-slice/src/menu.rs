@@ -28,6 +28,8 @@ pub fn check_menu_draws(count: usize) -> Result<()> {
 /// Immutable prepared resources survive subsequent resize, retirement and art replacement.
 pub struct MenuFrame {
     pub frame: Frame,
+    /// Page colour below the world, in the frame's coordinate space; absent when login is hidden.
+    pub backdrop: Option<Draw>,
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
@@ -40,7 +42,7 @@ impl MenuFrame {
             f64::from(extent[0]) * self.frame.viewport_scale / f64::from(self.frame.extent[0]),
             f64::from(extent[1]) * self.frame.viewport_scale / f64::from(self.frame.extent[1]),
         ];
-        for draw in &mut self.frame.draws {
+        for draw in self.frame.draws.iter_mut().chain(&mut self.backdrop) {
             // Menu composition emits axis-aligned images, unlike world bodies.
             if draw.rotation != 0. {
                 return Err("Rotated menu host mapping".into());
@@ -62,9 +64,11 @@ impl MenuFrame {
         self.frame.viewport_scale = 1.;
         Ok(self)
     }
-    /// Append in paint order. A failed whole-picture admission publishes nothing.
+    /// Put the page below every world draw and menu controls above them.
+    /// A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
-        check_menu_draws(self.frame.draws.len())?;
+        let count = self.frame.draws.len() + usize::from(self.backdrop.is_some());
+        check_menu_draws(count)?;
         if self.frame.extent != picture.frame.extent
             || self.frame.viewport_scale != picture.frame.viewport_scale
         {
@@ -88,7 +92,10 @@ impl MenuFrame {
         {
             return Err("Menu whole-picture pixel budget".into());
         }
-        frame::reserve_draws(&mut picture.frame.draws, self.frame.draws.len())?;
+        frame::reserve_draws(&mut picture.frame.draws, count)?;
+        if let Some(backdrop) = self.backdrop {
+            picture.frame.draws.insert(0, backdrop);
+        }
         picture.frame.draws.extend(self.frame.draws);
         picture.resources = std::mem::take(&mut resources).into_values().collect();
         Ok(())
@@ -141,7 +148,7 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
     }
 }
 impl Composition<'_> {
-    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+    fn solid_draw(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<Draw> {
         let key = (1, 1, kind, 0);
         if !self.materials.contains_key(&key) {
             let resource = if let Some(resource) = self.old.get(&key) {
@@ -174,7 +181,11 @@ impl Composition<'_> {
             };
             self.materials.insert(key, resource);
         }
-        self.push(image(&self.materials[&key], r, alpha))
+        Ok(image(&self.materials[&key], r, alpha))
+    }
+    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+        let draw = self.solid_draw(r, kind, alpha)?;
+        self.push(draw)
     }
     fn push(&mut self, draw: Draw) -> Result<()> {
         check_menu_draws(self.draws.len() + 1)?;
@@ -303,9 +314,8 @@ impl Menu {
             labels: Vec::new(),
         };
         let a = view.login_alpha;
-        if view.visible {
-            // The host places this opaque page colour below the fading world.
-            c.solid(
+        let backdrop = if view.visible {
+            Some(c.solid_draw(
                 MenuRect {
                     x: 0.,
                     y: 0.,
@@ -314,7 +324,11 @@ impl Menu {
                 },
                 10,
                 1.,
-            )?;
+            )?)
+        } else {
+            None
+        };
+        if view.visible {
             let qr = layout.viewport_rect(E::Quality);
             if self.focus == Some(E::Quality) {
                 c.control(qr, 4, a * 0.35)?;
@@ -577,6 +591,7 @@ impl Menu {
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
+                check_menu_draws(c.draws.len() + usize::from(backdrop.is_some()))?;
                 let frame = Frame {
                     identity: 0,
                     extent,
@@ -588,6 +603,7 @@ impl Menu {
                 frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;
                 Ok(MenuFrame {
                     frame,
+                    backdrop,
                     resources: resources.into_values().collect(),
                 })
             },

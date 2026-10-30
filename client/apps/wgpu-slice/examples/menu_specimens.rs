@@ -18,6 +18,10 @@ fn capture_scaled(
     file: &Path,
     physical: Option<[u32; 2]>,
 ) -> Result<()> {
+    let mut frame = p.frame.clone();
+    if let Some(backdrop) = &p.backdrop {
+        frame.draws.insert(0, backdrop.clone());
+    }
     renderer.sync_resources(&p.resources)?;
     let [width, height] = physical.unwrap_or(p.frame.extent);
     let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
@@ -51,7 +55,7 @@ fn capture_scaled(
             view_formats: &[],
         });
         let source = backing.create_view(&Default::default());
-        renderer.render(&p.frame, &source)?;
+        renderer.render(&frame, &source)?;
         // Same linear final scaling as SurfaceHost::present_scaled.
         let blitter = wgpu::util::TextureBlitterBuilder::new(
             &renderer.device,
@@ -68,7 +72,7 @@ fn capture_scaled(
         );
         renderer.queue.submit([encoder.finish()]);
     } else {
-        renderer.render(&p.frame, &texture.create_view(&Default::default()))?;
+        renderer.render(&frame, &texture.create_view(&Default::default()))?;
     }
     let row = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
@@ -129,7 +133,7 @@ fn capture_scaled(
     println!(
         "{} draws={} pixel_bytes={}",
         file.display(),
-        p.frame.draws.len(),
+        frame.draws.len(),
         p.resources
             .iter()
             .map(|r| r.image.pixels.len())

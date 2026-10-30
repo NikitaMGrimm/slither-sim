@@ -264,6 +264,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
         .unwrap();
     let draw = p.frame.draws[0].clone();
     let make = |count| slither_wgpu_slice::menu::MenuFrame {
+        backdrop: None,
         frame: slither_wgpu_slice::frame::Frame {
             draws: vec![draw.clone(); count],
             ..p.frame.clone()
@@ -330,7 +331,7 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
             let material_scale = dpr.min(1.5);
             let pad = (40. * material_scale).ceil() / material_scale;
-            let shape = p.frame.draws[1].destination;
+            let shape = p.frame.draws[0].destination;
             assert!((shape.x + pad - nick.x).abs() <= 2.);
             assert!((shape.y + pad - nick.y).abs() <= 2.);
             assert!((shape.x + shape.width - pad - nick.x - nick.width).abs() <= 2.);
@@ -453,7 +454,7 @@ fn page_backdrop_keeps_its_colour_and_opacity_through_the_crossfade() {
                 0,
             )
             .unwrap();
-        let backdrop = &p.frame.draws[0];
+        let backdrop = p.backdrop.as_ref().unwrap();
         let resource = p
             .resources
             .iter()
@@ -502,5 +503,59 @@ fn disabled_play_dims_the_normal_surface_and_label_together() {
         assert_eq!(a.asset, b.asset);
         assert_eq!(a.destination, b.destination);
         assert!((b.effective_alpha / a.effective_alpha - 0.38).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
+    use slither_wgpu_slice::render::PreparedFrame;
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    let base = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    let world: Vec<_> = base
+        .frame
+        .draws
+        .iter()
+        .take(3)
+        .cloned()
+        .enumerate()
+        .map(|(i, mut d)| {
+            d.translation = [11. * i as f64, 13.];
+            d.effective_alpha = 1.;
+            d
+        })
+        .collect();
+    for (visible, spinner) in [(true, false), (false, false), (false, true)] {
+        view.visible = visible;
+        view.spinner_visible = spinner;
+        view.spinner_alpha = 1.;
+        view.spinner_scale = 0.9;
+        let prepared = menu
+            .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+            .unwrap();
+        assert_eq!(prepared.backdrop.is_some(), visible);
+        let backdrop = prepared.backdrop.clone();
+        let controls = prepared.frame.draws.clone();
+        let mut picture = PreparedFrame {
+            frame: slither_wgpu_slice::frame::Frame {
+                draws: world.clone(),
+                ..base.frame.clone()
+            },
+            resources: base.resources.clone(),
+        };
+        prepared.append_to(&mut picture).unwrap();
+        let first_world = usize::from(visible);
+        if let Some(backdrop) = backdrop {
+            assert_eq!(picture.frame.draws[0], backdrop);
+            assert!(picture.resources.iter().any(|r| r.asset == backdrop.asset));
+        }
+        assert_eq!(
+            &picture.frame.draws[first_world..first_world + world.len()],
+            world
+        );
+        assert_eq!(&picture.frame.draws[first_world + world.len()..], controls);
     }
 }
