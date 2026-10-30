@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Bot, Recorder, headingDanger, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseLocalServer } from './slither-headless.mjs';
 
 const COLLECTOR_SOURCE = captureSourceIdentity(import.meta.url);
 
@@ -309,9 +309,7 @@ export async function recordFeedingShape({ out, server, seconds = 480, plan, ori
     throw Error('use --out, --server ip:port and 1..480 seconds');
   origin = validateOrigin(origin);
   if (fs.existsSync(out)) throw Error(`refusing to overwrite ${out}`);
-  const [ip, portText] = server.split(':');
-  const port = Number(portText);
-  if (!ip || !Number.isInteger(port) || port < 1 || port > 65535) throw Error('invalid server');
+  const { ip, port } = parseLocalServer(server);
   const batch = createCaptureBatch({ seconds, server, scenario: 'feeding-shape', serverBody: true,
     plan, origin }, 2, COLLECTOR_SOURCE);
   const state = new FeedingState(), bots = [], recorders = [];

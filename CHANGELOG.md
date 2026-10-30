@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- The fidelity toolkit now collects from local hosts only; official server
+  discovery and pilot preparation tools are removed. Earlier studies retain
+  their historical scripts and records.
+
 ### Added
 
 - A `perf_baseline` catalog row, `engine-battledome-spawn-318`, that times

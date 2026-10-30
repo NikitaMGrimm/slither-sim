@@ -53,6 +53,8 @@ def capture_command(study, output, node="node"):
     address = ipaddress.ip_address(capture["server"]["ip"])
     if address.version != 4:
         raise ValueError("this collector requires an explicit IPv4 server")
+    if not address.is_loopback or plan["dataOrigin"] != "local-simulator":
+        raise ValueError("collectors require a loopback server and local-simulator dataOrigin")
     if capture["scenario"] in ("preyprobe", "boundaryprobe", "visibilityprobe", "speedprobe", "food-lanes") and capture["bots"] != 1:
         raise ValueError("this scenario requires exactly one client")
     executable = shutil.which(node)
@@ -72,10 +74,7 @@ def capture_command(study, output, node="node"):
         command.extend(["--mode", capture["mode"]])
         if "direction" in capture:
             command.extend(["--direction", capture["direction"]])
-    elif collision:
-        if plan["dataOrigin"] == "official-server":
-            command.extend(["--allow-outside", "yes"])
-    elif not food_lanes:
+    elif not food_lanes and not collision:
         command.extend(["--bots", str(capture["bots"]), "--scenario", capture["scenario"]])
     if "origin" in capture:
         command.extend(["--origin", capture["origin"]])

@@ -42,18 +42,19 @@ not blinded validation.
 
 ## Plan a real measurement
 
-Collection requires an explicit protocol-19 WebSocket IPv4 address/port and
-`/slither` path; tools do not discover servers. Recordings contain raw received
-packets and sent controls, without server-only state.
+The toolkit collects from local hosts only. Collection requires an explicit
+protocol-19 WebSocket loopback IPv4 address/port and `/slither` path; tools do not
+discover servers. Collecting from outside servers needs the owner's authorization
+for that task (see [AGENTS.md](https://github.com/NikitaMGrimm/slither-sim/blob/main/AGENTS.md)).
+Recordings contain raw received packets and sent controls, without server-only state.
 
 Copy [the movement plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/movement-plan.json). Specify:
 
 - Study ID, question, competing explanations and method.
 - Sampling unit, attempt budget, exclusions and held-out validation.
-- Operator-supplied protocol-19 IP/port and actual `dataOrigin`: `local-simulator`
-  for the template's loopback `127.0.0.1:8766` at `/slither`, or `community-server`
-  for another compatible server. Set HTTP(S) `capture.origin` when the endpoint
-  requires it; official servers close handshakes without `http://slither.io`.
+- Operator-supplied protocol-19 loopback IP/port and `dataOrigin: local-simulator`,
+  as in the template's `127.0.0.1:8766` at `/slither`. Set HTTP(S) `capture.origin`
+  if your local host requires it.
 
 Freeze confirmatory predictions and selection rules before collection; label
 exploratory results. A plan hash cannot prove when or why it was written.
@@ -66,7 +67,7 @@ uv run --locked --only-group tools python tools/fidelity/evidence.py init --plan
 uv run --locked --only-group tools python tools/fidelity/collect.py outputs/your-study --dry-run
 ```
 
-To collect on that server:
+To collect on that local host:
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/collect.py outputs/your-study
@@ -218,14 +219,11 @@ tandem lateral-offset ladder and head-on crossings with reversed roles/join
 order. It records both own streams, actual sent bytes, staging failures,
 qualification samples and post-event deaths in the ordinary archive format.
 `paired-collision` capture plans require exactly two bots and at most 600 seconds;
-no paired `mode` or `direction` fields apply. Outside endpoints require an
-explicit official-server plan and `--allow-outside yes`; the default is loopback.
+no paired `mode` or `direction` fields apply. The collector accepts loopback
+endpoints only.
 
-The [pilot plan and commands](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/README.md)
-freeze population selection, trial qualification, uncertainty and stop rules.
-The offline preparer binds retained selection metadata without probing any
-server. `collect.py` rejects pilot two after failed integrity, zero qualified
-ladder/head-on trials or excessive third-party contamination in pilot one.
+`collect.py` rejects a second attempt after failed integrity, zero qualified
+ladder/head-on trials or excessive third-party contamination in the first attempt.
 Only the coordinator owns reconnection, waiting for both close handshakes before
 the next ordered joins. Run no other game collectors during acquisition.
 
@@ -244,29 +242,6 @@ Simulator API. These verify current simulator outcomes, not online laws or
 live-server feasibility. Raw local test archives remain outside Git, including
 failures; the test prints their location. Use `CARGO_BUILD_JOBS=2` and
 `RAYON_NUM_THREADS=2` on a shared machine.
-
-#### Busy official servers
-
-Every controlled route tried on official servers so far stopped on interference
-before reaching its coverage gate:
-
-- The [visibility pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-visibility-pilot/REPORT.md)
-  produced no qualified crossing: every leg paused for staleness and avoidance.
-- The [collision pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-collision-pilot/EXECUTION.md)
-  lost five of seven slots to third-party proximity and one to the rim margin
-  before a join failed.
-- The [food-interest pilot](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-food-interest/REPORT.md)
-  ended at its first avoidance abort after three slots, as the
-  [October 23 food lanes](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-23-visibility-recheck/REPORT.md)
-  had after 13 seconds.
-
-Before freezing another route, show offline that it survives interference.
-Restage or re-site after an abort within a fixed budget instead of ending the
-invocation. Keep the staging footprint away from the rim, pace reconnects and
-screen opponent bodies, not just heads. Check that the freshness gates can pass
-from the planned vantage: every October 23 food reintroduction failed the
-anchor-age gate.
-Keep failed pilots as evidence; a rerun of the same controller is not new data.
 
 ### Capture records
 

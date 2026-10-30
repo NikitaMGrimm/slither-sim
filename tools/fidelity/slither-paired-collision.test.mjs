@@ -58,11 +58,11 @@ test('ladder survival requires full target hold; contact is own game-over, never
   const lost = running(); lost.update(0, pair(lost.offset)); lost.update(125, [null, null]);
   assert.equal(lost.result.qualified, false);
 });
-test('default network gate refuses every outside address before making a socket or output', () => {
-  assert.throws(() => validateOptions({ out: 'unused', server: '192.0.2.1:444' }), /outside/);
+test('network gate refuses every outside address before making a socket or output', () => {
+  assert.throws(() => validateOptions({ out: 'unused', server: '192.0.2.1:444', allowOutside: true }), /loopback/);
   assert.throws(() => validateOptions({ out: 'unused', server: 'example.com:444' }), /IPv4/);
-  assert.equal(validateOptions({ out: 'unused', server: '127.0.0.1:8766' }).local, true);
-  assert.throws(() => parseArgs(['--allow-outside', 'true']), /yes/);
+  assert.equal(validateOptions({ out: 'unused', server: '127.0.0.1:8766' }).ip, '127.0.0.1');
+  assert.throws(() => parseArgs(['--allow-outside', 'yes']), /invalid/);
   assert.throws(() => parseArgs(['--out', 'a', '--out', 'b']), /repeated/);
 });
 

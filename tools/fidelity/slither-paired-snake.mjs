@@ -1,9 +1,8 @@
 // Controlled acquisition waypoints, not measured server visibility ranges.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isIP } from 'node:net';
 import { Bot, Recorder, headingDanger, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseLocalServer } from './slither-headless.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
 const TAU = Math.PI * 2;
@@ -364,9 +363,7 @@ function validateOptions({ out, server, seconds, mode, direction, origin }) {
       seconds < 1 || seconds > PAIR_SNAKE.maxSeconds) throw Error('use --out, --server ip:port and 1..3600 seconds');
   if (mode !== 'crossing') throw Error('use --mode crossing');
   validateDirection(direction); validateOrigin(origin);
-  const parts = server.split(':');
-  if (parts.length !== 2 || isIP(parts[0]) !== 4 || !/^\d+$/.test(parts[1]) ||
-      Number(parts[1]) < 1 || Number(parts[1]) > 65535) throw Error('invalid server');
+  parseLocalServer(server);
 }
 
 export function parseArgs(argv) {
