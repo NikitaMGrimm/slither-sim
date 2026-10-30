@@ -530,18 +530,23 @@ fn replacement_admission_uses_final_pixels_in_both_producer_orders() {
 #[test]
 fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_family() {
     let mut c = TextCache::default();
-    for (family, a, d, file) in [
-        (Family::Arial, 16., 4., "arial.ttf"),
-        (Family::Lucida, 20., 8., "l_10646.ttf"),
+    for (family, file) in [
+        (Family::Arial, "arial.ttf"),
+        (Family::Lucida, "l_10646.ttf"),
     ] {
         let s = TextStyle {
             family,
             slant: Slant::Normal,
             ..style()
         };
+        let reference = c.measure_panel("", s).unwrap();
+        assert!(reference.font_ascent > 0. && reference.font_descent > 0.);
         for text in ["ace", "Ace", "..."] {
             let m = c.measure_panel(text, s).unwrap();
-            assert_eq!((m.font_ascent, m.font_descent), (a, d));
+            assert_eq!(
+                (m.font_ascent, m.font_descent),
+                (reference.font_ascent, reference.font_descent)
+            );
         }
         if family == Family::Lucida {
             for weight in [Weight::Normal, Weight::Bold] {
@@ -554,7 +559,7 @@ fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_fami
                         c.measure_panel("Length", TextStyle { weight, slant, ..s })
                             .unwrap()
                             .font_ascent,
-                        a
+                        reference.font_ascent
                     );
                 }
             }
@@ -568,7 +573,7 @@ fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_fami
 
 #[cfg(windows)]
 #[test]
-fn mixed_installed_fonts_use_each_inline_box_half_leading() {
+fn mixed_installed_fonts_center_one_maximum_strut() {
     let mut cache = TextCache::default();
     let arial = TextStyle {
         size: 24.,
@@ -602,5 +607,10 @@ fn mixed_installed_fonts_use_each_inline_box_half_leading() {
     )
     .unwrap();
     assert_eq!(p.runs.len(), 2);
-    assert!(p.runs.iter().all(|r| r.position[1] == 24.));
+    let a = cache.measure_panel("", arial).unwrap();
+    let l = cache.measure_panel("", lucida).unwrap();
+    let expected =
+        (32. + a.font_ascent.max(l.font_ascent) - a.font_descent.max(l.font_descent)) / 2.;
+    assert!(p.runs.iter().all(|r| r.position[1] == expected));
+    assert!((expected - 24.).abs() <= 2.);
 }

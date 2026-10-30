@@ -60,6 +60,13 @@ pub struct TextStyle {
     /// Straight sRGB bytes.
     pub color: [u8; 3],
 }
+impl TextStyle {
+    /// Explicit logical line cell for automatically sized panel text.
+    /// Perceptual spacing policy; independent of platform font tables and DPR.
+    pub fn line_height(self) -> f64 {
+        (1.15 * self.size).round()
+    }
+}
 /// Horizontal text anchor.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TextAlign {

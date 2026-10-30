@@ -96,7 +96,7 @@ struct Content {
     family: Family,
     slant: Slant,
     clip: Option<[u64; 4]>,
-    // Exact RGB also identifies the native luminance-dependent coverage table.
+    // Exact RGB also identifies the native luminance-dependent coverage curve.
     color: [u8; 3],
     shadow: Option<[u64; 3]>,
     line_height: Option<u64>,
@@ -197,20 +197,6 @@ impl TextCache {
         style: TextStyle,
     ) -> Result<slither_client::presentation::TextMeasurement> {
         self.rasterizer.measure(text, style)
-    }
-    /// Backend CSS-normal line box, including the face's line gap. This does not
-    /// rasterize text or put dynamic placement/opacity in cache keys.
-    pub fn normal_panel_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
-        if !scale.is_finite()
-            || scale <= 0.
-            || scale > 8192.
-            || !style.size.is_finite()
-            || style.size <= 0.
-            || style.size > 24.
-        {
-            return Err("Panel normal font scale/style".into());
-        }
-        self.rasterizer.normal_line_height(style, scale)
     }
     /// Exact deterministic native face choice, including Lucida substitutions.
     #[cfg(not(target_arch = "wasm32"))]

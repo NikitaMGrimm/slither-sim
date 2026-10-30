@@ -218,7 +218,7 @@ fn chunk_end(text: &str, start: usize) -> usize {
     }
     end
 }
-// Advances are logical; font boxes stay in device pixels until leading is resolved.
+// Convert complete-run metrics to logical pixels once, before line layout.
 struct Measured {
     advance: f64,
     font_ascent: f64,
@@ -236,7 +236,7 @@ fn measured(
     let v = m.measure(
         text,
         TextStyle {
-            size: f64::from(style.size as f32 * scale as f32),
+            size: style.size * scale,
             ..style
         },
     )?;
@@ -256,14 +256,10 @@ fn measured(
     {
         return Err("Invalid panel metrics");
     }
-    // Blink rounds font boxes in device pixels before DOM layout. GetFontHeight
-    // also uses integer A/D for tiny fonts, unlike Canvas's float font box.
-    // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/font_metrics.cc#L104-L121
-    // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/font_metrics.h#L164-L171
     Ok(Measured {
         advance: v.advance / scale,
-        font_ascent: v.font_ascent.round(),
-        font_descent: v.font_descent.round(),
+        font_ascent: v.font_ascent / scale,
+        font_descent: v.font_descent / scale,
     })
 }
 fn width(m: &mut impl TextMetrics, runs: &[Segment], scale: f64) -> Result<f64, &'static str> {
@@ -289,26 +285,16 @@ impl<M: TextMetrics> Layout<'_, M> {
         let b = self.block.bounds;
         let top = b.y + self.row as f64 * self.block.line_height;
         let height = self.block.line_height.min(b.y + b.height - top).max(0.);
-        let mut strut = [f64::NEG_INFINITY; 2];
+        let mut strut = [0_f64; 2];
         let scale = self.block.device_scale;
-        // Blink stores float line heights in 1/64 device-pixel LayoutUnits.
-        // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L473
-        // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L146-L151
-        let line_height =
-            f64::from((self.block.line_height as f32 * scale as f32 * 64.).round()) / 64.;
         for r in &self.line {
             let m = measured(self.metrics, &r.0, r.1, scale)?;
-            // CalculateLeadingSpace divides on the 1/64 LayoutUnit grid before
-            // flooring in device pixels, including negative leading. Assign the
-            // remainder below, then union per inline box.
-            // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/core/layout/inline/line_utils.cc#L35-L43
-            // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L617-L622
-            let leading = line_height - m.font_ascent - m.font_descent;
-            let above = ((leading * 32.).trunc() / 64.).floor();
-            strut[0] = strut[0].max(m.font_ascent + above);
-            strut[1] = strut[1].max(m.font_descent + leading - above);
+            strut[0] = strut[0].max(m.font_ascent);
+            strut[1] = strut[1].max(m.font_descent);
         }
-        let baseline = top + strut[0] / scale;
+        // Center one font strut in the explicit cell, even for compact cells.
+        // Ink never changes the baseline or the following line's position.
+        let baseline = top + (self.block.line_height - strut[0] - strut[1]) / 2. + strut[0];
         let mut x = b.x;
         for r in &self.line {
             let full = measured(self.metrics, &r.0, r.1, scale)?.advance;

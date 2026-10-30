@@ -200,8 +200,7 @@ fn all_four_branches_preserve_fragment_alpha_gap_geometry_and_fade_resources() {
                 .plan(&g.client().announcement_view(), &mut g.bank.text, 1.)
                 .unwrap();
             assert_eq!(&alpha[..3], &[0.5, 1., 0.5]);
-            // Windows Arial's normal 17px cell includes its 1px rounded hhea gap;
-            // font-box ascent/descent alone produces 19px and shifts later blocks.
+            // Explicit typography policy: round(1.15 * 17) = 20px.
             assert_eq!(plan.runs[0].clip.height, 20.);
             assert_eq!(plan.runs[3].clip.y, 29.);
             assert_eq!(plan.runs[0].text, "\"");

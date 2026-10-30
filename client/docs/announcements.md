@@ -52,12 +52,12 @@ repeated layout visits only a bounded visible prefix. Production `LocalGame`
 enables tracking before ingress and passes the existing
 step lifecycle to the shared owner. Native and browser WebGPU preserve source
 fragment indices through bounded layout and multiply each alpha by the retained
-fade at submission. CSS-normal line height includes the backend font box and
-line gap; the quote
-keeps its 5px gap. Native reads installed Windows font metrics. Browser WebGPU
-measures one invisible DOM span per face/size/density, removes it immediately and
-retains a bounded 16-entry metric cache; Canvas TextMetrics omits the line gap.
-At DPR1 the quote occupies 20px, then 5px gap, with 15px attribution/length rows.
+fade at submission. Each block uses the largest explicit
+`TextStyle::line_height()` among its runs: `round(1.15 * font_size)` logical
+pixels. The quote keeps its 5px gap. Native uses fontdue metrics; browser WebGPU
+uses Canvas metrics. A single centered maximum-ascent/descent strut places each
+baseline, independent of ink and DPR rounding. The quote occupies 20px, then a
+5px gap, with 15px attribution/length rows.
 The world precedes announcements, then minimap and HUD.
 Announcement slots and the 96-draw producer bound are independent of
 HUD/nickname quotas. There is no draw reservation or visibility-dependent
