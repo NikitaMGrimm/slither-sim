@@ -107,6 +107,23 @@ python3 tables.py selected-results.json
 
 No access to cloud resources is needed for reduction.
 
+Post-result nearest-rank correction (the historical ladder is unchanged):
+
+```sh
+python3 check_quantiles.py
+git show 55f2921594aff00044624e47a8a1f90c4ee0b073:research/performance/2026-10-30-official-500-acceptance/selected-results.json > prior-selected.json
+python3 correct_tails.py PRIVATE_RUN1_RESULTS.tar.gz prior-selected.json tail-correction.json
+python3 tables.py prior-selected.json
+```
+
+The correction reuses the actual helper definitions and verified raw CPU rows /
+histograms. It asserts every non-tail value is identical. `prior-selected.json`
+then equals the corrected published selected results; the correction receipt
+lists all four changed values. `select.py` now compares every gate, count, mean
+and non-tail replay value exactly, allowing the declared report-only quantiles
+and their derived seven-ms flag to differ from the retained online calculation.
+The pre-correction exact online/offline replay was already verified on AWS.
+
 The retained run-1 archive is local-only, SHA-256
 `4002cf60512b63558e163e252db84f9f33782fb17efe415c35d70dda3a6323f9`
 (12,205,258 bytes); retrieval was verified before termination. The selected

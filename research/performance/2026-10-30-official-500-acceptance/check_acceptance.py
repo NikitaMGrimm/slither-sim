@@ -13,6 +13,8 @@ assert verdict(**args)['passes']
 for key in args:assert not verdict(**(args|{key:False}))['passes']
 assert not verdict(**args,accounting=False)['passes']
 assert quantiles([1,2,3,4])['p999']==4
+assert quantiles([1,2,3,4])['p50']==2
+assert hist_quantiles([{'x':[[1000,1],[2000,1],[3000,1],[4000,1]]}],'x')['p50']==2
 assert hist_quantiles([{'x':[[1000,2],[-1000,1]]}],'x')['p99']==1
 with tempfile.TemporaryDirectory() as name:
  root=Path(name);lines=[]

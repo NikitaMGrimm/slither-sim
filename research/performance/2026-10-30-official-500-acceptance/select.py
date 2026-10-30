@@ -1,13 +1,23 @@
 """Guest-side replay, accounting and privacy-limited selected acceptance data."""
 from pathlib import Path
-import bisect,hashlib,json,os,sys
+import bisect,copy,hashlib,json,os,sys
 from acceptance import reduce_window,verdict,mature
 from metrics import prior
 r=Path(__file__).resolve().parent
 summary=json.loads((r/'run-summary.json').read_text());pins=json.loads((r/'pins.json').read_text())
 assert summary['status']=='complete' and summary['completeHostEvidence']
 assert len(summary['windows'])==1
-window=summary['windows'][0];result=reduce_window(r/'load-run',window);assert result==window['result'],'Offline replay differs'
+window=summary['windows'][0];result=reduce_window(r/'load-run',window)
+def non_tail_values(value):
+ value=copy.deepcopy(value)
+ for parent in [value,value['maintenance'],value['ordinary']]:
+  for name in ['worldCpuMsPerTick','simulationCpuMsPerTick','socketCpuMsPerTick']:
+   for key in ['p50','p99','p999','max']:parent[name].pop(key)
+ for name in ['frameGapMs','gapResidualMs','frameExcessMs']:
+  for key in ['p50','p99','p999','max']:value['client'][name].pop(key)
+ value.pop('p99AtMost7ms') # Derived report-only flag, never an acceptance gate.
+ return value
+assert non_tail_values(result)==non_tail_values(window['result']),'Gates or non-tail replay values differ'
 assert len(summary['matureScreen'])==3 and all(mature(v) for v in summary['matureScreen'])
 assert [v['tick'] for v in summary['matureScreen']]==list(range(summary['matureScreen'][0]['tick'],summary['matureScreen'][0]['tick']+1500,500))
 assert summary['matureScreen'][-1]['tick']>=193000

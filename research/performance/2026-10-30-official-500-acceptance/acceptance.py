@@ -12,7 +12,7 @@ def verdict(*,client_valid,zero_deferrals,start_mature,end_mature,accounting=Tru
 
 def quantiles(values):
  values=sorted(values);assert values
- return {'n':len(values),'mean':statistics.mean(values),**{k:values[math.ceil((len(values)-1)*p)] for k,p in [('p50',.5),('p99',.99),('p999',.999),('max',1)]}}
+ return {'n':len(values),'mean':statistics.mean(values),**{k:values[math.ceil(len(values)*p)-1] for k,p in [('p50',.5),('p99',.99),('p999',.999),('max',1)]}}
 
 def hist_quantiles(rows,key):
  h=collections.Counter()
@@ -21,10 +21,10 @@ def hist_quantiles(rows,key):
  n=sum(h.values());assert n>0
  out={'n':n,'mean':sum(k*v for k,v in h.items())/n/1000}
  for name,p in [('p50',.5),('p99',.99),('p999',.999),('max',1)]:
-  rank=math.ceil((n-1)*p);count=0
+  rank=math.ceil(n*p);count=0
   for value,multiplicity in sorted(h.items()):
    count+=multiplicity
-   if count>rank:out[name]=value/1000;break
+   if count>=rank:out[name]=value/1000;break
  return out
 
 def reduce_window(root,window):

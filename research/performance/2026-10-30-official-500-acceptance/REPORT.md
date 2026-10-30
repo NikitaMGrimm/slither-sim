@@ -18,6 +18,8 @@ Read simulation and socket user+kernel CPU at consecutive tick edges, sum aligne
 
 ## Results
 
+Post-result correction: tails now use the nearest-rank method the plan specifies; values changed by at most **0.000400 ms (0.400 microseconds)**. Gates and the failed outcome are unchanged. [Correction receipt](tail-correction.json) retains every changed value; all other fields are identical. The original online result remains in the raw archive.
+
 | Run | Pass | Deferred | World CPU p50 / p99 / p99.9 / max ms | Maintenance / other mean ms | End mean / p90 / p99 length |
 | --- | --- | ---: | ---: | ---: | ---: |
 | 1 | False | 0 | 4.750 / 7.331 / 8.517 / 11.174 | 7.287 / 4.805 | 99.034 / 224 / 298 |
@@ -34,7 +36,7 @@ Read simulation and socket user+kernel CPU at consecutive tick edges, sum aligne
 
 | Run | Component | CPU p50 / p99 / p99.9 / max ms |
 | --- | --- | ---: |
-| 1 | Simulation/broadcast | 2.395 / 4.499 / 4.935 / 7.628 |
+| 1 | Simulation/broadcast | 2.395 / 4.498 / 4.935 / 7.628 |
 | 1 | Socket I/O | 2.319 / 4.275 / 4.711 / 5.825 |
 
 
