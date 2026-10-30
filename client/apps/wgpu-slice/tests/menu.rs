@@ -264,6 +264,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
         .unwrap();
     let draw = p.frame.draws[0].clone();
     let make = |count| slither_wgpu_slice::menu::MenuFrame {
+        backdrop: None,
         frame: slither_wgpu_slice::frame::Frame {
             draws: vec![draw.clone(); count],
             ..p.frame.clone()
@@ -329,7 +330,7 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
             let nick =
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
             let material_scale = dpr.min(1.5);
-            let pad = (12. * material_scale).ceil() / material_scale;
+            let pad = (40. * material_scale).ceil() / material_scale;
             let shape = p.frame.draws[0].destination;
             assert!((shape.x + pad - nick.x).abs() <= 2.);
             assert!((shape.y + pad - nick.y).abs() <= 2.);
@@ -383,4 +384,183 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
                 .collect(),
         )
         .unwrap();
+}
+
+#[test]
+fn logo_paints_its_aspect_ratio_without_changing_the_flow_holder() {
+    use slither_client::menu_layout::MenuElement as E;
+    let view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    let layout = layout();
+    let holder = layout.viewport_rect(E::Logo);
+    let room = layout.viewport_rect(E::LastLength).y - holder.y;
+    for (w, h) in [(450, 135), (450, 450)] {
+        let mut images = Images::default();
+        images
+            .add("menu/logo.png", &png_rect(w, h, [80, 200, 100, 255]))
+            .unwrap();
+        let art = Cosmetics::from_images(images, None).unwrap();
+        let asset = art.menu_art(MenuArt::Logo(0)).unwrap().asset;
+        let p = Menu::default()
+            .prepare(
+                &mut TextCache::menu(),
+                &view,
+                &layout,
+                [1280, 720],
+                1.,
+                Some(&art),
+                0,
+            )
+            .unwrap();
+        let logo = p
+            .frame
+            .draws
+            .iter()
+            .find(|d| d.asset == asset)
+            .unwrap()
+            .destination;
+        assert_eq!(logo.y, holder.y);
+        assert!((logo.width * f64::from(h) - logo.height * f64::from(w)).abs() < 1e-9);
+        assert!((logo.x + logo.width / 2. - holder.x - holder.width / 2.).abs() < 1e-9);
+        assert!(logo.height <= room);
+        if h == 135 {
+            assert_eq!(logo.width, holder.width);
+        }
+    }
+    assert_eq!(holder.height, 115.);
+}
+
+#[test]
+fn page_backdrop_keeps_its_colour_and_opacity_through_the_crossfade() {
+    for transition in [0., 0.5, 1.] {
+        let mut view =
+            StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+        view.transition = transition;
+        view.login_alpha = 1. - transition;
+        let mut layout = layout();
+        layout
+            .update(
+                transition,
+                true,
+                MenuMetrics {
+                    last_length_line_height: 18.,
+                    nickname_baseline_space: 4.,
+                    padded_play_label_width: 52.,
+                },
+            )
+            .unwrap();
+        let p = Menu::default()
+            .prepare(
+                &mut TextCache::menu(),
+                &view,
+                &layout,
+                [3840, 2160],
+                3.,
+                None,
+                0,
+            )
+            .unwrap();
+        let backdrop = p.backdrop.as_ref().unwrap();
+        let resource = p
+            .resources
+            .iter()
+            .find(|r| r.asset == backdrop.asset)
+            .unwrap();
+        assert_eq!(resource.image.pixels, [22, 28, 34, 255]);
+        assert_eq!(backdrop.effective_alpha, 1.);
+        assert_eq!(
+            (backdrop.destination.width, backdrop.destination.height),
+            (1280., 720.)
+        );
+    }
+}
+
+#[test]
+fn disabled_play_dims_the_normal_surface_and_label_together() {
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    view.login_alpha = 0.8;
+    view.play_return_alpha = 0.6;
+    let enabled = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    view.disabled = true;
+    let disabled = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    let changed: Vec<_> = enabled
+        .frame
+        .draws
+        .iter()
+        .filter(|d| d.effective_alpha > 0.)
+        .zip(
+            disabled
+                .frame
+                .draws
+                .iter()
+                .filter(|d| d.effective_alpha > 0.),
+        )
+        .filter(|(a, b)| a.effective_alpha != b.effective_alpha)
+        .collect();
+    // The base capsule and white Play label share the same 0.38 multiplier.
+    assert_eq!(changed.len(), 2);
+    for (a, b) in changed {
+        assert_eq!(a.asset, b.asset);
+        assert_eq!(a.destination, b.destination);
+        assert!((b.effective_alpha / a.effective_alpha - 0.38).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
+    use slither_wgpu_slice::render::PreparedFrame;
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    let base = menu
+        .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+        .unwrap();
+    let world: Vec<_> = base
+        .frame
+        .draws
+        .iter()
+        .take(3)
+        .cloned()
+        .enumerate()
+        .map(|(i, mut d)| {
+            d.translation = [11. * i as f64, 13.];
+            d.effective_alpha = 1.;
+            d
+        })
+        .collect();
+    for (visible, spinner) in [(true, false), (false, false), (false, true)] {
+        view.visible = visible;
+        view.spinner_visible = spinner;
+        view.spinner_alpha = 1.;
+        view.spinner_scale = 0.9;
+        let prepared = menu
+            .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
+            .unwrap();
+        assert_eq!(prepared.backdrop.is_some(), visible);
+        let backdrop = prepared.backdrop.clone();
+        let controls = prepared.frame.draws.clone();
+        let mut picture = PreparedFrame {
+            frame: slither_wgpu_slice::frame::Frame {
+                draws: world.clone(),
+                ..base.frame.clone()
+            },
+            resources: base.resources.clone(),
+        };
+        prepared.append_to(&mut picture).unwrap();
+        let first_world = usize::from(visible);
+        if let Some(backdrop) = backdrop {
+            assert_eq!(picture.frame.draws[0], backdrop);
+            assert!(picture.resources.iter().any(|r| r.asset == backdrop.asset));
+        }
+        assert_eq!(
+            &picture.frame.draws[first_world..first_world + world.len()],
+            world
+        );
+        assert_eq!(&picture.frame.draws[first_world + world.len()..], controls);
+    }
 }

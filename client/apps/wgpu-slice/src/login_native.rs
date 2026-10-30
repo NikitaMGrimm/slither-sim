@@ -121,6 +121,10 @@ impl NativeLogin {
         admission: bool,
     ) -> Vec<HostEditEffect> {
         let view = self.state.view(admission);
+        self.menu.skin_hovered = view.visible && self.layout.hit_test(E::Skin, point[0], point[1]);
+        if let Some(down) = down {
+            self.menu.skin_pressed = down && self.menu.skin_hovered;
+        }
         if !view.visible || view.disabled {
             self.pressed = false;
             return Vec::new();
@@ -162,7 +166,7 @@ impl NativeLogin {
                     let style = TextStyle {
                         size: 15. * self.layout.scale,
                         weight: Weight::Normal,
-                        family: Family::Arial,
+                        family: Family::Lucida,
                         slant: Slant::Normal,
                         color: [224, 224, 255],
                     };
@@ -307,7 +311,7 @@ impl NativeLogin {
         let style = TextStyle {
             size: 15. * self.layout.scale,
             weight: Weight::Normal,
-            family: Family::Arial,
+            family: Family::Lucida,
             slant: Slant::Normal,
             color: [224, 224, 255],
         };
