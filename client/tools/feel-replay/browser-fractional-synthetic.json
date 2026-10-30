@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "framing": "header-free",
+  "provenance": "AUTHORED SYNTHETIC fractional-coordinate control at 961 x 541 CSS pixels: paired explicit pointer/mouse movement then physical mouse compatibility movement; no recorded data",
+  "durationMs": 300,
+  "packets": [
+    {
+      "at": 1,
+      "body": "NmV1bHh1Z3htanZvcHZtZmFuZnZ1ZGNsbnJpYXpseHBweXpmd3BkeG1mdm5ldm5kd2xmdG9ieGpncnB6eWhocHF4emdzb2J3a2V0bWN1bGN1aHlxcGJzampzZXZzaXlwYnlrYnFuaHN0YW9paHRueXlnd29qd3ZoYmxsdHRiem9qdnBkc2x5dGZheGpkcXB3eGh0bG94bGZ5bnp3aWJybGx0aWJyaHZzZ3ZzaGJsanV0Z2Q="
+    },
+    {
+      "at": 2,
+      "body": "ABlhAAPoAa4AZAAUMAIbACgFeAAhABwBrhMqABlhAAPoAa4AZAAUMAIbACgFeAAhABwBrhMq"
+    },
+    {
+      "at": 3,
+      "body": "cwAHAAAAMAAAABCaAAAAAAAVfAATiAAA/wASrAATiJd/l3+Xf5d/l3+Xf5d/l3+Xf5d/AAA="
+    },
+    {
+      "at": 280,
+      "body": "cA=="
+    }
+  ],
+  "inputs": [
+    {
+      "at": 10,
+      "type": "pointermove",
+      "x": 0.7,
+      "y": 0.4
+    },
+    {
+      "at": 10,
+      "type": "mousemove",
+      "x": 0.7,
+      "y": 0.4,
+      "encoding": "dom-event"
+    },
+    {
+      "at": 20,
+      "type": "mousemove",
+      "x": 0.75,
+      "y": 0.4
+    },
+    {
+      "at": 80,
+      "type": "keydown",
+      "code": "Space"
+    },
+    {
+      "at": 140,
+      "type": "keyup",
+      "code": "Space"
+    },
+    {
+      "at": 160,
+      "type": "keydown",
+      "code": "ArrowLeft",
+      "target": "textarea"
+    },
+    {
+      "at": 170,
+      "type": "keyup",
+      "code": "ArrowLeft",
+      "target": "textarea"
+    }
+  ]
+}

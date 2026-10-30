@@ -29,13 +29,13 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
     });
     if (down) event.preventDefault();
   }
-  // Use one movement/press family so pointer + compatibility mouse events do not
-  // submit twice. Both release families may clear a press, including over UI.
-  const family = typeof realm.PointerEvent === 'function' ? 'pointer' : 'mouse';
-  listen(realm, `${family}move`, event => pointer(event, false));
+  // Match Canvas's two movement admissions: a compatibility mousemove overwrites
+  // the fractional pointer position when present. An isolated pointermove still
+  // reaches gameplay. Press uses mouse coordinates; releases only clear boost.
+  for (const type of ['pointermove', 'mousemove']) listen(realm, type, event => pointer(event, false));
   for (const type of ['pointerdown', 'mousedown']) listen(realm, type, event => {
     pendingMouseUp = undefined;
-    if (type === `${family}down` && event.button === 0) pointer(event, true);
+    if (type === 'mousedown' && event.button === 0) pointer(event, true);
     else observeInput?.(event, 'filtered-family-or-button');
   });
   listen(realm, 'pointerup', release);

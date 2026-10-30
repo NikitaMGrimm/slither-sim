@@ -115,6 +115,49 @@ path checks the first gaze/command without subsequent input masking startup:
 node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-startup-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 1 --appearance-at 3 --width 961 --height 541
 ```
 
+## Mouse coordinate admission (B2)
+
+WebGPU admits both `pointermove` and `mousemove`, matching Canvas. A compatibility
+`mousemove` overwrites fractional pointer coordinates with the integer mouse
+position when present; isolated pointer movement remains admitted. Primary press
+uses `mousedown`, matching the private official mouse listeners. Press updates
+the position and boost; release only clears boost. Pointer releases/cancel still reach the
+owner over editors and controls, and the matching compatibility mouseup is
+de-duplicated. Pointer movement/press is not canceled by this adapter, so normal
+mouse compatibility dispatch can reach the mouse listeners.
+
+Native winit positions are physical pixels. `desktop_input::mouse_client_position`
+casts the physical position and device scale to f32, computes the f32 reciprocal
+of that scale, multiplies each f32 coordinate by it, promotes the f32 result to
+f64, then floors each axis before
+the existing projection. Negative/outside-window positions are not clamped. This
+admission rule follows Blink at revision `2d56607133c816d230f75a4e0bb797bdd69c8c8c`:
+[layout zoom includes device scale](https://github.com/chromium/chromium/blob/2d56607133c816d230f75a4e0bb797bdd69c8c8c/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc),
+[mouse initialization removes layout zoom](https://github.com/chromium/chromium/blob/2d56607133c816d230f75a4e0bb797bdd69c8c8c/third_party/blink/renderer/core/events/mouse_event.cc),
+with [PointF scaling in float precision](https://github.com/chromium/chromium/blob/2d56607133c816d230f75a4e0bb797bdd69c8c8c/ui/gfx/geometry/point_f.h#L77-L82),
+then [MouseEvent client coordinate getters floor](https://github.com/chromium/chromium/blob/2d56607133c816d230f75a4e0bb797bdd69c8c8c/third_party/blink/renderer/core/events/mouse_event.h#L139-L140).
+The f32 operation order matters: physical -21 at DPR 1.75 scales to
+-12.000000953674316, so the getter admits -13 rather than -12. Native regressions
+cover a 45-position sweep over DPR 1, 1.25, 1.5, 1.75 and 2, coordinate/scale
+narrowing and negative/edge positions. Browser hosts consume DOM getters directly.
+
+The authored `browser-fractional-synthetic.json` preserves fractional coordinates
+through dispatch, exercising explicit pointer/mouse pairs and the physical-mouse
+compatibility mapping. Its independently frozen expectation is four commands;
+it is a DOM-listener regression, not a physical-input or perceptual claim:
+
+```sh
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-fractional-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 4 --appearance-at 3 --width 961 --height 541
+```
+
+The authored `browser-pointer-only-synthetic.json` removes the first paired
+mousemove, leaving fractional pointer movement isolated until the next input.
+It freezes the same four-command expectation, with 30 events and 45 boundaries:
+
+```sh
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-pointer-only-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 4 --appearance-at 3 --width 961 --height 541
+```
+
 `feel-trace` is absent from ordinary builds, including its fields, hooks and CPU
 sink. The reusable Rust `Recorder` copies raw state at the existing core update
 and draw boundaries, including packet application and every Setup draw. Packet
