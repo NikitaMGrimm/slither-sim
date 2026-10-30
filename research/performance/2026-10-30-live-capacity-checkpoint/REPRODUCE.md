@@ -15,7 +15,7 @@ common client's `client.rs` byte-for-byte as extracted from #256's harness.
 
 Set `REPO` to the checkout and `OUT` to that fresh external directory. `STUDY`
 is this study directory. Reuse, rather than duplicate, [#256's harness patch](../2026-10-28-capacity-checkpoint/harness.patch)
-and [#248's helpers](../2026-10-28-official-density-capacity/REPRODUCE.md):
+and [#248's helpers](../2026-10-28-official-density-capacity/prepare.py):
 
 ```sh
 cd "$OUT"
