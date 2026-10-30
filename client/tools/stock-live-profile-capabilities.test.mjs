@@ -1,5 +1,5 @@
 // Authored native-style API doubles with private backing. No source fixture,
-// profile/password, real fetch, network or browser is used by these tests.
+// profile/pageEcho, real fetch, network or browser is used by these tests.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

@@ -12,15 +12,15 @@ fn error(message: impl std::fmt::Display) -> JsValue {
 #[wasm_bindgen]
 pub fn encode_login(
     client_version: u16,
-    password: &[u8],
+    page_echo: &[u8],
     nickname: &str,
     skin: u8,
     custom_skin: &[u8],
 ) -> Result<Vec<u8>, JsValue> {
-    let password = password
+    let page_echo = page_echo
         .try_into()
-        .map_err(|_| error("password must contain exactly 20 bytes"))?;
-    protocol::encode_login(client_version, password, nickname, skin, Some(custom_skin))
+        .map_err(|_| error("page echo must contain exactly 20 bytes"))?;
+    protocol::encode_login(client_version, page_echo, nickname, skin, Some(custom_skin))
         .map_err(error)
 }
 

@@ -12,7 +12,7 @@ function fixture(version = '17', last = '19') {
   const a = new TextEncoder().encode(`var authoredVersion=${version};`);
   const b = new TextEncoder().encode(`var authoredBytes=[${[...Array.from({length: 19}, (_, i) => i), last].join(',')}];`);
   const source = new Uint8Array(a.length + b.length); source.set(a); source.set(b, a.length);
-  const spans = freeze({version: freeze({start: 0, end: a.length}), password: freeze({start: a.length, end: source.length})});
+  const spans = freeze({version: freeze({start: 0, end: a.length}), pageEcho: freeze({start: a.length, end: source.length})});
   return {source, spans, pin: freeze({expectedBytes: source.length,
     sha256: createHash('sha256').update(source).digest('hex'), ...spans})};
 }
@@ -42,7 +42,7 @@ test('scratch is clear then freed before copied profile returns; caller input is
     free() { assert.ok(zero(this.input)); assert.ok(zero(this.output)); trace.push('free'); this.freed = true; }}, value => { owner = value; });
   const profile = parseClosedProfileDeclarations(f.source, f.spans, Parser);
   assert.deepEqual(trace, ['clear', 'free']); wiped(owner); assert.deepEqual(f.source, before);
-  assert.equal(profile.clientVersion, 17); assert.equal(profile.protocolVersion, 19); profile.password.fill(0);
+  assert.equal(profile.clientVersion, 17); assert.equal(profile.protocolVersion, 19); profile.pageEcho.fill(0);
 });
 
 test('size/span/digest/hash rejection creates no Wasm scratch or partial output', async () => {
@@ -63,7 +63,7 @@ test('size/span/digest/hash rejection creates no Wasm scratch or partial output'
 });
 
 test('partial Wasm writes, syntax/numeric failures and output-copy errors clear before free', () => {
-  for (const method of ['write', 'parse_version', 'parse_password', 'password_byte', 'protocol_version']) {
+  for (const method of ['write', 'parse_version', 'parse_page_echo', 'page_echo_byte', 'protocol_version']) {
     const f = fixture(); let owner, calls = 0;
     const Parser = policy({[method](...args) {
       const result = ProfileLiteralParserDouble.prototype[method].apply(this, args);
@@ -93,18 +93,18 @@ test('Wasm cleanup failures attempt both operations and prevent consumers withou
   }
 });
 
-test('source/hash and scratch are zero before consumer, password after either consumer outcome', async () => {
+test('source/hash and scratch are zero before consumer, pageEcho after either consumer outcome', async () => {
   for (const throws of [false, true]) {
-    const f = fixture(); let owner, password, hash;
+    const f = fixture(); let owner, pageEcho, hash;
     const operation = verifyAndConsumeProfileBytes({source: f.source, pin: f.pin,
       digest(...args) { return hash = digest(...args); }, literalParser: policy({}, value => { owner = value; }),
       consumeProfile(profile) {
-        assert.ok(zero(f.source)); assert.ok(zero(hash)); wiped(owner); password = profile.password;
-        assert.equal(password[19], 19);
+        assert.ok(zero(f.source)); assert.ok(zero(hash)); wiped(owner); pageEcho = profile.pageEcho;
+        assert.equal(pageEcho[19], 19);
         if (throws) throw new Error('PRIVATE synthetic consumer fault');
       }});
     if (throws) await assert.rejects(operation, error => error.code === 'consumer-failed'); else await operation;
-    assert.ok(zero(password)); wiped(owner);
+    assert.ok(zero(pageEcho)); wiped(owner);
   }
 });
 

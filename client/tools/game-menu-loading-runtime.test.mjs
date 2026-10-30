@@ -168,8 +168,8 @@ test('loading-enabled menu still persists and sends its chosen nickname/skin/cus
   await runGameModuleTest(async({assert,createGraph})=>{
     const graph=createGraph({hudNative:true,ownedHudNative:true,ownedPlayNative:true});graph.hudWasm();
     const profile=graph.profileNative(),logins=[],encode=graph.wasm.api.encode_login;
-    graph.wasm.api.encode_login=(version,password,nickname,skin,custom)=>{
-      logins.push({nickname,skin,custom:[...custom]});return encode(version,password,nickname,skin,custom);
+    graph.wasm.api.encode_login=(version,pageEcho,nickname,skin,custom)=>{
+      logins.push({nickname,skin,custom:[...custom]});return encode(version,pageEcho,nickname,skin,custom);
     };
     const realm=graph.nativeBoundary(native=>Object.freeze({...native,liveProfile:profile.capabilities}));
     const {startGamePage}=await graph.load('runtime.mjs');

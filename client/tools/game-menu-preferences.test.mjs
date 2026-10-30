@@ -7,8 +7,8 @@ test('owned native menu edits copied selection and persists without implicit Pla
     const graph = createGraph({ hudNative: true, ownedHudNative: true, ownedPlayNative: true }); graph.hudWasm();
     const profile = graph.profileNative(), login = [];
     const encode = graph.wasm.api.encode_login;
-    graph.wasm.api.encode_login = (version, password, nickname, skin, customSkin) => {
-      login.push({ nickname, skin, custom: [...customSkin] }); return encode(version, password, nickname, skin, customSkin);
+    graph.wasm.api.encode_login = (version, pageEcho, nickname, skin, customSkin) => {
+      login.push({ nickname, skin, custom: [...customSkin] }); return encode(version, pageEcho, nickname, skin, customSkin);
     };
     const realm = graph.nativeBoundary(native => Object.freeze({ ...native, liveProfile: profile.capabilities }));
     const { startGamePage } = await graph.load('runtime.mjs');

@@ -33,7 +33,7 @@ export function menuPreferencesSmoke(wasm) {
     const unsubscribe = session.subscribe({ packet() {}, state() {}, error(error) { throw error; } });
     try {
       session.play({ endpoint: 'ws://192.0.2.1:1234/slither',
-        profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+        profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
         nickname: selected.nickname, skin: selected.skin, customSkin: selected.customSkin });
       selected.customSkin.fill(0);
       assert.deepEqual(encoded, Uint8Array.from([115, 30, 0, 1, ...new Array(20).fill(0), 0, 3, 32, 127, 32, 0, 255, ...bytes]));
@@ -68,7 +68,7 @@ export function menuPreferencesSmoke(wasm) {
     try {
       const selected = local.view(), custom = selected.customSkin.slice();
       session.play({ endpoint: 'ws://192.0.2.1:1234/slither',
-        profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+        profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
         nickname: selected.nickname, skin: selected.skin, customSkin: selected.customSkin });
       selected.customSkin.fill(0);
       assert.equal(encoded[24], 65); assert.deepEqual(encoded.slice(-custom.length), custom);

@@ -17,10 +17,10 @@ fn setup(length: usize) -> Vec<u8> {
 
 #[test]
 fn login_layout_preserves_runtime_inputs() {
-    let password = std::array::from_fn(|index| index as u8);
-    let packet = encode_login(0x1234, &password, "Synthetic", 7, Some(&[5, 9])).unwrap();
+    let page_echo = std::array::from_fn(|index| index as u8);
+    let packet = encode_login(0x1234, &page_echo, "Synthetic", 7, Some(&[5, 9])).unwrap();
     assert_eq!(&packet[..4], &[b's', 30, 0x12, 0x34]);
-    assert_eq!(&packet[4..24], &password);
+    assert_eq!(&packet[4..24], &page_echo);
     assert_eq!(&packet[24..26], &[7, 9]);
     assert_eq!(&packet[26..35], b"Synthetic");
     assert_eq!(&packet[35..], &[0, 255, 5, 9]);

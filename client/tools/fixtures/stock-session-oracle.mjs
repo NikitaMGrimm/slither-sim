@@ -349,19 +349,19 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
       if (!sink || phase !== 'ready') throw new Error('One manual Play per session');
       // Invalid requests leave readiness intact and construct nothing.
       const request = record(value, ['endpoint', 'profile', 'nickname', 'skin', 'customSkin']);
-      const profile = record(request.profile, ['clientVersion', 'password', 'protocolVersion']);
+      const profile = record(request.profile, ['clientVersion', 'pageEcho', 'protocolVersion']);
       integer(profile.clientVersion, 65535, 'client version');
       if (profile.protocolVersion !== 19) throw new RangeError('Protocol 19 required');
-      const password = copiedBytes(profile.password, 20, 'external profile');
+      const pageEcho = copiedBytes(profile.pageEcho, 20, 'external profile');
       let endpoint, login;
       try {
         const custom = copiedBytes(request.customSkin, undefined, 'custom skin');
         if (custom.length > 255 || typeof request.nickname !== 'string' || !/^[\x20-\x7f]{0,24}$/.test(request.nickname)) throw new TypeError('Invalid login fields');
         integer(request.skin, 255, 'skin');
         endpoint = stockEndpoint(request.endpoint);
-        login = copiedBytes(wasm.encode_login(profile.clientVersion, password, request.nickname, request.skin, custom), undefined, 'encoded login');
+        login = copiedBytes(wasm.encode_login(profile.clientVersion, pageEcho, request.nickname, request.skin, custom), undefined, 'encoded login');
       }
-      finally { password.fill(0); }
+      finally { pageEcho.fill(0); }
       return guarded(() => {
         launch = { endpoint, login }; phase = 'opening';
         requestActions({ resetWorld: true, connected: false }); publish();

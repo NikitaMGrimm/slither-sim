@@ -45,12 +45,12 @@ export function oracleClientVersion(source) {
   const parser = cursor(source, { start: 0, end: source.length });
   parser.begin(); const value = parser.decimal(5, 65535); parser.end(); return value;
 }
-export function oraclePassword(source, password) {
+export function oraclePageEcho(source, pageEcho) {
   const parser = cursor(source, { start: 0, end: source.length });
   parser.begin(); parser.token('['); parser.ws();
   for (let i = 0; i < 20; i++) {
     if (i) { parser.token(','); parser.ws(); }
-    password[i] = parser.decimal(3, 255); parser.ws();
+    pageEcho[i] = parser.decimal(3, 255); parser.ws();
   }
   parser.token(']'); parser.end();
 }

@@ -51,7 +51,7 @@ const startGamePage = bootstrap.runInNewContext({ admitsBrowserInput, createStoc
 
 // Documentation-range endpoint and labelled synthetic profile, never a real transport.
 const playRequest = () => ({ endpoint: 'ws://192.0.2.1:1234/slither',
-  profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+  profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
   nickname: 'Synthetic', skin: 24, customSkin: new Uint8Array() });
 const setup = [97, ...new Array(24).fill(0)];
 function connect(f, runtime) {

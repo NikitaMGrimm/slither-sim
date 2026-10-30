@@ -27,16 +27,16 @@ const deferred = () => {
 };
 const realDigest = async (algorithm, bytes) => new Uint8Array(await webcrypto.subtle.digest(algorithm, bytes));
 const code = expected => error => error instanceof Error && error.code === expected;
-function fixture({ version = '17', password = Array.from({ length: 20 }, (_, i) => i).join(','),
-  versionText, passwordText, prefix = 'synthetic data\n' } = {}) {
+function fixture({ version = '17', pageEcho = Array.from({ length: 20 }, (_, i) => i).join(','),
+  versionText, pageEchoText, prefix = 'synthetic data\n' } = {}) {
   const before = encode(prefix);
   const a = encode(versionText ?? `var syntheticVersion=${version};`);
-  const b = encode(passwordText ?? `var syntheticBytes=[${password}];`);
+  const b = encode(pageEchoText ?? `var syntheticBytes=[${pageEcho}];`);
   const source = new Uint8Array(before.length + a.length + b.length);
   source.set(before); source.set(a, before.length); source.set(b, before.length + a.length);
   const versionSpan = freeze({ start: before.length, end: before.length + a.length });
-  const passwordSpan = freeze({ start: versionSpan.end, end: source.length });
-  const spans = freeze({ version: versionSpan, password: passwordSpan });
+  const pageEchoSpan = freeze({ start: versionSpan.end, end: source.length });
+  const spans = freeze({ version: versionSpan, pageEcho: pageEchoSpan });
   const pin = freeze({ expectedBytes: source.length,
     sha256: createHash('sha256').update(source).digest('hex'), ...spans });
   return { source, spans, pin };
@@ -127,29 +127,29 @@ function harness(options = {}) {
 
 test('closed parser accepts authored decimal data/whitespace and preserves caller input', () => {
   const f = fixture({ prefix: 'µ synthetic\n', versionText: '\tvar $_v\r\n= 65535 ;\n',
-    passwordText: `var $p = [ ${Array.from({ length: 20 }, (_, i) => i === 19 ? 255 : i).join(' ,\t')} ] ;` });
+    pageEchoText: `var $p = [ ${Array.from({ length: 20 }, (_, i) => i === 19 ? 255 : i).join(' ,\t')} ] ;` });
   const original = f.source.slice();
   const profile = parseClosedProfileDeclarations(f.source, f.spans);
   assert.equal(profile.clientVersion, 65535); assert.equal(profile.protocolVersion, 19);
-  assert.deepEqual([...profile.password], Array.from({ length: 20 }, (_, i) => i === 19 ? 255 : i));
+  assert.deepEqual([...profile.pageEcho], Array.from({ length: 20 }, (_, i) => i === 19 ? 255 : i));
   assert.equal(Object.isFrozen(profile), true); assert.deepEqual(f.source, original);
-  profile.password.fill(0);
-  const zero = fixture({ version: '0', password: new Array(20).fill(0).join(',') });
+  profile.pageEcho.fill(0);
+  const zero = fixture({ version: '0', pageEcho: new Array(20).fill(0).join(',') });
   const parsed = parseClosedProfileDeclarations(zero.source, zero.spans);
-  assert.equal(parsed.clientVersion, 0); assert.equal(allZero(parsed.password), true);
+  assert.equal(parsed.clientVersion, 0); assert.equal(allZero(parsed.pageEcho), true);
 });
 
-test('captured password allocation keeps its original failure mapping and Wasm cleanup boundary', async () => {
+test('captured pageEcho allocation keeps its original failure mapping and Wasm cleanup boundary', async () => {
   for (const kind of ['throw', 'wrong-size']) {
     const h = harness();
-    let passwordAllocations = 0, parser;
+    let pageEchoAllocations = 0, parser;
     class Parser extends ProfileLiteralParserDouble { constructor() { super(); parser = this; } }
     for (const [name, field] of Object.entries(Object.getOwnPropertyDescriptors(ProfileLiteralParserDouble.prototype))) {
       if (name !== 'constructor') Object.defineProperty(Parser.prototype, name, field);
     }
     const bytes = {...h.caps.bytes, allocate(size) {
       if (size === 20) {
-        passwordAllocations++;
+        pageEchoAllocations++;
         if (kind === 'throw') throw new Error('PRIVATE captured native allocation fault');
         return h.caps.bytes.allocate(19);
       }
@@ -159,7 +159,7 @@ test('captured password allocation keeps its original failure mapping and Wasm c
       isCurrentDocument: () => true, literalParser: Parser});
     await assert.rejects(acquirer.acquireForPlay(() => assert.fail('consumer after allocation failure')), error =>
       error.code === (kind === 'throw' ? 'request-failed' : 'unavailable-native') && !String(error).includes('PRIVATE'));
-    assert.equal(passwordAllocations, 1); assert.equal(parser.freed, true);
+    assert.equal(pageEchoAllocations, 1); assert.equal(parser.freed, true);
     assert.ok(parser.input.every(byte => byte === 0)); assert.ok(parser.output.every(byte => byte === 0));
     h.assertWiped();
   }
@@ -167,12 +167,12 @@ test('captured password allocation keeps its original failure mapping and Wasm c
 
 test('identifier bound is 64 ASCII bytes and spans/own data are bounded before parsing', () => {
   const f = fixture({ versionText: `var ${'a'.repeat(64)}=1;` });
-  const good = parseClosedProfileDeclarations(f.source, f.spans); good.password.fill(0);
+  const good = parseClosedProfileDeclarations(f.source, f.spans); good.pageEcho.fill(0);
   const tooLong = fixture({ versionText: `var ${'a'.repeat(65)}=1;` });
   assert.throws(() => parseClosedProfileDeclarations(tooLong.source, tooLong.spans), code('bad-literal'));
-  for (const spans of [{ ...f.spans }, freeze({ version: { ...f.spans.version }, password: f.spans.password }),
-    freeze({ version: freeze({ start: -1, end: 2 }), password: f.spans.password }),
-    freeze({ version: f.spans.version, password: freeze({ start: 0, end: 1 }) })]) {
+  for (const spans of [{ ...f.spans }, freeze({ version: { ...f.spans.version }, pageEcho: f.spans.pageEcho }),
+    freeze({ version: freeze({ start: -1, end: 2 }), pageEcho: f.spans.pageEcho }),
+    freeze({ version: f.spans.version, pageEcho: freeze({ start: 0, end: 1 }) })]) {
     assert.throws(() => parseClosedProfileDeclarations(f.source, spans), code('bad-pin'));
   }
   const hostile = Object.defineProperty({}, 'version', { get() { assert.fail('getter invoked'); } });
@@ -186,7 +186,7 @@ test('closed numeric and token grammar rejects expressions, signs, escapes and e
     assert.throws(() => parseClosedProfileDeclarations(f.source, f.spans), code('bad-literal'), version);
   }
   for (const byte of ['256', '-1', '+0', '1.5', '1e1', '0x10', '00', '1_0', '1234', 'n', 'f()', '"1"']) {
-    const f = fixture({ password: [byte, ...new Array(19).fill(0)].join(',') });
+    const f = fixture({ pageEcho: [byte, ...new Array(19).fill(0)].join(',') });
     assert.throws(() => parseClosedProfileDeclarations(f.source, f.spans), code('bad-literal'), byte);
   }
   for (const versionText of ['varv=17;', 'let v=17;', 'var v/*x*/=17;', 'var v=17', 'var v=17;extra;',
@@ -194,24 +194,24 @@ test('closed numeric and token grammar rejects expressions, signs, escapes and e
     const f = fixture({ versionText });
     assert.throws(() => parseClosedProfileDeclarations(f.source, f.spans), code('bad-literal'));
   }
-  for (const password of [new Array(19).fill(0).join(','), new Array(21).fill(0).join(','),
+  for (const pageEcho of [new Array(19).fill(0).join(','), new Array(21).fill(0).join(','),
     new Array(20).fill(0).join(',') + ',', '0,,0', '0;0', '...values']) {
-    const f = fixture({ password });
+    const f = fixture({ pageEcho });
     assert.throws(() => parseClosedProfileDeclarations(f.source, f.spans), code('bad-literal'));
   }
 });
 
 test('pure verifier uses real Node WebCrypto on synthetic pin, clears source before use and all owned data after', async () => {
-  const f = fixture(); let password, digest, calls = 0;
+  const f = fixture(); let pageEcho, digest, calls = 0;
   const result = await verifyAndConsumeProfileBytes({ source: f.source, pin: f.pin,
     async digest(algorithm, input) { digest = await realDigest(algorithm, input); return digest; },
     consumeProfile(profile) {
       calls++; assert.equal(allZero(f.source), true); assert.equal(allZero(digest), true);
-      assert.equal(profile.clientVersion, 17); assert.deepEqual([...profile.password], Array.from({ length: 20 }, (_, i) => i));
-      password = profile.password;
+      assert.equal(profile.clientVersion, 17); assert.deepEqual([...profile.pageEcho], Array.from({ length: 20 }, (_, i) => i));
+      pageEcho = profile.pageEcho;
     },
   });
-  assert.equal(result, undefined); assert.equal(calls, 1); assert.equal(allZero(password), true);
+  assert.equal(result, undefined); assert.equal(calls, 1); assert.equal(allZero(pageEcho), true);
 });
 
 test('full hash precedes invalid declarations and mismatched length; partial outputs never reach consumer', async () => {
@@ -220,7 +220,7 @@ test('full hash precedes invalid declarations and mismatched length; partial out
   await assert.rejects(verifyAndConsumeProfileBytes({ source: f.source, pin: wrongPin,
     async digest(a, b) { hashes++; return realDigest(a, b); }, consumeProfile() { calls++; } }), code('hash-mismatch'));
   assert.equal(hashes, 1); assert.equal(calls, 0); assert.equal(allZero(f.source), true);
-  const badLiteral = fixture({ password: new Array(19).fill(0).join(',') });
+  const badLiteral = fixture({ pageEcho: new Array(19).fill(0).join(',') });
   await assert.rejects(verifyAndConsumeProfileBytes({ source: badLiteral.source, pin: badLiteral.pin,
     digest: realDigest, consumeProfile() { calls++; } }), code('bad-literal'));
   assert.equal(allZero(badLiteral.source), true); assert.equal(calls, 0);
@@ -255,7 +255,7 @@ test('pure verifier rejects mutable/extra pins, digest failures and invalid dige
 test('pure parser byte brand ignores own shadow getters and rejects shared/non-byte domains', () => {
   const f = fixture();
   Object.defineProperty(f.source, 'length', { get() { assert.fail('length getter invoked'); } });
-  const p = parseClosedProfileDeclarations(f.source, f.spans); p.password.fill(0);
+  const p = parseClosedProfileDeclarations(f.source, f.spans); p.pageEcho.fill(0);
   for (const source of [new Uint16Array(100), new Uint8Array(new SharedArrayBuffer(100)), new Proxy(new Uint8Array(100), {})]) {
     assert.throws(() => parseClosedProfileDeclarations(source, f.spans), code('bad-size'));
   }
@@ -277,11 +277,11 @@ test('constructor is inert, production pin non-overridable, callbacks/caps are e
 test('fixed native request and synthetic reader success clear all data and expose only closed status', async () => {
   const h = harness(); let calls = 0, borrowed;
   assert.equal(await h.acquirer.acquireForPlay(profile => {
-    calls++; borrowed = profile.password;
+    calls++; borrowed = profile.pageEcho;
     assert.deepEqual(h.acquirer.status(), { state: 'consuming', reasonCode: null });
     assert.equal(allZero(h.allocations[0]), true, 'source must clear before use');
     assert.equal(allZero(h.digests[0]), true);
-    assert.deepEqual([...profile.password], Array.from({ length: 20 }, (_, i) => i));
+    assert.deepEqual([...profile.pageEcho], Array.from({ length: 20 }, (_, i) => i));
   }), undefined);
   assert.equal(calls, 1); assert.equal(allZero(borrowed), true); h.assertWiped();
   assert.deepEqual(h.acquirer.status(), { state: 'used', reasonCode: null });
@@ -354,7 +354,7 @@ test('actual WebCrypto rejects entirely synthetic factory body against fixed pro
   assert.equal(calls, 0); h.assertWiped(); assert.equal(h.acquirer.status().reasonCode, 'hash-mismatch');
 });
 
-test('hash mismatch is reported before malformed synthetic literals; no partial password/profile leakage', async () => {
+test('hash mismatch is reported before malformed synthetic literals; no partial pageEcho/profile leakage', async () => {
   const payload = productionShapedSynthetic(); payload[181647] = 0;
   const h = harness({ payload, digest: () => new Uint8Array(32) });
   await assert.rejects(h.acquirer.acquireForPlay(() => assert.fail()), code('hash-mismatch'));
@@ -427,7 +427,7 @@ test('consumer throw/value/native Promise/thenable failure is private, wiped, no
   for (const kind of ['throw', 'value', 'promise', 'thenable']) {
     const h = harness(); let borrowed;
     await assert.rejects(h.acquirer.acquireForPlay(profile => {
-      borrowed = profile.password;
+      borrowed = profile.pageEcho;
       if (kind === 'throw') throw new Error('PRIVATE fake profile must not leak');
       if (kind === 'value') return profile;
       if (kind === 'promise') return Promise.reject(new Error('PRIVATE asynchronous fake error'));
@@ -449,9 +449,9 @@ test('concurrent and consumer-reentrant acquire cannot start another fetch; disp
   const p = harness(); let rejected;
   await p.acquirer.acquireForPlay(() => { rejected = p.acquirer.acquireForPlay(() => assert.fail()); rejected.catch(() => {}); });
   await assert.rejects(rejected, code('already-used')); assert.equal(p.counts.fetchCalls, 1);
-  const d = harness(); let password;
+  const d = harness(); let pageEcho;
   await assert.rejects(d.acquirer.acquireForPlay(profile => {
-    password = profile.password; d.acquirer.dispose(); assert.equal(allZero(password), true);
+    pageEcho = profile.pageEcho; d.acquirer.dispose(); assert.equal(allZero(pageEcho), true);
   }), code('cancelled'));
   assert.deepEqual(d.acquirer.status(), { state: 'disposed', reasonCode: 'cancelled' }); d.assertWiped();
 });
@@ -486,7 +486,7 @@ test('pure verifier clears borrowed data for failing/async consumer without expo
     const f = fixture(); let borrowed;
     await assert.rejects(verifyAndConsumeProfileBytes({ source: f.source, pin: f.pin, digest: realDigest,
       consumeProfile(profile) {
-        borrowed = profile.password;
+        borrowed = profile.pageEcho;
         if (asyncResult) return Promise.reject(new Error('PRIVATE synthetic asynchronous error'));
         throw new Error('PRIVATE synthetic synchronous error');
       } }), error => error.code === 'consumer-failed' && !String(error).includes('PRIVATE'));

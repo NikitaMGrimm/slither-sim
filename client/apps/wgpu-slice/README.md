@@ -34,7 +34,7 @@ There is no automatic reconnect.
 Play without a window, wanders along broad drifting arcs with a periodic boost through the
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
 (server, profile version, handshake/login/Setup, packet and frame counts, own
-length over time, exit reason). Passwords and raw packets are never printed.
+length over time, exit reason). Page echo bytes and raw packets are never printed.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and

@@ -297,9 +297,9 @@ test('accepted genuine action keeps staged reset, source release and one socket 
       const graph = createGraph({ hudNative: true, ownedHudNative: true, ownedPlayNative: true }), hud = graph.hudWasm();
       const profile = graph.profileNative(), endpoints = [], login = [];
       const encode = graph.wasm.api.encode_login;
-      graph.wasm.api.encode_login = (version, password, nickname, skin, customSkin) => {
+      graph.wasm.api.encode_login = (version, pageEcho, nickname, skin, customSkin) => {
         login.push({ nickname, skin, customSkin: [...customSkin] });
-        return encode(version, password, nickname, skin, customSkin);
+        return encode(version, pageEcho, nickname, skin, customSkin);
       };
       const realm = graph.nativeBoundary(native => Object.freeze({ ...native, liveProfile: profile.capabilities,
         createSocket(endpoint) {
