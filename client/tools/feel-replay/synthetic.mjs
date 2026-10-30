@@ -51,7 +51,7 @@ export function syntheticFixture() {
     samples: schedule.boundaries.map(b => ({
       ...b, acknowledgedMs: b.phase === 'draw' ? b.atMs : null, delta: { raw: 1, lagged: 1, steps: 1, doubledSteps: 2 },
       lag: { active: false, multiplier: 1, pingPending: false, pongAgeMs: 0 },
-      own: b.eligibility === 'own' ? own : null,
+      own: b.eligibility === 'own' ? { ...own, body: b.phase === 'draw' ? own.body : [] } : null,
       camera: { x: 1, y: 2, offset: zero, follow: true, zoom: 1, targetZoom: 1 },
       quality: { requested: 'high', active: 'high', successfulDraws: b.phase === 'draw' ? ++successfulDraws : successfulDraws },
       geometry, status: { prepared: b.phase === 'draw', submitted: b.phase === 'draw', committed: b.phase === 'draw', retries: 0,

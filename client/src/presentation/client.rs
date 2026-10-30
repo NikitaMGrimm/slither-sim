@@ -2033,7 +2033,7 @@ impl AnimatedClient {
             self.face_presentation_enabled |= enable_face_presentation;
             self.accessory_presentation_enabled |= enable_accessory_presentation;
             #[cfg(feature = "feel-trace")]
-            self.trace_boundary("update", None, None);
+            self.trace_boundary("update", None, None, None);
             return Ok((applied.report, None));
         }
         let mut next = self.clone();
@@ -2475,7 +2475,7 @@ impl AnimatedClient {
         }
         next.received = received;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", None, None);
+        next.trace_boundary("update", None, None, None);
         *self = next;
         Ok((applied.report, journal))
     }
@@ -2541,7 +2541,7 @@ impl AnimatedClient {
         }
         next.advance_entities(step, now_ms)?;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", Some(step), None);
+        next.trace_boundary("update", Some(step), None, None);
         *self = next;
         Ok(step)
     }
@@ -3245,7 +3245,16 @@ impl AnimatedClient {
             });
         }
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("draw", None, Some([width, height]));
+        next.trace_boundary(
+            "draw",
+            None,
+            Some([width, height]),
+            prepared
+                .iter()
+                .find(|p| p.snake.own)
+                .and_then(|p| p.snake.body_geometry.as_ref())
+                .map(|body| body.samples.as_slice()),
+        );
         Ok(prepared)
     }
 
@@ -3275,9 +3284,10 @@ impl AnimatedClient {
         phase: &'static str,
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
+        body: Option<&[BodyPaintSample]>,
     ) {
         if let Some(recorder) = &self.trace {
-            recorder.observe(self, phase, step, extent);
+            recorder.observe(self, phase, step, extent, body);
         }
     }
 
@@ -4209,6 +4219,83 @@ mod resolved_draw_tests {
         }
         p.extend(0_u16.to_be_bytes());
         p
+    }
+
+    #[cfg(feature = "feel-trace")]
+    #[test]
+    fn feel_body_records_prepared_curve_and_detects_displacement_without_anchor_changes() {
+        use crate::feel_trace::{BODY_TRACE_STRIDE, Recorder};
+        let recorder = Recorder::default();
+        let mut client = AnimatedClient::new(0.).unwrap();
+        client.record_feel(recorder.clone());
+        apply(&mut client, &setup());
+        apply(&mut client, &spawn(3, 11));
+        let mut prepared = Vec::new();
+        for i in 1..=15 {
+            client.advance(f64::from(i) * 40., false).unwrap();
+            prepared = client
+                .prepare_draw_with_style(1500, 845, 1., false)
+                .unwrap();
+        }
+        let baseline = recorder.take().pop().unwrap();
+        assert_eq!(baseline.values[14], 1., "fully opaque body");
+        let body = &prepared
+            .iter()
+            .find(|p| p.own)
+            .unwrap()
+            .body_geometry
+            .as_ref()
+            .unwrap()
+            .samples;
+        let indices: Vec<_> = (0..body.len())
+            .filter(|i| i % BODY_TRACE_STRIDE == 0 || i + 1 == body.len())
+            .collect();
+        assert!(!indices.is_empty());
+        assert_eq!(baseline.values[37] as usize, indices.len());
+        for (j, &i) in indices.iter().enumerate() {
+            assert_eq!(
+                baseline.values[38 + j * 2],
+                750. + (f64::from(body[i].x) - client.camera().position().x)
+                    * client.camera().zoom()
+            );
+            assert_eq!(
+                baseline.values[39 + j * 2],
+                422.5
+                    + (f64::from(body[i].y) - client.camera().position().y)
+                        * client.camera().zoom()
+            );
+        }
+        let anchors = client.own_snake().unwrap().body().points().to_vec();
+        let mut shifted = body.clone();
+        for sample in &mut shifted {
+            sample.x += 16.;
+        }
+        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&shifted));
+        let mutant = recorder.take().pop().unwrap();
+        assert_eq!(client.own_snake().unwrap().body().points(), anchors);
+        assert_eq!(&baseline.values[..38], &mutant.values[..38]);
+        let end = 38 + 2 * indices.len();
+        assert_eq!(&baseline.values[end..], &mutant.values[end..]);
+        for j in 0..indices.len() {
+            let displacement = mutant.values[38 + j * 2] - baseline.values[38 + j * 2];
+            assert!((displacement - 16. * client.camera().zoom()).abs() < 1e-10);
+            assert!(
+                displacement * 960. / 1500. > 1.,
+                "CSS-pixel body budget must fail"
+            );
+        }
+        // The hard production sample cap plus stride bounds telemetry, including
+        // the tail even when its ordinal does not fall on the stride.
+        let mut bounded = vec![body[0]; super::super::MAX_CURVE_SAMPLES];
+        bounded.last_mut().unwrap().x += 32.;
+        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        let row = recorder.take().pop().unwrap();
+        assert_eq!(row.values[37], 8193.);
+        let tail = bounded.last().unwrap();
+        assert_eq!(
+            row.values[38 + 8192 * 2],
+            750. + (f64::from(tail.x) - client.camera().position().x) * client.camera().zoom()
+        );
     }
 
     fn apply(client: &mut AnimatedClient, p: &[u8]) {

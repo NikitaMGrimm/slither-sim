@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 
 function lifecycle() {
   const f = syntheticFixture();
-  Object.assign(f.trace.samples[2].own, { expired: true, deathProgress: 1.1, projected: null });
+  Object.assign(f.trace.samples[2].own, { expired: true, deathProgress: 1.1, projected: null, body: [] });
   f.schedule.boundaries[3].eligibility = 'between-lives';
   Object.assign(f.trace.samples[3], { eligibility: 'between-lives', own: null });
   f.trace.samples[4].own.token = 'synthetic-own-2';
@@ -25,7 +25,7 @@ function appendLives(f, states) {
     const sample = parse(stringify(f.trace.samples[4]));
     Object.assign(sample, b, { own: token === null ? null : {
       ...parse(stringify(liveOwn)), token, expired, deathProgress: expired ? 1.1 : 0,
-      projected: expired ? null : liveOwn.projected,
+      projected: expired ? null : liveOwn.projected, body: [],
     } });
     f.schedule.boundaries.push(b);
     f.trace.samples.push(sample);

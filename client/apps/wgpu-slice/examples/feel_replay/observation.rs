@@ -12,6 +12,12 @@ pub fn decode(row: &Observation, geometry: &Value) -> Result<Value, String> {
     fn point(n: &mut impl FnMut() -> Result<f64, String>) -> Result<Value, String> {
         Ok(json!({"x":n()?, "y":n()?}))
     }
+    let css = |p: &Value| {
+        json!({
+            "x": p["x"].as_f64().unwrap() * geometry["css"]["width"].as_f64().unwrap() / geometry["backing"]["width"].as_f64().unwrap(),
+            "y": p["y"].as_f64().unwrap() * geometry["css"]["height"].as_f64().unwrap() / geometry["backing"]["height"].as_f64().unwrap()
+        })
+    };
     let delta = json!({"raw":n()?, "lagged":n()?, "steps":n()?, "doubledSteps":n()?});
     let multiplier = n()?;
     let mut camera =
@@ -32,21 +38,16 @@ pub fn decode(row: &Observation, geometry: &Value) -> Result<Value, String> {
         own["size"] = json!({"segments":n()?, "fraction":n()?, "length":n()?});
         camera["targetZoom"] = json!(n()?);
         let count = n()?;
-        if count.fract() != 0. || !(0. ..=100_000.).contains(&count) {
+        if count.fract() != 0. || !(0. ..=8193.).contains(&count) {
             return Err("Invalid body count".into());
         }
         own["body"] = (0..count as usize)
-            .map(|_| point(&mut n))
+            .map(|_| point(&mut n).map(|p| css(&p)))
             .collect::<Result<Value, _>>()?;
         own["projected"] = Value::Null;
         if own["expired"] == false {
             let head = point(&mut n)?;
             let pupils = json!([point(&mut n)?, point(&mut n)?]);
-            let css = |p: &Value| {
-                json!({
-                "x": p["x"].as_f64().unwrap() * geometry["css"]["width"].as_f64().unwrap() / geometry["backing"]["width"].as_f64().unwrap(),
-                "y": p["y"].as_f64().unwrap() * geometry["css"]["height"].as_f64().unwrap() / geometry["backing"]["height"].as_f64().unwrap() })
-            };
             own["projected"] = json!({"backing":{"head":head, "pupils":pupils},
                 "css":{"head":css(&head), "pupils":[css(&pupils[0]),css(&pupils[1])]}});
         }

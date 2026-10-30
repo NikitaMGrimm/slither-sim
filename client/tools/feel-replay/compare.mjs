@@ -21,7 +21,7 @@ export function compareTraces(left, right, schedule) {
     return Math.min(20, index > 0 ? frames[index] - frames[index - 1]
       : index === -1 && frames.length > 1 ? frames.at(-1) - frames.at(-2) : 20);
   };
-  const exactChannels = new Map();
+  const exactChannels = new Map(), channelPaths = new Map();
   const result = channels => ({ policyVersion, status: errors.length ? 'invalid' : mismatches.length ? 'mismatch' : 'perceptual-match',
     passed: !errors.length && !mismatches.length, errors, mismatches, firstFailure: errors[0] ?? mismatches[0] ?? null, channels });
   for (const [name, trace] of [['left', left], ['right', right]]) {
@@ -63,7 +63,7 @@ export function compareTraces(left, right, schedule) {
       for (let i = 0; i < Math.min(a.length, b.length); i++) walk(a[i], b[i], schema.list, path + '[' + i + ']', l, r);
     } else if (l && typeof a === 'object' && a && 'x' in a && 'y' in a &&
       /\.(camera\.offset|rawHead|correctedHead|pupils\.(left|right)|body\[\d+\]|(css|backing)\.(head|pupils\[\d+\]))$/.test(path)) {
-      const scale = (s, axis) => path.includes('.css.') ? 1 :
+      const scale = (s, axis) => schema.x === 'css-px' || path.includes('.css.') ? 1 :
         (path.includes('.backing.') ? 1 : s.camera.zoom) * s.geometry.css[axis] / s.geometry.backing[axis];
       metric(path, ['x', 'y'].map((axis, i) => (b[axis] - a[axis]) * scale(l, i ? 'height' : 'width')), position, l);
     } else if (schema.choice || typeof schema === 'string') {
@@ -126,12 +126,16 @@ export function compareTraces(left, right, schedule) {
     }
     const rmsGrowth = quarter >= 10 && lastQuarterRms - firstQuarterRms > budget.max / 2;
     if (rmsGrowth) mismatches.push({ path: rows.at(-1).path, reason: 'last-quarter RMS growth', error: lastQuarterRms - firstQuarterRms, threshold: budget.max / 2 });
+    channelPaths.set(budget.channel, new Set(rows.map(r => r.path)));
     channels.push({ ...budget, count: rows.length, max: sorted.at(-1), p95, rms: rms(rows), signedMean: mean.length === 1 ? mean[0] : { x: mean[0], y: mean[1] },
       threshold: { max: budget.max, ...(budget.p95 === undefined ? {} : { p95: budget.p95 }) },
-      bias500ms, firstQuarterRms, lastQuarterRms, rmsGrowth,
-      firstFailure: mismatches.find(m => rows.some(r => r.path === m.path)) ?? null });
+      bias500ms, firstQuarterRms, lastQuarterRms, rmsGrowth });
   }
   // Preserve chronological first failure even if an aggregate limit failed.
   mismatches.sort((a, b) => (Number(a.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1) - Number(b.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1)));
+  for (const channel of channels) {
+    const paths = channelPaths.get(channel.channel);
+    if (paths) channel.firstFailure = mismatches.find(m => paths.has(m.path)) ?? null;
+  }
   return result(channels);
 }

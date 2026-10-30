@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { compareTraces } from './feel-replay/compare.mjs';
 import { buildManifest, parse, readTrace, scheduleHash, sha256, stringify } from './feel-replay/io.mjs';
-import { orderEvents, validateSchedule, validateTrace } from './feel-replay/schema.mjs';
+import { orderEvents, validate, validateSchedule, validateTrace } from './feel-replay/schema.mjs';
+import { observation } from './feel-replay/observation.mjs';
 import { syntheticFixture } from './feel-replay/synthetic.mjs';
 const cli = fileURLToPath(new URL('./feel-replay.mjs', import.meta.url));
 function peers() { const { schedule, trace: left } = syntheticFixture(); return { schedule, left, right: structuredClone(left) }; }
@@ -98,7 +99,7 @@ function history() {
 const setPath = (sample, channel, delta) => {
   if (channel === 'head') sample.own.projected.css.head.x += delta;
   if (channel === 'camera') sample.camera.x += delta * sample.geometry.backing.width / sample.geometry.css.width;
-  if (channel === 'body') sample.own.body[0].x += delta * sample.geometry.backing.width / sample.geometry.css.width;
+  if (channel === 'body') sample.own.body[0].x += delta;
   if (channel === 'pupils') sample.own.projected.css.pupils[0].x += delta;
   if (channel === 'heading') sample.own.correctedHeading += delta * Math.PI / 180;
   if (channel === 'phase') sample.own.opacity += delta;
@@ -211,4 +212,62 @@ test('manifest hashing, trace reader and CLI use temporary synthetic files', asy
     p.right.commands[0].bytes[0]++; await writeFile(files[2], stringify(p.right)); assert.equal(execute().status, 1);
     await writeFile(files[2], '{'); assert.equal(execute().status, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+
+test('per-channel first failure is the earliest p95 violation before a later max', () => {
+  const p = history();
+  for (const sample of p.right.samples) sample.own.projected.css.head.x += 0.6;
+  p.right.samples[39].own.projected.css.head.x = 1.1;
+  const report = run(p), channel = report.channels.find(c => c.channel === 'samples[].own.projected.css.head');
+  assert.equal(channel.firstFailure.path, 'samples[0].own.projected.css.head');
+  assert.equal(channel.firstFailure.reason, 'p95');
+  assert.deepEqual(channel.firstFailure, report.firstFailure);
+});
+
+for (const type of ['uint', 'int', 'byte']) test(type + ' range validation directly rejects unsafe integers', () => {
+  for (const value of [2 ** 53, -(2 ** 53), 1.5]) assert.throws(() => validate(value, type, 'id'), /id: required/);
+  assert.doesNotThrow(() => validate(type === 'byte' ? 255 : Number.MAX_SAFE_INTEGER, type));
+});
+test('matching unsafe schedule/trace IDs fail range validation, not boundary equality', () => {
+  const p = peers();
+  for (const b of p.schedule.boundaries) b.frameId = 2 ** 53;
+  for (const t of [p.left, p.right]) {
+    for (const sample of t.samples) sample.frameId = 2 ** 53;
+    for (const c of t.commands) c.frameId = 2 ** 53;
+  }
+  assert.throws(() => validateSchedule(p.schedule), /schedule.boundaries\[0\].frameId: required uint/);
+  assert.throws(() => validateTrace(p.left, p.schedule), /schedule.boundaries\[0\].frameId: required uint/);
+});
+test('identical unsafe own segment counts fail their own range guard', () => {
+  const p = peers();
+  for (const t of [p.left, p.right]) for (const s of t.samples) if (s.own) s.own.size.segments = 2 ** 53;
+  assert.throws(() => validateTrace(p.left, p.schedule), /trace.samples\[1\].own.size.segments: required uint/);
+  assert.equal(run(p).status, 'invalid');
+});
+
+test('prepared curve displacement in the flat ABI fails body budget without moving anchors/head', () => {
+  const p = peers(), geometry = p.left.manifest.geometry, zoom = 1;
+  // Camera + semantic own prefix, one prepared backing-pixel point, head/pupils.
+  const cells = [0, 0, 0, 0, 1, 1, 2, 0, 0, 1, zoom,
+    0, 0, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 2, 0, 2, 1,
+    1, 750, 422.5, 750, 422.5, 750, 422.5, 750, 422.5];
+  const baseline = observation(['draw', 'synthetic-own-1', cells], geometry);
+  const shifted = [...cells]; shifted[38] += 16 * zoom;
+  const candidate = observation(['draw', 'synthetic-own-1', shifted], geometry);
+  assert.deepEqual(candidate.own.rawHead, baseline.own.rawHead);
+  assert.deepEqual(candidate.own.correctedHead, baseline.own.correctedHead);
+  for (const [trace, own] of [[p.left, baseline.own], [p.right, candidate.own]]) trace.samples[2].own = own;
+  const report = run(p);
+  assert.equal(report.passed, false);
+  const body = report.channels.find(c => c.channel === 'samples[].own.body[0]');
+  assert.equal(body.max, candidate.own.body[0].x - baseline.own.body[0].x);
+  assert(body.max > 1);
+});
+test('prepared body trace limit and draw-only shape fail closed', () => {
+  const p = peers();
+  p.right.samples[2].own.body = Array.from({ length: 8194 }, () => ({ x: 0, y: 0 }));
+  assert.throws(() => validateTrace(p.right, p.schedule), /at most 8193/);
+  p.right = structuredClone(p.left); p.right.samples[1].own.body = [{ x: 1, y: 2 }];
+  assert.throws(() => validateTrace(p.right, p.schedule), /prepared body only/);
 });

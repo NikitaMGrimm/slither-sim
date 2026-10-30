@@ -30,7 +30,7 @@ const own = {
   offsets: { x: 'number', y: 'number', fraction: 'number', heading: 'radians' },
   speed: 'number', visualSpeed: 'number', boost: 'boolean', boostPhase: 'number',
   size: { segments: 'uint', fraction: 'number', length: 'number' },
-  body: list(point('world')),
+  body: { list: point('css-px'), maxLength: 8193 },
   projected: nullable({ backing: { head: point('number'), pupils: list(point('number'), 2) },
     css: { head: point('number'), pupils: list(point('number'), 2) } }),
 };
@@ -65,7 +65,7 @@ export const traceSchema = {
 export function fail(path, message) { throw new Error(`${path}: ${message}`); }
 export function validate(value, schema, path = '$') {
   if (typeof schema === 'string') {
-    const numeric = ['number', 'unit', 'world', 'radians', 'zoom', 'time', 'positive', 'int', 'uint', 'byte'];
+    const numeric = ['number', 'css-px', 'unit', 'world', 'radians', 'zoom', 'time', 'positive', 'int', 'uint', 'byte'];
     let ok;
     if (numeric.includes(schema)) {
       ok = typeof value === 'number' && Number.isFinite(value);
@@ -85,6 +85,7 @@ export function validate(value, schema, path = '$') {
   } else if (schema.list) {
     if (!Array.isArray(value)) fail(path, 'required array');
     if (schema.length !== undefined && value.length !== schema.length) fail(path, `required ${schema.length} values, got ${value.length}`);
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) fail(path, `at most ${schema.maxLength} values required`);
     for (let i = 0; i < value.length; i++) validate(value[i], schema.list, `${path}[${i}]`);
   } else if (schema.choice) {
     if (!schema.choice.some(x => Object.is(x, value))) fail(path, `expected ${schema.choice.join('|')}`);
@@ -225,6 +226,7 @@ export function validateTrace(trace, schedule, acknowledgedDrawIds) {
       if (lastOwn && lastOwn.token !== s.own.token) retiredOwnTokens.add(lastOwn.token);
       if (s.own.expired) retiredOwnTokens.add(s.own.token);
       if (s.own.expired !== (s.own.projected === null)) fail(`trace.samples[${i}].own.projected`, 'only expired own skips projection');
+      if ((s.phase !== 'draw' || s.own.expired) && s.own.body.length) fail(`trace.samples[${i}].own.body`, 'prepared body only at a visible draw boundary');
       appeared = true;
       betweenLives = false;
       lastOwn = s.own;

@@ -51,8 +51,15 @@ Events retain admitted input coordinates/keys/buttons, semantic targets, effects
 and scheduled/actual receipt clocks. Commands retain gameplay bytes, decision,
 transport-send and acknowledgement clocks, send success and source event/frame IDs.
 Login/handshake bytes are excluded. Samples retain raw/predicted head, headings,
-semantic body centerline, pupil positions, offsets, speed/size, spawn/death/boost
+prepared body centerline in CSS pixels, pupil positions, offsets, speed/size, spawn/death/boost
 phases, body opacity, camera, zoom, quality, geometry and preparation status.
+The body channel copies the actual own-body painter samples at draw preparation,
+with fixed stride eight (ordinals 0, 8, 16, ...) plus the final tail sample: at most
+8,193 points from the production 65,536-sample cap. The flat ABI projects prepared
+world positions to backing pixels; both decoders convert to CSS pixels before
+comparison. Updates, culled/expired bodies and preparations without a body carry
+an empty list. Anchors are not recorded. This fixed spatial sampling can miss
+changes confined to omitted ordinals; it never realigns or resamples two traces.
 Production correction rings remain private; their cells, cursors and pending
 counters are absent from this schema and both flat-ABI decoders.
 
@@ -77,8 +84,9 @@ Exact channels include event/admission semantics, command bytes/order/boost and
 all command times (0 virtual ms), lifecycle/identity, packet-derived speed/mass/
 segment decisions, requested quality, schedule and successful-picture counts.
 
-Vectors use Euclidean CSS-pixel distance. Raw/corrected head, body, pupil and
-camera diagnostics convert using declared zoom/backing geometry. Camera and
+Vectors use Euclidean CSS-pixel distance. Raw/corrected head, pupil and
+camera diagnostics convert using declared zoom/backing geometry; prepared body
+points are already CSS pixels. Camera and
 projected head are independent channels. Positions use p95 ≤0.5 px/max ≤1 px;
 headings use shortest wrapped differences with p95 ≤0.25°/max ≤0.5°.
 Zoom must pass absolute 0.0005, relative 0.001 and diagonal viewport-edge 1 px

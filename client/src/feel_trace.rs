@@ -4,9 +4,15 @@
 //! [browser peers](../tools/feel-replay/browser-peers.md) and the authored
 //! [synthetic fixture](../tools/feel-replay/browser-synthetic.json).
 
-use crate::presentation::{AnimatedClient, EyeLayoutInput, FaceGeometry, FrameStep};
+use crate::presentation::{
+    AnimatedClient, BodyPaintSample, EyeLayoutInput, FaceGeometry, FrameStep,
+};
 use crate::state::Point;
 use std::sync::{Arc, Mutex};
+
+/// Frozen telemetry stride over prepared painter samples; always include the tail.
+/// At MAX_CURVE_SAMPLES this retains at most 8,193 points. See the replay contract.
+pub const BODY_TRACE_STRIDE: usize = 8;
 
 /// An immutable copy of one exact core boundary, including a staged draw.
 #[derive(Clone, Debug, PartialEq)]
@@ -117,6 +123,7 @@ impl Recorder {
         phase: &'static str,
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
+        body: Option<&[BodyPaintSample]>,
     ) {
         let mut journal = self.0.lock().expect("trace journal");
         if phase == "draw" {
@@ -190,12 +197,21 @@ impl Recorder {
                 m.displayed_length,
                 0.64285 + 0.514285714 / ((m.logical_segments as f64 + 16.) / 36.).max(1.),
             ]);
-            // Semantic centerline only; correction storage is private to presentation.
-            values.push(snake.body().points().len() as f64);
-            for p in snake.body().points() {
-                let position = p.position();
-                let offset = p.position_offset();
-                values.extend([position.x + offset.x, position.y + offset.y]);
+            // Copy the actual prepared painter positions, never anchors or a
+            // second sampling pass. The flat ABI uses backing pixels; both
+            // decoders convert these to CSS pixels (feel-replay/README.md).
+            let body = body.unwrap_or_default();
+            let indices: Vec<_> = (0..body.len())
+                .filter(|i| i % BODY_TRACE_STRIDE == 0 || i + 1 == body.len())
+                .collect();
+            values.push(indices.len() as f64);
+            for i in indices {
+                values.extend([
+                    f64::from(journal.extent[0]) / 2.
+                        + (f64::from(body[i].x) - position.x) * camera.zoom(),
+                    f64::from(journal.extent[1]) / 2.
+                        + (f64::from(body[i].y) - position.y) * camera.zoom(),
+                ]);
             }
             if !m.expired {
                 let half = Point {
@@ -298,13 +314,13 @@ mod tests {
     fn observation_identity_distinguishes_equal_values_and_survives_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None);
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let rows = recorder.take();
         assert_eq!(rows[0].values, rows[1].values);
         assert_ne!(rows[0].sequence, rows[1].sequence);
         assert_eq!(recorder.last_draw(), Some(rows[1].clone()));
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         assert!(recorder.take()[0].sequence > rows[1].sequence);
     }
 
@@ -312,9 +328,9 @@ mod tests {
     fn pictures_acknowledge_only_the_submitted_identity_across_row_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let skipped = recorder.last_draw_sequence().unwrap();
-        recorder.observe(&client, "draw", None, None);
+        recorder.observe(&client, "draw", None, None, None);
         let submitted = recorder.last_draw_sequence().unwrap();
         assert_eq!(recorder.take().len(), 2);
         assert!(recorder.take_pictures().is_empty());
