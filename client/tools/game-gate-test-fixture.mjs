@@ -1,0 +1,442 @@
+// Authored native-receiver and explicit propagation doubles. No browser semantics.
+export function createGateTestDom({ hud = false, ownedHud = false, ownedPlay = false, leaderboard = false, minimap = false } = {}) {
+  ownedPlay = hud && ownedHud && ownedPlay;
+  leaderboard = hud && ownedHud && leaderboard;
+  minimap = hud && ownedHud && minimap;
+  const nodes = new WeakMap(), eventData = new WeakMap();
+  const state = value => {
+    if (!nodes.has(value)) throw new TypeError('Synthetic native Node receiver');
+    return nodes.get(value);
+  };
+  const root = value => { let node = value; while (state(node).parent) node = state(node).parent; return node; };
+  class Node extends EventTarget {
+    constructor(tag, document = false) {
+      super(); nodes.set(this, { tag, document, parent: null, owner: null, type: 'text',
+        readOnly: false, disabled: false, inert: false, visible: true, active: null });
+      this.children = []; this.id = ''; this.textContent = '';
+    }
+    get nodeType() { return state(this).document ? 9 : 1; }
+    get ownerDocument() { return state(this).document ? null : state(this).owner; }
+    get parentNode() { return state(this).parent; }
+    get isConnected() { return state(this).document || root(this) === state(this).owner; }
+    getRootNode() { return root(this); }
+    appendChild(value) {
+      const old = state(value).parent;
+      if (old) old.children.splice(old.children.indexOf(value), 1);
+      this.children.push(value); state(value).parent = this;
+      const owner = state(this).document ? this : state(this).owner;
+      const adopt = node => { state(node).owner = owner; for (const child of node.children) adopt(child); };
+      adopt(value); return value;
+    }
+    removeChild(value) {
+      this.children.splice(this.children.indexOf(value), 1); state(value).parent = null; return value;
+    }
+  }
+  const elements = new WeakSet();
+  const elementState = value => {
+    if (!elements.has(value)) throw new TypeError('Synthetic Element receiver'); return state(value);
+  };
+  class Element extends Node {
+    constructor(tag) { super(tag.toLowerCase()); elements.add(this); this.tagName = tag; }
+    get namespaceURI() { return elementState(this).namespace ?? 'http://www.w3.org/1999/xhtml'; }
+    get localName() { return elementState(this).tag; }
+    matches(selector) {
+      elementState(this);
+      if (selector !== ':disabled') throw new Error('Unexpected synthetic selector');
+      for (let node = this; node; node = state(node).parent) if (state(node).disabled) return true;
+      return false;
+    }
+    closest(selector) {
+      elementState(this);
+      if (selector !== '[inert]') throw new Error('Unexpected synthetic selector');
+      for (let node = this; node; node = state(node).parent) if (state(node).inert) return node;
+      return null;
+    }
+    checkVisibility(options) {
+      elementState(this);
+      if (Object.keys(options).length !== 3 || options.opacityProperty !== true
+        || options.visibilityProperty !== true || options.contentVisibilityAuto !== true) throw new Error('Visibility options');
+      for (let node = this; node; node = state(node).parent) if (!state(node).visible) return false;
+      return true;
+    }
+    setAttribute() {}
+  }
+  // Opt-in operation doubles keep the default editing fixture's shape unchanged.
+  let hudFixture;
+  if (hud) {
+    const trace = [], controls = new Map(), styles = new WeakMap(), html = new WeakMap(), characters = new WeakMap();
+    const branded = (store, receiver) => {
+      if (!store.has(receiver)) throw new TypeError('Synthetic HUD native receiver');
+      return store.get(receiver);
+    };
+    const operation = (name, body) => function (...args) {
+      trace.push([name, this, ...args]);
+      const control = controls.get(name);
+      control?.hook?.(this, ...args);
+      if (control && Object.hasOwn(control, 'failure')) throw control.failure;
+      const result = body(this, ...args);
+      if (ownedPlay || leaderboard) {
+        control?.afterHook?.(this, ...args);
+        if (control && Object.hasOwn(control, 'afterFailure')) throw control.afterFailure;
+      }
+      return result;
+    };
+    for (const [owner, names] of [[Node, ['nodeType', 'ownerDocument', 'parentNode', 'isConnected']],
+      [Element, ['localName', 'namespaceURI']]]) {
+      for (const name of names) {
+        const descriptor = Object.getOwnPropertyDescriptor(owner.prototype, name);
+        Object.defineProperty(owner.prototype, name, { ...descriptor, get: operation(name, receiver => {
+          if (name === 'nodeType' && characters.has(receiver)) return 3;
+          return Reflect.apply(descriptor.get, receiver, []);
+        }) });
+      }
+    }
+    Object.defineProperty(Node.prototype, 'firstChild', { configurable: true,
+      get: operation('firstChild', receiver => { state(receiver); return receiver.children[0] ?? null; }) });
+    Object.defineProperty(Node.prototype, 'nextSibling', { configurable: true,
+      get: operation('nextSibling', receiver => {
+        const parent = state(receiver).parent;
+        return parent ? parent.children[parent.children.indexOf(receiver) + 1] ?? null : null;
+      }) });
+    class CSSStyleDeclaration {
+      constructor() { styles.set(this, new Map()); }
+    }
+    Object.defineProperty(CSSStyleDeclaration.prototype, 'setProperty', { configurable: true, writable: true,
+      value: operation('setStyle', (receiver, name, value) => { branded(styles, receiver).set(name, value); }) });
+    class HTMLElement extends Element {
+      constructor(tag) { super(tag); html.set(this, new CSSStyleDeclaration()); }
+    }
+    Object.defineProperty(HTMLElement.prototype, 'style', { configurable: true,
+      get: operation('style', receiver => branded(html, receiver)) });
+    if (leaderboard) Object.defineProperty(HTMLElement.prototype, 'translate', { configurable: true,
+      get() { branded(html, this); return state(this).translate ?? true; },
+      set: operation('setTranslate', (receiver, value) => {
+        branded(html, receiver); state(receiver).translate = Boolean(value);
+      }) });
+    class CharacterData extends Node {
+      constructor(data = '') { super('#text'); characters.set(this, { data }); }
+    }
+    Object.defineProperty(CharacterData.prototype, 'data', { configurable: true,
+      get() { return branded(characters, this).data; },
+      set: operation('setText', (receiver, value) => { branded(characters, receiver).data = value; }) });
+    hudFixture = { HTMLElement, CharacterData, CSSStyleDeclaration, trace, controls,
+      character: receiver => branded(characters, receiver), style: receiver => branded(styles, receiver) };
+  }
+  const inputs = new WeakSet(), valueState = new WeakMap();
+  const inputValue = receiver => {
+    if (!inputs.has(receiver)) throw new TypeError('Synthetic Input value receiver');
+    return valueState.get(receiver);
+  };
+  class Input extends (ownedPlay ? hudFixture.HTMLElement : Element) {
+    constructor() {
+      super('input'); inputs.add(this);
+      valueState.set(this, { value: '', gets: 0, sets: 0, trace: [], getHook: undefined, setHook: undefined });
+    }
+    get type() { if (!inputs.has(this)) throw new TypeError('Synthetic Input receiver'); return state(this).type; }
+    get readOnly() { if (!inputs.has(this)) throw new TypeError('Synthetic Input receiver'); return state(this).readOnly; }
+    get value() {
+      const data = inputValue(this); data.gets++; data.trace.push(['get', this]);
+      data.getHook?.(this);
+      if (Object.hasOwn(data, 'getFailure')) throw data.getFailure;
+      return data.value;
+    }
+    set value(value) {
+      const data = inputValue(this); data.sets++; data.trace.push(['set', this, value]);
+      data.setHook?.(this, value);
+      if (Object.hasOwn(data, 'setFailure')) throw data.setFailure;
+      data.value = value;
+      data.afterSetHook?.(this, value);
+    }
+  }
+  let playFixture, Button;
+  if (ownedPlay) {
+    const trace = [], controls = new Map(), buttons = new WeakMap();
+    const buttonState = receiver => {
+      if (!buttons.has(receiver)) throw new TypeError('Synthetic Button receiver');
+      return buttons.get(receiver);
+    };
+    const operation = (name, body) => function (...args) {
+      trace.push([name, this, ...args]);
+      const control = controls.get(name);
+      control?.hook?.(this, ...args);
+      if (control && Object.hasOwn(control, 'failure')) throw control.failure;
+      const result = body(this, ...args);
+      control?.afterHook?.(this, ...args);
+      if (control && Object.hasOwn(control, 'afterFailure')) throw control.afterFailure;
+      return result;
+    };
+    const value = Object.getOwnPropertyDescriptor(Input.prototype, 'value');
+    Object.defineProperty(Input.prototype, 'value', { ...value,
+      get: operation('inputValue', receiver => Reflect.apply(value.get, receiver, [])) });
+    for (const [property, name] of [['maxLength', 'inputMaxLength'], ['autocomplete', 'inputAutocompleteOff']]) {
+      Object.defineProperty(Input.prototype, property, { configurable: true,
+        set: operation(name, (receiver, value) => { inputValue(receiver)[property] = value; }) });
+    }
+    Button = class Button extends hudFixture.HTMLElement {
+      constructor() { super('button'); buttons.set(this, { type: 'submit', disabled: false }); }
+    };
+    for (const [property, name] of [['type', 'buttonType'], ['disabled', 'buttonDisabled']]) {
+      Object.defineProperty(Button.prototype, property, { configurable: true,
+        set: operation(name, (receiver, value) => {
+          buttonState(receiver)[property] = value;
+          if (property === 'disabled') state(receiver).disabled = value;
+        }) });
+    }
+    playFixture = { trace, controls, buttonState };
+  }
+  // Explicit opt-in Canvas/ImageData recorder; it does not rasterize pixels.
+  let minimapFixture;
+  if (minimap) {
+    const trace = [], canvases = new WeakMap(), contexts = new WeakMap();
+    class Context {
+      constructor(canvas) { contexts.set(this, { canvas, properties: {} }); }
+      get canvas() { return contexts.get(this).canvas; }
+    }
+    for (const name of ['save', 'restore', 'setTransform', 'clearRect', 'beginPath', 'arc',
+      'moveTo', 'lineTo', 'closePath', 'fill', 'stroke', 'putImageData', 'drawImage', 'fillRect', 'strokeRect', 'reset']) {
+      Context.prototype[name] = function (...args) {
+        if (!contexts.has(this)) throw new TypeError('Synthetic minimap Context receiver');
+        trace.push([name, this, ...args]);
+      };
+    }
+    for (const name of ['fillStyle', 'strokeStyle', 'lineWidth', 'shadowColor', 'shadowBlur',
+      'shadowOffsetX', 'shadowOffsetY']) Object.defineProperty(Context.prototype, name, {
+      configurable: true,
+      get() { return contexts.get(this).properties[name]; },
+      set(value) { contexts.get(this).properties[name] = value; trace.push(['set', this, name, value]); },
+    });
+    class Canvas extends hudFixture.HTMLElement {
+      constructor() { super('canvas'); canvases.set(this, { width: 0, height: 0, context: new Context(this) }); }
+      getContext(kind) {
+        if (kind !== '2d') throw new TypeError('Synthetic minimap 2d required');
+        trace.push(['context', this]); return canvases.get(this).context;
+      }
+    }
+    for (const name of ['width', 'height']) Object.defineProperty(Canvas.prototype, name, {
+      configurable: true,
+      get() { return canvases.get(this)[name]; },
+      set(value) { canvases.get(this)[name] = value; trace.push(['resize', this, name, value]); },
+    });
+    class ImageData {
+      constructor(data, width, height) {
+        this.data = data; this.width = width; this.height = height;
+        trace.push(['ImageData', this]);
+      }
+    }
+    minimapFixture = { Canvas, Context, ImageData, trace,
+      canvas: value => canvases.get(value), context: value => contexts.get(value) };
+  }
+  const documents = new WeakSet();
+  class Document extends Node {
+    constructor() { super('#document', true); documents.add(this); }
+    get activeElement() { if (!documents.has(this)) throw new TypeError('Synthetic Document receiver'); return state(this).active; }
+  }
+  if (hud && ownedHud) {
+    const apply = Reflect.apply;
+    const append = Object.getOwnPropertyDescriptor(Node.prototype, 'appendChild').value;
+    const remove = Object.getOwnPropertyDescriptor(Node.prototype, 'removeChild').value;
+    const operation = (owner, name, body) => Object.defineProperty(owner.prototype, name, {
+      configurable: true, writable: true, value: function (value) {
+        hudFixture.trace.push([name, this, value]);
+        const control = hudFixture.controls.get(name);
+        control?.hook?.(this, value);
+        if (control && Object.hasOwn(control, 'failure')) throw control.failure;
+        const result = body(this, value);
+        control?.afterHook?.(this, value);
+        if (control && Object.hasOwn(control, 'afterFailure')) throw control.afterFailure;
+        return result;
+      },
+    });
+    const documentState = receiver => {
+      if (!documents.has(receiver)) throw new TypeError('Synthetic Document receiver');
+      return state(receiver);
+    };
+    operation(Document, 'createElement', (receiver, tag) => {
+      documentState(receiver);
+      const element = minimap && tag === 'canvas' ? new minimapFixture.Canvas()
+        : ownedPlay && tag === 'input' ? new Input()
+        : ownedPlay && tag === 'button' ? new Button() : new hudFixture.HTMLElement(tag);
+      state(element).owner = receiver; return element;
+    });
+    operation(Document, 'createTextNode', (receiver, text) => {
+      documentState(receiver);
+      const node = new hudFixture.CharacterData(text); state(node).owner = receiver; return node;
+    });
+    operation(Node, 'appendChild', (receiver, child) => {
+      state(receiver); state(child); return apply(append, receiver, [child]);
+    });
+    operation(Node, 'removeChild', (receiver, child) => {
+      state(receiver);
+      if (state(child).parent !== receiver) throw new Error('Synthetic child not at parent');
+      return apply(remove, receiver, [child]);
+    });
+  }
+  const nativeType = Object.getOwnPropertyDescriptor(Event.prototype, 'type').get;
+  const nativeTarget = Object.getOwnPropertyDescriptor(Event.prototype, 'target').get;
+  const nativePrevented = Object.getOwnPropertyDescriptor(Event.prototype, 'defaultPrevented').get;
+  class FenceEvent extends Event {
+    constructor(type, properties = {}) {
+      super(type, { cancelable: properties.cancelable ?? true });
+      eventData.set(this, { type, target: properties.target ?? null, prevented: false, stopped: false,
+        trace: [], ...properties });
+      if (ownedPlay && properties.trustedDescriptor !== 'missing') {
+        const descriptor = { configurable: properties.trustedDescriptor === 'configurable', enumerable: true };
+        if (properties.trustedDescriptor === 'data') descriptor.value = properties.trusted === true;
+        else {
+          descriptor.get = function () {
+            if (!eventData.has(this)) throw new TypeError('Synthetic trusted Event receiver');
+            const data = eventData.get(this);
+            if (Object.hasOwn(data, 'getTrustedFailure')) throw data.getTrustedFailure;
+            return data.trusted === true;
+          };
+          if (properties.trustedDescriptor === 'setter') descriptor.set = () => {};
+        }
+        Object.defineProperty(this, 'isTrusted', descriptor);
+      }
+      for (const name of ['clientX', 'clientY', 'deltaY']) if (name in properties) this[name] = properties[name];
+    }
+    get type() {
+      if (eventData.get(this)?.getterFailure?.name === 'type') throw eventData.get(this).getterFailure.value;
+      return eventData.has(this) ? eventData.get(this).type : Reflect.apply(nativeType, this, []);
+    }
+    get target() {
+      if (eventData.get(this)?.getterFailure?.name === 'target') throw eventData.get(this).getterFailure.value;
+      return eventData.has(this) ? eventData.get(this).target : Reflect.apply(nativeTarget, this, []);
+    }
+    get defaultPrevented() {
+      if (eventData.get(this)?.getterFailure?.name === 'defaultPrevented') throw eventData.get(this).getterFailure.value;
+      return eventData.has(this) ? eventData.get(this).prevented : Reflect.apply(nativePrevented, this, []);
+    }
+    preventDefault() {
+      if (!eventData.has(this)) return Reflect.apply(Event.prototype.preventDefault, this, []);
+      const data = eventData.get(this); data.trace.push('prevent');
+      if (ownedPlay) data.preventHook?.(this);
+      if (Object.hasOwn(data, 'preventFailure')) throw data.preventFailure;
+      if (this.cancelable) data.prevented = true;
+      if (ownedPlay) {
+        data.afterPreventHook?.(this);
+        if (Object.hasOwn(data, 'afterPreventFailure')) throw data.afterPreventFailure;
+      }
+    }
+    stopImmediatePropagation() {
+      if (!eventData.has(this)) return Reflect.apply(Event.prototype.stopImmediatePropagation, this, []);
+      const data = eventData.get(this); data.trace.push('stop');
+      if (ownedPlay) data.stopHook?.(this);
+      if (Object.hasOwn(data, 'stopFailure')) throw data.stopFailure;
+      data.stopped = true;
+      if (ownedPlay) {
+        data.afterStopHook?.(this);
+        if (Object.hasOwn(data, 'afterStopFailure')) throw data.afterStopFailure;
+      }
+    }
+  }
+  const eventBrands = new Map();
+  function eventGetter(owner, name, fallback) {
+    Object.defineProperty(owner.prototype, name, { configurable: true, get() {
+      if (!eventBrands.get(owner).has(this)) throw new TypeError('Synthetic event receiver');
+      const data = eventData.get(this);
+      if (data.getterFailure?.name === name) throw data.getterFailure.value;
+      return data[name] ?? fallback;
+    } });
+  }
+  class Keyboard extends FenceEvent {
+    constructor(...args) { super(...args); eventBrands.get(Keyboard).add(this); }
+    getModifierState(name) {
+      if (!eventBrands.get(Keyboard).has(this) || name !== 'AltGraph') throw new TypeError('Synthetic Keyboard receiver');
+      return eventData.get(this).altGraph ?? false;
+    }
+  }
+  eventBrands.set(Keyboard, new WeakSet());
+  for (const name of ['key', 'code']) eventGetter(Keyboard, name, '');
+  for (const name of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey', 'isComposing']) eventGetter(Keyboard, name, false);
+  class InputEvent extends FenceEvent { constructor(...args) { super(...args); eventBrands.get(InputEvent).add(this); } }
+  eventBrands.set(InputEvent, new WeakSet());
+  eventGetter(InputEvent, 'inputType', '');
+  class Mouse extends FenceEvent { constructor(...args) { super(...args); eventBrands.get(Mouse).add(this); } }
+  eventBrands.set(Mouse, new WeakSet());
+  for (const name of ['button', 'buttons']) eventGetter(Mouse, name, 0);
+  class Pointer extends Mouse { constructor(...args) { super(...args); eventBrands.get(Pointer).add(this); } }
+  eventBrands.set(Pointer, new WeakSet());
+  eventGetter(Pointer, 'pointerId', 1); eventGetter(Pointer, 'pointerType', 'mouse'); eventGetter(Pointer, 'isPrimary', true);
+  return { Node, Element, Input, Document, FenceEvent, Keyboard, InputEvent, Mouse, Pointer, state, eventData, inputValue,
+    ...(minimapFixture ? { minimap: minimapFixture } : {}),
+    ...(hudFixture ? { hud: hudFixture } : {}), ...(playFixture ? { Button, ownedPlay: playFixture } : {}) };
+}
+
+export function attachGateTestRealm(dom, realm, document, actualRealm) {
+  Object.assign(realm, { Node: dom.Node, Element: dom.Element, HTMLInputElement: dom.Input, Document: dom.Document,
+    Event: dom.FenceEvent, KeyboardEvent: dom.Keyboard, InputEvent: dom.InputEvent,
+    MouseEvent: dom.Mouse, PointerEvent: dom.Pointer });
+  if (dom.hud) Object.assign(realm, { HTMLElement: dom.hud.HTMLElement, CharacterData: dom.hud.CharacterData,
+    CSSStyleDeclaration: dom.hud.CSSStyleDeclaration });
+  if (dom.ownedPlay) realm.HTMLButtonElement = dom.Button;
+  if (dom.minimap) Object.assign(realm, { HTMLCanvasElement: dom.minimap.Canvas,
+    CanvasRenderingContext2D: dom.minimap.Context, ImageData: dom.minimap.ImageData,
+    Uint8Array, Uint8ClampedArray });
+  const location = realm.location;
+  let href = location.href;
+  Object.defineProperty(location, 'href', { configurable: true, get() {
+    if (this !== location) throw new TypeError('Synthetic Location receiver'); return href;
+  }, set(value) { href = value; } });
+  for (const name of ['document', 'top', 'location']) {
+    let value = name === 'top' ? actualRealm : realm[name];
+    Object.defineProperty(realm, name, { configurable: true, get() {
+      if (this !== actualRealm && this !== realm) throw new TypeError('Synthetic Window receiver'); return value;
+    }, set(next) { value = next; } });
+  }
+  const listeners = [], documentListeners = [], originals = [];
+  const add = realm.addEventListener;
+  realm.addEventListener = (type, handler, options) => { listeners.push({ type, handler, options }); add(type, handler, options); };
+  const docAdd = document.addEventListener.bind(document);
+  document.addEventListener = (type, handler, options) => { documentListeners.push({ type, handler, options }); docAdd(type, handler, options); };
+  function make(type, properties = {}) {
+    const Constructor = /^key/.test(type) ? dom.Keyboard : type === 'beforeinput' || type === 'input' ? dom.InputEvent
+      : /^pointer/.test(type) ? dom.Pointer : /^(mouse|click|dblclick)/.test(type) ? dom.Mouse : dom.FenceEvent;
+    return new Constructor(type, properties);
+  }
+  function deliver(event) {
+    const data = dom.eventData.get(event), type = data.type;
+    // A non-bubbling Document selectionchange still has a Window capture ancestor.
+    const phases = type === 'selectionchange'
+      ? [['window-capture', listeners], ['document-capture', documentListeners]]
+      : [['window-capture', listeners]];
+    for (const [phase, path] of phases) {
+      data.trace.push(phase);
+      for (const entry of path.filter(entry => entry.type === type)) {
+        entry.handler(event); if (data.stopped) break;
+      }
+      if (data.stopped) break;
+    }
+    if (!data.stopped) for (const phase of ['document-capture-original', 'target-inline', 'target-listener', 'bubble']) {
+      data.trace.push(phase);
+      for (const handler of originals) handler(phase, event);
+    }
+    return event;
+  }
+  return { ...dom, listeners, documentListeners, make, deliver, originals,
+    dispatch: (type, properties) => deliver(make(type, properties)) };
+}
+
+// Labelled issued Rust-view double, authored from the public Wasm record shape.
+// This is not real-Wasm composition or a pixel/raster oracle.
+export function issuedMinimapViewDouble(dimension = 2, imageRevision = 1n) {
+  const side = dimension + 24, center = side / 2;
+  return { schema: 1, enabled: true, imageRevision, dimension,
+    baseRgba: Uint8Array.from({ length: dimension * dimension * 4 }, (_, i) => i % 256),
+    alternateRgba: Uint8Array.from({ length: dimension * dimension * 4 }, (_, i) => 255 - i % 256),
+    widget: { side, right: 16, bottom: 16, zIndex: 10, opacity: 0.25,
+      background: { center: { x: center, y: center }, radius: dimension / 2,
+        fill: [32, 38, 48], quadrantFill: [64, 70, 80],
+        quadrantAngles: [[0, Math.PI / 2], [Math.PI, Math.PI * 1.5]],
+        diameters: [[{ x: 12, y: center }, { x: side - 12, y: center }],
+          [{ x: center, y: 12 }, { x: center, y: side - 12 }]],
+        stroke: [0, 0, 0], strokeWidth: 1, shadowBlur: 12, shadowOffset: { x: 0, y: 0 },
+        opacity: 0.4, zIndex: 11 },
+      images: [0, 1].map(index => ({ dimension, left: 12, top: 12, opacity: 0.3 + index * 0.1, zIndex: 12 + index })),
+      marker: { left: 3.2, top: 5.6, side: 14, center: { x: 7, y: 7 }, radius: 2.5,
+        stroke: [0, 0, 0], strokeWidth: 2, fill: [255, 255, 255], opacity: 0.8, zIndex: 13 },
+      label: { text: 'server 1', left: 0, top: side, width: side, height: 20,
+        fontSize: 14, fontFamily: 'Arial', textAlign: 'center', overflowHidden: true,
+        fill: [255, 255, 255], opacity: 0.7, shadowOffset: { x: 1, y: 2 }, shadowBlur: 3 },
+    } };
+}
