@@ -77,6 +77,26 @@ fn input(now_ms: f64, delta: f64) -> MinimapUpdateInput {
 }
 
 #[test]
+fn server_label_content_style_and_centred_css_anchor() {
+    let state = map();
+    let label = plan_minimap(state.view(), MinimapLayout::default())
+        .unwrap()
+        .widget
+        .unwrap()
+        .label;
+    assert_eq!(label.text, "server 42");
+    assert_eq!(label.font_family, presentation::PLATFORM_FONT_FAMILY);
+    assert_eq!(label.font_size, 14.);
+    assert_eq!(label.fill, [255; 3]);
+    assert_eq!(label.opacity, 0.5);
+    assert_eq!(label.text_align, "center");
+    assert!(label.overflow_hidden);
+    assert_eq!(label.text_anchor(), Point { x: 24., y: 54. });
+    assert_eq!(label.shadow_offset, Point { x: 0., y: 1. });
+    assert_eq!(label.shadow_blur, 8.);
+}
+
+#[test]
 fn default_requires_setup_and_setup_forces_empty_24() {
     let mut state = MinimapState::default();
     assert_eq!(state.view().dimension, None);
