@@ -8,6 +8,14 @@ commit `55f2921594aff00044624e47a8a1f90c4ee0b073`; use its `select.py`,
 `tables.py` unchanged at the staging root. Add this study's files there. Do not
 copy v1's raw results, source-hash maps or cloud identifiers into Git.
 
+Exception for the labelled pre-reduction method correction: take
+`sharedv1/acceptance.py`, root `select.py` and `sharedv1/check_quantiles.py` from
+v1 commit `fa10b79368e4176f03287de7605d2058c5948665`. Run
+`python3 sharedv1/check_quantiles.py` before reduction. All other linked source
+stays at the original pin. The first collector keeps its original in-memory
+tails; corrected replay compares every gate and non-tail value exactly while
+allowing only declared report-tail/derived seven-ms fields to differ.
+
 On the first fresh AWS generator, before warmup, run the portable locked build
 on the pinned main archive. `prepare.py` applies v1 and this study's generator
 changes. Retain one bounded Cargo target and remove it after build. Run:

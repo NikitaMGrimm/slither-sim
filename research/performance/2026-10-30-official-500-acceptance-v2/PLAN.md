@@ -182,3 +182,18 @@ verify task instances/volumes gone before another pair; delete task key/security
 group and scan **every enabled region** at completion. Preserve unrelated work.
 Keep raw data, AWS identities/addresses, SSH material and personal paths outside
 Git. Publish lean selected evidence and scripts linking earlier harnesses.
+
+## Pre-reduction method correction (maintainer, during run-1 warmup)
+
+The stated nearest-rank method means sample index **ceil(n*p)-1**, maximum n-1,
+and histogram cumulative count **>=ceil(n*p)**. The v1 helper used a different
+index; the maintainer requested correction in both studies before v2 reduction.
+Use corrected v1 `acceptance.py` and `select.py` from commit
+`fa10b79368e4176f03287de7605d2058c5948665` for v2 reductions and the second pair.
+V2 run 1 continues uninterrupted with the original in-memory collector. Retain
+that online result and allow only report-tail fields/the derived seven-ms flag
+to differ on replay; compare every gate, count, mean and other value exactly.
+These helpers calculate report-only CPU/frame tails. No frozen acceptance gate,
+the ladder's generator headroom calculation, world, binary, cohort or timing
+changes. The historical ladder study remains untouched. This correction is
+recorded before any v2 result is reduced; it is not an outcome-based amendment.
