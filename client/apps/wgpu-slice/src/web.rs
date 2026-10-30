@@ -87,7 +87,7 @@ pub async fn menu_specimen(
         host,
         canvas,
         menu: crate::menu::Menu::default(),
-        text: crate::text::TextCache::default(),
+        text: crate::text::TextCache::menu(),
     };
     specimen.render(dpr, state)?;
     Ok(specimen)

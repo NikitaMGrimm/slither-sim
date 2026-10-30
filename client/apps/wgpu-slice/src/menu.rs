@@ -16,7 +16,7 @@ use slither_client::{
 use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
-const MATERIAL_HANDLE_BASE: u64 = 0x7000_0000_0000_0000;
+use crate::bank::MENU_MATERIAL_HANDLE_BASE;
 type MaterialKey = (u32, u32, u8, u64);
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
@@ -70,12 +70,15 @@ impl MenuFrame {
         {
             return Err("Menu picture extent/scale mismatch".into());
         }
-        let mut resources: BTreeMap<_, _> = picture
-            .resources
-            .iter()
-            .chain(&self.resources)
-            .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
-            .collect();
+        // Keyed by handle alone: the renderer keeps one revision per handle.
+        let mut resources = BTreeMap::new();
+        for r in picture.resources.iter().chain(&self.resources) {
+            if let Some(old) = resources.insert(r.asset.handle, r.clone())
+                && old.asset != r.asset
+            {
+                return Err("Menu resource handle collides with the world picture".into());
+            }
+        }
         if resources.len() > 2048
             || resources
                 .values()
@@ -145,7 +148,7 @@ impl Composition<'_> {
                 self.next_handle = self
                     .next_handle
                     .checked_add(1)
-                    .filter(|h| *h < MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
                 let rgb = if kind == 8 {
                     [224, 224, 255]
@@ -202,7 +205,7 @@ impl Composition<'_> {
                 self.next_handle = self
                     .next_handle
                     .checked_add(1)
-                    .filter(|h| *h < MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
                 Resource {
                     asset: BodyAsset {
@@ -281,7 +284,7 @@ impl Menu {
         let mut c = Composition {
             old: &self.materials,
             materials: BTreeMap::new(),
-            next_handle: self.next_handle.max(MATERIAL_HANDLE_BASE),
+            next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
             scale: dpr.min(3.),
             draws: Vec::new(),
             art: Vec::new(),
