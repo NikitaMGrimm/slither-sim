@@ -4,12 +4,19 @@ reviews:
   changed_files_summary: false
   sequence_diagrams: false
   auto_review:
+    # Drafts and stacked PRs are reviewed too, without pausing on busy branches.
+    drafts: true
+    base_branches: [".*"]
+    auto_pause_after_reviewed_commits: 0
     ignore_title_keywords:
       - "chore(release):"
   path_filters:
     - "!README.md"
     - "!CHANGELOG.md"
     - "!assets/**"
+  path_instructions:
+    - path: "client/**"
+      instructions: "Follow client/AGENTS.md. Never accept official slither.io code, assets, credentials or raw captures; fixtures must be labelled synthetic. Game, protocol and presentation policy belongs in the shared Rust core, not platform adapters."
   pre_merge_checks:
     docstrings:
       mode: "off"

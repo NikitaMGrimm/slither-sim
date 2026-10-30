@@ -1,0 +1,19 @@
+{
+  "name": "slither-client",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Rust client development tools",
+  "scripts": {
+    "test": "node --test tools/*.test.mjs apps/wgpu-slice/tests/local-host.test.mjs",
+    "check": "node tools/check.mjs",
+    "dev:desktop": "node tools/dev.mjs desktop",
+    "dev:web": "node tools/dev.mjs web",
+    "build:web": "node tools/build-web.mjs",
+    "scene": "node tools/scene-server.mjs"
+  },
+  "devDependencies": {
+    "ws": "8.22.0"
+  }
+}
