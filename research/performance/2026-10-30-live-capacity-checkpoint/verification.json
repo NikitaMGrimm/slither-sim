@@ -255,10 +255,12 @@
     "command": "python3 -B -m unittest discover -s tools -p test_documentation.py",
     "exitCode": 0,
     "testsPassed": 7,
-    "publicationSnapshotCommit": "fc7b7f29d1db2654f4f6c7803ca345ebf58eac96",
+    "publicationSnapshotCommit": "f08e2aeef3d81f7ec0c6ed306277dd6a4001d84d",
     "allStudyPythonScriptsCompile": true,
     "reportTablesMatchSelectedJsonExactly": true,
     "pureReductionControlsOnPublicationScriptsPass": true,
-    "initialCheck": "one missing historical helper link, corrected before this pass"
+    "initialCheck": "one missing historical helper link, corrected before this pass",
+    "previousDocumentationSnapshotCommit": "fc7b7f29d1db2654f4f6c7803ca345ebf58eac96",
+    "latestMainCatalogUpdateIncluded": true
   }
 }

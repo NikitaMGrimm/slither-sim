@@ -6,5 +6,6 @@
   "privateRawArchiveRetainedLocally": true,
   "guestRawArchiveRemoved": true,
   "archiveReceipt": "archive-receipt.json",
-  "unrelatedDirectoriesUnchanged": true
+  "unrelatedDirectoriesUnchanged": true,
+  "finalDocumentationScratchRemoved": true
 }
