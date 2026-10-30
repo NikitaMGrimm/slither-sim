@@ -129,52 +129,22 @@ impl FoodGrid {
                 }
             })
             .collect();
-        if u32::try_from(cols * rows).is_err() {
-            return grid.populate_legacy(food, &cells);
+        for c in 0..cols * rows {
+            grid.starts[c + 1] += grid.starts[c];
         }
-        // Start each cell's insertion cursor at c + 1. Filling it advances the
-        // cursor to that cell's end, leaving final offsets without a scratch copy.
-        let mut placed = 0;
-        for start in &mut grid.starts[1..] {
-            let count = *start;
-            *start = placed;
-            placed += count;
-        }
-        let placed = placed as usize;
+        let placed = grid.starts[cols * rows] as usize;
         grid.points = vec![Point::default(); placed];
         grid.ids = vec![0; placed];
+        let mut next = grid.starts[..cols * rows].to_vec();
         for (i, &c) in cells.iter().enumerate() {
             if c != u32::MAX {
-                let slot = &mut grid.starts[c as usize + 1];
+                let slot = &mut next[c as usize];
                 grid.points[*slot as usize] = food[i].point();
                 grid.ids[*slot as usize] = i as u32;
                 *slot += 1;
             }
         }
         grid
-    }
-    #[cold]
-    #[inline(never)]
-    fn populate_legacy(mut self, food: &[Food], cells: &[u32]) -> Self {
-        // Above the cell-ID range, narrowing can alias cells or hit the outlier
-        // sentinel. Keep the original offsets and writes even in that case.
-        let count = self.cols * self.rows;
-        for c in 0..count {
-            self.starts[c + 1] += self.starts[c];
-        }
-        let placed = self.starts[count] as usize;
-        self.points = vec![Point::default(); placed];
-        self.ids = vec![0; placed];
-        let mut next = self.starts[..count].to_vec();
-        for (i, &c) in cells.iter().enumerate() {
-            if c != u32::MAX {
-                let slot = &mut next[c as usize];
-                self.points[*slot as usize] = food[i].point();
-                self.ids[*slot as usize] = i as u32;
-                *slot += 1;
-            }
-        }
-        self
     }
     // Rounding is monotone, so a coordinate between two query bounds always lands
     // between their cells; exact cell edges do not matter.
