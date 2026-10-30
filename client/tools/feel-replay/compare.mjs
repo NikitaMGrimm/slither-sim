@@ -1,6 +1,16 @@
 import { traceSchema, validateTrace } from './schema.mjs';
 import { floatBits, scheduleHash, stringify } from './io.mjs';
 
+export const crossTargetPolicyVersion = 'feel-cross-target-v2';
+
+// Storage types and shapes stay unchanged. Only cross-target comparison assigns
+// the existing numeric caps to ring floats; cursors/counts never enter this map.
+function ringFloatType(type, path) {
+  if (/^samples\[\d+\]\.camera\.ring\[\d+\]$/.test(path)) return 'world';
+  if (/^samples\[\d+\]\.own\.rings\.(head|angle|length)\.values\[\d+\]$/.test(path)) return 'f32';
+  return type;
+}
+
 function f32Ordinal(value) {
   const bytes = Buffer.alloc(4);
   bytes.writeFloatBE(value);
@@ -14,10 +24,11 @@ function allowance(a, b, type, policy) {
   const cap = { world: policy.worldCap, radians: policy.angleCap, zoom: policy.zoomCap }[type];
   return cap !== undefined && Math.abs(a - b) <= cap;
 }
-export function compareTraces(left, right, schedule, { mode = 'same-core' } = {}) {
+export function compareTraces(left, right, schedule, { mode = 'same-core', exactOnly = false } = {}) {
   const errors = [], mismatches = [], nonExactFloats = [];
   const result = () => ({
-    mode, status: errors.length ? 'invalid' : mismatches.length ? 'mismatch'
+    mode, policyVersion: mode === 'cross-target' ? crossTargetPolicyVersion : 'feel-same-core-v1', exactOnly,
+    status: errors.length ? 'invalid' : mismatches.length ? 'mismatch'
       : nonExactFloats.length ? 'numerical-match' : 'exact-match',
     passed: errors.length === 0 && mismatches.length === 0,
     exact: errors.length === 0 && mismatches.length === 0 && nonExactFloats.length === 0,
@@ -44,7 +55,7 @@ export function compareTraces(left, right, schedule, { mode = 'same-core' } = {}
     }
   }
   if (errors.length) return result();
-  const policy = mode === 'cross-target' ? a.numericalPolicy : null;
+  const policy = mode === 'cross-target' && !exactOnly ? a.numericalPolicy : null;
   const drift = new Map();
   function walk(x, y, schema, path) {
     if (schema.nullable) {
@@ -62,13 +73,16 @@ export function compareTraces(left, right, schedule, { mode = 'same-core' } = {}
         return;
       }
       if (numericFloat) {
-        const tolerated = allowance(x, y, schema, policy);
+        const type = mode === 'cross-target' ? ringFloatType(schema, path) : schema;
+        const tolerated = allowance(x, y, type, policy);
         const delta = y - x;
         const difference = { path, reason: x === 0 && y === 0 ? 'signed zero mismatch' : 'non-exact float',
           leftBits: floatBits(x), rightBits: floatBits(y),
           delta: Number.isFinite(delta) ? delta : delta > 0 ? 'positive overflow' : 'negative overflow', tolerated };
         nonExactFloats.push(difference);
         if (!tolerated) mismatches.push(difference);
+        // The channel retains the physical ring-element index, so each stored
+        // element has an independent history in sample order, even as cursors move.
         // Three growing same-sign error levels in one ordered sample channel fail.
         // Repeated update/draw observations retain progress without counting as growth.
         if (tolerated && path.startsWith('samples[')) {

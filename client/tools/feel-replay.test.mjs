@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { compareTraces } from './feel-replay/compare.mjs';
+import { compareTraces, crossTargetPolicyVersion } from './feel-replay/compare.mjs';
 import { buildManifest, floatBits, parse, readTrace, scheduleHash, sha256, stringify } from './feel-replay/io.mjs';
-import { orderEvents, validateManifest, validateSchedule, validateTrace } from './feel-replay/schema.mjs';
+import { orderEvents, validateManifest, validateNumericalPolicy, validateSchedule, validateTrace } from './feel-replay/schema.mjs';
 import { syntheticFixture, syntheticNumericalPolicy } from './feel-replay/synthetic.mjs';
 
 const cli = fileURLToPath(new URL('./feel-replay.mjs', import.meta.url));
@@ -173,16 +173,87 @@ test('cross-target f32 offsets pass one ULP, fail two, including negative offset
     failure(run(p), /non-exact float/);
   }
 });
-for (const cross of [false, true]) test(`discrete, ring, command and timing mismatches fail in ${cross ? 'cross-target' : 'same-core'}`, () => {
+for (const cross of [false, true]) test(`discrete, ring cursor, command and timing mismatches fail in ${cross ? 'cross-target' : 'same-core'}`, () => {
   for (const mutate of [
     p => { p.right.samples[1].camera.follow = false; },
     p => { p.right.samples[1].own.rings.head.index = 1; },
-    p => { p.right.samples[1].own.rings.head.values[0] = next32(0); },
+    p => { p.right.samples[1].own.rings.head.pending = 1; },
+    p => { p.right.samples[1].camera.index = 1; },
+    p => { p.right.samples[1].camera.pending = 1; },
     p => { p.right.commands[0].bytes[0] = 11; },
     p => { p.right.commands[0].ackMs = Number.MIN_VALUE; },
     p => { p.right.events[0].actualMs = -0; },
   ]) {
     const p = peers(cross); mutate(p); assert.equal(run(p).passed, false);
+  }
+});
+
+test('cross-target f32 ring storage admits one ULP only for every ring family', () => {
+  for (const name of ['head', 'angle', 'length']) for (const sign of [1, -1]) {
+    const p = peers(true);
+    p.left.samples[1].own.rings[name].values[0] = sign;
+    p.right.samples[1].own.rings[name].values[0] = sign * next32(1);
+    const report = run(p);
+    assert.equal(report.status, 'numerical-match');
+    assert.equal(report.policyVersion, crossTargetPolicyVersion);
+    assert.equal(report.nonExactFloats.length, 1);
+    p.right.samples[1].own.rings[name].values[0] = sign * next32(1, 2);
+    failure(run(p), /non-exact float/);
+    p.right.samples[1].own.rings[name].values[0] = next64(1);
+    failure(run(p), /required f32-exact/);
+  }
+});
+
+test('cross-target camera ring storage admits the world cap and fails immediately beyond', () => {
+  const p = peers(true);
+  p.right.samples[1].camera.ring[0] = 1e-9;
+  assert.equal(run(p).status, 'numerical-match');
+  p.right.samples[1].camera.ring[0] = next64(1e-9);
+  failure(run(p), /non-exact float/);
+});
+
+test('same-core ring floats stay exact even with a declared cross-target policy', () => {
+  for (const name of ['head', 'angle', 'length', 'camera']) {
+    const p = peers();
+    for (const t of [p.left, p.right]) t.manifest.numericalPolicy = structuredClone(syntheticNumericalPolicy);
+    if (name === 'camera') p.right.samples[1].camera.ring[0] = 1e-10;
+    else p.right.samples[1].own.rings[name].values[0] = next32(0);
+    const report = run(p);
+    failure(report, /non-exact float/);
+    assert.equal(report.nonExactFloats[0].tolerated, false);
+  }
+});
+
+test('ring allowance requires a cause and retains signed-zero evidence', () => {
+  for (const policy of [null, { ...syntheticNumericalPolicy, cause: '' }, { ...syntheticNumericalPolicy, cause: undefined }]) {
+    const p = peers(true);
+    p.left.manifest.numericalPolicy = p.right.manifest.numericalPolicy = policy;
+    p.right.samples[1].camera.ring[0] = 1e-10;
+    failure(run(p), policy === null ? /non-exact float/ : /cause/);
+  }
+  for (const camera of [true, false]) {
+    const p = peers(true);
+    if (camera) p.right.samples[1].camera.ring[0] = -0;
+    else p.right.samples[1].own.rings.head.values[0] = -0;
+    failure(run(p), /signed zero mismatch/);
+  }
+});
+
+test('an exact cross-target report preserves the declared policy without accepting its allowances', () => {
+  const p = peers(true);
+  p.right.samples[1].camera.ring[0] = 1e-10;
+  assert.equal(run(p).status, 'numerical-match');
+  const report = compareTraces(p.left, p.right, p.schedule, { mode: 'cross-target', exactOnly: true });
+  failure(report, /non-exact float/);
+  assert.equal(report.exactOnly, true);
+  assert.equal(report.nonExactFloats[0].tolerated, false);
+  assert.deepEqual(p.left.manifest.numericalPolicy, syntheticNumericalPolicy);
+});
+
+test('numerical declarations reject an excessive cap before peer execution', () => {
+  assert.equal(validateNumericalPolicy(syntheticNumericalPolicy), syntheticNumericalPolicy);
+  for (const [key, value] of [['worldCap', 1e-8], ['angleCap', 1e-8], ['zoomCap', 1e-11], ['f32Ulps', 2]]) {
+    assert.throws(() => validateNumericalPolicy({ ...syntheticNumericalPolicy, [key]: value }), /exceeds/);
   }
 });
 test('cross-target fails without a declared cause, with excessive caps, or wrong peer mode', () => {
@@ -258,6 +329,49 @@ test('cross-target decrease or sign change resets growth before later update/dra
     assert.equal(report.status, 'mismatch');
     assert.equal(report.mismatches[0].path, 'samples[9].camera.x');
   }
+});
+
+for (const name of ['camera', 'head', 'angle', 'length']) test(`cross-target ${name} ring accumulation is guarded per stored element in sample order`, () => {
+  const ring = sample => name === 'camera' ? sample.camera.ring : sample.own.rings[name].values;
+  const history = levels => {
+    const p = fiveFrameCameraErrors(Array(10).fill(0));
+    p.right.samples.slice(1).forEach((s, i) => {
+      const level = levels[i];
+      if (name === 'camera') ring(s)[0] = level * 1e-10;
+      else if (level !== 0) {
+        // Increasing binades grow absolute error while each sample remains one
+        // f32 ULP apart. The accumulation guard is separate from the ULP cap.
+        const base = 1.5 * 2 ** (Math.abs(level) - 1);
+        ring(p.left.samples[i + 1])[0] = base;
+        ring(s)[0] = base + Math.sign(level) * (next32(base) - base);
+      }
+    });
+    return p;
+  };
+  for (const sign of [1, -1]) {
+    const p = history([1, 1, 2, 2, 3, 3, 4, 4, 5, 5].map(x => x * sign));
+    for (const t of [p.left, p.right]) t.samples.slice(1).forEach((s, i) => {
+      const cursor = name === 'camera' ? s.camera : s.own.rings[name];
+      cursor.index = i; // Cursor movement must not reset a physical element's history.
+    });
+    const report = run(p);
+    failure(report, /accumulating numerical drift/);
+    assert.match(report.mismatches[0].path, /^samples\[5\]\./);
+  }
+  assert.equal(run(history(Array(10).fill(2))).status, 'numerical-match');
+  for (const levels of [[1, 1, 2, 2, 1, 1, 2, 2, 2, 2], [1, 1, 2, 2, -1, -1, -2, -2, -2, -2], [1, 1, 2, 2, 0, 0, 1, 1, 2, 2]]) {
+    assert.equal(run(history(levels)).status, 'numerical-match');
+  }
+  const independent = history(Array(10).fill(0));
+  independent.right.samples.slice(1).forEach((s, i) => {
+    if (name === 'camera') ring(s)[i] = (i + 1) * 1e-10;
+    else {
+      const base = 1.5 * 2 ** i;
+      ring(independent.left.samples[i + 1])[i] = base;
+      ring(s)[i] = next32(base);
+    }
+  });
+  assert.equal(run(independent).status, 'numerical-match');
 });
 test('hash, core, startup, geometry, entropy and input bindings fail closed', () => {
   for (const mutate of [

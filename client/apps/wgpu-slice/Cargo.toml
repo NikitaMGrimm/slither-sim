@@ -17,6 +17,11 @@ path = "src/main.rs"
 name = "slither-wgpu-diagnostic"
 path = "src/diagnostic_main.rs"
 
+[[example]]
+name = "feel-replay"
+path = "examples/feel_replay.rs"
+required-features = ["feel-trace"]
+
 [dependencies]
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 slither-client = { path = "../.." }
