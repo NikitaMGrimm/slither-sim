@@ -50,6 +50,8 @@ def main():
     tables=render(data)
     storm=r/'botstorm-selected.json'
     if storm.exists():tables.update(render_storm(json.loads(storm.read_text())))
+    diagnostic=r/'diagnostic-selected.json'
+    if diagnostic.exists():tables.update(render_diagnostic(json.loads(diagnostic.read_text())))
     if '--check' in sys.argv:
         report=(r/'REPORT.md').read_text()
         for key,table in tables.items():
@@ -83,6 +85,31 @@ def render_storm(value):
             lo,hi=phase[key]['cpuMsPerTickBounds'];columns.append(f'{lo:.3f}–{hi:.3f}')
         phases.append(f"| {n:,} | "+' | '.join(columns)+f" | {p['centerCpuMs']['mean']:.3f} |")
     return {'storm-census':'\n'.join(population),'storm-cpu':'\n'.join(cpu),'storm-phases':'\n'.join(phases)}
+
+
+def render_diagnostic(value):
+    guards=['| Workload | Ticks | Box cells min–max | Food at pickup min–max | Cover area min–max | Declines a / b / c ticks | Dense / hashed / linear ticks | Pickup CPU share on matched slow ticks |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+    slow=['| Workload | Sample group | Samples | Movement | Collisions | Food pickup/cache | Grid build | Death | Admission | Prey | Ambient | Unresolved |',
+          '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+    overhead=['| Workload | Diagnostic / primary world CPU range | Sampled / ordinary CPU | Phase-profile / ordinary world CPU | Lost samples | Unparsed records |',
+              '| --- | ---: | ---: | ---: | ---: | ---: |']
+    def span(s):return f"{s['min']:,}–{s['max']:,}"
+    for window in value['windows']:
+        label=window['label'];o=window['overhead'];ratios=o['timestampDebugToPrimaryWorldCpuRatios']
+        lost=window['lostSamples'] if window['lostSamples'] is not None else 'unknown'
+        overhead.append(f"| {label} | {min(ratios):.3f}–{max(ratios):.3f} | {o['cpuRatio']:.3f} | {window['stepProfileDiagnostic']['profileToOrdinaryCpuRatios'][0]:.3f} | {lost} | {window['unparsedRecords']} |")
+        if label=='1000':continue
+        g=window['pickupGuards']['allTicks'];d=g['declines'];p=g['paths']
+        bounds=window['sameVirtualSlowTicksPhaseDiagnostic']['phases']['foodSeconds']['cpuShareBounds']
+        guards.append(f"| {label} | {g['ticks']} | {span(g['boxCells'])} | {span(g['foodLen'])} | {span(g['coverArea'])} | {d['declineFixedCells']} / {d['declineFoodLength']} / {d['declineCoverArea']} | {p.get('dense',0)} / {p.get('hashed indexed',0)} / {p.get('linear',0)} | {100*bounds[0]:.1f}–{100*bounds[1]:.1f}% |")
+        for key in ['all world ticks','slowest 1% excluding first']:
+            row=window['worldTickAttribution'][key]
+            columns=[100*row['phases'].get(phase,{}).get('share',0) for phase in
+                ['movement','collisions','food pickup/cache','pickup grid construction','death processing',
+                 'spawn/admission','prey','ambient/maintenance','unresolved world / clock brackets']]
+            slow.append(f"| {label} | {key} | {row['samples']} | "+' | '.join(f'{v:.1f}%' for v in columns)+' |')
+    return {'pickup-guards':'\n'.join(guards),'slow-attribution':'\n'.join(slow),'diagnostic-overhead':'\n'.join(overhead)}
 
 
 if __name__=='__main__':main()

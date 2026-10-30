@@ -185,9 +185,21 @@ These samples support ranking, not a replacement throughput measurement or a
 proven exact speedup. The original 8,192-byte/no-timestamp diagnostic proposal
 was superseded before collection; measured instrumentation costs are retained.
 
-The read-only `grid` mode constructs no observations. Its guard result is for
-checkpoint pickup geometry; real steps build after movement/deaths. Interpret
-that result with sampled fallback-path stacks and phase/work counters.
+The read-only `grid` mode constructs no observations. It reports checkpoint
+geometry separately from the diagnostic's per-tick audit. In the latter, public
+event recording reconstructs exact pickup-entry food length as final food plus
+Food pickup events minus ambient births. After pickup, only fam/derived score
+changes; head, heading, speed, integer segments and alive status still match
+the pickup circles. The source's directed circle and public `pickup_circle`
+have the same arithmetic order. See the source-bound argument in AMENDMENT.md.
+
+The diagnostic folds those actual circles after the world clock ends and records
+all three grid guards and dense/hashed/linear selection on each of 512 ticks.
+All ordinary/sampled/profiled guard records must agree, and their final state
+must equal the primary reference. No extra timing run or `src/` edit is added.
+Event recording inside step is part of the disclosed instrumentation overhead;
+the guard fold is outside the world/admission sample intervals. These audit
+samples are labelled separately in whole-operation sampled attribution.
 
 `after_primary.py` waits on the main controller with a pidfd, then sequences
 post-count work. `finish_collection.py` waits for that controller, runs tests and

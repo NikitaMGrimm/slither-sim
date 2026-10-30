@@ -17,6 +17,8 @@ class StackClassification(unittest.TestCase):
             'internal_scaling_debug::Scene::tick'),'observation')
         self.assertEqual(operation_phase('slither_sim::bot::kernel::choose\n'
             'internal_scaling_debug::Scene::tick'),'A4')
+        self.assertEqual(operation_phase('internal_scaling_debug::pickup_guard_after_step\n'
+            'internal_scaling_debug::Scene::tick'),'guard audit outside world brackets')
 
     def test_legacy_symbols_and_outside_tick(self):
         self.assertEqual(operation_phase('_ZN11slither_sim11observation8Observer5visit\n'
@@ -59,7 +61,10 @@ class StackClassification(unittest.TestCase):
                     samples.append({'tick':tick,'worldCpu':.001,'worldWall':.001,'admissionCpu':.00001,
                         'observations':1,'decisions':1,'observationCpu':.00002,'policyLoopCpu':.00001,
                         'worldStartMonotonic':tick+.01,'worldEndMonotonic':tick+.011,
-                        'admissionStartMonotonic':tick,'admissionEndMonotonic':tick+.00001,'profile':profile})
+                        'admissionStartMonotonic':tick,'admissionEndMonotonic':tick+.00001,'profile':profile,
+                        'pickupGuard':{'path':'dense','boxCells':100,'foodLen':1000,'coverArea':25,'circles':6,
+                            'foodGuardLimit':4096,'regularGeometry':True,'declineFixedCells':False,
+                            'declineFoodLength':False,'declineCoverArea':False}})
                     stacks.extend([f'worker 1 {tick+.0105:.9f}: 2004008 cpu-clock:u:\n'
                         'slither_sim::simulator::Simulator::advance /fixture/src/simulator.rs:1\n'
                         'internal_scaling_debug::Scene::tick\n\n',

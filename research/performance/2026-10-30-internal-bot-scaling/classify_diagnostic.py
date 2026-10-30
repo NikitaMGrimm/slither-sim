@@ -22,6 +22,7 @@ def records(path):
 
 def operation_phase(record):
     if not any(name in record for name in ['5Scene4tick','::Scene::tick','5Scene10storm_tick','::Scene::storm_tick']):return None
+    if 'pickup_guard_after_step' in record:return 'guard audit outside world brackets'
     for phase,names in [
         ('A4',['3bot6kernel','7Forager6decide','::bot::kernel::','::bot::Forager::decide']),
         ('observation',['11observation','::observation::']),
@@ -63,6 +64,18 @@ def diagnostic_costs(row):
         'wholeWindowTicksPerSecond':row['ticks']/row['wallSeconds'],
         'observationProcessCpuUsPerBot':sum(s['observationCpu'] for s in samples)*1e6/observations if observations else None,
         'policyLoopCpuUsPerBot':sum(s['policyLoopCpu'] for s in samples)*1e6/decisions if decisions else None}
+
+
+def guard_summary(samples):
+    guards=[s['pickupGuard'] for s in samples]
+    paths=collections.Counter(g['path'] for g in guards)
+    combinations=collections.Counter((g['declineFixedCells'],g['declineFoodLength'],g['declineCoverArea']) for g in guards)
+    return {'ticks':len(guards),'fixedCellLimit':1048576,'cellSize':128,'foodGuardMinimum':4096,
+        **{key:stats([g[key] for g in guards]) for key in ['boxCells','foodLen','coverArea','circles','foodGuardLimit']},
+        'paths':dict(paths),'regularGeometryEveryTick':all(g['regularGeometry'] for g in guards),
+        'declines':{key:sum(g[key] for g in guards) for key in ['declineFixedCells','declineFoodLength','declineCoverArea']},
+        'combinations':[{'aFixedCells':a,'bFoodLength':b,'cCoverArea':c,'ticks':count}
+                        for (a,b,c),count in sorted(combinations.items())]}
 
 
 def classify(root):
@@ -146,6 +159,8 @@ def classify(root):
         ordinary=json.loads((root/f'diagnostic/{label}-ordinary.json').read_text())
         profiled=json.loads((root/f'diagnostic/{label}-phases.json').read_text())
         assert ordinary['finalStateSha256']==profiled['finalStateSha256']
+        guards=lambda row:[s['pickupGuard'] for s in row['samples']]
+        assert guards(ordinary)==guards(sampled)==guards(profiled)
         slow_profile={'samples':[s for s in profiled['samples'] if s['tick'] in warm_slow]}
         slow_plain={'samples':[s for s in ordinary['samples'] if s['tick'] in warm_slow]}
         cadence=[]
@@ -161,6 +176,9 @@ def classify(root):
              'sameVirtualSlowTicksPhaseDiagnostic':phase_summary(slow_profile,[slow_plain]),
              'phaseCadenceByTickMod6':cadence,
              'initialCensus':ordinary['initial'],'finalCensus':ordinary['final'],
+             'pickupGuards':{'method':'post-step circle fields plus final food + food pickups - ambient births; exact pickup-entry reconstruction',
+                 'allThreeGuardTracesEqual':True,'allTicks':guard_summary(tick_samples),
+                 'slowest1pctExcludingFirst':guard_summary([s for s in tick_samples if s['tick'] in warm_slow])},
              'lostSamples':int(lost[1].replace(',','')) if lost else None,'unparsedRecords':unparsed,
              'coverage':dict(all_samples),
              'slowWorldTicks':[{'tick':s['tick'],'worldCpuMs':s['worldCpu']*1000,

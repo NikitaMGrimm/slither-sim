@@ -31,3 +31,29 @@ Use “a 4-vCPU Zen 5 EPYC KVM guest” only. Describe the anonymous reported
 comparison as “a 12k-snake single-core reference world (64,800 across,
 center-steering bots)”; its hardware and older tick rate remain unknown.
 No production source changes or implementation proposals are adopted.
+
+## Pickup-guard clarification before diagnostic execution
+
+The maintainer requests all three decline conditions, not just the fixed cap.
+Use existing public event recording in the already planned diagnostic copies.
+After a complete step, head, heading, speed, integer segments and alive status
+still equal their pickup-phase values: later food/prey gains change fam and
+derived score/radius, not these circle inputs. `kiosk.finish_score` changes only
+displayed length/score. Source pins bind these statements to this runtime.
+
+Pickup-entry food length is exactly final food length plus Food pickup events
+minus ambient birth events. Boost/death births occur before pickup and have a
+source; ambient births follow it and have no source. Event recording is
+non-authoritative and excluded from checkpoints. Require diagnostic final-state
+identity with primary rows and identical guard traces across plain, sampled
+and profiled diagnostic continuations.
+
+After the world clock's end, fold the unchanged circles with the same 128-unit
+cover arithmetic. Record box cells, input food length, summed cover area,
+the fixed and food-relative limits, each decline flag, and derived dense/
+hashed-indexed/linear branch for all 512 ticks. The actual food-relative limit
+is `max(4*food.len(),4096)`; report that floor rather than silently omitting it.
+The normal worlds are within the finite geometry/u32-count guards; retain those
+checks too. This adds no timing run and changes no `src/` file. Event-recording
+overhead inside step and audit work outside it are included in the separately
+reported diagnostic/primary instrumentation ratios.

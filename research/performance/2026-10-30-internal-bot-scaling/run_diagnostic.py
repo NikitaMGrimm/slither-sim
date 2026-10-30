@@ -52,9 +52,9 @@ def execute(root):
           'a4BinarySha256':digest(binaries['internal_scaling']),
           'botstormBinarySha256':digest(binaries['internal_botstorm']),
           'buildLogSha256':digest(output/'build.log'),'command':command,
-          'profile':'portable default codegen, debug=2 and study-only timestamp fields; no Rust flags',
+          'profile':'portable default codegen, debug=2, timestamps and event-derived pickup guards; no Rust flags',
           'sampling':'cpu-clock:u, 499 Hz, DWARF 4096-byte stacks, CLOCK_MONOTONIC',
-          'clockScope':'admission and world brackets only; absent from primary counted binaries'}
+          'clockScope':'admission/world brackets; guard arithmetic after world end; event recording is inside step; primary binaries unchanged'}
     (output/'pins.json').write_text(json.dumps(pins,indent=2)+'\n')
     os.sched_setaffinity(0,{3})
     summaries=[]
@@ -82,6 +82,8 @@ def execute(root):
         phase_path=output/f'{label}-phases.json'
         subprocess.run(args('profile',phase_path),env=env,check=True)
         assert json.loads(phase_path.read_text())['finalStateSha256']==a['finalStateSha256']
+        guards=lambda row:[s['pickupGuard'] for s in row['samples']]
+        assert guards(a)==guards(b)==guards(json.loads(phase_path.read_text()))
         if stem=='internal_scaling':
             reference=json.loads((directory/'verify-serial.json').read_text())['finalStateSha256']
             qualification=json.loads((directory/'warm-qualification.json').read_text())

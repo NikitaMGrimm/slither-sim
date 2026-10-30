@@ -40,3 +40,10 @@
   are retained. Perf script now explicitly requests `+srcline,+period` instead
   of relying on version-specific default fields. No study timing is selected
   from that probe.
+- Before any diagnostic timing, the maintainer requested all pickup-grid guards
+  and the chosen path. Source inspection showed the existing event recorder
+  permits exact post-step reconstruction of pickup-entry food/circles. The
+  already planned diagnostic copies now record it outside world brackets,
+  preserve primary-state parity and compare all three guard traces. No source
+  hook, production edit or extra timing run is introduced. The original
+  checkpoint-only census remains separately labelled.
