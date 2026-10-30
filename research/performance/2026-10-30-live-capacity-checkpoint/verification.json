@@ -1,0 +1,254 @@
+{
+  "preflight": {
+    "eightClientSmokes": [
+      "base",
+      "candidate"
+    ],
+    "fiveHundredClientPilotKeepsUp": true,
+    "actualExportChecks": {
+      "smoke-base": {
+        "actualFoodFlagsValidatedTicks": 600,
+        "phaseDeltasReconcile": true
+      },
+      "smoke-candidate": {
+        "actualFoodFlagsValidatedTicks": 600,
+        "phaseDeltasReconcile": true
+      },
+      "pilot-candidate-3": {
+        "actualFoodFlagsValidatedTicks": 700,
+        "phaseDeltasReconcile": true
+      }
+    }
+  },
+  "metrologyMutations": {
+    "controls": [
+      {
+        "control": "cpu-clock",
+        "detected": true
+      },
+      {
+        "control": "client-saturation",
+        "detected": true
+      },
+      {
+        "control": "queue-growth",
+        "detected": true
+      }
+    ],
+    "originalFilesUnchanged": true
+  },
+  "arithmeticAndExportControls": {
+    "synthetic": true,
+    "knownPeriodicTailPassed": true,
+    "phaseAndWorldArithmeticPassed": true,
+    "frozenGateFormulaPassed": true,
+    "mutations": [
+      {
+        "control": "food-flag",
+        "detected": true
+      },
+      {
+        "control": "phase-sum",
+        "detected": true
+      },
+      {
+        "control": "primary-detail-contamination",
+        "detected": true
+      }
+    ]
+  },
+  "retryClassificationControls": {
+    "synthetic": true,
+    "originalUnchanged": true,
+    "controls": [
+      {
+        "syntheticCombination": "class-only",
+        "correctClassification": true
+      },
+      {
+        "syntheticCombination": "isolation-only",
+        "correctClassification": true
+      },
+      {
+        "syntheticCombination": "both",
+        "correctClassification": true
+      },
+      {
+        "syntheticCombination": "neither",
+        "correctClassification": true
+      }
+    ]
+  },
+  "completeSourceReconstruction": {
+    "hostCopies": [
+      {
+        "arm": "base",
+        "completeRustSourcesMatch": true,
+        "instrumentedRustSourceSha256": "b687a2f316a06d425d227e58cd64ed160b0bcab661efa8d0d414c170eec7a590"
+      },
+      {
+        "arm": "candidate",
+        "completeRustSourcesMatch": true,
+        "instrumentedRustSourceSha256": "df12d5aed01fdaf59013ef9f0440ad12c1a607284d234efaad4d93ac8e61c3b9"
+      },
+      {
+        "arm": "diagnostic-candidate",
+        "completeRustSourcesMatch": true,
+        "instrumentedRustSourceSha256": "5636b5a7d8b3e8b2c603e6356b2f2e2a918c101259545557db8cd8561ebd7388"
+      }
+    ],
+    "commonClientProductionSourcesUnchanged": true,
+    "commonClientHarnessUnchanged": true
+  },
+  "fullHoldBoundaryAudit": {
+    "base-pair-1-attempt-2": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.563636
+    },
+    "candidate-pair-1-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 3.224848
+    },
+    "candidate-pair-2-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 7.834809
+    },
+    "base-pair-2-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.311228
+    },
+    "base-pair-3-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.159608
+    },
+    "candidate-pair-3-attempt-1": {
+      "maximumWriteBlocksEntireRun": 0,
+      "maximumBufferFullEntireRun": 0,
+      "bracketedWindowWriteBlocks": 0,
+      "bracketedWindowBufferFull": 0,
+      "worstClientP99IncludingBoundaryReportsMs": 2.74754
+    }
+  },
+  "failedPrimary": {
+    "name": "base-pair-1-attempt-1",
+    "excluded": true,
+    "reason": "class-only p90 drift below 156",
+    "minimumP90Segments": 153,
+    "allOtherPrimaryGatesPass": true,
+    "backgroundProcessScreen": {
+      "largestOtherUserProcessCpuSeconds": 0.0800000000000125,
+      "totalOtherUserProcessCpuSeconds": 0.15000000000000568,
+      "thresholdSeconds": 0.40223895530518466,
+      "idleEnvelopeAllowanceSeconds": 0.08818471889313628,
+      "excessAllowanceSeconds": 0.29405423641204836,
+      "counterAllowanceSeconds": 0.02,
+      "passes": true
+    }
+  },
+  "series": {
+    "status": "complete",
+    "accepted": [
+      "base-pair-1-attempt-2",
+      "candidate-pair-1-attempt-1",
+      "candidate-pair-2-attempt-1",
+      "base-pair-2-attempt-1",
+      "base-pair-3-attempt-1",
+      "candidate-pair-3-attempt-1"
+    ],
+    "attempts": [
+      {
+        "name": "base-pair-1-attempt-1",
+        "arm": "base",
+        "pair": 1,
+        "orderIndex": 0,
+        "accepted": false,
+        "hostClientCpuSeconds": 2444.2799999999997,
+        "retryReason": "class-only"
+      },
+      {
+        "name": "base-pair-1-attempt-2",
+        "arm": "base",
+        "pair": 1,
+        "orderIndex": 0,
+        "accepted": true,
+        "hostClientCpuSeconds": 2388.66,
+        "coarseValid": true
+      },
+      {
+        "name": "candidate-pair-1-attempt-1",
+        "arm": "candidate",
+        "pair": 1,
+        "orderIndex": 1,
+        "accepted": true,
+        "hostClientCpuSeconds": 2332.01,
+        "coarseValid": true
+      },
+      {
+        "name": "candidate-pair-2-attempt-1",
+        "arm": "candidate",
+        "pair": 2,
+        "orderIndex": 2,
+        "accepted": true,
+        "hostClientCpuSeconds": 2312.27,
+        "coarseValid": true
+      },
+      {
+        "name": "base-pair-2-attempt-1",
+        "arm": "base",
+        "pair": 2,
+        "orderIndex": 3,
+        "accepted": true,
+        "hostClientCpuSeconds": 2385.93,
+        "coarseValid": true
+      },
+      {
+        "name": "base-pair-3-attempt-1",
+        "arm": "base",
+        "pair": 3,
+        "orderIndex": 4,
+        "accepted": true,
+        "hostClientCpuSeconds": 2494.33,
+        "coarseValid": true
+      },
+      {
+        "name": "candidate-pair-3-attempt-1",
+        "arm": "candidate",
+        "pair": 3,
+        "orderIndex": 5,
+        "accepted": true,
+        "hostClientCpuSeconds": 2395.7799999999997,
+        "coarseValid": true
+      }
+    ],
+    "isolationRetries": 0
+  },
+  "primaryCpuReceipt": {
+    "buildCalibrationPilotAllowanceSeconds": 600.0,
+    "allPrimaryAndControllerCpuSeconds": 16755.233806,
+    "totalWithAllowanceSeconds": 17355.233811,
+    "limitSeconds": 21600
+  },
+  "fineCpuReceipt": {
+    "startUnix": 1793329201.5572886,
+    "endUnix": 1793330704.3734984,
+    "setupAndAnalysisReserveSeconds": 100.0,
+    "allChildAndControllerCpuSeconds": 2669.606656,
+    "totalWithAllowanceSeconds": 2769.606663,
+    "limitSeconds": 7200.0
+  }
+}

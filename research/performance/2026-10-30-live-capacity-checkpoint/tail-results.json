@@ -1,0 +1,737 @@
+{
+  "limits": "Fresh asynchronous live cohorts, descriptive only. Primary per-tick phases unavailable; coarse export adds diagnostic overhead. Neighbor bins do not reassign socket CPU. Post-report ticks retain observer CPU.",
+  "cadenceValidatedTicks": {
+    "base": 8400,
+    "candidate": 8400
+  },
+  "actualFoodGapCounts": {
+    "base": {
+      "72": 114
+    },
+    "candidate": {
+      "72": 114
+    }
+  },
+  "cases": {
+    "base-pair-1-attempt-2": {
+      "arm": "base",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 9.39871,
+            "p99": 12.86426,
+            "max": 12.86426,
+            "mean": 9.442800322033898
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 5.71724,
+            "p99": 8.68503,
+            "max": 8.68503,
+            "mean": 5.936225254237288
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.19276,
+            "p99": 4.78375,
+            "max": 4.78375,
+            "mean": 3.5065750677966103
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 4.16109,
+            "p99": 6.43749,
+            "max": 8.8151,
+            "mean": 4.186527859695726
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 2.20549,
+            "p99": 3.46279,
+            "max": 4.33056,
+            "mean": 2.274005652740884
+          },
+          "socketCpuMsPerTick": {
+            "p50": 1.89066,
+            "p99": 3.98433,
+            "max": 4.69434,
+            "mean": 1.9125222069548418
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 9.61381,
+            "p99": 12.86426,
+            "max": 12.86426,
+            "mean": 9.855779023809523
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 5.76795,
+            "p99": 8.68503,
+            "max": 8.68503,
+            "mean": 6.036005
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.10475,
+            "p99": 4.78375,
+            "max": 4.78375,
+            "mean": 3.819774023809524
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 1.504742619047619,
+          "0": 3.819774023809524,
+          "1": 1.6650370731707318
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 9.51621,
+            "p99": 10.57379,
+            "max": 10.57379,
+            "mean": 9.614922222222223
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 5.93676,
+            "p99": 6.97002,
+            "max": 6.97002,
+            "mean": 6.022318518518518
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.3426,
+            "p99": 4.79529,
+            "max": 4.79529,
+            "mean": 3.5926037037037037
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.08072925925925926,
+            "collisionBuild": 0.0845,
+            "collisionQuery": 0.17910925925925925,
+            "deathFood": 0.00022962962962962965,
+            "pickupFoodCache": 0.23488185185185184,
+            "prey": 0.02280962962962963,
+            "ambient": 0.007366666666666666,
+            "admission": 0.0,
+            "broadcast": 4.192842962962963
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.6096262962962963,
+          "unbracketedSimulationMeanCpuMsPerTick": 1.2198492592592594
+        }
+      },
+      "coarseQualityPasses": true
+    },
+    "candidate-pair-1-attempt-1": {
+      "arm": "candidate",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 8.52175,
+            "p99": 10.79176,
+            "max": 10.79176,
+            "mean": 8.634120169491526
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.57721,
+            "p99": 7.54699,
+            "max": 7.54699,
+            "mean": 4.690639322033898
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.06179,
+            "p99": 5.20433,
+            "max": 5.20433,
+            "mean": 3.9434808474576273
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 3.84074,
+            "p99": 6.92177,
+            "max": 9.9326,
+            "mean": 4.016242985993721
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 1.93968,
+            "p99": 3.1169,
+            "max": 4.43772,
+            "mean": 2.008592257184255
+          },
+          "socketCpuMsPerTick": {
+            "p50": 1.97056,
+            "p99": 4.28303,
+            "max": 5.49488,
+            "mean": 2.0076507288094665
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 8.89752,
+            "p99": 10.79176,
+            "max": 10.79176,
+            "mean": 9.082775476190475
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.57721,
+            "p99": 7.54699,
+            "max": 7.54699,
+            "mean": 4.681836666666666
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.49109,
+            "p99": 5.49488,
+            "max": 5.49488,
+            "mean": 4.40093880952381
+          },
+          "maintenanceFraction": 0.8571428571428571,
+          "postReportFraction": 0
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 1.6899714285714285,
+          "0": 4.40093880952381,
+          "1": 1.2346685365853658
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 8.41526,
+            "p99": 9.50292,
+            "max": 9.50292,
+            "mean": 8.583059629629629
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.38403,
+            "p99": 5.6569,
+            "max": 5.6569,
+            "mean": 4.391012962962963
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.18611,
+            "p99": 5.06265,
+            "max": 5.06265,
+            "mean": 4.192046666666667
+          },
+          "maintenanceFraction": 0.8888888888888888,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.0908888888888889,
+            "collisionBuild": 0.09273740740740741,
+            "collisionQuery": 0.18190777777777778,
+            "deathFood": 0.0003214814814814815,
+            "pickupFoodCache": 0.2301337037037037,
+            "prey": 0.022654444444444446,
+            "ambient": 0.0065903703703703706,
+            "admission": 0.05740777777777778,
+            "broadcast": 2.9785837037037037
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.625234074074074,
+          "unbracketedSimulationMeanCpuMsPerTick": 0.7297874074074074
+        }
+      },
+      "coarseQualityPasses": true
+    },
+    "candidate-pair-2-attempt-1": {
+      "arm": "candidate",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 8.44566,
+            "p99": 10.4035,
+            "max": 10.4035,
+            "mean": 8.530704576271187
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.64969,
+            "p99": 6.24196,
+            "max": 6.24196,
+            "mean": 4.69859406779661
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.01265,
+            "p99": 5.02241,
+            "max": 5.02241,
+            "mean": 3.8321105084745763
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 3.7426,
+            "p99": 6.98844,
+            "max": 13.18832,
+            "mean": 3.930550493842067
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 1.91594,
+            "p99": 3.0295,
+            "max": 5.85159,
+            "mean": 1.9884910760685826
+          },
+          "socketCpuMsPerTick": {
+            "p50": 1.87565,
+            "p99": 4.30273,
+            "max": 7.33673,
+            "mean": 1.9420594177734847
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 8.87695,
+            "p99": 13.18832,
+            "max": 13.18832,
+            "mean": 9.079217142857143
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.70738,
+            "p99": 6.24196,
+            "max": 6.24196,
+            "mean": 4.753886904761905
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.30968,
+            "p99": 7.33673,
+            "max": 7.33673,
+            "mean": 4.325330238095238
+          },
+          "maintenanceFraction": 0.9047619047619048,
+          "postReportFraction": 0
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 1.6046219047619048,
+          "0": 4.325330238095238,
+          "1": 1.0629256097560975
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 8.74947,
+            "p99": 12.95617,
+            "max": 12.95617,
+            "mean": 9.100461851851852
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.97226,
+            "p99": 6.75896,
+            "max": 6.75896,
+            "mean": 4.960137037037037
+          },
+          "socketCpuMsPerTick": {
+            "p50": 4.15815,
+            "p99": 6.19721,
+            "max": 6.19721,
+            "mean": 4.140324814814814
+          },
+          "maintenanceFraction": 0.9259259259259259,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.10963703703703703,
+            "collisionBuild": 0.10970888888888888,
+            "collisionQuery": 0.18028037037037037,
+            "deathFood": 0.0003111111111111111,
+            "pickupFoodCache": 0.27327,
+            "prey": 0.02547962962962963,
+            "ambient": 0.0073207407407407405,
+            "admission": 0.0,
+            "broadcast": 3.4232225925925928
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.7060077777777778,
+          "unbracketedSimulationMeanCpuMsPerTick": 0.8309066666666667
+        }
+      },
+      "coarseQualityPasses": true
+    },
+    "base-pair-2-attempt-1": {
+      "arm": "base",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 9.69512,
+            "p99": 12.82917,
+            "max": 12.82917,
+            "mean": 9.542568305084746
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.60319,
+            "p99": 8.68624,
+            "max": 8.68624,
+            "mean": 6.347424745762712
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.04977,
+            "p99": 4.54712,
+            "max": 4.54712,
+            "mean": 3.195143559322034
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 4.82635,
+            "p99": 6.78482,
+            "max": 11.58902,
+            "mean": 4.686646803670611
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 2.64597,
+            "p99": 3.87355,
+            "max": 7.45819,
+            "mean": 2.6642891683168317
+          },
+          "socketCpuMsPerTick": {
+            "p50": 2.01504,
+            "p99": 3.87397,
+            "max": 5.34228,
+            "mean": 2.0223576353537793
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 10.09786,
+            "p99": 12.82917,
+            "max": 12.82917,
+            "mean": 10.229946666666667
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.92003,
+            "p99": 8.68624,
+            "max": 8.68624,
+            "mean": 6.796349761904762
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.19332,
+            "p99": 5.34228,
+            "max": 5.34228,
+            "mean": 3.4335969047619046
+          },
+          "maintenanceFraction": 0.9523809523809523,
+          "postReportFraction": 0.023809523809523808
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 2.0323664285714287,
+          "0": 3.4335969047619046,
+          "1": 2.005000243902439
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 9.98343,
+            "p99": 13.36931,
+            "max": 13.36931,
+            "mean": 10.109094777777777
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.4895,
+            "p99": 8.0155,
+            "max": 8.0155,
+            "mean": 6.410639962962963
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.71522,
+            "p99": 5.45057,
+            "max": 5.45057,
+            "mean": 3.6984548148148146
+          },
+          "maintenanceFraction": 0.9629629629629629,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.0998388888888889,
+            "collisionBuild": 0.11452629629629629,
+            "collisionQuery": 0.18740222222222222,
+            "deathFood": 0.0003262962962962963,
+            "pickupFoodCache": 0.2657288888888889,
+            "prey": 0.02527851851851852,
+            "ambient": 0.007903333333333333,
+            "admission": 0.0,
+            "broadcast": 4.464755185185185
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.7010044444444444,
+          "unbracketedSimulationMeanCpuMsPerTick": 1.2448803333333334
+        }
+      },
+      "coarseQualityPasses": true
+    },
+    "base-pair-3-attempt-1": {
+      "arm": "base",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 9.48599,
+            "p99": 12.48641,
+            "max": 12.48641,
+            "mean": 9.650497288135593
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.31176,
+            "p99": 7.95928,
+            "max": 7.95928,
+            "mean": 6.3572513559322035
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.16954,
+            "p99": 5.41139,
+            "max": 5.41139,
+            "mean": 3.29324593220339
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 4.66573,
+            "p99": 7.07055,
+            "max": 8.6068,
+            "mean": 4.69521640038638
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 2.57563,
+            "p99": 3.90559,
+            "max": 4.59659,
+            "mean": 2.651213978990582
+          },
+          "socketCpuMsPerTick": {
+            "p50": 2.01714,
+            "p99": 3.93967,
+            "max": 4.7122,
+            "mean": 2.044002421395798
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 9.96635,
+            "p99": 12.48641,
+            "max": 12.48641,
+            "mean": 10.129366904761905
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.52413,
+            "p99": 7.95928,
+            "max": 7.95928,
+            "mean": 6.631211904761905
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.23761,
+            "p99": 5.41139,
+            "max": 5.41139,
+            "mean": 3.498155
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 1.8576766666666666,
+          "0": 3.498155,
+          "1": 2.077002682926829
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 9.98803,
+            "p99": 12.88674,
+            "max": 12.88674,
+            "mean": 10.299753703703704
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 6.66323,
+            "p99": 7.98409,
+            "max": 7.98409,
+            "mean": 6.794751851851852
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.36312,
+            "p99": 5.56187,
+            "max": 5.56187,
+            "mean": 3.5050018518518518
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.09289037037037037,
+            "collisionBuild": 0.10172555555555556,
+            "collisionQuery": 0.1763385185185185,
+            "deathFood": 0.0010937037037037037,
+            "pickupFoodCache": 0.27675962962962963,
+            "prey": 0.027325555555555554,
+            "ambient": 0.007846666666666667,
+            "admission": 0.0,
+            "broadcast": 4.809248888888889
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.68398,
+          "unbracketedSimulationMeanCpuMsPerTick": 1.301522962962963
+        }
+      },
+      "coarseQualityPasses": true
+    },
+    "candidate-pair-3-attempt-1": {
+      "arm": "candidate",
+      "primary": {
+        "maintenance": {
+          "ticks": 59,
+          "worldCpuMsPerTick": {
+            "p50": 8.44771,
+            "p99": 14.01619,
+            "max": 14.01619,
+            "mean": 8.599260169491526
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 4.9134,
+            "p99": 7.58978,
+            "max": 7.58978,
+            "mean": 4.957339830508475
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.42304,
+            "p99": 6.42641,
+            "max": 6.42641,
+            "mean": 3.641920338983051
+          },
+          "maintenanceFraction": 1,
+          "postReportFraction": 0
+        },
+        "ordinary": {
+          "ticks": 4141,
+          "worldCpuMsPerTick": {
+            "p50": 4.42013,
+            "p99": 7.04298,
+            "max": 9.75565,
+            "mean": 4.353490559043709
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 2.22957,
+            "p99": 3.16404,
+            "max": 4.11924,
+            "mean": 2.2400907841101185
+          },
+          "socketCpuMsPerTick": {
+            "p50": 2.11065,
+            "p99": 4.41491,
+            "max": 5.63641,
+            "mean": 2.113399774933591
+          },
+          "maintenanceFraction": 0,
+          "postReportFraction": 0.010142477662400387
+        },
+        "slowestOnePercent": {
+          "ticks": 42,
+          "worldCpuMsPerTick": {
+            "p50": 8.81756,
+            "p99": 14.01619,
+            "max": 14.01619,
+            "mean": 9.030998095238095
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 5.27651,
+            "p99": 7.58978,
+            "max": 7.58978,
+            "mean": 5.1575283333333335
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.46905,
+            "p99": 6.42641,
+            "max": 6.42641,
+            "mean": 3.873469761904762
+          },
+          "maintenanceFraction": 0.9523809523809523,
+          "postReportFraction": 0.023809523809523808
+        },
+        "tailNeighborSocketMeansMs": {
+          "-1": 1.670372380952381,
+          "0": 3.873469761904762,
+          "1": 1.8237773170731708
+        }
+      },
+      "coarse": {
+        "ticks": 2700,
+        "maintenanceTicks": 37,
+        "slowestOnePercent": {
+          "ticks": 27,
+          "worldCpuMsPerTick": {
+            "p50": 9.02187,
+            "p99": 10.75021,
+            "max": 10.75021,
+            "mean": 9.10128962962963
+          },
+          "simulationCpuMsPerTick": {
+            "p50": 5.60869,
+            "p99": 6.66156,
+            "max": 6.66156,
+            "mean": 5.556353703703704
+          },
+          "socketCpuMsPerTick": {
+            "p50": 3.41504,
+            "p99": 4.92534,
+            "max": 4.92534,
+            "mean": 3.544935925925926
+          },
+          "maintenanceFraction": 0.9629629629629629,
+          "postReportFraction": 0,
+          "phaseMeanCpuMsPerTick": {
+            "movement": 0.12525814814814815,
+            "collisionBuild": 0.11754407407407408,
+            "collisionQuery": 0.20449481481481482,
+            "deathFood": 0.0011555555555555557,
+            "pickupFoodCache": 0.3666540740740741,
+            "prey": 0.030138148148148147,
+            "ambient": 0.007943333333333333,
+            "admission": 0.0,
+            "broadcast": 3.7794055555555555
+          },
+          "bracketedPhysicsMeanCpuMsPerTick": 0.8531881481481481,
+          "unbracketedSimulationMeanCpuMsPerTick": 0.92376
+        }
+      },
+      "coarseQualityPasses": true
+    }
+  }
+}
