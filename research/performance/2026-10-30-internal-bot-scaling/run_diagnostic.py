@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from reduce import population_directory
 
 
 def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -43,9 +44,13 @@ def execute(root):
           'command':command,'profile':'portable default codegen with debug=2, no Rust flags; diagnostic only',
           'sampling':'cpu-clock:u at 499 Hz, DWARF 8192-byte stacks'}
     (output/'pins.json').write_text(json.dumps(pins,indent=2)+'\n')
+    os.sched_setaffinity(0,{3})
     summaries=[]
     for n in [1000,10000]:
-        fixture=root/'results'/str(n)/'fixture'
+        directory=population_directory(root,n)
+        if n==10000 and directory.name=='10000' and (root/'results/10000-continuation/fixture/world.json').exists():
+            directory=root/'results/10000-continuation'
+        fixture=directory/'fixture'
         ordinary=output/f'{n}-ordinary.json';profiled=output/f'{n}-sampled.json'
         args=[str(binary),'measure',str(fixture),'serial','512','plain']
         subprocess.run([*args,str(ordinary)],check=True)
@@ -61,9 +66,9 @@ def execute(root):
                             '--stdio','--no-children','-g','none','--percent-limit','0.5'],stdout=out,check=True)
         a=json.loads(ordinary.read_text());b=json.loads(profiled.read_text())
         assert a['finalStateSha256']==b['finalStateSha256']
-        reference=root/'results'/str(n)/'verify-serial.json'
+        reference=directory/'verify-serial.json'
         if reference.exists():assert a['finalStateSha256']==json.loads(reference.read_text())['finalStateSha256']
-        qualification=json.loads((root/'results'/str(n)/'warm-qualification.json').read_text())
+        qualification=json.loads((directory/'warm-qualification.json').read_text())
         summaries.append({'population':n,'stabilized':qualification['stabilized'],
                           'ordinaryProcessCpuSeconds':a['processCpuSeconds'],
                           'sampledProcessCpuSeconds':b['processCpuSeconds'],

@@ -110,6 +110,11 @@ and a table script, not full recordings or host-identifying command inventories.
 
 Keep [BOTSTORM_PLAN.md](BOTSTORM_PLAN.md) and
 [DIAGNOSTIC_PLAN.md](DIAGNOSTIC_PLAN.md) separate from the original frozen plan.
+The separate [warmup follow-up](WARMUP_FOLLOWUP_PLAN.md) applies only if 10k
+reaches the original wall guard before its stability screen. `resume_warmup.py`
+keeps that censored attempt and proves continuation against the unchanged
+counted executable. A qualifying follow-up is selected explicitly in
+`selection.json`; the original censored receipt remains in selected evidence.
 Once the A4 runner has emitted `complete`, copy these study files into a tools
 directory on the guest. The botstorm builder checks that completion and the
 original binary/source pins before doing any build. It generates a new example

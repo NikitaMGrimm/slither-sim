@@ -6,6 +6,15 @@ import statistics
 import sys
 
 
+def population_directory(root,n):
+    selection=Path(root)/'selection.json'
+    if selection.exists():
+        values=json.loads(selection.read_text())
+        assert values=={'10000':'10000-continuation'},'unexpected follow-up selection'
+        if n==10000:return Path(root)/'results/10000-continuation'
+    return Path(root)/'results'/str(n)
+
+
 def stats(values):
     values=sorted(values)
     if not values:return {'n':0}
@@ -87,11 +96,17 @@ def reduce(root):
                         'structurallyAbsent':['wire encoding','socket egress','minimap','leaderboard','ForagerBot frame adapter']},
               'populations':[]}
     for n in [1000,2500,5000,10000]:
-        directory=root/'results'/str(n)
+        directory=population_directory(root,n)
         qualification=json.loads((directory/'warm-qualification.json').read_text())
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         population={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config}
+        if directory.name.endswith('-continuation'):
+            original=root/'results'/str(n)
+            population['priorCensoredAttempt']={
+                'qualification':json.loads((original/'warm-qualification.json').read_text()),
+                'census':json.loads((original/'fixture/census.json').read_text())}
+            population['followupPins']=json.loads((directory/'pins.json').read_text())
         if not qualification['stabilized']:
             selected['populations'].append(population)
             continue
