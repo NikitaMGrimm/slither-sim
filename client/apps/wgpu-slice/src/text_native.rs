@@ -157,12 +157,23 @@ impl Rasterizer {
     pub fn new() -> Self {
         Self::default()
     }
+    #[cfg(test)]
     pub fn rasterize(
         &mut self,
         text: &str,
         px: f64,
         weight: Weight,
         color: [u8; 3],
+    ) -> Result<Raster> {
+        self.rasterize_limited(text, px, weight, color, None)
+    }
+    pub fn rasterize_limited(
+        &mut self,
+        text: &str,
+        px: f64,
+        weight: Weight,
+        color: [u8; 3],
+        max_width: Option<u32>,
     ) -> Result<Raster> {
         let slot = match weight {
             Weight::Normal => &mut self.regular,
@@ -240,6 +251,7 @@ impl Rasterizer {
         let top = (f64::from(bounds[1]) / SAMPLE as f64).floor() as i32 - 1;
         let width =
             ((f64::from(bounds[2]) / SAMPLE as f64).ceil() as i32 - left + 1).max(1) as usize;
+        let width = max_width.map_or(width, |limit| width.min(limit as usize + 2));
         let height =
             ((f64::from(bounds[3]) / SAMPLE as f64).ceil() as i32 - top + 1).max(1) as usize;
         if width > 8192 || height > 512 {
@@ -248,11 +260,14 @@ impl Rasterizer {
         let mut mask = vec![0_u8; width * height * SAMPLE * SAMPLE];
         let stride = width * SAMPLE;
         for (x, y, w, h, c) in glyphs {
-            let (_, coverage) = font.rasterize(c, size);
             let x = (x - left * SAMPLE as i32) as usize;
             let y = (y - top * SAMPLE as i32) as usize;
+            if x >= stride {
+                continue;
+            }
+            let (_, coverage) = font.rasterize(c, size);
             for row in 0..h {
-                for col in 0..w {
+                for col in 0..w.min(stride - x) {
                     let dst = &mut mask[(y + row) * stride + x + col];
                     let a = u32::from(coverage[row * w + col]);
                     *dst = (a + u32::from(*dst) * (255 - a) / 255) as u8;

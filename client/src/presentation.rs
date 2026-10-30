@@ -30,6 +30,7 @@ mod food;
 mod food_painter;
 mod hud;
 mod hud_history;
+mod hud_text;
 mod leaderboard_history;
 mod leaderboard_score;
 mod length;
@@ -103,6 +104,10 @@ pub use hud::{
 pub use hud_history::{
     HudCurrent, HudFinal, HudHistory, HudHistoryEvent, HudLifecycle, HudOpacity, HudSample,
     hud_score_text,
+};
+pub use hud_text::{
+    HudTextLine, HudTextPlan, HudTextSpan, HudTextView, MAX_HUD_TEXT_SPANS, PLATFORM_FONT_FAMILY,
+    TextAlign, TextBaseline, TextStyle, TextWeight, plan_hud_diagnostic, plan_hud_text,
 };
 pub use leaderboard_history::{
     LeaderboardEvent, LeaderboardEventKind, LeaderboardHistory, LeaderboardPlan, LeaderboardRawRow,

@@ -1093,44 +1093,7 @@ impl LocalGame {
         failure: Option<&str>,
         reset_rows: bool,
     ) -> crate::hud::View {
-        let phase = session.view().phase;
-        let status = if phase == Phase::Failed {
-            "FAILED"
-        } else {
-            match GameplayPolicy::status(phase.label(), session.view().connected) {
-                1 => "READY",
-                2 => "CONNECTED",
-                4 => "CONNECTING",
-                _ => "NOT CONNECTED",
-            }
-        };
-        let score = hud
-            .current
-            .and_then(|s| s.score_text().ok())
-            .unwrap_or_else(|| "--".into());
-        let final_score = hud
-            .final_capture
-            .and_then(|v| v.score_text().ok())
-            .unwrap_or_else(|| "--".into());
-        crate::hud::View {
-            playing: session.view().playing,
-            opacity: hud.requested_opacity,
-            status: status.into(),
-            score,
-            final_score,
-            rank: hud
-                .current
-                .map_or_else(|| "--".into(), |current| current.rank_text()),
-            population: hud
-                .current
-                .map_or_else(|| "--".into(), |current| current.population_text()),
-            rows: if reset_rows {
-                Vec::new()
-            } else {
-                rows.visible_rows().to_vec()
-            },
-            message: failure.map(str::to_owned),
-        }
+        crate::hud::View::project(hud, rows, session, failure, reset_rows)
     }
 }
 #[cfg(test)]
