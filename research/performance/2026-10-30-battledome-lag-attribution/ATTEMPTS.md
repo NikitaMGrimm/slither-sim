@@ -33,3 +33,8 @@
   `-O` (under one second each locally). No native/reduction work ran locally.
   Preserve every measured archive and original source pin; this corrects the
   future controller only and does not re-label the measured helper version.
+
+- CodeRabbit caught a manual narrative error: `17-followup` has one steal jiffy
+  while the other five count windows have zero; hard-IRQ jiffies are zero and
+  softirq jiffies nonzero in all six. Corrected the prose to match the already
+  correct selected data/generated table. No data, pins or timing changed.
