@@ -67,6 +67,14 @@ impl PlayAdmission {
         self.return_pending
     }
 
+    /// Return a failed connecting attempt after the login owner accepted its
+    /// terminal observation. Gameplay/death returns keep their existing policy.
+    pub fn attempt_return_ready(&mut self, phase: &str) -> bool {
+        self.return_pending =
+            self.local && self.accepted && matches!(phase, "failed" | "disconnected");
+        self.return_pending
+    }
+
     /// Release local admission only after the caller's UI unlock has succeeded.
     /// Failures before this commit leave acceptance consumed. A new attempt still
     /// requires explicit Play; remote attempts are never released here.

@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "regionsEnabled": 17,
+  "regionsScanned": 17,
+  "regionsUnavailable": 0,
+  "disabledRegionsNotScanned": 17,
+  "taskInstancesTerminated": true,
+  "taskRequestsClosed": true,
+  "taskVolumesDeleted": true,
+  "taskKeyDeleted": true,
+  "taskSecurityGroupDeleted": true,
+  "protectedResourcesUntouched": true,
+  "inventory": {
+    "nonterminatedInstances": 0,
+    "openOrActiveSpotRequests": 0,
+    "volumes": 0,
+    "elasticIPs": 0,
+    "taskInstances": 0,
+    "taskSpotRequests": 0,
+    "taskVolumes": 0,
+    "taskKeys": 0,
+    "taskGroups": 0
+  }
+}

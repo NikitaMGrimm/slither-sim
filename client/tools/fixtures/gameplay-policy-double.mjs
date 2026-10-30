@@ -34,6 +34,7 @@ export class TestGameplayPolicy {
   profile_needs_current(){return this.phase===3;}profile_available(){return this.phase!==0;}profile_idle(){return this.phase===1;}
   begin_profile(){this.phase=2;this.started=false;}profile_started(){this.started=true;}profile_retry_allowed(){return!this.started&&!this.dead;}
   profile_retry(){this.phase=1;}profile_ready(){this.phase=3;this.changed=true;}profile_failed(){this.phase=5;}
+  retry_transport_failure(phase,playing,reason){return this.local&&!playing&&phase==='failed'&&['socket-error','socket-construction'].includes(reason);}
   replace_local(disconnected,returned){return this.local&&(disconnected||returned);}
   set_nickname(units){this.units=Uint16Array.from(units);}nickname(){return Uint16Array.from(this.units);}
   begin_dispose(){this.dead=true;this.phase=6;this.pending=this.companion=false;this.units=new Uint16Array();}

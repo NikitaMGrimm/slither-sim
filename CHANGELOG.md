@@ -4,6 +4,10 @@
 
 ### Added
 
+- The README and Linux hosting guide state the measured one-core capacity:
+  500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
+  falling behind
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-30-official-500-acceptance-v4/REPORT.md)).
 - A `perf_baseline` catalog row, `engine-battledome-spawn-318`, that times
   spawn searches and ticks in a crowded synthetic Battledome. It needs the new
   off-by-default `perf-internals` Cargo feature, which exists only for the
@@ -37,6 +41,11 @@
   restores visible food order without walking the entire food list. In a fresh
   10,000-snake official-density world, observation CPU falls from about 122 to
   42 microseconds per decision. Every observation and its ordering are unchanged.
+- Collision checks keep each snake's body bounds until its body changes,
+  instead of rescanning every body point on every tick. In a frozen
+  10,000-snake world, world CPU per tick falls from about 14.2 to 11.6 ms, and
+  the 500-player catalog step gets about 6% faster. Collision results, death
+  order and killer attribution are unchanged.
 - Removing eaten food copies the surviving pellets in one pass instead of
   rotating them through the list. In a frozen 10,000-snake world, world CPU
   per tick falls from about 17.1 to 14.2 ms, and the 500-player catalog step

@@ -58,7 +58,7 @@ pub fn layout(
     .map_err(str::to_owned)
 }
 pub fn prepare(extent: [u32; 2], dpr: f64, state: u8) -> Result<MenuFrame> {
-    let mut text = TextCache::default();
+    let mut text = TextCache::menu();
     let view = view(state)?;
     let layout = layout(&mut text, &view, extent, dpr)?;
     Menu::default().prepare(&mut text, &view, &layout, extent, dpr, None, 0)

@@ -10,7 +10,7 @@ for (const failure of ['missing', 'corrupt']) {
     class Images {
       sources = new Map();
       static paths() { return paths; }
-      manifest(bytes) { assert.equal(bytes[0], 1); }
+      manifest(bytes) { assert.equal(new TextDecoder().decode(bytes), 'menu-art-v1\n'); }
       menu_paths() { return []; }
       add(path, bytes) {
         if (bytes[0] !== 1) throw new Error('Synthetic decoder rejected corrupt bytes');
@@ -25,6 +25,7 @@ for (const failure of ['missing', 'corrupt']) {
     await loadCosmetics({ owner, CosmeticImages: Images, baseUrl: 'http://127.0.0.1/cosmetics/',
       fetch: async url => {
         const path = url.pathname.slice('/cosmetics/'.length); attempts.push(path);
+        if (path === 'menu/manifest.txt') return new Response('menu-art-v1\n');
         if (path === 's/a_hardhat.png') {
           if (failure === 'missing') return new Response(null, { status: 404 });
           return new Response(Uint8Array.of(0));

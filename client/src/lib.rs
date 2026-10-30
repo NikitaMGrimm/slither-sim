@@ -43,6 +43,9 @@ pub mod stock_controller_policy;
 mod start_page_browser;
 
 #[cfg(target_arch = "wasm32")]
+pub mod login_browser;
+
+#[cfg(target_arch = "wasm32")]
 mod menu_preferences_browser;
 
 #[cfg(target_arch = "wasm32")]

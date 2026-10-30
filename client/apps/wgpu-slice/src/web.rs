@@ -87,7 +87,7 @@ pub async fn menu_specimen(
         host,
         canvas,
         menu: crate::menu::Menu::default(),
-        text: crate::text::TextCache::default(),
+        text: crate::text::TextCache::menu(),
     };
     specimen.render(dpr, state)?;
     Ok(specimen)
@@ -104,6 +104,9 @@ pub fn game_backing_size(width: f64, height: f64) -> std::result::Result<Vec<u32
 pub struct CosmeticImages(crate::cosmetics::Images);
 #[wasm_bindgen]
 impl CosmeticImages {
+    pub fn pixel_bytes(&self) -> usize {
+        self.0.pixel_bytes()
+    }
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self(crate::cosmetics::Images::default())
@@ -178,6 +181,19 @@ impl LocalGameplay {
 }
 #[wasm_bindgen]
 impl LocalGameplay {
+    pub fn phase(&self) -> String {
+        self.game.phase().label().into()
+    }
+    pub fn playing(&self) -> bool {
+        self.game.phase() == slither_client::session_policy::Phase::Playing
+    }
+    pub fn requested_quality(&mut self, high: bool) {
+        self.game.set_requested_quality(if high {
+            slither_client::presentation::QualityMode::High
+        } else {
+            slither_client::presentation::QualityMode::Low
+        });
+    }
     #[wasm_bindgen(js_name=create)]
     pub async fn create(
         canvas: web_sys::HtmlCanvasElement,

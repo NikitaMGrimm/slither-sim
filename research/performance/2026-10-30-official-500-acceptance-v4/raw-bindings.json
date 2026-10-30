@@ -1,0 +1,21 @@
+{
+  "runs": [
+    {
+      "run": 1,
+      "sha256": "055e1db9350edb26f8b14d6f764178b8dbb0b54e08f576bb941199758f6d7b23",
+      "bytes": 13654210,
+      "retrievalVerified": true,
+      "access": "Local-only retained full logs, process CPU, journal and unit/timer states outside repositories"
+    },
+    {
+      "run": 2,
+      "sha256": "cbf61c18d8b9d30af807463243bf006e71f5caeaf12cbce26e56397d88f6147e",
+      "bytes": 13529178,
+      "retrievalVerified": true,
+      "access": "Local-only retained full logs, process CPU, journal and unit/timer states outside repositories"
+    }
+  ],
+  "preflightBindings": "preflight.json",
+  "replacementUsed": false,
+  "access": "Local-only, outside repositories"
+}

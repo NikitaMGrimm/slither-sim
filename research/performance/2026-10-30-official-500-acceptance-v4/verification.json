@@ -1,0 +1,36 @@
+{
+  "runtime": "388be59aebf3108f5c510aa7269c08b67851b202",
+  "frozenCollectorCommit": "2abc874e275c7e9ed62d7cb358fc9cc8efe1d6d2",
+  "sameVerifiedV3BinariesAcrossFreshRuns": true,
+  "allHostThreadsOneVcpu": true,
+  "collectionSourceUnchangedSinceFreeze": true,
+  "fullOnlineOfflineResultsEqual": [
+    true,
+    true
+  ],
+  "tailMaximumMutationsDetectedPerRun": 4,
+  "allReportsHaveSummedThreeThreadCpu": true,
+  "selectedReportsPerRun": [
+    10812,
+    10812
+  ],
+  "inputLatenessViolations": [
+    0,
+    0
+  ],
+  "bothCompleteWindowsPassAllGates": true,
+  "awsPreflightDocumentationTestsPerRun": 7,
+  "finalAwsDocumentationTests": 7,
+  "independentReview": "Not performed",
+  "finalProofArchive": {
+    "sha256": "30890e02318a8ba4b0651936932e20a9157dfa1f23086278d3238394b1a0e958",
+    "bytes": 2032,
+    "access": "Local-only retained final check log, integrity receipts and bindings outside repositories"
+  },
+  "documentationSnapshot": {
+    "sha256": "443685097fb9601796b81987636dbb3b853c6b6a63da604537cea6ea9335f57d",
+    "bytes": 46561280,
+    "access": "Local-only pre-teardown documentation snapshot outside repositories; numeric cost/cleanup fields were pending",
+    "finalEditsAfterCheck": "Verified cost/cleanup values and matching prose only; link targets and measured data unchanged"
+  }
+}

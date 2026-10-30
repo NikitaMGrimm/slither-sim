@@ -13,7 +13,8 @@ mod desktop {
         Result,
         game::LocalGame,
         gpu::{SurfaceHost, instance},
-        menu_input_native::{NativeMenuInput, WindowEditHost},
+        login_native::NativeLogin,
+        menu_input_native::WindowEditHost,
         native::{Event, Transport},
         official::{self, Preparation},
     };
@@ -25,7 +26,7 @@ mod desktop {
         application::ApplicationHandler,
         event::{ElementState, MouseButton, WindowEvent},
         event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
-        keyboard::{KeyCode, PhysicalKey},
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
         window::{Window, WindowId},
     };
     #[derive(Debug)]
@@ -143,15 +144,17 @@ mod desktop {
         Ok(Some(o))
     }
     struct Running {
-        // PR2 is an inactive input seam; the later menu compositor owns creation,
-        // StartMenuState clocks/focus intents, admission and deferred Play effects.
-        menu_input: Option<(NativeMenuInput, slither_client::start_page::StartMenuState)>,
+        login: NativeLogin,
+        endpoint: Option<String>,
+        official: bool,
+        server: Option<String>,
         window: Arc<Window>,
         host: SurfaceHost,
         game: LocalGame,
         transport: Transport,
         started: Instant,
         cursor: [f64; 2],
+        shift: bool,
         preparation: Option<Preparation>,
         nickname: String,
         skin: u8,
@@ -164,6 +167,25 @@ mod desktop {
         pacing_log: Option<(Instant, u32, Instant, f64)>,
     }
     impl Running {
+        fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
+            use slither_client::menu_input::HostEditEffect;
+            for effect in self
+                .login
+                .input
+                .execute(effects, &mut WindowEditHost(&self.window))
+            {
+                match effect {
+                    HostEditEffect::Gameplay { key, pressed } => {
+                        if !pressed || !self.login.blocks_gameplay() {
+                            self.game.key(key.name(), pressed);
+                        }
+                    }
+                    HostEditEffect::ReleasePointerBoost => self.game.mouse_up(),
+                    HostEditEffect::ClipboardFailed(error) => eprintln!("{error}"),
+                    _ => {}
+                }
+            }
+        }
         fn effects(&mut self) -> Result<()> {
             for _ in 0..64 {
                 let Some(e) = self.game.effect() else {
@@ -196,16 +218,20 @@ mod desktop {
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
-                if !cancelled {
+                if cancelled {
+                    self.game.stop();
+                } else {
                     match result {
                         Ok(prepared) => {
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
-                            self.game.play_with_profile(
+                            if let Err(error) = self.game.play_with_profile(
                                 &prepared.endpoint,
                                 &self.nickname,
                                 self.skin,
                                 &prepared.profile,
-                            )?;
+                            ) {
+                                self.game.fail(&error);
+                            }
                         }
                         Err(e) => {
                             eprintln!("Official discovery failed: {e}");
@@ -255,11 +281,16 @@ mod desktop {
             self.effects()?;
             self.game.service_ingress()?;
             self.effects()?;
+            // Do not return while a cancelled acquisition still owns its worker.
+            if self.preparation.is_none() {
+                self.login.observe_session(self.game.phase());
+            }
             let active = !matches!(
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
             );
-            self.schedule.activity(active);
+            self.schedule
+                .activity(active || self.login.state.view(true).visible);
             if !matches!(
                 self.game.phase(),
                 Phase::Opening | Phase::Challenge | Phase::Setup
@@ -312,6 +343,46 @@ mod desktop {
             // FIFO may have waited. Ingest everything now available before
             // sampling the next frame; receive() retains its own deferral rules.
             self.service()?;
+            let admission = self.game.can_play()
+                && self.preparation.is_none()
+                && (self.official || self.endpoint.is_some());
+            let (intents, effects) = self.login.step(
+                self.started.elapsed().as_secs_f64() * 1000.,
+                admission,
+                self.game.phase() == Phase::Playing,
+            )?;
+            self.edit_effects(effects);
+            for intent in intents {
+                if let slither_client::start_page::StartMenuIntent::Play { nickname, quality } =
+                    intent
+                {
+                    self.nickname = nickname;
+                    self.game.set_requested_quality(match quality {
+                        slither_client::menu_preferences::MenuQuality::High => {
+                            slither_client::presentation::QualityMode::High
+                        }
+                        slither_client::menu_preferences::MenuQuality::Low => {
+                            slither_client::presentation::QualityMode::Low
+                        }
+                    });
+                    if self.official {
+                        match Preparation::start(self.server.clone()) {
+                            Ok(preparation) => self.preparation = Some(preparation),
+                            Err(error) => self.game.fail(&error),
+                        }
+                    } else if let Some(endpoint) = &self.endpoint
+                        && let Err(error) = slither_wgpu_slice::endpoint_login::play(
+                            &mut self.game,
+                            endpoint,
+                            &self.nickname,
+                            self.skin,
+                        )
+                    {
+                        self.game.fail(&error);
+                    }
+                }
+            }
+            self.effects()?;
             self.game
                 .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
             self.effects()?;
@@ -320,12 +391,31 @@ mod desktop {
                 self.schedule.retry(Instant::now());
                 return Ok(());
             };
-            if let Err(e) = self.host.renderer.sync_resources(&p.resources) {
+            let view = self.login.state.view(admission);
+            let composed = if view.visible || view.spinner_visible {
+                let mut picture = slither_wgpu_slice::render::PreparedFrame {
+                    frame: p.frame.clone(),
+                    resources: p.resources.clone(),
+                };
+                for draw in &mut picture.frame.draws {
+                    draw.effective_alpha *= view.world_alpha;
+                }
+                self.login
+                    .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
+                    .append_to(&mut picture)?;
+                let effects = self.login.cursor_area()?;
+                self.edit_effects(effects);
+                Some(picture)
+            } else {
+                None
+            };
+            let picture = composed.as_ref().unwrap_or(&p);
+            if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
                 self.game.presented(false)?;
                 return Err(e);
             }
             self.window.pre_present_notify();
-            match self.host.present_scaled(&p.frame) {
+            match self.host.present_scaled(&picture.frame) {
                 Ok(true) => {
                     self.game.presented(true)?;
                     self.schedule.presented();
@@ -434,7 +524,10 @@ mod desktop {
                 host.renderer.adapter_info, host.renderer.sample_count
             );
             Ok(Running {
-                menu_input: None,
+                login: NativeLogin::new(&options.nickname)?,
+                endpoint: options.endpoint.clone(),
+                official: options.official,
+                server: options.server.clone(),
                 window,
                 host,
                 game,
@@ -443,9 +536,10 @@ mod desktop {
                 }),
                 started: Instant::now(),
                 cursor: [480., 270.],
+                shift: false,
                 preparation: None,
                 nickname: String::new(),
-                skin: 0,
+                skin: options.skin,
                 schedule: Schedule::default(),
                 occluded: false,
                 surface_occluded: false,
@@ -479,35 +573,49 @@ mod desktop {
                 return;
             }
             let result = (|| -> Result<()> {
-                if let Some((input, menu)) = &mut r.menu_input {
-                    use slither_client::menu_input::HostEditEffect;
-                    let mapped = input.window_event(&event);
-                    let effects = input.execute(mapped.effects, &mut WindowEditHost(&r.window));
-                    let effects = input.state.commit_menu(effects, menu, r.game.can_play());
-                    for effect in input.execute(effects, &mut WindowEditHost(&r.window)) {
-                        match effect {
-                            HostEditEffect::Gameplay { key, pressed } => {
-                                r.game.key(key.name(), pressed);
-                            }
-                            HostEditEffect::ReleasePointerBoost => r.game.mouse_up(),
-                            HostEditEffect::ClipboardFailed(error) => eprintln!("{error}"),
-                            _ => {}
-                        }
-                    }
-                    if mapped.consumed {
+                if let WindowEvent::ModifiersChanged(modifiers) = &event {
+                    r.shift = modifiers.state().shift_key();
+                }
+                let admission = r.game.can_play()
+                    && r.preparation.is_none()
+                    && (r.official || r.endpoint.is_some());
+                if let WindowEvent::KeyboardInput { event, .. } = &event
+                    && event.state == ElementState::Pressed
+                    && !r.login.state.view(admission).disabled
+                {
+                    if event.logical_key == Key::Named(NamedKey::Tab) {
+                        let next = (r.login.focus + if r.shift { 2 } else { 1 }) % 3;
+                        let effects = r.login.focus(next);
+                        r.edit_effects(effects);
+                        r.schedule.invalidate();
                         return Ok(());
                     }
-                    if input.state.suspends_gameplay()
+                    if r.login.focus != 0
+                        && !event.repeat
                         && matches!(
-                            &event,
-                            WindowEvent::MouseInput {
-                                state: ElementState::Pressed,
-                                ..
-                            }
+                            event.logical_key,
+                            Key::Named(NamedKey::Enter | NamedKey::Space)
                         )
                     {
+                        r.login.activate(admission);
+                        r.schedule.invalidate();
                         return Ok(());
                     }
+                }
+                let mapped = r.login.input.window_event(&event);
+                let effects = r
+                    .login
+                    .input
+                    .execute(mapped.effects, &mut WindowEditHost(&r.window));
+                let effects =
+                    r.login
+                        .input
+                        .state
+                        .commit_menu(effects, &mut r.login.state, admission);
+                r.edit_effects(effects);
+                if mapped.consumed {
+                    r.schedule.invalidate();
+                    return Ok(());
                 }
                 match event {
                     WindowEvent::CloseRequested => {
@@ -557,14 +665,27 @@ mod desktop {
                             [position.x, position.y],
                             d,
                         );
-                        r.pointer(false)?;
+                        if r.login.intercepts_pointer(r.cursor) {
+                            let effects = r.login.pointer(r.cursor, None, admission);
+                            r.edit_effects(effects);
+                        } else {
+                            r.pointer(false)?;
+                        }
                     }
                     WindowEvent::MouseInput {
                         state,
                         button: MouseButton::Left,
                         ..
                     } => {
-                        if state == ElementState::Pressed {
+                        if r.login.intercepts_pointer(r.cursor) {
+                            let effects = r.login.pointer(
+                                r.cursor,
+                                Some(state == ElementState::Pressed),
+                                admission,
+                            );
+                            r.edit_effects(effects);
+                            r.game.mouse_up();
+                        } else if state == ElementState::Pressed {
                             r.pointer(true)?;
                         } else {
                             r.game.mouse_up();
@@ -579,29 +700,7 @@ mod desktop {
                     WindowEvent::KeyboardInput { event, .. } => {
                         let down = event.state == ElementState::Pressed;
                         match event.physical_key {
-                            PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {
-                                if r.game.can_play() && r.preparation.is_none() {
-                                    if self.options.official {
-                                        r.nickname.clone_from(&self.options.nickname);
-                                        r.skin = self.options.skin;
-                                        println!(
-                                            "Acquiring official profile and server; Escape cancels"
-                                        );
-                                        r.preparation =
-                                            Some(Preparation::start(self.options.server.clone())?);
-                                    } else if let Some(endpoint) = &self.options.endpoint {
-                                        slither_wgpu_slice::endpoint_login::play(
-                                            &mut r.game,
-                                            endpoint,
-                                            &self.options.nickname,
-                                            self.options.skin,
-                                        )?;
-                                        r.schedule.activity(true);
-                                    } else {
-                                        eprintln!("Use --official or --endpoint before Play");
-                                    }
-                                }
-                            }
+                            PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
                             PhysicalKey::Code(KeyCode::Escape) if down => {
                                 if let Some(p) = &r.preparation {
                                     p.cancel();
@@ -673,6 +772,11 @@ mod desktop {
                 &options.nickname,
                 options.skin,
                 cosmetics,
+            );
+        }
+        if !options.official && options.endpoint.is_none() {
+            eprintln!(
+                "No connection mode configured; Play stays disabled. Use --official or --endpoint."
             );
         }
         let event_loop = EventLoop::<TransportWake>::with_user_event()

@@ -16,7 +16,7 @@ use slither_client::{
 use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
-const MATERIAL_HANDLE_BASE: u64 = 0x7000_0000_0000_0000;
+use crate::bank::MENU_MATERIAL_HANDLE_BASE;
 type MaterialKey = (u32, u32, u8, u64);
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
@@ -31,6 +31,37 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
+    /// Map the menu's logical quads into the world backing before the native
+    /// host scales that complete picture to the physical window. Input/IME keep
+    /// the original logical layout, including fractional window DPR.
+    pub fn into_backing(mut self, extent: [u32; 2]) -> Result<Self> {
+        crate::render::dimensions(extent, 1.)?;
+        let scale = [
+            f64::from(extent[0]) * self.frame.viewport_scale / f64::from(self.frame.extent[0]),
+            f64::from(extent[1]) * self.frame.viewport_scale / f64::from(self.frame.extent[1]),
+        ];
+        for draw in &mut self.frame.draws {
+            // Menu composition emits axis-aligned images, unlike world bodies.
+            if draw.rotation != 0. {
+                return Err("Rotated menu host mapping".into());
+            }
+            draw.destination.x *= scale[0];
+            draw.destination.width *= scale[0];
+            draw.destination.y *= scale[1];
+            draw.destination.height *= scale[1];
+            draw.translation[0] *= scale[0];
+            draw.translation[1] *= scale[1];
+            if let Some(corners) = &mut draw.corners {
+                for p in corners {
+                    p[0] *= scale[0];
+                    p[1] *= scale[1];
+                }
+            }
+        }
+        self.frame.extent = extent;
+        self.frame.viewport_scale = 1.;
+        Ok(self)
+    }
     /// Append in paint order. A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
         check_menu_draws(self.frame.draws.len())?;
@@ -39,12 +70,15 @@ impl MenuFrame {
         {
             return Err("Menu picture extent/scale mismatch".into());
         }
-        let mut resources: BTreeMap<_, _> = picture
-            .resources
-            .iter()
-            .chain(&self.resources)
-            .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
-            .collect();
+        // Keyed by handle alone: the renderer keeps one revision per handle.
+        let mut resources = BTreeMap::new();
+        for r in picture.resources.iter().chain(&self.resources) {
+            if let Some(old) = resources.insert(r.asset.handle, r.clone())
+                && old.asset != r.asset
+            {
+                return Err("Menu resource handle collides with the world picture".into());
+            }
+        }
         if resources.len() > 2048
             || resources
                 .values()
@@ -62,6 +96,7 @@ impl MenuFrame {
 }
 #[derive(Default)]
 pub struct Menu {
+    pub focus: Option<E>,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
 }
@@ -104,6 +139,41 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
     }
 }
 impl Composition<'_> {
+    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+        let key = (1, 1, kind, 0);
+        if !self.materials.contains_key(&key) {
+            let resource = if let Some(resource) = self.old.get(&key) {
+                resource.clone()
+            } else {
+                self.next_handle = self
+                    .next_handle
+                    .checked_add(1)
+                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .ok_or("Menu material handle overflow")?;
+                let rgb = if kind == 8 {
+                    [224, 224, 255]
+                } else {
+                    [150, 108, 213]
+                };
+                Resource {
+                    asset: BodyAsset {
+                        handle: self.next_handle,
+                        revision: 1,
+                        width: 1,
+                        height: 1,
+                        status: BodyAssetStatus::Ready,
+                    },
+                    image: materials::RgbaImage {
+                        width: 1,
+                        height: 1,
+                        pixels: vec![rgb[0], rgb[1], rgb[2], 255],
+                    },
+                }
+            };
+            self.materials.insert(key, resource);
+        }
+        self.push(image(&self.materials[&key], r, alpha))
+    }
     fn push(&mut self, draw: Draw) -> Result<()> {
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
@@ -135,7 +205,7 @@ impl Composition<'_> {
                 self.next_handle = self
                     .next_handle
                     .checked_add(1)
-                    .filter(|h| *h < MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
                 Resource {
                     asset: BodyAsset {
@@ -195,11 +265,26 @@ impl Menu {
         cosmetics: Option<&Cosmetics>,
         logo_frame: u8,
     ) -> Result<MenuFrame> {
+        self.prepare_with_input(text, view, layout, extent, dpr, cosmetics, logo_frame, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_with_input(
+        &mut self,
+        text: &mut TextCache,
+        view: &StartMenuView,
+        layout: &MenuLayout,
+        extent: [u32; 2],
+        dpr: f64,
+        cosmetics: Option<&Cosmetics>,
+        logo_frame: u8,
+        input: Option<&slither_client::menu_input::MenuInputState>,
+    ) -> Result<MenuFrame> {
         crate::render::dimensions(extent, dpr)?;
         let mut c = Composition {
             old: &self.materials,
             materials: BTreeMap::new(),
-            next_handle: self.next_handle.max(MATERIAL_HANDLE_BASE),
+            next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
             scale: dpr.min(3.),
             draws: Vec::new(),
             art: Vec::new(),
@@ -207,12 +292,36 @@ impl Menu {
         };
         let a = view.login_alpha;
         if view.visible {
+            let qr = layout.viewport_rect(E::Quality);
+            if self.focus == Some(E::Quality) {
+                c.control(qr, 4, a * 0.35)?;
+            }
+            let role = match view.quality {
+                slither_client::menu_preferences::MenuQuality::High => MenuArt::QualityHigh,
+                slither_client::menu_preferences::MenuQuality::Low => MenuArt::QualityLow,
+            };
+            if let Some(art) = cosmetics.and_then(|p| p.menu_art(role)) {
+                c.art(art, qr, a)?;
+            } else {
+                c.label(
+                    if role == MenuArt::QualityHigh {
+                        "High quality"
+                    } else {
+                        "Low quality"
+                    },
+                    qr,
+                    14.,
+                    false,
+                    a,
+                );
+            }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha * view.logo_reveal;
             if let Some(art) = cosmetics.and_then(|p| p.menu_art(MenuArt::Logo(logo_frame))) {
                 c.art(art, logo, logo_alpha)?;
             } else {
                 c.label("slither", logo, 40. * layout.scale, true, logo_alpha);
+                c.labels.last_mut().unwrap().style.color = [130, 214, 91];
             }
             if view.tips_visible {
                 c.label(
@@ -248,11 +357,82 @@ impl Menu {
                     a * view.nickname_alpha * if view.disabled { 0.5 } else { 1. },
                 );
                 c.labels.last_mut().unwrap().align = Align::Left;
+                if view.nickname.is_empty() {
+                    c.labels.last_mut().unwrap().style.color = [112, 112, 176];
+                }
+                if let Some(input) = input
+                    .filter(|i| i.focus() == Some(slither_client::menu_input::TextField::Nickname))
+                {
+                    let editor = input.editor(slither_client::menu_input::TextField::Nickname);
+                    let (anchor, caret) = editor.selection();
+                    let r = layout.viewport_rect(E::Nickname);
+                    let style = c.labels.last().unwrap().style;
+                    let full = text.measure_panel(&view.nickname, style)?.advance;
+                    let fit = if full > r.width { r.width / full } else { 1. };
+                    let advance = |prefix: &str, text: &mut TextCache| -> Result<f64> {
+                        Ok(text.measure_panel(prefix, style)?.advance * fit)
+                    };
+                    let left = advance(&editor.text()[..anchor.min(caret)], text)?;
+                    let right = advance(&editor.text()[..anchor.max(caret)], text)?;
+                    if anchor != caret && editor.preedit().is_none() {
+                        c.solid(
+                            MenuRect {
+                                x: r.x + left,
+                                y: r.y,
+                                width: (right - left).max(1.),
+                                height: r.height,
+                            },
+                            9,
+                            0.45 * a * view.nickname_alpha,
+                        )?;
+                    }
+                    let cursor = if let Some(preedit) = editor.preedit() {
+                        let end = preedit.selection.map_or(preedit.text.len(), |(_, end)| end);
+                        advance(&editor.text()[..anchor.min(caret)], text)?
+                            + advance(&preedit.text[..end], text)?
+                    } else {
+                        advance(&editor.text()[..caret], text)?
+                    };
+                    c.solid(
+                        MenuRect {
+                            x: r.x + cursor.min(r.width - 1.),
+                            y: r.y,
+                            width: 1.,
+                            height: r.height,
+                        },
+                        8,
+                        a * view.nickname_alpha,
+                    )?;
+                    if let Some(preedit) = editor.preedit() {
+                        let start = advance(&editor.text()[..anchor.min(caret)], text)?;
+                        let width = advance(&preedit.text, text)?.min((r.width - start).max(0.));
+                        if width > 0. {
+                            c.solid(
+                                MenuRect {
+                                    x: r.x + start,
+                                    y: r.y + r.height - 2.,
+                                    width,
+                                    height: 1.,
+                                },
+                                8,
+                                a * view.nickname_alpha,
+                            )?;
+                        }
+                    }
+                }
                 let play = layout.viewport_rect(E::Play);
                 let pa = a * view.play_alpha * view.play_return_alpha;
                 c.control(play, if view.disabled { 3 } else { 0 }, pa)?;
                 if !view.disabled {
-                    c.control(play, 1, pa * view.hover_alpha)?;
+                    c.control(
+                        play,
+                        1,
+                        pa * view.hover_alpha.max(if self.focus == Some(E::Play) {
+                            0.33
+                        } else {
+                            0.
+                        }),
+                    )?;
                     c.control(play, 2, pa * view.press_alpha)?;
                 }
                 c.label(
@@ -270,7 +450,7 @@ impl Menu {
                     c.control(
                         MenuRect {
                             x: r.x + 23.,
-                            y: r.y + 10.,
+                            y: r.y + 36.,
                             width: 48.,
                             height: 25.,
                         },
