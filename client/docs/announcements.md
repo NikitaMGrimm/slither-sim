@@ -59,12 +59,10 @@ measures one invisible DOM span per face/size/density, removes it immediately an
 retains a bounded 16-entry metric cache; Canvas TextMetrics omits the line gap.
 At DPR1 the quote occupies 20px, then 5px gap, with 15px attribution/length rows.
 The world precedes announcements, then minimap and HUD.
-Announcement slots are independent of HUD/nickname quotas. The 96-draw reserve
-applies only while the captured view has present content, projected blocks and
-positive opacity, including through the fade. The same snapshot supplies both
-the reserve and submission. Before a record, while Setup hides it, at zero fade
-and after the return sentinel, the reserve stays at HUD/minimap 140 (8052 world
-draws); visible announcements reserve 236 (7956 world draws).
+Announcement slots and the 96-draw producer bound are independent of
+HUD/nickname quotas. There is no draw reservation or visibility-dependent
+reduction in world capacity. [Bounded vertex chunks](draw-chunks.md) retain all
+eligible world geometry; only the final memory guard can skip a whole picture.
 Setup callbacks, ordinary work and resize prepare immutable announcement draws
 and resources at the same boundary as the world; retained/retried pictures never
 consult later live text. Same-content fades reuse texture identities.

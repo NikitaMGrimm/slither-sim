@@ -87,7 +87,7 @@ for (const mode of ['already-signaled', 'signal-during-kill', 'already-exited'])
 test('explicit recorder error makes a trace incomplete without decoding a partial row', () => {
   const { schedule, trace } = syntheticFixture();
   const assembly = traceAssembly(schedule, trace.manifest);
-  assembly.append({ seq: 0, event: trace.events[0], commands: [], observations: [], observationErrors: ['update: unsupported face layout'] });
+  assembly.append({ seq: 0, event: trace.events[0], commands: [], observations: [], pictures: [], observationErrors: ['update: unsupported face layout'] });
   const result = assembly.finish({ atMs: 10, completed: true, pendingEffects: 0, pendingFrames: 0, unexpectedNetwork: false });
   assert.equal(result.final.completed, false);
   assert.equal(result.samples.length, 0);

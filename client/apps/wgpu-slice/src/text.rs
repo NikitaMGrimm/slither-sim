@@ -334,15 +334,16 @@ impl TextCache {
                         .1
                     {
                         if crate::render::clip_text(&mut draw, r.clip) {
+                            // Preserve the producer quota before growing its staged output.
+                            if draws.len()
+                                == crate::render::PANEL_PRODUCER_DRAWS
+                                    - crate::render::PANEL_CONTROL_DRAWS
+                            {
+                                return Err("Panel draw budget".into());
+                            }
                             draws.push((draw, resource));
                         }
                     }
-                }
-                // Eight draws remain for flat fills, border strips and controls.
-                if draws.len()
-                    > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS
-                {
-                    return Err("Panel draw budget".into());
                 }
                 output.push(draws);
             }

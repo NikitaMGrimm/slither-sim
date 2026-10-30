@@ -113,7 +113,9 @@ replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
 HUD names are rasterized only to their visible column width. HUD raster scale
 is capped at 3x independently of viewport DPR, retaining logical sizes/anchors
 and the pixel budget on denser displays. Unused HUD slots are retired each frame. Nickname work is
-limited to 128 runs per frame; text tiles share the 8192-draw frame budget.
+limited to 128 runs per frame. [Bounded vertex chunks](../../docs/draw-chunks.md)
+preserve crowded frames up to the 64 MiB Draw-record memory guard (262,144 quads
+on native and Wasm); an oversized production picture is skipped recoverably.
 Existing active/queued budgets still apply.
 
 ## Scope

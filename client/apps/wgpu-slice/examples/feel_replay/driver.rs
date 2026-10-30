@@ -9,6 +9,7 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame},
     render,
 };
+use std::collections::BTreeSet;
 
 const ENDPOINT: &str = "ws://127.0.0.1:19090/slither";
 
@@ -18,6 +19,7 @@ pub struct Driver {
     pub effects: Vec<String>,
     pub commands: Vec<Value>,
     pub receipts: Vec<Value>,
+    pub acknowledged_pictures: BTreeSet<u64>,
     pub extent: [u32; 2],
     socket: Option<u32>,
     sends: usize,
@@ -34,6 +36,7 @@ impl Driver {
             effects: vec![],
             commands: vec![],
             receipts: vec![],
+            acknowledged_pictures: BTreeSet::new(),
             extent: render::backing_size([width, height])?,
             socket: None,
             sends: 0,
@@ -99,10 +102,16 @@ impl Driver {
                 return Ok(());
             };
             // The issued candidate is observable before its world is committed.
-            if self.game.issued_feel_observation().is_none() && !self.recorder.has_failed() {
+            let observation = self.game.issued_feel_observation().map(|row| row.sequence);
+            if observation.is_none() && !self.recorder.has_failed() {
                 return Err("Issued picture has no observation".into());
             }
             self.game.presented(true)?;
+            if let Some(sequence) = observation
+                && !self.acknowledged_pictures.insert(sequence)
+            {
+                return Err("Picture observation acknowledged twice".into());
+            }
         }
         if self.game.has_frame() {
             Err("Picture drain budget".into())

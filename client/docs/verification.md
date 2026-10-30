@@ -54,6 +54,9 @@ The [native CPU peer](../tools/feel-replay/native-peer.md) adds feature-gated
 LocalGame driver tests, bit-exact native repeats and native/Wasm cross-target
 reports; it opens no window and does not measure GPU or desktop pacing.
 
+The wgpu [draw-chunk contract](draw-chunks.md) documents the draw-memory bound,
+recoverable picture skips and native/browser correctness evidence limits.
+
 ## Offline host/client end-to-end run
 
 Build from the repository root with `CARGO_BUILD_JOBS=2` (and

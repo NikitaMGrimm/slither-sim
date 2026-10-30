@@ -176,6 +176,7 @@ pub struct LocalGame {
     identity: u64,
     rng: u64,
     pub failure: Option<String>,
+    pub draw_diagnostics: crate::frame::DrawDiagnostics,
     suspended: bool,
     quality: QualityState,
     draws_since_statistics: u32,
@@ -224,6 +225,7 @@ impl LocalGame {
             identity: 0,
             rng: 17,
             failure: None,
+            draw_diagnostics: crate::frame::DrawDiagnostics::default(),
             suspended: false,
             quality: QualityState::new(QualityMode::High, now).map_err(|e| e.to_string())?,
             draws_since_statistics: 0,
@@ -589,6 +591,8 @@ impl LocalGame {
         let serial = Cell::new(self.identity);
         let frames = RefCell::new(Vec::new());
         let captured_pixels = Cell::new(0_usize);
+        let captured_draws = Cell::new(0_usize);
+        let diagnostics = RefCell::new(self.draw_diagnostics.clone());
         let extent = self.extent;
         let scale = self.scale;
         let quality = self.quality.snapshot();
@@ -607,16 +611,27 @@ impl LocalGame {
             |c,_|{
                 if frames.borrow().len()>=16{return Err(Ingress("Setup draw budget".into()));}
                 serial.set(serial.get()+1);
-                let frame=render::prepare_gameplay(c,&mut bank.borrow_mut(),extent,scale,serial.get(),quality).map_err(Ingress)?;
+                let prepared=render::prepare_gameplay(c,&mut bank.borrow_mut(),extent,scale,serial.get(),quality);
+                let Some(frame)=diagnostics.borrow_mut().admit(serial.get(),prepared).map_err(Ingress)? else {
+                    frames.borrow_mut().push(None);
+                    return Ok(());
+                };
+                // Bound all retained Setup draw records together, including late HUD capacity.
+                let draws=captured_draws.get()+frame.frame.draws.len()+crate::hud::MAX_DRAWS;
+                if diagnostics.borrow_mut().admit(serial.get(),crate::frame::check_draw_count(draws)).map_err(Ingress)?.is_none() {
+                    frames.borrow_mut().push(None);
+                    return Ok(());
+                }
+                captured_draws.set(draws);
                 // HUD projection follows the complete ingress report. Reserve its
                 // bounded atlas before retaining each immutable scene snapshot.
                 let bytes=captured_pixels.get()+frame.pixel_bytes()+crate::hud::MAX_PIXEL_BYTES;
                 if bytes>crate::bank::PIXEL_BUDGET{return Err(Ingress("Setup capture pixels budget".into()));}
                 captured_pixels.set(bytes);
-                frames.borrow_mut().push(Picture { value: frame,
+                frames.borrow_mut().push(Some(Picture { value: frame,
                     #[cfg(feature = "feel-trace")]
                     observation: self.trace.as_ref().and_then(|t| t.last_draw()),
-                });
+                }));
                 Ok(())
             },
             HudIngressPlan{schema:2,command_count:commands.len(),guards:&guards,final_capture_indices:&plan.final_capture_indices}).map_err(|e|e.0)?;
@@ -731,8 +746,15 @@ impl LocalGame {
             let mut bytes = 0;
             let view =
                 Self::format_hud_parts(&hud, &rows, &session, self.failure.as_deref(), false);
-            for frame in frames.into_inner() {
-                let p = render::finish_hud(frame.value, &mut self.bank, &view)?;
+            for frame in frames.into_inner().into_iter().flatten() {
+                let identity = frame.value.frame.identity;
+                let Some(p) = diagnostics.borrow_mut().admit(
+                    identity,
+                    render::finish_hud(frame.value, &mut self.bank, &view),
+                )?
+                else {
+                    continue;
+                };
                 bytes += p
                     .resources
                     .iter()
@@ -757,6 +779,7 @@ impl LocalGame {
         self.identity = serial.get();
         self.rng = rng.get();
         self.packet_frames.extend(pictures);
+        self.draw_diagnostics = diagnostics.into_inner();
         Ok(())
     }
     /// Probe only the existing transactional clock callback; intentionally abort before entity update.
@@ -986,7 +1009,7 @@ impl LocalGame {
             w.scale,
             self.identity,
             w.quality.snapshot(),
-        )?;
+        );
         self.policy.controller_done();
         let score = if w.hud.readout_required(self.session.view().playing) {
             sample(world.score_view())
@@ -998,7 +1021,10 @@ impl LocalGame {
         w.world = Some(world);
         let w = self.work.as_ref().expect("work");
         let view = self.format_hud(&w.hud, w.reset_rows);
-        let prepared = render::finish_hud(frame, &mut self.bank, &view)?;
+        let prepared = frame.and_then(|frame| render::finish_hud(frame, &mut self.bank, &view));
+        let Some(prepared) = self.draw_diagnostics.admit(self.identity, prepared)? else {
+            return self.commit_work();
+        };
         self.work.as_mut().expect("work").prepared = Some(Picture {
             value: prepared,
             #[cfg(feature = "feel-trace")]
@@ -1082,6 +1108,7 @@ impl LocalGame {
         let changed = self.suspended || self.extent != extent || self.scale != scale;
         self.suspended = false;
         if changed {
+            let mut skipped = false;
             self.extent = extent;
             self.scale = scale;
             self.packet_frames.clear();
@@ -1101,13 +1128,21 @@ impl LocalGame {
                         scale,
                         self.identity,
                         w.quality.snapshot(),
-                    )?;
-                    w.prepared = Some(Picture {
-                        value: render::finish_hud(frame, &mut self.bank, &view)?,
-                        #[cfg(feature = "feel-trace")]
-                        observation: self.trace.as_ref().and_then(|t| t.last_draw()),
-                    });
+                    )
+                    .and_then(|frame| render::finish_hud(frame, &mut self.bank, &view));
+                    w.prepared = self
+                        .draw_diagnostics
+                        .admit(self.identity, frame)?
+                        .map(|value| Picture {
+                            value,
+                            #[cfg(feature = "feel-trace")]
+                            observation: self.trace.as_ref().and_then(|t| t.last_draw()),
+                        });
+                    skipped = w.prepared.is_none();
                 }
+            }
+            if skipped {
+                self.commit_work()?;
             }
         }
         Ok(())

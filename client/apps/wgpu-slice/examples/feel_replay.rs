@@ -5,6 +5,9 @@ mod codec;
 mod driver;
 #[path = "feel_replay/observation.rs"]
 mod observation;
+#[cfg(test)]
+#[path = "../tests/support/announcement_tape.rs"]
+mod synthetic_tape;
 use serde_json::{Value, json};
 use slither_wgpu_slice::Result;
 use std::io::{self, Read};
@@ -37,6 +40,7 @@ fn replay(request: Value) -> Result<Value> {
     let mut samples = vec![];
     let mut frame = 0;
     let mut draw = 0;
+    let mut successful_draws = 0;
     let mut appeared = false;
     let mut errors = vec![];
     for (seq, step) in request["steps"]
@@ -121,6 +125,10 @@ fn replay(request: Value) -> Result<Value> {
                 "pre-appearance"
             };
             let drawing = row.phase == "draw";
+            let acknowledged = d.acknowledged_pictures.remove(&row.sequence);
+            if acknowledged {
+                successful_draws += 1;
+            }
             let draw_id = if drawing {
                 let id = draw;
                 draw += 1;
@@ -133,9 +141,12 @@ fn replay(request: Value) -> Result<Value> {
                 "delta":o["delta"], "lag":{"active":session.lagging,"multiplier":o["multiplier"],
                     "pingPending":session.ping_pending,"pongAgeMs":(now-session.last_ping_ms).max(0.)},
                 "own":o["own"],"camera":o["camera"],"quality":{"requested":"high",
-                    "active":if d.game.quality().high_quality {"high"} else {"low"},"successfulDraws":draw},
-                "geometry":geometry,"status":{"prepared":drawing,"submitted":drawing,"committed":drawing,
+                    "active":if d.game.quality().high_quality {"high"} else {"low"},"successfulDraws":successful_draws},
+                "geometry":geometry,"status":{"prepared":drawing,"submitted":acknowledged,"committed":acknowledged,
                     "retries":0,"sendFailed":false,"presentFailed":false}}));
+        }
+        if !d.acknowledged_pictures.is_empty() {
+            return Err("Acknowledged picture has no recorded observation".into());
         }
         errors.extend(d.recorder.take_errors());
         if event["kind"] == "frame" {
@@ -146,7 +157,7 @@ fn replay(request: Value) -> Result<Value> {
     let pending = d.game.feel_pending();
     let body = json!({"schema":2,"events":events,"commands":commands,"samples":samples,
         "final":{"atMs":request["durationMs"],"events":events.len(),"commands":commands.len(),"samples":samples.len(),
-            "draws":draw,"pendingEffects":pending[0],"pendingFrames":pending[1],
+            "draws":successful_draws,"pendingEffects":pending[0],"pendingFrames":pending[1],
             "lastBoundaryId":samples.last().map(|s|s["id"].clone()).unwrap_or(json!("missing")),
             "completed":d.game.failure.is_none() && !d.recorder.has_failed(),"unexpectedNetwork":false}});
     Ok(json!({"body":body,"random":d.recorder.take_random(),"effects":d.receipts,"errors":errors}))
@@ -180,5 +191,65 @@ fn main() {
     if let Err(error) = run() {
         eprintln!("Native feel replay failed: {error}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use synthetic_tape::{bundle, challenge, setup, snake};
+
+    #[test]
+    fn overflow_observation_is_retained_without_claiming_a_picture_acknowledgement() {
+        let mut steps = Vec::new();
+        let mut step = |kind: &str, now: f64, packet: Option<Vec<u8>>| {
+            let mut value = json!({"event":{"seq":steps.len(),"sourceId":format!("synthetic-{}",steps.len()),
+                "kind":kind,"scheduledMs":now,"actualMs":now,"target":"host","type":kind,
+                "coordinates":null,"code":null,"trusted":false,"repeat":false,"buttons":0,
+                "focused":true,"visibility":"visible","effectIds":[]},"actions":[]});
+            if let Some(packet) = packet {
+                value["packet"] = json!(packet);
+            }
+            steps.push(value);
+        };
+        step("frame", 0., None);
+        step("packet", 1., Some(challenge()));
+        step("packet", 3., Some(bundle(&[setup(), snake(44)])));
+        step("frame", 20., None);
+        let foods = (0..60_000)
+            .map(|i| vec![b'F', 11, 10, 41, (i % 245) as u8, (i / 245) as u8, 20])
+            .collect::<Vec<_>>();
+        for (i, commands) in foods.chunks(4000).enumerate() {
+            step("packet", 30. + i as f64, Some(bundle(commands)));
+        }
+        step("frame", 60., None);
+        let backing = slither_wgpu_slice::render::backing_size([960., 540.]).unwrap();
+        let geometry = json!({"css":{"width":960,"height":540},"backing":{"width":backing[0] as f64,"height":backing[1] as f64},
+            "surface":{"width":960,"height":540},"dpr":1});
+        let result = replay(
+            json!({"geometry":geometry,"pointer":{"x":0,"y":0},"steps":steps,"durationMs":60}),
+        )
+        .unwrap();
+        let samples = result["body"]["samples"].as_array().unwrap();
+        let draw_rows = samples
+            .iter()
+            .filter(|s| s["phase"] == "draw")
+            .collect::<Vec<_>>();
+        let acknowledged = draw_rows
+            .iter()
+            .filter(|s| s["status"]["committed"] == true)
+            .count();
+        let skipped = draw_rows.last().unwrap();
+        assert_eq!(
+            skipped["status"],
+            json!({"prepared":true,"submitted":false,"committed":false,
+            "retries":0,"sendFailed":false,"presentFailed":false})
+        );
+        assert_eq!(draw_rows.len(), acknowledged + 1);
+        assert_eq!(skipped["quality"]["successfulDraws"], acknowledged);
+        assert_eq!(result["body"]["final"]["draws"], acknowledged);
+        assert_eq!(result["body"]["final"]["pendingFrames"], 0);
+        assert_eq!(result["body"]["final"]["completed"], true);
+        assert!(result["errors"].as_array().unwrap().is_empty());
     }
 }

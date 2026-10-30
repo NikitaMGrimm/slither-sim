@@ -48,12 +48,12 @@ fn board_at(g: &mut LocalGame, now: f64) {
     g.receive(g.generation(), &bundle(&[board()]), now).unwrap();
 }
 #[test]
-fn production_reserves_announcements_only_while_the_captured_view_is_visible() {
+fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announcements() {
     use slither_wgpu_slice::{bank::Bank, frame::MAX_DRAWS};
     let mut g = negotiating();
     let mut commands = vec![setup(), snake(44)];
     // Authored mandatory geometry: 259 world draws + 1109*7 food draws +
-    // 5*6 prey draws = 8052. Optional labels have no room at this capacity.
+    // 5*6 prey draws = 8052. This frame has no visible nickname yet.
     for i in 0..1109 {
         commands.push(vec![b'F', 11, 10, 41, (i % 40) as u8, (i / 40) as u8, 20]);
     }
@@ -64,9 +64,7 @@ fn production_reserves_announcements_only_while_the_captured_view_is_visible() {
     }
     g.receive(g.generation(), &bundle(&commands), 3.).unwrap();
     pictures(&mut g);
-    let old_capacity =
-        MAX_DRAWS - slither_wgpu_slice::hud::MAX_DRAWS - slither_wgpu_slice::minimap::MAX_DRAWS;
-    assert_eq!(old_capacity, 8052);
+    let old_capacity = 8052;
     let quality = g.quality();
     let alive = AnnouncementLifecycle {
         death_pending: false,
@@ -138,19 +136,13 @@ fn production_reserves_announcements_only_while_the_captured_view_is_visible() {
         );
         assert!(view.present);
         assert_eq!(view.opacity, fraction);
-        assert_eq!(
-            MAX_DRAWS
-                - render::PanelDrawReserve {
-                    announcement: true,
-                    result: false
-                }
-                .late_draws(),
-            7956
-        );
-        assert_eq!(
-            visible.err().as_deref(),
-            Some("frame extent/scale/budget: mandatory overlay reserve")
-        );
+        let visible = visible.unwrap();
+        assert!(visible.frame.draws.len() > old_capacity);
+        // World order/geometry is identical; the panel is appended after it.
+        let baseline = prepare(&client, &mut g.bank, None, identity + 100)
+            .1
+            .unwrap();
+        assert_eq!(&visible.frame.draws[..old_capacity], baseline.frame.draws);
     }
     let (view, returned) = prepare(
         &client,
@@ -483,17 +475,14 @@ fn near_budget_world_long_record_ten_row_hud_and_maximal_minimap_compose_in_orde
             draws: Vec::new(),
             snakes: Vec::new(),
         };
-        let reserve = render::PanelDrawReserve {
-            announcement: true,
-            result: false,
-        }
-        .late_draws();
-        assert_eq!(reserve, 236);
+        let overlay_capacity = render::PANEL_PRODUCER_DRAWS
+            + slither_wgpu_slice::minimap::MAX_DRAWS
+            + slither_wgpu_slice::hud::MAX_DRAWS;
         // Synthetic near-limit geometry: same valid world quad, repeated without
         // texture growth. This is an admission fixture, not dense-gameplay evidence.
         let mut world = base.frame.draws[0].clone();
         world.asset = bank.solid([0, 0, 0]);
-        frame.draws.resize(MAX_DRAWS - reserve, world);
+        frame.draws.resize(MAX_DRAWS - overlay_capacity, world);
         let mut resources = bank.resources(&frame).unwrap();
         let world_end = frame.draws.len();
         bank.announcement

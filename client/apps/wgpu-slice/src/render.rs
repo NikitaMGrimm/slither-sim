@@ -2,7 +2,10 @@
 use crate::{
     Result,
     bank::Bank,
-    frame::{Draw, Frame, MAX_DRAWS, MAX_EXTENT, SnakeDrawObservation},
+    frame::{
+        DRAW_MEMORY_LIMIT, Draw, Frame, MAX_DRAWS, MAX_EXTENT, SnakeDrawObservation,
+        check_draw_count, push_draw, reserve_draws,
+    },
     scene::Resource,
 };
 use slither_client::{presentation::*, state::Point};
@@ -18,25 +21,9 @@ pub struct PreparedFrame {
     pub frame: Frame,
     pub resources: Vec<Resource>,
 }
-// Nicknames are already in the scene before antenna admission. Only these
-// bounded overlay producers append draws after it; body/face draws are counted too.
-const ANTENNA_LATE_DRAW_RESERVE: usize = crate::hud::MAX_DRAWS + crate::minimap::MAX_DRAWS;
-/// Includes tiled text plus flat fills, borders and controls; see panel-text.md.
+/// Producer limits bound text resources; they no longer reserve world capacity.
 pub const PANEL_PRODUCER_DRAWS: usize = 96;
 pub const PANEL_CONTROL_DRAWS: usize = 8;
-/// Gameplay opts in to announcements. Producers reserve before world
-/// nicknames/antennas are admitted, then preflight their entire panel together.
-#[derive(Clone, Copy, Default)]
-pub struct PanelDrawReserve {
-    pub announcement: bool,
-    pub result: bool,
-}
-impl PanelDrawReserve {
-    pub fn late_draws(self) -> usize {
-        ANTENNA_LATE_DRAW_RESERVE
-            + (usize::from(self.announcement) + usize::from(self.result)) * PANEL_PRODUCER_DRAWS
-    }
-}
 impl PreparedFrame {
     pub fn pixel_bytes(&self) -> usize {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
@@ -166,14 +153,17 @@ fn submit_face(
                 let outer = e.eye_radius + e.outline_width / 2.;
                 if e.eye_alpha >= 1. {
                     // The opaque fill covers the disk's interior, saving draws.
-                    draws.push(image(
-                        bank.disk([0; 3])?,
-                        pair.eye.x - outer,
-                        pair.eye.y - outer,
-                        outer * 2.,
-                        outer * 2.,
-                        e.eye_alpha,
-                    ));
+                    push_draw(
+                        draws,
+                        image(
+                            bank.disk([0; 3])?,
+                            pair.eye.x - outer,
+                            pair.eye.y - outer,
+                            outer * 2.,
+                            outer * 2.,
+                            e.eye_alpha,
+                        ),
+                    )?;
                 } else {
                     let inner = (e.eye_radius - e.outline_width / 2.).max(0.);
                     let steps = (std::f64::consts::TAU * outer).ceil().clamp(16., 48.) as usize;
@@ -187,16 +177,19 @@ fn submit_face(
                                 y: pair.eye.y + radius * angle.sin(),
                             }
                         };
-                        draws.push(polygon(
-                            black,
-                            [
-                                at(i, outer),
-                                at(i + 1, outer),
-                                at(i + 1, inner),
-                                at(i, inner),
-                            ],
-                            e.eye_alpha,
-                        ));
+                        push_draw(
+                            draws,
+                            polygon(
+                                black,
+                                [
+                                    at(i, outer),
+                                    at(i + 1, outer),
+                                    at(i + 1, inner),
+                                    at(i, inner),
+                                ],
+                                e.eye_alpha,
+                            ),
+                        )?;
                     }
                 }
             }
@@ -205,14 +198,17 @@ fn submit_face(
                 (e.pupil_color, pair.pupil, e.pupil_radius, e.pupil_alpha),
             ] {
                 if radius > 0. {
-                    draws.push(image(
-                        bank.disk(color)?,
-                        point.x - radius,
-                        point.y - radius,
-                        radius * 2.,
-                        radius * 2.,
-                        alpha,
-                    ));
+                    push_draw(
+                        draws,
+                        image(
+                            bank.disk(color)?,
+                            point.x - radius,
+                            point.y - radius,
+                            radius * 2.,
+                            radius * 2.,
+                            alpha,
+                        ),
+                    )?;
                 }
             }
         }
@@ -229,19 +225,22 @@ fn submit_face(
                 view,
             )
             .map_err(|e| e.to_string())?;
-        draws.push(placed(
-            asset,
-            Some(BodyRect {
-                x: 0.,
-                y: 0.,
-                width: f64::from(asset.width),
-                height: f64::from(asset.height),
-            }),
-            layout.destination,
-            layout.translation,
-            layout.rotation,
-            layout.alpha,
-        ));
+        push_draw(
+            draws,
+            placed(
+                asset,
+                Some(BodyRect {
+                    x: 0.,
+                    y: 0.,
+                    width: f64::from(asset.width),
+                    height: f64::from(asset.height),
+                }),
+                layout.destination,
+                layout.translation,
+                layout.rotation,
+                layout.alpha,
+            ),
+        )?;
     }
     let Some(cosmetics) = &bank.cosmetics else {
         return Ok(());
@@ -258,16 +257,19 @@ fn submit_face(
                 .layout(heading, pupil, view)
                 .map_err(|e| e.to_string())?;
             for (source, rect) in [base, source_pupil].into_iter().zip(layout.destinations) {
-                draws.push(placed(
-                    cosmetics
-                        .role(source.source)
-                        .ok_or("Missing prepared face source")?,
-                    source.source_rect,
-                    rect,
-                    Point { x: 0., y: 0. },
-                    0.,
-                    layout.alpha,
-                ));
+                push_draw(
+                    draws,
+                    placed(
+                        cosmetics
+                            .role(source.source)
+                            .ok_or("Missing prepared face source")?,
+                        source.source_rect,
+                        rect,
+                        Point { x: 0., y: 0. },
+                        0.,
+                        layout.alpha,
+                    ),
+                )?;
             }
         }
         (FaceGeometry::Mouth(geometry), SkinFaceSources::Mouth { eye_marks, mouth }) => {
@@ -275,16 +277,19 @@ fn submit_face(
                 .layout(heading, pupil, view)
                 .map_err(|e| e.to_string())?;
             for (source, layout) in [eye_marks, eye_marks, mouth].into_iter().zip(layout.images) {
-                draws.push(placed(
-                    cosmetics
-                        .role(source)
-                        .ok_or("Missing prepared face source")?,
-                    None,
-                    layout.destination,
-                    layout.translation,
-                    layout.rotation,
-                    1.,
-                ));
+                push_draw(
+                    draws,
+                    placed(
+                        cosmetics
+                            .role(source)
+                            .ok_or("Missing prepared face source")?,
+                        None,
+                        layout.destination,
+                        layout.translation,
+                        layout.rotation,
+                        1.,
+                    ),
+                )?;
             }
         }
         (FaceGeometry::Paired(face), SkinFaceSources::PairedSide(source)) => {
@@ -294,16 +299,19 @@ fn submit_face(
                 .layout(heading, view)
                 .map_err(|e| e.to_string())?
             {
-                draws.push(placed(
-                    cosmetics
-                        .role(source)
-                        .ok_or("Missing prepared face source")?,
-                    None,
-                    layout.destination,
-                    layout.translation,
-                    layout.rotation,
-                    1.,
-                ));
+                push_draw(
+                    draws,
+                    placed(
+                        cosmetics
+                            .role(source)
+                            .ok_or("Missing prepared face source")?,
+                        None,
+                        layout.destination,
+                        layout.translation,
+                        layout.rotation,
+                        1.,
+                    ),
+                )?;
             }
         }
         _ => {}
@@ -326,15 +334,17 @@ fn submit_antenna(
             AntennaPath::Inner => &antenna.inner_path,
         };
         let Some(path) = stroke_path(path, stroke.width) else {
-            return Ok(());
+            return Err(DRAW_MEMORY_LIMIT.into());
         };
         count += path.segments.len() + path.fans.iter().map(|fan| fan.4).sum::<usize>();
         paths.push(path);
     }
     // Admit the complete antenna, including every cap/join fan and its bulb.
     if count > remaining {
-        return Ok(());
+        return Err(DRAW_MEMORY_LIMIT.into());
     }
+    // The complete polygon/bulb count also bounds StrokePath's infallible pushes.
+    reserve_draws(draws, count)?;
     for (stroke, path) in antenna.strokes.iter().zip(paths) {
         let color = [
             (stroke.color >> 16) as u8,
@@ -351,17 +361,20 @@ fn submit_antenna(
             .ok_or("Antenna images unavailable")?
             .role(skin.antenna.ok_or("Missing antenna role")?.source)
             .ok_or("Missing prepared antenna source")?;
-        draws.push(placed(
-            asset,
-            None,
-            bulb.destination,
-            Point {
-                x: bulb.center.x + bulb.translation.x,
-                y: bulb.center.y + bulb.translation.y,
-            },
-            bulb.rotation.unwrap_or(0.),
-            bulb.alpha,
-        ));
+        push_draw(
+            draws,
+            placed(
+                asset,
+                None,
+                bulb.destination,
+                Point {
+                    x: bulb.center.x + bulb.translation.x,
+                    y: bulb.center.y + bulb.translation.y,
+                },
+                bulb.rotation.unwrap_or(0.),
+                bulb.alpha,
+            ),
+        )?;
     }
     Ok(())
 }
@@ -563,7 +576,10 @@ mod antenna_budget_tests {
         assert!(full.len() > 5); // Four segments, plus cap/join fans and the bulb.
         let mut draws = vec![image(bank.solid([255; 3]), 0., 0., 1., 1., 1.)];
         let before = draws.clone();
-        submit_antenna(&mut bank, &skin, &antenna, full.len() - 1, &mut draws).unwrap();
+        assert_eq!(
+            submit_antenna(&mut bank, &skin, &antenna, full.len() - 1, &mut draws),
+            Err(DRAW_MEMORY_LIMIT.into())
+        );
         assert_eq!(draws, before);
         submit_antenna(&mut bank, &skin, &antenna, full.len(), &mut draws).unwrap();
         assert_eq!(&draws[before.len()..], full);
@@ -579,28 +595,7 @@ pub fn prepare(
     identity: u64,
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
-    prepare_reserved(
-        client,
-        bank,
-        extent,
-        scale,
-        identity,
-        applied,
-        PanelDrawReserve::default(),
-    )
-}
-/// Opt-in reservation seam. It enables no lifecycle or producer by itself.
-#[allow(clippy::too_many_arguments)]
-pub fn prepare_reserved(
-    client: &mut AnimatedClient,
-    bank: &mut Bank,
-    extent: [u32; 2],
-    scale: f64,
-    identity: u64,
-    applied: QualitySnapshot,
-    panels: PanelDrawReserve,
-) -> Result<PreparedFrame> {
-    prepare_composed(client, bank, extent, scale, identity, applied, panels, None)
+    prepare_composed(client, bank, extent, scale, identity, applied, None)
 }
 /// Production LocalGame preparation captures the announcement at this exact draw
 /// boundary, including ordered Setup callbacks, ordinary work and resize.
@@ -613,10 +608,6 @@ pub fn prepare_gameplay(
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
     let announcement = client.announcement_view();
-    // Select admission from the same snapshot submitted below. Hidden content
-    // (including Setup and the return sentinel) must not reduce world capacity.
-    let visible =
-        announcement.present && announcement.opacity > 0. && !announcement.text.blocks.is_empty();
     prepare_composed(
         client,
         bank,
@@ -624,10 +615,6 @@ pub fn prepare_gameplay(
         scale,
         identity,
         applied,
-        PanelDrawReserve {
-            announcement: visible,
-            result: false,
-        },
         Some(&announcement),
     )
 }
@@ -639,7 +626,6 @@ fn prepare_composed(
     scale: f64,
     identity: u64,
     applied: QualitySnapshot,
-    panels: PanelDrawReserve,
     announcement: Option<&AnnouncementView>,
 ) -> Result<PreparedFrame> {
     let logical = dimensions(extent, scale)?;
@@ -711,7 +697,7 @@ fn prepare_composed(
     )];
     if let Some(layer) = background.image {
         let [x, y, w, h] = layer.destination;
-        draws.push(image(backdrop, x, y, w, h, layer.alpha));
+        push_draw(&mut draws, image(backdrop, x, y, w, h, layer.alpha))?;
     }
     if let Some(layer) = background.pattern {
         // Clip the oversized Canvas fill to the viewport; keep its pattern-space
@@ -730,7 +716,7 @@ fn prepare_composed(
             width: f64::from(logical[0]) / layer.zoom / f64::from(tile.width),
             height: f64::from(logical[1]) / layer.zoom / f64::from(tile.height),
         });
-        draws.push(draw);
+        push_draw(&mut draws, draw)?;
     }
     let food = plan_food(FoodPaintInput {
         foods: client.foods().foods(),
@@ -740,9 +726,15 @@ fn prepare_composed(
         assets: &bank.assets,
         target_handle: None,
         entry_alpha: 1.,
-        command_limit: 8192,
+        command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
     })
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        if e == FoodPaintError::CommandLimit {
+            DRAW_MEMORY_LIMIT.into()
+        } else {
+            e.to_string()
+        }
+    })?;
     let eaters: Vec<_> = client
         .snake_objects()
         .map(|(token, _, _, snake)| {
@@ -767,9 +759,16 @@ fn prepare_composed(
         target_handle: None,
         early_entry_alpha: 1.,
         late_entry_alpha: 1.,
-        command_limit: 8192,
+        command_limit: MAX_PREY_PAINT_COMMANDS
+            .min(MAX_DRAWS - draws.len() - food.early.len() - food.late.len()),
     })
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| {
+        if e == PreyPaintError::CommandLimit {
+            DRAW_MEMORY_LIMIT.into()
+        } else {
+            e.to_string()
+        }
+    })?;
     let families = bank.bodies.clone();
     let palettes: Vec<_> = families
         .iter()
@@ -778,6 +777,7 @@ fn prepare_composed(
             boost_glow: Some(p.glow),
         })
         .collect();
+    reserve_draws(&mut draws, food.early.len() + prey_plan.early.len())?;
     draws.extend(food.early.iter().map(Draw::from));
     draws.extend(prey_plan.early.iter().map(prey));
     let nickname_index = draws.len();
@@ -836,14 +836,23 @@ fn prepare_composed(
                         boost_phase: m.boost_phase,
                     },
                     entry_alpha: 1.,
-                    command_limit: 8192,
+                    command_limit: MAX_BODY_PAINT_COMMANDS.min(
+                        MAX_DRAWS
+                            .saturating_sub(draws.len() + food.late.len() + prey_plan.late.len()),
+                    ),
                 },
                 snake
                     .antenna
                     .as_ref()
                     .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
             )
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| {
+                if e == BodyPaintError::CommandLimit {
+                    DRAW_MEMORY_LIMIT.into()
+                } else {
+                    e.to_string()
+                }
+            })?;
             for command in &body.commands {
                 if command.pass == BodyPaintPass::Body {
                     observation.body_commands += 1;
@@ -852,6 +861,7 @@ fn prepare_composed(
                     }
                 }
             }
+            reserve_draws(&mut draws, body.commands.len())?;
             draws.extend(body.commands[..body.antenna_barrier].iter().map(Draw::from));
             antenna_index = draws.len();
             draws.extend(body.commands[body.antenna_barrier..].iter().map(Draw::from));
@@ -875,10 +885,12 @@ fn prepare_composed(
                 .map(|r| (geometry, r.asset))
         });
         submit_face(bank, &skin, &snake, input, accessory, &mut draws)?;
+        check_draw_count(draws.len() + food.late.len() + prey_plan.late.len())?;
         if let Some(antenna) = snake.antenna {
             antennas.push((antenna_index, skin, antenna));
         }
     }
+    reserve_draws(&mut draws, food.late.len() + prey_plan.late.len())?;
     draws.extend(food.late.iter().map(Draw::from));
     draws.extend(prey_plan.late.iter().map(prey));
     if let Some(boundary) = client.boundary()
@@ -894,16 +906,19 @@ fn prepare_composed(
     {
         let fill = bank.solid([48, 0, 0]);
         for i in 0..40 {
-            draws.push(polygon(
-                fill,
-                [
-                    edge.fill[i + 1],
-                    edge.fill[i + 2],
-                    edge.fill[81 - i],
-                    edge.fill[82 - i],
-                ],
-                0.8,
-            ));
+            push_draw(
+                &mut draws,
+                polygon(
+                    fill,
+                    [
+                        edge.fill[i + 1],
+                        edge.fill[i + 2],
+                        edge.fill[81 - i],
+                        edge.fill[82 - i],
+                    ],
+                    0.8,
+                ),
+            )?;
         }
         let stroke = bank.solid([128, 0, 0]);
         let points = &edge.stroke[1..];
@@ -920,41 +935,40 @@ fn prepare_composed(
                 x: -dy / length * edge.line_width / 2.,
                 y: dx / length * edge.line_width / 2.,
             };
-            draws.push(polygon(
-                stroke,
-                [
-                    Point {
-                        x: a.x + n.x,
-                        y: a.y + n.y,
-                    },
-                    Point {
-                        x: b.x + n.x,
-                        y: b.y + n.y,
-                    },
-                    Point {
-                        x: b.x - n.x,
-                        y: b.y - n.y,
-                    },
-                    Point {
-                        x: a.x - n.x,
-                        y: a.y - n.y,
-                    },
-                ],
-                0.8,
-            ));
+            push_draw(
+                &mut draws,
+                polygon(
+                    stroke,
+                    [
+                        Point {
+                            x: a.x + n.x,
+                            y: a.y + n.y,
+                        },
+                        Point {
+                            x: b.x + n.x,
+                            y: b.y + n.y,
+                        },
+                        Point {
+                            x: b.x - n.x,
+                            y: b.y - n.y,
+                        },
+                        Point {
+                            x: a.x - n.x,
+                            y: a.y - n.y,
+                        },
+                    ],
+                    0.8,
+                ),
+            )?;
         }
     }
     let mut text_draws = Vec::new();
     let mut text_resources = std::collections::BTreeMap::new();
-    let nickname_budget = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
     for name in client
         .nickname_draws()
         .iter()
         .take(crate::text::MAX_NICKNAME_RUNS_PER_FRAME)
     {
-        if text_draws.len() >= nickname_budget {
-            break;
-        }
         use crate::text::{Align, Baseline, TextRun, TextStyle, Weight};
         for (draw, resource) in bank.text.draw(
             TextRun {
@@ -976,36 +990,30 @@ fn prepare_composed(
             },
             scale,
         )? {
-            if text_draws.len() < nickname_budget {
-                text_resources.insert(resource.asset.handle, resource);
-                text_draws.push(draw);
-            }
+            check_draw_count(draws.len() + text_draws.len() + 1)?;
+            text_resources.insert(resource.asset.handle, resource);
+            text_draws.push(draw);
         }
     }
     let nickname_count = text_draws.len();
+    reserve_draws(&mut draws, nickname_count)?;
     draws.splice(nickname_index..nickname_index, text_draws);
     // Admit antennas against the complete non-antenna scene, then restore each
     // original barrier position (including its relation to death passes).
-    let mut remaining = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
+    check_draw_count(draws.len())?;
+    let mut remaining = MAX_DRAWS - draws.len();
     let mut inserted = 0;
     for (index, skin, antenna) in antennas {
         let mut commands = Vec::new();
         submit_antenna(bank, &skin, &antenna, remaining, &mut commands)?;
         remaining -= commands.len();
         let count = commands.len();
+        reserve_draws(&mut draws, count)?;
         draws.splice(
             index + nickname_count + inserted..index + nickname_count + inserted,
             commands,
         );
         inserted += count;
-    }
-    // Optional nicknames and antennas already yielded to this reserve. Dense
-    // mandatory geometry must fail explicitly rather than consume a later panel
-    // or HUD halfway through submission (panel-text.md, aggregate resource proof).
-    if (panels.announcement || panels.result)
-        && draws.len() > MAX_DRAWS.saturating_sub(panels.late_draws())
-    {
-        return Err("frame extent/scale/budget: mandatory overlay reserve".into());
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
     let mut frame = Frame {
@@ -1024,12 +1032,12 @@ fn prepare_composed(
     bank.minimap
         .append(client, &mut bank.text, &mut frame, &mut resources)?;
     // Mandatory overlays must fit in full; never silently truncate a panel.
-    if frame.draws.len() > MAX_DRAWS
-        || resources
-            .iter()
-            .map(|r| r.image.pixels.len())
-            .sum::<usize>()
-            > crate::bank::PIXEL_BUDGET
+    check_draw_count(frame.draws.len())?;
+    if resources
+        .iter()
+        .map(|r| r.image.pixels.len())
+        .sum::<usize>()
+        > crate::bank::PIXEL_BUDGET
     {
         return Err("Whole-frame draw/pixel budget".into());
     }
@@ -1100,7 +1108,7 @@ fn finish_plan(
             width: f64::from(prepared.frame.extent[0]) / scale,
             height: f64::from(prepared.frame.extent[1]) / scale,
         };
-        let draw_limit = MAX_DRAWS.min(prepared.frame.draws.len() + crate::hud::MAX_DRAWS);
+        let draw_limit = prepared.frame.draws.len() + crate::hud::MAX_DRAWS;
         let mut slot = 0;
         let mut resources = std::collections::BTreeMap::new();
         for line in &plan.lines {
@@ -1130,8 +1138,8 @@ fn finish_plan(
                         break;
                     }
                     if clip_text(&mut draw, line.clip) && clip_text(&mut draw, viewport) {
+                        push_draw(&mut prepared.frame.draws, draw)?;
                         resources.insert(resource.asset.handle, resource);
-                        prepared.frame.draws.push(draw);
                     }
                 }
             }
@@ -1145,7 +1153,7 @@ fn finish_plan(
             .iter()
             .map(|r| (r.asset.into(), r.asset))
             .collect();
-        prepared.frame.quads(&resident)?;
+        prepared.frame.validate(&resident)?;
         Ok(prepared)
     })();
     bank.discard_text(identity);

@@ -32,7 +32,7 @@ impl DrawState {
     }
 }
 
-/// Vertex ranges for maximal adjacent runs. The caller has preflighted MAX_DRAWS.
+/// Vertex ranges for maximal adjacent runs. The caller has preflighted a bounded vertex chunk.
 pub(super) fn draw_runs(
     states: impl Iterator<Item = DrawState>,
 ) -> impl Iterator<Item = (DrawState, Range<u32>)> {
@@ -72,8 +72,8 @@ mod tests {
         let a = state();
         assert_eq!(draw_runs([a].into_iter()).collect::<Vec<_>>(), [(a, 0..6)]);
         assert_eq!(
-            draw_runs(std::iter::repeat_n(a, crate::frame::MAX_DRAWS)).collect::<Vec<_>>(),
-            [(a, 0..crate::frame::MAX_DRAWS as u32 * 6)]
+            draw_runs(std::iter::repeat_n(a, crate::frame::VERTEX_CHUNK_QUADS)).collect::<Vec<_>>(),
+            [(a, 0..crate::frame::VERTEX_CHUNK_QUADS as u32 * 6)]
         );
     }
 

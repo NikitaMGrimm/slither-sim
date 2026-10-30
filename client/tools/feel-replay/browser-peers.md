@@ -59,6 +59,14 @@ Only its GPU I/O is replaced by a feature-gated CPU presentation sink; all resou
 preparation, gameplay, effects and presentation acknowledgments remain production
 paths. This gate does not compare pixels, GPU completion, physical input or pacing.
 
+Both peers drain recorder-local sequence identities alongside the unchanged
+numeric observation cells, plus a separate list of pictures acknowledged after
+submission and model commit. Assembly matches receipts by identity, retaining
+unacknowledged draw rows as prepared but neither submitted nor committed. It
+rejects missing receipt metadata, duplicate identities and orphan/non-draw
+acknowledgements. The runner validates the resulting status against acknowledged
+draw ordinals and retains those ordinals in the private receipt sidecar.
+
 The virtual Date/performance origin, timer/RAF history, high quality, viewport,
 resting mouse pointer and empty keys are equal before bootstrap. An optional
 `startupPointer` records normalized `x/y` (or explicit `coordinateSpace: "css"`).
