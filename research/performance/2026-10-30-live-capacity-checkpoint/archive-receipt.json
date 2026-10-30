@@ -1,0 +1,10 @@
+{
+  "archiveFileName": "slither-live-checkpoint-20261030-raw.tar.gz",
+  "archiveSha256": "0364aca9f4f992e46dc3f97876f3ea7497bbb6f561db1d9c7c61a2a16fe3d48e",
+  "archiveBytes": 96439743,
+  "verifiedFileContents": 5373,
+  "verifiedUncompressedFileBytes": 506378502,
+  "access": "local-only",
+  "includes": "All original runs, the class-only failed attempt, raw clocks and process inventories, source archives/copies, binaries, helper scripts and original private preregistration Git bundle. Public publication drafts are excluded.",
+  "verifiedAgainstOriginalsBeforeCleanup": true
+}

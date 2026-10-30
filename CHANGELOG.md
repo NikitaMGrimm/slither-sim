@@ -4,6 +4,11 @@
 
 ### Added
 
+- A `perf_baseline` catalog row, `engine-battledome-spawn-318`, that times
+  spawn searches and ticks in a crowded synthetic Battledome. It needs the new
+  off-by-default `perf-internals` Cargo feature, which exists only for the
+  benchmark harness and has no stability promise
+  ([guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/performance-workloads.md#battledome-spawn-row)).
 - A study of storing each player's retained food sectors in flat sorted
   arrays instead of a tree. Food-update ticks get about 0.55 ms cheaper in
   every measured pair, but the whole run isn't reliably faster: in a

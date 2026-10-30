@@ -337,6 +337,12 @@ class BaseComparisons(unittest.TestCase):
             prepare.assert_not_called()
             self.assertFalse((output / "failure.json").exists())
 
+    def test_requested_features_reach_both_builds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            code, _, _, prepare = self.run_base(Path(temporary), {}, options=("--features", "perf-internals"))
+            self.assertEqual(code, 0)
+            self.assertEqual(prepare.call_args.kwargs["cargo_args"], ("--features", "perf-internals"))
+
 
 class SharedPolicyTrace(unittest.TestCase):
     def test_real_shared_policy_trace_matches_catalog_and_collector(self):
@@ -360,6 +366,14 @@ class SharedPolicyTrace(unittest.TestCase):
             self.assertEqual(trace["end"]["operations"], iterations)
             with gzip.open(root / (workload.name + ".jsonl.gz"), "rb") as source:
                 self.assertTrue(any(json.loads(line).get("kind") == "epoch" for line in source))
+            code = perf_build.command(
+                ["cargo", "build", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
+                perf_baseline.ROOT, log, dict(os.environ), timeout=180)
+            self.assertEqual(code, 0, log.read_text(encoding="utf-8", errors="replace"))
+            workload, = perf_baseline.load_catalog(binary).select(["engine-battledome-spawn-318"])
+            self.assertFalse(workload.legacy)
+            trace = perf_baseline.capture_trace(binary, workload.name, 1, root, terminal=True)
+            self.assertEqual(trace["end"]["operations"], 1)
 
 
 class ProcessFailures(unittest.TestCase):

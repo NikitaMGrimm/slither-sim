@@ -1,0 +1,11 @@
+{
+  "calibrationPasses": true,
+  "calibrationWindows": 12,
+  "idleEnvelopeRate": 0.002998926999628939,
+  "excessRateAllowance": 0.01,
+  "counterQuantumSeconds": 0.01,
+  "endpointQuantumCount": 2,
+  "formula": "W * (idleEnvelopeRate + 0.01) + 2 * counterQuantumSeconds",
+  "exampleThirtySecondAllowanceSeconds": 0.4099678099888682,
+  "calibrationPlanCommit": "b682c392f783d1c1a544463389e6e4c620fd9512"
+}
