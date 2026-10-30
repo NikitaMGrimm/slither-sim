@@ -16,6 +16,10 @@ crate-type = ["rlib", "cdylib"]
 [dependencies]
 unicode-segmentation = "=1.13.3"
 
+[features]
+# Offline measuring instrument; absent from ordinary builds.
+feel-trace = []
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "=0.3.106"
 wasm-bindgen = "=0.2.129"

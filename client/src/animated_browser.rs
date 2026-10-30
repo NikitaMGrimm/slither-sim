@@ -471,6 +471,8 @@ pub struct AnimatedScene {
     food_sources: FoodSources,
     prey_sources: PreySources,
     background_backdrop: Option<HtmlImageElement>,
+    #[cfg(feature = "feel-trace")]
+    feel_trace: Option<crate::feel_trace::Recorder>,
 }
 
 #[wasm_bindgen]
@@ -483,6 +485,8 @@ impl AnimatedScene {
             food_sources: FoodSources::default(),
             prey_sources: PreySources::default(),
             background_backdrop: None,
+            #[cfg(feature = "feel-trace")]
+            feel_trace: None,
         })
     }
 
@@ -492,6 +496,23 @@ impl AnimatedScene {
         self.client.reset();
         self.food_sources.clear();
         self.prey_sources.clear();
+    }
+
+    /// Test-only copied update/draw observations; excluded from production builds.
+    #[cfg(feature = "feel-trace")]
+    pub fn enable_feel_trace(&mut self) {
+        let recorder = crate::feel_trace::Recorder::default();
+        self.client.record_feel(recorder.clone());
+        self.feel_trace = Some(recorder);
+    }
+
+    /// Drain the exact prepared observations, including every Setup draw.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_trace(&self) -> js_sys::Array {
+        self.feel_trace
+            .as_ref()
+            .expect("enable trace first")
+            .take_js()
     }
 
     /// Supply the optional loaded screen-filling image from the asset map.

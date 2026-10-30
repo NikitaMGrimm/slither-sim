@@ -9,8 +9,29 @@ use wasm_bindgen::prelude::*;
 /// Same gameplay owner/effect protocol as the native host. No WebSocket or DOM policy in Rust.
 #[wasm_bindgen]
 pub struct LocalGameplay {
-    host: SurfaceHost,
+    host: GameplaySurface,
     game: crate::game::LocalGame,
+    #[cfg(feature = "feel-trace")]
+    trace: Option<slither_client::feel_trace::Recorder>,
+}
+// Single-variant in ordinary builds. The offline variant replaces only GPU I/O;
+// LocalGame still prepares every resource and acknowledges every actual picture.
+// Keep the existing inline production host instead of adding a heap allocation
+// solely to shrink the feature-only empty sink variant.
+#[cfg_attr(feature = "feel-trace", allow(clippy::large_enum_variant))]
+enum GameplaySurface {
+    Gpu(SurfaceHost),
+    #[cfg(feature = "feel-trace")]
+    Cpu,
+}
+impl GameplaySurface {
+    fn resize(&mut self, extent: [u32; 2]) -> crate::Result<()> {
+        match self {
+            Self::Gpu(host) => host.resize(extent),
+            #[cfg(feature = "feel-trace")]
+            Self::Cpu => Ok(()),
+        }
+    }
 }
 fn js_error(e: String) -> JsValue {
     JsValue::from_str(&e)
@@ -58,8 +79,15 @@ impl LocalGameplay {
             let Some(p) = self.game.take_frame() else {
                 return Ok(());
             };
-            self.host.renderer.sync_resources(&p.resources)?;
-            match self.host.present(&p.frame) {
+            let presented = match &mut self.host {
+                GameplaySurface::Gpu(host) => {
+                    host.renderer.sync_resources(&p.resources)?;
+                    host.present(&p.frame)
+                }
+                #[cfg(feature = "feel-trace")]
+                GameplaySurface::Cpu => Ok(true),
+            };
+            match presented {
                 Ok(true) => self.game.presented(true)?,
                 Ok(false) => {
                     self.game.retry_frame(p)?;
@@ -91,17 +119,73 @@ impl LocalGameplay {
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(Self {
-            host: SurfaceHost::new(&i, surface, extent)
-                .await
-                .map_err(js_error)?,
+            host: GameplaySurface::Gpu(
+                SurfaceHost::new(&i, surface, extent)
+                    .await
+                    .map_err(js_error)?,
+            ),
             game: crate::game::LocalGame::new(now_ms).map_err(js_error)?,
+            #[cfg(feature = "feel-trace")]
+            trace: None,
         })
     }
+    /// Offline CPU gate: same gameplay, resources and host protocol; no GPU device.
+    #[cfg(feature = "feel-trace")]
+    pub fn replay(now_ms: f64) -> std::result::Result<LocalGameplay, JsValue> {
+        let trace = slither_client::feel_trace::Recorder::default();
+        let mut game = crate::game::LocalGame::new(now_ms).map_err(js_error)?;
+        game.record_feel(trace.clone());
+        Ok(Self {
+            host: GameplaySurface::Cpu,
+            game,
+            trace: Some(trace),
+        })
+    }
+    /// Copied observations belong to their prepared candidate, never client().
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_trace(&self) -> js_sys::Array {
+        self.trace.as_ref().expect("replay owner").take_js()
+    }
+    /// Observe the private factory RNG without adding an entropy provider seam.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_random(&self) -> js_sys::Array {
+        self.trace
+            .as_ref()
+            .expect("replay owner")
+            .take_random()
+            .into_iter()
+            .map(|(tag, value)| {
+                let row = js_sys::Array::new();
+                row.push(&tag.into());
+                row.push(&value.into());
+                row
+            })
+            .collect()
+    }
+    /// Session/quality metadata after the host has drained synchronous effects.
+    #[cfg(feature = "feel-trace")]
+    pub fn feel_metadata(&self, now: f64) -> Vec<f64> {
+        let session = self.game.feel_session();
+        let q = self.game.quality();
+        let pending = self.game.feel_pending();
+        vec![
+            f64::from(session.lagging),
+            f64::from(session.ping_pending),
+            (now - session.last_ping_ms).max(0.),
+            f64::from(q.high_quality),
+            pending[1] as f64,
+            pending[0] as f64,
+        ]
+    }
     pub fn adapter(&self) -> String {
-        format!(
-            "{:?}; MSAA{}",
-            self.host.renderer.adapter_info, self.host.renderer.sample_count
-        )
+        match &self.host {
+            GameplaySurface::Gpu(host) => format!(
+                "{:?}; MSAA{}",
+                host.renderer.adapter_info, host.renderer.sample_count
+            ),
+            #[cfg(feature = "feel-trace")]
+            GameplaySurface::Cpu => "offline CPU presentation sink".into(),
+        }
     }
     pub fn cosmetics(
         &mut self,

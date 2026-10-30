@@ -1,10 +1,10 @@
 import { admitsBrowserInput, isEditorTarget } from './input-targeting.mjs';
 
 // DOM targeting only. The owner retains steering, held-key and boost policy.
-export function installLocalInput({ realm, canvas, owner, host, start, controls, signal }) {
+export function installLocalInput({ realm, canvas, owner, host, start, controls, signal, observeInput }) {
   const document = realm.document;
   const Input = realm.HTMLInputElement, TextArea = realm.HTMLTextAreaElement;
-  const listen = (node, type, fn) => node.addEventListener(type, fn, { capture: true, signal });
+  const listen = (node, type, fn) => node.addEventListener(type, observeInput ? event => { observeInput(event, 'received'); fn(event); } : fn, { capture: true, signal });
   const targeting = event => ({
     editor: isEditorTarget(event.target, Input, TextArea),
     menu: controls.includes(event.target),
@@ -15,10 +15,12 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
     // matching compatibility mouseup may reuse a release already delivered.
     const duplicate = event.type === 'mouseup' && pendingMouseUp !== undefined && pendingMouseUp === event.button;
     pendingMouseUp = event.type === 'pointerup' ? event.button : undefined;
+    observeInput?.(event, duplicate ? 'filtered-compatibility' : 'gameplay');
     if (!duplicate) host.call(() => owner.mouse_up());
   }
   function pointer(event, down) {
-    if (!admitsBrowserInput(event, targeting(event))) return;
+    if (!admitsBrowserInput(event, targeting(event))) { observeInput?.(event, 'filtered-target'); return; }
+    observeInput?.(event, 'gameplay');
     host.call(() => {
       const r = canvas.getBoundingClientRect();
       if (r.width && r.height) {
@@ -34,18 +36,21 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
   for (const type of ['pointerdown', 'mousedown']) listen(realm, type, event => {
     pendingMouseUp = undefined;
     if (type === `${family}down` && event.button === 0) pointer(event, true);
+    else observeInput?.(event, 'filtered-family-or-button');
   });
   listen(realm, 'pointerup', release);
   listen(realm, 'mouseup', release);
   listen(realm, 'pointercancel', release);
   listen(realm, 'keydown', event => {
     pendingMouseUp = undefined;
-    if (!admitsBrowserInput(event, targeting(event))) return;
+    if (!admitsBrowserInput(event, targeting(event))) { observeInput?.(event, 'filtered-target'); return; }
+    observeInput?.(event, 'gameplay');
     if (event.code === 'Enter' && !event.repeat) { if (owner.can_play()) start(); }
     else if (event.code === 'Escape') host.call(() => owner.stop());
     else host.call(() => { if (owner.key(event.code, true)) event.preventDefault(); });
   });
   listen(realm, 'keyup', event => {
+    observeInput?.(event, 'gameplay');
     const { editor, menu } = targeting(event);
     host.call(() => {
       if (owner.key(event.code, false) && !editor && !(menu && ['Space', 'Enter'].includes(event.code))) event.preventDefault();

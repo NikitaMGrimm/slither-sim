@@ -43,6 +43,13 @@ struct Pending {
     after: After,
     started: bool,
 }
+// The prepared candidate and its observation travel together through retries and
+// queueing. Native callers keep the existing PreparedFrame API.
+struct Picture<T> {
+    value: T,
+    #[cfg(feature = "feel-trace")]
+    observation: Option<slither_client::feel_trace::Observation>,
+}
 struct Work {
     now: f64,
     lagging: bool,
@@ -54,7 +61,7 @@ struct Work {
     hud: HudHistory,
     reset_rows: bool,
     world: Option<AnimatedClient>,
-    prepared: Option<PreparedFrame>,
+    prepared: Option<Picture<PreparedFrame>>,
     quality: QualityState,
     statistics_consumed: bool,
 }
@@ -136,6 +143,10 @@ impl Drop for LoginProfile {
 }
 
 pub struct LocalGame {
+    #[cfg(feature = "feel-trace")]
+    trace: Option<slither_client::feel_trace::Recorder>,
+    #[cfg(feature = "feel-trace")]
+    issued_observation: Option<slither_client::feel_trace::Observation>,
     client: AnimatedClient,
     pub bank: Bank,
     session: SessionPolicy,
@@ -152,7 +163,7 @@ pub struct LocalGame {
     generation: u32,
     has_socket: bool,
     work: Option<Work>,
-    packet_frames: VecDeque<PreparedFrame>,
+    packet_frames: VecDeque<Picture<PreparedFrame>>,
     inflight: u8,
     deferred: VecDeque<(u32, Vec<u8>, f64)>,
     deferred_bytes: usize,
@@ -177,6 +188,10 @@ impl LocalGame {
         let mut session = SessionPolicy::new();
         session.subscribe(2).map_err(|e| e.0)?;
         Ok(Self {
+            #[cfg(feature = "feel-trace")]
+            trace: None,
+            #[cfg(feature = "feel-trace")]
+            issued_observation: None,
             client,
             bank: Bank::new()?,
             session,
@@ -211,11 +226,37 @@ impl LocalGame {
     pub fn generation(&self) -> u32 {
         self.generation
     }
+    /// A3 may attach the same CPU recorder before the first Play.
+    #[cfg(feature = "feel-trace")]
+    pub fn record_feel(&mut self, recorder: slither_client::feel_trace::Recorder) {
+        self.client.record_feel(recorder.clone());
+        self.trace = Some(recorder);
+    }
+    /// Observation carried by the issued picture, including before world commit.
+    #[cfg(feature = "feel-trace")]
+    pub fn issued_feel_observation(&self) -> Option<&slither_client::feel_trace::Observation> {
+        self.issued_observation.as_ref()
+    }
     pub fn client(&self) -> &AnimatedClient {
         &self.client
     }
     pub fn quality(&self) -> QualitySnapshot {
         self.quality.snapshot()
+    }
+    /// Read-only session metadata for the offline peer.
+    #[cfg(feature = "feel-trace")]
+    pub fn feel_session(&self) -> slither_client::session_policy::View {
+        self.session.view()
+    }
+    /// Outstanding model work, independent of the host's perpetual RAF request.
+    #[cfg(feature = "feel-trace")]
+    pub fn feel_pending(&self) -> [usize; 2] {
+        [
+            self.effects.len() + self.deferred.len(),
+            self.packet_frames.len()
+                + usize::from(self.work.is_some())
+                + usize::from(self.inflight != 0),
+        ]
     }
     /// Store the preference; the next explicit Play applies it, matching Canvas.
     pub fn set_requested_quality(&mut self, mode: QualityMode) {
@@ -548,6 +589,10 @@ impl LocalGame {
         let unit = || {
             let state = rng.get().wrapping_mul(1664525).wrapping_add(1013904223) & 0xffff_ffff;
             rng.set(state);
+            #[cfg(feature = "feel-trace")]
+            if let Some(trace) = &self.trace {
+                trace.random("factory-unit", state as f64 / 4294967296.);
+            }
             state as f64 / 4294967296.
         };
         let report=client.apply_frame_with_tinted_presentation_and_all_factories_and_setup_and_hud::<Ingress,_,_,_,_>(bytes,ElapsedHeader::Absent,
@@ -562,7 +607,10 @@ impl LocalGame {
                 let bytes=captured_pixels.get()+frame.pixel_bytes()+crate::hud::MAX_PIXEL_BYTES;
                 if bytes>crate::bank::PIXEL_BUDGET{return Err(Ingress("Setup capture pixels budget".into()));}
                 captured_pixels.set(bytes);
-                frames.borrow_mut().push(frame);
+                frames.borrow_mut().push(Picture { value: frame,
+                    #[cfg(feature = "feel-trace")]
+                    observation: self.trace.as_ref().and_then(|t| t.last_draw()),
+                });
                 Ok(())
             },
             HudIngressPlan{schema:2,command_count:commands.len(),guards:&guards,final_capture_indices:&plan.final_capture_indices}).map_err(|e|e.0)?;
@@ -678,7 +726,7 @@ impl LocalGame {
             let view =
                 Self::format_hud_parts(&hud, &rows, &session, self.failure.as_deref(), false);
             for frame in frames.into_inner() {
-                let p = render::finish_hud(frame, &mut self.bank, &view)?;
+                let p = render::finish_hud(frame.value, &mut self.bank, &view)?;
                 bytes += p
                     .resources
                     .iter()
@@ -687,7 +735,11 @@ impl LocalGame {
                 if bytes > crate::bank::PIXEL_BUDGET {
                     return Err("Queued Setup pixels budget".into());
                 }
-                pictures.push_back(p);
+                pictures.push_back(Picture {
+                    value: p,
+                    #[cfg(feature = "feel-trace")]
+                    observation: frame.observation,
+                });
             }
         }
         // All packet outputs and their aggregate charge are valid before any world/history publish.
@@ -933,7 +985,11 @@ impl LocalGame {
         let w = self.work.as_ref().expect("work");
         let view = self.format_hud(&w.hud, w.reset_rows);
         let prepared = render::finish_hud(frame, &mut self.bank, &view)?;
-        self.work.as_mut().expect("work").prepared = Some(prepared);
+        self.work.as_mut().expect("work").prepared = Some(Picture {
+            value: prepared,
+            #[cfg(feature = "feel-trace")]
+            observation: self.trace.as_ref().and_then(|t| t.last_draw()),
+        });
         Ok(())
     }
     pub fn take_frame(&mut self) -> Option<PreparedFrame> {
@@ -942,11 +998,19 @@ impl LocalGame {
         }
         if let Some(frame) = self.packet_frames.pop_front() {
             self.inflight = 1;
-            return Some(frame);
+            #[cfg(feature = "feel-trace")]
+            {
+                self.issued_observation = frame.observation;
+            }
+            return Some(frame.value);
         }
         let prepared = self.work.as_mut()?.prepared.take()?;
         self.inflight = 2;
-        Some(prepared)
+        #[cfg(feature = "feel-trace")]
+        {
+            self.issued_observation = prepared.observation;
+        }
+        Some(prepared.value)
     }
     /// Non-consuming drain-boundary query: never issue an extra unacknowledged picture.
     pub fn has_frame(&self) -> bool {
@@ -1024,13 +1088,22 @@ impl LocalGame {
                         self.identity,
                         w.quality.snapshot(),
                     )?;
-                    w.prepared = Some(render::finish_hud(frame, &mut self.bank, &view)?);
+                    w.prepared = Some(Picture {
+                        value: render::finish_hud(frame, &mut self.bank, &view)?,
+                        #[cfg(feature = "feel-trace")]
+                        observation: self.trace.as_ref().and_then(|t| t.last_draw()),
+                    });
                 }
             }
         }
         Ok(())
     }
     pub fn retry_frame(&mut self, frame: PreparedFrame) -> Result<()> {
+        let frame = Picture {
+            value: frame,
+            #[cfg(feature = "feel-trace")]
+            observation: self.issued_observation.take(),
+        };
         match std::mem::replace(&mut self.inflight, 0) {
             1 => self.packet_frames.push_front(frame),
             2 => self.work.as_mut().ok_or("Missing frame work")?.prepared = Some(frame),

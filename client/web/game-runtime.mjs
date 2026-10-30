@@ -28,7 +28,7 @@ const editNotifications = new Set(['keypress', 'beforeinput', 'input', 'composit
   'dragstart', 'drag', 'dragenter', 'dragleave', 'dragover', 'drop', 'dragend']);
 
 /** Local runtime factory. Importing this module performs no page ownership work. */
-export async function startGamePage({ realm = globalThis, initialize, wasmApi, hudReadout = false, ownedHudUi = false, ownedPlayUi = false, ownedMenuUi = false, ownedAppearancePreview = false, ownedLoadingUi = false, ownedLeaderboardUi = false, ownedMinimapUi = false, ownedAnnouncementUi = false, ownedEndScreenUi = false, diagnosticUi = true, localHost } = {}) {
+export async function startGamePage({ realm = globalThis, initialize, wasmApi, hudReadout = false, ownedHudUi = false, ownedPlayUi = false, ownedMenuUi = false, ownedAppearancePreview = false, ownedLoadingUi = false, ownedLeaderboardUi = false, ownedMinimapUi = false, ownedAnnouncementUi = false, ownedEndScreenUi = false, diagnosticUi = true, localHost, observeInput } = {}) {
   if (typeof hudReadout !== 'boolean') throw new TypeError('Explicit hudReadout boolean required');
   if (typeof diagnosticUi !== 'boolean') throw new TypeError('Explicit diagnosticUi boolean required');
   if (typeof initialize !== 'function' || wasmApi === null || typeof wasmApi !== 'object') {
@@ -551,9 +551,9 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
           throw error;
         } finally { handlingNickname = undefined; operation.primary = undefined; }
       }
-      if (editNotifications.has(event.type)) return;
+      if (editNotifications.has(event.type)) { observeInput?.(event, 'filtered-notification'); return; }
       // Keep menu presses out of steering/boost; releases still clear existing held input.
-      if (!admitsBrowserInput(event, { menu: !!menuUi && menuActions.some(action => action.button === event.target) })) return;
+      if (!admitsBrowserInput(event, { menu: !!menuUi && menuActions.some(action => action.button === event.target) })) { observeInput?.(event, 'filtered-menu'); return; }
       if (disposed || !controller) return;
       if (event.type === 'resize') {
         try {
@@ -566,7 +566,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         return;
       }
       try {
-        const deliver = () => gameplay?.event(event, { width: realm.innerWidth, height: realm.innerHeight });
+        const deliver = () => { observeInput?.(event, 'gameplay'); return gameplay?.event(event, { width: realm.innerWidth, height: realm.innerHeight }); };
         if (hudReadout) runNative(deliver); else deliver();
       }
       catch (error) { fail(error); }

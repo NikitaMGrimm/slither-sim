@@ -6,6 +6,9 @@ real timers, connect to a server or establish gameplay/rendering/latency parity.
 `synthetic.mjs` is authored synthetic data, including its placeholder hashes.
 Never replace it with private recordings. Historical tapes and tools stay intact.
 
+The [browser peers](browser-peers.md) now drive the production Canvas runtime and
+WebGPU LocalGameplay offline. The contract/comparator below remains pure Node.
+
 Run from `client/`:
 
 ```sh

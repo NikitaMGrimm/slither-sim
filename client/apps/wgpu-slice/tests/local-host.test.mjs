@@ -6,7 +6,7 @@ import { installLocalInput } from '../web/local-input.mjs';
 import { createClientInput as createInputOracle } from '../../../tools/fixtures/client-input-oracle.mjs';
 
 // Authored event-path/DOM doubles, not physical input or browser default actions.
-function inputFixture({ pointerEvents = true } = {}) {
+function inputFixture({ pointerEvents = true, observeInput } = {}) {
   const listeners = new Map(), calls = [];
   function node(parent) {
     const value = { parent, addEventListener(type, handler, options) {
@@ -43,7 +43,7 @@ function inputFixture({ pointerEvents = true } = {}) {
     can_play: () => true, stop() { stops++; },
   };
   const abort = new AbortController();
-  installLocalInput({ realm, canvas, owner, host: { call: fn => fn() }, start: () => starts++, controls: [button], signal: abort.signal });
+  installLocalInput({ realm, canvas, owner, host: { call: fn => fn() }, start: () => starts++, controls: [button], signal: abort.signal, observeInput });
   function fire(target, type, properties = {}) {
     const event = { target, type, button: 0, clientX: 620, clientY: 180, defaultPrevented: false,
       preventDefault() { this.defaultPrevented = true; }, ...properties };
@@ -56,6 +56,15 @@ function inputFixture({ pointerEvents = true } = {}) {
   return { realm, document, canvas, overlay, button, input, textarea, editable, owner, abort, fire, calls, policy,
     get boosting() { return policy.snapshot().own.requestedBoost; }, get starts() { return starts; }, get stops() { return stops; } };
 }
+
+test('read-only receipts retain filtered events and compatibility releases', () => {
+  const receipts = [], f = inputFixture({ observeInput: (event, stage) => receipts.push([event.type, stage]) });
+  f.fire(f.textarea, 'pointerdown');
+  f.fire(f.canvas, 'pointerup'); f.fire(f.input, 'mouseup');
+  assert.deepEqual(receipts, [['pointerdown', 'received'], ['pointerdown', 'filtered-target'],
+    ['pointerup', 'received'], ['pointerup', 'gameplay'], ['mouseup', 'received'], ['mouseup', 'filtered-compatibility']]);
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 1);
+});
 
 test('window capture tracks canvas and overlay coordinates in the game viewport', () => {
   const f = inputFixture();
