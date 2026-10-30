@@ -39,3 +39,47 @@ Corrected final plan/source freeze: `2abc874e275c7e9ed62d7cb358fc9cc8efe1d6d2`. 
 verification, corrected AWS module controls and all seven documentation checks
 pass before tick zero. The preflight receipt binds all earlier setup evidence
 and the final proof archive; initial masks/failed states remain retained.
+
+## Run 1: complete, all gates pass
+
+The full thirty-minute window completed with zero deferrals. Both online/offline
+full results match, including every tail and maximum; all four tail/max mutation
+controls are detected. The closed raw archive was retrieved/hash-verified before
+teardown. World CPU p50/p99/p99.9/max is 4.750660/7.018760/8.238520/11.906610 ms;
+maintenance/ordinary means are 7.150233/4.789356 ms. World p99 <=7 ms is false
+and report-only. All client/queue/generator and class gates pass; worst one-second
+input-lateness p99 is 1.579167 ms. Final living/mean/p90/p99 is
+500/101.434/234/289. No exclusion, tuning or rescue.
+
+All-process/stat data, pre-window/after unit/timer inventories and a timestamped
+journal are retained. The descriptive reducer uses direct matched-process CPU
+for other work; its signed global/task user-counter residual does not reconcile
+exactly and is explicitly not other-process CPU. No gate uses that residual.
+First-pair instances/volumes were verified gone before the second launch.
+
+## Run 2: fresh independent pair
+
+The second tagged on-demand pair uses the same image selection, collection
+source, verified v3 binaries and frozen gates. Same-zone placement, one/eight
+vCPUs, shutdown deadlines <=92 minutes and terminate-on-shutdown were verified.
+The same module/headroom/gate/quantile controls and seven documentation checks
+passed before its world; the separate run-2 proof archive is bound in preflight.
+No new Rust build, target, runtime/generator change or timing retry.
+
+The second full thirty-minute window completes and passes every gate, with zero
+deferrals. Full result replay is exact, including tails/maxima and all four
+mutation controls. World CPU p50/p99/p99.9/max is
+4.631940/7.077700/8.246330/12.019360 ms; maintenance/ordinary means
+7.086837/4.707322 ms (full selected precision is authoritative). World p99 <=7 ms
+is false and report-only. All other class/client/queue/generator gates pass.
+Both closed archives, journals, all-process/full-proc-stat and unit/timer states
+are retrieved/hash-verified. The study passes its two-run frozen gates without
+replacement, exclusion, retiming, runtime change or rescue of failed v3.
+
+Seven final documentation checks passed on AWS after both windows. Every raw
+archive, replay/integrity receipt and final check proof was retrieved before
+teardown. Final audit covers all 17 enabled regions with none unavailable;
+task instances, requests, volumes, key and group are gone, unrelated resources
+preserved. Conservative compute plus full reserve is $1.598168 < $3.
+Cost/cleanup numbers and this prose were filled after teardown without changing
+link targets, gates or measured results. No further acceptance attempt was run.

@@ -1,0 +1,67 @@
+{
+  "scope": "Exactly the frozen boundary-overlapping one-second reports; no gate changes",
+  "selectedReports": 10812,
+  "maximumComponentSumRoundingError": 5.551115123125783e-17,
+  "workers": {
+    "1": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.15604557421560764,
+        "connectorCpuFraction": 3.3466179638870796e-05,
+        "publisherCpuFraction": 0.00011123177567416033,
+        "cpuFraction": 0.15619027217092066
+      },
+      "lateReportsAtLeast42ms": 0
+    },
+    "2": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.15435588590820418,
+        "connectorCpuFraction": 3.325000176135777e-05,
+        "publisherCpuFraction": 0.00011017422961244317,
+        "cpuFraction": 0.154499310139578
+      },
+      "lateReportsAtLeast42ms": 0
+    },
+    "3": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.15383800351045046,
+        "connectorCpuFraction": 3.577443007999816e-05,
+        "publisherCpuFraction": 0.00011358457774667067,
+        "cpuFraction": 0.15398736251827713
+      },
+      "lateReportsAtLeast42ms": 0
+    },
+    "4": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.1548128032601589,
+        "connectorCpuFraction": 3.0490594340175634e-05,
+        "publisherCpuFraction": 0.00011663865585899688,
+        "cpuFraction": 0.15495993251035806
+      },
+      "lateReportsAtLeast42ms": 0
+    },
+    "5": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.15453544546602663,
+        "connectorCpuFraction": 3.174930802885463e-05,
+        "publisherCpuFraction": 0.00010948709652196115,
+        "cpuFraction": 0.15467668187057743
+      },
+      "lateReportsAtLeast42ms": 0
+    },
+    "6": {
+      "reports": 1802,
+      "meanFractions": {
+        "decisionCpuFraction": 0.15405982534246374,
+        "connectorCpuFraction": 2.989523755131498e-05,
+        "publisherCpuFraction": 0.00012072008085626036,
+        "cpuFraction": 0.1542104406608713
+      },
+      "lateReportsAtLeast42ms": 0
+    }
+  }
+}
