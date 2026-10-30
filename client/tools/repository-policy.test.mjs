@@ -227,6 +227,60 @@ function syntheticTree(git, entries) {
   return git(['mktree', '-z'], leaves.map(({ mode, object, name }) => `${mode} ${mode === '040000' ? 'tree' : mode === '160000' ? 'commit' : 'blob'} ${object}\t${name}\0`).join('')).toString().trim();
 }
 
+function syntheticRawTree(git, entries) {
+  const bytes = Buffer.concat(entries.flatMap(({ mode, object, name }) => [
+    Buffer.isBuffer(mode) ? mode : Buffer.from(mode), Buffer.from(` ${name}\0`), Buffer.from(object, 'hex'),
+  ]));
+  return git(['hash-object', '-t', 'tree', '--literally', '-w', '--stdin'], bytes).toString().trim();
+}
+
+function syntheticAncestor(git, tree) {
+  const ancestor = git(['commit-tree', tree], 'test: SYNTHETIC raw-tree ancestor\n').toString().trim();
+  const object = git(['hash-object', '-w', '--stdin'], '// SYNTHETIC portable index\n').toString().trim();
+  const clean = syntheticTree(git, [{ mode: '100644', object, name: 'web/bridge.mjs' }]);
+  const tip = git(['commit-tree', clean, '-p', ancestor], 'test: SYNTHETIC clean descendant\n').toString().trim();
+  git(['update-ref', 'refs/heads/main', tip]);
+  git(['read-tree', clean]);
+  return ancestor;
+}
+
+test('raw tree modes match Git unsigned wrapping and unknown-type canonicalization', () => withRepository(async (directory, git) => {
+  const object = git(['hash-object', '-w', '--stdin'], 'SYNTHETIC raw-mode fixture\n').toString().trim();
+  const entries = ['400000000000077777', '0', '010000', '060000', '170000'].map((mode, index) => ({ mode, object, name: `synthetic-mode-${index}` }));
+  const tree = syntheticRawTree(git, entries);
+  const ancestor = syntheticAncestor(git, tree);
+  const old = git(['ls-tree', '-r', '-z', '--full-tree', ancestor]).toString().split('\0').filter(Boolean);
+  assert.deepEqual(old, entries.map(({ name }) => `160000 commit ${object}\t${name}`));
+  const actual = [];
+  for await (const entry of treeEntries([tree], object => git(['cat-file', 'tree', object]))) actual.push(entry);
+  assert.deepEqual(actual, entries.map(entry => ({ ...entry, mode: '160000' })));
+  assert.deepEqual(await checkRepository(directory, true), {
+    count: 1, errors: entries.map(({ name }) => `${name}: submodules require explicit policy review`),
+  });
+}));
+
+test('malformed raw tree modes fail closed like the old ls-tree walk', () => withRepository(async (directory, git) => {
+  const object = git(['hash-object', '-w', '--stdin'], 'SYNTHETIC malformed-mode fixture\n').toString().trim();
+  for (const mode of ['100644junk', '', '100648', Buffer.from([0xb1, 0x30, 0x30, 0x36, 0x34, 0x34])]) {
+    const tree = syntheticRawTree(git, [{ mode, object, name: 'synthetic-malformed-mode' }]);
+    const ancestor = syntheticAncestor(git, tree);
+    assert.throws(() => git(['ls-tree', '-r', '-z', '--full-tree', ancestor]), /malformed mode in tree entry/);
+    await assert.rejects(checkRepository(directory, true), /malformed mode in tree entry/);
+  }
+}));
+
+test('a large blob referenced as a tree exits with an error instead of hanging', () => withRepository(async (directory, git, env) => {
+  const bytes = Buffer.alloc(8 * 1024 * 1024, 32);
+  bytes.write('SYNTHETIC large object with an intentionally mismatched tree mode\n');
+  const object = git(['hash-object', '-w', '--stdin'], bytes).toString().trim();
+  const tree = syntheticRawTree(git, [{ mode: '040000', object, name: 'synthetic-not-a-tree' }]);
+  syntheticAncestor(git, tree);
+  const result = spawnSync(process.execPath, [guard, '--history'], { cwd: directory, env, encoding: 'utf8', timeout: 5_000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stderr, /Cannot read tree .*: .* blob 8388608/);
+}));
+
 test('batched tree enumeration equals the full per-commit ls-tree audit', () => withRepository(async (directory, git) => {
   const blob = text => git(['hash-object', '-w', '--stdin'], `SYNTHETIC ${text}\n`).toString().trim();
   const original = blob('original');
@@ -272,7 +326,7 @@ test('batched tree enumeration equals the full per-commit ls-tree audit', () => 
       expected.add(`${mode}\0${object}\0${record.slice(tab + 1)}`);
     }
   }
-  const trees = git(['rev-list', '--format=%T', '--no-commit-header', '--branches', '--remotes', '--tags']).toString().trim().split('\n');
+  const trees = git(['rev-list', '--format=%T', '--branches', '--remotes', '--tags']).toString().trim().split('\n').filter(line => line && !line.startsWith('commit '));
   const actual = new Set();
   for await (const { mode, object, name } of treeEntries(trees, object => git(['cat-file', 'tree', object]))) actual.add(`${mode}\0${object}\0${name}`);
   assert.deepEqual([...actual].sort(), [...expected].sort());
@@ -303,6 +357,7 @@ test('Git process count stays bounded as commits, blobs and outgoing tips grow',
     assert.equal(result.status, 0, result.stderr || result.error?.message);
     const starts = fs.readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(event => event.event === 'start');
     assert(starts.length <= 4, `${label}: ${starts.length} Git processes`);
+    assert(!starts.some(event => event.argv.includes('--no-commit-header')));
     return starts;
   };
   fs.writeFileSync(path.join(directory, 'web/root.mjs'), '// SYNTHETIC root\n');

@@ -58,14 +58,16 @@ function batchReader(directory) {
       child.stdin.write(`${object}\n`);
       const header = await line();
       const [, actualType, size] = header.split(' ');
-      if (actualType !== type || !/^\d+$/.test(size)) throw new Error(`Cannot read ${type} ${object}: ${header}`);
+      if (!/^\d+$/.test(size)) throw new Error(`Cannot read ${type} ${object}: ${header}`);
       const bytes = await read(Number(size));
       if ((await read(1))[0] !== 10) throw new Error('Invalid git cat-file object delimiter');
+      if (actualType !== type) throw new Error(`Cannot read ${type} ${object}: ${header}`);
       return bytes;
     },
     async close() {
       child.stdin.end();
-      child.stdout.resume();
+      // Keep draining through the iterator: flowing mode cannot unblock its active reader.
+      while (!(await chunks.next()).done) {}
       await finished;
     },
   };
@@ -84,11 +86,19 @@ export async function* treeEntries(trees, readTree) {
       const space = bytes.indexOf(32, offset);
       const nul = bytes.indexOf(0, space + 1);
       if (space < 0 || nul < 0 || nul + 1 + hashBytes > bytes.length) throw new Error('Invalid Git tree entry');
-      const rawMode = Number.parseInt(bytes.toString('ascii', offset, space), 8);
-      // Match Git's canonical file modes, including noncanonical regular-file permission bits.
-      const mode = (rawMode & 0o170000) === 0o100000
+      if (space === offset) throw new Error('malformed mode in tree entry');
+      let rawMode = 0;
+      for (let index = offset; index < space; index++) {
+        const digit = bytes[index] - 48;
+        if (digit < 0 || digit > 7) throw new Error('malformed mode in tree entry');
+        // Git's get_mode accumulates in an unsigned int, wrapping at 32 bits.
+        rawMode = ((rawMode << 3) | digit) >>> 0;
+      }
+      const type = rawMode & 0o170000;
+      // Git's canon_mode treats every unrecognized type as a gitlink.
+      const mode = type === 0o100000
         ? (rawMode & 0o100 ? '100755' : '100644')
-        : (rawMode & 0o170000).toString(8).padStart(6, '0');
+        : type === 0o120000 ? '120000' : type === 0o040000 ? '040000' : '160000';
       const name = prefix + bytes.toString('utf8', space + 1, nul);
       const child = bytes.subarray(nul + 1, nul + 1 + hashBytes).toString('hex');
       offset = nul + 1 + hashBytes;
@@ -139,7 +149,7 @@ export async function checkRepository(directory, history = false, outgoingTips =
       }
       const revisions = history ? ['--branches', '--remotes', '--tags', ...outgoingTips]
         : [...outgoingTips, '--not', '--remotes'];
-      const trees = git(directory, ['rev-list', '--format=%T', '--no-commit-header', ...revisions]).toString('utf8').trim().split('\n').filter(Boolean);
+      const trees = git(directory, ['rev-list', '--format=%T', ...revisions]).toString('utf8').trim().split('\n').filter(line => line && !line.startsWith('commit '));
       for await (const { mode, object, name } of treeEntries(trees, object => readObject(object, 'tree'))) {
         await inspect(mode, object, name);
       }

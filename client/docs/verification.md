@@ -51,7 +51,8 @@ node tools/check-repository.mjs
 node tools/check-repository.mjs --history
 ```
 
-Run the staged guard before committing; `--history` audits all reachable history.
+Run the staged guard before committing; `--history` audits history reachable from
+branches, remote-tracking branches and tags.
 Use `--pre-push` with Git's push input to check only outgoing commits plus the index.
 Do not set `core.hooksPath` in a shared multi-worktree checkout; `tools/hooks`
 remains available for single-clone opt-in.
