@@ -3,20 +3,21 @@ import http from 'node:http';
 import path from 'node:path';
 import { open, readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { menuPaths, DEFAULT_MENU_PATHS, MANIFEST_LIMIT } from './menu-art.mjs';
 
 const app = path.dirname(fileURLToPath(import.meta.url));
 const types = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg' };
 export const IMAGE_LIMIT = 4 * 1024 * 1024;
 // Read from the same opened handle, including a sentinel byte for concurrent growth.
-export async function readImage(handle) {
-  const bytes = Buffer.alloc(IMAGE_LIMIT + 1);
+export async function readImage(handle, limit = IMAGE_LIMIT) {
+  const bytes = Buffer.alloc(limit + 1);
   let size = 0;
   while (size < bytes.length) {
     const { bytesRead } = await handle.read(bytes, size, bytes.length - size, null);
     if (!bytesRead) break;
     size += bytesRead;
   }
-  if (size > IMAGE_LIMIT) throw new Error('Image budget');
+  if (size > limit) throw new Error('Image budget');
   return bytes.subarray(0, size);
 }
 export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir, accessory = -1, simulatorPort } = {}) {
@@ -36,17 +37,28 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     }
     const cosmetic = resource.startsWith('/cosmetics/');
     const relative = cosmetic ? resource.slice('/cosmetics/'.length) : resource === '/' ? 'index.html' : resource.slice(1);
-    if (cosmetic && (!cosmeticsDir || !/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative))) { send(404, 'text/plain', 'Unavailable'); return; }
+    if (cosmetic && !cosmeticsDir) { send(404, 'text/plain', 'Unavailable'); return; }
     if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|local-input\.mjs|input-targeting\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
     try {
       const root = await realpath(cosmetic ? cosmeticsDir : webDir);
+      if (cosmetic && relative !== 'menu/manifest.txt' && !/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative)) {
+        let allowed = DEFAULT_MENU_PATHS;
+        try {
+          const manifest = await realpath(path.join(root, 'menu/manifest.txt'));
+          const escaped = path.relative(root, manifest);
+          if (escaped === '..' || escaped.startsWith(`..${path.sep}`) || path.isAbsolute(escaped)) throw new Error('Escaped root');
+          const handle = await open(manifest, 'r');
+          try { allowed = menuPaths(await readImage(handle, MANIFEST_LIMIT)); } finally { await handle.close(); }
+        } catch { /* Missing/malformed manifests use the same authored fallback paths as Rust. */ }
+        if (!allowed.includes(relative)) throw new Error('Unknown menu art');
+      }
       const file = await realpath(path.join(root, relative));
       const escaped = path.relative(root, file);
       if (escaped === '..' || escaped.startsWith(`..${path.sep}`) || path.isAbsolute(escaped)) throw new Error('Escaped root');
       let bytes;
       if (cosmetic) {
         const handle = await open(file, 'r');
-        try { bytes = await readImage(handle); } finally { await handle.close(); }
+        try { bytes = await readImage(handle, relative === 'menu/manifest.txt' ? MANIFEST_LIMIT : IMAGE_LIMIT); } finally { await handle.close(); }
       } else bytes = await readFile(file);
       send(200, types[path.extname(file)] ?? 'application/octet-stream', bytes);
     } catch { send(404, 'text/plain', 'Unavailable'); }

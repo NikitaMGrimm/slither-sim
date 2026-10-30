@@ -10,6 +10,8 @@ for (const failure of ['missing', 'corrupt']) {
     class Images {
       sources = new Map();
       static paths() { return paths; }
+      manifest(bytes) { assert.equal(bytes[0], 1); }
+      menu_paths() { return []; }
       add(path, bytes) {
         if (bytes[0] !== 1) throw new Error('Synthetic decoder rejected corrupt bytes');
         this.sources.set(path, bytes);
@@ -31,7 +33,7 @@ for (const failure of ['missing', 'corrupt']) {
       }, warn: message => warnings.push(message) });
     owner.play();
     assert.equal(plays, 1);
-    assert.deepEqual(attempts, paths);
+    assert.deepEqual(attempts, ['menu/manifest.txt', ...paths]);
     assert.equal(warnings.length, 1);
     assert.match(warnings[0], /s\/a_hardhat\.png/);
     assert.deepEqual([...published.keys()], ['s/a_cap.png', 's/jmou3.png']);

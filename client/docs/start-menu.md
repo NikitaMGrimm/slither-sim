@@ -1,5 +1,8 @@
 # Opt-in start menu core
 
+The opt-in wgpu [resource layer](menu-resources.md) consumes this projection.
+Adapters do not mount it yet; its authored visuals use perceptual acceptance.
+
 `start_page::StartMenuState` publishes copied `StartMenuView` values and
 `StartMenuIntent` effects. `MenuLayout` takes logical viewport pixels and measured
 text/inline-flow metrics; no world backing size or DPR enters its geometry.

@@ -6,6 +6,8 @@ use std::{collections::BTreeMap, io::Cursor};
 
 pub const MAX_ENCODED_BYTES: usize = 4 * 1024 * 1024;
 pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
+mod menu_art;
+pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
 
 // Public resource identifiers and attachment metadata, independently transcribed
 // as data. This is not a copy of the external loader or drawing implementation.
@@ -108,15 +110,43 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
 pub struct Images {
     images: BTreeMap<String, RgbaImage>,
     bytes: usize,
+    menu: menu_art::MenuArtCache,
 }
 impl Images {
+    pub fn manifest(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.bytes != 0 || !self.menu.resident.is_empty() {
+            return Err("Menu manifest must precede image loading".into());
+        }
+        self.menu.manifest = MenuManifest::parse(bytes)?;
+        Ok(())
+    }
+    pub fn menu_paths(&self) -> Vec<String> {
+        let mut logos = 0;
+        self.menu
+            .manifest
+            .0
+            .iter()
+            .filter(|e| {
+                if matches!(e.art, MenuArt::Logo(_)) {
+                    logos += 1;
+                    logos <= 2
+                } else {
+                    true
+                }
+            })
+            .map(|e| e.path.clone())
+            .collect()
+    }
     pub fn add(&mut self, path: &str, bytes: &[u8]) -> Result<()> {
+        if let Some(entry) = self.menu.manifest.0.iter().find(|e| e.path == path) {
+            return self.menu.insert(entry.art, decode(bytes)?, self.bytes);
+        }
         if !paths().iter().any(|p| p == path) || self.images.contains_key(path) {
             return Err("Unknown or duplicate cosmetic path".into());
         }
         let image = decode(bytes)?;
         let charge = image.pixels.len();
-        if self.bytes + charge > COSMETIC_PIXEL_BUDGET {
+        if self.bytes + self.menu.bytes() + charge > COSMETIC_PIXEL_BUDGET {
             return Err("Cosmetic pixel budget".into());
         }
         self.images.insert(path.into(), image);
@@ -129,12 +159,18 @@ pub struct Cosmetics {
     roles: BTreeMap<&'static str, Resource>,
     accessories: BTreeMap<u8, Resource>,
     pub own_accessory: Option<u8>,
+    menu: menu_art::MenuArtCache,
 }
 impl Cosmetics {
     /// The only byte-source seam. Native and browser bind it to local development inputs.
     pub fn load(mut resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
         let mut images = Images::default();
-        for path in paths() {
+        if let Ok(bytes) = resolve(MANIFEST_PATH)
+            && let Err(error) = images.manifest(&bytes)
+        {
+            eprintln!("Menu manifest unavailable: {error}");
+        }
+        for path in paths().into_iter().chain(images.menu_paths()) {
             if let Err(error) = resolve(&path).and_then(|bytes| images.add(&path, &bytes)) {
                 eprintln!("Cosmetic {path} unavailable: {error}");
             }
@@ -160,7 +196,14 @@ impl Cosmetics {
                 let mut bytes = Vec::new();
                 std::fs::File::open(file)
                     .map_err(|e| e.to_string())?
-                    .take(MAX_ENCODED_BYTES as u64 + 1)
+                    .take(
+                        if path == MANIFEST_PATH {
+                            MANIFEST_LIMIT
+                        } else {
+                            MAX_ENCODED_BYTES
+                        } as u64
+                            + 1,
+                    )
                     .read_to_end(&mut bytes)
                     .map_err(|e| e.to_string())?;
                 Ok(bytes)
@@ -173,7 +216,7 @@ impl Cosmetics {
             return Err("Accessory must be 0..31".into());
         }
         let mut next = crate::bank::COSMETIC_HANDLE_BASE;
-        let mut bytes = 0;
+        let mut bytes = images.menu.bytes();
         let mut resource = |image: RgbaImage, name: &str| {
             if bytes + image.pixels.len() > COSMETIC_PIXEL_BUDGET {
                 eprintln!("Cosmetic {name} unavailable: pixel budget");
@@ -229,6 +272,7 @@ impl Cosmetics {
             roles,
             accessories,
             own_accessory: own,
+            menu: images.menu,
         };
         Ok(result)
     }
@@ -297,7 +341,27 @@ impl Cosmetics {
         })
     }
     pub fn resources(&self) -> impl Iterator<Item = &Resource> {
-        self.roles.values().chain(self.accessories.values())
+        self.roles
+            .values()
+            .chain(self.accessories.values())
+            .chain(self.menu.resident.values())
+    }
+    pub fn menu_art(&self, art: MenuArt) -> Option<&Resource> {
+        self.menu.resident.get(&art)
+    }
+    pub fn menu_manifest(&self) -> &MenuManifest {
+        &self.menu.manifest
+    }
+    /// A caller resolves only the manifest's relative path. Decode/admission fail
+    /// before replacement; prepared pictures own the earlier immutable pixels.
+    pub fn replace_menu_art(&mut self, art: MenuArt, bytes: &[u8]) -> Result<()> {
+        let other_bytes = self
+            .roles
+            .values()
+            .chain(self.accessories.values())
+            .map(|r| r.image.pixels.len())
+            .sum();
+        self.menu.insert(art, decode(bytes)?, other_bytes)
     }
 }
 
