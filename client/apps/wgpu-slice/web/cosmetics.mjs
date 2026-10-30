@@ -1,6 +1,6 @@
 // Optional startup resources. Each path is attempted once; failures leave Play available.
-export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory = -1, signal,
-  fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
+export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory = -1, signal, includeMenu = true,
+  isCurrent = () => true, fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
   let images = new CosmeticImages();
   try {
     const localBase = new URL(baseUrl);
@@ -36,18 +36,23 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
       images.manifest(manifest);
     }
     catch (error) {
-      if (signal?.aborted) return;
+      if (signal?.aborted || !isCurrent()) return;
       warn(`Menu manifest unavailable: ${String(error)}`);
     }
-    for (const path of [...cosmeticPaths, ...images.menu_paths()]) {
+    for (const path of [...cosmeticPaths, ...(includeMenu ? images.menu_paths() : [])]) {
       try {
-        images.add(path, await read(path, 4 * 1024 * 1024));
+        const bytes=await read(path,4*1024*1024);
+        if(signal?.aborted || !isCurrent())return;
+        images.add(path,bytes);
       } catch (error) {
-        if (signal?.aborted) return;
+        if (signal?.aborted || !isCurrent()) return;
         warn(`Cosmetic ${path} unavailable: ${String(error)}`);
       }
     }
+    if(signal?.aborted || !isCurrent())return;
+    const pixelBytes=includeMenu ? undefined : images.pixel_bytes();
     const ready = images; images = undefined;
     owner.cosmetics(ready, accessory);
+    return pixelBytes;
   } finally { images?.free(); }
 }

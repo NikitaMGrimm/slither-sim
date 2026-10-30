@@ -113,6 +113,9 @@ pub struct Images {
     menu: menu_art::MenuArtCache,
 }
 impl Images {
+    pub fn pixel_bytes(&self) -> usize {
+        self.bytes + self.menu.bytes()
+    }
     pub fn manifest(&mut self, bytes: &[u8]) -> Result<()> {
         if self.bytes != 0 || !self.menu.resident.is_empty() {
             return Err("Menu manifest must precede image loading".into());

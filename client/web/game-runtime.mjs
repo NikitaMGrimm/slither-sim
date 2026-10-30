@@ -19,6 +19,8 @@ import { createOwnedAnnouncementUi } from './owned-announcement-ui.mjs';
 import { createOwnedEndScreenUi } from './owned-end-screen-ui.mjs';
 import { projectLeaderboardView } from './stock-leaderboard-view.mjs';
 import { stockEndpoint } from './stock-session.mjs';
+import { mountLogin } from './login-overlay.mjs';
+import { loginArt } from './login-art.mjs';
 
 // Gate-only notifications must not add gameplay control/source observations.
 const editNotifications = new Set(['keypress', 'beforeinput', 'input', 'compositionstart', 'compositionupdate', 'compositionend',
@@ -28,7 +30,8 @@ const editNotifications = new Set(['keypress', 'beforeinput', 'input', 'composit
   'dragstart', 'drag', 'dragenter', 'dragleave', 'dragover', 'drop', 'dragend']);
 
 /** Local runtime factory. Importing this module performs no page ownership work. */
-export async function startGamePage({ realm = globalThis, initialize, wasmApi, hudReadout = false, ownedHudUi = false, ownedPlayUi = false, ownedMenuUi = false, ownedAppearancePreview = false, ownedLoadingUi = false, ownedLeaderboardUi = false, ownedMinimapUi = false, ownedAnnouncementUi = false, ownedEndScreenUi = false, diagnosticUi = true, localHost, observeInput } = {}) {
+export async function startGamePage({ realm = globalThis, initialize, wasmApi, hudReadout = false, ownedHudUi = false, ownedPlayUi = false, ownedMenuUi = false, ownedAppearancePreview = false, ownedLoadingUi = false, ownedLeaderboardUi = false, ownedMinimapUi = false, ownedAnnouncementUi = false, ownedEndScreenUi = false, diagnosticUi = true, localHost, observeInput, loginScreen = false } = {}) {
+  if(typeof loginScreen!=='boolean' || (loginScreen && (!ownedPlayUi || !hudReadout || !ownedHudUi || ownedMenuUi)))throw new TypeError('Explicit loginScreen boolean requires owned Play/HUD without the legacy menu');
   if (typeof hudReadout !== 'boolean') throw new TypeError('Explicit hudReadout boolean required');
   if (typeof diagnosticUi !== 'boolean') throw new TypeError('Explicit diagnosticUi boolean required');
   if (typeof initialize !== 'function' || wasmApi === null || typeof wasmApi !== 'object') {
@@ -72,6 +75,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
   let nickname, bindingOperation, handlingNickname, routing = 0;
   let hud, ownedUi, constructCapabilities, hudOperation, nativeOperation, sourceOperation, hudCapabilities, cleanupActive = false;
   let playUi, controlsLease, playCapabilities, playOperation, playNodes;
+  let loginUi, loginArtLease, loginPreferences;
   let menuUi, menuCapabilities, MenuPolicy, menuMethods, menuActions = [];
   let PreviewPolicy, previewMethods, preparePreview;
   let loadingUi, projectMenuLoading, loadingInitialized = false, loadingHandoff = false;
@@ -369,6 +373,8 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
     disposed = true;
     cleanupActive = true;
     playGeneration++;
+    const login=loginUi, art=loginArtLease, preferences=loginPreferences;
+    loginUi=loginArtLease=loginPreferences=undefined;
     playNodes = undefined;
     let failed = false, primary;
     const cleanup = callback => {
@@ -378,6 +384,9 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       }
     };
     cleanup(() => detachNickname(nickname));
+    cleanup(() => login?.dispose());
+    cleanup(() => art?.dispose());
+    if(preferences)cleanup(()=>apply(menuMethods.free,preferences,[]));
     if (controlsLease !== undefined) {
       const lease = controlsLease; controlsLease = undefined;
       cleanup(() => apply(lease.unregister, undefined, []));
@@ -553,7 +562,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       }
       if (editNotifications.has(event.type)) { observeInput?.(event, 'filtered-notification'); return; }
       // Keep menu presses out of steering/boost; releases still clear existing held input.
-      if (!admitsBrowserInput(event, { menu: !!menuUi && menuActions.some(action => action.button === event.target) })) { observeInput?.(event, 'filtered-menu'); return; }
+      if (!admitsBrowserInput(event, { menu: !!loginUi?.root.contains(event.target) || !!menuUi && menuActions.some(action => action.button === event.target) })) { observeInput?.(event, 'filtered-menu'); return; }
       if (disposed || !controller) return;
       if (event.type === 'resize') {
         try {
@@ -677,7 +686,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         }
         playPolicyMethods = freeze(Object.fromEntries(policyNames.map(name => [name, descriptor(policyPrototype, name).value])));
         playCapabilityObservation = [Boolean(localHost), localHost ? false : native.liveProfile !== undefined];
-        if (ownedMenuUi) {
+        if (ownedMenuUi || loginScreen) {
           const raw = descriptor(native, 'menuPreferences')?.value;
           const group = copyRecord(raw, ['schema', 'document', 'read', 'write', 'setNickname']);
           if (group.schema !== 1 || group.document !== document || !Object.isFrozen(raw)
@@ -916,6 +925,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       frame = undefined;
       if (disposed) return;
       try {
+        loginUi?.frame(now);
         if (hudReadout) { runNative(() => gameplay.frame(now)); publishHud(); }
         else gameplay.frame(now);
         frame = native.requestAnimationFrame(tick); } catch (error) { fail(error); }
@@ -958,7 +968,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       // Binding has its own idle protocol and takes the one genuine initial snapshot.
       runtime.bindHudReadout({ schema: 1, scope: 'readout-and-final', nodes });
     }
-    if (ownedPlayUi) {
+    if (ownedPlayUi && !loginScreen) {
       const generation = playGeneration;
       const settle = state => {
         if (disposed || generation !== playGeneration) return;
@@ -1178,6 +1188,37 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         checkHudOperation();
       } catch (error) { throw operation.failed ? operation.primary : error; }
       finally { hudOperation = undefined; operation.primary = undefined; }
+    }
+    if (loginScreen) {
+      const generation = playGeneration;
+      const current = () => !disposed && generation === playGeneration && hudCapabilities.isCurrentDocument();
+      const saved=menuCapabilities.read();
+      if(saved!==null && (typeof saved!=='string'||saved.length>600))throw new TypeError('Bounded native menu storage required');
+      loginPreferences=new MenuPolicy(Boolean(localHost),saved??'');
+      const initial=apply(menuMethods.view,loginPreferences,[]);
+      const remember=value=>{if(!current())return;return runPlay(()=>{
+        apply(menuMethods.set_nickname,loginPreferences,[value]);
+        if(typeof menuCapabilities.write(apply(menuMethods.serialize,loginPreferences,[]))!=='boolean')throw new TypeError('Synchronous menu storage result required');
+      });};
+      loginArtLease = loginArt({realm,current});
+      loginUi = mountLogin({ realm, art: loginArtLease.art, world:target, LoginMenu: wasmApi.LoginMenu, parent: root, nickname:initial.nickname,onEdit:remember,
+        isCurrent: () => !disposed && generation === playGeneration && hudCapabilities.isCurrentDocument(),
+        available: () => playFlag('available') && !playFlag('accepted'),
+        playing: () => gameplay.diagnostics().session.playing,
+        release() {
+          runNative(() => {
+            for (const code of ['ArrowLeft','ArrowRight','ArrowUp','Space']) gameplay.event({type:'keyup',code});
+            gameplay.event({type:'mouseup'});
+          });
+        },
+        play(nickname, requested) {
+          if (!current() || !localHost || !playFlag('accept')) return;
+          remember(nickname);
+          const selection=apply(menuMethods.view,loginPreferences,[]);
+          runNative(() => quality.set_requested_mode(requested === 'high' ? 1 : 0));
+          runtime.play({endpoint:localHost.endpoint,nickname,skin:selection.skin,customSkin:selection.customSkin,profile:localHost.profile});
+        },
+      });
     }
     // Retire the startup fallback only after every selected owner has mounted.
     loadingHandoff = true;

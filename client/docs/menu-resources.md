@@ -1,9 +1,10 @@
-# Opt-in menu resources
+# Menu resources
 
 `apps/wgpu-slice/src/menu.rs` prepares an immutable `MenuFrame` from the core's
-`StartMenuView` and `MenuLayout`. No game host enables it yet. Login adapters,
-editing/caret rendering and chooser/picker screens are later work. This layer
-owns no clock, hit test, focus or Play admission policy.
+`StartMenuView` and `MenuLayout`. The native login enables it with the PR2 editor for caret, selection and preedit.
+Both browser clients use one semantic DOM overlay; their GPU/Canvas world
+renderers do not draw login controls. Chooser/picker screens remain later work.
+This layer owns no clock, hit test, focus or Play admission policy.
 
 Authored Play capsules use two-stop vertical gradients, soft shadows and
 normal/hover/pressed/disabled states. Nickname boxes, plain skin icons, tips,
@@ -39,7 +40,8 @@ Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Native `--cosmetics-dir` and browser `/cosmetics/` use the same `Cosmetics`
 semantic manifest and decoder. Without a manifest, optional paths are
-`menu/logo.png`, `menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`.
+`menu/logo.png`, `menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`,
+`menu/quality-high.png` and `menu/quality-low.png`.
 Missing/malformed art keeps layout and hit targets with authored fallbacks.
 Builder/cosmetic entries are available for future chooser composition.
 
@@ -52,10 +54,13 @@ logo:1 2 menu/logo-next.png
 skin 1 menu/skin.png
 builder 1 menu/builder.png
 cosmetic 1 menu/cosmetic.png
+quality-high 1 menu/quality-high.png
+quality-low 1 menu/quality-low.png
 ```
 
 Rows are role, positive u32 source revision and relative PNG/JPEG path. At most
-35 distinct rows: `logo:0` through `logo:31`, `skin`, `builder`, `cosmetic`.
+37 distinct rows: `logo:0` through `logo:31`, `skin`, `builder`, `cosmetic`,
+`quality-high`, `quality-low`. No server role is admitted yet.
 Paths are at most 128 ASCII characters (letters, digits, `_`, `-`, `.`, `/`).
 Empty, `.` and `..` components, absolute paths, URLs and duplicate roles/paths
 are rejected. Native/served reads check canonical containment, including links.
@@ -89,3 +94,12 @@ at DPR 1/1.25/2/3; native also covers synthetic replacement, missing art, resize
 and retained pictures. Inspect recognizable states, no clipping and core edges
 within 2 CSS px. No reference-pixel equality. These specimens do not establish
 owner perceptual acceptance, physical IME/accessibility or real display pacing.
+
+The browser DOM loader uses the same role/path grammar, bounded same-origin
+streaming reads and PNG/JPEG dimensions checked before browser decode. Only
+logo:0, skin and the two quality roles mount in login (at most four images and
+16 spinner dots). Its art shares the 16 MiB decoded cosmetics allowance: the
+WebGPU host loads world cosmetics first, then gives DOM art the remaining bytes,
+without decoding unused menu art into the GPU bank. Native retains the existing
+shared bank. Object URLs retire on generation teardown; stale async reads cannot
+publish into a replacement document. Missing images use authored controls.

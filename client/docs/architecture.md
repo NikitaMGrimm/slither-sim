@@ -53,7 +53,7 @@ Play opens a simulator endpoint or, natively with `--official`, an official
 server chosen from the live directory; there is no automatic reconnect. The
 renderer covers body, food, prey, paired eyes, arena and platform text for
 nicknames, the HUD, leaderboard and official record announcements.
-Image faces, antennas and complete menus remain incomplete. Rasterization can
+Image faces, antennas and complete chooser/return menus remain incomplete. Rasterization can
 differ from Canvas; passing tests does not establish perceptual parity.
 
 Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and an
@@ -64,8 +64,9 @@ resize preparation. [Bounded vertex chunks](draw-chunks.md) preserve crowded
 world geometry without overlay reservations; producer/cache quotas remain.
 Result/editor remains inactive. Fragment opacity multiplies the shared retained
 fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
-The opt-in [menu resource layer](menu-resources.md) adds bounded authored controls
-and semantic local art; login adapters do not enable it yet.
+The [menu resource layer](menu-resources.md) supplies native login controls and
+semantic local art. Both browsers share a semantic DOM login overlay backed by
+the same Rust state, clocks and layout; world renderers draw the world only.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.

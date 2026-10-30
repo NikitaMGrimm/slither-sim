@@ -17,6 +17,10 @@ test('menu manifest admits semantic revisions and rejects malformed or escaping 
     assert.throws(() => menuPaths(bytes(`menu-art-v1\n${line}`)));
   }
   assert.throws(() => menuPaths(new Uint8Array(4097)));
+  assert.deepEqual(menuPaths(bytes('menu-art-v1\nquality-high 1 menu/high.png\nquality-low 2 menu/low.png')),['menu/high.png','menu/low.png']);
+  assert.throws(()=>menuPaths(bytes('menu-art-v1\nserver 1 menu/server.png')));
+  assert.deepEqual(menuPaths(bytes('menu-art-v1\nquality-high\f1\fmenu/high.png')),['menu/high.png']);
+  assert.throws(()=>menuPaths(bytes('menu-art-v1\n\u00a0quality-high 1 menu/high.png')));
 });
 test('served art is limited to manifest paths, defaults and contained real paths', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'menu-art-'));
