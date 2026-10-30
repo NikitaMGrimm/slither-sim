@@ -16,3 +16,8 @@
 - A durability pause helper was staged in anticipation of large full-IRQ primary
   captures. The overhead gate selected LIGHT, so it was stopped before any
   checkpoint pause occurred. No counted window was suspended or changed.
+- After collection, add an explicitly exploratory client diagnostic around
+  adjacent ticks with no pacing wait, with a one-tick margin. It does not replace
+  or relax the frozen >20-ms episode definition. The ordinary full reducer and
+  the bounded augmentation path call the same function; scheduler events need
+  not be decoded again to append this diagnostic.
