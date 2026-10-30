@@ -68,8 +68,11 @@ of `apt-daily.timer`, `apt-daily-upgrade.timer`, `fwupd-refresh.timer`,
 finish (active/running, activating or deactivating), bounded to five minutes;
 do not kill those jobs. Stop and runtime-mask existing fwupd, snapd and
 amazon-ssm-agent services, including snap-packaged SSM and snapd's activation
-socket, to prevent reactivation during the window. Missing units are recorded,
-not assumed present. Verify targeted timers/services are inactive and masked.
+socket, to prevent reactivation during the window. Exception: an actual service
+file in `/etc` outranks a `/run` mask; stop that service and keep snapd and its
+activation socket masked/stopped. Record these stop-only services explicitly.
+Missing units are recorded, not assumed present. Verify targeted timers and
+maskable services inactive/masked, and stop-only services inactive.
 Failure to quiesce stops collection, not a reason for a new attempt.
 
 Keep networking, SSH, timekeeping, journald/rsyslog and the verified shutdown
@@ -138,3 +141,17 @@ startup, warmup, collection, nearest-rank selection/assembly and teardown; run
 the full comparison before inherited `select.py`. Report each run separately.
 Freeze commit, source/binary identities and proof/access bindings go in ATTEMPTS
 and preflight receipt before timing; no per-file source-hash map in the PR.
+
+### Pre-start verifier correction (before any world or acceptance data)
+
+The first quiet preparation exposed systemd representation/order errors in the
+verifier: unit-file mask state can differ from cached `LoadState`; mask-then-stop
+left timer failure states; a runtime mask cannot override snap SSM's actual
+unit file in `/etc`. Stop timers before masking, clear their retained failure
+state after preserving it, and verify inactive plus masked/masked-runtime
+unit-file state. Stop-only `/etc` services remain inactive with snapd and its
+socket stopped/masked. Original preparation receipts and source are retained
+separately, not erased. No acceptance gate, workload, binary, timing window or
+instance changed; no world had started. The quiet-image intervention remains
+the single experimental variable. Commit corrected source, checks and proof
+binding before tick zero.

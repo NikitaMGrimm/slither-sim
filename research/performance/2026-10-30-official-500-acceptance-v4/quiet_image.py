@@ -27,7 +27,7 @@ def targeted_service(name):
 def state(unit):
     output = command('systemctl', 'show', unit, '--no-pager',
                      '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState',
-                     '-p', 'SubState', '-p', 'UnitFileState', '-p', 'Result')
+                     '-p', 'SubState', '-p', 'UnitFileState', '-p', 'Result', '-p', 'FragmentPath')
     return dict(line.split('=', 1) for line in output.splitlines() if '=' in line)
 
 
@@ -49,7 +49,7 @@ def main():
     if args.mode == 'after':
         policy = json.loads((root / 'policy.json').read_text())
         result = record(root, 'after', policy['recordedUnits'])
-        verify(result, policy['maskedUnits'])
+        verify(result, policy['maskedUnits'], policy['servicesStopped'])
         return
     units = discover()
     timers = sorted(set(TIMERS) & units)
@@ -61,29 +61,46 @@ def main():
     recorded = sorted(set(timers + jobs + services + protected))
     record(root, 'before', recorded)
     for timer in timers:
-        command('systemctl', 'mask', '--runtime', timer)
         command('systemctl', 'stop', timer)
+        command('systemctl', 'mask', '--runtime', timer)
+        if state(timer)['ActiveState'] == 'failed':
+            command('systemctl', 'reset-failed', timer)
     deadline = time.monotonic() + 300
     while any(state(job)['SubState'] in ('running', 'start', 'start-pre', 'start-post', 'stop', 'stop-sigterm')
               or state(job)['ActiveState'] in ('activating', 'deactivating') for job in jobs):
         if time.monotonic() >= deadline:
             raise RuntimeError('Existing maintenance job did not finish within five minutes')
         time.sleep(1)
-    for service in services:
-        command('systemctl', 'mask', '--runtime', service)
+    masked_services, stop_only = [], []
+    for service in sorted(services, key=lambda u: not u.endswith('.socket')):
         command('systemctl', 'stop', service)
+        # A /run mask cannot override an actual unit file in /etc (snap SSM).
+        # Stopping snapd plus its socket removes that service's activation path.
+        if state(service).get('FragmentPath', '').startswith('/etc/'):
+            stop_only.append(service)
+        else:
+            command('systemctl', 'mask', '--runtime', service)
+            masked_services.append(service)
+        if state(service)['ActiveState'] == 'failed':
+            command('systemctl', 'reset-failed', service)
     policy = {'timersPresent': timers, 'timersAbsent': sorted(set(TIMERS) - units),
-              'servicesStopped': services, 'maskedUnits': sorted(timers + services),
+              'servicesStopped': services, 'stopOnlyEtcUnits': stop_only,
+              'maskedUnits': sorted(timers + masked_services),
               'recordedUnits': recorded, 'runningJobsWaitedToCompletion': True}
     (root / 'policy.json').write_text(json.dumps(policy, indent=2) + '\n')
-    verify(record(root, 'quiet', recorded), policy['maskedUnits'])
+    verify(record(root, 'quiet', recorded), policy['maskedUnits'], services)
 
 
-def verify(receipt, masked):
+def verify(receipt, masked, stopped=()):
     for name in masked:
         value = receipt['units'][name]
-        if value['ActiveState'] != 'inactive' or value['LoadState'] != 'masked':
+        # A referenced unit may remain loaded after a runtime mask. UnitFileState
+        # reports the mask; LoadState alone would reject valid inactive masks.
+        if value['ActiveState'] != 'inactive' or value['UnitFileState'] not in ('masked', 'masked-runtime'):
             raise RuntimeError('Quiet unit not inactive/masked: ' + name)
+    for name in stopped:
+        if receipt['units'][name]['ActiveState'] != 'inactive':
+            raise RuntimeError('Quiet service still active: ' + name)
 
 
 if __name__ == '__main__':
