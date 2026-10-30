@@ -24,8 +24,10 @@ Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 - Text caps at 3x. Capsules cap at 1.5x to fit the existing 512px texture limit
   with shadows. Logical edges remain at core rectangles. Decoded menu art is
   filtered to at most 512px on its longest axis, preserving aspect ratio.
-- External art and authored materials share the existing **16 MiB cosmetics
-  allowance**. Prepared pictures and staged replacements own additional bounded
+- External art shares the existing **16 MiB cosmetics allowance**. Authored
+  controls use the Menu group's own allowance, so a full cosmetics bank cannot
+  block essential controls; unadmitted art uses authored fallbacks.
+  Prepared pictures and staged replacements own additional bounded
   copies; active-cache ceilings do not describe total process memory.
 - Changed/hidden Menu slots retire together in a staged cache. Materials, text
   and picture validation must succeed before cache publication. A failure leaves

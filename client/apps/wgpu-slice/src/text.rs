@@ -1060,6 +1060,32 @@ mod menu_budget_tests {
         }
     }
     #[test]
+    fn menu_composition_admits_exact_byte_boundary_and_rolls_back_one_more() {
+        let mut cache = TextCache::default();
+        let runs = [run("Play", 20.)];
+        let first = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let text_bytes = cache.cached_bytes();
+        let material_bytes = MENU_CACHE_BYTES - text_bytes;
+        cache
+            .compose_menu(&runs, 1., (0, material_bytes), Ok)
+            .unwrap();
+        let next_handle = cache.next_handle;
+        let mut published = false;
+        assert!(
+            cache
+                .compose_menu(&runs, 1., (0, material_bytes + 1), |_| {
+                    published = true;
+                    Ok(())
+                })
+                .is_err()
+        );
+        assert!(!published);
+        assert_eq!(cache.next_handle, next_handle);
+        assert_eq!(cache.cached_bytes(), text_bytes);
+        let retained = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        assert_eq!(first[0][0].0.asset, retained[0][0].0.asset);
+    }
+    #[test]
     fn menu_slots_bytes_and_failed_finish_are_transactional_and_isolated() {
         assert!(preflight_menu_totals(64, MENU_CACHE_BYTES).is_ok());
         assert!(preflight_menu_totals(65, 0).is_err());

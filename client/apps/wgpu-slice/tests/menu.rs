@@ -12,8 +12,11 @@ use slither_wgpu_slice::{
 use std::io::Cursor;
 
 fn png(size: u32, color: [u8; 4]) -> Vec<u8> {
+    png_rect(size, size, color)
+}
+fn png_rect(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
-    image::RgbaImage::from_pixel(size, size, image::Rgba(color))
+    image::RgbaImage::from_pixel(width, height, image::Rgba(color))
         .write_to(&mut bytes, image::ImageFormat::Png)
         .unwrap();
     bytes.into_inner()
@@ -106,6 +109,85 @@ fn menu_art_shares_existing_cosmetic_pixel_allowance() {
     assert!(art.menu_art(MenuArt::Logo(0)).is_some());
     assert!(art.menu_art(MenuArt::Skin).is_some());
     assert_eq!(art.menu_art(MenuArt::Logo(0)).unwrap().asset.width, 512);
+}
+#[test]
+fn full_cosmetics_bank_keeps_essential_menu_and_authored_fallbacks() {
+    use slither_wgpu_slice::cosmetics::{ACCESSORIES, COSMETIC_PIXEL_BUDGET};
+    let procedural_bytes: usize = Cosmetics::from_images(Images::default(), None)
+        .unwrap()
+        .resources()
+        .map(|r| r.image.pixels.len())
+        .sum();
+    let mut remaining = COSMETIC_PIXEL_BUDGET - procedural_bytes;
+    let mut images = Images::default();
+    for accessory in ACCESSORIES {
+        if remaining == 0 {
+            break;
+        }
+        let pixels = remaining / 4;
+        let width = pixels.min(512) as u32;
+        let height = (pixels / width as usize).min(512) as u32;
+        images
+            .add(
+                &format!("s/a_{}.png", accessory.0),
+                &png_rect(width, height, [20, 80, 50, 255]),
+            )
+            .unwrap();
+        remaining -= width as usize * height as usize * 4;
+    }
+    assert_eq!(remaining, 0);
+    let mut cosmetics = Cosmetics::from_images(images, None).unwrap();
+    assert_eq!(
+        cosmetics
+            .resources()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>(),
+        COSMETIC_PIXEL_BUDGET
+    );
+    assert!(
+        cosmetics
+            .resources()
+            .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+    );
+    assert!(
+        cosmetics
+            .replace_menu_art(MenuArt::Logo(0), &png(1, [255; 4]))
+            .is_err()
+    );
+    assert!(cosmetics.menu_art(MenuArt::Logo(0)).is_none());
+    assert!(cosmetics.menu_art(MenuArt::Skin).is_none());
+    let view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    let mut text = TextCache::default();
+    let prepared = Menu::default()
+        .prepare(
+            &mut text,
+            &view,
+            &layout(),
+            [1280, 720],
+            1.,
+            Some(&cosmetics),
+            0,
+        )
+        .unwrap();
+    assert!(!prepared.frame.draws.is_empty());
+    // This full composition contains both controls and the text/icon fallbacks.
+    assert!(
+        prepared
+            .resources
+            .iter()
+            .any(|r| r.asset.handle >= 0x7000_0000_0000_0000)
+    );
+    assert!(text.cached_runs() >= 4);
+    prepared
+        .frame
+        .validate(
+            &prepared
+                .resources
+                .iter()
+                .map(|r| (r.asset.into(), r.asset))
+                .collect(),
+        )
+        .unwrap();
 }
 #[test]
 fn menu_draw_boundary_and_whole_picture_rollback() {

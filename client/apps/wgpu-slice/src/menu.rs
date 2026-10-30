@@ -317,12 +317,8 @@ impl Menu {
             .values()
             .map(|r| r.image.pixels.len())
             .sum::<usize>();
-        if material_bytes
-            + cosmetics.map_or(0, |p| p.resources().map(|r| r.image.pixels.len()).sum())
-            > crate::cosmetics::COSMETIC_PIXEL_BUDGET
-        {
-            return Err("Menu material/cosmetic pixel budget".into());
-        }
+        // Essential controls belong to the Menu allowance. Optional cosmetics
+        // must not consume the capacity needed by Play, nickname or fallbacks.
         // Measure replacement faces normally. Fit full labels into their authored
         // boxes, without synthetic bold or browser-specific metric machinery.
         for l in &mut c.labels {
