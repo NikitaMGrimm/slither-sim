@@ -49,10 +49,10 @@ try {
         const release=()=>host.call(()=>{for(const code of ['ArrowLeft','ArrowRight','ArrowUp','Space'])owner.key(code,false);owner.mouse_up();});
         artLease=loginArt({current,signal:abort.signal,pixelBudget:16*1024*1024-cosmeticBytes});
         login=mountLogin({LoginMenu,art:artLease.art,world:canvas,isCurrent:current,available:()=>canPlay&&!!endpoint,
-          playing:()=>owner.playing(),release,
+          playing:()=>owner.playing(),release,cancel:()=>host.call(()=>owner.stop()),
           play(nickname,quality){host.call(()=>{owner.requested_quality(quality==='high');owner.play(endpoint,nickname,0);});}});
         installLocalInput({realm:window,canvas,owner,host,start:()=>login.activate('enter'),controls:[login.button,login.quality],signal:abort.signal});
-        function draw(time){if(current()){login.frame(time);host.frame(time);raf=requestAnimationFrame(draw);}}
+        function draw(time){if(current()){login.observeSession(owner.phase());login.frame(time);host.frame(time);raf=requestAnimationFrame(draw);}}
         raf=requestAnimationFrame(draw);
       } else {owner?.free();owner=undefined;}
     }

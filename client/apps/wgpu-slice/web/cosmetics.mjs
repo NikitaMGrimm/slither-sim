@@ -1,3 +1,4 @@
+import { menuEntries } from './menu-art.mjs';
 // Optional startup resources. Each path is attempted once; failures leave Play available.
 export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory = -1, signal, includeMenu = true,
   isCurrent = () => true, fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
@@ -26,13 +27,7 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
     const cosmeticPaths = CosmeticImages.paths();
     try {
       const manifest = await read('menu/manifest.txt', 4096);
-      const reserved = new Set(cosmeticPaths);
-      const rows = new TextDecoder('utf-8', { fatal: true }).decode(manifest).split('\n').slice(1);
-      // Match Rust's ASCII field separators and exact logical path bindings.
-      if (rows.some(row => {
-        const fields = row.split(/[\t\f\r ]+/).filter(Boolean);
-        return fields.length === 3 && reserved.has(fields[2]);
-      })) throw new Error('Menu manifest path collides with cosmetic');
+      menuEntries(manifest,cosmeticPaths);
       images.manifest(manifest);
     }
     catch (error) {

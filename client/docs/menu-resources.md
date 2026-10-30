@@ -6,6 +6,13 @@ Both browser clients use one semantic DOM overlay; their GPU/Canvas world
 renderers do not draw login controls. Chooser/picker screens remain later work.
 This layer owns no clock, hit test, focus or Play admission policy.
 
+Native login layout, pointer input and IME candidate rectangles use logical window
+pixels. `NativeLogin::prepare_host` maps the menu into the world backing before
+`SurfaceHost` scales the complete picture to the physical window. Login specimens
+use this same mapping and final linear blit before offscreen readback.
+A terminal connecting attempt returns to login without reconnecting; a fresh
+explicit Play is required. Gameplay/death returns remain separate work.
+
 Authored Play capsules use two-stop vertical gradients, soft shadows and
 normal/hover/pressed/disabled states. Nickname boxes, plain skin icons, tips,
 text logo fallback and a green/purple dotted spinner approximate the controls
@@ -13,6 +20,11 @@ at gameplay size. Spinner dots follow shared time/scale/opacity, approximating
 ribbons. A static logo uses shared reveal/opacity timing; it does not reproduce
 animated strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
+
+Both browser art loaders share reserved cosmetic-path rejection with the bounded
+manifest parser. A leading UTF-8 BOM is retained and rejected, matching Rust.
+The no-art placeholder uses `#7070B0`; native caret, selection and preedit underline
+use solid materials without capsule shadows.
 
 ## Bounds and publication
 

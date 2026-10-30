@@ -181,6 +181,9 @@ impl LocalGameplay {
 }
 #[wasm_bindgen]
 impl LocalGameplay {
+    pub fn phase(&self) -> String {
+        self.game.phase().label().into()
+    }
     pub fn playing(&self) -> bool {
         self.game.phase() == slither_client::session_policy::Phase::Playing
     }

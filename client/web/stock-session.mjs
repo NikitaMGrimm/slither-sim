@@ -74,7 +74,7 @@ export function stockEndpoint(input) {
 
 /** No socket is constructed until an explicit Play and its native reset commit. */
 export function createStockSession({ wasm, createSocket, now, maxBufferedBytes = 4096,
-  SessionPolicy = wasm?.SessionPolicy }) {
+  SessionPolicy = wasm?.SessionPolicy, deferConstructionError = false }) {
   for (const name of ['encode_login', 'solve_challenge', 'decode_frame', 'setup_protocol_version']) {
     if (typeof wasm?.[name] !== 'function') throw new TypeError('Wasm capability required: ' + name);
   }
@@ -222,7 +222,14 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     const activeGeneration = ++generation;
     const active = () => generation === activeGeneration && !terminal();
     owner().begin_construct(time());
-    socket = createSocket(launch.endpoint);
+    try { socket = createSocket(launch.endpoint); }
+    catch(error) {
+      fail(error, deferConstructionError ? 'socket-construction' : 'session-failed');
+      // The local gameplay owner handles this terminal notification after the
+      // control stack unwinds; other callers retain synchronous exceptions.
+      if (!deferConstructionError) throw error;
+      return;
+    }
     if (!socket || typeof socket.send !== 'function' || typeof socket.close !== 'function') throw new TypeError('Invalid socket capability');
     socket.binaryType = 'arraybuffer';
     socket.onopen = () => {

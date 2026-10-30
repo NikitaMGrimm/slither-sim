@@ -20,7 +20,7 @@ pub struct NativeLogin {
     pub focus: u8,
     menu: Menu,
     text: TextCache,
-    extent: [u32; 2],
+    area: [f64; 2],
     pressed: bool,
     pressed_quality: bool,
 }
@@ -53,7 +53,7 @@ impl NativeLogin {
             focus: 0,
             menu: Menu::default(),
             text,
-            extent: [960, 540],
+            area: [960., 540.],
             pressed: false,
             pressed_quality: false,
         })
@@ -68,11 +68,17 @@ impl NativeLogin {
         if playing {
             self.state.begin_outgoing();
         }
+        if intents.contains(&StartMenuIntent::FocusNickname) {
+            self.focus = 0;
+        }
         let effects = self
             .input
             .state
             .sync_menu(&self.state.view(admission), &intents);
         Ok((intents, effects))
+    }
+    pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
+        self.state.attempt_ended(phase)
     }
     pub fn focus(&mut self, focus: u8) -> Vec<HostEditEffect> {
         self.focus = focus;
@@ -200,6 +206,28 @@ impl NativeLogin {
         admission: bool,
         cosmetics: Option<&Cosmetics>,
     ) -> Result<MenuFrame> {
+        self.prepare_scaled(extent, 1., admission, cosmetics)
+    }
+    pub fn prepare_host(
+        &mut self,
+        physical: [u32; 2],
+        window_scale: f64,
+        admission: bool,
+        cosmetics: Option<&Cosmetics>,
+    ) -> Result<MenuFrame> {
+        crate::render::dimensions(physical, window_scale)?;
+        let area = physical.map(|n| f64::from(n) / window_scale);
+        let backing = crate::render::backing_size(area)?;
+        self.prepare_scaled(physical, window_scale, admission, cosmetics)?
+            .into_backing(backing)
+    }
+    fn prepare_scaled(
+        &mut self,
+        extent: [u32; 2],
+        dpr: f64,
+        admission: bool,
+        cosmetics: Option<&Cosmetics>,
+    ) -> Result<MenuFrame> {
         let mut view = self.state.view(admission);
         self.menu.focus = if view.disabled {
             None
@@ -210,10 +238,11 @@ impl NativeLogin {
                 _ => None,
             }
         };
-        let fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, 1.)?;
-        if self.extent != extent {
+        let area = extent.map(|n| f64::from(n) / dpr);
+        let fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
+        if self.area != area {
             self.layout = fresh;
-            self.extent = extent;
+            self.area = area;
         } else {
             // Keep resize-time top across fade updates.
             let style = TextStyle {
@@ -245,7 +274,7 @@ impl NativeLogin {
             &view,
             &self.layout,
             extent,
-            1.,
+            dpr,
             cosmetics,
             0,
             Some(&self.input.state),

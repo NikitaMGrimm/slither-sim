@@ -75,6 +75,16 @@ impl LoginMenu {
         self.state.disconnected();
     }
 
+    /// Observe the current session only; stale generations are filtered by its owner.
+    pub fn observe_session(&mut self, phase: &str) -> bool {
+        use crate::session_policy::Phase;
+        match phase {
+            "failed" => self.state.attempt_ended(Phase::Failed),
+            "disconnected" => self.state.attempt_ended(Phase::Disconnected),
+            _ => false,
+        }
+    }
+
     /// Advance one host callback and copy geometry, clocks and deferred effects.
     #[allow(clippy::too_many_arguments)]
     pub fn step(
@@ -98,7 +108,7 @@ impl LoginMenu {
             nickname_baseline_space: 4.,
             padded_play_label_width: label_width + 20.,
         };
-        if self.extent != [width, height] {
+        if self.layout.is_none() || self.extent != [width, height] {
             self.layout = Some(
                 MenuLayout::new(width, height, view.transition, view.tips_visible, metrics)
                     .map_err(JsValue::from_str)?,

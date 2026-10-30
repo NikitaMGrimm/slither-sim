@@ -14,7 +14,7 @@ const own = (token = 1n, dead = false) => ({ token, id: 7, rawHead: { x: 300, y:
 const frame = commands => Uint8Array.from(commands.length === 1 ? commands[0] : commands.flatMap((c, i) =>
   i === 0 ? [0, c.length, ...c] : [c.length + 32, ...c])).buffer;
 
-function harness({ useStockController = false, InputPolicy = TestDesktopInput } = {}) {
+function harness({ useStockController = false, InputPolicy = TestDesktopInput, localSession = false } = {}) {
   let time = 0, borrowed = false, ingress = false, serial = 0;
   let nativeConnected = false, currentOwn = null, stopped = false;
   const trace = [], sockets = [], pending = [], intervals = new Map(), errors = [], statuses = [], faults = {};
@@ -86,7 +86,7 @@ function harness({ useStockController = false, InputPolicy = TestDesktopInput } 
       target: {}, palettes: [{}, {}, {}], background: {}, width: 960, height: 540,
     });
   }
-  const gameplay = createStockGameplay({ scene, controller,
+  const gameplay = createStockGameplay({ scene, controller, localSession,
     quality,
     wasm: { DesktopInput: InputPolicy, SessionPolicy: TestSessionPolicy,
       encode_login() { return Uint8Array.of(115, 1); }, solve_challenge() { return new Uint8Array(27); },
@@ -103,6 +103,7 @@ function harness({ useStockController = false, InputPolicy = TestDesktopInput } 
     },
     createSocket(endpoint) {
       outside(); trace.push(['construct', endpoint]);
+      if(faults.construct)throw faults.construct;
       const socket = { readyState: 0, bufferedAmount: 0, sent: [], closes: 0,
         send(bytes) { trace.push(['send', [...bytes]]); this.sent.push([...bytes]); faults.onSend?.(bytes); if (faults.send) throw faults.send; },
         close() { this.closes++; this.readyState = 3; trace.push(['close']); },
@@ -336,3 +337,22 @@ test('disposal reentry during input send releases the input only after controlle
  assert.equal(thrown,true);assert.equal(primary,undefined);assert.equal(frees,0);h.flush();assert.equal(frees,1);
  assert.deepEqual(h.errors,[undefined]);h.gameplay.dispose();assert.equal(frees,1);assert.equal(h.gameplay.diagnostics().input.connected,false);
 });
+
+for(const outcome of ['cancel','close','error','construction']) {
+  test(`local pre-game ${outcome} permits only a fresh explicit attempt`,()=>{
+    const h=harness({localSession:true});
+    if(outcome==='construction')h.faults.construct=Error('Synthetic constructor failure');
+    h.gameplay.play(request());h.tick(8);
+    const stale=h.sockets[0]?.onclose;
+    if(outcome==='cancel')h.gameplay.stop();
+    if(outcome==='close')h.sockets[0].onclose();
+    if(outcome==='error')h.sockets[0].onerror(Error('Synthetic socket failure'));
+    h.flush();assert.equal(h.gameplay.diagnostics().disposed,false);assert.deepEqual(h.errors,[]);
+    assert.ok(['failed','disconnected'].includes(h.gameplay.diagnostics().session.phase));
+    h.tick(16);const count=h.sockets.length;h.tick(24);assert.equal(h.sockets.length,count);
+    delete h.faults.construct;h.gameplay.play(request());h.tick(32);
+    assert.equal(h.sockets.length,count+1);stale?.();h.tick(40);
+    assert.equal(h.gameplay.diagnostics().session.phase,'opening');
+    assert.equal(h.sockets.length,count+1);
+  });
+}

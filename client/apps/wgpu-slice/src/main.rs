@@ -218,16 +218,20 @@ mod desktop {
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
-                if !cancelled {
+                if cancelled {
+                    self.game.stop();
+                } else {
                     match result {
                         Ok(prepared) => {
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
-                            self.game.play_with_profile(
+                            if let Err(error) = self.game.play_with_profile(
                                 &prepared.endpoint,
                                 &self.nickname,
                                 self.skin,
                                 &prepared.profile,
-                            )?;
+                            ) {
+                                self.game.fail(&error);
+                            }
                         }
                         Err(e) => {
                             eprintln!("Official discovery failed: {e}");
@@ -277,6 +281,10 @@ mod desktop {
             self.effects()?;
             self.game.service_ingress()?;
             self.effects()?;
+            // Do not return while a cancelled acquisition still owns its worker.
+            if self.preparation.is_none() {
+                self.login.observe_session(self.game.phase());
+            }
             let active = !matches!(
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
@@ -358,9 +366,14 @@ mod desktop {
                         }
                     });
                     if self.official {
-                        self.preparation = Some(Preparation::start(self.server.clone())?);
-                    } else if let Some(endpoint) = &self.endpoint {
-                        self.game.play(endpoint, &self.nickname, self.skin)?;
+                        match Preparation::start(self.server.clone()) {
+                            Ok(preparation) => self.preparation = Some(preparation),
+                            Err(error) => self.game.fail(&error),
+                        }
+                    } else if let Some(endpoint) = &self.endpoint
+                        && let Err(error) = self.game.play(endpoint, &self.nickname, self.skin)
+                    {
+                        self.game.fail(&error);
                     }
                 }
             }
@@ -383,7 +396,7 @@ mod desktop {
                     draw.effective_alpha *= view.world_alpha;
                 }
                 self.login
-                    .prepare(extent, admission, self.game.menu_cosmetics())?
+                    .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
                     .append_to(&mut picture)?;
                 let effects = self.login.cursor_area()?;
                 self.edit_effects(effects);

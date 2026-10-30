@@ -41,9 +41,9 @@ try {
       globalThis.requestAnimationFrame=callback=>{frames.set(++serial,callback);return serial;};
       globalThis.cancelAnimationFrame=id=>frames.delete(id);
       globalThis.advanceLogin=async(target)=>{while(clock<target){clock=Math.min(target,clock+16);const work=[...frames.values()];frames.clear();for(const callback of work)callback(clock);await Promise.resolve();}return clock;};
-      globalThis.socketEffects=[];globalThis.sourceEvents=[];
+      globalThis.socketEffects=[];globalThis.sourceEvents=[];globalThis.testSockets=[];
       globalThis.WebSocket=class {static OPEN=1;readyState=0;bufferedAmount=0;
-        constructor(url){socketEffects.push({kind:'connect',url,at:performance.now()});}
+        constructor(url){socketEffects.push({kind:'connect',url,at:performance.now()});if(globalThis.failNextSocket){globalThis.failNextSocket=false;throw Error('Synthetic constructor failure');}testSockets.push(this);}
         send(bytes){socketEffects.push({kind:'send',bytes:[...bytes],at:performance.now()});}
         close(){this.readyState=3;socketEffects.push({kind:'close',at:performance.now()});}
       };
@@ -83,7 +83,7 @@ try {
     await send('Emulation.setDeviceMetricsOverride',{width:960,height:540,deviceScaleFactor:1,mobile:false});
     await evaluate('advanceLogin(performance.now()+16)');
     const before=await evaluate('socketEffects.length');if(before!==0)throw new Error('Implicit connection');
-    const dispatchKey=async(key,code=key)=>{await send('Input.dispatchKeyEvent',{type:'keyDown',key,code,windowsVirtualKeyCode:key==='Tab'?9:13});await send('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:key==='Tab'?9:13});};
+    const dispatchKey=async(key,code=key)=>{await send('Input.dispatchKeyEvent',{type:'keyDown',key,code,windowsVirtualKeyCode:key==='Tab'?9:key==='Escape'?27:13});await send('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:key==='Tab'?9:key==='Escape'?27:13});};
     await dispatchKey('Tab');await dispatchKey('Tab');
     const tab=await evaluate(`document.activeElement.dataset.role`);if(tab!=='quality')throw new Error(`${name} Tab route ${tab}`);
     await evaluate(`document.querySelector('[data-role="nickname"]').focus()`);
@@ -100,9 +100,37 @@ try {
     console.log(`${name}: ${trace.events.length} source events, ${trace.effects.length} explicit transport effects`);
     if(trace.effects.filter(e=>e.kind==='connect').length!==1)throw new Error(`${name} admission ${JSON.stringify(trace)}`);
     const {data}=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});await writeFile(path.join(output,`${name}-spinner.png`),Buffer.from(data,'base64'));
-    const textWidths=await evaluate(`(()=>{const c=document.createElement('canvas').getContext('2d');return ${JSON.stringify(nativeText)}.map(m=>{c.font=(m.bold?'bold ':'')+m.size+'px Arial';const advance=c.measureText(m.text).width;return {...m,browserAdvance:advance,relativeError:Math.abs(advance-m.advance)/m.advance};});})()`);
+    const recovery=[];
+    const clickPlay=async()=>{for(const type of ['mousePressed','mouseReleased'])await send('Input.dispatchMouseEvent',{type,button:'left',clickCount:1,...rect});await evaluate('advanceLogin(performance.now()+32)');};
+    const returned=async kind=>{
+      await evaluate('advanceLogin(performance.now()+32)');
+      const state=await evaluate(`({disabled:document.querySelector('[data-role="play"]')?.disabled??'missing',spinner:document.querySelector('[data-role="spinner"]')?.style.display,effects:socketEffects.length,failure:globalThis.loginFailure})`);
+      if(state.disabled||state.spinner!=='none'||state.failure)throw Error(`${name} ${kind} recovery ${JSON.stringify(state)}`);
+      await evaluate('advanceLogin(performance.now()+64)');
+      if(await evaluate('socketEffects.length')!==state.effects)throw Error('Automatic reconnect');
+      recovery.push({kind,...state});console.log(`${name}: ${kind} returned`);
+    };
+    for(const kind of ['close','cancel','error','construction']) {
+      if(kind==='cancel')await dispatchKey('Escape');
+      else await evaluate(`(()=>{const socket=testSockets.at(-1);socket.readyState=3;socket.${kind==='error'?'onerror':'onclose'}?.();})()`);
+      await returned(kind);
+      if(kind==='construction'){
+        await evaluate('globalThis.failNextSocket=true');await clickPlay();await returned('constructor-failed');
+      }
+      const count=await evaluate(`socketEffects.filter(e=>e.kind==='connect').length`);
+      await clickPlay();
+      if(await evaluate(`socketEffects.filter(e=>e.kind==='connect').length`)!==count+1)throw Error(`${name} explicit retry failed`);
+    }
+    await writeFile(path.join(output,`${name}-recovery.json`),JSON.stringify({recovery,trace:await evaluate('socketEffects')},null,2));
+    const measured=await send('Runtime.callFunctionOn',{
+      functionDeclaration:"function(metrics){const c=document.createElement('canvas').getContext('2d');return metrics.map(m=>{c.font=(m.bold?'bold ':'')+m.size+'px Arial';const advance=c.measureText(m.text).width;return {...m,browserAdvance:advance,relativeError:Math.abs(advance-m.advance)/m.advance};});}",
+      objectId:(await send('Runtime.evaluate',{expression:'globalThis'})).result.objectId,
+      arguments:[{value:nativeText}],returnByValue:true,
+    });
+    if(measured.exceptionDetails)throw new Error(measured.exceptionDetails.text);
+    const textWidths=measured.result.value;
     if(textWidths.some(m=>m.relativeError>.15))throw new Error('Text width budget');
-    results.push({name,checkpoints,tab,normalized,trace,textWidths});
+    results.push({name,checkpoints,tab,normalized,trace,recovery,textWidths});
     await browser.call('Target.closeTarget',{targetId});
   }
   await writeFile(path.join(output,'browser.json'),JSON.stringify({executable,art:artDir?'private local pack':'authored fallback',results},null,2)+'\n');

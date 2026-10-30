@@ -24,8 +24,10 @@ export async function readImage(handle, limit = IMAGE_LIMIT) {
 export async function readCosmetic(directory, relative) {
   const root=await realpath(directory);
   const contained=async name=>{
-    const file=await realpath(path.join(root,name)), escaped=path.relative(root,file);
-    if(escaped==='..'||escaped.startsWith(`..${path.sep}`)||path.isAbsolute(escaped))throw new Error('Escaped root');
+    const candidate=path.resolve(root,name);
+    if(candidate!==root && !candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+    const file=await realpath(candidate);
+    if(file!==root && !file.startsWith(root+path.sep))throw new Error('Escaped root');
     return file;
   };
   if(relative!=='menu/manifest.txt'&&!/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative)){
@@ -57,9 +59,10 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|local-input\.mjs|login-overlay\.mjs|login-art\.mjs|menu-art\.mjs|input-targeting\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
     try {
       if(cosmetic){const bytes=await readCosmetic(cosmeticsDir,relative);send(200,types[path.extname(relative)]??'text/plain',bytes);return;}
-      const root=await realpath(webDir), file=await realpath(path.join(root,relative));
-      const escaped=path.relative(root,file);
-      if(escaped==='..'||escaped.startsWith(`..${path.sep}`)||path.isAbsolute(escaped))throw new Error('Escaped root');
+      const root=await realpath(webDir), candidate=path.resolve(root,relative);
+      if(candidate!==root && !candidate.startsWith(root+path.sep))throw new Error('Escaped root');
+      const file=await realpath(candidate);
+      if(file!==root && !file.startsWith(root+path.sep))throw new Error('Escaped root');
       const bytes=await readFile(file);
       send(200, types[path.extname(file)] ?? 'application/octet-stream', bytes);
     } catch { send(404, 'text/plain', 'Unavailable'); }

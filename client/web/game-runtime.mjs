@@ -190,7 +190,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
     checkHudOperation();
   }
   function publishHud(...snapshots) {
-    if ((!hud && !leaderboardUi && !announcementUi && !endScreenUi && !(localHost && playUi)) || disposed || cleanupActive) return;
+    if ((!hud && !leaderboardUi && !announcementUi && !endScreenUi && !(localHost && (playUi || loginUi))) || disposed || cleanupActive) return;
     // This is a post-operation seam, never a held-source or native callback.
     guardNicknameOperation();
     if (held) nicknameBusy();
@@ -226,6 +226,13 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         checkHudOperation();
         endScreenUi.render(view, session.playing);
         checkHudOperation();
+      }
+      if (localHost && loginUi && playFlag('accepted')) {
+        const session = gameplay.diagnostics().session;
+        if (loginUi.observeSession(session.phase) && playFlag('attempt_return_ready', session.phase)) {
+          apply(playPolicyMethods.complete_return, playPolicy, []);
+          checkHudOperation();
+        }
       }
       if (localHost && playUi && playFlag('accepted')) {
         const session = gameplay.diagnostics().session;
@@ -680,7 +687,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         playCapabilities = { controls: freeze(controls), createControlsLease: guarded(group.createControlsLease) };
         PlayPolicy = descriptor(wasmApi, 'PlayAdmission')?.value;
         const policyPrototype = typeof PlayPolicy === 'function' && descriptor(PlayPolicy, 'prototype')?.value;
-        const policyNames = ['available', 'accepted', 'nickname_valid', 'accept', 'lock_unavailable', 'return_ready', 'complete_return', 'free'];
+        const policyNames = ['available', 'accepted', 'nickname_valid', 'accept', 'lock_unavailable', 'return_ready', 'attempt_return_ready', 'complete_return', 'free'];
         if (!synchronous(PlayPolicy) || policyNames.some(name => !synchronous(policyPrototype && descriptor(policyPrototype, name)?.value))) {
           throw new TypeError('Captured Rust Play admission required');
         }
@@ -1205,6 +1212,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
         isCurrent: () => !disposed && generation === playGeneration && hudCapabilities.isCurrentDocument(),
         available: () => playFlag('available') && !playFlag('accepted'),
         playing: () => gameplay.diagnostics().session.playing,
+        cancel: () => {runNative(() => gameplay.stop());publishHud();},
         release() {
           runNative(() => {
             for (const code of ['ArrowLeft','ArrowRight','ArrowUp','Space']) gameplay.event({type:'keyup',code});

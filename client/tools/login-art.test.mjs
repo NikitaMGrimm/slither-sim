@@ -19,3 +19,18 @@ test('DOM art shares a remaining pixel allowance and stale reads cannot publish'
     assert.deepEqual(calls,stale?[]:['allocate','decode','retire']);
   }
 });
+
+for(const manifest of ['menu-art-v1\nquality-high 1 s/a_cap.png','\ufeffmenu-art-v1\nquality-high 1 custom/high.png']) {
+  test(`DOM loader falls back for reserved paths or BOM: ${JSON.stringify(manifest)}`,async()=>{
+    const reads=[];
+    const realm={location:new URL('http://127.0.0.1:19090/'),Blob,
+      URL:{createObjectURL:()=> 'blob:synthetic',revokeObjectURL(){}},
+      Image:class{naturalWidth=10;naturalHeight=10;async decode(){}},
+      async fetch(url){reads.push(url.pathname);return new Response(url.pathname.endsWith('.txt')?manifest:png(10,10));}};
+    const lease=loginArt({realm,current:()=>true});await lease.ready;
+    assert.ok(!reads.includes('/cosmetics/s/a_cap.png'));
+    assert.ok(!reads.includes('/cosmetics/custom/high.png'));
+    assert.ok(reads.includes('/cosmetics/menu/quality-high.png'));
+    lease.dispose();
+  });
+}

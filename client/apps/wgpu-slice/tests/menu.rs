@@ -77,6 +77,7 @@ fn manifests_reject_malformed_duplicates_and_escaping_paths() {
     for s in [
         "",
         "menu-art-v2",
+        "\u{feff}menu-art-v1\nlogo:0 1 menu/logo.png",
         "menu-art-v1\nlogo:32 1 menu/a.png",
         "menu-art-v1\nskin 0 menu/a.png",
         "menu-art-v1\nskin 1 ../a.png",

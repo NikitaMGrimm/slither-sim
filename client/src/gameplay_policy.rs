@@ -402,6 +402,14 @@ impl GameplayPolicy {
     pub fn profile_failed(&mut self) {
         self.profile = ProfilePhase::Failed;
     }
+    /// A local transport failure before gameplay leaves the owner reusable.
+    /// Decoder, renderer and callback failures retain the existing fatal path.
+    pub fn retry_transport_failure(&self, phase: &str, playing: bool, reason: &str) -> bool {
+        self.local
+            && !playing
+            && phase == "failed"
+            && matches!(reason, "socket-error" | "socket-construction")
+    }
     /// Local replacement requires the next explicit Play, never automatic reconnect.
     pub fn replace_local(&self, disconnected: bool, returned_victory: bool) -> bool {
         self.local && (disconnected || returned_victory)

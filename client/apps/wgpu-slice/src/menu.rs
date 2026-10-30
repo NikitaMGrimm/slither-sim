@@ -31,6 +31,37 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
+    /// Map the menu's logical quads into the world backing before the native
+    /// host scales that complete picture to the physical window. Input/IME keep
+    /// the original logical layout, including fractional window DPR.
+    pub fn into_backing(mut self, extent: [u32; 2]) -> Result<Self> {
+        crate::render::dimensions(extent, 1.)?;
+        let scale = [
+            f64::from(extent[0]) * self.frame.viewport_scale / f64::from(self.frame.extent[0]),
+            f64::from(extent[1]) * self.frame.viewport_scale / f64::from(self.frame.extent[1]),
+        ];
+        for draw in &mut self.frame.draws {
+            // Menu composition emits axis-aligned images, unlike world bodies.
+            if draw.rotation != 0. {
+                return Err("Rotated menu host mapping".into());
+            }
+            draw.destination.x *= scale[0];
+            draw.destination.width *= scale[0];
+            draw.destination.y *= scale[1];
+            draw.destination.height *= scale[1];
+            draw.translation[0] *= scale[0];
+            draw.translation[1] *= scale[1];
+            if let Some(corners) = &mut draw.corners {
+                for p in corners {
+                    p[0] *= scale[0];
+                    p[1] *= scale[1];
+                }
+            }
+        }
+        self.frame.extent = extent;
+        self.frame.viewport_scale = 1.;
+        Ok(self)
+    }
     /// Append in paint order. A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
         check_menu_draws(self.frame.draws.len())?;
@@ -105,6 +136,41 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
     }
 }
 impl Composition<'_> {
+    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+        let key = (1, 1, kind, 0);
+        if !self.materials.contains_key(&key) {
+            let resource = if let Some(resource) = self.old.get(&key) {
+                resource.clone()
+            } else {
+                self.next_handle = self
+                    .next_handle
+                    .checked_add(1)
+                    .filter(|h| *h < MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .ok_or("Menu material handle overflow")?;
+                let rgb = if kind == 8 {
+                    [224, 224, 255]
+                } else {
+                    [150, 108, 213]
+                };
+                Resource {
+                    asset: BodyAsset {
+                        handle: self.next_handle,
+                        revision: 1,
+                        width: 1,
+                        height: 1,
+                        status: BodyAssetStatus::Ready,
+                    },
+                    image: materials::RgbaImage {
+                        width: 1,
+                        height: 1,
+                        pixels: vec![rgb[0], rgb[1], rgb[2], 255],
+                    },
+                }
+            };
+            self.materials.insert(key, resource);
+        }
+        self.push(image(&self.materials[&key], r, alpha))
+    }
     fn push(&mut self, draw: Draw) -> Result<()> {
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
@@ -288,6 +354,9 @@ impl Menu {
                     a * view.nickname_alpha * if view.disabled { 0.5 } else { 1. },
                 );
                 c.labels.last_mut().unwrap().align = Align::Left;
+                if view.nickname.is_empty() {
+                    c.labels.last_mut().unwrap().style.color = [112, 112, 176];
+                }
                 if let Some(input) = input
                     .filter(|i| i.focus() == Some(slither_client::menu_input::TextField::Nickname))
                 {
@@ -303,14 +372,14 @@ impl Menu {
                     let left = advance(&editor.text()[..anchor.min(caret)], text)?;
                     let right = advance(&editor.text()[..anchor.max(caret)], text)?;
                     if anchor != caret && editor.preedit().is_none() {
-                        c.control(
+                        c.solid(
                             MenuRect {
                                 x: r.x + left,
                                 y: r.y,
                                 width: (right - left).max(1.),
                                 height: r.height,
                             },
-                            7,
+                            9,
                             0.45 * a * view.nickname_alpha,
                         )?;
                     }
@@ -321,28 +390,28 @@ impl Menu {
                     } else {
                         advance(&editor.text()[..caret], text)?
                     };
-                    c.control(
+                    c.solid(
                         MenuRect {
                             x: r.x + cursor.min(r.width - 1.),
                             y: r.y,
                             width: 1.,
                             height: r.height,
                         },
-                        6,
+                        8,
                         a * view.nickname_alpha,
                     )?;
                     if let Some(preedit) = editor.preedit() {
                         let start = advance(&editor.text()[..anchor.min(caret)], text)?;
                         let width = advance(&preedit.text, text)?.min((r.width - start).max(0.));
                         if width > 0. {
-                            c.control(
+                            c.solid(
                                 MenuRect {
                                     x: r.x + start,
                                     y: r.y + r.height - 2.,
                                     width,
                                     height: 1.,
                                 },
-                                6,
+                                8,
                                 a * view.nickname_alpha,
                             )?;
                         }
@@ -378,7 +447,7 @@ impl Menu {
                     c.control(
                         MenuRect {
                             x: r.x + 23.,
-                            y: r.y + 10.,
+                            y: r.y + 36.,
                             width: 48.,
                             height: 25.,
                         },

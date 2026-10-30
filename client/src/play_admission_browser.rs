@@ -42,6 +42,10 @@ impl PlayAdmission {
         self.0.lock_unavailable()
     }
 
+    /// Copy a terminal connecting-attempt return decision.
+    pub fn attempt_return_ready(&mut self, phase: &str) -> bool {
+        self.0.attempt_return_ready(phase)
+    }
     /// Copy a local return decision from the existing session's observations.
     pub fn return_ready(&mut self, phase: &str, playing: bool) -> bool {
         self.0.return_ready(phase, playing)

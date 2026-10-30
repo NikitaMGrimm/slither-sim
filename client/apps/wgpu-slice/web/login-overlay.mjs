@@ -1,10 +1,10 @@
 // One semantic DOM adapter for Canvas and WebGPU. All animation, normalization,
 // rectangles and Play locking come from LoginMenu; no CSS animation or timers.
 export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.document.body,
-  isCurrent = () => true, available, playing, play, release, nickname = '', art = {}, world, onEdit = () => {} }) {
+  isCurrent = () => true, available, playing, play, release, nickname = '', art = {}, world, onEdit = () => {}, cancel = () => {} }) {
   const document = realm.document, location = realm.location.href;
   const locationObject=realm.location, top=realm.top;
-  let disposed = false, composing = false, imeEnter = false, pendingClick = false, view;
+  let disposed = false, composing = false, imeEnter = false, pendingClick = false, releasePending = false, view;
   const abort = new realm.AbortController();
   const documentCurrent=()=>realm.document===document && realm.location===locationObject && realm.location.href===location && realm.top===top;
   const current = () => !disposed && isCurrent() && documentCurrent();
@@ -71,6 +71,7 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
       else if (e.key==='Enter' && !imeEnter && !e.repeat) {e.preventDefault(); activate('enter');}
     }
   });
+  listen(realm,'keydown', e => {if(e.code==='Escape' && view?.disabled) cancel();});
   listen(realm,'keyup', e => {if (e.code==='Enter' || e.code==='NumpadEnter') imeEnter=false;});
   listen(button,'click', () => {if (composing) pendingClick=true; else activate('play');});
   for (const [type,hover,press] of [['pointerenter',true,false],['pointerleave',false,false],['pointerdown',true,true],['pointerup',true,false],['pointercancel',false,false]]) {
@@ -90,7 +91,7 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
     if(art[role]) {const img=document.createElement('img');img.src=art[role];img.alt='';img.style.cssText='width:100%;height:100%;object-fit:fill';node.appendChild(img);}
     else if(role==='skin') {
       const icon=document.createElement('span'),label=document.createElement('span');
-      icon.style.cssText='position:absolute;left:23px;top:10px;width:48px;height:25px;border-radius:20px;background:linear-gradient(#56ac81,#366c51)';
+      icon.style.cssText='position:absolute;left:23px;top:36px;width:48px;height:25px;border-radius:20px;background:linear-gradient(#56ac81,#366c51)';
       label.textContent=fallback;label.style.cssText='position:absolute;left:0;bottom:0;width:100%;height:24px;line-height:24px';
       node.appendChild(icon);node.appendChild(label);
     }else node.textContent=fallback;
@@ -98,8 +99,15 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   parent.appendChild(root);
   return {
     root, input, button, quality, activate,
+    observeSession(phase) {
+      if (!current() || !policy.observe_session(phase)) return false;
+      composing=imeEnter=pendingClick=false;
+      releasePending=true;
+      return true;
+    },
     frame(now) {
       if (!current()) return;
+      if(releasePending){releasePending=false;release();}
       measure.font='bold 20px Arial';
       // RAF's frame-start timestamp may precede mounting later in that frame.
       view=policy.step(Math.max(0,now-started),realm.innerWidth,realm.innerHeight,measure.measureText(buttonLabel.textContent).width,available(),playing());
