@@ -105,3 +105,35 @@ Keep raw checkpoints, tapes, binaries, samples and logs private/local-only.
 Close and member-verify an archive, transfer it, check its digest, and only then
 remove task-owned guest data and targets. The public report needs selected values
 and a table script, not full recordings or host-identifying command inventories.
+
+## Added center-seeking comparison and observation attribution
+
+Keep [BOTSTORM_PLAN.md](BOTSTORM_PLAN.md) and
+[DIAGNOSTIC_PLAN.md](DIAGNOSTIC_PLAN.md) separate from the original frozen plan.
+Once the A4 runner has emitted `complete`, copy these study files into a tools
+directory on the guest. The botstorm builder checks that completion and the
+original binary/source pins before doing any build. It generates a new example
+from the frozen `profile.rs` helpers plus `botstorm.rs`, without copying helpers
+into a second checked-in file or changing `src/`.
+
+```sh
+python3 build_botstorm.py EXECUTION_DIRECTORY STUDY_TOOLS_DIRECTORY
+python3 test_botstorm.py
+python3 run_botstorm.py EXECUTION_DIRECTORY
+python3 reduce_botstorm.py EXECUTION_DIRECTORY
+python3 run_diagnostic.py EXECUTION_DIRECTORY
+python3 classify_diagnostic.py EXECUTION_DIRECTORY
+```
+
+Preserve all counted binaries in `bin/` before the additional builds. The added
+row pins reference the original master pin digest rather than duplicating it.
+The center policy runs without an observation or worker pool. Death/admission
+rates use virtual seconds; separate wall rates are also retained. Report the
+normal-public-admission caveat for this family too.
+
+The diagnostic uses another example name and debug=2, preserving portable
+codegen flags and all original primary binaries. It records an unsampled and
+sampled 512-tick serial continuation at 1k/10k, checks final-state identity and
+retains overhead ratios. Source-context buckets use the same source revision;
+unresolved and outside-operation samples remain explicit. These samples support
+ranking, not a replacement throughput measurement or a proven exact speedup.
