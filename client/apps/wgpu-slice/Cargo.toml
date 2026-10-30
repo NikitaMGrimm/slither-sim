@@ -38,6 +38,9 @@ png = "=0.18.1"
 fontdue = { version = "=0.9.5", default-features = false, features = ["std"] }
 ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"] }
 
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "=5.4.3"
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-futures = "=0.4.79"
