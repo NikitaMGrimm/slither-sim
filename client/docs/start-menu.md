@@ -1,5 +1,8 @@
 # Opt-in start menu core
 
+The opt-in wgpu [resource layer](menu-resources.md) consumes this projection.
+Adapters do not mount it yet; its authored visuals use perceptual acceptance.
+
 `start_page::StartMenuState` publishes copied `StartMenuView` values and
 `StartMenuIntent` effects. `MenuLayout` takes logical viewport pixels and measured
 text/inline-flow metrics; no world backing size or DPR enters its geometry.
@@ -57,6 +60,127 @@ Logo assets/curve settling, renderer styles, chooser/builder/server modal policy
 champion editing/acknowledgement and all adapter activation remain later work.
 Incoming/API skin 65 and the existing chooser are untouched; the later official
 chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
+
+## Opt-in text editing and native input
+
+`menu_input::MenuInputState` owns two `TextEditState` values, directional UTF-8
+byte selections, focus, modality, composition and bounded undo/redo (64 edits).
+`EditIntent` and `HostEditEffect` contain copied data only. No DOM, window,
+clipboard, transport or accessibility-library handle enters the shared core.
+Movement and deletion use committed scalar boundaries; raw Unicode preedit,
+including combining marks, remains IME-owned. Word movement uses whitespace boundaries; this is a
+small native editing policy, not a locale-specific word/grapheme segmenter.
+`byte_to_utf16` and `utf16_to_byte` reject offsets inside a UTF-8 scalar or UTF-16
+surrogate pair rather than silently interpreting different coordinate systems.
+Selection intents clamp invalid byte positions backwards to a scalar boundary.
+
+Typing, paste and IME commit all replace the selection, normalize the complete
+result and apply the field limit. Nicknames reuse #300's inclusive 32..127 UTF-16
+unit rule and 24-unit cap: DEL survives and an emoji becomes two spaces, or one
+space at unit 24 when the limit splits the pair. Champion editing uses the same
+ASCII substitution with a 140-unit cap: each surrogate becomes a space, including unit 140 when the
+limit splits a pair. This follows the private
+`source/20b-skins-and-cosmetics.js:528-537` input handler; Save repeats substitution
+and truncation at `source/06-login-and-hud.js:321-323`. The plan's earlier Unicode
+inference was incorrect. This PR adds no champion submission or wire encoding.
+
+Raw Unicode preedit and its optional UTF-8 byte selection stay separate from
+the committed value, field limit and undo history. Retaining raw preedit until
+commit approximates Chromium's input-event timing during composition, rather
+than establishing timing parity. Empty preedit immediately clears the raw
+preview, including winit's mandatory pre-Commit clear.
+Disabled, explicit cancellation,
+focus changes, modal open and blur discard uncommitted text. The OS owns Enter's
+composition commit: the core waits for `Ime::Commit`, never inserts the preview
+or activates Play/Save on that key. IME availability alone does not suppress
+ordinary key text (important for hosts with long-lived Enabled notifications).
+Windows text input follows **winit 0.30.13**: `src/window.rs:1260-1268` documents
+that the window receives no `KeyboardInput` during preedit. Its
+`src/platform_impl/windows/event_loop.rs:1526-1576` emits the composed result from
+`WM_IME_COMPOSITION` and returns without `DefWindowProc`, so it generates no
+second `WM_CHAR` text for that result. `keyboard_layout.rs:946` in the same
+Windows directory maps `VK_PROCESSKEY` to `Key::Named(Process)`. This does not
+imply an empty `KeyEvent.text`: Windows can provide a payload for Process, which
+the adapter rejects regardless of content. These citations were checked against
+the local registry source, not inferred from synthetic events.
+
+Every `Ime::Commit` inserts and normalizes its text. `KeyEvent.text` inserts
+while not composing, including ordinary typing and repeats with IME allowed.
+Unexpected keyboard text during a non-empty preedit is ignored defensively:
+the contract excludes it, and it must not overwrite the raw preview. There is
+no string comparison for duplicate suppression or retrospective rollback.
+`Process` events never insert text or trigger shortcuts; key releases still
+clear held gameplay keys and the composition Enter state.
+
+A composition Enter flag is armed only by an observed physical Enter press
+consumed by IME: logical `Process`, or a key event delivered while composing.
+Preedit, commit, candidate selection and cancellation never arm it themselves.
+It clears on that physical key's release (including a release reported as
+`Process`) or blur/focus teardown. Unrelated key presses and releases do not
+release a held IME Enter. Normal activation requires a non-repeat logical Enter
+press while not composing and without an owned IME Enter. No event-batch hook
+controls this barrier. X11 and macOS input are unsupported
+by this Windows rule; they need a platform-specific rule before support.
+Real OS ordering still needs physical-host validation; synthetic traces are
+not that acceptance.
+
+The private `source/21-logo.js:303,339-347` keydown handler does not filter
+repeat events. Its Play and Save callbacks reject disabled controls and disable
+after acceptance (`source/06-login-and-hud.js:294-307,320-344`). This native seam
+uses the explicit non-repeat activation rule; its event-level filtering differs
+from the source dispatch, while menu admission still owns once-only execution.
+
+Clipboard effects carry tokens. Focus, selection, editing and composition
+changes invalidate pending work; failed cuts retain their selection and text,
+and successful cuts enter undo history. The native `EditHost` capability is
+injected in tests. Windows uses exactly pinned `clipboard-win` 5.4.3 with no
+optional monitoring features: a small Unicode clipboard API with one mandatory
+dependency (`error-code`), without an image clipboard, toolkit or Linux display
+backend. Other native targets report clipboard unavailability. Resolution of an
+initial 5.4.1 pin failed with `version 5.4.1 is yanked`; the pin was corrected
+after querying Cargo, without bypassing the registry safeguard.
+
+Focus gain, modal open and window blur emit releases for both turn keys, both
+boost keys and pointer boost. Editing/modal state suspends gameplay presses;
+key-up always passes. This opt-in seam does not change the legacy
+`DesktopInput::blur` or its accumulated turn-debt semantics. Modal close restores
+the previous text focus. `sync_menu` consumes #300's focus intents and current
+hidden/disabled state. `apply_menu` (or `commit_menu` after adapter/clipboard
+work) updates the committed nickname and dispatches Enter through the existing
+admission gate; the once-only Play request still comes from the next menu step.
+
+`login_accessibility` returns stable copied nodes in reading order, with role,
+plain name, committed value, effective focus, enabled state and semantic actions.
+It covers the ordinary login, last-life status and busy/incomplete champion
+status. Actions must return through the menu/editor admission policy. It adds
+no AccessKit bridge or fake functioning champion editor.
+Skin, server and graphics-quality names and high/low values come from the shared
+`MenuWording` table in English, German, French and Portuguese. These accessible
+names/values are authored: the source image links at `site/index.html:288-301`
+and `347-350` provide neither alt nor title text. They are not claimed as official
+translations. Each locale has a projection test covering both quality states.
+Connecting and incomplete champion-handoff status names are also authored in
+the same table and covered in each locale's projection test.
+
+The native adapter maps winit 0.30 logical editing keys, physical gameplay keys,
+modifiers (including Windows AltGr), IME and focus events. The host executes
+IME admission, normal purpose, logical candidate rectangles and clipboard work
+outside core borrows. `main.rs` has an optional hook initialized to `None`:
+there is no visible menu, window startup change, enabled editor or new draw.
+The later compositor must initialize/synchronize the menu and editor, supply
+the measured caret rectangle and clock/focus/admission intents, and consume the
+existing deferred Play effects. Browsers will use real DOM inputs separately.
+
+The authored traces in `tests/menu_input.rs` and
+`apps/wgpu-slice/tests/menu_input_native.rs` exercise offsets, normalization,
+limits, selection/history, Windows IME/Enter and key-release traces, injected
+clipboard success/failure, gameplay releases and login semantic snapshots.
+winit's `KeyEvent` has a private platform payload, so synthetic key events inject
+the exact public fields production extracts through `KeyInput`; no fabricated
+platform payload or unsafe constructor is used. IME and focus tests use actual
+`WindowEvent` values. No test opens a window, real clipboard, IME or server.
+Real OS candidate placement, IME/keyboard interaction and screen readers remain
+unverified. Native accessibility bridging and browser inputs are later PRs.
 
 ## Label width
 

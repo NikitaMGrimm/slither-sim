@@ -4,7 +4,9 @@ Contributors record user-facing changes in the changelog and follow
 [versioning guidance](../../CONTRIBUTING.md#interfaces-and-packaging).
 
 `release-pr.yml` uses release-plz to maintain one rolling PR, updating
-`Cargo.toml`, `Cargo.lock` and the changelog after main merges. Comparing packaged
+`Cargo.toml`, `Cargo.lock` and the changelog after main merges. The version
+heading goes above the curated Unreleased entries, without generated commit
+titles. Comparing packaged
 files with crates.io excludes tools-only releases; packaged docs, tests and
 examples can trigger one. The root `Cargo.toml`'s `[workspace.package]` version is inherited
 by the unpublished C ABI crate and Python package, including lockfile entries.

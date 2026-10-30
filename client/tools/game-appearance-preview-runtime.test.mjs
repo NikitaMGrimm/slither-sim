@@ -194,10 +194,10 @@ test('local pattern controls restore reload preview and explicit Play retain ful
       // Routing-only ABI capability DOUBLE; numeric pattern rendering is verified separately.
       graph.wasm.api.resolve_local_skin=function(){throw Error('No numeric resolver execution in this routing-only test');};
       const logins=[],recipes=[],encode=graph.wasm.api.encode_login;
-      graph.wasm.api.encode_login=(version,password,nickname,skin,custom)=>{logins.push({nickname,skin,custom:[...custom]});return encode(version,password,nickname,skin,custom);};
+      graph.wasm.api.encode_login=(version,pageEcho,nickname,skin,custom)=>{logins.push({nickname,skin,custom:[...custom]});return encode(version,pageEcho,nickname,skin,custom);};
       const realm={...graph.f.realm,location:{href:'http://127.0.0.1:18884/'}};realm.top=realm;
       const gate=graph.f.gate,metadata=gate.metadata(),endpoint='ws://127.0.0.1:19400/slither';
-      const localHost={endpoint,profile:{clientVersion:1,password:new Uint8Array(20),protocolVersion:19},
+      const localHost={endpoint,profile:{clientVersion:1,pageEcho:new Uint8Array(20),protocolVersion:19},
         bindSkinPolicy(){},isCurrentDocument:()=>true,dispose(){},
         presetEndpoint(node){graph.f.edit.inputValue(node).value=endpoint;},
         gate:{metadata:()=>metadata,claim:()=>gate.claim(metadata.id)},

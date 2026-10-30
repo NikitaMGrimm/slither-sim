@@ -17,6 +17,15 @@ path = "src/main.rs"
 name = "slither-wgpu-diagnostic"
 path = "src/diagnostic_main.rs"
 
+[[bin]]
+name = "slither-client-e2e"
+path = "src/e2e_main.rs"
+
+[[example]]
+name = "feel-replay"
+path = "examples/feel_replay.rs"
+required-features = ["feel-trace"]
+
 [dependencies]
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 slither-client = { path = "../.." }
@@ -28,7 +37,6 @@ feel-trace = ["slither-client/feel-trace"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 mio = { version = "=1.2.4", features = ["os-poll", "net"] }
-winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }
 pollster = "=0.4.0"
 tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 ureq = { version = "=3.5.0", default-features = false, features = ["rustls", "gzip"] }
@@ -36,23 +44,21 @@ scraper = { version = "=0.29.0", default-features = false }
 rand = "=0.10.3"
 png = "=0.18.1"
 fontdue = { version = "=0.9.5", default-features = false, features = ["std"] }
-ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"] }
+
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "=5.4.3"
+
+# Linux has no enabled x11/wayland backend; the GPU-free probe does not need winit.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "linux")))'.dependencies]
+winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-futures = "=0.4.79"
 js-sys = "=0.3.106"
-web-sys = { version = "=0.3.106", features = ["HtmlCanvasElement", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "TextMetrics", "ImageData"] }
-
-[profile.dev]
-debug = 0
-
-[profile.release]
-debug = 0
-lto = "thin"
-codegen-units = 1
+web-sys = { version = "=0.3.106", features = ["Window", "Document", "HtmlElement", "Node", "Element", "DomRect", "HtmlCanvasElement", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "TextMetrics", "ImageData"] }
 
 [dev-dependencies]
 flate2 = "=1.1.10"
 png = "=0.18.1"
-serde_json = "=1.0.154"
+serde_json = "=1.0.151"

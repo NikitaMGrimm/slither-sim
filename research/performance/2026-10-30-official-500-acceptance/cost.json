@@ -1,0 +1,22 @@
+{
+  "kind": "Conservative launch-to-verified-cleanup compute upper bound, not final invoice",
+  "capUSD": 3,
+  "durations": [
+    {
+      "pair": 1,
+      "role": "generator",
+      "lifetimeUpperSeconds": 4052.518819,
+      "bidCapUSDPerHour": 0.3
+    },
+    {
+      "pair": 1,
+      "role": "server",
+      "lifetimeUpperSeconds": 4050.518819,
+      "bidCapUSDPerHour": 0.06
+    }
+  ],
+  "computeUpperUSD": 0.4052185485666666,
+  "noncomputeReserveUSD": 1,
+  "totalUpperUSD": 1.4052185485666666,
+  "allAttemptsFullTimerBoundUSD": 2.836
+}

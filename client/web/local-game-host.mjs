@@ -421,8 +421,8 @@ export async function createLocalGameHost({ realm = globalThis, endpoint, source
       if (typeof resolveSkin !== 'function') throw new TypeError('Local skin policy function required');
       skinPolicy = resolveSkin;
     },
-    // Authored local credentials accepted by the simulator; no profile discovery.
-    profile: { clientVersion: 0, password: new Uint8Array(20), protocolVersion: 19 },
+    // Authored local login profile accepted by the simulator; no profile discovery.
+    profile: { clientVersion: 0, pageEcho: new Uint8Array(20), protocolVersion: 19 },
     endpoint, isCurrentDocument,
     presetEndpoint(field) {
       current();

@@ -7,6 +7,7 @@ first; mobile comes later.
 The shared wgpu client is in [apps/wgpu-slice](apps/wgpu-slice/README.md).
 The Canvas2D browser client remains the visual reference. Both use the Rust core.
 The server is the slither-sim crate at the repository root.
+See [perceptual parity](docs/perceptual-parity.md) for acceptance policy and visual drift budgets.
 
 ## Setup
 

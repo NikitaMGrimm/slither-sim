@@ -2,7 +2,7 @@
 
 Windows desktop and browser WebGPU hosts share game::LocalGame, the root Rust
 protocol/session/input/HUD/presentation policies and a small ordered wgpu renderer.
-The crate has its own lockfile and a path dependency on the core. Canvas remains
+The crate is a member of the root Cargo workspace and depends on the core by path. Canvas remains
 the visual reference.
 
 On Windows, from the repository root, run the desktop client and a local simulator:
@@ -34,7 +34,7 @@ There is no automatic reconnect.
 Play without a window, wanders along broad drifting arcs with a periodic boost through the
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
 (server, profile version, handshake/login/Setup, packet and frame counts, own
-length over time, exit reason). Passwords and raw packets are never printed.
+length over time, exit reason). Page echo bytes and raw packets are never printed.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and
@@ -49,6 +49,12 @@ and retained pictures. The first viewport-body encounter also saves one extra
 The deterministic autopilot keeps its existing input cadence/boost schedule;
 its slow heading drift makes the first minute travel across the map rather than
 repeat a small orbit. It does not avoid opponents or the arena edge.
+
+For GPU-free offline host/client coverage, build the separate
+`slither-client-e2e` binary and run [the local-host runner](../../docs/verification.md#offline-hostclient-end-to-end-run).
+It uses production transport and LocalGame presentation preparation with a CPU
+sink, and has no official-server mode. The desktop `--headless` option above
+continues to render offscreen through a GPU.
 
 The browser build stays simulator-only: browser fetches need CORS permission for
 the official page, script and directory, JavaScript cannot set WebSocket Origin,
@@ -107,7 +113,9 @@ replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
 HUD names are rasterized only to their visible column width. HUD raster scale
 is capped at 3x independently of viewport DPR, retaining logical sizes/anchors
 and the pixel budget on denser displays. Unused HUD slots are retired each frame. Nickname work is
-limited to 128 runs per frame; text tiles share the 8192-draw frame budget.
+limited to 128 runs per frame. [Bounded vertex chunks](../../docs/draw-chunks.md)
+preserve crowded frames up to the 64 MiB Draw-record memory guard (262,144 quads
+on native and Wasm); an oversized production picture is skipped recoverably.
 Existing active/queued budgets still apply.
 
 ## Scope

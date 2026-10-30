@@ -570,7 +570,7 @@ fn hundred_alive_outlined_snakes_with_hud_and_minimap_fit_the_draw_budget() {
 }
 
 #[test]
-fn antenna_crowd_skips_whole_antennas_and_preserves_hud_and_minimap() {
+fn antenna_crowd_keeps_every_antenna_with_hud_and_minimap() {
     let mut bank = Bank::new().unwrap();
     bank.cosmetics = Some(cosmetics(None));
     let mut c = crowd_client(&bank, 37, 100);
@@ -595,7 +595,7 @@ fn antenna_crowd_skips_whole_antennas_and_preserves_hud_and_minimap() {
         .iter()
         .filter(|d| d.asset == bulb)
         .count();
-    assert!((1..100).contains(&admitted), "admitted {admitted} antennas");
+    assert_eq!(admitted, 100);
     finish_crowd(prepared, &mut bank);
 }
 

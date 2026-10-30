@@ -52,7 +52,7 @@ pub enum PanelTextFragment<'a> {
 }
 #[derive(Clone, Debug)]
 enum AdmittedFragment {
-    Text(String, TextStyle),
+    Text(String, TextStyle, usize),
     Break,
 }
 /// Retained admission projection. Build once when content changes, then reuse
@@ -67,6 +67,14 @@ impl PanelText {
     /// scalar's style. A cluster over 1024 bytes projects to one U+FFFD, never a
     /// partial cluster. Raw admission limits fail explicitly, without truncation.
     pub fn new(fragments: &[PanelTextFragment<'_>]) -> Result<Self, &'static str> {
+        Self::admit(fragments, false)
+    }
+    /// Preserve source fragment boundaries for independent draw-time opacity.
+    /// Normalization and grapheme ownership still cross inline boundaries.
+    pub fn preserving_fragments(fragments: &[PanelTextFragment<'_>]) -> Result<Self, &'static str> {
+        Self::admit(fragments, true)
+    }
+    fn admit(fragments: &[PanelTextFragment<'_>], preserve: bool) -> Result<Self, &'static str> {
         if fragments.len() > PANEL_INPUT_FRAGMENTS
             || fragments
                 .iter()
@@ -84,9 +92,9 @@ impl PanelText {
             fragments: Vec::new(),
         };
         let mut paragraph = String::new();
-        let mut styles: Vec<(usize, TextStyle)> = Vec::new();
+        let mut styles: Vec<(usize, TextStyle, usize)> = Vec::new();
         let mut whitespace = false;
-        for fragment in fragments {
+        for (index, fragment) in fragments.iter().enumerate() {
             match *fragment {
                 PanelTextFragment::Break => {
                     result.paragraph(&paragraph, &styles);
@@ -102,8 +110,12 @@ impl PanelText {
                             continue;
                         }
                         whitespace = space;
-                        if styles.last().is_none_or(|(_, s)| *s != style) {
-                            styles.push((paragraph.len(), style));
+                        let source = if preserve { index } else { 0 };
+                        if styles
+                            .last()
+                            .is_none_or(|(_, s, id)| *s != style || *id != source)
+                        {
+                            styles.push((paragraph.len(), style, source));
                         }
                         paragraph.push(if space { ' ' } else { c });
                     }
@@ -113,27 +125,26 @@ impl PanelText {
         result.paragraph(&paragraph, &styles);
         Ok(result)
     }
-    fn paragraph(&mut self, text: &str, styles: &[(usize, TextStyle)]) {
+    fn paragraph(&mut self, text: &str, styles: &[(usize, TextStyle, usize)]) {
         let mut style = 0;
         for (start, cluster) in text.grapheme_indices(true) {
             while style + 1 < styles.len() && styles[style + 1].0 <= start {
                 style += 1;
             }
             let requested = styles[style].1;
+            let source = styles[style].2;
             let cluster = if cluster.len() > PANEL_RUN_BYTES {
                 "\u{fffd}"
             } else {
                 cluster
             };
-            if let Some(AdmittedFragment::Text(last, _)) = self
-                .fragments
-                .last_mut()
-                .filter(|f| matches!(f, AdmittedFragment::Text(_,s) if *s == requested))
-            {
+            if let Some(AdmittedFragment::Text(last, _, _)) = self.fragments.last_mut().filter(
+                |f| matches!(f, AdmittedFragment::Text(_,s,id) if *s == requested && *id == source),
+            ) {
                 last.push_str(cluster);
             } else {
                 self.fragments
-                    .push(AdmittedFragment::Text(cluster.into(), requested));
+                    .push(AdmittedFragment::Text(cluster.into(), requested, source));
             }
         }
     }
@@ -172,12 +183,15 @@ pub struct PanelTextPlan {
     pub scanned_bytes: usize,
 }
 #[derive(Clone)]
-struct Segment(String, TextStyle);
-fn append(to: &mut Vec<Segment>, text: &str, style: TextStyle) {
-    if let Some(last) = to.last_mut().filter(|last| last.1 == style) {
+struct Segment(String, TextStyle, usize);
+fn append(to: &mut Vec<Segment>, text: &str, style: TextStyle, source: usize) {
+    if let Some(last) = to
+        .last_mut()
+        .filter(|last| last.1 == style && last.2 == source)
+    {
         last.0.push_str(text);
     } else {
-        to.push(Segment(text.into(), style));
+        to.push(Segment(text.into(), style, source));
     }
 }
 fn pieces(runs: &[Segment]) -> usize {
@@ -204,7 +218,7 @@ fn chunk_end(text: &str, start: usize) -> usize {
     }
     end
 }
-// Advances are logical; font boxes stay in device pixels until leading is resolved.
+// Convert complete-run metrics to logical pixels once, before line layout.
 struct Measured {
     advance: f64,
     font_ascent: f64,
@@ -222,7 +236,7 @@ fn measured(
     let v = m.measure(
         text,
         TextStyle {
-            size: f64::from(style.size as f32 * scale as f32),
+            size: style.size * scale,
             ..style
         },
     )?;
@@ -242,14 +256,10 @@ fn measured(
     {
         return Err("Invalid panel metrics");
     }
-    // Blink rounds font boxes in device pixels before DOM layout. GetFontHeight
-    // also uses integer A/D for tiny fonts, unlike Canvas's float font box.
-    // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/font_metrics.cc#L104-L121
-    // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/font_metrics.h#L164-L171
     Ok(Measured {
         advance: v.advance / scale,
-        font_ascent: v.font_ascent.round(),
-        font_descent: v.font_descent.round(),
+        font_ascent: v.font_ascent / scale,
+        font_descent: v.font_descent / scale,
     })
 }
 fn width(m: &mut impl TextMetrics, runs: &[Segment], scale: f64) -> Result<f64, &'static str> {
@@ -264,6 +274,7 @@ struct Layout<'a, M> {
     plan: PanelTextPlan,
     line: Vec<Segment>,
     row: usize,
+    sources: Vec<usize>,
 }
 impl<M: TextMetrics> Layout<'_, M> {
     fn visible(&self) -> bool {
@@ -274,26 +285,16 @@ impl<M: TextMetrics> Layout<'_, M> {
         let b = self.block.bounds;
         let top = b.y + self.row as f64 * self.block.line_height;
         let height = self.block.line_height.min(b.y + b.height - top).max(0.);
-        let mut strut = [f64::NEG_INFINITY; 2];
+        let mut strut = [0_f64; 2];
         let scale = self.block.device_scale;
-        // Blink stores float line heights in 1/64 device-pixel LayoutUnits.
-        // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L473
-        // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L146-L151
-        let line_height =
-            f64::from((self.block.line_height as f32 * scale as f32 * 64.).round()) / 64.;
         for r in &self.line {
             let m = measured(self.metrics, &r.0, r.1, scale)?;
-            // CalculateLeadingSpace divides on the 1/64 LayoutUnit grid before
-            // flooring in device pixels, including negative leading. Assign the
-            // remainder below, then union per inline box.
-            // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/core/layout/inline/line_utils.cc#L35-L43
-            // https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/geometry/layout_unit.h#L617-L622
-            let leading = line_height - m.font_ascent - m.font_descent;
-            let above = ((leading * 32.).trunc() / 64.).floor();
-            strut[0] = strut[0].max(m.font_ascent + above);
-            strut[1] = strut[1].max(m.font_descent + leading - above);
+            strut[0] = strut[0].max(m.font_ascent);
+            strut[1] = strut[1].max(m.font_descent);
         }
-        let baseline = top + strut[0] / scale;
+        // Center one font strut in the explicit cell, even for compact cells.
+        // Ink never changes the baseline or the following line's position.
+        let baseline = top + (self.block.line_height - strut[0] - strut[1]) / 2. + strut[0];
         let mut x = b.x;
         for r in &self.line {
             let full = measured(self.metrics, &r.0, r.1, scale)?.advance;
@@ -308,6 +309,7 @@ impl<M: TextMetrics> Layout<'_, M> {
                 let start_x = measured(self.metrics, &r.0[..start], r.1, scale)?.advance;
                 let left = (x + start_x - r.1.size).max(b.x);
                 let right = (x + end_x + r.1.size).min(b.x + b.width);
+                self.sources.push(r.2);
                 self.plan.runs.push(PanelTextRun {
                     text: text.into(),
                     style: r.1,
@@ -327,18 +329,22 @@ impl<M: TextMetrics> Layout<'_, M> {
         self.row += 1;
         Ok(())
     }
-    fn word(&mut self, word: &[Segment], space: Option<TextStyle>) -> Result<(), &'static str> {
+    fn word(
+        &mut self,
+        word: &[Segment],
+        space: Option<(TextStyle, usize)>,
+    ) -> Result<(), &'static str> {
         if word.is_empty() {
             return Ok(());
         }
         let mut next = self.line.clone();
         if !next.is_empty()
-            && let Some(style) = space
+            && let Some((style, source)) = space
         {
-            append(&mut next, " ", style);
+            append(&mut next, " ", style, source);
         }
         for r in word {
-            append(&mut next, &r.0, r.1);
+            append(&mut next, &r.0, r.1, r.2);
         }
         if !self.line.is_empty()
             && width(self.metrics, &next, self.block.device_scale)? > self.block.bounds.width
@@ -346,7 +352,7 @@ impl<M: TextMetrics> Layout<'_, M> {
             self.flush()?;
             next.clear();
             for r in word {
-                append(&mut next, &r.0, r.1);
+                append(&mut next, &r.0, r.1, r.2);
             }
         }
         if self.visible() {
@@ -362,6 +368,18 @@ pub fn layout_panel_text(
     block: &PanelTextBlock<'_>,
     metrics: &mut impl TextMetrics,
 ) -> Result<PanelTextPlan, &'static str> {
+    if block.line_height < PANEL_MIN_LINE_HEIGHT {
+        return Err("Invalid panel bounds");
+    }
+    layout_panel_text_with_sources(block, metrics).map(|(plan, _)| plan)
+}
+/// Layout plus the input-fragment index for each run. Alpha is never raster style.
+/// The official 13px announcement font also permits its rounded normal line box (at least 14 CSS pixels);
+/// callers must establish their producer allocation bound for that smaller cell.
+pub fn layout_panel_text_with_sources(
+    block: &PanelTextBlock<'_>,
+    metrics: &mut impl TextMetrics,
+) -> Result<(PanelTextPlan, Vec<usize>), &'static str> {
     let b = block.bounds;
     if ![b.x, b.y, b.width, b.height, block.line_height]
         .into_iter()
@@ -370,7 +388,7 @@ pub fn layout_panel_text(
         || b.width > 600.
         || b.height < 0.
         || b.height > 228.
-        || !(PANEL_MIN_LINE_HEIGHT..=PANEL_MAX_LINE_HEIGHT).contains(&block.line_height)
+        || !(14. ..=PANEL_MAX_LINE_HEIGHT).contains(&block.line_height)
         || block.max_runs > PANEL_RUNS
         || !block.device_scale.is_finite()
         || block.device_scale <= 0.
@@ -384,6 +402,7 @@ pub fn layout_panel_text(
         plan: PanelTextPlan::default(),
         line: Vec::new(),
         row: 0,
+        sources: Vec::new(),
     };
     let mut word: Vec<Segment> = Vec::new();
     let mut space = None;
@@ -401,8 +420,9 @@ pub fn layout_panel_text(
                     l.flush()?;
                 }
             }
-            AdmittedFragment::Text(text, style) => {
+            AdmittedFragment::Text(text, style, source) => {
                 let style = *style;
+                let source = *source;
                 for cluster in text.graphemes(true) {
                     let whitespace = cluster == " ";
                     if !l.visible()
@@ -416,19 +436,19 @@ pub fn layout_panel_text(
                             l.word(&word, space.take())?;
                             word.clear();
                         }
-                        space.get_or_insert(style);
+                        space.get_or_insert((style, source));
                     } else {
                         visible_bytes += cluster.len();
                         let mut next = word.clone();
-                        append(&mut next, cluster, style);
+                        append(&mut next, cluster, style, source);
                         let mut visible = l.line.clone();
                         if !visible.is_empty()
-                            && let Some(style) = space
+                            && let Some((style, source)) = space
                         {
-                            append(&mut visible, " ", style);
+                            append(&mut visible, " ", style, source);
                         }
                         for r in &next {
-                            append(&mut visible, &r.0, r.1);
+                            append(&mut visible, &r.0, r.1, r.2);
                         }
                         if pieces(&visible) > block.max_runs - l.plan.runs.len() {
                             l.word(&word, space.take())?;
@@ -452,7 +472,7 @@ pub fn layout_panel_text(
                                 break 'fragments;
                             }
                         }
-                        append(&mut word, cluster, style);
+                        append(&mut word, cluster, style, source);
                         // Even the first character's metrics must validate.
                         measured(
                             l.metrics,
@@ -471,5 +491,5 @@ pub fn layout_panel_text(
     if l.visible() && !l.line.is_empty() {
         l.flush()?;
     }
-    Ok(l.plan)
+    Ok((l.plan, l.sources))
 }

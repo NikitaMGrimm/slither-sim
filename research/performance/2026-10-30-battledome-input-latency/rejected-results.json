@@ -1,0 +1,12 @@
+{
+  "rows": [
+    {
+      "label": "attempt2-04-320",
+      "evidenceStatus": "unverified",
+      "reason": "Worker 3 exited before primary during non-atomic target-file replacement",
+      "sourceArchiveSha256": "75d3c30c4f6694b743aca1afc088d0ec6def27eeb03085ccaf7425d236fc58fb",
+      "archiveBytes": 93248697,
+      "primarySelected": false
+    }
+  ]
+}

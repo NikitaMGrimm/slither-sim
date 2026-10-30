@@ -10,7 +10,7 @@ import { createStockClient } from './fixtures/stock-client-fixture.mjs';
 
 const nativeName = 'apply_frame_and_render_standard_with_face_presentation_and_prey_and_hud';
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+  profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
   nickname: 'Synthetic', skin: 0, customSkin: new Uint8Array() });
 const frame = commands => Uint8Array.from(commands.length === 1 ? commands[0] : commands.flatMap((c, i) =>
   i === 0 ? [0, c.length, ...c] : [c.length + 32, ...c])).buffer;

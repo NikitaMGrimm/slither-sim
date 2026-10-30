@@ -30,7 +30,7 @@ test('post-operation end-screen publication forwards session and captured final 
     graph.wasm.api.EndScreenProjector.prototype.project = () => assert.fail('Late method lookup');
     graph.wasm.api.EndScreenProjector.prototype.free = () => assert.fail('Late free lookup');
     runtime.play(graph.run(`({endpoint:'ws://192.0.2.1:1234/slither',
-      profile:{clientVersion:1,password:new Uint8Array(20),protocolVersion:19},
+      profile:{clientVersion:1,pageEcho:new Uint8Array(20),protocolVersion:19},
       nickname:'Synthetic',skin:0,customSkin:new Uint8Array()})`));
     graph.f.frame(8); graph.f.socket.open(); graph.message([54, 1]);
     graph.message([97, ...new Array(24).fill(0)]); graph.f.flush();
@@ -102,7 +102,7 @@ test('return placement failure preserves falsy primary through cleanup after sou
         hudReadout: true, ownedHudUi: true, ownedPlayUi: true, ownedEndScreenUi: true });
       const root = graph.f.document.getElementById('slither-client-root'), play = root.children[4], end = play.children.at(-1);
       runtime.play(graph.run(`({endpoint:'ws://192.0.2.1:1234/slither',
-        profile:{clientVersion:1,password:new Uint8Array(20),protocolVersion:19},
+        profile:{clientVersion:1,pageEcho:new Uint8Array(20),protocolVersion:19},
         nickname:'Synthetic',skin:0,customSkin:new Uint8Array()})`));
       graph.f.frame(8); graph.f.socket.open(); graph.message([54, 1]);
       graph.message([97, ...new Array(24).fill(0)]); graph.f.flush();

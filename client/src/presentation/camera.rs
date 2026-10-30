@@ -1,7 +1,6 @@
 //! Camera offsets advance with draws rather than entity animation steps.
 
-use super::{PI, Point, PresentationError, finite};
-use crate::math;
+use super::{Point, PresentationError, finite};
 
 /// Number of double-precision camera correction samples.
 pub const CAMERA_SAMPLES: usize = 62;
@@ -25,10 +24,10 @@ impl Default for CameraCorrections {
             weights: std::array::from_fn(|index| {
                 let mut weight = 0.5
                     * (1.
-                        - math::cos(
-                            PI * (CAMERA_SAMPLES - 1 - index) as f64 / (CAMERA_SAMPLES - 1) as f64,
-                        ));
-                weight += (0.5 * (1. - math::cos(PI * weight)) - weight) * 0.5;
+                        - (std::f64::consts::PI * (CAMERA_SAMPLES - 1 - index) as f64
+                            / (CAMERA_SAMPLES - 1) as f64)
+                            .cos());
+                weight += (0.5 * (1. - (std::f64::consts::PI * weight).cos()) - weight) * 0.5;
                 weight
             }),
             samples: [[0.; CAMERA_SAMPLES]; 2],
@@ -103,5 +102,26 @@ impl CameraCorrections {
     /// Double-precision camera weights, including the additional curve shaping.
     pub fn weights(&self) -> &[f64; CAMERA_SAMPLES] {
         &self.weights
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn camera_weights_preserve_endpoints_sum_and_monotonicity() {
+        let ring = CameraCorrections::default();
+        let weights = ring.weights();
+        assert_eq!(weights.len(), 62);
+        assert_eq!(weights[0], 1.);
+        assert_eq!(weights[CAMERA_SAMPLES - 1], 0.);
+        assert!(
+            weights
+                .iter()
+                .all(|w| w.is_finite() && (0. ..=1.).contains(w))
+        );
+        assert!(weights.windows(2).all(|pair| pair[0] >= pair[1]));
+        assert!((weights.iter().sum::<f64>() - 31.).abs() < 1e-12);
     }
 }

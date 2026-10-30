@@ -12,11 +12,12 @@ import { launchBrowser } from './feel-replay/browser.mjs';
 import { replayServer } from './feel-replay/server.mjs';
 import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
 import { floatBits } from './feel-replay/io.mjs';
+import { validateNumericalPolicy, validateTrace } from './feel-replay/schema.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2), options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt');
+  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt', '--numerical-policy', '--hz'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt --numerical-policy --hz');
   options[args[i]] = args[i + 1];
 }
 for (const key of ['--record', '--out', '--browser', '--commands', '--appearance-at']) if (!options[key]) throw new Error(`Required ${key}`);
@@ -26,11 +27,21 @@ if (out.toLowerCase() === repository.toLowerCase() || out.toLowerCase().startsWi
 await mkdir(out); // No recursive/exist-ok: preserve every prior attempt.
 let server, browser;
 try {
+  // Freeze the declaration before either peer executes. The native runner adopts
+  // this same manifest policy; neither runner learns caps from observed errors.
+  let numericalPolicy = null;
+  if (options['--numerical-policy']) {
+    const bytes = await readFile(options['--numerical-policy']);
+    numericalPolicy = validateNumericalPolicy(parse(bytes.toString('utf8')));
+    await writeFile(path.join(out, 'numerical-policy.json'), bytes, { flag: 'wx' });
+  }
   const inputFile = path.resolve(options['--record']), input = await readFile(inputFile);
   const receipts = options['--receipt'] ? [{ path: path.resolve(options['--receipt']), sha256: sha256(await readFile(options['--receipt'])) }] : [];
   await writeFile(path.join(out, 'input-receipt.json'), stringify({ inputFile, sha256: sha256(input), receipts }));
   const record = JSON.parse(input);
-  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: Number(options['--commands']), appearanceAtMs: Number(options['--appearance-at']) });
+  const hz = Number(options['--hz'] ?? 60);
+  if (!Number.isFinite(hz) || hz <= 0) throw new Error('Positive display cadence required');
+  const { schedule, deliveries } = buildSchedule(record, { expectedCommands: Number(options['--commands']), appearanceAtMs: Number(options['--appearance-at']), stepMs: 1000 / hz });
   await writeFile(path.join(out, 'schedule.json'), stringify(schedule)); // Frozen before either peer.
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const product = { commit: git('rev-parse', 'HEAD'), tree: git('write-tree'), core: git('write-tree', '--prefix=client/src/') };
@@ -56,7 +67,7 @@ try {
     peers.push({ name, page, acks: [], step: async (event, data, seq) => parse(await page.evaluate(`window.replayStepEncoded(${JSON.stringify(stringify([event, data, seq]))})`)) });
   }
   await coordinate(schedule, deliveries, peers, (peer, ack) => { peer.acks.push(ack); });
-  const traces = [];
+  const traces = [], traceSha256 = {};
   const observationFailures = [];
   for (const peer of peers) {
     const finish = parse(await peer.page.evaluate('window.replayFinish()'));
@@ -70,17 +81,21 @@ try {
       startup: ['clock-zero', 'empty-timers-and-raf', 'high-quality', 'play',
         `startup-pointer:${pointer.source}:${floatBits(pointer.x)}:${floatBits(pointer.y)}`,
         `input-normalization:${inputNormalization}`, 'scheduled-startup-raf'],
-      geometry: peer.acks[0].geometry, qualityRequest: 'high', presentation: { gpu: null, mode: 'cpu-boundary-sink', maxFrameLatency: null }, numericalPolicy: null });
+      geometry: peer.acks[0].geometry, qualityRequest: 'high', presentation: { gpu: null, mode: 'cpu-boundary-sink', maxFrameLatency: null }, numericalPolicy });
     const assembly = traceAssembly(schedule, manifest);
     for (const ack of peer.acks) assembly.append(ack);
     const trace = assembly.finish({ atMs: finish.atMs, completed: finish.completed,
       pendingEffects: finish.pendingEffects, pendingFrames: finish.pendingFrames, unexpectedNetwork: finish.unexpectedNetwork || peer.page.denied() !== 0 });
     traces.push(trace);
-    await writeFile(path.join(out, `${peer.name}.json`), stringify(trace));
+    const traceBytes = stringify(trace);
+    traceSha256[peer.name] = sha256(traceBytes);
+    await writeFile(path.join(out, `${peer.name}.json`), traceBytes);
     await writeFile(path.join(out, `${peer.name}-receipts.json`), stringify({ receipts: finish.receipts, recorderErrors: finish.recorderErrors,
+      pictureAcknowledgements: assembly.pictureDrawIds(),
       entropyRequests: randomStream, queuedRaf: finish.queuedRaf, deniedRequests: peer.page.denied() }));
     await writeFile(path.join(out, `${peer.name}-manifest.json`), stringify(manifest));
     await peer.page.close();
+    validateTrace(trace, schedule, assembly.pictureDrawIds());
   }
   const report = compareTraces(...traces, schedule, { mode: 'same-core' });
   if (observationFailures.length) {
@@ -97,7 +112,7 @@ try {
     const category = row.path.replace(/\[\d+\]/g, '[]').split('.').slice(0, 3).join('.');
     mismatchClasses[category] = (mismatchClasses[category] ?? 0) + 1;
   }
-  const summary = { status: report.status, errors: report.errors, mismatches: report.mismatches.length, diagnosticRows: rows.length, mismatchClasses,
+  const summary = { status: report.status, errors: report.errors, mismatches: report.mismatches.length, diagnosticRows: rows.length, mismatchClasses, traceSha256,
     counts: traces.map(t => ({ peer: t.manifest.peer, events: t.events.length, commands: t.commands.length, samples: t.samples.length, draws: t.final.draws })) };
   await writeFile(path.join(out, 'summary.json'), stringify(summary));
   console.log(JSON.stringify(summary));

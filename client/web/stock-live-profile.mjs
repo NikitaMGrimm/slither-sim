@@ -18,7 +18,7 @@ const nativeBind = Function.prototype.bind;
 const PIN = freeze({ expectedBytes: 224092,
   sha256: '5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095',
   version: freeze({ start: 181647, end: 181670 }),
-  password: freeze({ start: 181670, end: 181754 }) });
+  pageEcho: freeze({ start: 181670, end: 181754 }) });
 const ORIGIN = 'https://slither.io';
 const URL = 'https://slither.io/s/game1107249518.js';
 const DEADLINE_MS = 5000;
@@ -70,20 +70,20 @@ function bounds(value, size, limit) {
   return span;
 }
 function spans(value, size) {
-  const parts = data(value, ['version', 'password'], [], 'bad-pin');
+  const parts = data(value, ['version', 'pageEcho'], [], 'bad-pin');
   if (!isFrozen(value)) throw failure('bad-pin');
   const version = bounds(parts.version, size, 128);
-  const password = bounds(parts.password, size, 256);
-  if (version.end > password.start) throw failure('bad-pin');
-  return { version, password };
+  const pageEcho = bounds(parts.pageEcho, size, 256);
+  if (version.end > pageEcho.start) throw failure('bad-pin');
+  return { version, pageEcho };
 }
 function checkedPin(value, size) {
-  const pin = data(value, ['expectedBytes', 'sha256', 'version', 'password'], [], 'bad-pin');
+  const pin = data(value, ['expectedBytes', 'sha256', 'version', 'pageEcho'], [], 'bad-pin');
   if (!isFrozen(value) || !Number.isSafeInteger(pin.expectedBytes) || pin.expectedBytes < 1
     || pin.expectedBytes > PIN.expectedBytes || typeof pin.sha256 !== 'string'
     || !/^[0-9a-f]{64}$/.test(pin.sha256)) throw failure('bad-pin');
   if (size !== pin.expectedBytes) throw failure('bad-size');
-  return { ...pin, ...spans(freeze({ version: pin.version, password: pin.password }), size) };
+  return { ...pin, ...spans(freeze({ version: pin.version, pageEcho: pin.pageEcho }), size) };
 }
 function literalPolicy(Parser) {
   try {
@@ -91,7 +91,7 @@ function literalPolicy(Parser) {
     const prototype = Object.getOwnPropertyDescriptor(Parser, 'prototype');
     if (!prototype || !Object.hasOwn(prototype, 'value')) throw 0;
     const methods = {};
-    for (const name of ['write', 'parse_version', 'parse_password', 'password_byte', 'protocol_version', 'clear', 'free']) {
+    for (const name of ['write', 'parse_version', 'parse_page_echo', 'page_echo_byte', 'protocol_version', 'clear', 'free']) {
       const field = Object.getOwnPropertyDescriptor(prototype.value, name);
       if (!field || !Object.hasOwn(field, 'value') || typeof field.value !== 'function') throw 0;
       methods[name] = Reflect.apply(nativeBind, nativeCall, [field.value]);
@@ -122,19 +122,19 @@ function extract(source, parts, bytes, own, policy) {
     const clientVersion = call('parse_version', parts.version.end - parts.version.start);
     if (clientVersion === -1) throw failure('bad-literal');
     if (!Number.isInteger(clientVersion) || clientVersion < 0 || clientVersion > 65535) throw failure('bad-literal');
-    // Keep the captured native password allocation at its existing version-before-password boundary.
-    const password = own(bytes.allocate(20));
-    if (bytes.length(password) !== 20) throw failure('unavailable-native');
-    copy(parts.password, 128);
-    if (call('parse_password', parts.password.end - parts.password.start) !== true) throw failure('bad-literal');
+    // Keep the captured native page echo allocation at its existing version-before-page-echo boundary.
+    const pageEcho = own(bytes.allocate(20));
+    if (bytes.length(pageEcho) !== 20) throw failure('unavailable-native');
+    copy(parts.pageEcho, 128);
+    if (call('parse_page_echo', parts.pageEcho.end - parts.pageEcho.start) !== true) throw failure('bad-literal');
     for (let i = 0; i < 20; i++) {
-      const byte = call('password_byte', i);
+      const byte = call('page_echo_byte', i);
       if (!Number.isInteger(byte) || byte < 0 || byte > 255) throw failure('bad-literal');
-      password[i] = byte;
+      pageEcho[i] = byte;
     }
     const protocolVersion = call('protocol_version');
     if (protocolVersion !== 19) throw failure('bad-literal');
-    return freeze({ clientVersion, password, protocolVersion });
+    return freeze({ clientVersion, pageEcho, protocolVersion });
   } finally {
     // Zero live Wasm storage before releasing it, even after partial writes or rejection.
     let cleared = true;
@@ -162,7 +162,7 @@ function ownership(bytes) {
   };
 }
 
-/** Pure offline parser. Caller owns input and the returned password; no hash/fetch authority. */
+/** Pure offline parser. Caller owns input and the returned pageEcho; no hash/fetch authority. */
 export function parseClosedProfileDeclarations(source, frozenSpans, ProfileLiteralParser) {
   const owned = ownership(offlineBytes);
   try { return extract(source, spans(frozenSpans, offlineBytes.length(source)), offlineBytes, owned.own, literalPolicy(ProfileLiteralParser)); }

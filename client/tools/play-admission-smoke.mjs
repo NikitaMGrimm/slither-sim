@@ -38,7 +38,7 @@ export function playAdmissionSmoke(wasm) {
     const selected = menu.view(), saved = menu.serialize(), bytes = selected.customSkin.slice();
     assert.equal(policy.accept(), true);
     session.play({ endpoint:'ws://127.0.0.1:19400/slither', nickname:selected.nickname, skin:selected.skin, customSkin:selected.customSkin,
-      profile:{clientVersion:0,password:new Uint8Array(20),protocolVersion:19} });
+      profile:{clientVersion:0,pageEcho:new Uint8Array(20),protocolVersion:19} });
     selected.customSkin.fill(0);
     assert.deepEqual(encoded, Uint8Array.from([115,30,0,0,...new Array(20).fill(0),2,10,...Buffer.from(' Retained '),0,255,...bytes]));
     assert.equal(policy.accept(), false); assert.equal(menu.serialize(), saved);

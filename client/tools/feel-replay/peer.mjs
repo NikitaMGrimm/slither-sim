@@ -166,10 +166,12 @@ window.replayStep = async (event, data, ordinal) => {
   // A task boundary drains the entire microtask queue, including recursively
   // queued publication work, without advancing virtual time or adding a draw.
   await settle();
-  const observations = (peer === 'canvas-wasm' ? scene.take_feel_trace() : owner.take_feel_trace()).map(([phase, token, cells]) => [phase, token, Array.from(cells)]);
-  const observationErrors = (peer === 'canvas-wasm' ? scene : owner).take_feel_trace_errors();
+  const recorder = peer === 'canvas-wasm' ? scene : owner;
+  const observations = recorder.take_feel_trace().map(([phase, token, cells, sequence]) => [phase, token, Array.from(cells), sequence]);
+  const pictures = recorder.take_feel_pictures();
+  const observationErrors = recorder.take_feel_trace_errors();
   recorderErrors.push(...observationErrors.map(reason => ({ seq, reason })));
-  return stringify({ seq, sourceId: event.sourceId, atMs: clock.now(), observations, observationErrors, commands: currentCommands, effects: currentEffects,
+  return stringify({ seq, sourceId: event.sourceId, atMs: clock.now(), observations, pictures, observationErrors, commands: currentCommands, effects: currentEffects,
     event: { seq, sourceId: event.sourceId, kind: event.kind, scheduledMs: event.atMs, actualMs: clock.now(),
       ...observed, target: event.kind === 'input' && !data?.control ? (data.target ?? 'surface') : observed.target },
     geometry: geometry(), ...metadata(), failed, sendFailed });

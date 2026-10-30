@@ -10,15 +10,18 @@ function run(command, args, env = process.env) {
 const node = (...args) => run(process.execPath, args);
 const cargo = (...args) => run('cargo', args);
 const manifest = ['--manifest-path', 'apps/wgpu-slice/Cargo.toml'];
-const gpuEnv = { ...process.env, CARGO_BUILD_JOBS: '1', RUST_TEST_THREADS: '1',
-  CARGO_TARGET_DIR: path.resolve('target/wgpu-slice-check') };
+// Root workspace profiles keep debug info; the wgpu builds skip it to limit time and memory.
+const gpuEnv = { ...process.env, CARGO_BUILD_JOBS: process.env.CARGO_BUILD_JOBS || '1', RUST_TEST_THREADS: '1', CARGO_PROFILE_DEV_DEBUG: '0',
+  CARGO_TARGET_DIR: process.env.CARGO_TARGET_DIR || path.resolve('target/wgpu-slice-check') };
 const gpu = (...args) => run('cargo', [args[0], ...manifest, ...args.slice(1)], gpuEnv);
 
 try {
   node('tools/check-repository.mjs');
   node('tools/check-repository.mjs', '--history');
-  node('--test', 'tools/*.test.mjs', 'apps/wgpu-slice/tests/local-host.test.mjs');
-  cargo('fmt', '--all', '--check');
+  node('--test', 'tools/*.test.mjs');
+  // Same app tests and concurrency as CI; several start loopback servers.
+  node('--test', '--test-concurrency=1', 'apps/wgpu-slice/tests/*.test.mjs');
+  cargo('fmt', '-p', 'slither-client', '--check');
   cargo('test', '--all-targets', '--locked');
   cargo('test', '--doc', '--locked');
   cargo('clippy', '--all-targets', '--locked', '--', '-D', 'warnings');

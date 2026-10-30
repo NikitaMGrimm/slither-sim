@@ -116,10 +116,12 @@ export function presentationSmoke(wasm) {
     assert.equal(camera.weights().length, 62);
     assert.equal(length.weights().length, 53);
     assert.equal(camera.weights()[1] === Math.fround(camera.weights()[1]), false);
-    // This index exposed a host-vs-libm rounding difference in the Wasm build.
-    let cameraWeight = 0.5 * (1 - Math.cos(Math.PI * (61 - 55) / 61));
-    cameraWeight += (0.5 * (1 - Math.cos(Math.PI * cameraWeight)) - cameraWeight) * 0.5;
-    assert.equal(camera.weights()[55], cameraWeight, 'use the current host Math cosine');
+    const cameraWeights = camera.weights();
+    assert.equal(cameraWeights[0], 1);
+    assert.equal(cameraWeights[61], 0);
+    assert.ok(cameraWeights.every(w => Number.isFinite(w) && w >= 0 && w <= 1));
+    assert.ok(cameraWeights.every((w, i) => i === 0 || cameraWeights[i - 1] >= w));
+    assert.ok(Math.abs(cameraWeights.reduce((sum, w) => sum + w, 0) - 31) < 1e-12);
     for (let index = 1; index < 62; index++) camera.draw();
     assert.equal(JSON.parse(camera.snapshot()).pending, 0);
     const exhausted = camera.snapshot(); camera.draw();

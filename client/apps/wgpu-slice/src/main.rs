@@ -13,6 +13,7 @@ mod desktop {
         Result,
         game::LocalGame,
         gpu::{SurfaceHost, instance},
+        menu_input_native::{NativeMenuInput, WindowEditHost},
         native::{Event, Transport},
         official::{self, Preparation},
     };
@@ -141,6 +142,9 @@ mod desktop {
         Ok(Some(o))
     }
     struct Running {
+        // PR2 is an inactive input seam; the later menu compositor owns creation,
+        // StartMenuState clocks/focus intents, admission and deferred Play effects.
+        menu_input: Option<(NativeMenuInput, slither_client::start_page::StartMenuState)>,
         window: Arc<Window>,
         host: SurfaceHost,
         game: LocalGame,
@@ -248,6 +252,8 @@ mod desktop {
             self.game
                 .observe_time(self.started.elapsed().as_secs_f64() * 1000.)?;
             self.effects()?;
+            self.game.service_ingress()?;
+            self.effects()?;
             let active = !matches!(
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
@@ -305,11 +311,9 @@ mod desktop {
             // FIFO may have waited. Ingest everything now available before
             // sampling the next frame; receive() retains its own deferral rules.
             self.service()?;
-            if !self.game.has_frame() {
-                self.game
-                    .begin_frame(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
-                self.effects()?;
-            }
+            self.game
+                .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
+            self.effects()?;
             let Some(p) = self.game.take_frame() else {
                 self.host.discard_acquired();
                 self.schedule.retry(Instant::now());
@@ -429,6 +433,7 @@ mod desktop {
                 host.renderer.adapter_info, host.renderer.sample_count
             );
             Ok(Running {
+                menu_input: None,
                 window,
                 host,
                 game,
@@ -473,6 +478,36 @@ mod desktop {
                 return;
             }
             let result = (|| -> Result<()> {
+                if let Some((input, menu)) = &mut r.menu_input {
+                    use slither_client::menu_input::HostEditEffect;
+                    let mapped = input.window_event(&event);
+                    let effects = input.execute(mapped.effects, &mut WindowEditHost(&r.window));
+                    let effects = input.state.commit_menu(effects, menu, r.game.can_play());
+                    for effect in input.execute(effects, &mut WindowEditHost(&r.window)) {
+                        match effect {
+                            HostEditEffect::Gameplay { key, pressed } => {
+                                r.game.key(key.name(), pressed);
+                            }
+                            HostEditEffect::ReleasePointerBoost => r.game.mouse_up(),
+                            HostEditEffect::ClipboardFailed(error) => eprintln!("{error}"),
+                            _ => {}
+                        }
+                    }
+                    if mapped.consumed {
+                        return Ok(());
+                    }
+                    if input.state.suspends_gameplay()
+                        && matches!(
+                            &event,
+                            WindowEvent::MouseInput {
+                                state: ElementState::Pressed,
+                                ..
+                            }
+                        )
+                    {
+                        return Ok(());
+                    }
+                }
                 match event {
                     WindowEvent::CloseRequested => {
                         if let Some(p) = &r.preparation {

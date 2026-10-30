@@ -1,0 +1,2785 @@
+{
+  "pins": {
+    "runtime": "9cd6ba6922c0a63b525ba88b69f86c8558142596",
+    "runtimeArchiveSha256": "5be813231c579e36f27dbc3ee4425ba41d238f9488d7db15cc17c787394fcc76",
+    "sourceManifestSha256": "d47631a775c9537ec45790383b2f9650267bf86746527d1211ca747943c534fc",
+    "runtimeSrcUnchanged": true,
+    "binaries": {
+      "clients": "047b957aa26e45f0a39d88af6c28801ac0834ff1a3793c5df54cee09450c566e",
+      "probe": "280a2b395ba6b6750d4f7dd3c359b57d43a7598d81e453b6d8eb05b4f448586c",
+      "host": "55d3720fa686c2ed05b11a37f2017d056fdd39139a9e86c7494cf0f194414dea"
+    },
+    "probeSourceSha256": "52aade2b8d21e658724b66f8aae99f1d8fe16a5b5ac5ecb5c368c03f079fbde3",
+    "loadSourceSha256": "3e3e702536243790ee43047dfbebe3dc7cf7eac20fb31498e0bb0d6e4ce45ca5",
+    "portable": true,
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "buildArchive": {
+      "complete": true,
+      "allMembersVerified": true,
+      "requiredSourcesVerified": true,
+      "archiveBytes": 20001455,
+      "archiveSha256": "407b60d66b5f39299cf45a0402451d97c21650c0922920766b64757e1542d851",
+      "manifestSha256": "cfe20ffacd70cefde397fc679cdab98d9af4ded6d0f4722667ccd15620d68e4c",
+      "nativeBinariesMatchFirstAttempt": true
+    },
+    "analysisSha256": {
+      "assemble.py": "85166fbef15226c5bedbed390fbd746451dc5bb470d507226c6a030564bfdb31",
+      "reduce.py": "72c94f1c6bf8c2ac5f73d17ac6aef134bb3ace33a77891372897f7066a560803",
+      "historical.py": "b7df106d207750be0ded314691e312d95afdb44adf286530edd8d62b66dd6880",
+      "tables.py": "ec5eee136cd6f72a673452e7d77c7767e87ce781dd5be7f2f2ab7327130b9c26",
+      "test_reduce.py": "d22bb35b069176d99e6e044268d9f3cfe3621bf2e27be93381d867c7b7f3931f"
+    }
+  },
+  "rows": [
+    {
+      "label": "01-solo",
+      "seats": 1,
+      "seconds": 360.00014901161194,
+      "attempts": 805,
+      "confirmed": 805,
+      "censored": {},
+      "unobservedAtBoundary": 0,
+      "inputToEffectMs": {
+        "n": 805,
+        "min": 0.3177019999895947,
+        "mean": 4.202320160248642,
+        "p50": 4.285809000002416,
+        "p95": 7.229370000004565,
+        "p99": 7.846905000000959,
+        "max": 8.004774999989195
+      },
+      "latencyByStatsBucketMs": {
+        "normal-bucket": {
+          "n": 805,
+          "min": 0.3177019999895947,
+          "mean": 4.202320160248642,
+          "p50": 4.285809000002416,
+          "p95": 7.229370000004565,
+          "p99": 7.846905000000959,
+          "max": 8.004774999989195
+        }
+      },
+      "rttMs": {
+        "control": {
+          "n": 359,
+          "min": 0.16157099999247748,
+          "mean": 0.6541139025077579,
+          "p50": 0.6297749999930602,
+          "p95": 1.2165979999991805,
+          "p99": 1.2505890000085174,
+          "max": 1.2536989999887282
+        },
+        "game": {
+          "n": 1440,
+          "min": 0.3172119999987899,
+          "mean": 4.144486497916712,
+          "p50": 4.156688999984226,
+          "p95": 7.228569999995216,
+          "p99": 7.693202999998761,
+          "max": 8.156086000013829
+        },
+        "icmp": {
+          "n": 1731,
+          "min": 0.136,
+          "mean": 0.16196995956094742,
+          "p50": 0.161,
+          "p95": 0.179,
+          "p99": 0.188,
+          "max": 0.224
+        }
+      },
+      "latencyMinusRttMs": {
+        "icmp": {
+          "n": 805,
+          "min": 0.14866300002750357,
+          "mean": 4.04053755155299,
+          "p50": 4.123830000002188,
+          "p95": 7.08276000001393,
+          "p99": 7.68947399995922,
+          "max": 7.855774999989195
+        },
+        "control": {
+          "n": 805,
+          "min": -0.6515050000075462,
+          "mean": 3.5477643440988755,
+          "p50": 3.525854000002937,
+          "p95": 6.747226000015871,
+          "p99": 7.213809999996101,
+          "max": 7.525751000002856
+        }
+      },
+      "captureEffectMs": {
+        "outgoingToIncoming": {
+          "n": 805,
+          "min": 0.2498626708984375,
+          "mean": 4.124279792264382,
+          "p50": 4.17017936706543,
+          "p95": 7.189750671386719,
+          "p99": 7.7915191650390625,
+          "max": 7.970571517944336
+        },
+        "sendToOutgoing": {
+          "n": 805,
+          "min": 0.0007152557373046875,
+          "mean": 0.0013357363872646545,
+          "p50": 0.0011920928955078125,
+          "p95": 0.0019073486328125,
+          "p99": 0.0030994415283203125,
+          "max": 0.019550323486328125
+        },
+        "echoReadAge": {
+          "n": 805,
+          "min": 0.0064373016357421875,
+          "mean": 0.07670118201593434,
+          "p50": 0.08130073547363281,
+          "p95": 0.12755393981933594,
+          "p99": 0.1404285430908203,
+          "max": 0.15854835510253906
+        },
+        "appMinusKernel": {
+          "n": 805,
+          "min": 0.007297422854435354,
+          "mean": 0.07804036798426094,
+          "p50": 0.08248559998946803,
+          "p95": 0.12912351110117015,
+          "p99": 0.14170922229084226,
+          "max": 0.17129957677752827
+        },
+        "unmatchedEchoes": 0
+      },
+      "sendCallMs": {
+        "n": 805,
+        "min": 0.0006500000040432496,
+        "mean": 0.005569787577145208,
+        "p50": 0.005500000014535544,
+        "p95": 0.006409999997458726,
+        "p99": 0.0074599999777547055,
+        "max": 0.011209999968286866
+      },
+      "sendLatenessMs": {
+        "n": 805,
+        "min": 0.00016825705273504354,
+        "mean": 0.07402731069661424,
+        "p50": 0.07234203206962775,
+        "p95": 0.14761698288623393,
+        "p99": 0.15429094310093205,
+        "max": 0.15527188858754926
+      },
+      "observedDeferredTicks": 0,
+      "enclosingStatsDeferredTicks": 0,
+      "generator": [],
+      "generatorQualified": true,
+      "loadClientFrameMetricsMs": {
+        "gap": {
+          "n": 0
+        },
+        "gapResidual": {
+          "n": 0
+        },
+        "excess": {
+          "n": 0
+        }
+      },
+      "loadClientResidualStalls": {
+        "20": 0,
+        "100": 0,
+        "250": 0
+      },
+      "loadWorkerMaxPassMs": {
+        "n": 0
+      },
+      "probeFramesMatched": 18869,
+      "captures": [
+        {
+          "life": 1,
+          "verified": true,
+          "payloadSegments": 19259,
+          "overlappingSegments": 0,
+          "binaryFrames": 18870,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 18869,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 11943,
+            "overlappingSegments": 0,
+            "binaryFrames": 11554,
+            "unparsedTailBytes": 0
+          }
+        }
+      ],
+      "captureCoverage": {
+        "primaryPlayingFrames": 17493,
+        "verifiedPrimaryPlayingFrames": 17493,
+        "verifiedInputEchoes": 805,
+        "unmatchedInputEchoes": 0
+      },
+      "frameMetricsMs": {
+        "readAge": {
+          "n": 17493,
+          "min": 0.0045299530029296875,
+          "mean": 0.07441996137880376,
+          "p50": 0.07653236389160156,
+          "p95": 0.1289844512939453,
+          "p99": 0.15735626220703125,
+          "max": 1.7271041870117188
+        },
+        "gap": {
+          "n": 17493,
+          "min": 6.169123000006493,
+          "mean": 20.579035504430344,
+          "p50": 14.102597999993804,
+          "p95": 42.001257999970676,
+          "p99": 55.995150000001104,
+          "max": 98.00096899999744
+        },
+        "packetGap": {
+          "n": 17493,
+          "min": 6.637811660766602,
+          "mean": 20.579031712739155,
+          "p50": 14.045238494873047,
+          "p95": 42.01340675354004,
+          "p99": 55.99546432495117,
+          "max": 98.02436828613281
+        },
+        "gapResidual": {
+          "n": 17493,
+          "min": -1.615994000009323,
+          "mean": 3.891785286706768e-06,
+          "p50": 5.2000038522237446e-05,
+          "p95": 0.07233899998982452,
+          "p99": 0.15946600000529543,
+          "max": 1.616357000033986
+        },
+        "packetGapResidual": {
+          "n": 17493,
+          "min": -0.36218833923339844,
+          "mean": 1.0009409734876094e-07,
+          "p50": 0.0001163482666015625,
+          "p95": 0.038593292236328125,
+          "p99": 0.08270072937011719,
+          "max": 0.37008094787597656
+        },
+        "excess": {
+          "n": 17493,
+          "min": 0.0,
+          "mean": 0.10272699011919037,
+          "p50": 0.09922599999845261,
+          "p95": 0.16109399998094887,
+          "p99": 0.24877800000831485,
+          "max": 1.7712540000211447
+        },
+        "packetExcess": {
+          "n": 17493,
+          "min": 0.0,
+          "mean": 0.07019787546715114,
+          "p50": 0.069580078125,
+          "p95": 0.104736328125,
+          "p99": 0.1484375,
+          "max": 0.445068359375
+        }
+      },
+      "stalls": {
+        "rawGap": {
+          "20": 8626,
+          "100": 0,
+          "250": 0
+        },
+        "packetGap": {
+          "20": 8626,
+          "100": 0,
+          "250": 0
+        },
+        "gapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        },
+        "packetGapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        }
+      },
+      "largestTenGaps": [
+        {
+          "life": 1,
+          "frame": 16650,
+          "gapMs": 98.00096899999744,
+          "headerDeltaMs": 98,
+          "residualMs": 0.0009689999974398233
+        },
+        {
+          "life": 1,
+          "frame": 12708,
+          "gapMs": 98.00071800003707,
+          "headerDeltaMs": 98,
+          "residualMs": 0.0007180000370681228
+        },
+        {
+          "life": 1,
+          "frame": 10629,
+          "gapMs": 98.00040700000068,
+          "headerDeltaMs": 98,
+          "residualMs": 0.00040700000067772635
+        },
+        {
+          "life": 1,
+          "frame": 15433,
+          "gapMs": 98.00016799999867,
+          "headerDeltaMs": 98,
+          "residualMs": 0.00016799999866634607
+        },
+        {
+          "life": 1,
+          "frame": 3509,
+          "gapMs": 97.99764299999936,
+          "headerDeltaMs": 98,
+          "residualMs": -0.0023570000006429837
+        },
+        {
+          "life": 1,
+          "frame": 15810,
+          "gapMs": 97.9968279999639,
+          "headerDeltaMs": 98,
+          "residualMs": -0.003172000036101963
+        },
+        {
+          "life": 1,
+          "frame": 13941,
+          "gapMs": 97.99567499999284,
+          "headerDeltaMs": 98,
+          "residualMs": -0.004325000007156632
+        },
+        {
+          "life": 1,
+          "frame": 4396,
+          "gapMs": 91.06749400000069,
+          "headerDeltaMs": 91,
+          "residualMs": 0.06749400000069272
+        },
+        {
+          "life": 1,
+          "frame": 1957,
+          "gapMs": 91.06549400000574,
+          "headerDeltaMs": 91,
+          "residualMs": 0.06549400000574224
+        },
+        {
+          "life": 1,
+          "frame": 6905,
+          "gapMs": 91.06319299999655,
+          "headerDeltaMs": 91,
+          "residualMs": 0.06319299999654504
+        }
+      ],
+      "minimumSampleQuotaPass": true,
+      "sourceArchiveSha256": "30431c53dc9aadc3a3667d749003cdafab43d5abb8e9ad1dab172727e68baf2a",
+      "archive": {
+        "bytes": 3838246,
+        "manifestSha256": "5661fc0bd6a5e211b81e7e7495de9ca06d808f29add0d24758c200376295cef9",
+        "completeReceiptAndSourcesVerified": true
+      },
+      "evidenceStatus": "qualified"
+    },
+    {
+      "label": "02-80",
+      "seats": 80,
+      "seconds": 360.00022625923157,
+      "attempts": 748,
+      "confirmed": 748,
+      "censored": {},
+      "unobservedAtBoundary": 0,
+      "inputToEffectMs": {
+        "n": 748,
+        "min": 1.4125589999594013,
+        "mean": 5.326475918451555,
+        "p50": 5.376747000013893,
+        "p95": 8.448829999963436,
+        "p99": 8.756600999959119,
+        "max": 8.937252000009721
+      },
+      "latencyByStatsBucketMs": {
+        "normal-bucket": {
+          "n": 748,
+          "min": 1.4125589999594013,
+          "mean": 5.326475918451555,
+          "p50": 5.376747000013893,
+          "p95": 8.448829999963436,
+          "p99": 8.756600999959119,
+          "max": 8.937252000009721
+        }
+      },
+      "rttMs": {
+        "control": {
+          "n": 355,
+          "min": 0.1599409999926138,
+          "mean": 0.7771510704233279,
+          "p50": 0.7834559999650992,
+          "p95": 1.3735499999256717,
+          "p99": 1.411159999975098,
+          "max": 1.5682210000136365
+        },
+        "game": {
+          "n": 1419,
+          "min": 1.3769600000159699,
+          "mean": 5.21417306483416,
+          "p50": 5.2206459999979415,
+          "p95": 8.317309000005935,
+          "p99": 8.752681999965262,
+          "max": 8.910502999981418
+        },
+        "icmp": {
+          "n": 1731,
+          "min": 0.128,
+          "mean": 0.16470363951473138,
+          "p50": 0.156,
+          "p95": 0.232,
+          "p99": 0.32,
+          "max": 0.424
+        }
+      },
+      "latencyMinusRttMs": {
+        "icmp": {
+          "n": 748,
+          "min": 1.2545589999594013,
+          "mean": 5.161201854280431,
+          "p50": 5.226716999997668,
+          "p95": 8.295391999996195,
+          "p99": 8.59535099999827,
+          "max": 8.793252000009721
+        },
+        "control": {
+          "n": 748,
+          "min": 0.34701100003076135,
+          "mean": 4.552216852942971,
+          "p50": 4.591561999973237,
+          "p95": 7.81493900001351,
+          "p99": 8.253995999950803,
+          "max": 8.440948999975717
+        }
+      },
+      "captureEffectMs": {
+        "outgoingToIncoming": {
+          "n": 748,
+          "min": 1.2531280517578125,
+          "mean": 5.2411846298584965,
+          "p50": 5.300283432006836,
+          "p95": 8.358478546142578,
+          "p99": 8.649826049804688,
+          "max": 8.918523788452148
+        },
+        "sendToOutgoing": {
+          "n": 748,
+          "min": 0.0007152557373046875,
+          "mean": 0.0013693131227544284,
+          "p50": 0.0011920928955078125,
+          "p95": 0.0019073486328125,
+          "p99": 0.0035762786865234375,
+          "max": 0.015974044799804688
+        },
+        "echoReadAge": {
+          "n": 748,
+          "min": 0.004291534423828125,
+          "mean": 0.08388158471826564,
+          "p50": 0.08273124694824219,
+          "p95": 0.15354156494140625,
+          "p99": 0.1590251922607422,
+          "max": 0.1633167266845703
+        },
+        "appMinusKernel": {
+          "n": 748,
+          "min": 0.0055042664826032706,
+          "mean": 0.08529128859305836,
+          "p50": 0.08443258843726653,
+          "p95": 0.15495616094085563,
+          "p99": 0.16016148833841726,
+          "max": 0.16493377449933178
+        },
+        "unmatchedEchoes": 0
+      },
+      "sendCallMs": {
+        "n": 748,
+        "min": 0.0009000000318337698,
+        "mean": 0.0056861590925160405,
+        "p50": 0.0056999999742402,
+        "p95": 0.006640000037805294,
+        "p99": 0.007060000029923685,
+        "max": 0.009360000035485427
+      },
+      "sendLatenessMs": {
+        "n": 748,
+        "min": 0.0003738311988854548,
+        "mean": 0.07723394824468191,
+        "p50": 0.0754801945959116,
+        "p95": 0.14919880680963615,
+        "p99": 0.15558660646775024,
+        "max": 0.23582818005252193
+      },
+      "observedDeferredTicks": 0,
+      "enclosingStatsDeferredTicks": 0,
+      "generator": [
+        {
+          "worker": 1,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.04904297201699657,
+            "mean": 0.05822784151364399,
+            "p50": 0.058163622966733275,
+            "p95": 0.06310205265943264,
+            "p99": 0.0653246410053727,
+            "max": 0.06621527222801807
+          },
+          "worstInputP99Ms": 3.863396,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 2,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.048296015478853274,
+            "mean": 0.05693968708440158,
+            "p50": 0.05689915059940705,
+            "p95": 0.06148613472961517,
+            "p99": 0.06286472733888002,
+            "max": 0.06439621882875979
+          },
+          "worstInputP99Ms": 2.399441,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 3,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.04827435667888231,
+            "mean": 0.05575568539878339,
+            "p50": 0.055928011828512314,
+            "p95": 0.06019806727175242,
+            "p99": 0.061421235319171714,
+            "max": 0.06218419953502169
+          },
+          "worstInputP99Ms": 3.273226,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 4,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.04958565933852572,
+            "mean": 0.056343545366374814,
+            "p50": 0.05636339498433592,
+            "p95": 0.060818718786717005,
+            "p99": 0.06274427187594245,
+            "max": 0.06385918640923406
+          },
+          "worstInputP99Ms": 3.017113,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 5,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.04799299853506839,
+            "mean": 0.05583231237868501,
+            "p50": 0.055823711300854006,
+            "p95": 0.06073191860293991,
+            "p99": 0.06280008515801375,
+            "max": 0.06424065489953368
+          },
+          "worstInputP99Ms": 3.845317,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 6,
+          "reports": 359,
+          "cpuFraction": {
+            "n": 359,
+            "min": 0.048379934279621485,
+            "mean": 0.05641304647426571,
+            "p50": 0.05659058832919403,
+            "p95": 0.0608455007975758,
+            "p99": 0.06213470286494109,
+            "max": 0.06268310694344312
+          },
+          "worstInputP99Ms": 3.213514,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        }
+      ],
+      "generatorQualified": true,
+      "loadClientFrameMetricsMs": {
+        "gap": {
+          "n": 3788627,
+          "p50": 7.002,
+          "p95": 7.465,
+          "p99": 21.018,
+          "max": 100.773
+        },
+        "gapResidual": {
+          "n": 3788627,
+          "p50": -0.001,
+          "p95": 0.289,
+          "p99": 0.57,
+          "max": 11.689
+        },
+        "excess": {
+          "n": 3788627,
+          "p50": 0.257,
+          "p95": 0.529,
+          "p99": 0.827,
+          "max": 11.853
+        }
+      },
+      "loadClientResidualStalls": {
+        "20": 0,
+        "100": 0,
+        "250": 0
+      },
+      "loadWorkerMaxPassMs": {
+        "n": 2154,
+        "min": 0.09787,
+        "mean": 2.2166906429897866,
+        "p50": 3.518174,
+        "p95": 4.39857,
+        "p99": 4.982971,
+        "max": 8.232746
+      },
+      "probeFramesMatched": 82340,
+      "captures": [
+        {
+          "life": 1,
+          "verified": true,
+          "payloadSegments": 1570,
+          "overlappingSegments": 0,
+          "binaryFrames": 1553,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1553,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 363,
+            "overlappingSegments": 0,
+            "binaryFrames": 346,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 2,
+          "verified": true,
+          "payloadSegments": 2878,
+          "overlappingSegments": 0,
+          "binaryFrames": 2856,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2856,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 619,
+            "overlappingSegments": 0,
+            "binaryFrames": 597,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 3,
+          "verified": true,
+          "payloadSegments": 1623,
+          "overlappingSegments": 0,
+          "binaryFrames": 1608,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1608,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 397,
+            "overlappingSegments": 0,
+            "binaryFrames": 382,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 4,
+          "verified": true,
+          "payloadSegments": 3539,
+          "overlappingSegments": 0,
+          "binaryFrames": 3511,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3511,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 761,
+            "overlappingSegments": 0,
+            "binaryFrames": 733,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 5,
+          "verified": false,
+          "recordedFrames": 834,
+          "droppedPackets": 54,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 6,
+          "verified": true,
+          "payloadSegments": 1333,
+          "overlappingSegments": 0,
+          "binaryFrames": 1322,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1322,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 297,
+            "overlappingSegments": 0,
+            "binaryFrames": 286,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 7,
+          "verified": true,
+          "payloadSegments": 1349,
+          "overlappingSegments": 0,
+          "binaryFrames": 1338,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1338,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 294,
+            "overlappingSegments": 0,
+            "binaryFrames": 283,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 8,
+          "verified": true,
+          "payloadSegments": 2184,
+          "overlappingSegments": 0,
+          "binaryFrames": 2166,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2166,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 489,
+            "overlappingSegments": 0,
+            "binaryFrames": 471,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 9,
+          "verified": true,
+          "payloadSegments": 5896,
+          "overlappingSegments": 0,
+          "binaryFrames": 5851,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 5851,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1249,
+            "overlappingSegments": 0,
+            "binaryFrames": 1204,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 10,
+          "verified": false,
+          "recordedFrames": 2654,
+          "droppedPackets": 2,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 11,
+          "verified": true,
+          "payloadSegments": 2335,
+          "overlappingSegments": 0,
+          "binaryFrames": 2317,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2317,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 489,
+            "overlappingSegments": 0,
+            "binaryFrames": 471,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 12,
+          "verified": true,
+          "payloadSegments": 1000,
+          "overlappingSegments": 0,
+          "binaryFrames": 991,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 991,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 244,
+            "overlappingSegments": 0,
+            "binaryFrames": 235,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 13,
+          "verified": true,
+          "payloadSegments": 2024,
+          "overlappingSegments": 0,
+          "binaryFrames": 2007,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2007,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 449,
+            "overlappingSegments": 0,
+            "binaryFrames": 432,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 14,
+          "verified": true,
+          "payloadSegments": 1408,
+          "overlappingSegments": 0,
+          "binaryFrames": 1396,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1396,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 308,
+            "overlappingSegments": 0,
+            "binaryFrames": 296,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 15,
+          "verified": true,
+          "payloadSegments": 1516,
+          "overlappingSegments": 0,
+          "binaryFrames": 1503,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1503,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 343,
+            "overlappingSegments": 0,
+            "binaryFrames": 330,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 16,
+          "verified": true,
+          "payloadSegments": 7448,
+          "overlappingSegments": 0,
+          "binaryFrames": 7393,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 7393,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1535,
+            "overlappingSegments": 0,
+            "binaryFrames": 1480,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 17,
+          "verified": true,
+          "payloadSegments": 2737,
+          "overlappingSegments": 0,
+          "binaryFrames": 2715,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2715,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 623,
+            "overlappingSegments": 0,
+            "binaryFrames": 601,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 18,
+          "verified": true,
+          "payloadSegments": 3512,
+          "overlappingSegments": 0,
+          "binaryFrames": 3484,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3484,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 804,
+            "overlappingSegments": 0,
+            "binaryFrames": 776,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 19,
+          "verified": true,
+          "payloadSegments": 1552,
+          "overlappingSegments": 0,
+          "binaryFrames": 1538,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1538,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 391,
+            "overlappingSegments": 0,
+            "binaryFrames": 377,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 20,
+          "verified": true,
+          "payloadSegments": 1563,
+          "overlappingSegments": 0,
+          "binaryFrames": 1549,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1549,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 376,
+            "overlappingSegments": 0,
+            "binaryFrames": 362,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 21,
+          "verified": true,
+          "payloadSegments": 3089,
+          "overlappingSegments": 0,
+          "binaryFrames": 3065,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3065,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 722,
+            "overlappingSegments": 0,
+            "binaryFrames": 698,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 22,
+          "verified": true,
+          "payloadSegments": 1965,
+          "overlappingSegments": 0,
+          "binaryFrames": 1950,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1950,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 429,
+            "overlappingSegments": 0,
+            "binaryFrames": 414,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 23,
+          "verified": true,
+          "payloadSegments": 4443,
+          "overlappingSegments": 0,
+          "binaryFrames": 4411,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 4411,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 976,
+            "overlappingSegments": 0,
+            "binaryFrames": 944,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 24,
+          "verified": true,
+          "payloadSegments": 1654,
+          "overlappingSegments": 0,
+          "binaryFrames": 1641,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1641,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 394,
+            "overlappingSegments": 0,
+            "binaryFrames": 381,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 25,
+          "verified": true,
+          "payloadSegments": 1126,
+          "overlappingSegments": 0,
+          "binaryFrames": 1116,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1116,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 264,
+            "overlappingSegments": 0,
+            "binaryFrames": 254,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 26,
+          "verified": true,
+          "payloadSegments": 1370,
+          "overlappingSegments": 0,
+          "binaryFrames": 1359,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1359,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 333,
+            "overlappingSegments": 0,
+            "binaryFrames": 322,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 27,
+          "verified": true,
+          "payloadSegments": 3184,
+          "overlappingSegments": 0,
+          "binaryFrames": 3159,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3159,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 723,
+            "overlappingSegments": 0,
+            "binaryFrames": 698,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 28,
+          "verified": true,
+          "payloadSegments": 3397,
+          "overlappingSegments": 0,
+          "binaryFrames": 3372,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3372,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 761,
+            "overlappingSegments": 0,
+            "binaryFrames": 736,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 29,
+          "verified": true,
+          "payloadSegments": 1688,
+          "overlappingSegments": 0,
+          "binaryFrames": 1673,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1673,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 413,
+            "overlappingSegments": 0,
+            "binaryFrames": 398,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 30,
+          "verified": true,
+          "payloadSegments": 1116,
+          "overlappingSegments": 0,
+          "binaryFrames": 1106,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1106,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 270,
+            "overlappingSegments": 0,
+            "binaryFrames": 260,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 31,
+          "verified": true,
+          "payloadSegments": 755,
+          "overlappingSegments": 0,
+          "binaryFrames": 747,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 747,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 210,
+            "overlappingSegments": 0,
+            "binaryFrames": 202,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 32,
+          "verified": true,
+          "payloadSegments": 1519,
+          "overlappingSegments": 0,
+          "binaryFrames": 1506,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1506,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 375,
+            "overlappingSegments": 0,
+            "binaryFrames": 362,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 33,
+          "verified": true,
+          "payloadSegments": 1996,
+          "overlappingSegments": 0,
+          "binaryFrames": 1981,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1981,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 446,
+            "overlappingSegments": 0,
+            "binaryFrames": 431,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 34,
+          "verified": true,
+          "payloadSegments": 2118,
+          "overlappingSegments": 0,
+          "binaryFrames": 2102,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2102,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 478,
+            "overlappingSegments": 0,
+            "binaryFrames": 462,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 35,
+          "verified": true,
+          "payloadSegments": 2202,
+          "overlappingSegments": 0,
+          "binaryFrames": 2184,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2184,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 506,
+            "overlappingSegments": 0,
+            "binaryFrames": 488,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 36,
+          "verified": true,
+          "payloadSegments": 5916,
+          "overlappingSegments": 0,
+          "binaryFrames": 5874,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 5870,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1309,
+            "overlappingSegments": 0,
+            "binaryFrames": 1267,
+            "unparsedTailBytes": 0
+          }
+        }
+      ],
+      "captureCoverage": {
+        "primaryPlayingFrames": 47015,
+        "verifiedPrimaryPlayingFrames": 47015,
+        "verifiedInputEchoes": 748,
+        "unmatchedInputEchoes": 0
+      },
+      "frameMetricsMs": {
+        "readAge": {
+          "n": 47015,
+          "min": 0.0035762786865234375,
+          "mean": 0.08517220389725083,
+          "p50": 0.08440017700195312,
+          "p95": 0.15473365783691406,
+          "p99": 0.16260147094726562,
+          "max": 1.5609264373779297
+        },
+        "gap": {
+          "n": 47015,
+          "min": 5.380688999991889,
+          "mean": 7.506517309645861,
+          "p50": 6.997718000036457,
+          "p95": 7.382171000017479,
+          "p99": 21.086186999980328,
+          "max": 98.15593100000797
+        },
+        "packetGap": {
+          "n": 47015,
+          "min": 5.378246307373047,
+          "mean": 7.506531532122888,
+          "p50": 7.003545761108398,
+          "p95": 7.356882095336914,
+          "p99": 21.048307418823242,
+          "max": 98.22463989257812
+        },
+        "gapResidual": {
+          "n": 47015,
+          "min": -1.6193110000081106,
+          "mean": -0.0001507750079732554,
+          "p50": -0.004581000036523619,
+          "p95": 0.22572999995918508,
+          "p99": 0.3853620000363662,
+          "max": 1.5586799999646246
+        },
+        "packetGapResidual": {
+          "n": 47015,
+          "min": -1.6217536926269531,
+          "mean": -0.00013655253094611595,
+          "p50": 0.0002079010009765625,
+          "p95": 0.18832015991210938,
+          "p99": 0.3730945587158203,
+          "max": 1.424520492553711
+        },
+        "excess": {
+          "n": 47015,
+          "min": 0.0,
+          "mean": 0.19414044298242447,
+          "p50": 0.16163099999539554,
+          "p95": 0.38660999992862344,
+          "p99": 0.5971459998982027,
+          "max": 1.798220999946352
+        },
+        "packetExcess": {
+          "n": 47015,
+          "min": 0.0,
+          "mean": 0.1601046956423482,
+          "p50": 0.1357421875,
+          "p95": 0.356201171875,
+          "p99": 0.541015625,
+          "max": 1.674560546875
+        }
+      },
+      "stalls": {
+        "rawGap": {
+          "20": 711,
+          "100": 0,
+          "250": 0
+        },
+        "packetGap": {
+          "20": 711,
+          "100": 0,
+          "250": 0
+        },
+        "gapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        },
+        "packetGapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        }
+      },
+      "largestTenGaps": [
+        {
+          "life": 20,
+          "frame": 93,
+          "gapMs": 98.15593100000797,
+          "headerDeltaMs": 98,
+          "residualMs": 0.15593100000796767
+        },
+        {
+          "life": 20,
+          "frame": 92,
+          "gapMs": 83.5328000000004,
+          "headerDeltaMs": 84,
+          "residualMs": -0.4671999999995933
+        },
+        {
+          "life": 19,
+          "frame": 86,
+          "gapMs": 76.93076699996482,
+          "headerDeltaMs": 77,
+          "residualMs": -0.06923300003518307
+        },
+        {
+          "life": 19,
+          "frame": 88,
+          "gapMs": 70.30597099998204,
+          "headerDeltaMs": 70,
+          "residualMs": 0.30597099998203703
+        },
+        {
+          "life": 19,
+          "frame": 107,
+          "gapMs": 70.15595999996549,
+          "headerDeltaMs": 70,
+          "residualMs": 0.15595999996548926
+        },
+        {
+          "life": 19,
+          "frame": 109,
+          "gapMs": 70.14999000000444,
+          "headerDeltaMs": 70,
+          "residualMs": 0.1499900000044363
+        },
+        {
+          "life": 19,
+          "frame": 91,
+          "gapMs": 70.00034899999719,
+          "headerDeltaMs": 70,
+          "residualMs": 0.00034899999718618346
+        },
+        {
+          "life": 20,
+          "frame": 90,
+          "gapMs": 63.220279000006485,
+          "headerDeltaMs": 63,
+          "residualMs": 0.22027900000648515
+        },
+        {
+          "life": 20,
+          "frame": 101,
+          "gapMs": 63.0929980000019,
+          "headerDeltaMs": 63,
+          "residualMs": 0.09299800000189862
+        },
+        {
+          "life": 19,
+          "frame": 111,
+          "gapMs": 63.09266099998467,
+          "headerDeltaMs": 63,
+          "residualMs": 0.09266099998467325
+        }
+      ],
+      "minimumSampleQuotaPass": true,
+      "sourceArchiveSha256": "bae5987e7fef4c3a9ab13b6111de62a4ab66a2f41c5f661d44097e015380fe74",
+      "archive": {
+        "bytes": 39064437,
+        "manifestSha256": "7ea87efada260216db0ac2837391d87e92bf49fb937c28381a5b66bcdc546292",
+        "completeReceiptAndSourcesVerified": true
+      },
+      "evidenceStatus": "qualified"
+    },
+    {
+      "label": "03-160",
+      "seats": 160,
+      "seconds": 360.00028371810913,
+      "attempts": 770,
+      "confirmed": 769,
+      "censored": {
+        "death": 1
+      },
+      "unobservedAtBoundary": 0,
+      "inputToEffectMs": {
+        "n": 769,
+        "min": 1.3788089999877684,
+        "mean": 5.614252999999058,
+        "p50": 5.688199000005056,
+        "p95": 8.84998099996892,
+        "p99": 9.382443999982115,
+        "max": 9.69325600000559
+      },
+      "latencyByStatsBucketMs": {
+        "normal-bucket": {
+          "n": 769,
+          "min": 1.3788089999877684,
+          "mean": 5.614252999999058,
+          "p50": 5.688199000005056,
+          "p95": 8.84998099996892,
+          "p99": 9.382443999982115,
+          "max": 9.69325600000559
+        }
+      },
+      "rttMs": {
+        "control": {
+          "n": 358,
+          "min": 0.12986100000489387,
+          "mean": 0.848751148044097,
+          "p50": 0.7870250000223677,
+          "p95": 1.5700400000469017,
+          "p99": 1.8507430000056502,
+          "max": 2.284765999988281
+        },
+        "game": {
+          "n": 1426,
+          "min": 1.3776699999965558,
+          "mean": 5.647727314865837,
+          "p50": 5.6849990000102935,
+          "p95": 8.846380999997905,
+          "p99": 9.534965999989709,
+          "max": 11.848971000006259
+        },
+        "icmp": {
+          "n": 1731,
+          "min": 0.125,
+          "mean": 0.17140381282495668,
+          "p50": 0.157,
+          "p95": 0.273,
+          "p99": 0.377,
+          "max": 0.435
+        }
+      },
+      "latencyMinusRttMs": {
+        "icmp": {
+          "n": 769,
+          "min": 1.1708089999877684,
+          "mean": 5.443424651494507,
+          "p50": 5.52656899998182,
+          "p95": 8.67737100000303,
+          "p99": 9.231974000009702,
+          "max": 9.544256000005591
+        },
+        "control": {
+          "n": 769,
+          "min": -0.1529499999719519,
+          "mean": 4.770758772431317,
+          "p50": 4.775202000018908,
+          "p95": 8.152395999985629,
+          "p99": 8.771179999996548,
+          "max": 9.218742999962615
+        }
+      },
+      "captureEffectMs": {
+        "outgoingToIncoming": {
+          "n": 716,
+          "min": 1.3701915740966797,
+          "mean": 5.5043883829809435,
+          "p50": 5.576610565185547,
+          "p95": 8.77690315246582,
+          "p99": 9.339570999145508,
+          "max": 9.64045524597168
+        },
+        "sendToOutgoing": {
+          "n": 716,
+          "min": 0.0007152557373046875,
+          "mean": 0.00140087564564284,
+          "p50": 0.001430511474609375,
+          "p95": 0.0019073486328125,
+          "p99": 0.002384185791015625,
+          "max": 0.0073909759521484375
+        },
+        "echoReadAge": {
+          "n": 716,
+          "min": 0.00476837158203125,
+          "mean": 0.0846712282916021,
+          "p50": 0.08511543273925781,
+          "p95": 0.15616416931152344,
+          "p99": 0.16260147094726562,
+          "max": 0.2040863037109375
+        },
+        "appMinusKernel": {
+          "n": 716,
+          "min": 0.006365021476995025,
+          "mean": 0.0861081868504783,
+          "p50": 0.08646088257080464,
+          "p95": 0.1572594669028149,
+          "p99": 0.1634633926528295,
+          "max": 0.20512660168492403
+        },
+        "unmatchedEchoes": 53
+      },
+      "sendCallMs": {
+        "n": 770,
+        "min": 0.001630000042496249,
+        "mean": 0.0056488805189463,
+        "p50": 0.005610000002320703,
+        "p95": 0.006600000006073969,
+        "p99": 0.007269999969139462,
+        "max": 0.011090000000990585
+      },
+      "sendLatenessMs": {
+        "n": 770,
+        "min": 0.0009617746741241717,
+        "mean": 0.07883366528569444,
+        "p50": 0.0776837983949008,
+        "p95": 0.14822940005387863,
+        "p99": 0.15533694283931254,
+        "max": 0.16692762898173896
+      },
+      "observedDeferredTicks": 0,
+      "enclosingStatsDeferredTicks": 0,
+      "generator": [
+        {
+          "worker": 1,
+          "reports": 358,
+          "cpuFraction": {
+            "n": 358,
+            "min": 0.07938201406428401,
+            "mean": 0.09179731459107952,
+            "p50": 0.09159004912225421,
+            "p95": 0.09896651364609062,
+            "p99": 0.10115177505593888,
+            "max": 0.10220176009114314
+          },
+          "worstInputP99Ms": 4.465884,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 2,
+          "reports": 358,
+          "cpuFraction": {
+            "n": 358,
+            "min": 0.08237028261099327,
+            "mean": 0.09419021938109406,
+            "p50": 0.09424427548378755,
+            "p95": 0.10081798493285997,
+            "p99": 0.10396884498920618,
+            "max": 0.10563157342645878
+          },
+          "worstInputP99Ms": 4.456595,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 3,
+          "reports": 358,
+          "cpuFraction": {
+            "n": 358,
+            "min": 0.07851112391096401,
+            "mean": 0.09207668228133797,
+            "p50": 0.09166517618198862,
+            "p95": 0.10114906763716541,
+            "p99": 0.10482755120134,
+            "max": 0.10595370791946973
+          },
+          "worstInputP99Ms": 3.821693,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 4,
+          "reports": 358,
+          "cpuFraction": {
+            "n": 358,
+            "min": 0.07740035322085843,
+            "mean": 0.0903826566966394,
+            "p50": 0.09007203137954982,
+            "p95": 0.09766217469166424,
+            "p99": 0.10130291684486832,
+            "max": 0.1023122376942025
+          },
+          "worstInputP99Ms": 3.62512,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 5,
+          "reports": 357,
+          "cpuFraction": {
+            "n": 357,
+            "min": 0.07514695527950754,
+            "mean": 0.08818684065563528,
+            "p50": 0.08806738409014983,
+            "p95": 0.09535898602024283,
+            "p99": 0.09840849832204872,
+            "max": 0.10108176700645684
+          },
+          "worstInputP99Ms": 3.876422,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 6,
+          "reports": 357,
+          "cpuFraction": {
+            "n": 357,
+            "min": 0.06953679827429583,
+            "mean": 0.09040175636038668,
+            "p50": 0.09104449728601888,
+            "p95": 0.09801342550057865,
+            "p99": 0.10065125627298614,
+            "max": 0.10167521455049025
+          },
+          "worstInputP99Ms": 4.444943,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        }
+      ],
+      "generatorQualified": true,
+      "loadClientFrameMetricsMs": {
+        "gap": {
+          "n": 7255536,
+          "p50": 7.01,
+          "p95": 13.648,
+          "p99": 30.918,
+          "max": 102.889
+        },
+        "gapResidual": {
+          "n": 7255536,
+          "p50": -0.002,
+          "p95": 0.428,
+          "p99": 1.195,
+          "max": 10.735
+        },
+        "excess": {
+          "n": 7255536,
+          "p50": 0.352,
+          "p95": 0.794,
+          "p99": 1.717,
+          "max": 11.131
+        }
+      },
+      "loadClientResidualStalls": {
+        "20": 0,
+        "100": 0,
+        "250": 0
+      },
+      "loadWorkerMaxPassMs": {
+        "n": 2146,
+        "min": 0.162671,
+        "mean": 3.2978630661696178,
+        "p50": 4.099389,
+        "p95": 5.268346,
+        "p99": 7.848934,
+        "max": 13.389122
+      },
+      "probeFramesMatched": 49389,
+      "captures": [
+        {
+          "life": 1,
+          "verified": true,
+          "payloadSegments": 2951,
+          "overlappingSegments": 0,
+          "binaryFrames": 2924,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2924,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 660,
+            "overlappingSegments": 0,
+            "binaryFrames": 633,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 2,
+          "verified": true,
+          "payloadSegments": 2130,
+          "overlappingSegments": 0,
+          "binaryFrames": 2112,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2112,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 515,
+            "overlappingSegments": 0,
+            "binaryFrames": 497,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 3,
+          "verified": true,
+          "payloadSegments": 1675,
+          "overlappingSegments": 0,
+          "binaryFrames": 1660,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1660,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 401,
+            "overlappingSegments": 0,
+            "binaryFrames": 386,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 4,
+          "verified": false,
+          "recordedFrames": 815,
+          "droppedPackets": 3,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 5,
+          "verified": true,
+          "payloadSegments": 6994,
+          "overlappingSegments": 0,
+          "binaryFrames": 6942,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 6942,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1586,
+            "overlappingSegments": 0,
+            "binaryFrames": 1534,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 6,
+          "verified": true,
+          "payloadSegments": 1676,
+          "overlappingSegments": 0,
+          "binaryFrames": 1662,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1662,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 424,
+            "overlappingSegments": 0,
+            "binaryFrames": 409,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 7,
+          "verified": true,
+          "payloadSegments": 2826,
+          "overlappingSegments": 0,
+          "binaryFrames": 2803,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2803,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 660,
+            "overlappingSegments": 0,
+            "binaryFrames": 637,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 8,
+          "verified": true,
+          "payloadSegments": 2130,
+          "overlappingSegments": 0,
+          "binaryFrames": 2113,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2113,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 524,
+            "overlappingSegments": 0,
+            "binaryFrames": 507,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 9,
+          "verified": true,
+          "payloadSegments": 1296,
+          "overlappingSegments": 0,
+          "binaryFrames": 1283,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1283,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 374,
+            "overlappingSegments": 0,
+            "binaryFrames": 361,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 10,
+          "verified": true,
+          "payloadSegments": 1617,
+          "overlappingSegments": 0,
+          "binaryFrames": 1602,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1602,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 430,
+            "overlappingSegments": 0,
+            "binaryFrames": 415,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 11,
+          "verified": true,
+          "payloadSegments": 3042,
+          "overlappingSegments": 0,
+          "binaryFrames": 3017,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3017,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 734,
+            "overlappingSegments": 0,
+            "binaryFrames": 709,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 12,
+          "verified": true,
+          "payloadSegments": 6574,
+          "overlappingSegments": 0,
+          "binaryFrames": 6523,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 6523,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1493,
+            "overlappingSegments": 0,
+            "binaryFrames": 1442,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 13,
+          "verified": true,
+          "payloadSegments": 2822,
+          "overlappingSegments": 0,
+          "binaryFrames": 2798,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2798,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 673,
+            "overlappingSegments": 0,
+            "binaryFrames": 649,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 14,
+          "verified": false,
+          "recordedFrames": 2180,
+          "droppedPackets": 42,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 15,
+          "verified": true,
+          "payloadSegments": 2518,
+          "overlappingSegments": 0,
+          "binaryFrames": 2498,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2498,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 597,
+            "overlappingSegments": 0,
+            "binaryFrames": 577,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 16,
+          "verified": true,
+          "payloadSegments": 2272,
+          "overlappingSegments": 0,
+          "binaryFrames": 2252,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 2252,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 551,
+            "overlappingSegments": 0,
+            "binaryFrames": 531,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 17,
+          "verified": true,
+          "payloadSegments": 3988,
+          "overlappingSegments": 0,
+          "binaryFrames": 3957,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3957,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 938,
+            "overlappingSegments": 0,
+            "binaryFrames": 907,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 18,
+          "verified": true,
+          "payloadSegments": 3219,
+          "overlappingSegments": 0,
+          "binaryFrames": 3194,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3194,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 736,
+            "overlappingSegments": 0,
+            "binaryFrames": 711,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 19,
+          "verified": true,
+          "payloadSegments": 1951,
+          "overlappingSegments": 0,
+          "binaryFrames": 1935,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1935,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 474,
+            "overlappingSegments": 0,
+            "binaryFrames": 458,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 20,
+          "verified": true,
+          "payloadSegments": 116,
+          "overlappingSegments": 0,
+          "binaryFrames": 114,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 114,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 46,
+            "overlappingSegments": 0,
+            "binaryFrames": 44,
+            "unparsedTailBytes": 0
+          }
+        }
+      ],
+      "captureCoverage": {
+        "primaryPlayingFrames": 45485,
+        "verifiedPrimaryPlayingFrames": 42634,
+        "verifiedInputEchoes": 716,
+        "unmatchedInputEchoes": 53
+      },
+      "frameMetricsMs": {
+        "readAge": {
+          "n": 42634,
+          "min": 0.003337860107421875,
+          "mean": 0.08420674221630967,
+          "p50": 0.08368492126464844,
+          "p95": 0.15497207641601562,
+          "p99": 0.16236305236816406,
+          "max": 1.5790462493896484
+        },
+        "gap": {
+          "n": 45485,
+          "min": 3.8394659999880787,
+          "mean": 7.790782754204683,
+          "p50": 7.034307999987277,
+          "p95": 13.838453999994726,
+          "p99": 28.062822000038068,
+          "max": 91.37142999998105
+        },
+        "packetGap": {
+          "n": 42634,
+          "min": 3.8805007934570312,
+          "mean": 7.76863666872999,
+          "p50": 7.006645202636719,
+          "p95": 13.668537139892578,
+          "p99": 28.056621551513672,
+          "max": 91.4311408996582
+        },
+        "gapResidual": {
+          "n": 45485,
+          "min": -3.5318520000031413,
+          "mean": -0.00024725568868864587,
+          "p50": -0.0046939999733695,
+          "p95": 0.3711010000039323,
+          "p99": 0.6838620000216906,
+          "max": 3.77491299999906
+        },
+        "packetGapResidual": {
+          "n": 42634,
+          "min": -3.497007369995117,
+          "mean": -0.0002567027575550168,
+          "p50": -0.0019378662109375,
+          "p95": 0.3184967041015625,
+          "p99": 0.6391696929931641,
+          "max": 3.7328224182128906
+        },
+        "excess": {
+          "n": 45485,
+          "min": 0.0,
+          "mean": 0.29332750491349807,
+          "p50": 0.24871299997903407,
+          "p95": 0.6235689999884926,
+          "p99": 0.9995779999881051,
+          "max": 5.063929999989341
+        },
+        "packetExcess": {
+          "n": 42634,
+          "min": 0.0,
+          "mean": 0.26635617923964733,
+          "p50": 0.22509765625,
+          "p95": 0.594970703125,
+          "p99": 0.958984375,
+          "max": 5.060302734375
+        }
+      },
+      "stalls": {
+        "rawGap": {
+          "20": 1125,
+          "100": 0,
+          "250": 0
+        },
+        "packetGap": {
+          "20": 1013,
+          "100": 0,
+          "250": 0
+        },
+        "gapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        },
+        "packetGapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        }
+      },
+      "largestTenGaps": [
+        {
+          "life": 15,
+          "frame": 262,
+          "gapMs": 91.37142999998105,
+          "headerDeltaMs": 91,
+          "residualMs": 0.3714299999810464
+        },
+        {
+          "life": 5,
+          "frame": 204,
+          "gapMs": 85.22051299999589,
+          "headerDeltaMs": 84,
+          "residualMs": 1.22051299999589
+        },
+        {
+          "life": 15,
+          "frame": 278,
+          "gapMs": 84.46388299995533,
+          "headerDeltaMs": 84,
+          "residualMs": 0.4638829999553309
+        },
+        {
+          "life": 5,
+          "frame": 213,
+          "gapMs": 83.84328300000732,
+          "headerDeltaMs": 84,
+          "residualMs": -0.15671699999268185
+        },
+        {
+          "life": 15,
+          "frame": 276,
+          "gapMs": 83.71190799999795,
+          "headerDeltaMs": 84,
+          "residualMs": -0.2880920000020524
+        },
+        {
+          "life": 16,
+          "frame": 90,
+          "gapMs": 83.68794500000831,
+          "headerDeltaMs": 84,
+          "residualMs": -0.3120549999916875
+        },
+        {
+          "life": 5,
+          "frame": 104,
+          "gapMs": 82.30661300000008,
+          "headerDeltaMs": 84,
+          "residualMs": -1.693386999999916
+        },
+        {
+          "life": 5,
+          "frame": 102,
+          "gapMs": 80.77491299999906,
+          "headerDeltaMs": 77,
+          "residualMs": 3.77491299999906
+        },
+        {
+          "life": 5,
+          "frame": 88,
+          "gapMs": 77.68295199998931,
+          "headerDeltaMs": 77,
+          "residualMs": 0.6829519999893137
+        },
+        {
+          "life": 17,
+          "frame": 103,
+          "gapMs": 77.05803999999716,
+          "headerDeltaMs": 77,
+          "residualMs": 0.05803999999716325
+        }
+      ],
+      "minimumSampleQuotaPass": true,
+      "sourceArchiveSha256": "1a92e2602bf23bca44ba8e2a7257f2f5ab5b7717969abc54e5cab4087dcad246",
+      "archive": {
+        "bytes": 56215452,
+        "manifestSha256": "9affbb05ac0bc9333d15b56d583519ff5d55d94e601767e5f933b1eceedf77ea",
+        "completeReceiptAndSourcesVerified": true
+      },
+      "evidenceStatus": "qualified"
+    },
+    {
+      "label": "04-320",
+      "seats": 320,
+      "seconds": 360.0002782344818,
+      "attempts": 773,
+      "confirmed": 772,
+      "censored": {
+        "death": 1
+      },
+      "unobservedAtBoundary": 0,
+      "inputToEffectMs": {
+        "n": 772,
+        "min": 2.622498999983236,
+        "mean": 7.187446636010754,
+        "p50": 7.161566999997149,
+        "p95": 10.31835300000239,
+        "p99": 12.043526000013571,
+        "max": 14.623194000023432
+      },
+      "latencyByStatsBucketMs": {
+        "normal-bucket": {
+          "n": 772,
+          "min": 2.622498999983236,
+          "mean": 7.187446636010754,
+          "p50": 7.161566999997149,
+          "p95": 10.31835300000239,
+          "p99": 12.043526000013571,
+          "max": 14.623194000023432
+        }
+      },
+      "rttMs": {
+        "control": {
+          "n": 358,
+          "min": 0.1625109999849883,
+          "mean": 1.0710116145252044,
+          "p50": 0.9126859999923909,
+          "p95": 2.3184609999589156,
+          "p99": 2.6029880000066896,
+          "max": 3.0703010000081576
+        },
+        "game": {
+          "n": 1426,
+          "min": 2.466498000046613,
+          "mean": 7.095680126928197,
+          "p50": 7.092780999983006,
+          "p95": 10.466514000029292,
+          "p99": 12.161255999984633,
+          "max": 15.097378000007211
+        },
+        "icmp": {
+          "n": 1730,
+          "min": 0.126,
+          "mean": 0.17594393063583816,
+          "p50": 0.159,
+          "p95": 0.277,
+          "p99": 0.373,
+          "max": 0.409
+        }
+      },
+      "latencyMinusRttMs": {
+        "icmp": {
+          "n": 772,
+          "min": 2.464498999983236,
+          "mean": 7.012587827720599,
+          "p50": 6.962399000004818,
+          "p95": 10.172564000003021,
+          "p99": 11.860356000034022,
+          "max": 14.488194000023432
+        },
+        "control": {
+          "n": 772,
+          "min": 0.773255999945377,
+          "mean": 6.108392340674572,
+          "p50": 6.126682999990862,
+          "p95": 9.5309680000355,
+          "p99": 11.373809000019719,
+          "max": 14.027109000039673
+        }
+      },
+      "captureEffectMs": {
+        "outgoingToIncoming": {
+          "n": 502,
+          "min": 2.488374710083008,
+          "mean": 7.065538391174074,
+          "p50": 7.068872451782227,
+          "p95": 10.292768478393555,
+          "p99": 11.938095092773438,
+          "max": 13.316154479980469
+        },
+        "sendToOutgoing": {
+          "n": 502,
+          "min": 0.0007152557373046875,
+          "mean": 0.0015164751455603368,
+          "p50": 0.001430511474609375,
+          "p95": 0.002384185791015625,
+          "p99": 0.003337860107421875,
+          "max": 0.00476837158203125
+        },
+        "echoReadAge": {
+          "n": 502,
+          "min": 0.004291534423828125,
+          "mean": 0.0830190590178349,
+          "p50": 0.0820159912109375,
+          "p95": 0.15425682067871094,
+          "p99": 0.16117095947265625,
+          "max": 0.21505355834960938
+        },
+        "appMinusKernel": {
+          "n": 502,
+          "min": 0.005500162956195709,
+          "mean": 0.08456984786967976,
+          "p50": 0.08364300292384996,
+          "p95": 0.15583575418531836,
+          "p99": 0.16275984103231167,
+          "max": 0.21705234800606377
+        },
+        "unmatchedEchoes": 270
+      },
+      "sendCallMs": {
+        "n": 773,
+        "min": 0.0016199999919308539,
+        "mean": 0.005869540749911446,
+        "p50": 0.005809999947814504,
+        "p95": 0.006979999966461037,
+        "p99": 0.007809999999608408,
+        "max": 0.012730000008787101
+      },
+      "sendLatenessMs": {
+        "n": 773,
+        "min": 0.0005613479174826352,
+        "mean": 0.07471317434954766,
+        "p50": 0.07251602025348802,
+        "p95": 0.14838953865137228,
+        "p99": 0.15491490884755876,
+        "max": 0.156518639926162
+      },
+      "observedDeferredTicks": 0,
+      "enclosingStatsDeferredTicks": 0,
+      "generator": [
+        {
+          "worker": 1,
+          "reports": 355,
+          "cpuFraction": {
+            "n": 355,
+            "min": 0.14514934527537426,
+            "mean": 0.16431756755496574,
+            "p50": 0.1639668451706198,
+            "p95": 0.17725645826319097,
+            "p99": 0.1831035102932862,
+            "max": 0.18701104963135443
+          },
+          "worstInputP99Ms": 14.433675,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 2,
+          "reports": 355,
+          "cpuFraction": {
+            "n": 355,
+            "min": 0.14661802592825898,
+            "mean": 0.16312783212835458,
+            "p50": 0.16228273439100305,
+            "p95": 0.17556299910510828,
+            "p99": 0.18273627454439786,
+            "max": 0.1895032127730422
+          },
+          "worstInputP99Ms": 8.040403,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 3,
+          "reports": 356,
+          "cpuFraction": {
+            "n": 356,
+            "min": 0.14377059881740276,
+            "mean": 0.16080247393494654,
+            "p50": 0.16127124061360928,
+            "p95": 0.17253433823831096,
+            "p99": 0.17659531365784326,
+            "max": 0.17920694706542764
+          },
+          "worstInputP99Ms": 9.31082,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 4,
+          "reports": 356,
+          "cpuFraction": {
+            "n": 356,
+            "min": 0.14621049588097054,
+            "mean": 0.16455121983960536,
+            "p50": 0.16477244797889415,
+            "p95": 0.17531662689193772,
+            "p99": 0.17908733166142643,
+            "max": 0.1812312706679848
+          },
+          "worstInputP99Ms": 9.0173,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 5,
+          "reports": 356,
+          "cpuFraction": {
+            "n": 356,
+            "min": 0.1385365608055822,
+            "mean": 0.15756357037647115,
+            "p50": 0.15784197904631694,
+            "p95": 0.17001164491224474,
+            "p99": 0.17864267384993832,
+            "max": 0.18448177391517734
+          },
+          "worstInputP99Ms": 12.578509,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        },
+        {
+          "worker": 6,
+          "reports": 356,
+          "cpuFraction": {
+            "n": 356,
+            "min": 0.1422538254503921,
+            "mean": 0.16755307721828375,
+            "p50": 0.1676228825246989,
+            "p95": 0.18193323665443903,
+            "p99": 0.19004680861867512,
+            "max": 0.1919480436133085
+          },
+          "worstInputP99Ms": 10.496617,
+          "boostActionShare": 1.0,
+          "wholeWindowReportCoverage": true,
+          "passed": true
+        }
+      ],
+      "generatorQualified": true,
+      "loadClientFrameMetricsMs": {
+        "gap": {
+          "n": 13671906,
+          "p50": 7.037,
+          "p95": 14.544,
+          "p99": 40.732,
+          "max": 107.632
+        },
+        "gapResidual": {
+          "n": 13671906,
+          "p50": -0.003,
+          "p95": 2.17,
+          "p99": 3.55,
+          "max": 23.059
+        },
+        "excess": {
+          "n": 13671906,
+          "p50": 0.519,
+          "p95": 2.753,
+          "p99": 4.491,
+          "max": 23.922
+        }
+      },
+      "loadClientResidualStalls": {
+        "20": 69,
+        "100": 0,
+        "250": 0
+      },
+      "loadWorkerMaxPassMs": {
+        "n": 2134,
+        "min": 0.433263,
+        "mean": 4.804718917994377,
+        "p50": 5.083086,
+        "p95": 7.436711,
+        "p99": 9.933248,
+        "max": 14.13243
+      },
+      "probeFramesMatched": 36472,
+      "captures": [
+        {
+          "life": 1,
+          "verified": true,
+          "payloadSegments": 8670,
+          "overlappingSegments": 0,
+          "binaryFrames": 8601,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 8601,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1842,
+            "overlappingSegments": 0,
+            "binaryFrames": 1773,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 2,
+          "verified": true,
+          "payloadSegments": 1809,
+          "overlappingSegments": 0,
+          "binaryFrames": 1791,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1791,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 520,
+            "overlappingSegments": 0,
+            "binaryFrames": 502,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 3,
+          "verified": false,
+          "recordedFrames": 2018,
+          "droppedPackets": 105,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 4,
+          "verified": true,
+          "payloadSegments": 9645,
+          "overlappingSegments": 0,
+          "binaryFrames": 9572,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 9572,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 2226,
+            "overlappingSegments": 0,
+            "binaryFrames": 2153,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 5,
+          "verified": false,
+          "recordedFrames": 2394,
+          "droppedPackets": 14,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 6,
+          "verified": true,
+          "payloadSegments": 4914,
+          "overlappingSegments": 0,
+          "binaryFrames": 4874,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 4874,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1158,
+            "overlappingSegments": 0,
+            "binaryFrames": 1118,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 7,
+          "verified": true,
+          "payloadSegments": 1941,
+          "overlappingSegments": 0,
+          "binaryFrames": 1923,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1923,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 511,
+            "overlappingSegments": 0,
+            "binaryFrames": 493,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 8,
+          "verified": true,
+          "payloadSegments": 4825,
+          "overlappingSegments": 0,
+          "binaryFrames": 4787,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 4787,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 1165,
+            "overlappingSegments": 0,
+            "binaryFrames": 1127,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 9,
+          "verified": false,
+          "recordedFrames": 1430,
+          "droppedPackets": 77,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 10,
+          "verified": false,
+          "recordedFrames": 2552,
+          "droppedPackets": 9,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 11,
+          "verified": true,
+          "payloadSegments": 3388,
+          "overlappingSegments": 0,
+          "binaryFrames": 3359,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 3359,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 841,
+            "overlappingSegments": 0,
+            "binaryFrames": 812,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 12,
+          "verified": true,
+          "payloadSegments": 1582,
+          "overlappingSegments": 0,
+          "binaryFrames": 1565,
+          "unparsedTailBytes": 0,
+          "recordedFrames": 1565,
+          "missingTailFrames": 0,
+          "outgoing": {
+            "payloadSegments": 479,
+            "overlappingSegments": 0,
+            "binaryFrames": 462,
+            "unparsedTailBytes": 0
+          }
+        },
+        {
+          "life": 13,
+          "verified": false,
+          "recordedFrames": 1611,
+          "droppedPackets": 22,
+          "reason": "capture loss or missing drop census"
+        },
+        {
+          "life": 14,
+          "verified": false,
+          "recordedFrames": 4254,
+          "droppedPackets": 64,
+          "reason": "capture loss or missing drop census"
+        }
+      ],
+      "captureCoverage": {
+        "primaryPlayingFrames": 42976,
+        "verifiedPrimaryPlayingFrames": 28740,
+        "verifiedInputEchoes": 502,
+        "unmatchedInputEchoes": 270
+      },
+      "frameMetricsMs": {
+        "readAge": {
+          "n": 28740,
+          "min": 0.003337860107421875,
+          "mean": 0.08349749638790377,
+          "p50": 0.08273124694824219,
+          "p95": 0.15401840209960938,
+          "p99": 0.16188621520996094,
+          "max": 0.38242340087890625
+        },
+        "gap": {
+          "n": 42976,
+          "min": 2.841500000002384,
+          "mean": 8.25451758525689,
+          "p50": 7.061229999976604,
+          "p95": 14.160640999989482,
+          "p99": 35.558855000004996,
+          "max": 98.15626799999677
+        },
+        "packetGap": {
+          "n": 28740,
+          "min": 2.974271774291992,
+          "mean": 8.004670244335049,
+          "p50": 7.019996643066406,
+          "p95": 13.911724090576172,
+          "p99": 34.914493560791016,
+          "max": 92.63777732849121
+        },
+        "gapResidual": {
+          "n": 42976,
+          "min": -4.158499999997616,
+          "mean": -0.00048520699925362225,
+          "p50": -0.004251999991538469,
+          "p95": 1.6306029999718703,
+          "p99": 2.633468000004086,
+          "max": 4.395550000003141
+        },
+        "packetGapResidual": {
+          "n": 28740,
+          "min": -4.025728225708008,
+          "mean": -0.000514167634330861,
+          "p50": 0.0006847381591796875,
+          "p95": 1.878469467163086,
+          "p99": 2.6743106842041016,
+          "max": 4.381864547729492
+        },
+        "excess": {
+          "n": 42976,
+          "min": 0.0,
+          "mean": 0.5980639385715496,
+          "p50": 0.3830870000529103,
+          "p95": 2.3781359999848064,
+          "p99": 3.0667890000040643,
+          "max": 5.406659999978729
+        },
+        "packetExcess": {
+          "n": 28740,
+          "min": 0.0,
+          "mean": 0.6052188668884829,
+          "p50": 0.37646484375,
+          "p95": 2.47314453125,
+          "p99": 3.0888671875,
+          "max": 5.3017578125
+        }
+      },
+      "stalls": {
+        "rawGap": {
+          "20": 1592,
+          "100": 0,
+          "250": 0
+        },
+        "packetGap": {
+          "20": 804,
+          "100": 0,
+          "250": 0
+        },
+        "gapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        },
+        "packetGapResidual": {
+          "20": 0,
+          "100": 0,
+          "250": 0
+        }
+      },
+      "largestTenGaps": [
+        {
+          "life": 3,
+          "frame": 104,
+          "gapMs": 98.15626799999677,
+          "headerDeltaMs": 98,
+          "residualMs": 0.15626799999677132
+        },
+        {
+          "life": 12,
+          "frame": 146,
+          "gapMs": 92.68595099996446,
+          "headerDeltaMs": 91,
+          "residualMs": 1.6859509999644615
+        },
+        {
+          "life": 12,
+          "frame": 127,
+          "gapMs": 92.30715900002906,
+          "headerDeltaMs": 91,
+          "residualMs": 1.3071590000290598
+        },
+        {
+          "life": 13,
+          "frame": 99,
+          "gapMs": 91.21704900002214,
+          "headerDeltaMs": 91,
+          "residualMs": 0.21704900002214345
+        },
+        {
+          "life": 12,
+          "frame": 116,
+          "gapMs": 91.09259000001657,
+          "headerDeltaMs": 91,
+          "residualMs": 0.09259000001657114
+        },
+        {
+          "life": 3,
+          "frame": 109,
+          "gapMs": 91.09182800000326,
+          "headerDeltaMs": 91,
+          "residualMs": 0.09182800000326097
+        },
+        {
+          "life": 3,
+          "frame": 108,
+          "gapMs": 90.90290799998968,
+          "headerDeltaMs": 91,
+          "residualMs": -0.09709200001032059
+        },
+        {
+          "life": 3,
+          "frame": 94,
+          "gapMs": 90.75183600000969,
+          "headerDeltaMs": 91,
+          "residualMs": -0.2481639999903109
+        },
+        {
+          "life": 12,
+          "frame": 103,
+          "gapMs": 90.55801599998858,
+          "headerDeltaMs": 91,
+          "residualMs": -0.44198400001141636
+        },
+        {
+          "life": 13,
+          "frame": 94,
+          "gapMs": 90.43960400003925,
+          "headerDeltaMs": 91,
+          "residualMs": -0.5603959999607468
+        }
+      ],
+      "minimumSampleQuotaPass": true,
+      "sourceArchiveSha256": "6ac15f7775cf59195ebaf35f697a488f7b34a58786433ad549f5ec5846984d2a",
+      "controllerManifestSha256": "e2383da392c191f44a83537a3a4ac67955deb75541dc9d058074b4a2597d1966",
+      "archive": {
+        "bytes": 106624821,
+        "manifestSha256": "3605fd363d56c97007e5b73849a2c9badec407dcef72099a59dfe6415fbe72b0",
+        "completeReceiptAndSourcesVerified": true
+      },
+      "evidenceStatus": "qualified"
+    }
+  ]
+}

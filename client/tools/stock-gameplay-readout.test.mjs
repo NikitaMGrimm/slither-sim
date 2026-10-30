@@ -11,7 +11,7 @@ import { createStockClient } from './fixtures/stock-client-fixture.mjs';
 
 const nativeName = 'apply_frame_and_render_standard_with_face_presentation_and_prey_and_hud';
 const login = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+  profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
   nickname: 'Authored HUD', skin: 0, customSkin: new Uint8Array() });
 const own = (token = 1n) => ({ token, id: 7, rawHead: { x: 300, y: 400 }, wantedHeading: .4,
   gazeHeading: 0, dead: false, turnRate: .03, sizeTurnFactor: 1, speedTurnFactor: 1 });

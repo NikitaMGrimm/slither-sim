@@ -47,7 +47,8 @@ export async function develop({ mode, simulator }) {
   else {
     const output = execFileSync('cargo', ['build', '--manifest-path', 'apps/wgpu-slice/Cargo.toml', '--locked',
       '--bin', 'slither-wgpu-desktop', '--message-format=json-render-diagnostics'],
-    { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 16 * 1024 * 1024 });
+    { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'], maxBuffer: 16 * 1024 * 1024,
+      env: { ...process.env, CARGO_PROFILE_DEV_DEBUG: '0' } });
     executable = output.split(/\r?\n/).filter(line => line.startsWith('{')).map(line => JSON.parse(line))
       .find(message => message.reason === 'compiler-artifact' && message.target.name === 'slither-wgpu-desktop' && message.executable)?.executable;
     if (!executable) throw new Error('Cargo did not report a desktop executable');

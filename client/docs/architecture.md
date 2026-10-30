@@ -44,23 +44,28 @@ fix/http-com-module-integrity, fix/http-com-live-play and feat/default-appearanc
 
 ## Shared wgpu client
 
-apps/wgpu-slice is a separate crate with its own lockfile and a path dependency
-on the core. game::LocalGame owns the shared protocol/session/input/presentation
+apps/wgpu-slice is a separate crate in the root Cargo workspace with a path
+dependency on the core. game::LocalGame owns the shared protocol/session/input/presentation
 flow. Windows uses winit and tungstenite; the browser uses WebSocket and RAF.
 Both submit ordered frames and authored materials through the same wgpu renderer.
 
 Play opens a simulator endpoint or, natively with `--official`, an official
 server chosen from the live directory; there is no automatic reconnect. The
-renderer covers body, food, prey, paired eyes, arena and platform text for nicknames, the HUD and leaderboard.
+renderer covers body, food, prey, paired eyes, arena and platform text for
+nicknames, the HUD, leaderboard and official record announcements.
 Image faces, antennas and complete menus remain incomplete. Rasterization can
 differ from Canvas; passing tests does not establish perceptual parity.
 
 Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and an
-independent lazy cache for future announcements and result/editor panels. No
-wgpu gameplay producer enables them yet; the shared [record announcement
-projection](announcements.md) supplies styled blocks to the Canvas reference.
-Existing text quotas and draw admission stay
-unchanged until a producer explicitly reserves panel draws.
+independent lazy cache. Production `LocalGame` enables the shared [record
+announcement projection](announcements.md) on native and browser WebGPU,
+capturing immutable text draws before minimap/HUD at each Setup, ordinary and
+resize preparation. [Bounded vertex chunks](draw-chunks.md) preserve crowded
+world geometry without overlay reservations; producer/cache quotas remain.
+Result/editor remains inactive. Fragment opacity multiplies the shared retained
+fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
+The opt-in [menu resource layer](menu-resources.md) adds bounded authored controls
+and semantic local art; login adapters do not enable it yet.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.

@@ -1,0 +1,30 @@
+{
+  "complete": true,
+  "verifiedUTC": "2026-10-30T04:43:15.507202+00:00",
+  "explicitProfile": "slither-bench",
+  "allTaskInstancesTerminatedOrAbsent": true,
+  "taskInstancesCreated": 4,
+  "retiredInstancesNoLongerReturned": 2,
+  "taskKeyPairDeleted": true,
+  "taskSecurityGroupDeleted": true,
+  "protectedAndUnrelatedResourcesUntouched": true,
+  "scope": "Task cleanup; unrelated global resources are retained",
+  "scan": {
+    "regionsAttempted": 17,
+    "regionsFullyScanned": 17,
+    "regionsUnavailable": 0,
+    "disabledRegionsNotScanned": 17,
+    "nonterminatedInstances": 0,
+    "openOrActiveSpotRequests": 0,
+    "availableVolumes": 0,
+    "allVolumes": 0,
+    "elasticIPs": 0,
+    "taskKeyPairs": 0,
+    "taskSecurityGroups": 0,
+    "projectKeyPairs": 0,
+    "projectSecurityGroups": 0,
+    "taskNonterminatedInstances": 0,
+    "taskVolumes": 0,
+    "taskOpenOrActiveSpotRequests": 0
+  }
+}

@@ -48,8 +48,24 @@ left 8, top 4, width 300, height 228 CSS pixels, clips overflow, collapses norma
 whitespace and wraps overlong words. Full text is submitted to browser layout;
 the browser clips the visible region. `AnnouncementTextBlock::panel_text` also
 admits each full block into the [bounded panel primitives](panel-text.md), whose
-repeated layout visits only a bounded visible prefix. GPU announcement
-submission and draw reservations remain inactive; enabling them is separate work.
+repeated layout visits only a bounded visible prefix. Production `LocalGame`
+enables tracking before ingress and passes the existing
+step lifecycle to the shared owner. Native and browser WebGPU preserve source
+fragment indices through bounded layout and multiply each alpha by the retained
+fade at submission. Each block uses the largest explicit
+`TextStyle::line_height()` among its runs: `round(1.15 * font_size)` logical
+pixels. The quote keeps its 5px gap. Native uses fontdue metrics; browser WebGPU
+uses Canvas metrics. A single centered maximum-ascent/descent strut places each
+baseline, independent of ink and DPR rounding. The quote occupies 20px, then a
+5px gap, with 15px attribution/length rows.
+The world precedes announcements, then minimap and HUD.
+Announcement slots and the 96-draw producer bound are independent of
+HUD/nickname quotas. There is no draw reservation or visibility-dependent
+reduction in world capacity. [Bounded vertex chunks](draw-chunks.md) retain all
+eligible world geometry; only the final memory guard can skip a whole picture.
+Setup callbacks, ordinary work and resize prepare immutable announcement draws
+and resources at the same boundary as the world; retained/retried pictures never
+consult later live text. Same-content fades reuse texture identities.
 
 Rust tests cover wording/styles, admission, receipt order and lifecycle. Node
 tests cover passive DOM submission, fixed node counts, stale-document/topology

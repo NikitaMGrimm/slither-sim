@@ -1,7 +1,7 @@
 //! Shared WebGPU/DX12/Vulkan texture-quad renderer. No sorting, game clock or Canvas fallback.
 use crate::{
     Result,
-    frame::{Frame, ResourceKey},
+    frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
     scene::Resource,
 };
 use slither_client::presentation::{BodyAsset, BodyAssetStatus};
@@ -337,7 +337,7 @@ impl Renderer {
             .iter()
             .map(|(key, t)| (*key, t.asset))
             .collect();
-        let quads = frame.quads(&resident)?;
+        let quads = frame.quad_iter(&resident)?;
         if frame.extent.contains(&0) {
             return Ok(());
         }
@@ -349,21 +349,45 @@ impl Renderer {
         {
             return Err("Render attachment budget".into());
         }
-        let bytes: Vec<u8> = quads
-            .iter()
-            .flat_map(|q| {
-                q.vertices
-                    .iter()
-                    .flat_map(|v| v.iter().flat_map(|f| f.to_le_bytes()))
-            })
-            .collect();
-        let buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("ordered vertices"),
-                contents: if bytes.is_empty() { &[0; 4] } else { &bytes },
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        // One scratch allocation, direct serialization, no per-quad heap objects.
+        // Buffers belong to this call: render(&self) never overwrites another
+        // caller's in-flight vertices. All validation finishes before submission.
+        let chunk_size = VERTEX_CHUNK_QUADS;
+        let mut bytes = Vec::with_capacity(frame.draws.len().min(chunk_size) * QUAD_VERTEX_BYTES);
+        let mut states = Vec::with_capacity(frame.draws.len().min(chunk_size));
+        let mut chunks = Vec::with_capacity(frame.draws.len().div_ceil(chunk_size));
+        for quad in quads {
+            let quad = quad?;
+            for vertex in quad.vertices {
+                for value in vertex {
+                    bytes.extend_from_slice(&value.to_le_bytes());
+                }
+            }
+            states.push(DrawState::new(&quad, self.textures[&quad.key].black));
+            if states.len() == chunk_size {
+                chunks.push((
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("ordered vertex chunk"),
+                            contents: &bytes,
+                            usage: wgpu::BufferUsages::VERTEX,
+                        }),
+                    std::mem::replace(&mut states, Vec::with_capacity(chunk_size)),
+                ));
+                bytes.clear();
+            }
+        }
+        if !states.is_empty() {
+            chunks.push((
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("ordered vertex chunk"),
+                        contents: &bytes,
+                        usage: wgpu::BufferUsages::VERTEX,
+                    }),
+                states,
+            ));
+        }
         let mut encoder = self.device.create_command_encoder(&Default::default());
         let multisample = if self.sample_count > 1 {
             Some(self.device.create_texture(&wgpu::TextureDescriptor {
@@ -405,33 +429,32 @@ impl Renderer {
                 })],
                 ..Default::default()
             });
-            pass.set_vertex_buffer(0, buffer.slice(..));
-            let states = quads
-                .iter()
-                .map(|q| DrawState::new(q, self.textures[&q.key].black));
             let mut previous: Option<DrawState> = None;
-            for (state, vertices) in draw_runs(states) {
-                if previous.is_none_or(|p| p.pipeline != state.pipeline) {
-                    pass.set_pipeline(match state.pipeline {
-                        Pipeline::BlackOver => &self.black_over,
-                        Pipeline::Lighter => &self.lighter,
-                        Pipeline::Over => &self.over,
-                    });
+            for (buffer, states) in &chunks {
+                pass.set_vertex_buffer(0, buffer.slice(..));
+                for (state, vertices) in draw_runs(states.iter().copied()) {
+                    if previous.is_none_or(|p| p.pipeline != state.pipeline) {
+                        pass.set_pipeline(match state.pipeline {
+                            Pipeline::BlackOver => &self.black_over,
+                            Pipeline::Lighter => &self.lighter,
+                            Pipeline::Over => &self.over,
+                        });
+                    }
+                    if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
+                        let texture = &self.textures[&state.key];
+                        pass.set_bind_group(
+                            0,
+                            if state.repeat {
+                                &texture.repeat_bind
+                            } else {
+                                &texture.bind
+                            },
+                            &[],
+                        );
+                    }
+                    pass.draw(vertices, 0..1);
+                    previous = Some(state);
                 }
-                if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
-                    let texture = &self.textures[&state.key];
-                    pass.set_bind_group(
-                        0,
-                        if state.repeat {
-                            &texture.repeat_bind
-                        } else {
-                            &texture.bind
-                        },
-                        &[],
-                    );
-                }
-                pass.draw(vertices, 0..1);
-                previous = Some(state);
             }
         }
         self.queue.submit([encoder.finish()]);
@@ -673,6 +696,19 @@ impl SurfaceHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chunk_and_record_storage_fit_default_device_limits() {
+        let limits = wgpu::Limits::default();
+        assert_eq!(std::mem::size_of::<crate::frame::Draw>(), 256);
+        assert_eq!(std::mem::size_of::<DrawState>(), 24);
+        assert_eq!(crate::frame::MAX_DRAWS, 262_144);
+        assert_eq!(VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES, 983_040);
+        assert!((VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES) as u64 <= limits.max_buffer_size);
+        assert!(20 <= limits.max_vertex_buffer_array_stride);
+        assert!(3 <= limits.max_vertex_attributes);
+        assert!(1 <= limits.max_vertex_buffers);
+    }
 
     #[test]
     fn surface_recovery_fails_on_lost_and_only_reconfigures_outdated() {

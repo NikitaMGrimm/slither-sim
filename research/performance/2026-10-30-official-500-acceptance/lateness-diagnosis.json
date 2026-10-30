@@ -1,0 +1,296 @@
+{
+  "label": "Post-result diagnosis; unchanged v1 gates and outcome",
+  "selection": "Frozen ladder overlapping one-second reports; interval boundaries and offsets retained.",
+  "thresholdNanos": 42000000,
+  "reports": 10806,
+  "violatingWorkerReports": 6,
+  "violatingWallSecondBins": 1,
+  "violatingWorkerReportsByMinute": {
+    "30": 6
+  },
+  "workers": {
+    "1": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 1,
+      "violationsWithDeaths": 1,
+      "firstOffsetSeconds": 1800.2042725086212,
+      "lastOffsetSeconds": 1800.2042725086212
+    },
+    "2": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 0,
+      "violationsWithDeaths": 0,
+      "firstOffsetSeconds": 1800.4602763652802,
+      "lastOffsetSeconds": 1800.4602763652802
+    },
+    "3": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 0,
+      "violationsWithDeaths": 0,
+      "firstOffsetSeconds": 1800.288774728775,
+      "lastOffsetSeconds": 1800.288774728775
+    },
+    "4": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 1,
+      "violationsWithDeaths": 1,
+      "firstOffsetSeconds": 1800.1803362369537,
+      "lastOffsetSeconds": 1800.1803362369537
+    },
+    "5": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 0,
+      "violationsWithDeaths": 1,
+      "firstOffsetSeconds": 1800.375325679779,
+      "lastOffsetSeconds": 1800.375325679779
+    },
+    "6": {
+      "reports": 1801,
+      "violatingReports": 1,
+      "violationsWithJoins": 0,
+      "violationsWithDeaths": 0,
+      "firstOffsetSeconds": 1800.5451638698578,
+      "lastOffsetSeconds": 1800.5451638698578
+    }
+  },
+  "worstPerWorker": [
+    {
+      "worker": 1,
+      "offsetSeconds": 1800.2042725086212,
+      "intervalSeconds": 1.0271165370941162,
+      "lateP99Nanos": 165753686,
+      "lateMaxNanos": 175839550,
+      "maxPassNanos": 178397543,
+      "cpuFraction": 0.219539686719836,
+      "joins": 1,
+      "deaths": 1,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 1,
+        "bytes": 702494,
+        "metricEndOffsetSeconds": 1800.0258603096008,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.17841219902038574
+    },
+    {
+      "worker": 2,
+      "offsetSeconds": 1800.4602763652802,
+      "intervalSeconds": 1.280381202697754,
+      "lateP99Nanos": 421551017,
+      "lateMaxNanos": 431591694,
+      "maxPassNanos": 434448380,
+      "cpuFraction": 0.17998708829087187,
+      "joins": 0,
+      "deaths": 0,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 2,
+        "bytes": 718858,
+        "metricEndOffsetSeconds": 1800.0258128643036,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.4344635009765625
+    },
+    {
+      "worker": 3,
+      "offsetSeconds": 1800.288774728775,
+      "intervalSeconds": 1.1111435890197754,
+      "lateP99Nanos": 252747041,
+      "lateMaxNanos": 262667088,
+      "maxPassNanos": 263036750,
+      "cpuFraction": 0.20452213294856114,
+      "joins": 0,
+      "deaths": 0,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 3,
+        "bytes": 706621,
+        "metricEndOffsetSeconds": 1800.025720834732,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.26305389404296875
+    },
+    {
+      "worker": 4,
+      "offsetSeconds": 1800.1803362369537,
+      "intervalSeconds": 1.0002961158752441,
+      "lateP99Nanos": 85501122,
+      "lateMaxNanos": 93590828,
+      "maxPassNanos": 94144078,
+      "cpuFraction": 0.23249283793907533,
+      "joins": 1,
+      "deaths": 1,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 4,
+        "bytes": 711006,
+        "metricEndOffsetSeconds": 1800.0256927013397,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.15464353561401367
+    },
+    {
+      "worker": 5,
+      "offsetSeconds": 1800.375325679779,
+      "intervalSeconds": 1.1977250576019287,
+      "lateP99Nanos": 335401834,
+      "lateMaxNanos": 347264254,
+      "maxPassNanos": 349343699,
+      "cpuFraction": 0.18900264948496837,
+      "joins": 0,
+      "deaths": 1,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 5,
+        "bytes": 703616,
+        "metricEndOffsetSeconds": 1800.0259673595428,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.34935832023620605
+    },
+    {
+      "worker": 6,
+      "offsetSeconds": 1800.5451638698578,
+      "intervalSeconds": 1.3682060241699219,
+      "lateP99Nanos": 505682703,
+      "lateMaxNanos": 516802133,
+      "maxPassNanos": 519342309,
+      "cpuFraction": 0.1687886843668312,
+      "joins": 0,
+      "deaths": 0,
+      "reconnectDurations": null,
+      "reconnectTimingStatus": "Not recorded; aggregate joins are completions, not start/end timings.",
+      "metricPublication": {
+        "worker": 6,
+        "bytes": 711731,
+        "metricEndOffsetSeconds": 1800.025805234909,
+        "nextClientReportWorker": 4
+      },
+      "reportAfterMetricEndSeconds": 0.5193586349487305
+    }
+  ],
+  "requestedEndOffsetSeconds": 1800.024944782257,
+  "metricMarkerOffsets": [
+    {
+      "marker": "count",
+      "offsetSeconds": -0.018265962600708008
+    },
+    {
+      "marker": "end",
+      "offsetSeconds": 1800.0286271572113
+    }
+  ],
+  "publicationOrder": [
+    {
+      "worker": 4,
+      "bytes": 711006,
+      "metricEndOffsetSeconds": 1800.0256927013397,
+      "nextClientReportWorker": 4
+    },
+    {
+      "worker": 1,
+      "bytes": 702494,
+      "metricEndOffsetSeconds": 1800.0258603096008,
+      "nextClientReportWorker": 4
+    },
+    {
+      "worker": 3,
+      "bytes": 706621,
+      "metricEndOffsetSeconds": 1800.025720834732,
+      "nextClientReportWorker": 4
+    },
+    {
+      "worker": 5,
+      "bytes": 703616,
+      "metricEndOffsetSeconds": 1800.0259673595428,
+      "nextClientReportWorker": 4
+    },
+    {
+      "worker": 2,
+      "bytes": 718858,
+      "metricEndOffsetSeconds": 1800.0258128643036,
+      "nextClientReportWorker": 4
+    },
+    {
+      "worker": 6,
+      "bytes": 711731,
+      "metricEndOffsetSeconds": 1800.025805234909,
+      "nextClientReportWorker": 4
+    }
+  ],
+  "hostLateEpisode": {
+    "beforeOffsetSeconds": 1798.5485174655914,
+    "afterOffsetSeconds": 1800.6473097801208,
+    "before": {
+      "tick": 451400,
+      "living": 500,
+      "occupied": 500,
+      "deaths": 2095,
+      "deferred": 0
+    },
+    "after": {
+      "tick": 451700,
+      "living": 499,
+      "occupied": 500,
+      "deaths": 2101,
+      "deferred": 0
+    },
+    "socketSamples": [
+      {
+        "offsetSeconds": 1798.9202032089233,
+        "players": 500,
+        "writeBlocks": 0,
+        "bufferFull": 0,
+        "rejects": 0,
+        "queueBytes": 0,
+        "kernelSendBytes": 6010
+      },
+      {
+        "offsetSeconds": 1799.9210667610168,
+        "players": 500,
+        "writeBlocks": 0,
+        "bufferFull": 0,
+        "rejects": 0,
+        "queueBytes": 0,
+        "kernelSendBytes": 5806
+      },
+      {
+        "offsetSeconds": 1800.9217972755432,
+        "players": 500,
+        "writeBlocks": 0,
+        "bufferFull": 0,
+        "rejects": 0,
+        "queueBytes": 0,
+        "kernelSendBytes": 6246
+      }
+    ]
+  },
+  "beforeRequestedEnd": {
+    "reports": 10800,
+    "maxLateP99Nanos": 3870476,
+    "maxPassNanos": 11583783
+  },
+  "hostLogPrefixes": {
+    "Listening": 1,
+    "SOCKET": 3103,
+    "CENSUS": 4523,
+    "stats:": 3166,
+    "CAPACITY": 2572
+  },
+  "missingEvidence": [
+    "Individual reconnect start/end and mutex-wait timings",
+    "TCP accept, HTTP-upgrade completion and per-snake admission event timestamps",
+    "Per-call blocking/scheduler traces"
+  ]
+}

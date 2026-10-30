@@ -13,6 +13,8 @@ Never replace it with private recordings. Historical tapes and tools stay intact
 
 The [browser peers](browser-peers.md) now drive the production Canvas runtime and
 WebGPU LocalGameplay offline. The contract/comparator below remains pure Node.
+The [native CPU peer](native-peer.md) drives production LocalGame and compares
+against the same frozen Canvas Wasm schedule in cross-target mode.
 
 Run from `client/`:
 
@@ -46,6 +48,16 @@ with big-endian IEEE 754 binary64 bits and a `feel-f64-v1` document wrapper.
 The reader rejects bare JSON numbers, invalid encodings and non-finite numbers.
 Rust peers can emit this same format directly. A normal JSON round trip before
 this writer irreversibly destroys signed-zero evidence.
+
+The [native Rust example](native-peer.md) supports an explicit subset of general
+A1 documents: every object key must be ASCII and must not be a canonical array
+index (decimal `0` through `4294967294`, without leading zeros). Both reading and
+writing reject unsupported keys recursively. This avoids JS's numeric ordering
+of index keys and UTF-16 versus Rust ordering of non-ASCII keys. String values
+may contain any Unicode scalar values; lone UTF-16 surrogates accepted by the JS
+reader fail native decoding and cannot inhabit the writer's Rust strings. The
+subset restriction changes no A1 schema or policy and does not normalize keys or
+strings. Admitted documents retain byte-compatible output.
 
 Build a manifest with `buildManifest({ schedule, artifactFiles, inputFile,
 ...fields })`: `artifactFiles` maps semantic artifact names to existing files;
@@ -103,8 +115,21 @@ Trace arrays contain:
   counts admit the core's `-1` cleanup sentinel. The camera ring has 2 x 62 f64
   values and nonnegative pending counts (see `src/presentation.rs`,
   `src/presentation/length.rs` and `src/presentation/camera.rs`).
-- `final`: duration, exact event/command/sample/draw counts and final boundary ID,
+- `final`: duration, exact event/command/sample/acknowledged-draw counts and final boundary ID,
   completion, pending effect/frame counts and unexpected network status.
+
+Draw IDs number observed preparation boundaries, including recoverably skipped
+pictures. A skipped core projection remains `prepared: true` with `submitted`
+and `committed` false; those flags and `quality.successfulDraws` require a picture
+acknowledgement. `final.draws` counts acknowledged draw samples, rather than all
+draw observations. These existing v2 fields need no new status value or shape.
+`quality.successfulDraws` must equal the cumulative committed draw count at
+every sample, including updates and skips. `validateTrace(trace, schedule,
+acknowledgedDrawIds)` optionally checks submitted/committed status against a
+host's actual picture receipts, expressed as draw ordinals. Without that external
+witness, a v2 file can establish counter/status consistency but cannot authenticate
+receipts. The browser runner supplies the witness and retains it in its receipt
+sidecar; no acknowledgement fields are added to the trace schema.
 
 Only explicitly scheduled both-peer `pre-appearance` boundaries may initially
 have `own: null`; that exception cannot resume after appearance. A scheduled
@@ -130,6 +155,12 @@ Unsupported face families continue to fail closed, including after expiry.
 
 ## Match criteria
 
+The comparator policy is **`feel-cross-target-v2`**. Schedule/trace v2, manifest
+v1 and `feel-f64-v1` schema/encoding bytes are unchanged: this revision changes
+only cross-target comparison rules for existing ring floats. Reports identify
+their policy version and `exactOnly` setting. Historical reports retain their
+pinned tool revision; do not rewrite them under the new policy.
+
 `compareTraces(left, right, schedule, { mode })` defaults to `same-core`, which
 accepts two Wasm peers or repeats of the same native peer. All numbers use
 `Object.is`, including signed zero; command bytes, timing/order, discrete state
@@ -140,12 +171,32 @@ delta and whether it was tolerated. Numerical acceptance requires identical,
 predeclared `numericalPolicy` in both manifests, with an identified platform-math
 `cause`. Maximum absolute caps are `worldCap: 1e-9` for head/camera world positions,
 `angleCap: 1e-9` radians for heading/gaze, `zoomCap: 1e-12` for zoom, and
-`f32Ulps: 1` for current entity offsets. Camera offsets remain f64 world values.
+`f32Ulps: 1` for current entity offsets and f32 ring storage. Camera offsets and
+camera ring elements remain f64 world values, bounded by `worldCap`.
 These are limits, not adjustable CLI tolerances.
-Smaller caps are allowed. f32 offset observations must already be exactly f32
+Smaller caps are allowed. f32 offset/ring observations must already be exactly f32
 representable; the comparator never rounds a double to make it pass. Signed-zero
-differences, ring storage, branch choices, speed/size/delta, pixels, commands and
-all times stay exact. Non-exact values without a declared cause fail.
+differences, ring indices/pending counts, branch choices, speed/size/delta, pixels,
+commands and all times stay exact. Non-exact values without a declared cause fail.
+
+Ring floats can retain platform-transcendental rounding from their construction
+and later injections. Requiring exact cross-target ring storage would reject
+these values while permitting the corresponding current offset; it would also
+tie native behavior to a particular browser/runtime's math implementation.
+Cross-target therefore applies the existing storage-appropriate caps to every
+head/angle/length f32 ring element and camera f64 ring element. This changes no
+production math and adds no tolerance in **same-core** mode: Canvas/WebGPU Wasm
+comparisons and same-native repeats still require bit-exact rings and all other
+numbers, even when their manifests declare a numerical policy.
+
+Cause taxonomy uses `host-transcendental` for target/runtime math differences,
+such as native platform libm `f64::cos` versus browser `Math.cos` when constructing
+camera smoothing weights. Identify the actual functions, targets, browser/tool
+versions and an independent reproduction alongside the predeclared policy;
+`Math.sin`, `Math.pow` and `Math.atan2` use the same Wasm/native dispatch boundary.
+The cause string classifies evidence, rather than proving it or granting a new
+cap. Authored synthetic perturbations must be labelled `SYNTHETIC` and cannot
+substantiate a measured cause. No generic unexplained-drift allowance exists.
 
 As a conservative accumulation guard, three nonzero same-sign growing error
 levels in one channel's ordered sample sequence fail even within its individual
@@ -155,3 +206,9 @@ or exact observation resets that channel. This guard screens a declared
 numerical result; it cannot prove a platform-math explanation scientifically.
 The owner must substantiate that cause with independent evidence. A numerical
 match is always separate from exact parity and from any perceptual/visual claim.
+Each physical ring element has its own accumulation history in sample order;
+moving ring cursors do not pool elements or reset that history. Array shape,
+indices and pending counts remain exact. `compareTraces(..., { mode:
+'cross-target', exactOnly: true })` produces a separate exact-parity report from
+the same traces and declarations, disabling all numerical allowances without
+rewriting either manifest.

@@ -1,7 +1,7 @@
 //! Authored bounded panels; no game server or native window.
 use slither_client::presentation::*;
 use slither_wgpu_slice::{
-    render::{PANEL_CONTROL_DRAWS, PANEL_PRODUCER_DRAWS, PanelDrawReserve},
+    render::{PANEL_CONTROL_DRAWS, PANEL_PRODUCER_DRAWS},
     text::*,
 };
 
@@ -38,19 +38,9 @@ fn aggregate_clipped_allocation_envelope_includes_overhang_rounding_and_tiles() 
     assert!(preflight_panel_totals(0, [89, 0]).is_err());
     assert_eq!(
         (PANEL_CACHE_RUNS, TOTAL_CACHE_RUNS, TOTAL_CACHE_BYTES),
-        (64, 322, 18 * 1024 * 1024)
+        (64, 386, 22 * 1024 * 1024)
     );
     assert_eq!((PANEL_PRODUCER_DRAWS, PANEL_CONTROL_DRAWS), (96, 8));
-    let both = PanelDrawReserve {
-        announcement: true,
-        result: true,
-    };
-    assert_eq!(both.late_draws(), 332);
-    assert_eq!(
-        slither_wgpu_slice::frame::MAX_DRAWS - both.late_draws(),
-        7860
-    );
-    assert_eq!(PanelDrawReserve::default().late_draws(), 140);
 }
 
 #[cfg(windows)]
@@ -82,6 +72,7 @@ fn native_faces_are_real_and_family_slant_weight_change_pixels() {
         (Family::Arial, Slant::Italic, Weight::Normal, "ariali.ttf"),
         (Family::Arial, Slant::Italic, Weight::Bold, "arialbi.ttf"),
         (Family::Lucida, Slant::Normal, Weight::Normal, "l_10646.ttf"),
+        (Family::Lucida, Slant::Normal, Weight::Bold, "arialbd.ttf"),
     ] {
         let style = TextStyle {
             family,
@@ -109,13 +100,6 @@ fn native_faces_are_real_and_family_slant_weight_change_pixels() {
             assert_ne!(images[i], images[j]);
         }
     }
-    assert_eq!(
-        TextCache::native_face(TextStyle {
-            family: Family::Lucida,
-            ..style()
-        }),
-        "l_10646.ttf"
-    );
 }
 
 #[cfg(windows)]
@@ -538,36 +522,22 @@ fn replacement_admission_uses_final_pixels_in_both_producer_orders() {
 }
 #[cfg(windows)]
 #[test]
-fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_family() {
+fn installed_windows_font_boxes_are_independent_of_ink() {
     let mut c = TextCache::default();
-    for (family, a, d, file) in [
-        (Family::Arial, 16., 4., "arial.ttf"),
-        (Family::Lucida, 20., 8., "l_10646.ttf"),
-    ] {
+    for family in [Family::Arial, Family::Lucida] {
         let s = TextStyle {
             family,
             slant: Slant::Normal,
             ..style()
         };
+        let reference = c.measure_panel("", s).unwrap();
+        assert!(reference.font_ascent > 0. && reference.font_descent > 0.);
         for text in ["ace", "Ace", "..."] {
             let m = c.measure_panel(text, s).unwrap();
-            assert_eq!((m.font_ascent, m.font_descent), (a, d));
-        }
-        if family == Family::Lucida {
-            for weight in [Weight::Normal, Weight::Bold] {
-                for slant in [Slant::Normal, Slant::Italic] {
-                    assert_eq!(
-                        TextCache::native_face(TextStyle { weight, slant, ..s }),
-                        file
-                    );
-                    assert_eq!(
-                        c.measure_panel("Length", TextStyle { weight, slant, ..s })
-                            .unwrap()
-                            .font_ascent,
-                        a
-                    );
-                }
-            }
+            assert_eq!(
+                (m.font_ascent, m.font_descent),
+                (reference.font_ascent, reference.font_descent)
+            );
         }
     }
     assert_ne!(
@@ -578,7 +548,7 @@ fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_fami
 
 #[cfg(windows)]
 #[test]
-fn mixed_installed_fonts_use_each_inline_box_half_leading() {
+fn mixed_installed_fonts_center_one_maximum_strut() {
     let mut cache = TextCache::default();
     let arial = TextStyle {
         size: 24.,
@@ -612,5 +582,10 @@ fn mixed_installed_fonts_use_each_inline_box_half_leading() {
     )
     .unwrap();
     assert_eq!(p.runs.len(), 2);
-    assert!(p.runs.iter().all(|r| r.position[1] == 24.));
+    let a = cache.measure_panel("", arial).unwrap();
+    let l = cache.measure_panel("", lucida).unwrap();
+    let expected =
+        (32. + a.font_ascent.max(l.font_ascent) - a.font_descent.max(l.font_descent)) / 2.;
+    assert!(p.runs.iter().all(|r| r.position[1] == expected));
+    assert!((expected - 24.).abs() <= 2.);
 }

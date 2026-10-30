@@ -37,6 +37,7 @@ pub struct Bank {
     cache: BTreeMap<usize, Resource>,
     disks: BTreeMap<[u8; 3], BodyAsset>,
     solids: BTreeMap<[u8; 3], BodyAsset>,
+    pub announcement: crate::announcement::Announcement,
     pub minimap: crate::minimap::Minimap,
     pub text: crate::text::TextCache,
     text_frames: BTreeMap<u64, Vec<Resource>>,
@@ -66,6 +67,7 @@ impl Bank {
             cache: BTreeMap::new(),
             disks: BTreeMap::new(),
             solids: BTreeMap::new(),
+            announcement: crate::announcement::Announcement::default(),
             minimap: crate::minimap::Minimap::default(),
             text: crate::text::TextCache::default(),
             text_frames: BTreeMap::new(),
@@ -181,6 +183,7 @@ impl Bank {
     }
     /// Only the frame's actual draw resources become pixel buffers. Metadata alone is not GPU residency.
     pub fn resources(&mut self, frame: &Frame) -> Result<Vec<Resource>> {
+        frame.check_limits()?;
         let keys: BTreeSet<ResourceKey> = frame.draws.iter().map(|d| d.asset.into()).collect();
         let indices: BTreeSet<usize> = keys
             .iter()
@@ -225,7 +228,13 @@ impl Bank {
                 .filter(|r| keys.contains(&r.asset.into()))
                 .cloned(),
         );
-        if resources.len() != keys.len() {
+        if resources.len() != keys.len()
+            || resources
+                .iter()
+                .map(|r| ResourceKey::from(r.asset))
+                .collect::<BTreeSet<_>>()
+                != keys
+        {
             return Err("Unknown prepared resource".into());
         }
         if resources
@@ -236,11 +245,6 @@ impl Bank {
         {
             return Err("Active resource pixel budget exceeded".into());
         }
-        let resident = resources
-            .iter()
-            .map(|r| (r.asset.into(), r.asset))
-            .collect();
-        frame.quads(&resident)?;
         Ok(resources)
     }
     pub(crate) fn discard_text(&mut self, identity: u64) {

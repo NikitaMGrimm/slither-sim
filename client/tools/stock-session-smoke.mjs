@@ -33,13 +33,13 @@ export function stockSessionSmoke(wasm) {
   const expectedReply = Uint8Array.from({ length: 27 }, (_, index) => 65 + (3 + index * 4) % 26);
   assert.deepEqual(wasm.solve_challenge(challenge), expectedReply);
   const profile = { clientVersion: 7,
-    password: Uint8Array.from({ length: 20 }, (_, index) => (index * 13 + 7) & 255),
+    pageEcho: Uint8Array.from({ length: 20 }, (_, index) => (index * 13 + 7) & 255),
     protocolVersion: 19 };
   const login = { endpoint: 'ws://192.0.2.7:1234/slither', profile,
     nickname: 'Synthetic smoke', skin: 0, customSkin: new Uint8Array() };
-  const expectedLogin = Uint8Array.from([115, 30, 0, 7, ...profile.password, 0,
+  const expectedLogin = Uint8Array.from([115, 30, 0, 7, ...profile.pageEcho, 0,
     login.nickname.length, ...Buffer.from(login.nickname, 'ascii'), 0, 255]);
-  assert.deepEqual(wasm.encode_login(profile.clientVersion, profile.password,
+  assert.deepEqual(wasm.encode_login(profile.clientVersion, profile.pageEcho,
     login.nickname, login.skin, login.customSkin), expectedLogin);
   const owners = [];
   const cases = [];

@@ -37,7 +37,7 @@ const own = {
   offsets: { x: 'f32', y: 'f32', fraction: 'f32', heading: 'f32' },
   speed: 'number', visualSpeed: 'number', boost: 'boolean', boostPhase: 'number',
   size: { segments: 'uint', fraction: 'number', length: 'number' },
-  // Stored rings stay exact even in the numerical lane; only current offsets get a ULP cap.
+  // Storage stays exactly f32-representable; cross-target allowances live in compare.mjs.
   rings: { head: ring(53, 3), angle: ring(26), length: ring(53) },
   projected: nullable({ backing: { head: point('number'), pupils: list(point('number'), 2) },
     css: { head: point('number'), pupils: list(point('number'), 2) } }),
@@ -148,6 +148,13 @@ export function validateSchedule(schedule) {
   }
   return schedule;
 }
+export function validateNumericalPolicy(policy, path = 'numericalPolicy') {
+  validate(policy, numericalPolicySchema, path);
+  if (policy && (policy.worldCap > 1e-9 || policy.angleCap > 1e-9 || policy.zoomCap > 1e-12 || policy.f32Ulps > 1)) {
+    fail(path, 'exceeds world/radians 1e-9, zoom 1e-12 or f32 1 ULP caps');
+  }
+  return policy;
+}
 export function validateManifest(manifest) {
   validate(manifest, manifestSchema, 'manifest');
   if (!manifest.artifacts.length || !manifest.toolVersions.length || !manifest.startup.length) {
@@ -155,10 +162,7 @@ export function validateManifest(manifest) {
   }
   unique(manifest.artifacts.map(x => x.name), 'manifest.artifacts');
   unique(manifest.toolVersions.map(x => x.name), 'manifest.toolVersions');
-  const p = manifest.numericalPolicy;
-  if (p && (p.worldCap > 1e-9 || p.angleCap > 1e-9 || p.zoomCap > 1e-12 || p.f32Ulps > 1)) {
-    fail('manifest.numericalPolicy', 'exceeds world/radians 1e-9, zoom 1e-12 or f32 1 ULP caps');
-  }
+  validateNumericalPolicy(manifest.numericalPolicy, 'manifest.numericalPolicy');
   return manifest;
 }
 
@@ -167,10 +171,30 @@ export function safeCommand(bytes) {
   return (bytes.length === 1 && bytes[0] <= 254 && bytes[0] !== 252)
     || (bytes.length === 2 && bytes[0] === 252 && bytes[1] !== 0 && bytes[1] !== 128);
 }
-export function validateTrace(trace, schedule) {
+export function validateSuccessfulDraws(trace) {
+  let committedDraws = 0;
+  trace.samples.forEach((s, i) => {
+    if (s.phase === 'draw' && s.status.committed) committedDraws++;
+    if (s.quality.successfulDraws !== committedDraws) {
+      fail(`trace.samples[${i}].quality.successfulDraws`, 'expected cumulative committed draw count');
+    }
+  });
+  return committedDraws;
+}
+// Hosts may supply actual acknowledged draw ordinals as an external witness.
+// A standalone v2 file has status/counts, but cannot authenticate host receipts.
+export function validateTrace(trace, schedule, acknowledgedDrawIds) {
   validateSchedule(schedule);
   validate(trace, traceSchema, 'trace');
   validateManifest(trace.manifest);
+  let pictures;
+  if (acknowledgedDrawIds !== undefined) {
+    validate(acknowledgedDrawIds, list('uint'), 'pictureAcknowledgements');
+    unique(acknowledgedDrawIds, 'pictureAcknowledgements');
+    pictures = new Set(acknowledgedDrawIds);
+    const draws = new Set(trace.samples.filter(s => s.phase === 'draw').map(s => s.drawId));
+    for (const id of pictures) if (!draws.has(id)) fail('pictureAcknowledgements', 'no matching draw');
+  }
   if (trace.events.length !== schedule.events.length) fail('trace.events', `count ${trace.events.length}, expected ${schedule.events.length} (truncation/extra/duplicate event)`);
   if (trace.commands.length !== schedule.expectedCommands) fail('trace.commands', `count ${trace.commands.length}, expected ${schedule.expectedCommands}`);
   if (trace.samples.length !== schedule.boundaries.length) fail('trace.samples', `boundary count ${trace.samples.length}, expected ${schedule.boundaries.length} (truncation/extra draw)`);
@@ -232,12 +256,16 @@ export function validateTrace(trace, schedule) {
     if ((s.status.submitted && !s.status.prepared) || (s.status.committed && !s.status.submitted)) {
       fail(`trace.samples[${i}].status`, 'invalid prepare/submit/commit order');
     }
+    if (pictures && s.phase === 'draw' && (s.status.submitted !== pictures.has(s.drawId) || s.status.committed !== pictures.has(s.drawId))) {
+      fail(`trace.samples[${i}].status`, 'picture acknowledgement mismatch');
+    }
   });
+  const committedDraws = validateSuccessfulDraws(trace);
   const f = trace.final;
   if (betweenLives) fail('trace.final', 'incomplete restart: still between lives');
   if (!f.completed || f.unexpectedNetwork || f.pendingEffects !== 0 || f.pendingFrames !== 0 || !same(f.atMs, schedule.durationMs)
     || f.events !== trace.events.length || f.commands !== trace.commands.length
-    || f.samples !== trace.samples.length || f.draws !== trace.samples.filter(s => s.phase === 'draw').length
+    || f.samples !== trace.samples.length || f.draws !== committedDraws
     || f.lastBoundaryId !== schedule.boundaries.at(-1).id) fail('trace.final', 'incomplete final boundary/counters or unexpected network');
   return trace;
 }
