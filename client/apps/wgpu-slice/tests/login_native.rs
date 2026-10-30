@@ -451,6 +451,17 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
     login.activate(true);
     let (intents, _) = login.step(4500., true, false).unwrap();
     assert!(matches!(intents.as_slice(), [StartMenuIntent::Play { .. }]));
+    // A failed fresh official acquisition has not replaced the old session.
+    game.fail("Synthetic replay acquisition failure");
+    login.observe_game(&game).unwrap();
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    assert!(!login.state.view(true).spinner_visible);
+    assert_eq!(login.state.view(true).last_life, captured);
+    login.activate(true);
+    assert!(matches!(
+        login.step(4516., true, false).unwrap().0.as_slice(),
+        [StartMenuIntent::Play { .. }]
+    ));
     endpoint_login::play(&mut game, "ws://127.0.0.1:19491/slither", "Again", 0).unwrap();
     assert_eq!(game.generation(), generation + 1);
     assert_eq!(game.login_session().outcome, None);

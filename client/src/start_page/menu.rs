@@ -336,6 +336,18 @@ impl StartMenuState {
         if self.pending_play.is_some() {
             return Ok(false);
         }
+        // Failed replay acquisition may still expose the previous session.
+        // Its original own token cannot authorize another game over.
+        if self.phase == MenuPhase::Connecting
+            && matches!(session.phase, Phase::Failed | Phase::Disconnected)
+            && session.outcome.is_some()
+            && capture.is_some_and(|value| {
+                self.last_capture
+                    .is_some_and(|last| last.sample.token == value.sample.token)
+            })
+        {
+            return Ok(self.attempt_ended(session.phase));
+        }
         if session.playing || session.outcome.is_some() {
             self.begin_outgoing();
         }
