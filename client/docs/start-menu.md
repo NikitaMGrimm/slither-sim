@@ -64,8 +64,8 @@ chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
 byte selections, focus, modality, composition and bounded undo/redo (64 edits).
 `EditIntent` and `HostEditEffect` contain copied data only. No DOM, window,
 clipboard, transport or accessibility-library handle enters the shared core.
-Movement and deletion use Unicode scalar boundaries, including independently
-editable combining marks. Word movement uses whitespace boundaries; this is a
+Movement and deletion use committed scalar boundaries; raw Unicode preedit,
+including combining marks, remains IME-owned. Word movement uses whitespace boundaries; this is a
 small native editing policy, not a locale-specific word/grapheme segmenter.
 `byte_to_utf16` and `utf16_to_byte` reject offsets inside a UTF-8 scalar or UTF-16
 surrogate pair rather than silently interpreting different coordinate systems.
@@ -74,15 +74,17 @@ Selection intents clamp invalid byte positions backwards to a scalar boundary.
 Typing, paste and IME commit all replace the selection, normalize the complete
 result and apply the field limit. Nicknames reuse #300's inclusive 32..127 UTF-16
 unit rule and 24-unit cap: DEL survives and an emoji becomes two spaces, even at
-the last available unit. Champion editing preserves Unicode and caps at 140
-UTF-16 units, stopping before a split surrogate pair. **This is a requested
-deviation:** the private `source/20b-skins-and-cosmetics.js:528-536` handler also
-applies ASCII substitution to champion input, and `06-login-and-hud.js:321-340`
-does so on Save. The plan's Unicode inference must not be treated as an official
-input or wire rule. This PR adds no champion submission or wire encoding.
+the last available unit. Champion editing uses the same ASCII substitution with
+a 140-unit cap: each surrogate becomes a space, including unit 140 when the
+limit splits a pair. This follows the private
+`source/20b-skins-and-cosmetics.js:528-537` input handler; Save repeats substitution
+and truncation at `source/06-login-and-hud.js:321-323`. The plan's earlier Unicode
+inference was incorrect. This PR adds no champion submission or wire encoding.
 
 Raw Unicode preedit and its optional UTF-8 byte selection stay separate from
-the committed value, field limit and undo history. Empty preedit is retained
+the committed value, field limit and undo history. Retaining raw preedit until
+commit approximates Chromium's input-event timing during composition, rather
+than establishing timing parity. Empty preedit is retained
 across winit's mandatory pre-Commit clear. An empty preview without an adjacent
 commit cancels at the dispatch boundary (also on hosts with long-lived Enabled).
 Disabled, explicit cancellation,
@@ -122,6 +124,11 @@ plain name, committed value, effective focus, enabled state and semantic actions
 It covers the ordinary login, last-life status and busy/incomplete champion
 status. Actions must return through the menu/editor admission policy. It adds
 no AccessKit bridge or fake functioning champion editor.
+Skin, server and graphics-quality names and high/low values come from the shared
+`MenuWording` table in English, German, French and Portuguese. These accessible
+names/values are authored: the source image links at `site/index.html:288-301`
+and `347-350` provide neither alt nor title text. They are not claimed as official
+translations. Each locale has a projection test covering both quality states.
 
 The native adapter maps winit 0.30 logical editing keys, physical gameplay keys,
 modifiers (including Windows AltGr), IME and focus events. The host executes

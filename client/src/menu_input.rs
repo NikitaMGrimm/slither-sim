@@ -1,6 +1,7 @@
 //! Copied menu editing policy. Hosts execute effects outside the core borrow.
-//! See docs/start-menu.md for source rules and the Unicode champion deviation.
+//! See docs/start-menu.md for source rules and composition timing limits.
 
+use crate::menu_preferences::MenuQuality;
 use crate::start_page::{MenuAction, StartMenuIntent, StartMenuState, StartMenuView};
 use std::ops::Range;
 
@@ -9,7 +10,7 @@ use std::ops::Range;
 pub enum TextField {
     /// Official UTF-16 ASCII substitution, limited to 24 units.
     Nickname,
-    /// Unicode text, limited to 140 UTF-16 units; no wire encoding here.
+    /// Official UTF-16 ASCII substitution, limited to 140 units; no wire encoding.
     Champion,
 }
 
@@ -39,18 +40,24 @@ fn boundary(text: &str, byte: usize) -> usize {
 }
 
 fn normalize(field: TextField, text: &str) -> String {
+    // Nickname input: source/20b-skins-and-cosmetics.js:513-527.
+    // Champion input: source/20b-skins-and-cosmetics.js:528-537; Save repeats
+    // substitution/truncation in source/06-login-and-hud.js:321-323.
+    // Retaining raw preedit until commit approximates Chromium's input-event
+    // timing during composition; it does not establish real OS timing parity.
     match field {
         TextField::Nickname => crate::start_page::normalize_nickname(text),
-        // Never manufacture an unpaired surrogate to reach the DOM unit limit.
-        TextField::Champion => {
-            let mut units = 0;
-            text.chars()
-                .take_while(|ch| {
-                    units += ch.len_utf16();
-                    units <= 140
-                })
-                .collect()
-        }
+        TextField::Champion => text
+            .encode_utf16()
+            .take(140)
+            .map(|unit| {
+                if (32..=127).contains(&unit) {
+                    char::from(unit as u8)
+                } else {
+                    ' '
+                }
+            })
+            .collect(),
     }
 }
 
@@ -84,7 +91,7 @@ pub struct TextEditState {
 /// Selection movement in a single-line field.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Movement {
-    /// Previous Unicode scalar (combining marks remain independently editable).
+    /// Previous committed Unicode scalar.
     Left,
     /// Next Unicode scalar.
     Right,
@@ -817,16 +824,24 @@ pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<
         );
         for (id, name, action) in [
             ("play", view.play_label, MenuAction::Play),
-            ("skin", "Change Skin", MenuAction::Skin),
-            ("server", "Choose Server", MenuAction::Server),
-            ("quality", "Graphics quality", MenuAction::Quality),
+            ("skin", view.wording.change_skin, MenuAction::Skin),
+            ("server", view.wording.choose_server, MenuAction::Server),
+            (
+                "quality",
+                view.wording.graphics_quality,
+                MenuAction::Quality,
+            ),
         ] {
             add(
                 id,
                 AccessibleRole::Button,
                 name.into(),
                 if id == "quality" {
-                    format!("{:?}", view.quality)
+                    match view.quality {
+                        MenuQuality::High => view.wording.quality_high,
+                        MenuQuality::Low => view.wording.quality_low,
+                    }
+                    .into()
                 } else {
                     String::new()
                 },

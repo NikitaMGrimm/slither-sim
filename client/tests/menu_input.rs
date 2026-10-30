@@ -85,22 +85,48 @@ fn normalization_is_identical_for_typing_paste_and_ime_commit() {
             &editor(TextField::Champion, &("c".repeat(139) + "😀")),
             TextField::Champion
         ),
-        "c".repeat(139)
+        "c".repeat(139) + " "
     );
     assert_eq!(
         text(
             &editor(TextField::Champion, &("c".repeat(138) + "😀x")),
             TextField::Champion
         ),
-        "c".repeat(138) + "😀"
+        "c".repeat(138) + "  "
     );
     assert_eq!(
         text(
             &editor(TextField::Champion, "é😀e\u{301}"),
             TextField::Champion
         ),
-        "é😀e\u{301}"
+        "   e "
     );
+}
+
+#[test]
+fn champion_ascii_units_and_140_limit_apply_to_typing_paste_and_ime() {
+    let field = TextField::Champion;
+    for (raw, expected) in [
+        (
+            " Aé😀e\u{301}\u{1f}\u{7f}!".into(),
+            " A   e  \u{7f}!".into(),
+        ),
+        ("😀".repeat(71), " ".repeat(140)),
+        ("c".repeat(139) + "😀", "c".repeat(139) + " "),
+        ("c".repeat(138) + "😀x", "c".repeat(138) + "  "),
+    ] {
+        assert_eq!(text(&editor(field, &raw), field), expected);
+        let mut pasted = editor(field, "");
+        paste(&mut pasted, Ok(raw.clone()));
+        assert_eq!(text(&pasted, field), expected);
+        let mut ime = editor(field, "");
+        ime.apply(EditIntent::Preedit(raw.clone(), None));
+        assert_eq!(ime.editor(field).preedit().unwrap().text, raw);
+        assert_eq!(text(&ime, field), "");
+        ime.apply(EditIntent::ImeCommit(raw));
+        assert_eq!(text(&ime, field), expected);
+        assert!(ime.editor(field).preedit().is_none());
+    }
 }
 
 #[test]
@@ -140,7 +166,7 @@ fn ime_preedit_empty_commit_enter_and_duplicate_text_are_separate() {
     input.apply(EditIntent::ImeCommit("界😀".into()));
     input.apply(EditIntent::ImeEnabled(false));
     input.apply(EditIntent::KeyText("界😀".into()));
-    assert_eq!(text(&input, TextField::Champion), "界😀");
+    assert_eq!(text(&input, TextField::Champion), "   ");
     input.apply(EditIntent::EndEventBatch);
     assert!(input.apply(enter(true, true)).is_empty());
     input.apply(enter(false, false));
@@ -204,14 +230,7 @@ fn direct_ime_commit_without_preedit_deduplicates_key_text_in_either_order() {
             if !text_first {
                 input.apply(EditIntent::KeyText("😀".into()));
             }
-            assert_eq!(
-                text(&input, field),
-                if field == TextField::Nickname {
-                    "  "
-                } else {
-                    "😀"
-                }
-            );
+            assert_eq!(text(&input, field), "  ");
             input.apply(EditIntent::Undo);
             assert_eq!(text(&input, field), "old");
         }
@@ -233,14 +252,9 @@ fn incremental_typing_stops_at_utf16_limit_and_selected_text_remains_replaceable
             caret: 2,
         });
         input.apply(EditIntent::KeyText("😀".into()));
-        let prefix = if field == TextField::Nickname {
-            "  "
-        } else {
-            "😀"
-        };
         assert_eq!(
             text(&input, field),
-            prefix.to_owned() + &"n".repeat(limit - 2)
+            "  ".to_owned() + &"n".repeat(limit - 2)
         );
         assert_eq!(text(&input, field).encode_utf16().count(), limit);
     }
@@ -249,7 +263,7 @@ fn incremental_typing_stops_at_utf16_limit_and_selected_text_remains_replaceable
 #[test]
 fn selections_arrows_shift_home_end_deletion_and_history() {
     let field = TextField::Champion;
-    let mut input = editor(field, "a😀e\u{301} z");
+    let mut input = editor(field, "aBCde z");
     input.apply(EditIntent::Move {
         movement: Movement::Home,
         extend: false,
@@ -262,7 +276,7 @@ fn selections_arrows_shift_home_end_deletion_and_history() {
         movement: Movement::Right,
         extend: true,
     });
-    assert_eq!(input.editor(field).selection(), (0, 5));
+    assert_eq!(input.editor(field).selection(), (0, 2));
     input.apply(EditIntent::Move {
         movement: Movement::Left,
         extend: false,
@@ -275,7 +289,7 @@ fn selections_arrows_shift_home_end_deletion_and_history() {
     input.apply(EditIntent::KeyText("new".into()));
     assert_eq!(text(&input, field), "new");
     input.apply(EditIntent::Undo);
-    assert_eq!(input.editor(field).selection(), (0, 10));
+    assert_eq!(input.editor(field).selection(), (0, 7));
     input.apply(EditIntent::Redo);
     assert_eq!(text(&input, field), "new");
     input.apply(EditIntent::Backspace);
@@ -295,35 +309,36 @@ fn selections_arrows_shift_home_end_deletion_and_history() {
 }
 
 #[test]
-fn combining_marks_and_words_use_explicit_scalar_boundaries() {
+fn normalized_combining_marks_and_words_use_committed_byte_boundaries() {
     let field = TextField::Champion;
     let mut input = editor(field, "hi  e\u{301} 😀");
-    input.apply(EditIntent::Move {
-        movement: Movement::WordLeft,
-        extend: false,
-    });
-    assert_eq!(input.editor(field).selection(), (8, 8));
+    assert_eq!(text(&input, field), "hi  e    ");
     input.apply(EditIntent::Move {
         movement: Movement::WordLeft,
         extend: false,
     });
     assert_eq!(input.editor(field).selection(), (4, 4));
     input.apply(EditIntent::Move {
+        movement: Movement::WordLeft,
+        extend: false,
+    });
+    assert_eq!(input.editor(field).selection(), (0, 0));
+    input.apply(EditIntent::Move {
         movement: Movement::WordRight,
         extend: false,
     });
-    assert_eq!(input.editor(field).selection(), (8, 8));
+    assert_eq!(input.editor(field).selection(), (4, 4));
     input.apply(EditIntent::Select {
-        anchor: 7,
-        caret: 7,
+        anchor: 6,
+        caret: 6,
     });
     input.apply(EditIntent::Backspace);
-    assert_eq!(text(&input, field), "hi  e 😀");
+    assert_eq!(text(&input, field), "hi  e   ");
     input.apply(EditIntent::Select {
         anchor: 999,
-        caret: 8,
+        caret: 6,
     });
-    assert_eq!(input.editor(field).selection(), (10, 6));
+    assert_eq!(input.editor(field).selection(), (8, 6));
 }
 
 #[test]
@@ -537,7 +552,7 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
             (
                 "skin",
                 AccessibleRole::Button,
-                "Change Skin",
+                "Changer d'apparence",
                 "",
                 false,
                 true,
@@ -546,7 +561,7 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
             (
                 "server",
                 AccessibleRole::Button,
-                "Choose Server",
+                "Choisir un serveur",
                 "",
                 false,
                 true,
@@ -555,8 +570,8 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
             (
                 "quality",
                 AccessibleRole::Button,
-                "Graphics quality",
-                "High",
+                "Qualité graphique",
+                "Élevée",
                 false,
                 true,
                 1
@@ -593,4 +608,64 @@ fn login_semantic_tree_snapshots_include_values_focus_actions_and_busy_state() {
     assert!(menu.begin_outgoing());
     menu.step(600., false).unwrap();
     assert!(login_accessibility(&menu.view(true), &input).is_empty());
+}
+
+fn assert_accessible_locale(locale: MenuLocale, names: [&str; 3], values: [&str; 2]) {
+    // Authored expected wording, tested independently of the wording table.
+    for (quality, expected_value) in [
+        (MenuQuality::High, values[0]),
+        (MenuQuality::Low, values[1]),
+    ] {
+        let menu = StartMenuState::new(locale, false, quality);
+        let nodes = login_accessibility(&menu.view(true), &MenuInputState::default());
+        for (id, expected_name) in ["skin", "server", "quality"].into_iter().zip(names) {
+            let node = nodes.iter().find(|node| node.id == id).unwrap();
+            assert_eq!(node.role, AccessibleRole::Button);
+            assert_eq!(node.name, expected_name);
+            assert_eq!(
+                node.value,
+                if id == "quality" { expected_value } else { "" }
+            );
+        }
+    }
+}
+
+#[test]
+fn english_accessible_button_names_and_quality_values() {
+    assert_accessible_locale(
+        MenuLocale::English,
+        ["Change Skin", "Choose Server", "Graphics quality"],
+        ["High", "Low"],
+    );
+}
+
+#[test]
+fn german_accessible_button_names_and_quality_values() {
+    assert_accessible_locale(
+        MenuLocale::German,
+        ["Skin ändern", "Server wählen", "Grafikqualität"],
+        ["Hoch", "Niedrig"],
+    );
+}
+
+#[test]
+fn french_accessible_button_names_and_quality_values() {
+    assert_accessible_locale(
+        MenuLocale::French,
+        [
+            "Changer d'apparence",
+            "Choisir un serveur",
+            "Qualité graphique",
+        ],
+        ["Élevée", "Faible"],
+    );
+}
+
+#[test]
+fn portuguese_accessible_button_names_and_quality_values() {
+    assert_accessible_locale(
+        MenuLocale::Portuguese,
+        ["Mudar aparência", "Escolher servidor", "Qualidade gráfica"],
+        ["Alta", "Baixa"],
+    );
 }

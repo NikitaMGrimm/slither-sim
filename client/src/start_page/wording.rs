@@ -14,7 +14,7 @@ pub enum MenuLocale {
     Portuguese,
 }
 
-/// Static translated login text.
+/// Static source login text and authored accessibility wording.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MenuWording {
     /// Initial Play label, without measurement padding.
@@ -27,6 +27,16 @@ pub struct MenuWording {
     pub final_length: &'static str,
     /// Three tips in source order.
     pub tips: [&'static str; 3],
+    /// Authored accessible name; the source image link has no alt/title text.
+    pub change_skin: &'static str,
+    /// Authored accessible name; the source image link has no alt/title text.
+    pub choose_server: &'static str,
+    /// Authored accessible name; the source image link has no alt/title text.
+    pub graphics_quality: &'static str,
+    /// Authored high-quality value for accessibility, independent of Debug output.
+    pub quality_high: &'static str,
+    /// Authored low-quality value for accessibility, independent of Debug output.
+    pub quality_low: &'static str,
 }
 
 impl MenuLocale {
@@ -40,10 +50,17 @@ impl MenuLocale {
         }
     }
 
-    /// Text specified by 06-login-and-hud.js:254-293 and 20a-game-over-and-codes.js:11-31.
+    /// Source text: 06-login-and-hud.js:254-293, 20a-game-over-and-codes.js:11-31.
+    /// Accessibility names/values are authored: site/index.html:288-301,347-350
+    /// provides image links without alt/title text. See docs/start-menu.md.
     pub fn wording(self) -> MenuWording {
         match self {
             Self::English => MenuWording {
+                change_skin: "Change Skin",
+                choose_server: "Choose Server",
+                graphics_quality: "Graphics quality",
+                quality_high: "High",
+                quality_low: "Low",
                 play: "Play",
                 play_again: "Play Again",
                 nickname: "Nickname",
@@ -55,6 +72,11 @@ impl MenuLocale {
                 ],
             },
             Self::German => MenuWording {
+                change_skin: "Skin ändern",
+                choose_server: "Server wählen",
+                graphics_quality: "Grafikqualität",
+                quality_high: "Hoch",
+                quality_low: "Niedrig",
                 play: "Spielen",
                 play_again: "Play Again",
                 nickname: "Nickname",
@@ -66,6 +88,11 @@ impl MenuLocale {
                 ],
             },
             Self::French => MenuWording {
+                change_skin: "Changer d'apparence",
+                choose_server: "Choisir un serveur",
+                graphics_quality: "Qualité graphique",
+                quality_high: "Élevée",
+                quality_low: "Faible",
                 play: "Jouer",
                 play_again: "Jouer",
                 nickname: "Surnom",
@@ -77,6 +104,11 @@ impl MenuLocale {
                 ],
             },
             Self::Portuguese => MenuWording {
+                change_skin: "Mudar aparência",
+                choose_server: "Escolher servidor",
+                graphics_quality: "Qualidade gráfica",
+                quality_high: "Alta",
+                quality_low: "Baixa",
                 play: "Joga",
                 play_again: "Joga",
                 nickname: "Apelido",
