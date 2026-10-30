@@ -1,0 +1,126 @@
+{
+  "status": "infrastructure-interrupted",
+  "acceptanceQualified": false,
+  "completedRuns": 0,
+  "run2Started": false,
+  "runtime": "388be59aebf3108f5c510aa7269c08b67851b202",
+  "frozenCollectorCommit": "fffdd8a834de7cd0fc978b05986e737ca155e9b2",
+  "build": {
+    "runtime": "388be59aebf3108f5c510aa7269c08b67851b202",
+    "archiveSha256": "938fd0177e11803ea214ddba1456ef161acdb5ffa0051704e3de35e6a262fb7b",
+    "priorHarnessSha256": "d5ded01411369473944c6084492fd98b172ccfd98f46df36d0b879dc0ad7be5b",
+    "clientSourceSha256": "7d00b2d7accc999b4a4f80c385790f948677faf980b345df0ba22311d3357255",
+    "cpuTarget": "x86-64",
+    "instrumentedRustAggregateSha256": "0d62c0c69c0caa0011ce0438e7931b3c4702f1d093f9ee53db05f70ef92fe17a",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "binaries": {
+      "clients": "75ef6e040eeee7a69ed1db28d80198ce32857a03f3f0162480dfc3e583cfb2bd",
+      "host": "d7ddbc80efcd0c0b5fb8e1d61d3931eb3aaf3c64b40171fb8687b533a184c780"
+    }
+  },
+  "replacementUsed": true,
+  "attempts": [
+    {
+      "attempt": 1,
+      "outcome": "InsufficientInstanceCapacity before either instance launched",
+      "worldStarted": false,
+      "consumedSingleReplacement": true
+    },
+    {
+      "attempt": 2,
+      "run": 1,
+      "outcome": "Generator Spot reclaim during counted window",
+      "generatorState": "terminated",
+      "reasonCode": "Server.SpotInstanceTermination",
+      "completeWindow": false,
+      "gates": null,
+      "reportedWorldCpuTails": null,
+      "clientFrameTails": null
+    }
+  ],
+  "lastRetainedControlProgress": {
+    "phase": "counting",
+    "tick": 285100,
+    "census": {
+      "deaths": 756,
+      "deferred": 0,
+      "food": 30411,
+      "living": 500,
+      "maxSegments": 316,
+      "meanSegments": 99.276,
+      "occupied": 500,
+      "p50Segments": 94,
+      "p90Segments": 202,
+      "p99Segments": 287,
+      "prey": 36,
+      "radius": 14981.655449248592,
+      "tick": 285100
+    }
+  },
+  "entryScreen": [
+    {
+      "deaths": 275,
+      "deferred": 0,
+      "food": 30132,
+      "living": 500,
+      "maxSegments": 272,
+      "meanSegments": 54.622,
+      "occupied": 500,
+      "p50Segments": 30,
+      "p90Segments": 187,
+      "p99Segments": 246,
+      "prey": 35,
+      "radius": 14981.655449248592,
+      "tick": 192000
+    },
+    {
+      "deaths": 276,
+      "deferred": 0,
+      "food": 30092,
+      "living": 500,
+      "maxSegments": 272,
+      "meanSegments": 55.144,
+      "occupied": 500,
+      "p50Segments": 30,
+      "p90Segments": 188,
+      "p99Segments": 246,
+      "prey": 35,
+      "radius": 14981.655449248592,
+      "tick": 192500
+    },
+    {
+      "deaths": 276,
+      "deferred": 0,
+      "food": 29866,
+      "living": 500,
+      "maxSegments": 273,
+      "meanSegments": 55.782,
+      "occupied": 500,
+      "p50Segments": 31,
+      "p90Segments": 189,
+      "p99Segments": 246,
+      "prey": 32,
+      "radius": 14981.655449248592,
+      "tick": 193000
+    }
+  ],
+  "retainedEvidence": {
+    "hostArchive": {
+      "bytes": 2631076,
+      "sha256": "68675c54b7f8475c9545ab8431337499440a15843f58c9aa69fa1fbee5cc9603",
+      "access": "Local-only, outside repositories"
+    },
+    "preflightArchive": {
+      "bytes": 6506,
+      "sha256": "75f5791874408c39a003bddf2098020ac30134e863d77de7a005c610374c71b6",
+      "access": "Local-only, outside repositories"
+    },
+    "copiedBinaryHashesVerified": true
+  },
+  "unavailableEvidence": [
+    "Generator client log and telemetry",
+    "Complete run summary / atomic result archive",
+    "Full-window endpoint and all client/queue/generator gate inputs"
+  ],
+  "limits": "No complete eligible window. No partial-window CPU/cadence claim, no repaired outcome and no additional pair."
+}

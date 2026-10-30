@@ -1,0 +1,15 @@
+{
+  "execution": "First fresh AWS generator, before any host world or warmup",
+  "portableTarget": "x86-64",
+  "lockedReleaseBuildPassed": true,
+  "backgroundRegressionPassed": true,
+  "synchronousDispatchMutationFailedAsIntended": true,
+  "syntheticLadderControlsPassed": true,
+  "prospectiveGateControlsPassed": true,
+  "metricTokenControlsPassed": true,
+  "documentationTestsPassed": 7,
+  "repositoryBoundaryPassed": true,
+  "cargoTargetRemovedAfterBuild": true,
+  "preWarmupCorrections": "Recorded in ATTEMPTS.md; no timing or world existed",
+  "independentReview": "Not performed"
+}
