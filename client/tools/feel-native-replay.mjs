@@ -6,7 +6,7 @@ import { buildManifest, floatBits, parse, sha256, stringify } from './feel-repla
 import { buildSchedule } from './feel-replay/schedule.mjs';
 import { assertBuildBinding } from './feel-replay/artifacts.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
-import { channelResults, nativeSteps } from './feel-replay/native.mjs';
+import { assertWasmTraceBinding, channelResults, nativeSteps } from './feel-replay/native.mjs';
 import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const options = {}, args = process.argv.slice(2);
@@ -28,6 +28,7 @@ try {
   if (sha256(await readFile(built.executable)) !== built.sha256) throw new Error('Native executable authentication failed');
   const wasmDirectory = path.resolve(options['--wasm-run']);
   const wasmBytes = await readFile(path.join(wasmDirectory, 'canvas-wasm.json'), 'utf8');
+  assertWasmTraceBinding(parse(await readFile(path.join(wasmDirectory, 'summary.json'), 'utf8')), wasmBytes);
   const wasm = parse(wasmBytes);
   // A2's source-tree and generated-artifact hashes were authenticated by its build
   // receipt before that run. A different candidate must regenerate the Wasm run.

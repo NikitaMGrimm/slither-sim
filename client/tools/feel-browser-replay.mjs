@@ -65,7 +65,7 @@ try {
     peers.push({ name, page, acks: [], step: async (event, data, seq) => parse(await page.evaluate(`window.replayStepEncoded(${JSON.stringify(stringify([event, data, seq]))})`)) });
   }
   await coordinate(schedule, deliveries, peers, (peer, ack) => { peer.acks.push(ack); });
-  const traces = [];
+  const traces = [], traceSha256 = {};
   const observationFailures = [];
   for (const peer of peers) {
     const finish = parse(await peer.page.evaluate('window.replayFinish()'));
@@ -85,7 +85,9 @@ try {
     const trace = assembly.finish({ atMs: finish.atMs, completed: finish.completed,
       pendingEffects: finish.pendingEffects, pendingFrames: finish.pendingFrames, unexpectedNetwork: finish.unexpectedNetwork || peer.page.denied() !== 0 });
     traces.push(trace);
-    await writeFile(path.join(out, `${peer.name}.json`), stringify(trace));
+    const traceBytes = stringify(trace);
+    traceSha256[peer.name] = sha256(traceBytes);
+    await writeFile(path.join(out, `${peer.name}.json`), traceBytes);
     await writeFile(path.join(out, `${peer.name}-receipts.json`), stringify({ receipts: finish.receipts, recorderErrors: finish.recorderErrors,
       entropyRequests: randomStream, queuedRaf: finish.queuedRaf, deniedRequests: peer.page.denied() }));
     await writeFile(path.join(out, `${peer.name}-manifest.json`), stringify(manifest));
@@ -106,7 +108,7 @@ try {
     const category = row.path.replace(/\[\d+\]/g, '[]').split('.').slice(0, 3).join('.');
     mismatchClasses[category] = (mismatchClasses[category] ?? 0) + 1;
   }
-  const summary = { status: report.status, errors: report.errors, mismatches: report.mismatches.length, diagnosticRows: rows.length, mismatchClasses,
+  const summary = { status: report.status, errors: report.errors, mismatches: report.mismatches.length, diagnosticRows: rows.length, mismatchClasses, traceSha256,
     counts: traces.map(t => ({ peer: t.manifest.peer, events: t.events.length, commands: t.commands.length, samples: t.samples.length, draws: t.final.draws })) };
   await writeFile(path.join(out, 'summary.json'), stringify(summary));
   console.log(JSON.stringify(summary));

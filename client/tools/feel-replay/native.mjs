@@ -2,10 +2,19 @@ import { normalizeInput } from './schedule.mjs';
 import { mouseReplay } from './input.mjs';
 import { admitsBrowserInput } from '../../apps/wgpu-slice/web/input-targeting.mjs';
 import { differences } from './differences.mjs';
+import { sha256 } from './io.mjs';
 
 // Native has no DOM. Reuse A2's CSS/physical-mouse normalization and production
 // admission predicate, retaining the observed compatibility event independently
 // of the actual LocalGame method calls. This lane does not test OS input routing.
+// A2 writes summary.json last, after its input/receipt rechecks, with the hash of each
+// trace it wrote. Requiring it binds the Wasm operand to that completed browser run.
+export function assertWasmTraceBinding(summary, traceBytes) {
+  const expected = summary?.traceSha256?.['canvas-wasm'];
+  if (typeof expected !== 'string') throw new Error('Wasm run has no completed A2 trace binding; regenerate A2');
+  if (expected !== sha256(traceBytes)) throw new Error('Wasm trace differs from the one its A2 run wrote');
+}
+
 export function nativeSteps(schedule, deliveries, area) {
   let actions, pendingMouseUp;
   const dispatch = mouseReplay(n => {

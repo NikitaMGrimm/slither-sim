@@ -40,7 +40,9 @@ build receipt and new runs; no trace's bindings are rewritten to make it compare
 
 The build receipt hashes the executable and staged source tree/core. The runner
 checks these against current sources and the A2 manifest, and checks the original
-input bytes and independently regenerated frozen schedule. Entropy is hashed
+input bytes and independently regenerated frozen schedule. The Wasm trace must
+match the `traceSha256` that its A2 run wrote into `summary.json` after that run's
+own rechecks; A2 runs without it must be regenerated. Entropy is hashed
 from actual native request-tagged observations, independently of Wasm. Native
 input mapping reuses A2's normalized CSS coordinates/physical-mouse expansion and
 the production browser target-admission predicate. It calls the real LocalGame

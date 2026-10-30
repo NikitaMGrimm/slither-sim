@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { nativeSteps, channelResults } from './feel-replay/native.mjs';
+import { assertWasmTraceBinding, nativeSteps, channelResults } from './feel-replay/native.mjs';
+import { sha256 } from './feel-replay/io.mjs';
 import { buildSchedule } from './feel-replay/schedule.mjs';
 import { syntheticFixture } from './feel-replay/synthetic.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
@@ -35,4 +36,14 @@ test('channel report retains exact channels and never promotes unexplained float
   assert.equal(result.channels.find(c => c.channel === 'camera').status, 'failing');
   assert.equal(report.passed, false);
   assert.equal(result.rows.length, 1);
+});
+
+test('Wasm operand must be the trace its completed A2 run wrote', () => {
+  // ORIGINAL SYNTHETIC bytes; only the binding is under test.
+  const bytes = '{"synthetic":"wasm trace"}';
+  assertWasmTraceBinding({ traceSha256: { 'canvas-wasm': sha256(bytes) } }, bytes);
+  assert.throws(() => assertWasmTraceBinding({ traceSha256: { 'canvas-wasm': sha256(bytes) } }, bytes + ' '), /differs/);
+  assert.throws(() => assertWasmTraceBinding({ traceSha256: { 'webgpu-wasm': sha256(bytes) } }, bytes), /regenerate A2/);
+  assert.throws(() => assertWasmTraceBinding({}, bytes), /regenerate A2/);
+  assert.throws(() => assertWasmTraceBinding(undefined, bytes), /regenerate A2/);
 });
