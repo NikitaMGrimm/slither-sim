@@ -55,3 +55,12 @@
   fresh target keeps the combined full-timer bound at $2.352 and restores the
   complete export safety margin; no timer is extended. Retrieve the old target's
   closed logs before retiring it. No original latency values informed selection.
+- The second pair completed and secured all four row archives, then the load
+  process failed its final exit check. Its log shows worker 3 read an empty
+  target-count file during the 160-to-320 transition and exited before the 320
+  primary. That row is unqualified, regardless of its latency values. Replace
+  controller truncation writes with atomic temporary-file replacement, including
+  RESET; keep native binaries unchanged. Repeat only 320 after the same staged
+  loaded prehistory; repeated lower rows are calibration, not replacements for
+  the retained lower primaries. Complete cleanup even when a worker exit check
+  fails. Record the original failed row and all control-source versions.

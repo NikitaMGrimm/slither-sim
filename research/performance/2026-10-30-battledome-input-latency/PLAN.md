@@ -145,3 +145,12 @@ snapshot of existing CLI logs. Download and hash-verify each immediately, keepin
 another copy on the target. These callbacks run between counted windows and do
 not alter a window, quota or selection rule. Use immediate-mode packet capture
 with a short post-run drain; retain partial old capture tails as unavailable.
+
+Before the next timing, attempt 2's exit/coverage audit rejects its 320 row:
+one load worker exited on a transient empty target file before that window.
+Keep the retained lower primaries and this failed 320. Atomically replace target
+and RESET files, without changing native programs. Repeat the loaded 300/360 s
+80 stage, 60/360 s 160 stage and 60/360 s 320 stage on the same fresh pair;
+only 320 is a replacement primary, the first two are calibration. Extend no
+timer or budget. Qualification requires all six workers to cover the whole row,
+not merely a sufficient count of earlier reports.
