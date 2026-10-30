@@ -3,10 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { localHost } from '../web/local-host.mjs';
 import { installLocalInput } from '../web/local-input.mjs';
+import { createClientInput as createInputOracle } from '../../../tools/fixtures/client-input-oracle.mjs';
 
 // Authored event-path/DOM doubles, not physical input or browser default actions.
 function inputFixture({ pointerEvents = true } = {}) {
-  const listeners = new Map(), calls = [], held = new Set();
+  const listeners = new Map(), calls = [];
   function node(parent) {
     const value = { parent, addEventListener(type, handler, options) {
       assert.equal(options.capture, true);
@@ -23,17 +24,22 @@ function inputFixture({ pointerEvents = true } = {}) {
     ...(pointerEvents ? { PointerEvent: class {} } : {}) });
   editable.isContentEditable = true;
   canvas.getBoundingClientRect = () => ({ left: 20, top: 30, width: 800, height: 600 });
-  let boosting = false, starts = 0, stops = 0;
+  const policy = createInputOracle({ protocolVersion: 19 });
+  policy.setOwn({ token: 1n, wantedHeading: 0, gazeHeading: 0, dead: false,
+    turnRate: 0.1, sizeTurnFactor: 1, speedTurnFactor: 1 });
+  let starts = 0, stops = 0;
   const owner = {
-    pointer(...args) { calls.push(['pointer', ...args]); if (args[4]) boosting = true; },
-    mouse_up() { calls.push(['release']); boosting = false; },
+    pointer(x, y, width, height, down) {
+      calls.push(['pointer', x, y, width, height, down]);
+      const input = { clientX: x, clientY: y, viewportWidth: width, viewportHeight: height, follow: true };
+      if (down) policy.mouseDown(input); else policy.pointer(input);
+    },
+    mouse_up() { calls.push(['release']); policy.mouseUp(); },
     key(code, down) {
       calls.push(['key', code, down]);
-      if (!['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp'].includes(code)) return false;
-      if (down) held.add(code); else held.delete(code);
-      return true;
+      return down ? policy.keyDown(code) : policy.keyUp(code);
     },
-    blur() { calls.push(['blur']); boosting = false; held.clear(); },
+    blur() { calls.push(['blur']); policy.blur(); },
     can_play: () => true, stop() { stops++; },
   };
   const abort = new AbortController();
@@ -47,8 +53,8 @@ function inputFixture({ pointerEvents = true } = {}) {
     }
     return event;
   }
-  return { realm, document, canvas, overlay, button, input, textarea, editable, owner, abort, fire, calls, held,
-    get boosting() { return boosting; }, get starts() { return starts; }, get stops() { return stops; } };
+  return { realm, document, canvas, overlay, button, input, textarea, editable, owner, abort, fire, calls, policy,
+    get boosting() { return policy.snapshot().own.requestedBoost; }, get starts() { return starts; }, get stops() { return stops; } };
 }
 
 test('window capture tracks canvas and overlay coordinates in the game viewport', () => {
@@ -91,21 +97,59 @@ test('canvas presses release over editors and controls for both pointer and mous
       f.fire(f.canvas, 'pointerdown'); assert.equal(f.boosting, true);
       assert.equal(f.fire(target, type).defaultPrevented, false); assert.equal(f.boosting, false);
     }
-    for (const code of ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp']) {
-      f.fire(f.canvas, 'keydown', { code }); assert.equal(f.held.has(code), true);
-      f.fire(target, 'keyup', { code }); assert.equal(f.held.has(code), false);
+    for (const [code, field] of [['Space', 'boostKeyHeld'], ['ArrowLeft', 'leftHeld'], ['ArrowRight', 'rightHeld'], ['ArrowUp', 'boostKeyHeld']]) {
+      f.fire(f.canvas, 'keydown', { code }); assert.equal(f.policy.snapshot()[field], true);
+      f.fire(target, 'keyup', { code }); assert.equal(f.policy.snapshot()[field], false);
     }
   }
 });
 
-test('blur and visibility loss clear mouse boost and held keys', () => {
+test('blur and visibility loss preserve input policy until genuine releases arrive', () => {
   const f = inputFixture();
   for (const type of ['blur', 'visibilitychange']) {
     f.fire(f.canvas, 'pointerdown'); f.fire(f.canvas, 'keydown', { code: 'Space' });
     f.fire(f.canvas, 'keydown', { code: 'ArrowLeft' });
     f.document.hidden = false; f.fire(f.document, 'visibilitychange'); assert.equal(f.boosting, true);
     f.document.hidden = true; f.fire(type === 'blur' ? f.realm : f.document, type);
-    assert.equal(f.boosting, false); assert.equal(f.held.size, 0);
+    assert.equal(f.boosting, true); assert.equal(f.policy.snapshot().leftHeld, true);
+    assert.equal(f.policy.snapshot().boostKeyHeld, true);
+    f.fire(f.input, 'pointerup'); assert.equal(f.boosting, false);
+    f.fire(f.input, 'mouseup');
+    f.fire(f.input, 'keyup', { code: 'Space' }); f.fire(f.input, 'keyup', { code: 'ArrowLeft' });
+    assert.equal(f.policy.snapshot().boostKeyHeld, false); assert.equal(f.policy.snapshot().leftHeld, false);
+  }
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 2);
+});
+
+test('keyboard-only boost clears on mouseup just as in Canvas, without changing held-key state', () => {
+  const f = inputFixture();
+  f.fire(f.canvas, 'keydown', { code: 'Space' }); assert.equal(f.boosting, true);
+  f.fire(f.textarea, 'mouseup'); assert.equal(f.boosting, false);
+  assert.equal(f.policy.snapshot().boostKeyHeld, true);
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 1);
+});
+
+test('unmatched releases are delivered; only the matching compatibility mouseup is skipped', () => {
+  const f = inputFixture();
+  f.fire(f.overlay, 'pointerup'); f.fire(f.input, 'mouseup');
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 1);
+  f.fire(f.overlay, 'mouseup');
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 2);
+  f.fire(f.canvas, 'pointerup', { button: 1 }); f.fire(f.canvas, 'mouseup', { button: 0 });
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 4);
+  f.fire(f.canvas, 'pointerup'); f.fire(f.canvas, 'keydown', { code: 'Space' });
+  f.fire(f.overlay, 'mouseup'); assert.equal(f.boosting, false);
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 6);
+});
+
+test('blur retains compatibility pairing, while a new suppressed press starts a fresh release', () => {
+  const f = inputFixture();
+  f.fire(f.canvas, 'pointerup'); f.fire(f.realm, 'blur'); f.fire(f.overlay, 'mouseup');
+  assert.equal(f.calls.filter(call => call[0] === 'release').length, 1);
+  for (const type of ['pointerdown', 'mousedown']) {
+    const g = inputFixture();
+    g.fire(g.canvas, 'pointerup'); g.fire(g.textarea, type); g.fire(g.overlay, 'mouseup');
+    assert.equal(g.calls.filter(call => call[0] === 'release').length, 2);
   }
 });
 

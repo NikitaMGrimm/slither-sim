@@ -9,15 +9,13 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
     editor: isEditorTarget(event.target, Input, TextArea),
     menu: controls.includes(event.target),
   });
-  let mouseHeld = false;
-  function release() {
-    if (!mouseHeld) return;
-    mouseHeld = false;
-    host.call(() => owner.mouse_up());
-  }
-  function blur() {
-    mouseHeld = false;
-    host.call(() => owner.blur());
+  let pendingMouseUp;
+  function release(event) {
+    // Canvas releases boost even when no mouse press reached gameplay. Only the
+    // matching compatibility mouseup may reuse a release already delivered.
+    const duplicate = event.type === 'mouseup' && pendingMouseUp !== undefined && pendingMouseUp === event.button;
+    pendingMouseUp = event.type === 'pointerup' ? event.button : undefined;
+    if (!duplicate) host.call(() => owner.mouse_up());
   }
   function pointer(event, down) {
     if (!admitsBrowserInput(event, targeting(event))) return;
@@ -25,7 +23,6 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
       const r = canvas.getBoundingClientRect();
       if (r.width && r.height) {
         owner.pointer(event.clientX - r.left, event.clientY - r.top, r.width, r.height, down);
-        if (down) mouseHeld = true;
       }
     });
     if (down) event.preventDefault();
@@ -34,11 +31,15 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
   // submit twice. Both release families may clear a press, including over UI.
   const family = typeof realm.PointerEvent === 'function' ? 'pointer' : 'mouse';
   listen(realm, `${family}move`, event => pointer(event, false));
-  listen(realm, `${family}down`, event => { if (event.button === 0) pointer(event, true); });
+  for (const type of ['pointerdown', 'mousedown']) listen(realm, type, event => {
+    pendingMouseUp = undefined;
+    if (type === `${family}down` && event.button === 0) pointer(event, true);
+  });
   listen(realm, 'pointerup', release);
   listen(realm, 'mouseup', release);
   listen(realm, 'pointercancel', release);
   listen(realm, 'keydown', event => {
+    pendingMouseUp = undefined;
     if (!admitsBrowserInput(event, targeting(event))) return;
     if (event.code === 'Enter' && !event.repeat) { if (owner.can_play()) start(); }
     else if (event.code === 'Escape') host.call(() => owner.stop());
@@ -50,6 +51,8 @@ export function installLocalInput({ realm, canvas, owner, host, start, controls,
       if (owner.key(event.code, false) && !editor && !(menu && ['Space', 'Enter'].includes(event.code))) event.preventDefault();
     });
   });
+  // Focus loss is deliberately a no-op in DesktopInput; preserve release routing.
+  const blur = () => host.call(() => owner.blur());
   listen(realm, 'blur', blur);
   listen(document, 'visibilitychange', () => { if (document.hidden) blur(); });
 }

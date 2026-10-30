@@ -442,7 +442,6 @@ test('Canvas host plus runtime menu admission and WebGPU admit the same gameplay
   const abort = new AbortController();
   installLocalInput({ realm: f.realm, canvas, owner, host: { call: fn => fn() }, start: () => gpuEvents.push(sequence), controls: [button], signal: abort.signal });
   for (const target of targets) for (const type of ['mousemove', 'mousedown', 'mouseup', 'keydown', 'keyup', 'blur']) {
-    if (type === 'mouseup') f.dispatch(f.realm, 'mousedown', { target: canvas, button: 0, clientX: 500, clientY: 200 });
     sequence++;
     f.dispatch(f.realm, type, { target, code: 'Space', button: 0, clientX: 500, clientY: 200 });
   }
