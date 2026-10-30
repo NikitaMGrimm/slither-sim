@@ -1,0 +1,10 @@
+{
+  "ownedTaskDirectoryRemoved": true,
+  "boundedCargoTargetAbsent": true,
+  "taskProcessesAbsentBeforeCleanup": true,
+  "rawArchiveCopiedAndSha256Verified": true,
+  "privateRawArchiveRetainedLocally": true,
+  "guestRawArchiveRemoved": true,
+  "archiveReceipt": "archive-receipt.json",
+  "unrelatedDirectoriesUnchanged": true
+}
