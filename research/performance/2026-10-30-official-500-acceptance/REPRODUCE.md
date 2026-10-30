@@ -126,6 +126,21 @@ contains neither `CLIENT_ERROR` nor `panicked at`; the failing client predicate
 is the selected worst one-second input-lateness p99, not CPU headroom or queues.
 No new Rust test matrix was run for this research-only change.
 
+For the labelled post-result diagnosis, use the same verified retained archive:
+
+```sh
+python3 diagnose_lateness.py PRIVATE_RUN1_RESULTS.tar.gz lateness-diagnosis.json
+```
+
+This short standard-library reduction preserves the frozen report selection,
+computes per-report join/death deltas and the six violating worker intervals,
+and binds them to histogram publication and nearby aggregate host samples.
+It checks its worst p99 against the original result and publishes no raw
+addresses or cloud identities. It cannot recover unrecorded per-connection
+event times or reconnect durations. Per the maintainer's scoped exception,
+this diagnosis reduction ran on Windows (under one second), with no build,
+Rust test, guest access or new AWS collection.
+
 Stop and retrieve within the fixed ninety-minute per-pair plan. Cancel task Spot
 requests by recorded instance/request identity, terminate the instances, verify
 task volumes disappear, and remove the task key and security group. Scan every

@@ -62,6 +62,64 @@ The generator-failure label does not authorize a replacement here: the end-class
 
 Clock/task reconciliation difference 0.000071 ms/tick; observer CPU 0.0564 ms/tick. IRQ/softirq/steal are separate accounting context, never added to world CPU. World p99 <=7 ms: False.
 
+## Cause of the input lateness
+
+**Post-result diagnosis from retained v1 data only; no gate or outcome changes.**
+[Reduction](diagnose_lateness.py) and [selected diagnosis](lateness-diagnosis.json).
+The frozen overlapping-report selector includes 10,806 worker reports. Exactly
+**six reports** reach 42 ms: one per worker, all in the single wall-second bin
+starting 1,800 seconds after the start. They end 155–520 ms after the requested
+host window ends at +1,800.024945 s. No earlier selected report violates the gate;
+the largest earlier p99 is 3.870476 ms and largest pass is 11.583783 ms. These
+observations do not remove any report from the frozen gate.
+
+| Worker | Report end offset s | lateP99Nanos | lateMaxNanos | maxPassNanos | Joins / deaths in report interval |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1800.204273 | 165753686 | 175839550 | 178397543 | 1 / 1 |
+| 2 | 1800.460276 | 421551017 | 431591694 | 434448380 | 0 / 0 |
+| 3 | 1800.288775 | 252747041 | 262667088 | 263036750 | 0 / 0 |
+| 4 | 1800.180336 | 85501122 | 93590828 | 94144078 | 1 / 1 |
+| 5 | 1800.375326 | 335401834 | 347264254 | 349343699 | 0 / 1 |
+| 6 | 1800.545164 | 505682703 | 516802133 | 519342309 | 0 / 0 |
+
+The cause supported by the timing and retained source is **synchronous metric
+publication in the generator decision loops**, serialized through shared stderr.
+At +1,800.025693–1,800.025967 s all six workers observe the end token and enter
+the `CLIENT_WINDOW` path added by [prepare.py](prepare.py). That path constructs
+and prints the accumulated histograms before servicing seats. Each line is
+702,494–718,858 bytes; the six appear in worker order **4, 1, 3, 5, 2, 6**. Long
+passes rise in that same order: **94, 178, 263, 349, 434, 519 ms**. For workers
+1/3/5/2/6, report timestamp minus the pre-publication metric-end timestamp matches
+`maxPassNanos` within 18 microseconds. The first worker's subsequent ordinary
+report can also wait behind other histogram writers. This accounts for the
+endpoint-only staircase while CPU fractions remain low. It is a generator
+publication artifact, not evidence of a half-second host admission stall.
+
+Synchronous reconnects are a separate generator hazard, but do not explain this
+episode: workers 2/3/6 have neither a join nor a death in their bad interval, and
+worker 5 has no completed join. The linked ladder puts `Seat::connect` and its
+global mutex inside each worker's seat loop. It blocks on TCP/HTTP upgrade and
+login send, adds a 3 ms sleep, then returns a nonblocking socket; challenge/setup
+and snake admission are processed later, rather than waited for by this call.
+No individual reconnect start/end or mutex-wait durations were recorded. Thus
+the requested per-reconnect durations cannot be recovered from aggregate join
+deltas; this study does not claim a measured reconnect latency.
+
+The server records only census, socket totals, stats and CPU blocks, with no
+per-connection accept, HTTP-handshake completion or snake-admission timestamps.
+Those requested event times are unavailable. The common aggregate bracket runs
+from tick 451,400 at +1,798.548517 s to tick 451,700 at +1,800.647310 s: living
+500→499, occupied 500→500, deaths 2,095→2,101, zero deferrals. Nearby socket
+samples retain 500 players, zero application queue, zero write-block/full/reject
+counters, and kernel queues 6,010/5,806/6,246 bytes. These aggregates do not prove
+individual host handshake latency; the generator publication path and its exact
+timing identify this observed stall without that unavailable inference.
+
+V1 remains failed for both recorded reasons. A prospective v2 must move reconnect
+work off decision loops **and** move histogram serialization/output off those
+loops, while retaining the unchanged overlapping-report gate. No v1 retiming,
+trimming, replacement or new cloud collection was performed for this diagnosis.
+
 ## Cost and teardown
 
 The [cost receipt](cost.json) bounds launch-to-verified-cleanup compute at $0.405219 using the frozen bid caps and lifetimes of at most 4,052.519/4,050.519 seconds for generator/server. Including the full $1 noncompute reserve gives **$1.405219 < $3**; this is a conservative bound, not a final invoice. The predeclared three-pair fail-safe bound remains $2.836. Only one pair was used, without timer extension or an extra paid service.
