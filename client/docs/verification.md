@@ -44,9 +44,12 @@ full check command uses one build job and target/wgpu-slice-check to limit memor
 and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 
 The pure Node [feel replay contract](../tools/feel-replay/README.md) defines
-offline schedules, manifests and bit-preserving trace comparison for future
-Canvas/WebGPU and native peers. Run `node --test tools/feel-replay.test.mjs` for
-its authored synthetic fault checks; these do not establish runtime or feel parity.
+offline schedules, manifests and bit-preserving trace comparison. Run
+`node --test tools/feel-replay.test.mjs tools/feel-browser-replay.test.mjs` for
+authored synthetic fault checks. The [browser peer command](../tools/feel-replay/browser-peers.md)
+uses prebuilt, feature-gated Wasm in background headless Edge/Chromium and a CPU
+GPU-boundary sink. It is a separate local run, not part of npm test or proof of
+pixel, physical-input or perceptual parity.
 
 ## Source guard
 

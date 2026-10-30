@@ -23,6 +23,9 @@ slither-client = { path = "../.." }
 url = "=2.5.8"
 wgpu = { version = "=30.0.1", default-features = false, features = ["std", "wgsl", "dx12", "vulkan", "webgpu"] }
 
+[features]
+feel-trace = ["slither-client/feel-trace"]
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 mio = { version = "=1.2.4", features = ["os-poll", "net"] }
 winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }

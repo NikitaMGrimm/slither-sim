@@ -23,6 +23,8 @@ pub mod authored_sources;
 pub mod challenge;
 pub mod desktop_input;
 pub mod desktop_layout;
+#[cfg(feature = "feel-trace")]
+pub mod feel_trace;
 pub mod gameplay_policy;
 pub mod menu_layout;
 pub mod menu_loading;

@@ -37,7 +37,7 @@ export function captureLocalGameDocument(realm) {
 }
 
 /** Browser plumbing and original stand-ins for the same game runtime on localhost. */
-export async function createLocalGameHost({ realm = globalThis, endpoint, sourceFactory, sourceRecipes } = {}) {
+export async function createLocalGameHost({ realm = globalThis, endpoint, sourceFactory, sourceRecipes, observeInput } = {}) {
   const documentFence = captureLocalGameDocument(realm);
   const document = realm.document, location = realm.location;
   endpoint = loopbackEndpoint(endpoint);
@@ -292,15 +292,17 @@ export async function createLocalGameHost({ realm = globalThis, endpoint, source
         && isCurrentDocument() && playControl === control;
     };
     const deliver = event => {
+      observeInput?.(event, 'received');
       if (!isCurrentDocument()) return;
       // Editing keeps native defaults and never becomes steering or boost input.
       const editable = isEditorTarget(event.target, Input, TextArea);
       // A release belongs to the game input owner even after the pointer/focus
       // moves into an editor. Editing keeps its native default behavior.
-      if (!admitsBrowserInput(event, { editor: editable })) return;
+      if (!admitsBrowserInput(event, { editor: editable })) { observeInput?.(event, 'filtered-editor'); return; }
       if (!editable && ['keydown', 'keyup'].includes(event.type)
         && ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.code)
         && !nativePlayDefault(event)) preventDefault(event);
+      observeInput?.(event, 'routed');
       inputRoute?.(event);
     };
     for (const type of ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'mousemove',

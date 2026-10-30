@@ -657,6 +657,8 @@ impl Entry {
 /// this object; only a brand-new client starts a new flag history.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AnimatedClient {
+    #[cfg(feature = "feel-trace")]
+    trace: Option<crate::feel_trace::Recorder>,
     received: ClientState,
     announcements_enabled: bool,
     announcements: AnnouncementState,
@@ -706,6 +708,8 @@ impl AnimatedClient {
     /// Start an empty received and animation world at an explicit timestamp.
     pub fn new(start_ms: f64) -> Result<Self, ClientPresentationError> {
         Ok(Self {
+            #[cfg(feature = "feel-trace")]
+            trace: None,
             received: ClientState::default(),
             announcements_enabled: false,
             announcements: AnnouncementState::default(),
@@ -2028,6 +2032,8 @@ impl AnimatedClient {
             self.appearance_enabled |= enable_appearance;
             self.face_presentation_enabled |= enable_face_presentation;
             self.accessory_presentation_enabled |= enable_accessory_presentation;
+            #[cfg(feature = "feel-trace")]
+            self.trace_boundary("update", None, None);
             return Ok((applied.report, None));
         }
         let mut next = self.clone();
@@ -2468,6 +2474,8 @@ impl AnimatedClient {
             event_start = boundary.event_end;
         }
         next.received = received;
+        #[cfg(feature = "feel-trace")]
+        next.trace_boundary("update", None, None);
         *self = next;
         Ok((applied.report, journal))
     }
@@ -2532,6 +2540,8 @@ impl AnimatedClient {
                 .map_err(ClientPresentationError::from)?;
         }
         next.advance_entities(step, now_ms)?;
+        #[cfg(feature = "feel-trace")]
+        next.trace_boundary("update", Some(step), None);
         *self = next;
         Ok(step)
     }
@@ -3234,6 +3244,8 @@ impl AnimatedClient {
                 accessory: entry.accessory,
             });
         }
+        #[cfg(feature = "feel-trace")]
+        next.trace_boundary("draw", None, Some([width, height]));
         Ok(prepared)
     }
 
@@ -3246,6 +3258,27 @@ impl AnimatedClient {
             entry.snake.set_gaze_heading(heading)?;
         }
         Ok(())
+    }
+
+    /// Attach the offline recorder before startup. Ordinary builds contain no hook.
+    /// See the [contract](../../tools/feel-replay/README.md),
+    /// [peer rules](../../tools/feel-replay/browser-peers.md) and authored
+    /// [fixture](../../tools/feel-replay/browser-synthetic.json) for boundary rules.
+    #[cfg(feature = "feel-trace")]
+    pub fn record_feel(&mut self, recorder: crate::feel_trace::Recorder) {
+        self.trace = Some(recorder);
+    }
+
+    #[cfg(feature = "feel-trace")]
+    fn trace_boundary(
+        &self,
+        phase: &'static str,
+        step: Option<FrameStep>,
+        extent: Option<[u32; 2]>,
+    ) {
+        if let Some(recorder) = &self.trace {
+            recorder.observe(self, phase, step, extent);
+        }
     }
 
     /// Toggle camera following without advancing its draw clock.
