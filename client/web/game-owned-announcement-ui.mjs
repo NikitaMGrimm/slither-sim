@@ -63,7 +63,10 @@ export function createOwnedAnnouncementUi({ document, parent, dom, construct, is
     current();
     const node = type === 1 ? construct.createElement(document, tag) : construct.createTextNode(document, '');
     if (node === parent || node === document || entries.some(entry => entry.node === node)) invalid();
-    const entry = { node, type, tag, style: type === 1 ? dom.style(node) : null, parent: null, children: [], next: null };
+    const entry = {
+      node, type, tag, style: type === 1 ? dom.style(node) : null, parent: null, children: [], next: null,
+      applied: new Map(),
+    };
     owner(entry);
     if (dom.parentNode(node) !== null || dom.firstChild(node) !== null
       || dom.nextSibling(node) !== null || dom.isConnected(node) !== false
@@ -76,8 +79,15 @@ export function createOwnedAnnouncementUi({ document, parent, dom, construct, is
     if (previous) entries.find(entry => entry.node === previous).next = child.node;
     target.children.push(child.node); child.parent = target.node; inspect();
   }
+  // render() runs on every HUD publication; like entry.value for text, skip writes the owned node
+  // already holds. render() still inspects the whole topology once before any write.
   function style(entry, values) {
-    for (const [key, value] of Object.entries(values)) effect(dom.setStyle, entry.style, key, String(value));
+    for (const [key, value] of Object.entries(values)) {
+      const next = String(value);
+      if (entry.applied.get(key) === next) continue;
+      effect(dom.setStyle, entry.style, key, next);
+      entry.applied.set(key, next);
+    }
   }
   function mount() {
     if (attempted || disposed) throw new Error('Owned announcement mount already consumed');

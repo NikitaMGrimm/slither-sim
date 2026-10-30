@@ -7,7 +7,7 @@ import { createGateTestDom } from './game-gate-test-fixture.mjs';
 function fixture() {
   const native = createGateTestDom({ hud: true, ownedHud: true });
   const document = new native.Document(), parent = document.createElement('main'); document.appendChild(parent);
-  let current = true, fail = false, writes = 0;
+  let current = true, fail = false, writes = 0, styleWrites = 0;
   const getter = (prototype, name) => {
     const get = Object.getOwnPropertyDescriptor(prototype, name).get;
     return value => Reflect.apply(get, value, []);
@@ -17,12 +17,13 @@ function fixture() {
   for (const name of ['localName', 'namespaceURI']) dom[name] = getter(native.Element.prototype, name);
   dom.style = getter(native.hud.HTMLElement.prototype, 'style');
   dom.setText = (node, text) => { if (fail) throw new Error('synthetic text failure'); node.data = text; writes++; };
-  dom.setStyle = (style, name, value) => style.setProperty(name, value);
+  dom.setStyle = (style, name, value) => { style.setProperty(name, value); styleWrites++; };
   const construct = { createElement: (doc, tag) => doc.createElement(tag), createTextNode: (doc, text) => doc.createTextNode(text),
     appendChild: (node, child) => node.appendChild(child), removeChild: (node, child) => node.removeChild(child) };
   const ui = createOwnedAnnouncementUi({ document, parent, dom, construct, isCurrentDocument: () => current });
   return { ui, parent, document, style: node => native.hud.style(dom.style(node)),
-    writes: () => writes, current: value => { current = value; }, fail: value => { fail = value; } };
+    writes: () => writes, styleWrites: () => styleWrites,
+    current: value => { current = value; }, fail: value => { fail = value; } };
 }
 const span = (text, fontSize = 13, bold = false, alpha = .5) => ({ kind: 'text', text,
   family: 'Arial, Helvetica Neue, Helvetica, sans-serif', fontSize, bold, italic: true, alpha });
@@ -54,6 +55,11 @@ test('passive lease submits literal spans, explicit breaks and multiplies alpha 
   assert.equal(f.style(holder.children[0]).get('margin-bottom'), '5px');
   assert.equal(f.writes(), 8); f.ui.render({ ...view(), opacity: .5 });
   assert.equal(f.writes(), 8, 'fade-only publication retains existing Text nodes without rewriting content');
+  let styles = f.styleWrites(); f.ui.render({ ...view(), opacity: .5 });
+  assert.equal(f.styleWrites(), styles, 'an unchanged publication writes no style property');
+  f.ui.render({ ...view(), opacity: .4 });
+  assert.equal(f.styleWrites(), styles + 1, 'a fade step writes only the holder opacity');
+  assert.equal(f.style(holder).get('opacity'), '0.4');
   f.ui.render({ ...view(), opacity: -1, blocks: view().blocks.slice(0, 1) });
   assert.equal(f.style(holder).get('opacity'), '0'); assert.equal(f.style(holder.children[1]).get('display'), 'none');
   f.ui.dispose(); f.ui.dispose(); assert.equal(f.parent.children.length, 0);
