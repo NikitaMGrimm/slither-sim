@@ -161,6 +161,17 @@ impl Bank {
         f.random_wobble_unit = units[1];
         f
     }
+    pub fn background_art(&self, art: crate::cosmetics::BackgroundArt) -> BodyAsset {
+        self.cosmetics
+            .as_ref()
+            .and_then(|c| c.background_art(art))
+            .unwrap_or_else(|| {
+                self.assets[match art {
+                    crate::cosmetics::BackgroundArt::HexTile => self.tile.asset,
+                    crate::cosmetics::BackgroundArt::Backdrop => self.backdrop.asset,
+                }]
+            })
+    }
     pub fn prey(&self, raw: u8, units: [f64; 2]) -> PreyFactory {
         let mut f = self.prey[usize::from(raw % 9)].clone();
         f.random_phase_unit = units[0];

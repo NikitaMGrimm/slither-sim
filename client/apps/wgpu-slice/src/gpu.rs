@@ -198,11 +198,21 @@ impl Renderer {
         if self.lost.load(Ordering::SeqCst) {
             return Err("GPU device lost; host stopped, scene retained".into());
         }
+        // Only local background art needs the decoder's larger dimension bound.
+        // Keep every other producer's limit and all resident byte budgets.
+        let max_dimension = if crate::cosmetics::BackgroundArt::ALL
+            .iter()
+            .any(|art| art.handle() == a.handle)
+        {
+            1024
+        } else {
+            512
+        };
         if a.status != BodyAssetStatus::Ready
             || a.width == 0
             || a.height == 0
-            || a.width > 512
-            || a.height > 512
+            || a.width > max_dimension
+            || a.height > max_dimension
             || r.image.width != a.width
             || r.image.height != a.height
             || r.image.pixels.len() != a.width as usize * a.height as usize * 4
