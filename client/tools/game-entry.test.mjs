@@ -310,7 +310,7 @@ test('actual HUD factory graph publishes genuine current and final history after
       assert.equal(runtime.diagnostics().captureHeld, false); writes.push([node,value]);
     } });
     runtime.play(graph.run(`({endpoint:'ws://192.0.2.1:1234/slither',
-      profile:{clientVersion:1,password:new Uint8Array(20),protocolVersion:19},
+      profile:{clientVersion:1,pageEcho:new Uint8Array(20),protocolVersion:19},
       nickname:'Synthetic',skin:24,customSkin:new Uint8Array()})`));
     graph.f.frame(); graph.f.socket.open(); graph.message([54,1]);
     graph.message([97,...new Array(24).fill(0)]); graph.f.flush();

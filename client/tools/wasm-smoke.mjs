@@ -116,7 +116,7 @@ endScreenSmoke(wasm);
 console.log('Synthetic Rust skin policy ABI passed:', skinPolicySmoke(wasm));
 leaderboardScoreSmoke(wasm);
 console.log('Synthetic native minimap view ABI passed:', minimapRenderSmoke(wasm));
-const profile = { clientVersion: 1, password: Uint8Array.from({ length: 20 }, (_, index) => index), protocolVersion: 19 };
+const profile = { clientVersion: 1, pageEcho: Uint8Array.from({ length: 20 }, (_, index) => index), protocolVersion: 19 };
 const session = new HandshakeSession(wasm, profile, 'Synthetic');
 const challenge = Uint8Array.from([54, ...syntheticChallenge('A'.repeat(27))]);
 const reply = session.receive(challenge);
@@ -131,11 +131,11 @@ assert.deepEqual(wasm.decode_frame(Uint8Array.of(112), false),
 assert.throws(() => wasm.solve_challenge(Uint8Array.of(0, 1)));
 assert.throws(() => wasm.encode_login(1, new Uint8Array(19), 'Synthetic', 0, new Uint8Array()));
 const delNickname = '\u007f'.repeat(24), delCustom = Uint8Array.of(3, 1);
-assert.deepEqual(wasm.encode_login(1, profile.password, delNickname, 255, delCustom),
-  Uint8Array.from([115, 30, 0, 1, ...profile.password, 255, 24,
+assert.deepEqual(wasm.encode_login(1, profile.pageEcho, delNickname, 255, delCustom),
+  Uint8Array.from([115, 30, 0, 1, ...profile.pageEcho, 255, 24,
     ...new Array(24).fill(127), 0, 255, ...delCustom]), 'Real Rust ABI preserves every DEL nickname byte');
 for (const nickname of ['\u001f', '\u0080', delNickname + '\u007f']) {
-  assert.throws(() => wasm.encode_login(1, profile.password, nickname, 0, new Uint8Array()));
+  assert.throws(() => wasm.encode_login(1, profile.pageEcho, nickname, 0, new Uint8Array()));
 }
 console.log('Synthetic Wasm ABI handshake passed; no reference files or sockets used.');
 

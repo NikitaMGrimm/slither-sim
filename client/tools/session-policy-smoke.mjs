@@ -7,7 +7,7 @@ import {syntheticChallenge} from './synthetic-challenge.mjs';
 import {unpackCommands} from '../web/handshake-session.mjs';
 const challenge=Uint8Array.of(54,...syntheticChallenge('ABCDEFGHIJKLMNOPQRSTUVWXYZA'));
 const wire=commands=>Uint8Array.from(commands.length===1?commands[0]:commands.flatMap((c,i)=>i===0?[c.length>>8,c.length&255,...c]:[c.length+32,...c]));
-const request=()=>({endpoint:'ws://192.0.2.9:1234/slither',profile:{clientVersion:7,password:new Uint8Array(20).fill(3),protocolVersion:19},nickname:'Authored session',skin:2,customSkin:new Uint8Array()});
+const request=()=>({endpoint:'ws://192.0.2.9:1234/slither',profile:{clientVersion:7,pageEcho:new Uint8Array(20).fill(3),protocolVersion:19},nickname:'Authored session',skin:2,customSkin:new Uint8Array()});
 const normalized=value=>value instanceof Error?{name:value.name,message:value.message}:value;
 const caught=callback=>{try{return{thrown:false,value:callback()};}catch(value){return{thrown:true,value:normalized(value)};}};
 const score=()=>({schema:1,enabled:true,tableMax:17,own:{token:1n,id:0,logicalSegments:4,fractionalMass:.25,scoreAdjustment:3,scoreIndex:7},status:'ready',score:17,error:null});

@@ -7,7 +7,7 @@ import { createStockGameplay } from './fixtures/stock-gameplay-fixture.mjs';
 import { createStockClient } from './fixtures/stock-client-fixture.mjs';
 
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+  profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
   nickname: 'Synthetic', skin: 0, customSkin: new Uint8Array() });
 const own = (token = 1n, dead = false) => ({ token, id: 7, rawHead: { x: 300, y: 400 },
   wantedHeading: 0.4, gazeHeading: 0, dead, turnRate: 0.03, sizeTurnFactor: 1, speedTurnFactor: 1 });

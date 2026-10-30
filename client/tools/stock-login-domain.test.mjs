@@ -6,7 +6,7 @@ import { createStockSession } from './fixtures/session-policy-fixture.mjs';
 function request(nickname) {
   return { endpoint: 'ws://192.0.2.9:1234/slither',
     profile: { clientVersion: 0x1234, protocolVersion: 19,
-      password: Uint8Array.from({ length: 20 }, (_, index) => index + 1) },
+      pageEcho: Uint8Array.from({ length: 20 }, (_, index) => index + 1) },
     nickname, skin: 255, customSkin: Uint8Array.of(0, 127, 255) };
 }
 
@@ -15,9 +15,9 @@ function harness({ rejectEncoding = false, failure } = {}) {
   let clockReads = 0;
   const session = createStockSession({
     wasm: {
-      encode_login(version, password, nickname, skin, custom) {
-        calls.push({ version, password, nickname, skin, custom });
-        assert.deepEqual([...password], Array.from({ length: 20 }, (_, index) => index + 1));
+      encode_login(version, pageEcho, nickname, skin, custom) {
+        calls.push({ version, pageEcho, nickname, skin, custom });
+        assert.deepEqual([...pageEcho], Array.from({ length: 20 }, (_, index) => index + 1));
         if (rejectEncoding) throw failure;
         // Opaque authored result: this double deliberately does not encode a login.
         return Uint8Array.of(42);
@@ -49,9 +49,9 @@ function assertForwarded(h, input) {
   assert.equal(call.skin, 255);
   assert.deepEqual([...call.custom], [0, 127, 255]);
   assert.notEqual(call.custom, input.customSkin);
-  assert.notEqual(call.password, input.profile.password);
-  assert.deepEqual([...call.password], new Array(20).fill(0));
-  assert.deepEqual([...input.profile.password], Array.from({ length: 20 }, (_, index) => index + 1));
+  assert.notEqual(call.pageEcho, input.profile.pageEcho);
+  assert.deepEqual([...call.pageEcho], new Array(20).fill(0));
+  assert.deepEqual([...input.profile.pageEcho], Array.from({ length: 20 }, (_, index) => index + 1));
   assert.equal(h.session.snapshot().phase, 'opening');
   assert.equal(h.session.snapshot().constructorAttempts, 0);
   assert.equal(h.sockets.length, 0);
@@ -112,7 +112,7 @@ test('controls, non-ASCII and 25-byte names reject before any staged mutation', 
       assert.equal(h.states.length, 0);
       assert.equal(h.sockets.length, 0);
       assert.equal(h.clockReads, 0);
-      assert.deepEqual([...input.profile.password], Array.from({ length: 20 }, (_, index) => index + 1));
+      assert.deepEqual([...input.profile.pageEcho], Array.from({ length: 20 }, (_, index) => index + 1));
       // Rejection leaves the same session Play-eligible.
       const valid = request('\u007f');
       h.session.play(valid);
@@ -121,7 +121,7 @@ test('controls, non-ASCII and 25-byte names reject before any staged mutation', 
   }
 });
 
-test('encoder rejection preserves readiness and exact thrown values, clearing the borrowed password copy', () => {
+test('encoder rejection preserves readiness and exact thrown values, clearing the borrowed pageEcho copy', () => {
   for (const failure of [new Error('Original synthetic encoder rejection'), undefined, null, false, 0, '']) {
     const h = harness({ rejectEncoding: true, failure }), input = request('\u007f');
     try {
@@ -131,8 +131,8 @@ test('encoder rejection preserves readiness and exact thrown values, clearing th
       assert.equal(threw, true);
       assert.equal(received, failure);
       assert.equal(h.calls.length, 1);
-      assert.deepEqual([...h.calls[0].password], new Array(20).fill(0));
-      assert.deepEqual([...input.profile.password], Array.from({ length: 20 }, (_, index) => index + 1));
+      assert.deepEqual([...h.calls[0].pageEcho], new Array(20).fill(0));
+      assert.deepEqual([...input.profile.pageEcho], Array.from({ length: 20 }, (_, index) => index + 1));
       assert.deepEqual(h.session.snapshot(), before);
       assert.deepEqual(h.session.pendingActions(), pending);
       assert.equal(h.states.length, 0);

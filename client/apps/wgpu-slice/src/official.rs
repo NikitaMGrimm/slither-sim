@@ -270,11 +270,11 @@ pub fn profile(source: &[u8]) -> Result<LoginProfile> {
         client_version,
         ..Default::default()
     };
-    profile_literals::password(
-        declaration(source, b"cpw", profile_literals::PASSWORD_LIMIT)?,
-        &mut result.password,
+    profile_literals::page_echo(
+        declaration(source, b"cpw", profile_literals::PAGE_ECHO_LIMIT)?,
+        &mut result.page_echo,
     )
-    .map_err(|_| "Unsupported password literal")?;
+    .map_err(|_| "Unsupported page echo literal")?;
     Ok(result)
 }
 

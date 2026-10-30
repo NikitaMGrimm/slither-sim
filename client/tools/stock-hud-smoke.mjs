@@ -343,7 +343,7 @@ export function stockHudSmoke(wasm) {
       error(value) { sessionErrors.push(value); },
     });
     session.play({ endpoint: 'ws://192.0.2.9:1234/slither', profile: {
-      clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19,
+      clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19,
     }, nickname: 'Authored rows', skin: 0, customSkin: new Uint8Array() });
     eq(sockets.length, 0);
     const resetStep = composed.scene.advance_with_control(0, false, request => session.afterStep(request));

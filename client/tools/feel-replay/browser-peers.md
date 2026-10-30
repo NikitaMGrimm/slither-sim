@@ -25,6 +25,12 @@ schema-1 header-free tapes use the same command with their existing immutable
 record path. `--receipt` hashes an existing acceptance receipt in place. Private
 paths, hashes, bodies, receipts and results must remain outside Git/public logs.
 
+Optional `--numerical-policy <feel-f64-v1-policy-file>` validates and freezes a
+cross-target declaration before either peer starts. Both Wasm manifests retain
+that declaration for a later native comparison; their own same-core comparison
+still requires exact equality. Omit it for the default null policy. See the
+[policy version and cause requirements](README.md#match-criteria).
+
 The authored synthetic v3 fixture includes two challenge negotiations, unsplit
 Setup pairs, own appearances, pointer/compatibility movement, boost, editor keys,
 pong and death through expiry followed by a restart. `npm test` covers pure schedule,

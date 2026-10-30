@@ -51,16 +51,20 @@ Both submit ordered frames and authored materials through the same wgpu renderer
 
 Play opens a simulator endpoint or, natively with `--official`, an official
 server chosen from the live directory; there is no automatic reconnect. The
-renderer covers body, food, prey, paired eyes, arena and platform text for nicknames, the HUD and leaderboard.
+renderer covers body, food, prey, paired eyes, arena and platform text for
+nicknames, the HUD, leaderboard and official record announcements.
 Image faces, antennas and complete menus remain incomplete. Rasterization can
 differ from Canvas; passing tests does not establish perceptual parity.
 
 Shared [panel text primitives](panel-text.md) add styled, bounded wrapping and an
-independent lazy cache for future announcements and result/editor panels. No
-wgpu gameplay producer enables them yet; the shared [record announcement
-projection](announcements.md) supplies styled blocks to the Canvas reference.
-Existing text quotas and draw admission stay
-unchanged until a producer explicitly reserves panel draws.
+independent lazy cache. Production `LocalGame` enables the shared [record
+announcement projection](announcements.md) on native and browser WebGPU,
+capturing immutable text draws before minimap/HUD at each Setup, ordinary and
+resize preparation. It reserves 96 announcement draws only while that captured
+view is visible (present content, projected blocks and positive opacity), including
+through the fade. Hidden views retain the existing 140-draw HUD/minimap reserve;
+visible announcements raise it to 236. Result/editor remains inactive.
+Fragment opacity multiplies the shared retained fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.

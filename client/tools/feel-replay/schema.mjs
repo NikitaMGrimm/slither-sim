@@ -37,7 +37,7 @@ const own = {
   offsets: { x: 'f32', y: 'f32', fraction: 'f32', heading: 'f32' },
   speed: 'number', visualSpeed: 'number', boost: 'boolean', boostPhase: 'number',
   size: { segments: 'uint', fraction: 'number', length: 'number' },
-  // Stored rings stay exact even in the numerical lane; only current offsets get a ULP cap.
+  // Storage stays exactly f32-representable; cross-target allowances live in compare.mjs.
   rings: { head: ring(53, 3), angle: ring(26), length: ring(53) },
   projected: nullable({ backing: { head: point('number'), pupils: list(point('number'), 2) },
     css: { head: point('number'), pupils: list(point('number'), 2) } }),
@@ -148,6 +148,13 @@ export function validateSchedule(schedule) {
   }
   return schedule;
 }
+export function validateNumericalPolicy(policy, path = 'numericalPolicy') {
+  validate(policy, numericalPolicySchema, path);
+  if (policy && (policy.worldCap > 1e-9 || policy.angleCap > 1e-9 || policy.zoomCap > 1e-12 || policy.f32Ulps > 1)) {
+    fail(path, 'exceeds world/radians 1e-9, zoom 1e-12 or f32 1 ULP caps');
+  }
+  return policy;
+}
 export function validateManifest(manifest) {
   validate(manifest, manifestSchema, 'manifest');
   if (!manifest.artifacts.length || !manifest.toolVersions.length || !manifest.startup.length) {
@@ -155,10 +162,7 @@ export function validateManifest(manifest) {
   }
   unique(manifest.artifacts.map(x => x.name), 'manifest.artifacts');
   unique(manifest.toolVersions.map(x => x.name), 'manifest.toolVersions');
-  const p = manifest.numericalPolicy;
-  if (p && (p.worldCap > 1e-9 || p.angleCap > 1e-9 || p.zoomCap > 1e-12 || p.f32Ulps > 1)) {
-    fail('manifest.numericalPolicy', 'exceeds world/radians 1e-9, zoom 1e-12 or f32 1 ULP caps');
-  }
+  validateNumericalPolicy(manifest.numericalPolicy, 'manifest.numericalPolicy');
   return manifest;
 }
 

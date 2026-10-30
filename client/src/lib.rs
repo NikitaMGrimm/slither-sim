@@ -26,6 +26,7 @@ pub mod desktop_layout;
 #[cfg(feature = "feel-trace")]
 pub mod feel_trace;
 pub mod gameplay_policy;
+pub mod menu_input;
 pub mod menu_layout;
 pub mod menu_loading;
 pub mod menu_preferences;

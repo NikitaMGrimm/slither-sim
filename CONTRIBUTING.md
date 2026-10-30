@@ -45,7 +45,8 @@ without running them. Commands report their time; CI adds a job-summary timing
 table. Tests use doubles or loopback, never outside game servers.
 PR CI runs the same runner automatically: `lint`,
 WASM and package once on Linux, `test` on Linux, Windows, macOS and Rust 1.99,
-and `tools` on Linux, Windows and macOS. The weekly
+and `tools` on Linux, Windows and macOS. Host or client code changes also run
+the client against a local host on Linux. The weekly
 [extended checks](https://github.com/NikitaMGrimm/slither-sim/blob/main/.github/workflows/extended.yml) add release-profile tests,
 Linux ARM tests and a RustSec audit; they block nothing and can be dispatched.
 
@@ -92,7 +93,9 @@ Preserve third-party license notices. For external data, note its source and any
 sharing restrictions in `REPORT.md`.
 
 A maintainer reviews the current revision and evidence before merging. Required
-CI must pass with latest main; new commits need relevant checks and renewed review.
+CI must pass; new commits need relevant checks and renewed review. PRs may merge
+behind main: the client and simulator change mostly separate files, main reruns
+every check after each merge, and releases wait for main's run.
 Auto-merge can then finish an approved PR. Independent agent review is useful
 evidence, but agents cannot approve their GitHub account's own PR. The owner-authorized
 [release automation](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md) can merge compatible patch release PRs

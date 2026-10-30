@@ -5,7 +5,7 @@ const probeNickname = 'Synthetic';
 
 const packed = commands => Uint8Array.from(commands.flatMap(command => [0, 0, 0, command.length, ...command]));
 const fakeWasm = () => ({ encode_login: () => Uint8Array.of(115, 0), solve_challenge: () => new Uint8Array(27), decode_frame: bytes => bytes, setup_protocol_version: command => command[1] });
-const profile = { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 };
+const profile = { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 };
 
 test('synthetic handshake emits only negotiation, challenge reply, and login before setup', () => {
   const session = new HandshakeSession(fakeWasm(), profile, probeNickname);

@@ -1,4 +1,4 @@
-//! Browser adapter: actual Canvas glyph rasterization, no DOM or scheduling.
+//! Browser adapter: Canvas glyphs and cached, invisible DOM normal-font metrics.
 use super::{Raster, Slant, TextStyle, Weight};
 use crate::{Result, materials::RgbaImage};
 use slither_client::presentation::TextMeasurement;
@@ -8,6 +8,7 @@ use web_sys::{OffscreenCanvas, OffscreenCanvasRenderingContext2d};
 #[derive(Default)]
 pub struct Rasterizer {
     metrics: Option<(OffscreenCanvas, OffscreenCanvasRenderingContext2d)>,
+    normal_heights: std::collections::BTreeMap<(String, u64), f64>,
 }
 impl Rasterizer {
     pub fn new() -> Self {
@@ -44,6 +45,39 @@ impl Rasterizer {
             },
             max_width,
         )
+    }
+    pub fn normal_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
+        let window = web_sys::window().ok_or("Panel metrics window")?;
+        let dpr = window.device_pixel_ratio();
+        if !dpr.is_finite() || dpr <= 0. || !scale.is_finite() || scale <= 0. {
+            return Err("Panel normal line scale".into());
+        }
+        // Request the same physical font size as shared layout, independent of
+        // the page's own DSF. Canvas TextMetrics does not expose the line gap.
+        let font = css_font(style, style.size * scale / dpr);
+        let key = (font.clone(), dpr.to_bits());
+        if let Some(height) = self.normal_heights.get(&key) {
+            return Ok(*height * dpr / scale);
+        }
+        let document = window.document().ok_or("Panel metrics document")?;
+        let body = document.body().ok_or("Panel metrics body")?;
+        let element = document
+            .create_element("span")
+            .map_err(|e| format!("Panel normal metrics: {e:?}"))?;
+        element.set_attribute("style", &format!("position:fixed;visibility:hidden;pointer-events:none;display:inline-block;white-space:pre;padding:0;border:0;margin:0;font:{font};line-height:normal")).map_err(|e| format!("Panel normal style: {e:?}"))?;
+        element.set_text_content(Some("M"));
+        body.append_child(&element)
+            .map_err(|e| format!("Panel normal append: {e:?}"))?;
+        let height = element.get_bounding_client_rect().height();
+        element.remove();
+        if !height.is_finite() || height <= 0. {
+            return Err("Panel normal font height".into());
+        }
+        if self.normal_heights.len() == 16 {
+            self.normal_heights.clear();
+        }
+        self.normal_heights.insert(key, height);
+        Ok(height * dpr / scale)
     }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
         if self.metrics.is_none() {
