@@ -94,6 +94,9 @@ cargo run --release --locked --example portable_bot -- --url ws://127.0.0.1:8766
 The host binds loopback by default. Stop it with Ctrl+C.
 [Server configuration](docs/raw-server.md) covers custom worlds and remote hosting.
 [Linux hosting](docs/hosting.md) sets up a public server as a service.
+In our test, one core of an AWS c7a.medium ran 500 fully grown bot players over
+real sockets for 30 minutes without falling behind
+([details](docs/hosting.md#size-the-server)).
 [All settings](docs/configuration.md) lists defaults, limits and timing behavior.
 
 ## Choose an interface

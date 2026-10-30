@@ -4,6 +4,10 @@
 
 ### Added
 
+- The README and Linux hosting guide state the measured one-core capacity:
+  500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
+  falling behind
+  ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-30-official-500-acceptance-v4/REPORT.md)).
 - A `perf_baseline` catalog row, `engine-battledome-spawn-318`, that times
   spawn searches and ticks in a crowded synthetic Battledome. It needs the new
   off-by-default `perf-internals` Cargo feature, which exists only for the
