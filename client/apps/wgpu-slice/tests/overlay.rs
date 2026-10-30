@@ -188,3 +188,56 @@ fn zero_window_suspends_and_restoring_the_same_size_resumes_frames() {
     assert!(game.take_frame().is_some());
     game.presented(true).unwrap();
 }
+
+#[test]
+fn menu_backdrop_stays_below_the_fading_world_at_unequal_sizes() {
+    use slither_wgpu_slice::login_native::NativeLogin;
+    let mut game = tape::playing();
+    let physical = [3840, 2160];
+    game.window_viewport(physical, 1.5).unwrap();
+    let mut picture = snapshot(&mut game, 100);
+    for draw in &mut picture.frame.draws {
+        draw.effective_alpha *= 0.25;
+    }
+    for draw in &mut picture.overlay.as_mut().unwrap().draws {
+        draw.effective_alpha *= 0.25;
+    }
+    let faded_world = picture.frame.draws.clone();
+    let faded_hud = picture.overlay.as_ref().unwrap().draws.clone();
+    let menu = NativeLogin::new("Player")
+        .unwrap()
+        .prepare_host(physical, 1.5, true, None)
+        .unwrap();
+    let page_asset = menu.backdrop.as_ref().unwrap().asset;
+    menu.append_to(&mut picture).unwrap();
+
+    let page = &picture.frame.draws[0];
+    assert_eq!(page.asset, page_asset);
+    assert_eq!(page.effective_alpha, 1.);
+    assert_eq!((page.destination.x, page.destination.y), (0., 0.));
+    assert_eq!(
+        (page.destination.width, page.destination.height),
+        (1500., 845.)
+    );
+    assert_eq!(picture.frame.draws[1..], faded_world);
+    let overlay = picture.overlay.as_ref().unwrap();
+    assert_eq!(overlay.draws[..faded_hud.len()], faded_hud);
+    assert!(!overlay.draws.iter().any(|draw| draw.asset == page_asset));
+    assert_eq!(
+        picture
+            .resources
+            .iter()
+            .find(|r| r.asset == page_asset)
+            .unwrap()
+            .image
+            .pixels,
+        [22, 28, 34, 255]
+    );
+    let resident = picture
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    picture.frame.validate(&resident).unwrap();
+    overlay.validate(&resident).unwrap();
+}

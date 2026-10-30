@@ -94,7 +94,10 @@ impl MenuFrame {
         frame::check_draw_count(picture.draw_count() + count)?;
         if let Some(overlay) = &mut picture.overlay {
             frame::reserve_draws(&mut overlay.draws, self.frame.draws.len())?;
-            frame::reserve_draws(&mut picture.frame.draws, usize::from(self.backdrop.is_some()))?;
+            frame::reserve_draws(
+                &mut picture.frame.draws,
+                usize::from(self.backdrop.is_some()),
+            )?;
         } else {
             frame::reserve_draws(&mut picture.frame.draws, count)?;
         }

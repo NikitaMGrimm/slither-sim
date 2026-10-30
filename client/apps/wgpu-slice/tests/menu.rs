@@ -547,6 +547,7 @@ fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
         let backdrop = prepared.backdrop.clone();
         let controls = prepared.frame.draws.clone();
         let mut picture = PreparedFrame {
+            overlay: None,
             frame: slither_wgpu_slice::frame::Frame {
                 draws: world.clone(),
                 ..base.frame.clone()

@@ -20,7 +20,8 @@ a broad shadow; tips and nickname use Lucida Sans Unicode on Windows, while Play
 keeps Arial Bold. The opaque `#161C22` page backdrop sits below the fading world;
 the world clear is unchanged. `MenuFrame.backdrop` carries it separately from the
 menu controls, retaining its texture in the menu resources. `append_to` places
-it below every world draw. A hidden login emits no backdrop, even while the
+it below every world draw, mapped to the capped world viewport when controls
+use the physical overlay. A hidden login emits no backdrop, even while the
 spinner remains. Hosts can take it for a separate world layer before composing
 a physical-resolution menu overlay. Logo art keeps its image aspect inside the
 unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
