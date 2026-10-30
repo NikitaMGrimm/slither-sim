@@ -74,6 +74,13 @@ and policy allocations without advancing or changing the world or held actions.
 All counted final-state digests must match the verification continuation.
 Profiled diagnostics are separate children on that same checkpoint.
 
+The ecology is warmed; derived world-step caches are reconstructed after each
+checkpoint load. Observation/policy priming does not step the world. Counted
+windows include the first restored tick (1/512 of each window); selected data
+also retain its CPU distribution and the distribution excluding that tick.
+Interpret maxima with this distinction, rather than treating a checkpoint-load
+cache spike as a measured steady live-server stall.
+
 Admission uses public core methods. In particular `spawn_margin` computes a
 complete margin, whereas the socket host's private bounded-margin helper may
 stop early. The pose/outcome rule is similar, but the extra fallback work is

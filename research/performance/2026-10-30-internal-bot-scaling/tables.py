@@ -14,7 +14,7 @@ def render(value):
             '| ---: | ---: | ---: | ---: | ---: | ---: |']
     throughput=['| Bots | Simulation-only ticks/s | Serial ticks/s | Three-worker ticks/s |',
                 '| ---: | ---: | ---: | ---: |']
-    costs=['| Bots | Mode | World CPU p50 / p99 ms/tick | Admission mean ms/tick | Observe CPU µs/bot | A4 loop CPU µs/bot | RSS MiB |',
+    costs=['| Bots | Mode | World CPU p50 / p99 / max ms/tick | Admission mean ms/tick | Observe CPU µs/bot | A4 loop CPU µs/bot | RSS / peak RSS MiB |',
            '| ---: | --- | ---: | ---: | ---: | ---: | ---: |']
     phases=['| Bots | Profile mode | Motion CPU bounds ms/tick | Collision | Death | Food pickup | Prey | Ambient | Profile / ordinary CPU ratio range |',
             '| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
@@ -33,7 +33,8 @@ def render(value):
             observe='—' if m['observationProcessCpuUsPerBot'] is None else number(m['observationProcessCpuUsPerBot'])
             decide='—' if m['policyLoopCpuUsPerBot'] is None else number(m['policyLoopCpuUsPerBot'])
             rss=max(v['VmRSS'] for v in m['finalMemoryKiB'])/1024
-            costs.append(f"| {n:,} | {mode} | {m['worldCpuMs']['p50']:.3f} / {m['worldCpuMs']['p99']:.3f} | {m['admissionCpuMs']['mean']:.3f} | {observe} | {decide} | {rss:.1f} |")
+            peak=max(v['VmHWM'] for v in m['finalMemoryKiB'])/1024
+            costs.append(f"| {n:,} | {mode} | {m['worldCpuMs']['p50']:.3f} / {m['worldCpuMs']['p99']:.3f} / {m['worldCpuMs']['max']:.3f} | {m['admissionCpuMs']['mean']:.3f} | {observe} | {decide} | {rss:.1f} / {peak:.1f} |")
         for mode in ['serial','parallel']:
             d=p['phaseDiagnostics'][mode]
             columns=[bounds(d['phases'][key]['cpuMsPerTickBounds']) for key in

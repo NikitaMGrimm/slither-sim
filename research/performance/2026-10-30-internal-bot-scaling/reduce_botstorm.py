@@ -44,6 +44,8 @@ def summarize(root):
         assert profile['finalStateSha256']==reference
         assert all(sum(s[key] for s in profile['samples'])*5==counts[key] for key in counts)
         out.update({'windows':5,'ticks':len(samples),'worldCpuMs':timing('worldCpu'),
+                    'firstRestoredTickWorldCpuMs':stats([r['samples'][0]['worldCpu']*1000 for r in rows]),
+                    'worldCpuMsExcludingFirstTick':stats([s['worldCpu']*1000 for r in rows for s in r['samples'][1:]]),
                     'worldWallMs':timing('worldWall'),'admissionCpuMs':timing('admissionCpu'),
                     'centerCpuMs':timing('centerCpu'),'centerWallMs':timing('centerWall'),
                     'worldPlusAdmissionCpuMs':combined('worldCpu','admissionCpu'),

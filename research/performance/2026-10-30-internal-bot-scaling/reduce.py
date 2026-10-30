@@ -54,6 +54,8 @@ def mode_summary(rows):
     return {
         'windows':len(rows),'ticks':len(samples),'decisions':decisions,'observations':observations,
         'worldCpuMs':per_tick('worldCpu'),'worldWallMs':per_tick('worldWall'),
+        'firstRestoredTickWorldCpuMs':stats([r['samples'][0]['worldCpu']*1000 for r in rows]),
+        'worldCpuMsExcludingFirstTick':stats([s['worldCpu']*1000 for r in rows for s in r['samples'][1:]]),
         'totalTickWallMs':per_tick('totalWall'),
         'totalTickWallFractionAbove7ms':sum(s['totalWall']>.007 for s in samples)/len(samples),
         'worldCpuFractionAbove7ms':sum(s['worldCpu']>.007 for s in samples)/len(samples),
