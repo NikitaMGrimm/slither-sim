@@ -685,7 +685,7 @@ fn round1_disabled_pointer_rejects_activation_but_accepts_releases() {
 }
 
 #[test]
-fn label_width_preserves_measurement_within_visual_budget() {
+fn round1_label_width_rounds_offset_width_before_adding_padding() {
     // Old integer measurements remain the baseline; transforms and hits use
     // the fractional rectangle under resize and animation.
     for (measured, expected) in [

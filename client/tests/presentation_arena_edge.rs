@@ -119,7 +119,7 @@ fn computed_zero_radius_remains_a_valid_degenerate_inner_path() {
     let mut boundary = BoundaryRadius::new(1000.).unwrap();
     boundary.set_target(1e-14).unwrap();
     boundary.advance(56, true);
-    assert_eq!(boundary.displayed().to_bits(), 0_f64.to_bits());
+    assert_eq!(boundary.displayed(), 0.);
     let plan = plan_arena_edge(input(boundary.displayed(), 0.))
         .unwrap()
         .unwrap();

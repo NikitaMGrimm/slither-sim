@@ -198,6 +198,8 @@ width. Add 35 CSS px of button padding directly, retaining fractional widths.
 The former integer `offsetWidth` emulation changes width by at most 0.5 CSS px;
 transformed control edges stay within the [perceptual budget](perceptual-parity.md).
 Font shaping remains the metric provider's responsibility.
+The source-rationale table below retains the historical integer checkpoints;
+the label-width test now compares them with tolerances instead of emulating Blink.
 
 ## Authored numeric fixtures and source rationale
 
@@ -211,7 +213,7 @@ constant used by this slice to independently authored checkpoints.
 | --- | --- | --- |
 | Login margin 64; logo 450x115, top 50; last slot top gap 44; tips 360x30 | `site/index.html:232-249` | `layout_border_boxes_and_measured_flow`: logo (415,114), result y273, tips y291 at 1280x720 |
 | Nickname content holder 244x43, border 2; input 220x24 at left12/top10; nickname top gap34 | `site/index.html:21-65,248-249` | `layout_border_boxes_and_measured_flow`: outer 248x47 at (516,355), input (530,367) |
-| Play height47, top20/bottom50; measured label width +35 | `source/06-login-and-hud.js:264-273`; `source/03-buttons.js:441-442,491-492` | `layout_border_boxes_and_measured_flow`: width87/y426, remeasured width125/y431; `label_width_preserves_measurement_within_visual_budget` |
+| Play height47, top20/bottom50; integer offsetWidth then +35 | `source/06-login-and-hud.js:264-273`; `source/03-buttons.js:441-442,491-492`; pinned Blink above | `layout_border_boxes_and_measured_flow`: width87/y426, remeasured width125/y431; `round1_label_width_rounds_offset_width_before_adding_padding` |
 | Skin left20/bottom16, 95x89; server right20/bottom16, 107x89; quality right20/top16, 90x87 | `site/index.html:288-301,347-350` | `layout_border_boxes_and_measured_flow`: corners (20,615), (1153,615), (1170,16) |
 | Height threshold560, floor50; combined scale and top rounded to 1e-5; scale multiplier 1+0.1p² | `source/16-eyes-and-layout.js:194-206`; `source/06-login-and-hud.js:70-72` | `resize_small_height_rounding_and_transform_origin`: heights559/280/40, scale0.99821/0.5/0.08929; `inverse_hit_test_round_trips` |
 | Top changes only on resize, including the scale1 branch; fades retain it | `source/16-eyes-and-layout.js:199-206`; `source/06-login-and-hud.js:70-73`; `source/13-update-frame.js:574-581` | `round1_animation_retains_resize_top_when_scale_crosses_one`: height540/p0.60858 gives scale1, retained top-19.28571 |

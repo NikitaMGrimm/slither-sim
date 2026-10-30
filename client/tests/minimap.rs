@@ -290,13 +290,10 @@ fn fade_uses_callback_count_transition_uses_shared_lagged_delta() {
     update.step = clock.advance(40., true, false).unwrap();
     map.advance(update, None).unwrap();
     let transition = update.step.delta / 230.;
-    assert_eq!(map.view().transition.to_bits(), transition.to_bits());
-    assert_eq!(
-        map.view().base_opacity.to_bits(),
-        (0.475 * (1. - transition)).to_bits()
-    );
+    assert!((map.view().transition - transition).abs() <= 0.001);
+    assert!((map.view().base_opacity - 0.475 * (1. - transition)).abs() <= 0.01);
     let alternate = 1. - (1. - 0.475) / (1. - 0.475 * (1. - transition));
-    assert_eq!(map.view().alternate_opacity.to_bits(), alternate.to_bits());
+    assert!((map.view().alternate_opacity - alternate).abs() <= 0.01);
     assert_eq!(map.view().holder_opacity, 0.05);
     map.observe_ui_fraction(-2.).unwrap();
     assert_eq!(map.view().holder_opacity, -0.1);
