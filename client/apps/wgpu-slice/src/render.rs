@@ -979,6 +979,17 @@ fn finish_plan(
         // Late overlays retain the captured scene's immutable resources. Text
         // slots may change afterward without changing queued Setup pictures.
         let scale = prepared.frame.viewport_scale;
+        let max_font_size = plan
+            .lines
+            .iter()
+            .flat_map(|line| &line.spans)
+            .map(|span| span.style.size)
+            .fold(0_f64, f64::max);
+        let raster_scale = scale
+            .min(crate::text::MAX_HUD_RASTER_SCALE)
+            .min(128. / max_font_size);
+        bank.text
+            .begin_hud_frame(plan.lines.iter().map(|line| line.spans.len()).sum());
         let viewport = BodyRect {
             x: 0.,
             y: 0.,
@@ -1004,7 +1015,7 @@ fn finish_plan(
                         baseline: crate::text::Baseline::Alphabetic,
                         alpha: span.alpha,
                     },
-                    scale,
+                    raster_scale,
                     matches!(line.align, crate::text::Align::Left)
                         .then_some((line.clip.x + line.clip.width - position[0]).max(0.)),
                 )?;

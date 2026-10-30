@@ -113,6 +113,43 @@ fn text_runs_match_readout_and_leaderboard_content_styles_and_anchors() {
     }
 }
 #[test]
+fn official_emphasis_preserves_regular_rank_and_score_spans() {
+    let mut v = view();
+    v.opacity.rows = 0.4;
+    v.opacity.readout = 0.5;
+    v.rows[4].name_text = "Player".into();
+    v.rows[4].score_text = "11901".into();
+    v.rows[4].opacity_request = 1.;
+    let plan = plan_hud_text(&v, [960, 540], 1.).unwrap();
+    let own = &plan.lines[15..18];
+    assert_eq!(
+        own.iter()
+            .map(|line| {
+                let span = &line.spans[0];
+                (span.text.as_str(), span.style.weight, span.alpha)
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("11901", Weight::Normal, 0.4),
+            ("Player", Weight::Bold, 0.4),
+            ("#5", Weight::Normal, 0.4),
+        ]
+    );
+    assert_eq!(
+        plan.lines[1]
+            .spans
+            .iter()
+            .map(|span| (span.text.as_str(), span.style.weight, span.alpha))
+            .collect::<Vec<_>>(),
+        [
+            ("Your rank: ", Weight::Normal, 0.15),
+            ("5", Weight::Normal, 0.175),
+            (" of ", Weight::Normal, 0.15),
+            ("100", Weight::Normal, 0.175),
+        ]
+    );
+}
+#[test]
 fn projected_text_is_not_rescored_reordered_or_normalized() {
     let mut v = view();
     v.rows[0].name_text = "Two\u{a0}words caf\u{e9} \u{ff}".into();

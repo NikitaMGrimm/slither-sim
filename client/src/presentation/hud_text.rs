@@ -230,6 +230,8 @@ pub fn plan_hud_text(
         });
         plan.lines.push(HudTextLine {
             spans: vec![
+                // Rank values differ in opacity, not weight. Preserve semantic
+                // styles rather than compensating here for raster coverage.
                 span("Your rank: ", 12., normal, white, a * 0.3),
                 span(&view.rank, 12., normal, white, a * 0.35),
                 span(" of ", 12., normal, white, a * 0.3),
@@ -297,6 +299,8 @@ pub fn plan_hud_text(
         .map_err(|_| "Invalid HUD color")?;
         let color = [(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8];
         let alpha = view.opacity.rows.clamp(0., 1.) * row.opacity_request.clamp(0., 1.);
+        // The desktop own-row emphasis bolds the nickname only. Scores and
+        // ordinal labels retain regular weight even at the own row's full alpha.
         for (text, x, left, width, align, weight) in [
             (
                 &row.score_text,

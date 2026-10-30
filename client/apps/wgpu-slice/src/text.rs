@@ -20,6 +20,9 @@ pub use slither_client::presentation::{
 // HUD slots replace their previous content and have a separate allowance. Fast
 // score updates cannot evict world labels from the nickname LRU.
 pub const HUD_CACHE_BYTES: usize = 2 * 1024 * 1024;
+// Preserve ordinary DPR 1–3 text. Denser displays upscale these bounded rasters
+// rather than exhausting the HUD allowance or exceeding the font-pixel limit.
+pub const MAX_HUD_RASTER_SCALE: f64 = 3.;
 const NICKNAME_CACHE_RUNS: usize = CACHE_RUNS - slither_client::presentation::MAX_HUD_TEXT_SPANS;
 pub const MAX_NICKNAME_RUNS_PER_FRAME: usize = 128;
 
@@ -106,6 +109,7 @@ impl TextCache {
     }
     /// A bounded semantic HUD slot; changed scores replace old entries, while
     /// already prepared frames retain their own immutable resource copies.
+    /// Errors are retained so frame completion cannot silently omit HUD fields.
     pub fn draw_hud(
         &mut self,
         slot: u8,
@@ -116,9 +120,16 @@ impl TextCache {
         if usize::from(slot) >= slither_client::presentation::MAX_HUD_TEXT_SPANS {
             return Err("HUD text slot budget".into());
         }
-        Ok(self
-            .try_draw(run, backing_scale, Some(slot), max_width)
-            .unwrap_or_default())
+        self.try_draw(run, backing_scale, Some(slot), max_width)
+    }
+    pub(crate) fn begin_hud_frame(&mut self, spans: usize) {
+        // A shorter layout must not pin stale HUD pixels needed by later fields.
+        // Prepared/queued frames already own their immutable resource copies.
+        self.entries.retain(|key, _| match key {
+            Key::Hud(slot) => usize::from(*slot) < spans,
+            Key::Nickname(_) => true,
+        });
+        self.bytes = self.entries.values().map(|entry| entry.bytes).sum();
     }
     fn try_draw(
         &mut self,
@@ -315,5 +326,144 @@ impl TextCache {
     }
     pub fn cached_bytes(&self) -> usize {
         self.bytes
+    }
+}
+
+#[cfg(all(test, windows))]
+mod hud_budget_tests {
+    use super::*;
+    use crate::{bank::Bank, frame::Frame, hud, render};
+    use slither_client::presentation::{HudOpacity, LeaderboardRow};
+
+    #[test]
+    fn dense_high_dpr_hud_retains_every_requested_span_and_reuses_its_pixels() {
+        // Authored synthetic worst-name board; no server or GPU.
+        let view = hud::View {
+            playing: true,
+            opacity: HudOpacity {
+                readout: 1.,
+                header: 0.85,
+                rows: 1.,
+                announcement: 1.,
+            },
+            status: "CONNECTED".into(),
+            score: "10000".into(),
+            final_score: "--".into(),
+            rank: "5".into(),
+            population: "100".into(),
+            message: None,
+            rows: (1..=10)
+                .map(|ordinal| LeaderboardRow {
+                    ordinal,
+                    number_text: format!("#{ordinal}"),
+                    score: (10000 + ordinal) as f64,
+                    score_text: (10000 + ordinal).to_string(),
+                    name_text: if ordinal == 5 {
+                        "Player".into()
+                    } else {
+                        "W".repeat(255)
+                    },
+                    css_color: "#80d0d0",
+                    own: ordinal == 5,
+                    opacity_request: 1.,
+                })
+                .collect(),
+        };
+        let mut bank = Bank::new().unwrap();
+        let nickname = TextRun {
+            text: "World nickname",
+            style: TextStyle {
+                size: 15.,
+                weight: Weight::Normal,
+                color: [255; 3],
+            },
+            position: [20., 20.],
+            align: Align::Left,
+            baseline: Baseline::Alphabetic,
+            alpha: 1.,
+        };
+        let nickname_asset = bank.text.draw(nickname, 1.).unwrap()[0].0.asset;
+        for (extent, dpr, count) in [
+            ([960, 540], 1., 37),
+            ([1920, 1080], 2., 37),
+            ([2880, 1620], 3., 37),
+            ([3000, 1500], 5., 37),
+            ([8192, 8192], 16., 37),
+            ([3000, 1500], 16., 6),
+            ([3000, 1500], 5., 37),
+        ] {
+            let plan = hud::plan(&view, extent, dpr).unwrap();
+            let expected: Vec<_> = plan.lines.iter().flat_map(|line| &line.spans).collect();
+            assert_eq!(expected.len(), count);
+            let mut previous = None;
+            for _ in 0..2 {
+                let out = render::finish_hud(
+                    render::PreparedFrame {
+                        frame: Frame {
+                            identity: 1,
+                            tick: 0,
+                            extent,
+                            viewport_scale: dpr,
+                            draws: vec![],
+                            snakes: vec![],
+                        },
+                        resources: vec![],
+                    },
+                    &mut bank,
+                    &view,
+                )
+                .unwrap();
+                assert!(!out.frame.draws.is_empty());
+                for (slot, span) in expected.iter().enumerate() {
+                    let entry = bank
+                        .text
+                        .entries
+                        .get(&Key::Hud(slot as u8))
+                        .expect("every requested HUD span must be cached");
+                    assert_eq!(entry.content.text, span.text);
+                    assert_eq!(entry.content.weight, span.style.weight);
+                    assert_eq!(entry.content.color, span.style.color);
+                    assert_eq!(
+                        f64::from_bits(entry.content.size),
+                        span.style.size * dpr.min(MAX_HUD_RASTER_SCALE)
+                    );
+                    assert!(f64::from_bits(entry.content.size) <= 128.);
+                    assert!(
+                        entry.tiles.iter().any(|tile| out
+                            .frame
+                            .draws
+                            .iter()
+                            .any(|d| d.asset == tile.resource.asset)),
+                        "requested span was cached but not submitted: {}",
+                        span.text
+                    );
+                }
+                assert_eq!(
+                    bank.text.entries.keys().filter(|key| key.is_hud()).count(),
+                    count
+                );
+                assert!(
+                    bank.text
+                        .entries
+                        .iter()
+                        .filter(|(key, _)| key.is_hud())
+                        .map(|(_, entry)| entry.bytes)
+                        .sum::<usize>()
+                        <= HUD_CACHE_BYTES
+                );
+                assert!(
+                    bank.text
+                        .entries
+                        .values()
+                        .flat_map(|entry| &entry.tiles)
+                        .any(|tile| tile.resource.asset == nickname_asset)
+                );
+                let assets: Vec<_> = out.frame.draws.iter().map(|d| d.asset).collect();
+                if let Some(previous) = previous {
+                    assert_eq!(assets, previous);
+                }
+                previous = Some(assets);
+            }
+        }
     }
 }

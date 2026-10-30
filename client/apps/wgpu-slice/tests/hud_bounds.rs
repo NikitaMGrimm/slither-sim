@@ -1,6 +1,6 @@
 //! Original synthetic viewport contract; CPU-only actual platform-text finish, no GPU.
 use slither_wgpu_slice::{bank::Bank, frame::Frame, render};
-fn bounded(extent: [u32; 2], scale: f64) {
+fn bounded(extent: [u32; 2], scale: f64) -> usize {
     let mut bank = Bank::new().unwrap();
     let frame = Frame {
         identity: 1,
@@ -34,6 +34,7 @@ fn bounded(extent: [u32; 2], scale: f64) {
     }
     assert!(bank.text.cached_bytes() <= slither_wgpu_slice::text::CACHE_BYTES);
     assert!(out.frame.draws.len() <= slither_wgpu_slice::hud::MAX_DRAWS);
+    out.frame.draws.len()
 }
 #[test]
 fn tiny_viewport_hud_is_clipped() {
@@ -41,7 +42,7 @@ fn tiny_viewport_hud_is_clipped() {
 }
 #[test]
 fn high_scale_hud_is_bounded() {
-    bounded([1920, 1080], 32.);
+    assert_eq!(bounded([8192, 8192], 32.), 4);
 }
 #[test]
 fn zero_extent_has_no_hud_submission() {

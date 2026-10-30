@@ -93,7 +93,8 @@ uses OffscreenCanvas; Windows loads system Arial through fontdue (kerning, 4x
 coverage). No fonts are bundled; native coverage differs from browser hinting.
 Native C0/C1 controls use Canvas's
 whitespace/missing-glyph choices; DEL keeps its blank fallback advance.
-Raster/style failures omit labels; failed frame completion releases staged pixels.
+Nickname raster/style failures omit labels; HUD raster failures are returned to
+frame completion. Failed frame completion releases staged pixels.
 
 `text::TextCache::draw(TextRun, scale)` returns ordered draw/resource pairs for
 Arial regular/bold, RGB, size, opacity, alignment and baseline; no shadows.
@@ -101,7 +102,9 @@ The text cache holds at most 256 runs / 4 MiB: 40 replaceable HUD slots with a
 2 MiB allowance, and a separate 216-run / 2 MiB nickname LRU. Changing scores
 replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
 1..=128 backing font pixels and an 8192x512 raster, tiled into 512px textures.
-HUD names are rasterized only to their visible column width. Nickname work is
+HUD names are rasterized only to their visible column width. HUD raster scale
+is capped at 3x independently of viewport DPR, retaining logical sizes/anchors
+and the pixel budget on denser displays. Unused HUD slots are retired each frame. Nickname work is
 limited to 128 runs per frame; text tiles share the 8192-draw frame budget.
 Existing active/queued budgets still apply.
 
