@@ -545,6 +545,7 @@ impl Simulator {
         snake.id = std::mem::take(&mut self.snakes[slot].id);
         self.snakes[slot] = snake;
         self.refresh_spawn_bounds(slot);
+        self.buffers.invalidate_body_bounds(slot);
         self.speeds[slot] = speed;
         self.boosts[slot] = Boost::default();
         self.kiosks[slot] = KioskState::default();
@@ -579,6 +580,7 @@ impl Simulator {
         Self::update_mass(snake);
         self.kiosks[slot].finish_score(snake);
         self.refresh_spawn_bounds(slot);
+        self.buffers.invalidate_body_bounds(slot);
         Ok(())
     }
     pub fn correct_pose(
@@ -622,6 +624,7 @@ impl Simulator {
         snake.body = points;
         snake.heading = heading;
         self.refresh_spawn_bounds(slot);
+        self.buffers.invalidate_body_bounds(slot);
         Ok(())
     }
     pub fn replace_food(&mut self, values: Vec<Food>) -> Result<(), SimError> {
