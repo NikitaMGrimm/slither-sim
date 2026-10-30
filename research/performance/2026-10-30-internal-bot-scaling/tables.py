@@ -52,6 +52,9 @@ def main():
     if storm.exists():tables.update(render_storm(json.loads(storm.read_text())))
     diagnostic=r/'diagnostic-selected.json'
     if diagnostic.exists():tables.update(render_diagnostic(json.loads(diagnostic.read_text())))
+    postfix=r/'postfix-selected.json'
+    if postfix.exists():tables.update(render_postfix(json.loads(postfix.read_text()),data,
+        json.loads(storm.read_text()) if storm.exists() else None))
     if '--check' in sys.argv:
         report=(r/'REPORT.md').read_text()
         for key,table in tables.items():
@@ -110,6 +113,27 @@ def render_diagnostic(value):
                  'spawn/admission','prey','ambient/maintenance','unresolved world / clock brackets']]
             slow.append(f"| {label} | {key} | {row['samples']} | "+' | '.join(f'{v:.1f}%' for v in columns)+' |')
     return {'pickup-guards':'\n'.join(guards),'slow-attribution':'\n'.join(slow),'diagnostic-overhead':'\n'.join(overhead)}
+
+
+def render_postfix(value,primary,storm):
+    costs=['| Workload | Arm | World CPU p50 / p99 / max ms/tick | Admission mean ms/tick | Whole-loop ticks/s median (range) |',
+           '| --- | --- | ---: | ---: | ---: |']
+    phases=['| Workload | Arm | Movement CPU bounds ms/tick | Collision | Death | Food pickup | Prey | Ambient | Profile / ordinary CPU range |',
+            '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+    for row in value['rows']:
+        label=row['label']
+        if label=='10000':baseline=next(p for p in primary['populations'] if p['population']==10000)['modes']['simulation']
+        else:baseline=next(p for p in storm['populations'] if p['population']==12000)
+        for arm,summary in [('main',baseline),('#331',row['candidate'])]:
+            s=summary['worldCpuMs'];rate=summary['wholeWindowTicksPerSecond']
+            costs.append(f"| {label} | {arm} | {s['p50']:.3f} / {s['p99']:.3f} / {s['max']:.3f} | {summary['admissionCpuMs']['mean']:.3f} | {rate['p50']:.2f} ({rate['min']:.2f}–{rate['max']:.2f}) |")
+            d=row['baselinePhaseDiagnostic' if arm=='main' else 'candidatePhaseDiagnostic']
+            columns=[]
+            for key in ['movementSeconds','collisionSeconds','deathSeconds','foodSeconds','preySeconds','ambientSeconds']:
+                lo,hi=d['phases'][key]['cpuMsPerTickBounds'];columns.append(f'{lo:.3f}–{hi:.3f}')
+            ratios=d['profileToOrdinaryCpuRatios']
+            phases.append(f"| {label} | {arm} | "+' | '.join(columns)+f" | {min(ratios):.3f}–{max(ratios):.3f} |")
+    return {'postfix-costs':'\n'.join(costs),'postfix-phases':'\n'.join(phases)}
 
 
 if __name__=='__main__':main()
