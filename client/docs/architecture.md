@@ -51,7 +51,7 @@ Both submit ordered frames and authored materials through the same wgpu renderer
 
 Play opens a simulator endpoint or, natively with `--official`, an official
 server chosen from the live directory; there is no automatic reconnect. The
-renderer covers body, food, prey, paired eyes, arena and a small bitmap HUD.
+renderer covers body, food, prey, paired eyes, arena and platform text for nicknames, the HUD and leaderboard.
 Image faces, antennas and complete menus remain incomplete. Rasterization can
 differ from Canvas; passing tests does not establish perceptual parity.
 

@@ -97,15 +97,20 @@ Raster/style failures omit labels; failed frame completion releases staged pixel
 
 `text::TextCache::draw(TextRun, scale)` returns ordered draw/resource pairs for
 Arial regular/bold, RGB, size, opacity, alignment and baseline; no shadows.
-The LRU holds 256 runs / 4 MiB. Runs admit 1024 UTF-8 bytes, 1..=128 backing font
-pixels and an 8192x512 raster, tiled into 512px textures. Existing active/queued
-budgets still apply. HUD/leaderboard text conversion is a follow-up.
+The text cache holds at most 256 runs / 4 MiB: 40 replaceable HUD slots with a
+2 MiB allowance, and a separate 216-run / 2 MiB nickname LRU. Changing scores
+replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
+1..=128 backing font pixels and an 8192x512 raster, tiled into 512px textures.
+HUD names are rasterized only to their visible column width. Nickname work is
+limited to 128 runs per frame; text tiles share the 8192-draw frame budget.
+Existing active/queued budgets still apply.
 
 ## Scope
 
 Ordered body, early/late food and prey, paired eyes and arena are implemented
 using authored procedural materials. The HUD shows length and rank at bottom left
-and the top-ten leaderboard at top right, in a temporary 5x7 bitmap font. Complete
+and the top-ten leaderboard at top right, using the same platform text as
+nicknames. Shared Rust owns their content, typography and layout. Complete
 menus and mobile integration remain open. Material/edge rasterization differs
 from Canvas; tests do not establish visual parity or player feel.
 

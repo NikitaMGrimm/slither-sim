@@ -1,4 +1,4 @@
-//! Original synthetic viewport contract; CPU-only actual finish/atlas, no GPU.
+//! Original synthetic viewport contract; CPU-only actual platform-text finish, no GPU.
 use slither_wgpu_slice::{bank::Bank, frame::Frame, render};
 fn bounded(extent: [u32; 2], scale: f64) {
     let mut bank = Bank::new().unwrap();
@@ -32,7 +32,8 @@ fn bounded(extent: [u32; 2], scale: f64) {
     if extent.contains(&0) || w < 48. || h < 40. {
         assert!(out.frame.draws.is_empty());
     }
-    assert!(bank.hud.asset.width <= 512 && bank.hud.asset.height <= 512);
+    assert!(bank.text.cached_bytes() <= slither_wgpu_slice::text::CACHE_BYTES);
+    assert!(out.frame.draws.len() <= slither_wgpu_slice::hud::MAX_DRAWS);
 }
 #[test]
 fn tiny_viewport_hud_is_clipped() {

@@ -10,12 +10,23 @@ impl Rasterizer {
     pub fn new() -> Self {
         Self
     }
+    #[cfg(test)]
     pub fn rasterize(
         &mut self,
         text: &str,
         px: f64,
         weight: Weight,
         color: [u8; 3],
+    ) -> Result<Raster> {
+        self.rasterize_limited(text, px, weight, color, None)
+    }
+    pub fn rasterize_limited(
+        &mut self,
+        text: &str,
+        px: f64,
+        weight: Weight,
+        color: [u8; 3],
+        max_width: Option<u32>,
     ) -> Result<Raster> {
         let error = |e| format!("Canvas text: {e:?}");
         let canvas = OffscreenCanvas::new(1, 1).map_err(error)?;
@@ -38,6 +49,7 @@ impl Rasterizer {
         let left = (-metrics.actual_bounding_box_left()).floor() - 1.;
         let top = (-metrics.actual_bounding_box_ascent()).floor() - 1.;
         let width = (metrics.actual_bounding_box_right().ceil() - left + 1.).max(1.);
+        let width = max_width.map_or(width, |limit| width.min(f64::from(limit) + 2.));
         let height = (metrics.actual_bounding_box_descent().ceil() - top + 1.).max(1.);
         context.set_text_baseline("middle");
         let middle = metrics.actual_bounding_box_ascent()

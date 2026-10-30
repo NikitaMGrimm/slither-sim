@@ -13,32 +13,16 @@ mod platform;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024;
 pub const CACHE_RUNS: usize = 256;
 
-/// The shared Canvas font stack. Native Windows loads Arial from the system fonts.
-pub const FONT_FAMILY: &str = "Arial, Helvetica Neue, Helvetica, sans-serif";
+pub use slither_client::presentation::{
+    PLATFORM_FONT_FAMILY as FONT_FAMILY, TextAlign as Align, TextBaseline as Baseline, TextStyle,
+    TextWeight as Weight,
+};
+// HUD slots replace their previous content and have a separate allowance. Fast
+// score updates cannot evict world labels from the nickname LRU.
+pub const HUD_CACHE_BYTES: usize = 2 * 1024 * 1024;
+const NICKNAME_CACHE_RUNS: usize = CACHE_RUNS - slither_client::presentation::MAX_HUD_TEXT_SPANS;
+pub const MAX_NICKNAME_RUNS_PER_FRAME: usize = 128;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Weight {
-    Normal,
-    Bold,
-}
-#[derive(Clone, Copy, Debug)]
-pub struct TextStyle {
-    /// Logical viewport pixels. Divide a fixed backing-pixel size by the scale.
-    pub size: f64,
-    pub weight: Weight,
-    pub color: [u8; 3],
-}
-#[derive(Clone, Copy, Debug)]
-pub enum Align {
-    Left,
-    Center,
-    Right,
-}
-#[derive(Clone, Copy, Debug)]
-pub enum Baseline {
-    Alphabetic,
-    Middle,
-}
 pub struct TextRun<'a> {
     pub text: &'a str,
     pub style: TextStyle,
@@ -57,13 +41,25 @@ pub(super) struct Raster {
     pub middle: f64,
 }
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Key {
+struct Content {
     text: String,
+    max_width: Option<u32>,
     size: u64,
     weight: Weight,
     color: [u8; 3],
 }
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Key {
+    Nickname(Content),
+    Hud(u8),
+}
+impl Key {
+    fn is_hud(&self) -> bool {
+        matches!(self, Self::Hud(_))
+    }
+}
 struct Entry {
+    content: Content,
     tiles: Vec<Tile>,
     bytes: usize,
     offset: [f64; 2],
@@ -103,9 +99,34 @@ impl TextCache {
     /// Invalid or unrasterizable cosmetic labels produce no draws, so missing
     /// fonts, platform errors and raster budgets cannot terminate gameplay.
     pub fn draw(&mut self, run: TextRun<'_>, backing_scale: f64) -> Result<Vec<(Draw, Resource)>> {
-        Ok(self.try_draw(run, backing_scale).unwrap_or_default())
+        Ok(self
+            .try_draw(run, backing_scale, None, None)
+            .unwrap_or_default()
+            .1)
     }
-    fn try_draw(&mut self, run: TextRun<'_>, backing_scale: f64) -> Result<Vec<(Draw, Resource)>> {
+    /// A bounded semantic HUD slot; changed scores replace old entries, while
+    /// already prepared frames retain their own immutable resource copies.
+    pub fn draw_hud(
+        &mut self,
+        slot: u8,
+        run: TextRun<'_>,
+        backing_scale: f64,
+        max_width: Option<f64>,
+    ) -> Result<(f64, Vec<(Draw, Resource)>)> {
+        if usize::from(slot) >= slither_client::presentation::MAX_HUD_TEXT_SPANS {
+            return Err("HUD text slot budget".into());
+        }
+        Ok(self
+            .try_draw(run, backing_scale, Some(slot), max_width)
+            .unwrap_or_default())
+    }
+    fn try_draw(
+        &mut self,
+        run: TextRun<'_>,
+        backing_scale: f64,
+        slot: Option<u8>,
+        max_width: Option<f64>,
+    ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         let px = run.style.size * backing_scale;
         if !run.position.into_iter().all(f64::is_finite)
             || !(0. ..=1.).contains(&run.alpha)
@@ -119,19 +140,26 @@ impl TextCache {
             return Err("invalid text run/style/budget".into());
         }
         if run.text.is_empty() {
-            return Ok(Vec::new());
+            return Ok((0., Vec::new()));
         }
-        let key = Key {
+        let max_width = max_width.map(|w| (w * backing_scale).ceil().clamp(1., 8192.) as u32);
+        let content = Content {
+            max_width,
             text: run.text.into(),
             size: px.to_bits(),
             weight: run.style.weight,
             color: run.style.color,
         };
+        let key = slot.map_or_else(|| Key::Nickname(content.clone()), Key::Hud);
         self.clock += 1;
-        if !self.entries.contains_key(&key) {
-            let raster =
-                self.rasterizer
-                    .rasterize(run.text, px, run.style.weight, run.style.color)?;
+        if self.entries.get(&key).is_none_or(|e| e.content != content) {
+            let raster = self.rasterizer.rasterize_limited(
+                run.text,
+                px,
+                run.style.weight,
+                run.style.color,
+                max_width,
+            )?;
             let [w, h] = [raster.image.width, raster.image.height];
             if w == 0
                 || h == 0
@@ -185,13 +213,36 @@ impl TextCache {
                     width: end - start,
                 });
             }
-            if bytes > CACHE_BYTES {
+            let (byte_limit, run_limit) = if key.is_hud() {
+                (
+                    HUD_CACHE_BYTES,
+                    slither_client::presentation::MAX_HUD_TEXT_SPANS,
+                )
+            } else {
+                (CACHE_BYTES - HUD_CACHE_BYTES, NICKNAME_CACHE_RUNS)
+            };
+            if bytes > byte_limit {
                 return Err("text cache run budget".into());
             }
-            while self.entries.len() >= CACHE_RUNS || self.bytes + bytes > CACHE_BYTES {
-                let oldest = self
+            if let Some(old) = self.entries.remove(&key) {
+                self.bytes -= old.bytes;
+            }
+            loop {
+                let group: Vec<_> = self
                     .entries
                     .iter()
+                    .filter(|(k, _)| k.is_hud() == key.is_hud())
+                    .collect();
+                if group.len() < run_limit
+                    && group.iter().map(|(_, e)| e.bytes).sum::<usize>() + bytes <= byte_limit
+                {
+                    break;
+                }
+                if key.is_hud() {
+                    return Err("HUD text pixel budget".into());
+                }
+                let oldest = group
+                    .into_iter()
                     .min_by_key(|(_, e)| e.used)
                     .map(|(k, _)| k.clone())
                     .ok_or("text cache budget")?;
@@ -201,6 +252,7 @@ impl TextCache {
             self.entries.insert(
                 key.clone(),
                 Entry {
+                    content,
                     tiles,
                     bytes,
                     offset: raster.offset,
@@ -221,39 +273,42 @@ impl TextCache {
             Baseline::Alphabetic => 0.,
             Baseline::Middle => entry.middle,
         };
-        Ok(entry
-            .tiles
-            .iter()
-            .map(|tile| {
-                (
-                    Draw {
-                        corners: None,
-                        repeat_uv: None,
-                        black_effect: false,
-                        asset: tile.resource.asset,
-                        // Neighbor pixels outside the crop preserve linear sampling
-                        // across tile seams at fractional screen positions.
-                        source: Some(BodyRect {
-                            x: f64::from(tile.source_x),
-                            y: 0.,
-                            width: f64::from(tile.width),
-                            height: f64::from(tile.resource.asset.height),
-                        }),
-                        destination: BodyRect {
-                            x: (entry.offset[0] + f64::from(tile.start) - x) / backing_scale,
-                            y: (entry.offset[1] + y) / backing_scale,
-                            width: f64::from(tile.width) / backing_scale,
-                            height: f64::from(tile.resource.asset.height) / backing_scale,
+        Ok((
+            entry.advance / backing_scale,
+            entry
+                .tiles
+                .iter()
+                .map(|tile| {
+                    (
+                        Draw {
+                            corners: None,
+                            repeat_uv: None,
+                            black_effect: false,
+                            asset: tile.resource.asset,
+                            // Neighbor pixels outside the crop preserve linear sampling
+                            // across tile seams at fractional screen positions.
+                            source: Some(BodyRect {
+                                x: f64::from(tile.source_x),
+                                y: 0.,
+                                width: f64::from(tile.width),
+                                height: f64::from(tile.resource.asset.height),
+                            }),
+                            destination: BodyRect {
+                                x: (entry.offset[0] + f64::from(tile.start) - x) / backing_scale,
+                                y: (entry.offset[1] + y) / backing_scale,
+                                width: f64::from(tile.width) / backing_scale,
+                                height: f64::from(tile.resource.asset.height) / backing_scale,
+                            },
+                            translation: run.position,
+                            rotation: 0.,
+                            effective_alpha: run.alpha,
+                            blend: BodyBlend::SourceOver,
                         },
-                        translation: run.position,
-                        rotation: 0.,
-                        effective_alpha: run.alpha,
-                        blend: BodyBlend::SourceOver,
-                    },
-                    tile.resource.clone(),
-                )
-            })
-            .collect())
+                        tile.resource.clone(),
+                    )
+                })
+                .collect(),
+        ))
     }
     pub fn cached_runs(&self) -> usize {
         self.entries.len()
