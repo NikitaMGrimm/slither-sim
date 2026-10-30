@@ -537,43 +537,44 @@ pub(super) fn food_updates(
         known.food_revision = Some(changes.current.clone());
         return;
     }
-    let held = std::mem::take(&mut known.entries);
     let mut subscriptions = subscribed.iter().peekable();
-    for (sector, _) in &held {
+    // Retire every old sector before encoding additions, retaining the vector's
+    // storage and the handles of subscriptions that still exist.
+    known.entries.retain(|(sector, _)| {
         while subscriptions.next_if(|next| *next < sector).is_some() {}
-        if subscriptions.peek() != Some(&sector) {
+        let keep = subscriptions.peek() == Some(&sector);
+        if !keep {
             packets.push(encode::sector_clear(*sector));
         }
-    }
-    let mut held = held.into_iter().peekable();
-    known.entries.reserve(subscribed.len());
-    for &sector in subscribed {
-        while held.next_if(|(old, _)| *old < sector).is_some() {}
-        let previous = held
-            .next_if(|(old, _)| *old == sector)
-            .map(|(_, food)| food);
+        keep
+    });
+    known
+        .entries
+        .reserve(subscribed.len() - known.entries.len());
+    for (index, &sector) in subscribed.iter().enumerate() {
         let current = sectors[usize::from(u16::from_be_bytes(sector))]
             .as_ref()
             .expect("subscribed sectors are listed");
-        let held = match previous {
-            None => {
-                let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
-                if !foods.is_empty() {
-                    packets.extend(encode::food_sector(sector, &foods));
+        if let Some((_, previous)) = known
+            .entries
+            .get_mut(index)
+            .filter(|(held, _)| *held == sector)
+        {
+            if !Arc::ptr_eq(previous, current) || changes.eaten.contains(&sector) {
+                changes.append_diff(packets, sector, previous, current, eaters);
+                if !Arc::ptr_eq(previous, current) {
+                    previous.clone_from(current);
                 }
-                current.clone()
             }
-            Some(previous) => {
-                let unchanged = Arc::ptr_eq(&previous, current);
-                if !unchanged || changes.eaten.contains(&sector) {
-                    changes.append_diff(packets, sector, &previous, current, eaters);
-                }
-                // A membership edit does not replace unchanged listings. Move
-                // the held handle instead of dropping and cloning that Arc.
-                if unchanged { previous } else { current.clone() }
+        } else {
+            let foods: Vec<_> = current.0.iter().map(|(k, v)| (*k, v.style)).collect();
+            if !foods.is_empty() {
+                packets.extend(encode::food_sector(sector, &foods));
             }
-        };
-        known.entries.push((sector, held));
+            // Retained entries are sorted; inserting new subscriptions here
+            // preserves both packet order and the next retained handle.
+            known.entries.insert(index, (sector, current.clone()));
+        }
     }
     known.subscription_revision = Some(interest.revision().clone());
     known.food_revision = Some(changes.current.clone());
@@ -1700,3 +1701,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "food/held_tests.rs"]
+mod held_tests;
