@@ -64,3 +64,24 @@
   loaded prehistory; repeated lower rows are calibration, not replacements for
   the retained lower primaries. Complete cleanup even when a worker exit check
   fails. Record the original failed row and all control-source versions.
+
+- Final reduction initially assumed a nonexistent historical `tickBusyMs` key;
+  corrected it to the retained `timingDiagnostics.busyWallMs`. A later streaming
+  optimization missed its `re` import; rerun completed on all four unchanged
+  historical windows. An earlier random-access gzip verifier was unnecessarily
+  slow; stream members sequentially. Retain failed analysis logs.
+- Packet loss in some connection captures invalidates their kernel diagnostics,
+  not independent monotonic echoes. Preserve lost-capture status and unmatched
+  counts, never silently report complete packet coverage. A challenge preceding
+  the playing epoch exposed a probe-only frame-excess baseline error; a regression
+  now starts that baseline at gameplay. This does not explain #281's direct-login
+  results. A private nested-command escaping error failed before dispatch and was
+  corrected with a file-based controller.
+- Attempt 3 completed its replacement 320 with all six workers covering the
+  measured window. Repeated 80/160 rows remain calibration. Attempt 2's failed
+  320 and the first generator's three unqualified checkpoints remain outside
+  primary selection. Marker reuse remains parked on reference branch
+  `perf/pit-marker-reuse` (`58145ae`); no PR or timing is claimed for it.
+
+- The final remote documentation check rejected Windows-default encoded prose.
+  Rewrote the new report/index as UTF-8 and reran remotely; no measured data changed.
