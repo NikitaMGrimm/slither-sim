@@ -1,5 +1,5 @@
 //! Browser adapter: Canvas glyphs and metrics.
-use super::{Raster, Slant, TextStyle, Weight};
+use super::{Raster, Slant, TextStyle, Weight, display_text};
 use crate::{Result, materials::RgbaImage};
 use slither_client::presentation::TextMeasurement;
 use wasm_bindgen::JsCast;
@@ -46,6 +46,7 @@ impl Rasterizer {
         )
     }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
+        let text = display_text(text);
         if self.metrics.is_none() {
             let canvas =
                 OffscreenCanvas::new(1, 1).map_err(|e| format!("Canvas metrics: {e:?}"))?;
@@ -62,7 +63,7 @@ impl Rasterizer {
         let (_, context) = self.metrics.as_ref().unwrap();
         context.set_font(&css_font(style, style.size));
         let m = context
-            .measure_text(text)
+            .measure_text(&text)
             .map_err(|e| format!("Canvas metrics: {e:?}"))?;
         Ok(TextMeasurement {
             advance: m.width(),
@@ -79,6 +80,7 @@ impl Rasterizer {
         style: TextStyle,
         max_width: Option<u32>,
     ) -> Result<Raster> {
+        let text = display_text(text);
         let color = style.color;
         let error = |e| format!("Canvas text: {e:?}");
         let canvas = OffscreenCanvas::new(1, 1).map_err(error)?;
@@ -90,7 +92,7 @@ impl Rasterizer {
             .map_err(|e: js_sys::Object| error(e.into()))?;
         let font = css_font(style, px);
         context.set_font(&font);
-        let metrics = context.measure_text(text).map_err(error)?;
+        let metrics = context.measure_text(&text).map_err(error)?;
         let advance = metrics.width();
         let left = (-metrics.actual_bounding_box_left()).floor() - 1.;
         let top = (-metrics.actual_bounding_box_ascent()).floor() - 1.;
@@ -100,7 +102,7 @@ impl Rasterizer {
         context.set_text_baseline("middle");
         let middle = metrics.actual_bounding_box_ascent()
             - context
-                .measure_text(text)
+                .measure_text(&text)
                 .map_err(error)?
                 .actual_bounding_box_ascent();
         if ![width, height, left, top, advance, middle]
@@ -117,7 +119,7 @@ impl Rasterizer {
         context.set_text_baseline("alphabetic");
         let [r, g, b] = color;
         context.set_fill_style_str(&format!("#{r:02x}{g:02x}{b:02x}"));
-        context.fill_text(text, -left, -top).map_err(error)?;
+        context.fill_text(&text, -left, -top).map_err(error)?;
         let mut pixels = context
             .get_image_data(0., 0., width, height)
             .map_err(error)?
@@ -156,6 +158,10 @@ fn css_font(style: TextStyle, px: f64) -> String {
         } else {
             "normal"
         },
-        style.family.css()
+        if style.weight == Weight::Bold {
+            "Arial, DejaVu Sans, sans-serif"
+        } else {
+            style.family.css()
+        }
     )
 }

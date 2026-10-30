@@ -72,6 +72,7 @@ fn native_faces_are_real_and_family_slant_weight_change_pixels() {
         (Family::Arial, Slant::Italic, Weight::Normal, "ariali.ttf"),
         (Family::Arial, Slant::Italic, Weight::Bold, "arialbi.ttf"),
         (Family::Lucida, Slant::Normal, Weight::Normal, "l_10646.ttf"),
+        (Family::Lucida, Slant::Normal, Weight::Bold, "arialbd.ttf"),
     ] {
         let style = TextStyle {
             family,
@@ -99,13 +100,6 @@ fn native_faces_are_real_and_family_slant_weight_change_pixels() {
             assert_ne!(images[i], images[j]);
         }
     }
-    assert_eq!(
-        TextCache::native_face(TextStyle {
-            family: Family::Lucida,
-            ..style()
-        }),
-        "l_10646.ttf"
-    );
 }
 
 #[cfg(windows)]
@@ -528,12 +522,9 @@ fn replacement_admission_uses_final_pixels_in_both_producer_orders() {
 }
 #[cfg(windows)]
 #[test]
-fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_family() {
+fn installed_windows_font_boxes_are_independent_of_ink() {
     let mut c = TextCache::default();
-    for (family, file) in [
-        (Family::Arial, "arial.ttf"),
-        (Family::Lucida, "l_10646.ttf"),
-    ] {
+    for family in [Family::Arial, Family::Lucida] {
         let s = TextStyle {
             family,
             slant: Slant::Normal,
@@ -547,22 +538,6 @@ fn installed_windows_font_boxes_are_independent_of_ink_and_lucida_keeps_its_fami
                 (m.font_ascent, m.font_descent),
                 (reference.font_ascent, reference.font_descent)
             );
-        }
-        if family == Family::Lucida {
-            for weight in [Weight::Normal, Weight::Bold] {
-                for slant in [Slant::Normal, Slant::Italic] {
-                    assert_eq!(
-                        TextCache::native_face(TextStyle { weight, slant, ..s }),
-                        file
-                    );
-                    assert_eq!(
-                        c.measure_panel("Length", TextStyle { weight, slant, ..s })
-                            .unwrap()
-                            .font_ascent,
-                        reference.font_ascent
-                    );
-                }
-            }
         }
     }
     assert_ne!(

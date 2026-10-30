@@ -1,5 +1,5 @@
 //! Native adapter: no bundled fonts, desktop APIs or window creation.
-use super::{Family, Raster, Slant, TextStyle, Weight};
+use super::{Family, Raster, Slant, TextStyle, Weight, display_character};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
 use slither_client::presentation::TextMeasurement;
@@ -62,146 +62,68 @@ mod coverage_tests {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
     #[test]
-    fn ascii_space_advances_match_canvas_without_pair_kerning() {
+    fn controls_use_the_same_bounded_display_policy_for_metrics_and_pixels() {
         let mut rasterizer = Rasterizer::new();
-        // Authored strings, absolute advances measured in 15px Arial Canvas.
-        for (text, expected) in [("A\u{b}V", 24.1772), ("A V A V A V A V A V A V", 165.9009)] {
-            let raster = rasterizer
-                .rasterize(text, 15., Weight::Normal, [255; 3])
-                .unwrap();
-            assert!(
-                (raster.advance - expected).abs() < 0.05,
-                "{text:?}: {} px, Canvas {expected} px",
-                raster.advance
-            );
-        }
-    }
-    #[test]
-    fn nbsp_retains_pair_kerning() {
-        let raster = Rasterizer::new()
-            .rasterize("A\u{a0}V", 15., Weight::Normal, [255; 3])
-            .unwrap();
-        assert!(
-            (raster.advance - 23.3496).abs() < 0.05,
-            "{}",
-            raster.advance
-        );
-    }
-    #[test]
-    fn soft_hyphen_is_invisible_and_vertical_tab_is_a_space() {
-        let mut rasterizer = Rasterizer::new();
-        let mut raster = |s: &str| {
-            rasterizer
-                .rasterize(s, 15., Weight::Normal, [255; 3])
-                .unwrap()
-        };
-        let soft = raster("A\u{ad}V");
-        let invisible = raster("A\u{1d}V");
-        assert_eq!(soft.advance, invisible.advance);
-        assert_eq!(soft.image.pixels, invisible.image.pixels);
-        let tab = raster("A\u{b}V");
-        let space = raster("A V");
-        assert_eq!(tab.advance, space.advance);
-        assert_eq!(tab.image.pixels, space.image.pixels);
-        let soft = raster("\u{ad}");
-        assert_eq!(soft.advance, 0.);
-        assert!(soft.image.pixels.iter().all(|p| *p == 0));
-    }
-    #[test]
-    fn c0_and_c1_rasters_use_canvas_missing_glyph_or_whitespace() {
-        let mut rasterizer = Rasterizer::new();
-        for weight in [Weight::Normal, Weight::Bold] {
-            for px in [15., 30.] {
-                for code in (0..=31).chain(128..=159) {
-                    let c = char::from_u32(code).unwrap().to_string();
-                    // Authored oracle: Chromium uses Arial's missing glyph for
-                    // these controls, except ASCII whitespace and U+001D.
-                    let equivalent = match code {
-                        9..=13 => " ",
-                        29 => "",
-                        _ => "\u{ffff}",
-                    };
-                    for (actual, expected) in [
-                        (c.clone(), equivalent.to_owned()),
+        for family in [Family::Arial, Family::Lucida] {
+            for weight in [Weight::Normal, Weight::Bold] {
+                let style = TextStyle {
+                    family,
+                    weight,
+                    size: 15.,
+                    slant: Slant::Normal,
+                    color: [255; 3],
+                };
+                for code in (0..=31).chain(127..=159).chain([173]) {
+                    let c = char::from_u32(code).unwrap();
+                    let equivalent = if c.is_whitespace() { ' ' } else { '\u{fffd}' };
+                    for (input, expected) in [
+                        (c.to_string(), equivalent.to_string()),
                         (format!("A{c}V"), format!("A{equivalent}V")),
                     ] {
-                        // U+001D is a shaping boundary, covered above separately.
-                        if code == 29 && actual.len() > 1 {
-                            continue;
-                        }
-                        let actual = rasterizer.rasterize(&actual, px, weight, [255; 3]).unwrap();
-                        let expected = rasterizer
-                            .rasterize(&expected, px, weight, [255; 3])
+                        let m = rasterizer.measure(&input, style).unwrap();
+                        let actual = rasterizer
+                            .rasterize_styled(&input, 15., style, None)
                             .unwrap();
-                        assert_eq!(
-                            actual.advance, expected.advance,
-                            "U+{code:04X}, {px}, {weight:?}"
-                        );
+                        let expected = rasterizer
+                            .rasterize_styled(&expected, 15., style, None)
+                            .unwrap();
+                        assert_eq!(m.advance, actual.advance);
+                        assert!(m.advance.is_finite() && m.advance > 0.);
+                        assert_eq!(actual.advance, expected.advance);
                         assert_eq!(actual.offset, expected.offset);
                         assert_eq!(actual.image.width, expected.image.width);
                         assert_eq!(actual.image.height, expected.image.height);
-                        assert_eq!(
-                            actual.image.pixels, expected.image.pixels,
-                            "U+{code:04X}, {px}, {weight:?}"
-                        );
-                        if equivalent == "\u{ffff}" {
-                            assert!(actual.image.pixels.iter().any(|p| *p != 0));
-                        }
+                        assert_eq!(actual.image.pixels, expected.image.pixels);
                     }
                 }
             }
         }
     }
+
     #[test]
-    fn del_raster_is_blank_with_canvas_fallback_advance() {
+    fn whitespace_keeps_its_normal_advance_and_pair_boundaries() {
         let mut rasterizer = Rasterizer::new();
-        for (px, regular, bold) in [
-            (8., 4., 4.),
-            (12., 6., 7.),
-            (12.5, 7., 8.),
-            (15., 8., 9.),
-            (17.9, 9., 10.),
-            (18., 9., 9.),
-            (30., 15., 15.),
-        ] {
-            for (weight, advance) in [(Weight::Normal, regular), (Weight::Bold, bold)] {
-                let del = rasterizer
-                    .rasterize("\u{7f}", px, weight, [255; 3])
-                    .unwrap();
-                assert_eq!(del.advance, advance);
-                assert!(del.image.pixels.iter().all(|p| *p == 0));
-                let av = rasterizer.rasterize("AV", px, weight, [255; 3]).unwrap();
-                let padded = rasterizer
-                    .rasterize("\u{7f}AV\u{7f}", px, weight, [255; 3])
-                    .unwrap();
-                assert!((padded.advance - av.advance - 2. * advance).abs() < 0.00001);
-            }
+        let space = rasterizer
+            .rasterize("A V", 15., Weight::Normal, [255; 3])
+            .unwrap();
+        for text in ["A\tV", "A\nV", "A\rV", "A\u{b}V", "A\u{85}V"] {
+            let actual = rasterizer
+                .rasterize(text, 15., Weight::Normal, [255; 3])
+                .unwrap();
+            assert_eq!(actual.advance, space.advance);
+            assert_eq!(actual.image.width, space.image.width);
+            assert_eq!(actual.image.height, space.image.height);
+            assert_eq!(actual.image.pixels, space.image.pixels);
         }
+        assert_eq!(display_character('\u{a0}'), '\u{a0}');
     }
 }
+
 struct Arial {
     font: Font,
     em_ascent: f64,
-}
-fn canvas_character(c: char) -> Option<char> {
-    match c {
-        '\u{9}'..='\u{d}' => Some(' '),
-        '\u{1d}' | '\u{ad}' => None,
-        // fontdue merges legacy cmaps, where these codes can name unrelated
-        // accented glyphs or the null glyph. Canvas uses Arial's .notdef box.
-        '\u{0}'..='\u{1f}' | '\u{80}'..='\u{9f}' => Some('\u{ffff}'),
-        _ => Some(c),
-    }
-}
-fn del_advance(px: f64, weight: Weight) -> f32 {
-    // Windows Chromium's blank SimSun fallback has half-em advances. At these
-    // small sizes its hinted widths snap to pixels, plus one for synthetic bold.
-    if (12. ..18.).contains(&px) {
-        ((px.round() / 2.).round() + f64::from(weight == Weight::Bold)) as f32
-    } else {
-        (px / 2.) as f32
-    }
 }
 impl Rasterizer {
     pub fn new() -> Self {
@@ -246,16 +168,7 @@ impl Rasterizer {
         let mut previous = None;
         let mut ascent = 0_f64;
         let mut descent = 0_f64;
-        for c in text.chars() {
-            if c == '\u{7f}' {
-                pen += del_advance(style.size, style.weight) * 4.;
-                previous = None;
-                continue;
-            }
-            let Some(c) = canvas_character(c) else {
-                previous = None;
-                continue;
-            };
+        for c in text.chars().map(display_character) {
             if let Some(p) = previous
                 && p != ' '
                 && c != ' '
@@ -315,7 +228,6 @@ impl Rasterizer {
         style: TextStyle,
         max_width: Option<u32>,
     ) -> Result<Raster> {
-        let weight = style.weight;
         let color = style.color;
         let arial = self.face(style)?;
         let font = &arial.font;
@@ -327,20 +239,8 @@ impl Rasterizer {
         let mut pen = 0_f32;
         let mut previous = None;
         let mut bounds = [0_i32; 4];
-        for c in text.chars() {
-            if c == '\u{7f}' {
-                pen += del_advance(px, weight) * SAMPLE as f32;
-                previous = None;
-                continue;
-            }
-            let Some(c) = canvas_character(c) else {
-                // Canvas suppresses these glyphs but keeps a shaping boundary:
-                // adjacent letters do not acquire kerning across the control.
-                previous = None;
-                continue;
-            };
-            // Canvas breaks kerning at ASCII spaces, including normalized
-            // whitespace. NBSP keeps its ordinary glyph-pair behavior.
+        for c in text.chars().map(display_character) {
+            // Whitespace separates ordinary glyph pairs; NBSP keeps its glyph.
             if let Some(p) = previous
                 && p != ' '
                 && c != ' '
@@ -419,15 +319,12 @@ impl Rasterizer {
     }
 }
 
-/// Keep styled Lucida in the matched family, using its regular installed face.
-/// Known non-parity: Chromium/Skia synthesizes bold/oblique; synthesis or an
-/// accepted approximation belongs to end-screen backlog item 5, not this PR.
-/// https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc#L484-L498
-/// Missing selected files are explicit errors; no fonts are bundled or sheared.
+/// Real installed faces; bold Lucida requests deliberately use Arial Bold.
+/// Missing selected files remain explicit errors. No font is bundled or synthesized.
 #[cfg(not(target_os = "linux"))]
 pub fn face_name(style: TextStyle) -> &'static str {
     match (style.family, style.weight, style.slant) {
-        (Family::Lucida, _, _) => "l_10646.ttf",
+        (Family::Lucida, Weight::Normal, _) => "l_10646.ttf",
         (_, Weight::Normal, Slant::Normal) => "arial.ttf",
         (_, Weight::Bold, Slant::Normal) => "arialbd.ttf",
         (_, Weight::Normal, Slant::Italic) => "ariali.ttf",
