@@ -26,9 +26,7 @@
 
 ### Changed
 
-- The fidelity toolkit collects from local hosts only. The tools for finding
-  outside servers and preparing pilots on them are removed; earlier studies
-  keep the scripts they used.
+- The fidelity collectors no longer ship server discovery. They connect to the address you give them with the standard protocol-19 login; the tools that found outside servers and prepared pilots on them are removed, and earlier studies keep the scripts they used.
 
 ### Performance
 

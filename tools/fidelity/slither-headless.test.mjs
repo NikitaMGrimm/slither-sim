@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { solveChallenge, splitFrame, loginPacket, World, Bot, Recorder, PREY_PROBE, BOUNDARY_PROBE, VISIBILITY_PROBE, SPEED_PROBE, visibilityEndpoints, DEATH_OBSERVATION_MS, chooseHeading, parseArgs, record, captureSourceIdentity, createCaptureBatch, finalizeCaptureBatch } from './slither-headless.mjs';
+import { solveChallenge, splitFrame, loginPacket, World, Bot, Recorder, PREY_PROBE, BOUNDARY_PROBE, VISIBILITY_PROBE, SPEED_PROBE, visibilityEndpoints, DEATH_OBSERVATION_MS, chooseHeading, parseArgs, record, captureSourceIdentity, createCaptureBatch, finalizeCaptureBatch, parseServer } from './slither-headless.mjs';
 import { recordPair as recordDeath, parseArgs as parseDeath } from './slither-paired-death.mjs';
 import { recordPair as recordPrey, parseArgs as parsePrey } from './slither-paired-prey.mjs';
 import { recordFeedingShape, parseArgs as parseFeeding } from './slither-feeding-shape.mjs';
@@ -26,7 +26,7 @@ test('CLI requires an explicit valid endpoint before creating output or using th
   });
   const preload = path.join(directory, 'offline.mjs');
   fs.writeFileSync(preload, 'globalThis.fetch = () => { throw Error("unexpected fetch"); }; globalThis.WebSocket = class { constructor() { throw Error("unexpected socket"); } };');
-  for (const server of [null, '127.0.0.1:0', '127.0.0.1:65536', '127.0.0.1:444:extra', 'invalid:444', '192.0.2.1:444', '0.0.0.0:444']) {
+  for (const server of [null, '127.0.0.1:0', '127.0.0.1:65536', '127.0.0.1:444:extra', 'invalid:444']) {
     const out = path.join(directory, 'capture');
     const result = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href,
       fileURLToPath(new URL('./slither-headless.mjs', import.meta.url)), '--out', out,
@@ -39,7 +39,7 @@ test('CLI requires an explicit valid endpoint before creating output or using th
   }
 });
 
-test('every collector rejects outside endpoints before output or sockets, including direct calls', async t => {
+test('collectors reject hostnames and malformed endpoints before output or sockets', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-loopback-'));
   const original = globalThis.WebSocket;
   let sockets = 0;
@@ -50,25 +50,38 @@ test('every collector rejects outside endpoints before output or sockets, includ
   });
   const out = path.join(directory, 'unused');
   const runners = [recordDeath, recordPrey, recordFeedingShape, recordSnake, recordCollision, recordTail];
-  for (const server of ['192.0.2.1:444', '0.0.0.0:444', 'localhost:444', '127.0.0.1.example.com:444', '127.1:444', '127.0.0.1:444:extra']) {
+  for (const server of ['localhost:444', '127.0.0.1.example.com:444', '127.1:444', '127.0.0.1:444:extra']) {
     for (const run of runners)
-      await assert.rejects(run({ out, server, seconds: 1, mode: 'crossing', direction: 'x' }), /loopback IPv4/);
+      await assert.rejects(run({ out, server, seconds: 1, mode: 'crossing', direction: 'x' }), /numeric IPv4/);
     const [ip] = server.split(':');
     const endpoint = { ip, port: 444 };
     if (server !== '127.0.0.1:444:extra') {
       const bot = new Bot({}, 0, { meta() {}, frame() {} });
-      assert.throws(() => bot.connect(endpoint), /loopback IPv4/);
-      await assert.rejects(record({ out, bots: 1 }, endpoint, 'bot'), /loopback IPv4/);
-      await assert.rejects(recordFoodLanes({ out }, endpoint), /loopback IPv4/);
+      assert.throws(() => bot.connect(endpoint), /numeric IPv4/);
+      await assert.rejects(record({ out, bots: 1 }, endpoint, 'bot'), /numeric IPv4/);
+      await assert.rejects(recordFoodLanes({ out }, endpoint), /numeric IPv4/);
     }
     assert.equal(fs.existsSync(out), false);
   }
   assert.equal(sockets, 0);
-  for (const dataOrigin of ['official-server', 'community-server']) {
-    const plan = path.join(directory, `${dataOrigin}.json`);
-    fs.writeFileSync(plan, JSON.stringify({ dataOrigin }));
-    assert.throws(() => createCaptureBatch({ plan }, 1), /local-simulator/);
+});
+
+test('operator endpoints require honest plan provenance without an outside flag', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-provenance-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const ip of ['127.0.0.1', '127.0.0.2', '192.0.2.1', '10.0.0.1', '0.0.0.0']) {
+    const server = `${ip}:444`;
+    assert.deepEqual(parseServer(server), { ip, port: 444 });
+    for (const dataOrigin of ['local-simulator', 'community-server', 'official-server']) {
+      const plan = path.join(directory, 'plan.json');
+      fs.writeFileSync(plan, JSON.stringify({ dataOrigin }));
+      if (ip.startsWith('127.') === (dataOrigin === 'local-simulator'))
+        assert.equal(createCaptureBatch({ server, plan }, 1).dataOrigin, dataOrigin);
+      else assert.throws(() => createCaptureBatch({ server, plan }, 1), /provenance|plan/);
+    }
   }
+  assert.equal(createCaptureBatch({ server: '127.0.0.1:444' }, 1).dataOrigin, 'local-simulator');
+  assert.throws(() => createCaptureBatch({ server: '192.0.2.1:444' }, 1), /plan/);
 });
 
 test('collector CLIs accept an explicit HTTP origin and reject discovery options', () => {
@@ -718,9 +731,11 @@ test('foraging follows nearby food off the current heading while retaining avoid
   assert.notEqual(safe.a, Math.PI / 2, 'nearby food must not override body avoidance');
 });
 
-test('login packet uses the local host short protocol-19 layout and truncates nicknames', () => {
+test('login packet uses the standard protocol-19 layout and truncates nicknames', () => {
   const p = loginPacket('x'.repeat(30), 7);
-  assert.deepEqual(Array.from(p), [115, 31, 0, 0, 7, 24, ...Buffer.from('x'.repeat(24)), 0, 255]);
+  assert.deepEqual(Array.from(p), [115, 30, 1, 35,
+    54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106, 236, 8, 208, 136, 213, 140, 111,
+    7, 24, ...Buffer.from('x'.repeat(24)), 0, 255]);
 });
 
 test('self rotation packets update heading, wanted heading and speed', () => {

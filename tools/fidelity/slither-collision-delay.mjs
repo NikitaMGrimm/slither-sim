@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { World, Recorder, splitFrame, splitPayload, captureSourceIdentity,
-  createCaptureBatch, finalizeCaptureBatch, parseLocalServer } from './slither-headless.mjs';
+  createCaptureBatch, finalizeCaptureBatch, parseServer } from './slither-headless.mjs';
 import { CollisionBot, segmentDistance, stageSteering } from './slither-paired-collision.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
@@ -178,13 +178,13 @@ export class TailTrial {
 
 export async function recordTail({ out, server, plan, specs, delayMs = 150, seconds = 600,
   connectGapMs = 8000 }) {
-  const { ip, port } = parseLocalServer(server);
+  const { ip, port } = parseServer(server);
   const batch = createCaptureBatch({ scenario: 'collision-delay', server, plan, seconds, delayMs }, 2, SOURCE);
   if (fs.existsSync(out)) throw Error('output exists');
   fs.mkdirSync(out, { recursive: true });
   const recorders = [0, 1].map(i => new Recorder(path.join(out, `bot${i}.jsonl.gz`), {
     schema: 1, scenario: 'collision-delay', server: { ip, port }, botIndex: i, t: performance.now(), wall: Date.now(),
-    dataOrigin: 'local-simulator', captureProvenance: batch.provenance(i) }));
+    dataOrigin: batch.dataOrigin, captureProvenance: batch.provenance(i) }));
   const emit = row => recorders.forEach(r => r.meta(row));
   const bots = recorders.map((rec, i) => new DelayBot({ nick: `Delay study ${i}`, serverBody: true,
     delayMs: 0 }, i, rec));

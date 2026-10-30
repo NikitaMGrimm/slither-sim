@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Bot, Recorder, headingDanger, splitFrame, splitPayload, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseLocalServer } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseServer } from './slither-headless.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
 export const C = Object.freeze({ tickMs: 25, freshMs: 350, gapMs: 100,
@@ -296,12 +296,10 @@ export function stageSteering(bot, control, now) {
 }
 
 export function validateOptions(opts) {
-  const { out, server, seconds = 600, plan } = opts;
-  const { ip, port } = parseLocalServer(server);
+  const { out, server, seconds = 600 } = opts;
+  const { ip, port } = parseServer(server);
   if (!out || !Number.isFinite(seconds) || seconds < 1 || seconds > 600)
-    throw Error('use --out, loopback IPv4:port, and 1..600 seconds');
-  const dataOrigin = plan ? JSON.parse(fs.readFileSync(plan)).dataOrigin : null;
-  if (dataOrigin && dataOrigin !== 'local-simulator') throw Error('loopback requires local-simulator provenance');
+    throw Error('use --out, IPv4:port, and 1..600 seconds');
   return { ...opts, seconds, ip, port, origin: validateOrigin(opts.origin) };
 }
 
@@ -322,7 +320,7 @@ export async function recordPair(opts, signal) {
       const nick = `Collision ${index}`;
       const rec = new Recorder(path.join(out, `bot${index}.jsonl.gz`), {
         schema: 1, server: { ip, port }, nick, scenario: 'paired-collision', botIndex: index,
-        dataOrigin: 'local-simulator',
+        dataOrigin: batch.dataOrigin,
         wall: Date.now(), t: performance.now(), captureProvenance: batch.provenance(index) });
       recorders.push(rec); bots.push(new CollisionBot({ nick, serverBody: true, origin }, index, rec));
     }

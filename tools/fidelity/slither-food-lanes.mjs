@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Bot, Recorder, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin, headingDanger, parseLocalServer, validateLocalServer } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, headingDanger, parseServer, validateServer, validateDataOrigin } from './slither-headless.mjs';
 
 const blocks = ['A', 'B', 'B', 'A'];
 export const FOOD_LANES = Object.freeze({
@@ -285,19 +285,20 @@ export function parseArgs(argv) {
   if (!opts.out || !opts.server) throw new Error('--out and --server ip:port are required');
   if (!Number.isFinite(opts.seconds) || opts.seconds <= 0 || opts.seconds > 480)
     throw new Error('--seconds must be positive and at most 480');
-  parseLocalServer(opts.server);
+  parseServer(opts.server);
   opts.origin = validateOrigin(opts.origin);
   return opts;
 }
 
 export async function recordFoodLanes(opts, server, signal, batch = createCaptureBatch(opts, 1, FOOD_LANES_SOURCE)) {
   if (signal?.aborted) return;
-  validateLocalServer(server);
+  validateServer(server);
+  validateDataOrigin(server, batch.dataOrigin);
   if (!Number.isFinite(opts.seconds) || opts.seconds <= 0 || opts.seconds > 480 ||
       opts.bots !== 1 || opts.scenario !== 'food-lanes') throw new Error('invalid food-lanes options');
   const rec = new Recorder(path.join(opts.out, 'bot0.jsonl.gz'), {
     schema: 1, server, nick: opts.nick, scenario: 'food-lanes',
-    wall: Date.now(), t: performance.now(), loginSelector: 31,
+    wall: Date.now(), t: performance.now(), clientVersion: 291,
     ...(batch.dataOrigin ? { dataOrigin: batch.dataOrigin } : {}), captureProvenance: batch.provenance(0) });
   const bots = [];
   let finish, failure = null, timer, deadline, finalized = false;

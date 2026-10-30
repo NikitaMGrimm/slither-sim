@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Bot, Recorder, headingDanger, captureSourceIdentity, createCaptureBatch,
-  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseLocalServer } from './slither-headless.mjs';
+  finalizeCaptureBatch, runCollectorCli, validateOrigin, parseServer } from './slither-headless.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
 const TAU = Math.PI * 2;
@@ -363,7 +363,7 @@ function validateOptions({ out, server, seconds, mode, direction, origin }) {
       seconds < 1 || seconds > PAIR_SNAKE.maxSeconds) throw Error('use --out, --server ip:port and 1..3600 seconds');
   if (mode !== 'crossing') throw Error('use --mode crossing');
   validateDirection(direction); validateOrigin(origin);
-  parseLocalServer(server);
+  parseServer(server);
 }
 
 export function parseArgs(argv) {

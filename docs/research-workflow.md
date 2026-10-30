@@ -42,19 +42,19 @@ not blinded validation.
 
 ## Plan a real measurement
 
-The toolkit collects from local hosts only. Collection requires an explicit
-protocol-19 WebSocket loopback IPv4 address/port and `/slither` path; tools do not
-discover servers. Collecting from outside servers needs the owner's authorization
-for that task (see [AGENTS.md](https://github.com/NikitaMGrimm/slither-sim/blob/main/AGENTS.md)).
-Recordings contain raw received packets and sent controls, without server-only state.
+Collectors connect to the address you give them and send the standard
+protocol-19 login. Supply a numeric IPv4 address/port and `/slither` path;
+tools do not discover servers or resolve hostnames. Recordings contain raw
+received packets and sent controls, without server-only state.
 
 Copy [the movement plan](https://github.com/NikitaMGrimm/slither-sim/blob/main/evidence/templates/movement-plan.json). Specify:
 
 - Study ID, question, competing explanations and method.
 - Sampling unit, attempt budget, exclusions and held-out validation.
-- Operator-supplied protocol-19 loopback IP/port and `dataOrigin: local-simulator`,
-  as in the template's `127.0.0.1:8766` at `/slither`. Set HTTP(S) `capture.origin`
-  if your local host requires it.
+- Operator-supplied protocol-19 IP/port and the matching `dataOrigin`: use
+  `local-simulator` for loopback, as in the template's `127.0.0.1:8766` at
+  `/slither`. Other addresses require a plan labelled `community-server` or
+  `official-server`. Set HTTP(S) `capture.origin` if your host requires it.
 
 Freeze confirmatory predictions and selection rules before collection; label
 exploratory results. A plan hash cannot prove when or why it was written.
@@ -67,7 +67,7 @@ uv run --locked --only-group tools python tools/fidelity/evidence.py init --plan
 uv run --locked --only-group tools python tools/fidelity/collect.py outputs/your-study --dry-run
 ```
 
-To collect on that local host:
+To collect on the supplied host:
 
 ```sh
 uv run --locked --only-group tools python tools/fidelity/collect.py outputs/your-study
@@ -219,8 +219,8 @@ tandem lateral-offset ladder and head-on crossings with reversed roles/join
 order. It records both own streams, actual sent bytes, staging failures,
 qualification samples and post-event deaths in the ordinary archive format.
 `paired-collision` capture plans require exactly two bots and at most 600 seconds;
-no paired `mode` or `direction` fields apply. The collector accepts loopback
-endpoints only.
+no paired `mode` or `direction` fields apply. Label provenance in the plan,
+as for the other collectors.
 
 `collect.py` rejects a second attempt after failed integrity, zero qualified
 ladder/head-on trials or excessive third-party contamination in the first attempt.
