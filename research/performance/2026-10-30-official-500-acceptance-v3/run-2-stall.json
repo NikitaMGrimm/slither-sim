@@ -1,0 +1,404 @@
+{
+  "archiveSha256": "acff67ab44e25d40ca07b29e5176b559a9361d09c14dc3f62caecffe090514a5",
+  "episodeReferenceUtc": "2026-10-30T17:19:36.186757+00:00",
+  "scope": "Post-result context only; no gate, tail, window or outcome changes",
+  "cpuCounterQuantumSeconds": 0.01,
+  "intervals": [
+    {
+      "fromOffsetSeconds": 743.246909,
+      "toOffsetSeconds": 744.25896,
+      "elapsedSeconds": 1.012051,
+      "serverCpuSeconds": {
+        "user": 0.3,
+        "system": 0.44
+      },
+      "observerCpuSeconds": {
+        "user": 0.0,
+        "system": 0.0
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.35,
+          "slither-sockets": 0.39
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.02
+        }
+      },
+      "coreSeconds": {
+        "user": 0.29,
+        "nice": 0.0,
+        "system": 0.32,
+        "idle": 0.23,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.13,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": -0.01
+    },
+    {
+      "fromOffsetSeconds": 744.25896,
+      "toOffsetSeconds": 745.274611,
+      "elapsedSeconds": 1.015651,
+      "serverCpuSeconds": {
+        "user": 0.31,
+        "system": 0.36
+      },
+      "observerCpuSeconds": {
+        "user": 0.01,
+        "system": 0.01
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.34,
+          "slither-sockets": 0.32
+        },
+        "collector": {
+          "main": 0.01,
+          "helpers": 0.0
+        }
+      },
+      "coreSeconds": {
+        "user": 0.36,
+        "nice": 0.0,
+        "system": 0.32,
+        "idle": 0.19,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.11,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": 0.04
+    },
+    {
+      "fromOffsetSeconds": 745.274611,
+      "toOffsetSeconds": 746.305811,
+      "elapsedSeconds": 1.031201,
+      "serverCpuSeconds": {
+        "user": 0.29,
+        "system": 0.25
+      },
+      "observerCpuSeconds": {
+        "user": 0.0,
+        "system": 0.0
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.3,
+          "slither-sockets": 0.25
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.0
+        }
+      },
+      "coreSeconds": {
+        "user": 0.7,
+        "nice": 0.0,
+        "system": 0.23,
+        "idle": 0.0,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.11,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": 0.41
+    },
+    {
+      "fromOffsetSeconds": 746.305811,
+      "toOffsetSeconds": 747.333827,
+      "elapsedSeconds": 1.028016,
+      "serverCpuSeconds": {
+        "user": 0.3,
+        "system": 0.23
+      },
+      "observerCpuSeconds": {
+        "user": 0.01,
+        "system": 0.0
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.29,
+          "slither-sockets": 0.24
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.0
+        }
+      },
+      "coreSeconds": {
+        "user": 0.61,
+        "nice": 0.0,
+        "system": 0.31,
+        "idle": 0.0,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.1,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": 0.3
+    },
+    {
+      "fromOffsetSeconds": 747.333827,
+      "toOffsetSeconds": 748.369868,
+      "elapsedSeconds": 1.036041,
+      "serverCpuSeconds": {
+        "user": 0.27,
+        "system": 0.24
+      },
+      "observerCpuSeconds": {
+        "user": 0.01,
+        "system": 0.0
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.28,
+          "slither-sockets": 0.23
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.01
+        }
+      },
+      "coreSeconds": {
+        "user": 0.69,
+        "nice": 0.0,
+        "system": 0.23,
+        "idle": 0.0,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.11,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": 0.41
+    },
+    {
+      "fromOffsetSeconds": 748.369868,
+      "toOffsetSeconds": 749.397826,
+      "elapsedSeconds": 1.027958,
+      "serverCpuSeconds": {
+        "user": 0.35,
+        "system": 0.34
+      },
+      "observerCpuSeconds": {
+        "user": 0.0,
+        "system": 0.01
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.38,
+          "slither-sockets": 0.32
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.01
+        }
+      },
+      "coreSeconds": {
+        "user": 0.66,
+        "nice": 0.0,
+        "system": 0.26,
+        "idle": 0.0,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.11,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": 0.31
+    },
+    {
+      "fromOffsetSeconds": 749.397826,
+      "toOffsetSeconds": 750.408381,
+      "elapsedSeconds": 1.010555,
+      "serverCpuSeconds": {
+        "user": 0.36,
+        "system": 0.39
+      },
+      "observerCpuSeconds": {
+        "user": 0.01,
+        "system": 0.0
+      },
+      "matchedThreadCpuSeconds": {
+        "server": {
+          "host": 0.0,
+          "slither-simulat": 0.39,
+          "slither-sockets": 0.35
+        },
+        "collector": {
+          "main": 0.0,
+          "helpers": 0.0
+        }
+      },
+      "coreSeconds": {
+        "user": 0.36,
+        "nice": 0.0,
+        "system": 0.28,
+        "idle": 0.22,
+        "iowait": 0.0,
+        "irq": 0.0,
+        "softirq": 0.12,
+        "steal": 0.0,
+        "guest": 0.0,
+        "guestNice": 0.0
+      },
+      "otherUserCpuSeconds": -0.01
+    }
+  ],
+  "fourSampleSummary": {
+    "fromOffsetSeconds": 745.274611,
+    "toOffsetSeconds": 749.397826,
+    "elapsedSeconds": 4.123216,
+    "coreSeconds": {
+      "user": 2.66,
+      "nice": 0.0,
+      "system": 1.03,
+      "idle": 0.0,
+      "iowait": 0.0,
+      "irq": 0.0,
+      "softirq": 0.43,
+      "steal": 0.0,
+      "guest": 0.0,
+      "guestNice": 0.0
+    },
+    "serverCpuSeconds": 2.27,
+    "observerCpuSeconds": 0.03,
+    "otherUserCpuSeconds": 1.43
+  },
+  "boundaryDaemonPresence": {
+    "start": {
+      "systemd-journald": {
+        "state": "S<s",
+        "lifetimeCpuPercent": 0.0
+      },
+      "cron": {
+        "state": "Ss",
+        "lifetimeCpuPercent": 0.0
+      },
+      "snapd": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "rsyslogd": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "unattended-upgrade-shutdown": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "amazon-ssm-agent": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      }
+    },
+    "end": {
+      "systemd-journald": {
+        "state": "S<s",
+        "lifetimeCpuPercent": 0.0
+      },
+      "cron": {
+        "state": "Ss",
+        "lifetimeCpuPercent": 0.0
+      },
+      "snapd": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "rsyslogd": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "unattended-upgrade-shutdown": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "amazon-ssm-agent": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.0
+      },
+      "fwupd": {
+        "state": "Ssl",
+        "lifetimeCpuPercent": 0.1
+      }
+    }
+  },
+  "tickBlocks": [
+    {
+      "afterTick": 300900,
+      "offsetSeconds": 744.949701,
+      "worldCpuSumMs": 495.38279,
+      "bracketedWallSumMs": 356.259059,
+      "bracketedWallOver10MsTicks": 0,
+      "bracketedWallMaxMs": 5.929209
+    },
+    {
+      "afterTick": 301000,
+      "offsetSeconds": 745.845832,
+      "worldCpuSumMs": 479.30595,
+      "bracketedWallSumMs": 865.670963,
+      "bracketedWallOver10MsTicks": 29,
+      "bracketedWallMaxMs": 14.976602
+    },
+    {
+      "afterTick": 301100,
+      "offsetSeconds": 746.815701,
+      "worldCpuSumMs": 506.41803,
+      "bracketedWallSumMs": 965.544225,
+      "bracketedWallOver10MsTicks": 40,
+      "bracketedWallMaxMs": 13.690076
+    },
+    {
+      "afterTick": 301200,
+      "offsetSeconds": 747.802435,
+      "worldCpuSumMs": 503.0681,
+      "bracketedWallSumMs": 982.034533,
+      "bracketedWallOver10MsTicks": 48,
+      "bracketedWallMaxMs": 23.640264
+    },
+    {
+      "afterTick": 301300,
+      "offsetSeconds": 748.823714,
+      "worldCpuSumMs": 501.18123,
+      "bracketedWallSumMs": 1011.672655,
+      "bracketedWallOver10MsTicks": 52,
+      "bracketedWallMaxMs": 16.124358
+    },
+    {
+      "afterTick": 301400,
+      "offsetSeconds": 749.409721,
+      "worldCpuSumMs": 478.09838,
+      "bracketedWallSumMs": 581.510212,
+      "bracketedWallOver10MsTicks": 11,
+      "bracketedWallMaxMs": 13.405735
+    },
+    {
+      "afterTick": 301500,
+      "offsetSeconds": 750.0307,
+      "worldCpuSumMs": 476.28103,
+      "bracketedWallSumMs": 391.096204,
+      "bracketedWallOver10MsTicks": 0,
+      "bracketedWallMaxMs": 8.977853
+    }
+  ],
+  "limits": "Only server and observer have interval task counters. Matched threads omit threads absent at either endpoint. Boundary ps CPU is lifetime, not interval. No journal, timer inventory, context switches, run queue, per-task I/O or scheduler trace was retained. Sequential samples and counter rounding limit attribution."
+}
