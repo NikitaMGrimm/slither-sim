@@ -6,6 +6,71 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame, loopback_endpoint},
     render,
 };
+#[path = "../src/scheduling.rs"]
+mod native_scheduling;
+
+#[test]
+fn native_wakes_ingest_before_frames_and_retry_ack_commits_only_once() {
+    use std::{
+        sync::mpsc,
+        time::{Duration, Instant},
+    };
+    let mut schedule = native_scheduling::Schedule::default();
+    let mut game = playing();
+    let mut control = playing();
+    let now = Instant::now();
+    schedule.activity(true);
+    assert!(schedule.request_redraw(now));
+    assert!(schedule.begin_redraw(now));
+    game.begin_frame(40., [960, 540], 1.).unwrap();
+    effects(&mut game);
+    let retained = game.take_frame().unwrap();
+    let identity = retained.frame.identity;
+    game.retry_frame(retained).unwrap();
+    schedule.retry(now);
+    pump(&mut control, 40.);
+
+    // Authored fake transport: its wake is handled without a redraw. Ingress
+    // remains deferred behind the retained picture, in LocalGame's own FIFO.
+    let (sender, receiver) = mpsc::channel();
+    for index in [1, 2] {
+        sender
+            .send((bundle(&[received_food(index)]), 40. + f64::from(index)))
+            .unwrap();
+    }
+    for (packet, time) in receiver.try_iter() {
+        game.receive(game.generation(), &packet, time).unwrap();
+        control
+            .receive(control.generation(), &packet, time)
+            .unwrap();
+    }
+    assert!(!schedule.request_redraw(now + Duration::from_millis(2)));
+    assert_eq!(game.client().foods().foods().len(), 1);
+    assert_eq!(control.client().foods().foods().len(), 3);
+
+    let retry = now + Duration::from_millis(100);
+    assert!(schedule.request_redraw(retry));
+    assert!(schedule.begin_redraw(retry));
+    let retained = game.take_frame().unwrap();
+    assert_eq!(retained.frame.identity, identity);
+    game.presented(true).unwrap();
+    schedule.presented();
+    assert!(!schedule.begin_redraw(retry));
+    assert!(game.presented(true).is_err());
+    assert!(schedule.request_redraw(retry));
+    assert!(schedule.begin_redraw(retry));
+    pump(&mut game, 160.);
+    pump(&mut control, 160.);
+    assert_eq!(
+        format!("{:?}", game.client().foods().foods()),
+        format!("{:?}", control.client().foods().foods())
+    );
+    assert_eq!(
+        game.client().control_view().own.unwrap().raw_head,
+        control.client().control_view().own.unwrap().raw_head
+    );
+    assert_eq!(game.hud_text(), control.hud_text());
+}
 fn u24(n: u32) -> [u8; 3] {
     let b = n.to_be_bytes();
     [b[1], b[2], b[3]]

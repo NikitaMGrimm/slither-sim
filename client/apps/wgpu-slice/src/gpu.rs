@@ -449,6 +449,8 @@ pub struct SurfaceHost {
     extent: [u32; 2],
     backing: Option<wgpu::Texture>,
     blitter: wgpu::util::TextureBlitter,
+    acquired: Option<wgpu::SurfaceTexture>,
+    occluded: bool,
 }
 impl SurfaceHost {
     pub async fn new(
@@ -490,7 +492,10 @@ impl SurfaceHost {
             width: extent[0].max(1),
             height: extent[1].max(1),
             present_mode: wgpu::PresentMode::Fifo,
-            desired_maximum_frame_latency: 2,
+            // Native prioritizes latency over CPU/GPU overlap; this is a backend
+            // hint, not a measured Chrome comparison. Keep the browser's hint.
+            // https://docs.rs/wgpu/30.0.1/wgpu/type.SurfaceConfiguration.html#structfield.desired_maximum_frame_latency
+            desired_maximum_frame_latency: if cfg!(target_arch = "wasm32") { 2 } else { 1 },
             alpha_mode: wgpu::CompositeAlphaMode::Opaque,
             view_formats: vec![],
         };
@@ -504,6 +509,8 @@ impl SurfaceHost {
             extent: [0, 0],
             backing: None,
             blitter,
+            acquired: None,
+            occluded: false,
         };
         host.resize(extent)?;
         Ok(host)
@@ -516,6 +523,7 @@ impl SurfaceHost {
             return Ok(());
         }
         self.extent = extent;
+        self.acquired = None;
         if !extent.contains(&0) {
             self.config.width = extent[0];
             self.config.height = extent[1];
@@ -529,6 +537,56 @@ impl SurfaceHost {
     /// Render at the desktop policy size, then scale the complete image like a CSS canvas.
     pub fn present_scaled(&mut self, frame: &Frame) -> Result<bool> {
         self.present_inner(frame, true)
+    }
+    /// Native waits for FIFO capacity before sampling the next model timestamp
+    /// and draining ingress, rather than staging an update ahead of that wait.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn prepare_present(&mut self) -> Result<bool> {
+        self.acquire()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn is_occluded(&self) -> bool {
+        self.occluded
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn discard_acquired(&mut self) {
+        self.acquired = None;
+    }
+    fn acquire(&mut self) -> Result<bool> {
+        if self.extent.contains(&0) {
+            return Ok(false);
+        }
+        if self.acquired.is_some() {
+            return Ok(true);
+        }
+        self.occluded = false;
+        self.acquired = Some(match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(t)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+            wgpu::CurrentSurfaceTexture::Occluded => {
+                self.occluded = true;
+                return Ok(false);
+            }
+            wgpu::CurrentSurfaceTexture::Timeout => return Ok(false),
+            wgpu::CurrentSurfaceTexture::Outdated => {
+                self.surface.configure(&self.renderer.device, &self.config);
+                return Ok(false);
+            }
+            // Native can reconfigure the existing surface without acknowledging
+            // or replacing the retained LocalGame picture.
+            #[cfg(not(target_arch = "wasm32"))]
+            wgpu::CurrentSurfaceTexture::Lost => {
+                self.surface.configure(&self.renderer.device, &self.config);
+                return Ok(false);
+            }
+            #[cfg(target_arch = "wasm32")]
+            wgpu::CurrentSurfaceTexture::Lost => return Err(
+                "surface lost; host stopped, scene retained; explicit surface recreation required"
+                    .into(),
+            ),
+            e => return Err(format!("surface stopped: {e:?}")),
+        });
+        Ok(true)
     }
     fn present_inner(&mut self, frame: &Frame, scale: bool) -> Result<bool> {
         let scaled = frame.extent != self.extent;
@@ -566,22 +624,10 @@ impl SurfaceHost {
                 ));
             }
         }
-        let texture = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(t)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
-                return Ok(false);
-            }
-            wgpu::CurrentSurfaceTexture::Outdated => {
-                self.surface.configure(&self.renderer.device, &self.config);
-                return Ok(false);
-            }
-            wgpu::CurrentSurfaceTexture::Lost => return Err(
-                "surface lost; host stopped, scene retained; explicit surface recreation required"
-                    .into(),
-            ),
-            e => return Err(format!("surface stopped: {e:?}")),
-        };
+        if !self.acquire()? {
+            return Ok(false);
+        }
+        let texture = self.acquired.take().expect("acquired surface");
         let view = texture.texture.create_view(&Default::default());
         if scaled {
             let backing = self
