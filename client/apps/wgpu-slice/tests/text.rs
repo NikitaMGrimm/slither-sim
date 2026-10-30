@@ -179,6 +179,12 @@ fn native_colour_separates_coverage_and_invalidates_hud_slot_pixels() {
         .collect();
     assert_ne!(dark_alpha, light_alpha);
     assert!(
+        dark_alpha
+            .iter()
+            .zip(&light_alpha)
+            .all(|(dark, light)| dark <= light)
+    );
+    assert!(
         dark_alpha.iter().map(|a| u64::from(*a)).sum::<u64>()
             < light_alpha.iter().map(|a| u64::from(*a)).sum::<u64>()
     );
