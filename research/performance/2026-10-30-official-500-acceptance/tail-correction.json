@@ -1,0 +1,33 @@
+{
+  "label": "Post-result nearest-rank correction matching the frozen plan; gates and outcome unchanged",
+  "archiveSha256": "4002cf60512b63558e163e252db84f9f33782fb17efe415c35d70dda3a6323f9",
+  "largestAbsoluteChangeMs": 0.00039999999999995595,
+  "changes": [
+    {
+      "path": "all.worldCpuMsPerTick.p99",
+      "beforeMs": 7.331087,
+      "afterMs": 7.330697,
+      "absoluteChangeMs": 0.0003900000000003345
+    },
+    {
+      "path": "all.simulationCpuMsPerTick.p99",
+      "beforeMs": 4.498538,
+      "afterMs": 4.498138,
+      "absoluteChangeMs": 0.00039999999999995595
+    },
+    {
+      "path": "all.socketCpuMsPerTick.p50",
+      "beforeMs": 2.318689,
+      "afterMs": 2.318688,
+      "absoluteChangeMs": 1.000000000139778e-06
+    },
+    {
+      "path": "all.socketCpuMsPerTick.p99",
+      "beforeMs": 4.274728,
+      "afterMs": 4.274658,
+      "absoluteChangeMs": 7.00000000000145e-05
+    }
+  ],
+  "allNonTailFieldsIdentical": true,
+  "historicalLadderUnchanged": true
+}
