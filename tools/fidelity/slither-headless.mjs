@@ -1,4 +1,4 @@
-// Headless protocol-19 client for bounded calibration captures on a selected server.
+// Headless protocol-19 client for bounded calibration captures on an operator-supplied host.
 // Records every raw frame (including the server's elapsed-ms header, when present) plus outgoing controls, and plays
 // with a simple forager so the capture contains natural motion, eating, boosting and deaths.
 //
@@ -31,15 +31,17 @@ export function createCaptureBatch(options, botCount, source = COLLECTOR_SOURCE)
     throw new Error('use 1-3 bots');
   const { out, plan, ...acquisitionOptions } = options;
   let planSha256 = null;
-  let dataOrigin;
+  let dataOrigin = 'local-simulator';
   if (plan) {
     const planBytes = fs.readFileSync(plan);
     if (planBytes.length > 262144) throw new Error('capture plan exceeds 256 KiB');
-    dataOrigin = JSON.parse(planBytes.toString('utf8')).dataOrigin;
-    if (dataOrigin !== undefined && !['local-simulator', 'community-server', 'official-server'].includes(dataOrigin))
+    const declaredOrigin = JSON.parse(planBytes.toString('utf8')).dataOrigin;
+    if (declaredOrigin !== undefined) dataOrigin = declaredOrigin;
+    if (!['local-simulator', 'community-server', 'official-server'].includes(dataOrigin))
       throw new Error('capture plan has an unsupported dataOrigin');
     planSha256 = createHash('sha256').update(planBytes).digest('hex');
   }
+  if (options.server) validateDataOrigin(parseServer(options.server), dataOrigin);
   const captureBatchId = randomUUID();
   return { dataOrigin, provenance(botIndex) {
     if (!Number.isInteger(botIndex) || botIndex < 0 || botIndex >= botCount)
@@ -208,6 +210,7 @@ export function solveChallenge(raw) {
 
 export function loginPacket(nick, skin = 0) {
   const name = Buffer.from(nick.slice(0, 24), 'latin1');
+  // Keep the standard protocol-19 layout shared with src/client/network.rs::login_packet.
   return Uint8Array.from([115, 30, CLIENT_VERSION >> 8, CLIENT_VERSION & 255, ...CPW, skin, name.length, ...name, 0, 255]);
 }
 
@@ -518,6 +521,7 @@ export class Bot {
   }
   connect(server) {
     if (this.stopped) return;
+    validateServer(server);
     this.world = new World({ serverBody: this.opts.serverBody });
     this.phase = null;
     this.movementTier = 0;
@@ -1535,6 +1539,29 @@ export function validateOrigin(origin) {
   return origin;
 }
 
+export function validateServer({ ip, port }) {
+  // Require the operator's numeric endpoint; never resolve hostnames.
+  if (isIP(ip) !== 4 ||
+      !Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error('invalid server: --server requires numeric IPv4:port in 1..65535');
+  return { ip, port };
+}
+
+export function parseServer(server) {
+  const [ip, portText, extra] = (server ?? '').split(':');
+  if (extra !== undefined || !/^\d+$/.test(portText ?? ''))
+    throw new Error('invalid server: --server requires numeric IPv4:port in 1..65535');
+  return validateServer({ ip, port: Number(portText) });
+}
+
+export function validateDataOrigin({ ip }, dataOrigin) {
+  if (ip.startsWith('127.')) {
+    if (dataOrigin !== 'local-simulator') throw new Error('loopback requires local-simulator provenance');
+  } else if (!['community-server', 'official-server'].includes(dataOrigin)) {
+    throw new Error('non-loopback capture requires a community-server or official-server plan');
+  }
+}
+
 export function parseArgs(argv) {
   const o = { seconds: 300, bots: 1, scenario: 'forage', nick: '(Bot) Bottingson', server: null, origin: null, out: null, plan: null, speedMinSegments: SPEED_PROBE.minSegments, speedGrowthSegments: 0, speedHeadingBytes: '', movementMinSegments: MOVEMENT_TIERS[0].minSegments };
   for (let i = 0; i < argv.length; i += 2) {
@@ -1567,7 +1594,9 @@ export function parseArgs(argv) {
 /** Play `bots` clients on one server for `seconds`, writing `<prefix><i>.jsonl.gz`. */
 export async function record(opts, server, prefix, bots = opts.bots, signal, captureBatch) {
   if (signal?.aborted) return [];
-  const batch = captureBatch ?? createCaptureBatch(opts, bots);
+  validateServer(server);
+  const batch = captureBatch ?? createCaptureBatch({ ...opts, server: `${server.ip}:${server.port}` }, bots);
+  validateDataOrigin(server, batch.dataOrigin);
   const list = [];
   let recordingError = null;
   try {
@@ -1638,11 +1667,7 @@ export async function record(opts, server, prefix, bots = opts.bots, signal, cap
 async function main(signal) {
   const opts = parseArgs(process.argv.slice(2));
   if (!opts.server) throw new Error('--server ip:port is required');
-  const [ip, portText, extra] = opts.server.split(':');
-  const port = Number(portText);
-  if (isIP(ip) !== 4 || extra !== undefined || !/^\d+$/.test(portText) || !Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error('--server requires an IPv4 address and port in 1..65535');
-  const server = { ip, port };
+  const server = parseServer(opts.server);
   if (fs.existsSync(opts.out)) throw new Error(`refusing to overwrite ${opts.out}`);
   const batch = createCaptureBatch(opts, opts.bots);
   fs.mkdirSync(opts.out, { recursive: true });

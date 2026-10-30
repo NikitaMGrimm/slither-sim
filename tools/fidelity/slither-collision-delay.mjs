@@ -1,9 +1,8 @@
 // Experimental collector only. Neither the simulator nor host rewinds state.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isIP } from 'node:net';
 import { World, Recorder, splitFrame, splitPayload, captureSourceIdentity,
-  createCaptureBatch, finalizeCaptureBatch } from './slither-headless.mjs';
+  createCaptureBatch, finalizeCaptureBatch, parseServer } from './slither-headless.mjs';
 import { CollisionBot, segmentDistance, stageSteering } from './slither-paired-collision.mjs';
 
 const SOURCE = captureSourceIdentity(import.meta.url);
@@ -178,21 +177,17 @@ export class TailTrial {
 }
 
 export async function recordTail({ out, server, plan, specs, delayMs = 150, seconds = 600,
-  official = false, connectGapMs = 8000 }) {
-  const [ip, portText] = server.split(':'), port = Number(portText);
-  if (isIP(ip) !== 4 || !Number.isInteger(port) || port < 1 || port > 65535) throw Error('numeric IPv4:port required');
-  const local = ip.startsWith('127.');
-  const frozen = JSON.parse(fs.readFileSync(plan));
-  if (!local && (!official || frozen.dataOrigin !== 'official-server' || !frozen.offlineGate?.passed)) throw Error('outside gate');
+  connectGapMs = 8000 }) {
+  const { ip, port } = parseServer(server);
+  const batch = createCaptureBatch({ scenario: 'collision-delay', server, plan, seconds, delayMs }, 2, SOURCE);
   if (fs.existsSync(out)) throw Error('output exists');
   fs.mkdirSync(out, { recursive: true });
-  const batch = createCaptureBatch({ scenario: 'collision-delay', server, plan, seconds, delayMs }, 2, SOURCE);
   const recorders = [0, 1].map(i => new Recorder(path.join(out, `bot${i}.jsonl.gz`), {
     schema: 1, scenario: 'collision-delay', server: { ip, port }, botIndex: i, t: performance.now(), wall: Date.now(),
-    dataOrigin: local ? 'local-simulator' : 'official-server', captureProvenance: batch.provenance(i) }));
+    dataOrigin: batch.dataOrigin, captureProvenance: batch.provenance(i) }));
   const emit = row => recorders.forEach(r => r.meta(row));
   const bots = recorders.map((rec, i) => new DelayBot({ nick: `Delay study ${i}`, serverBody: true,
-    origin: official ? 'http://slither.io' : undefined, delayMs: 0 }, i, rec));
+    delayMs: 0 }, i, rec));
   const results = [], started = performance.now();
   let lastConnect = -Infinity, failure, trial;
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -214,12 +209,6 @@ export async function recordTail({ out, server, plan, specs, delayMs = 150, seco
         const now = performance.now(), gap = now - lastTick; lastTick = now;
         bots.forEach(b => b.flush(now));
         const poses = bots.map(b => pose(b, now)), wire = bots.map(b => pose(b, now, true));
-        if (official && bots.some(b => b.population > 7)) throw Error('near-zero population gate failed');
-        if (official && bots.some(b => b.population === null)) {
-          if (now - trial.started > 12000) throw Error('leaderboard_timeout');
-          bots.forEach((b, i) => b.drive(stageSteering(b, trial.control(i, poses, bots), now), now));
-          await wait(10); continue;
-        }
         result = trial.update(now, poses, wire, bots, gap);
         if (result) break;
         bots.forEach((b, i) => b.drive(trial.phase === 'run' ? trial.control(i, poses, bots) :

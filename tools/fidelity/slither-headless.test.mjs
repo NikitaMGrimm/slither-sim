@@ -9,10 +9,14 @@ import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { solveChallenge, splitFrame, loginPacket, World, Bot, Recorder, PREY_PROBE, BOUNDARY_PROBE, VISIBILITY_PROBE, SPEED_PROBE, visibilityEndpoints, DEATH_OBSERVATION_MS, chooseHeading, parseArgs, record, captureSourceIdentity, createCaptureBatch, finalizeCaptureBatch } from './slither-headless.mjs';
+import { solveChallenge, splitFrame, loginPacket, World, Bot, Recorder, PREY_PROBE, BOUNDARY_PROBE, VISIBILITY_PROBE, SPEED_PROBE, visibilityEndpoints, DEATH_OBSERVATION_MS, chooseHeading, parseArgs, record, captureSourceIdentity, createCaptureBatch, finalizeCaptureBatch, parseServer } from './slither-headless.mjs';
 import { recordPair as recordDeath, parseArgs as parseDeath } from './slither-paired-death.mjs';
 import { recordPair as recordPrey, parseArgs as parsePrey } from './slither-paired-prey.mjs';
 import { recordFeedingShape, parseArgs as parseFeeding } from './slither-feeding-shape.mjs';
+import { recordPair as recordSnake } from './slither-paired-snake.mjs';
+import { recordPair as recordCollision } from './slither-paired-collision.mjs';
+import { recordFoodLanes } from './slither-food-lanes.mjs';
+import { recordTail } from './slither-collision-delay.mjs';
 
 test('CLI requires an explicit valid endpoint before creating output or using the network', t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-endpoint-'));
@@ -33,6 +37,51 @@ test('CLI requires an explicit valid endpoint before creating output or using th
     assert.doesNotMatch(result.stderr, /unexpected fetch|unexpected socket/);
     assert.equal(fs.existsSync(out), false);
   }
+});
+
+test('collectors reject hostnames and malformed endpoints before output or sockets', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-loopback-'));
+  const original = globalThis.WebSocket;
+  let sockets = 0;
+  globalThis.WebSocket = class { constructor() { sockets++; throw Error('unexpected socket'); } };
+  t.after(() => {
+    globalThis.WebSocket = original;
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  const out = path.join(directory, 'unused');
+  const runners = [recordDeath, recordPrey, recordFeedingShape, recordSnake, recordCollision, recordTail];
+  for (const server of ['localhost:444', '127.0.0.1.example.com:444', '127.1:444', '127.0.0.1:444:extra']) {
+    for (const run of runners)
+      await assert.rejects(run({ out, server, seconds: 1, mode: 'crossing', direction: 'x' }), /numeric IPv4/);
+    const [ip] = server.split(':');
+    const endpoint = { ip, port: 444 };
+    if (server !== '127.0.0.1:444:extra') {
+      const bot = new Bot({}, 0, { meta() {}, frame() {} });
+      assert.throws(() => bot.connect(endpoint), /numeric IPv4/);
+      await assert.rejects(record({ out, bots: 1 }, endpoint, 'bot'), /numeric IPv4/);
+      await assert.rejects(recordFoodLanes({ out }, endpoint), /numeric IPv4/);
+    }
+    assert.equal(fs.existsSync(out), false);
+  }
+  assert.equal(sockets, 0);
+});
+
+test('operator endpoints require honest plan provenance without an outside flag', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'slither-provenance-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  for (const ip of ['127.0.0.1', '127.0.0.2', '192.0.2.1', '10.0.0.1', '0.0.0.0']) {
+    const server = `${ip}:444`;
+    assert.deepEqual(parseServer(server), { ip, port: 444 });
+    for (const dataOrigin of ['local-simulator', 'community-server', 'official-server']) {
+      const plan = path.join(directory, 'plan.json');
+      fs.writeFileSync(plan, JSON.stringify({ dataOrigin }));
+      if (ip.startsWith('127.') === (dataOrigin === 'local-simulator'))
+        assert.equal(createCaptureBatch({ server, plan }, 1).dataOrigin, dataOrigin);
+      else assert.throws(() => createCaptureBatch({ server, plan }, 1), /provenance|plan/);
+    }
+  }
+  assert.equal(createCaptureBatch({ server: '127.0.0.1:444' }, 1).dataOrigin, 'local-simulator');
+  assert.throws(() => createCaptureBatch({ server: '192.0.2.1:444' }, 1), /plan/);
 });
 
 test('collector CLIs accept an explicit HTTP origin and reject discovery options', () => {
@@ -150,7 +199,7 @@ test('a malformed received frame interrupts acquisition while preserving raw evi
   const file=path.join(directory,'bot.jsonl.gz');
   const rec=new Recorder(file,{schema:1});
   const bot=new Bot({scenario:'forage'},0,rec);
-  bot.connect({ip:'1.1.1.1',port:444});
+  bot.connect({ip:'127.0.0.1',port:444});
   assert.doesNotThrow(()=>bot.ws.onmessage({data:Uint8Array.from([0,7,0,3,101]).buffer}));
   const error=await rec.failure;
   assert.match(error.message,/invalid packet length/);
@@ -682,11 +731,11 @@ test('foraging follows nearby food off the current heading while retaining avoid
   assert.notEqual(safe.a, Math.PI / 2, 'nearby food must not override body avoidance');
 });
 
-test('login packet uses the stock layout and truncates nicknames', () => {
-  const p = loginPacket('x'.repeat(30));
-  assert.deepEqual(Array.from(p.subarray(0, 4)), [115, 30, 1, 35]);
-  assert.equal(p[25], 24);
-  assert.deepEqual(Array.from(p.subarray(-2)), [0, 255]);
+test('login packet uses the standard protocol-19 layout and truncates nicknames', () => {
+  const p = loginPacket('x'.repeat(30), 7);
+  assert.deepEqual(Array.from(p), [115, 30, 1, 35,
+    54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106, 236, 8, 208, 136, 213, 140, 111,
+    7, 24, ...Buffer.from('x'.repeat(24)), 0, 255]);
 });
 
 test('self rotation packets update heading, wanted heading and speed', () => {
@@ -1308,7 +1357,7 @@ test('capture cancellation closes gzip without a false complete receipt', async 
   try {
     const controller = new AbortController();
     const capture = record({ out: directory, bots: 1, seconds: 60, scenario: 'forage', nick: 'Offline test' },
-      { ip: '127.0.0.1', port: 0 }, 'bot', 1, controller.signal);
+      { ip: '127.0.0.1', port: 444 }, 'bot', 1, controller.signal);
     controller.abort('SIGINT');
     const result = await capture;
     assert.equal(connections, 1);
@@ -1334,7 +1383,7 @@ test('normal capture completion keeps the legacy terminal receipt', async () => 
   try {
     const controller = new AbortController();
     await record({ out: directory, bots: 1, seconds: 0.01, scenario: 'forage', nick: 'Offline test' },
-      { ip: '127.0.0.1', port: 0 }, 'bot', 1, controller.signal);
+      { ip: '127.0.0.1', port: 444 }, 'bot', 1, controller.signal);
     assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
     const rows = zlib.gunzipSync(fs.readFileSync(path.join(directory, 'bot0.jsonl.gz')))
       .toString('utf8').trim().split('\n').map(line => JSON.parse(line));
@@ -1503,7 +1552,7 @@ test('simultaneous clients share a batch, retain unique capture IDs and pin the 
     const plan = path.join(directory, 'plan.json');
     fs.writeFileSync(plan, '{"features":["frozen-before-acquisition"]}\n');
     await record({ out: directory, plan, bots: 2, seconds: 0.01, scenario: 'forage' },
-      { ip: '127.0.0.1', port: 0 }, 'bot');
+      { ip: '127.0.0.1', port: 444 }, 'bot');
     const headers = [0, 1].map(index => JSON.parse(zlib.gunzipSync(
       fs.readFileSync(path.join(directory, `bot${index}.jsonl.gz`))).toString('utf8').split('\n')[0]));
     assert.equal(headers[0].captureProvenance.captureBatchId, headers[1].captureProvenance.captureBatchId);
@@ -1529,7 +1578,7 @@ test('already cancelled capture creates no clients or archive', async () => {
     const controller = new AbortController();
     controller.abort('SIGTERM');
     const result = await record({ out: directory, bots: 1, seconds: 60, scenario: 'forage' },
-      { ip: '127.0.0.1', port: 0 }, 'bot', 1, controller.signal);
+      { ip: '127.0.0.1', port: 444 }, 'bot', 1, controller.signal);
     assert.deepEqual(result, []);
     assert.equal(connections, 0);
     assert.deepEqual(fs.readdirSync(directory), []);
@@ -1577,7 +1626,7 @@ test('reentrant cancellation cannot start additional requested clients', async (
   Bot.prototype.connect = function () { connections++; controller.abort('SIGINT'); };
   try {
     const result = await record({ out: directory, bots: 3, seconds: 60, scenario: 'forage' },
-      { ip: '127.0.0.1', port: 0 }, 'bot', 3, controller.signal);
+      { ip: '127.0.0.1', port: 444 }, 'bot', 3, controller.signal);
     assert.equal(connections, 1);
     assert.equal(result.length, 1);
     assert.deepEqual(fs.readdirSync(directory), ['bot0.jsonl.gz']);
