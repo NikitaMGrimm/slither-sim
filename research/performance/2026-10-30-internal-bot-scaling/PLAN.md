@@ -37,7 +37,11 @@ is a censored warmup, not a stabilized row; report it and retain its census.
 Never select a more favorable warm snapshot based on timing.
 
 Freeze a complete checkpoint plus harness RNG, tick, retry clocks and held
-actions. On each population, discard one serial/parallel pair, then run five
+actions. Before each decision-mode window, prime all six observation buffers
+and policy scratch on the unchanged checkpoint, discarding the decisions;
+no physics, held-action or RNG state changes. Record memory before and after.
+This prevents repeated checkpoint loads from charging cold buffer allocations
+to every short timing window. On each population, discard one serial/parallel pair, then run five
 alternating pairs of 512 ticks from that state. Save all pairs and final-state
 digests. Separate 512-tick verification runs retain full action digests, keeping
 action hashing outside throughput measurements. Record world CPU/wall, admission/lifecycle CPU/wall,

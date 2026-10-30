@@ -124,6 +124,44 @@ struct Sample {
     replay_wall: f64,
 }
 impl Scene {
+    fn prime(&mut self) {
+        self.world.set_parallel(self.pool.is_some());
+        for phase in 0..6 {
+            if let Some(pool) = &self.pool {
+                pool.install(|| {
+                    self.world
+                        .observe_selected_into(&self.masks[phase], &mut self.observations[phase])
+                })
+                .unwrap();
+                let chunk = self.meta.actions.len().div_ceil(3);
+                pool.install(|| {
+                    self.policies
+                        .par_iter_mut()
+                        .zip(self.observations[phase].par_chunks(chunk))
+                        .for_each(|(policy, observations)| {
+                            for observation in observations.iter().flatten() {
+                                std::hint::black_box(policy.decide(
+                                    observation,
+                                    &Timing::default(),
+                                    &[],
+                                ));
+                            }
+                        })
+                });
+            } else {
+                self.world
+                    .observe_selected_into(&self.masks[phase], &mut self.observations[phase])
+                    .unwrap();
+                for observation in self.observations[phase].iter().flatten() {
+                    std::hint::black_box(self.policies[0].decide(
+                        observation,
+                        &Timing::default(),
+                        &[],
+                    ));
+                }
+            }
+        }
+    }
     fn prepare(world: Simulator, meta: Meta, parallel: bool) -> Self {
         let n = world.snakes().len();
         Self {
@@ -423,6 +461,10 @@ fn main() {
         if let Some(tape) = &tape {
             assert_eq!(tape.len(), stride * ticks);
         }
+        let world_memory = memory();
+        if args[3] != "simulation" {
+            scene.prime();
+        }
         let initial = census(&scene.world);
         let start = Instant::now();
         let c = cpu(2);
@@ -450,7 +492,7 @@ fn main() {
             output,
             serde_json::to_vec(
                 &json!({"mode":args[3],"profiled":profiled,"verify":verify,"ticks":ticks,
-            "initial":initial,"final":final_census,"samples":rows,"wallSeconds":wall,
+            "initial":initial,"worldOnlyMemoryKiB":world_memory,"final":final_census,"samples":rows,"wallSeconds":wall,
             "processCpuSeconds":process,"mainCpuSeconds":main_cpu,"actionSha256":action_hash,
             "finalStateSha256":hex(Sha256::digest(&final_bytes))}),
             )
