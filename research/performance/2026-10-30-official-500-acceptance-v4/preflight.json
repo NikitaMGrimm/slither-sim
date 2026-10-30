@@ -1,0 +1,24 @@
+{
+  "execution": "First on-demand generator, before any world",
+  "frozenPlanAndDeltaCommit": "89d74121a9eecdd7b73d10b16efeb710de7a892f",
+  "runtimeCommit": "388be59aebf3108f5c510aa7269c08b67851b202",
+  "sameVerifiedV3Binaries": {
+    "clients": "f8424b4bd4e997c06d9d648a356f9d2ea07f3a651953474d4ae68f25ba3387fe",
+    "host": "d7ddbc80efcd0c0b5fb8e1d61d3931eb3aaf3c64b40171fb8687b533a184c780"
+  },
+  "sourceBytesMatchCommittedDelta": true,
+  "syntaxAndModuleChecksPassed": true,
+  "protectedUnitsExcluded": true,
+  "quietStateFailuresRejected": true,
+  "liveAllProcessAndFullProcStatPassed": true,
+  "inheritedSummedHeadroomAndGateControlsPassed": true,
+  "nearestRankControlsPassed": true,
+  "documentationTestsPassed": 7,
+  "newRustBuildsOrTests": "Not run; unchanged previously verified v3 binaries reused",
+  "proofArchive": {
+    "sha256": "a740957a123ac6a71c6e9baa4ecf76cd0122f6ea792591c7cd0644d8acdb4f4e",
+    "bytes": 2050,
+    "access": "Local-only retained checks, test script, frozen bindings and pins outside repositories"
+  },
+  "independentReview": "Not performed"
+}

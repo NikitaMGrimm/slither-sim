@@ -16,3 +16,8 @@ fail-closed quiet-state checks, live all-process/stat samples, summed headroom,
 class/gate and nearest-rank controls passed. The documentation check found one
 link to v3's report, not yet on main. Before tick zero it was changed to the
 pinned v3 commit URL and rechecked; no method, script, workload or gate changed.
+
+Final plan/source freeze is `89d74121a9eecdd7b73d10b16efeb710de7a892f`.
+The [preflight receipt](preflight.json) binds it to the unchanged v3 binaries
+and local-only proof archive. All seven AWS documentation checks pass after
+the link correction. No new Rust build/test or Cargo target is used.
