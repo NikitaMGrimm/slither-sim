@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import statistics
 import sys
-from reduce import phase_summary, stats, verify_fixture
+from reduce import phase_summary, stats, verify_fixture, warm_food_bins
 from run import digest
 
 
@@ -31,6 +31,7 @@ def summarize(root):
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         out={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config,
+             'warmFoodBins':warm_food_bins(directory,qualification),
              'densityRelativeToOfficial':n*670.0**2/config['radius']**2,
              'status':'stabilized' if qualification['stabilized'] else 'warmup censored'}
         rows=[json.loads((directory/f'window-{i}.json').read_text()) for i in range(5)]

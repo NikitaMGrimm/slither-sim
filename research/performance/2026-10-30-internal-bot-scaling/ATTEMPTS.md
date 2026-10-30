@@ -65,3 +65,10 @@
   serial/parallel action tapes, census and every counted final state. A small
   Windows table preview without UTF-8 mode displayed replacement characters;
   source/result files were intact. Use `python -X utf8` for that preview/check.
+- Stop-handshake deviation, identified from the retained receipts: the qualified
+  A4 warmups first passed at 86k/86k/90k ticks but saved at 87k/87k/91k.
+  The parent requests stop after reading the census; the native loop checks
+  asynchronously at 1,000-tick boundaries. Each saved state is seven virtual
+  seconds later than the first qualifying census. These states are retained
+  as run, without performance-based reselection. The original plan's literal
+  first-qualifying-checkpoint wording was not met; both ticks remain public.

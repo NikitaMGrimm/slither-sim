@@ -65,6 +65,12 @@ and the qualification receipt. The world checkpoint includes the full world;
 Policies have reusable scratch, with no learned/per-bot memory. Staggering uses
 six sparse buffers so unselected slots do not discard another phase's storage.
 
+The parent/native stop handshake is asynchronous. In the qualified A4 rows,
+the saved checkpoint is one 1,000-tick census interval after the first passing
+census. Receipts keep the passing tick, while census/checkpoint time gives the
+actual saved tick. Preserve this as-run deviation; do not relabel the saved
+state as the exact first qualifying checkpoint promised by the initial plan.
+
 The original collection lost its controller during early 10k warmup, before a
 checkpoint existed. Its partial log remains in `results/10000-interrupted`.
 `restart_primary.py` invokes the unchanged frozen runner on a fresh 10k output

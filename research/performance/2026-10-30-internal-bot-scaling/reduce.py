@@ -41,6 +41,19 @@ def stats(values):
                for name,q in [('min',0),('p50',.5),('p95',.95),('p99',.99),('max',1)]}}
 
 
+def warm_food_bins(directory,qualification):
+    records=[json.loads(line) for line in (Path(directory)/'warm.jsonl').read_text().splitlines()]
+    records=[row for row in records if row.get('kind')=='warm']
+    bins={}
+    latest=math.floor(records[-1]['tick']*.007/30)
+    for row in records:
+        key=math.floor(row['tick']*.007/30)
+        if key<latest:bins.setdefault(key,[]).append(row['census']['world']['food'])
+    keys=qualification['acceptance']['binNumbers'] if qualification['acceptance'] else sorted(bins)[-4:]
+    return [{'binNumber':key,'meanFood':statistics.mean(bins[key]),'minFood':min(bins[key]),
+             'maxFood':max(bins[key])} for key in keys]
+
+
 def mode_summary(rows):
     samples=[s for row in rows for s in row['samples']]
     decisions=sum(s['decisions'] for s in samples)
