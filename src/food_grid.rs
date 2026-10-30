@@ -487,7 +487,13 @@ const CELL: f64 = 128.0;
 /// Below 2^20 rounding in the cover bounds stays under 1e-9, so the cover
 /// contains every pellet the exact pickup test can accept; see `EaterGrid::build`.
 const REGULAR: f64 = (1u64 << 20) as f64;
-const MAX_CELLS: usize = 1 << 20;
+/// Eaters span the whole arena, so this caps the arena that pickup can index
+/// densely: 2^22 cells of 128 reach a radius of about 131,000, official density
+/// for about 38,000 snakes. At 2^20 the grid declined above about 9,700 snakes,
+/// and the hashed fallback took pickup from 47M to 4.3B instructions per tick
+/// (research/performance/2026-10-27-population-scaling/REPORT.md). The heads
+/// array grows only as large as a built grid needs, at most 16 MB.
+const MAX_CELLS: usize = 1 << 22;
 const NONE: u32 = u32::MAX;
 
 /// Dense grid of pickup circles, with each cell listing eaters in ascending order.
@@ -1404,6 +1410,17 @@ mod tests {
             [(c, 36.0), (Point { x: 9e3, y: 9e3 }, 36.0)].into_iter(),
             4096
         ));
+        assert!(grid.build([(c, 36.0)].into_iter(), MAX_CELLS));
+        // An official-density 10k arena (radius 67,000) spans about 1.1M cells.
+        let rim = 67_000.0;
+        let corners = [
+            (Point { x: -rim, y: -rim }, 36.0),
+            (Point { x: rim, y: rim }, 36.0),
+        ];
+        assert!(grid.build(corners.into_iter(), MAX_CELLS));
+        let listed = |p| grid.candidates(p).map(|c| c.collect::<Vec<_>>());
+        assert_eq!(listed(corners[0].0), Some(vec![0]));
+        assert_eq!(listed(corners[1].0), Some(vec![1]));
         assert!(grid.build([(c, 36.0)].into_iter(), MAX_CELLS));
         assert!(
             grid.candidates(Point {
