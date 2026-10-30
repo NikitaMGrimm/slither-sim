@@ -24,7 +24,7 @@ export class HandshakeSession {
   #solve;
   constructor(wasm, profile, nickname, { solve = encoded => wasm.solve_challenge(encoded) } = {}) {
     this.#wasm = wasm; this.#profile = profile; this.#solve = solve;
-    this.#login = wasm.encode_login(profile.clientVersion, profile.password, nickname, 0, new Uint8Array());
+    this.#login = wasm.encode_login(profile.clientVersion, profile.pageEcho, nickname, 0, new Uint8Array());
   }
   get state() { return this.#state; }
   start() { return [Uint8Array.of(1), Uint8Array.of(99, 0)]; }

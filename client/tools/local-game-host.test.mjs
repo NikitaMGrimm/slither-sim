@@ -234,7 +234,7 @@ test('local host supplies authored sources/profile and one claim without startin
   const f = fixture(), host = await create(f);
   assert.deepEqual(Object.keys(host).sort(), ['gate', 'sources', 'profile', 'endpoint', 'isCurrentDocument', 'presetEndpoint', 'bindSkinPolicy', 'dispose'].sort());
   assert.equal(host.endpoint, endpoint);
-  assert.deepEqual(host.profile, { clientVersion: 0, password: new Uint8Array(20), protocolVersion: 19 });
+  assert.deepEqual(host.profile, { clientVersion: 0, pageEcho: new Uint8Array(20), protocolVersion: 19 });
   assert.equal(host.sources.palettes.length, 3);
   assert(host.sources.palettes.every(value => value instanceof f.realm.HTMLCanvasElement));
   assert(host.sources.background instanceof f.realm.HTMLImageElement);

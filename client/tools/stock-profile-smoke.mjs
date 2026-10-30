@@ -17,7 +17,7 @@ const SOURCE_BYTES = 224092;
 const PUBLIC_DIGEST_METADATA = '5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095';
 const PROFILE_URL = 'https://slither.io/s/game1107249518.js';
 const endpoint = 'ws://192.0.2.29:1234/slither';
-const password = () => Uint8Array.from({ length: 20 }, (_, i) => i + 3);
+const pageEcho = () => Uint8Array.from({ length: 20 }, (_, i) => i + 3);
 const request = () => ({ endpoint, nickname: 'Authored profile smoke', skin: 0,
   customSkin: Uint8Array.of(3, 8, 1, 42) });
 const allZero = value => value.every(byte => byte === 0);
@@ -31,7 +31,7 @@ function sourceFixture() {
   // size/offset metadata is shared with the immutable production acquisition pin.
   const source = new Uint8Array(SOURCE_BYTES).fill(32);
   source.set(new TextEncoder().encode('var v=29;'), 181647);
-  source.set(new TextEncoder().encode(`var p=[${[...password()].join(',')}];`), 181670);
+  source.set(new TextEncoder().encode(`var p=[${[...pageEcho()].join(',')}];`), 181670);
   return source;
 }
 function challengeFixture() {
@@ -132,7 +132,7 @@ export async function stockProfileSmoke(wasm) {
     const body = freeze({ authoredBody: true }), signal = freeze({ authoredSignal: true });
     let now = 0, serial = 0, held = false, captures = 0, releases = 0, frameCalls = 0;
     let qualityBegins = 0, fetchCalls = 0, readCalls = 0, digestCalls = 0, readerReleases = 0;
-    let current = true, stageProbes = 0, passwordClears = 0, aborts = 0;
+    let current = true, stageProbes = 0, pageEchoClears = 0, aborts = 0;
     let invalidControl = false, staleAfterController = false, cleanupFailed = false, freed = false, probeFailure;
     function drain() {
       let count = 0;
@@ -149,7 +149,7 @@ export async function stockProfileSmoke(wasm) {
         eq(sockets.length, 0);
         // After await, gameplay may initialize quality while its final freshness
         // checks still hold the frame lock. Before acquisition cleanup it may not.
-        const cleaned = passwordClears > 0 && readerReleases > 0
+        const cleaned = pageEchoClears > 0 && readerReleases > 0
           && allocations.filter(value => value.length === 20).every(allZero);
         if (cleaned) ok(qualityBegins <= 1); else eq(qualityBegins, 0);
         ok(allocations.filter(value => value.length === SOURCE_BYTES).every(allZero), 'Source wiped before staging');
@@ -203,10 +203,10 @@ export async function stockProfileSmoke(wasm) {
         copy: (target, source, offset) => target.set(source, offset),
         clear(value) {
           if (value.length === 20) {
-            passwordClears++; stagedProbe();
+            pageEchoClears++; stagedProbe();
             if (options.cleanupFailure && !cleanupFailed) {
               // Report a cleanup fault after wiping so this deliberate fault
-              // fixture itself retains no borrowed password bytes.
+              // fixture itself retains no borrowed pageEcho bytes.
               value.fill(0); cleanupFailed = true; throw new Error('Authored one-shot wipe failure');
             }
           }
@@ -224,7 +224,7 @@ export async function stockProfileSmoke(wasm) {
       get gameplay() { return gameplay; }, get client() { return client; },
       get quality() { return quality; },
       get counts() { return { frameCalls, qualityBegins, fetchCalls, readCalls, digestCalls,
-        readerReleases, captures, releases, stageProbes, passwordClears, aborts }; },
+        readerReleases, captures, releases, stageProbes, pageEchoClears, aborts }; },
       get current() { return current; },
       setCurrent(value) { current = value; },
       drain,
@@ -355,7 +355,7 @@ export async function stockProfileSmoke(wasm) {
     eq(socket.sent, [Uint8Array.of(1), Uint8Array.of(99, 0)]);
     socket.receive(Uint8Array.from([54, ...challenge])); h.drain();
     eq(socket.sent[2], Uint8Array.from({ length: 27 }, (_, i) => 65 + (3 + i * 4) % 26));
-    const expected = Uint8Array.from([115, 30, 0, 29, ...password(), loginRequest.skin,
+    const expected = Uint8Array.from([115, 30, 0, 29, ...pageEcho(), loginRequest.skin,
       loginRequest.nickname.length, ...Buffer.from(loginRequest.nickname, 'ascii'), 0, 255, ...loginRequest.customSkin]);
     eq(socket.sent[3], expected, 'Actual Rust login uses authored staged profile and copied request');
     socket.receive(bundle(setup, appearance)); h.drain();
@@ -391,7 +391,7 @@ export async function stockProfileSmoke(wasm) {
       eq(h.gameplay.diagnostics().input.leftHeld, false); eq(h.gameplay.diagnostics().input.boostKeyHeld, false);
       eq(h.gameplay.diagnostics().input.pointer, { x: 0, y: -170 });
       await rejects(h.begin(), /attempt|acquir|already/i);
-      throws(() => h.gameplay.play({ ...request(), profile: { clientVersion: 29, password: password(), protocolVersion: 19 } }), /acquir/i);
+      throws(() => h.gameplay.play({ ...request(), profile: { clientVersion: 29, pageEcho: pageEcho(), protocolVersion: 19 } }), /acquir/i);
       h.releaseFetch(); await h.waitForDigest(pending);
       eq(h.frame(5), undefined); eq(h.counts.frameCalls, frames); eq(h.sockets.length, 0);
       h.releaseDigest(); eq(await pending, undefined); h.drain();
@@ -454,7 +454,7 @@ export async function stockProfileSmoke(wasm) {
     {
       const h = harness({ unavailable: true });
       await rejects(h.begin(), /unavailable/i); eq(h.counts.fetchCalls, 0); eq(h.allocations.length, 0);
-      h.gameplay.play({ ...request(), profile: { clientVersion: 29, password: password(), protocolVersion: 19 } });
+      h.gameplay.play({ ...request(), profile: { clientVersion: 29, pageEcho: pageEcho(), protocolVersion: 19 } });
       handshake(h); h.dispose();
       cases.push('absent-optional-acquirer-preserves-explicit-external-profile-route');
     }

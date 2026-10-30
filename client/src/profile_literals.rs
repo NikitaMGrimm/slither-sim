@@ -2,8 +2,8 @@
 
 /// Maximum admitted version-declaration span, in bytes.
 pub const VERSION_LIMIT: usize = 128;
-/// Maximum admitted password-declaration span, in bytes.
-pub const PASSWORD_LIMIT: usize = 256;
+/// Maximum admitted page echo declaration span, in bytes.
+pub const PAGE_ECHO_LIMIT: usize = 256;
 /// The supported profile protocol, unchanged from the existing literal policy.
 pub const PROTOCOL_VERSION: u8 = 19;
 
@@ -125,9 +125,9 @@ pub fn client_version(source: &[u8]) -> Result<u16, InvalidLiteral> {
 }
 
 /// Parse exactly twenty decimal bytes, clearing caller-owned output on rejection.
-pub fn password(source: &[u8], output: &mut [u8; 20]) -> Result<(), InvalidLiteral> {
+pub fn page_echo(source: &[u8], output: &mut [u8; 20]) -> Result<(), InvalidLiteral> {
     let result = (|| {
-        if source.is_empty() || source.len() > PASSWORD_LIMIT {
+        if source.is_empty() || source.len() > PAGE_ECHO_LIMIT {
             return Err(InvalidLiteral);
         }
         let mut cursor = Cursor::new(source);
@@ -160,7 +160,7 @@ fn clear(bytes: &mut [u8]) {
 /// Bounded scratch ownership for the scalar copied Wasm seam, with no host callbacks.
 /// Callers must explicitly clear before freeing; Drop also clears retained storage.
 pub struct LiteralStorage {
-    input: [u8; VERSION_LIMIT + PASSWORD_LIMIT],
+    input: [u8; VERSION_LIMIT + PAGE_ECHO_LIMIT],
     output: [u8; 20],
     ready: bool,
 }
@@ -168,7 +168,7 @@ pub struct LiteralStorage {
 impl Default for LiteralStorage {
     fn default() -> Self {
         Self {
-            input: [0; VERSION_LIMIT + PASSWORD_LIMIT],
+            input: [0; VERSION_LIMIT + PAGE_ECHO_LIMIT],
             output: [0; 20],
             ready: false,
         }
@@ -201,11 +201,11 @@ impl LiteralStorage {
         result
     }
 
-    /// Parse password after version admission and clear its entire input region.
-    pub fn parse_password(&mut self, length: u32) -> bool {
+    /// Parse page echo after version admission and clear its entire input region.
+    pub fn parse_page_echo(&mut self, length: u32) -> bool {
         clear(&mut self.output);
-        self.ready = length <= PASSWORD_LIMIT as u32
-            && password(
+        self.ready = length <= PAGE_ECHO_LIMIT as u32
+            && page_echo(
                 &self.input[VERSION_LIMIT..VERSION_LIMIT + length as usize],
                 &mut self.output,
             )
@@ -214,8 +214,8 @@ impl LiteralStorage {
         self.ready
     }
 
-    /// Copy one output byte only after complete password syntax admission.
-    pub fn password_byte(&self, index: u32) -> i32 {
+    /// Copy one output byte only after complete page echo syntax admission.
+    pub fn page_echo_byte(&self, index: u32) -> i32 {
         if !self.ready {
             return -1;
         }
@@ -257,7 +257,7 @@ mod tests {
         storage.input.fill(33);
         assert_eq!(storage.parse_version(0), -1);
         assert!(storage.input[..VERSION_LIMIT].iter().all(|b| *b == 0));
-        assert!(!storage.parse_password(0));
+        assert!(!storage.parse_page_echo(0));
         assert!(storage.input.iter().all(|b| *b == 0));
         assert_eq!(storage.output, [0; 20]);
     }

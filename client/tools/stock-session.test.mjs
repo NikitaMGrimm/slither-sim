@@ -26,14 +26,14 @@ const setup = [97, ...new Array(22).fill(0), 19, 42];
 const own = { token: 1n, wantedHeading: 0, gazeHeading: 0, dead: false,
   turnRate: 0.03, sizeTurnFactor: 1, speedTurnFactor: 1 };
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 7, password: Uint8Array.from({ length: 20 }, (_, i) => i + 1), protocolVersion: 19 },
+  profile: { clientVersion: 7, pageEcho: Uint8Array.from({ length: 20 }, (_, i) => i + 1), protocolVersion: 19 },
   nickname: 'Synthetic', skin: 2, customSkin: new Uint8Array() });
 function harness({ rejectPacket = false, createError, subscriber = {}, wasmChanges = {} } = {}) {
   let clock = 1000;
   const packets = [], states = [], errors = [], sockets = [], trace = [];
   const wasm = {
-    encode_login(version, password, nickname, skin, custom) {
-      return Uint8Array.from([115, 30, version >> 8, version & 255, ...password, skin,
+    encode_login(version, pageEcho, nickname, skin, custom) {
+      return Uint8Array.from([115, 30, version >> 8, version & 255, ...pageEcho, skin,
         nickname.length, ...new TextEncoder().encode(nickname), 0, 255, ...custom]);
     },
     solve_challenge(encoded) {
@@ -119,7 +119,7 @@ test('only selected IP/explicit port/exact route is accepted without DNS or fall
 });
 
 test('profile and login validate before mutation, reject getters/truncation, copy caller bytes', () => {
-  for (const modify of [r => { r.profile.clientVersion = 65536; }, r => { r.profile.password = new Uint8Array(19); },
+  for (const modify of [r => { r.profile.clientVersion = 65536; }, r => { r.profile.pageEcho = new Uint8Array(19); },
     r => { r.profile.protocolVersion = 18; }, r => { r.nickname = '\u0080'; }, r => { r.skin = 256; },
     r => { r.customSkin = new Uint8Array(256); }]) {
     const h = harness(), r = request(); modify(r); assert.throws(() => h.session.play(r));
@@ -128,10 +128,10 @@ test('profile and login validate before mutation, reject getters/truncation, cop
   const h = harness(), r = request();
   Object.defineProperty(r.profile, 'clientVersion', { get() { assert.fail('getter executed'); } });
   assert.throws(() => h.session.play(r), /record field/);
-  const safe = request(); h.session.play(safe); safe.profile.password.fill(200);
+  const safe = request(); h.session.play(safe); safe.profile.pageEcho.fill(200);
   h.step(); h.session.commitControl(); h.sockets[0].open(); h.sockets[0].message(challenge);
   assert.deepEqual(h.sockets[0].sent[3].slice(4, 24), Array.from({ length: 20 }, (_, i) => i + 1));
-  assert.equal(JSON.stringify(h.session.snapshot()).includes('password'), false);
+  assert.equal(JSON.stringify(h.session.snapshot()).includes('pageEcho'), false);
 });
 
 for (const [name, modify] of [
@@ -143,7 +143,7 @@ for (const [name, modify] of [
   ['long custom skin', r => { r.customSkin = new Uint8Array(256); }],
   ['invalid endpoint', r => { r.endpoint = 'ws://example.invalid:1234/slither'; }],
 ]) {
-  test(`session clears its owned password when rejecting ${name}`, () => {
+  test(`session clears its owned pageEcho when rejecting ${name}`, () => {
     const h = harness(), r = request(); modify(r);
     const Native = globalThis.Uint8Array;
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
@@ -158,8 +158,8 @@ for (const [name, modify] of [
     try {
       assert.throws(() => h.session.play(r));
       assert.equal(copies.length, 1);
-      assert(copies.every(value => value.every(byte => byte === 0)), 'Every session password copy clears on rejection');
-      assert.deepEqual([...r.profile.password], Array.from({ length: 20 }, (_, i) => i + 1));
+      assert(copies.every(value => value.every(byte => byte === 0)), 'Every session pageEcho copy clears on rejection');
+      assert.deepEqual([...r.profile.pageEcho], Array.from({ length: 20 }, (_, i) => i + 1));
       assert.equal(h.session.snapshot().phase, 'ready');
       assert.deepEqual(h.session.pendingActions().actions, {});
       assert.equal(h.sockets.length, 0);
@@ -168,7 +168,7 @@ for (const [name, modify] of [
 }
 
 for (const failure of [new Error('Authored encoder failure'), undefined, null]) {
-  test(`session clears its password and preserves encoder failure ${String(failure)}`, () => {
+  test(`session clears its pageEcho and preserves encoder failure ${String(failure)}`, () => {
     const h = harness({ wasmChanges: { encode_login() { throw failure; } } }), r = request();
     const Native = globalThis.Uint8Array;
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'Uint8Array');
@@ -437,7 +437,7 @@ test('same-stack close during packet callback cannot resurrect connection state'
 
 test('intrinsic profile byte length ignores a shadow getter without invoking it', () => {
   const h = harness(), r = request();
-  Object.defineProperty(r.profile.password, 'length', { get() { assert.fail('byte getter invoked'); } });
+  Object.defineProperty(r.profile.pageEcho, 'length', { get() { assert.fail('byte getter invoked'); } });
   h.session.play(r); assert.equal(h.sockets.length, 0);
 });
 

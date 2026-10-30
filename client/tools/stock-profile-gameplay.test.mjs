@@ -13,7 +13,7 @@ import { createStockGameplay } from './fixtures/stock-gameplay-fixture.mjs';
 const HASH = '5ad8aa8f06d1e71bad2945001bab077f8d4d279c093a046d19b6f26ac6b62095';
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither', nickname: 'Synthetic live',
   skin: 2, customSkin: Uint8Array.of(1, 2, 3) });
-const externalRequest = () => ({ ...request(), profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 } });
+const externalRequest = () => ({ ...request(), profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 } });
 const defer = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -99,11 +99,11 @@ function harness(options = {}) {
   };
   const wasm = { DesktopInput: TestDesktopInput, SessionPolicy: TestSessionPolicy,
     ProfileLiteralParser: options.literalParser ?? ProfileLiteralParser,
-    encode_login(version, password, nickname, skin, custom) {
-      encoded.push({ version, password: [...password], nickname, skin, custom: [...custom] });
+    encode_login(version, pageEcho, nickname, skin, custom) {
+      encoded.push({ version, pageEcho: [...pageEcho], nickname, skin, custom: [...custom] });
       options.onEncode?.(h);
       if (!/^[\x20-\x7f]{0,24}$/.test(nickname) || skin < 0 || skin > 255 || custom.length > 255) throw new Error('Synthetic semantic rejection');
-      return Uint8Array.from([115, 30, version >> 8, version & 255, ...password, skin, nickname.length,
+      return Uint8Array.from([115, 30, version >> 8, version & 255, ...pageEcho, skin, nickname.length,
         ...new TextEncoder().encode(nickname), 0, 255, ...custom]);
     },
     solve_challenge: () => new Uint8Array(27), setup_protocol_version: () => 19,
@@ -161,7 +161,7 @@ test('actual acquirer success keeps stage locked through full resolution, then o
       assert.equal(h.sockets.length, 0); assert.ok(h.counts.qualityCalls <= 1);
       if (h.counts.qualityCalls === 1) {
         for (const value of h.allocations.filter(bytes => bytes.length === 20 || bytes.length === 224092)) {
-          assert.equal(allZero(value), true, 'acquirer source/password clear before quality');
+          assert.equal(allZero(value), true, 'acquirer source/pageEcho clear before quality');
         }
       }
     }
@@ -171,7 +171,7 @@ test('actual acquirer success keeps stage locked through full resolution, then o
   await h.gameplay.playWithLiveProfile(request());
   assert.ok(staged >= 1); assert.equal(h.gameplay.diagnostics().profilePhase, 'ready');
   assert.equal(h.sockets.length, 0); assert.equal(h.counts.qualityCalls, 1);
-  assert.deepEqual(h.encoded[0].password, Array.from({ length: 20 }, (_, i) => i));
+  assert.deepEqual(h.encoded[0].pageEcho, Array.from({ length: 20 }, (_, i) => i));
   h.assertWiped();
   h.tick(16); assert.equal(h.sockets.length, 1);
   assert.ok(h.trace.findLastIndex(x => x[0] === 'end-operation') < h.trace.findIndex(x => x[0] === 'construct'));

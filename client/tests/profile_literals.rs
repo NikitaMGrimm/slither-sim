@@ -1,8 +1,8 @@
 //! Authored synthetic declarations only; no downloaded source or acquisition.
 use slither_client::profile_literals::{self, InvalidLiteral, LiteralStorage};
 
-fn password(values: &str) -> String {
-    format!("var syntheticPassword=[{values}];")
+fn page_echo(values: &str) -> String {
+    format!("var syntheticPageEcho=[{values}];")
 }
 fn zeros(count: usize) -> String {
     vec!["0"; count].join(",")
@@ -67,7 +67,7 @@ fn only_four_whitespace_bytes_are_admitted() {
 }
 
 #[test]
-fn exactly_twenty_password_bytes_and_no_partial_output_on_any_error() {
+fn exactly_twenty_page_echo_bytes_and_no_partial_output_on_any_error() {
     let values = (0..19)
         .map(|i| i.to_string())
         .chain(["255".to_owned()])
@@ -76,7 +76,7 @@ fn exactly_twenty_password_bytes_and_no_partial_output_on_any_error() {
     let source = format!("\rvar $bytes9 = [ {values} ] ;\n");
     let mut output = [7; 20];
     assert_eq!(
-        profile_literals::password(source.as_bytes(), &mut output),
+        profile_literals::page_echo(source.as_bytes(), &mut output),
         Ok(())
     );
     assert_eq!(&output[..19], &(0..19).collect::<Vec<_>>());
@@ -84,7 +84,7 @@ fn exactly_twenty_password_bytes_and_no_partial_output_on_any_error() {
     for count in [0, 1, 19, 21] {
         output.fill(7);
         assert_eq!(
-            profile_literals::password(password(&zeros(count)).as_bytes(), &mut output),
+            profile_literals::page_echo(page_echo(&zeros(count)).as_bytes(), &mut output),
             Err(InvalidLiteral)
         );
         assert_eq!(output, [0; 20]);
@@ -97,7 +97,7 @@ fn exactly_twenty_password_bytes_and_no_partial_output_on_any_error() {
             values[index] = value;
             output.fill(7);
             assert_eq!(
-                profile_literals::password(password(&values.join(",")).as_bytes(), &mut output),
+                profile_literals::page_echo(page_echo(&values.join(",")).as_bytes(), &mut output),
                 Err(InvalidLiteral)
             );
             assert_eq!(output, [0; 20]);
@@ -107,7 +107,7 @@ fn exactly_twenty_password_bytes_and_no_partial_output_on_any_error() {
         let malformed = format!("var p=[{}{suffix}];", zeros(20));
         output.fill(7);
         assert_eq!(
-            profile_literals::password(malformed.as_bytes(), &mut output),
+            profile_literals::page_echo(malformed.as_bytes(), &mut output),
             Err(InvalidLiteral)
         );
         assert_eq!(output, [0; 20]);
@@ -124,24 +124,24 @@ fn span_limits_are_exact_and_input_is_borrowed_unchanged() {
         profile_literals::client_version(&version),
         Err(InvalidLiteral)
     );
-    let mut source = password(&zeros(20)).into_bytes();
+    let mut source = page_echo(&zeros(20)).into_bytes();
     source.resize(256, b' ');
     let original = source.clone();
     let mut output = [7; 20];
-    assert_eq!(profile_literals::password(&source, &mut output), Ok(()));
+    assert_eq!(profile_literals::page_echo(&source, &mut output), Ok(()));
     assert_eq!(source, original);
     source.push(b' ');
     assert_eq!(
-        profile_literals::password(&source, &mut output),
+        profile_literals::page_echo(&source, &mut output),
         Err(InvalidLiteral)
     );
     assert_eq!(output, [0; 20]);
 }
 
 #[test]
-fn scratch_copies_scalar_values_and_rejection_cannot_expose_partial_password() {
+fn scratch_copies_scalar_values_and_rejection_cannot_expose_partial_page_echo() {
     let mut storage = LiteralStorage::default();
-    assert_eq!(storage.password_byte(0), -1);
+    assert_eq!(storage.page_echo_byte(0), -1);
     assert!(!storage.write(384, 1));
     assert!(!storage.write(u32::MAX, 1));
     assert!(!storage.write(0, 256));
@@ -150,18 +150,18 @@ fn scratch_copies_scalar_values_and_rejection_cannot_expose_partial_password() {
         assert!(storage.write(i as u32, u32::from(*byte)));
     }
     assert_eq!(storage.parse_version(12), 65535);
-    let source = password(&vec!["255"; 20].join(","));
+    let source = page_echo(&vec!["255"; 20].join(","));
     for (i, byte) in source.bytes().enumerate() {
         assert!(storage.write(128 + i as u32, u32::from(byte)));
     }
-    assert!(storage.parse_password(source.len() as u32));
+    assert!(storage.parse_page_echo(source.len() as u32));
     for index in 0..20 {
-        assert_eq!(storage.password_byte(index), 255);
+        assert_eq!(storage.page_echo_byte(index), 255);
     }
-    assert_eq!(storage.password_byte(20), -1);
+    assert_eq!(storage.page_echo_byte(20), -1);
     storage.clear();
-    assert_eq!(storage.password_byte(0), -1);
-    assert!(!storage.parse_password(257));
+    assert_eq!(storage.page_echo_byte(0), -1);
+    assert!(!storage.parse_page_echo(257));
     assert_eq!(storage.parse_version(129), -1);
     assert_eq!(profile_literals::PROTOCOL_VERSION, 19);
 }

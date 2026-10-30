@@ -31,7 +31,7 @@ function decode(bytes) {
   return commands;
 }
 const request = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 7, password: new Uint8Array(20).fill(3), protocolVersion: 19 },
+  profile: { clientVersion: 7, pageEcho: new Uint8Array(20).fill(3), protocolVersion: 19 },
   nickname: 'Authored HUD', skin: 2, customSkin: new Uint8Array() });
 const ready = (score = 17) => ({ schema: 1, enabled: true, tableMax: 17,
   own: { token: 1n, id: 0, logicalSegments: 4, fractionalMass: 0.25, scoreAdjustment: 3, scoreIndex: 7 },

@@ -443,7 +443,7 @@ fn synthetic_profile_reaches_existing_challenge_login_without_local_credentials(
     let mut g = LocalGame::new(0.).unwrap();
     let profile = LoginProfile {
         client_version: 4242,
-        password: [123; 20],
+        page_echo: [123; 20],
     };
     g.play_with_profile("ws://192.0.2.1:445/slither", "Synthetic", 9, &profile)
         .unwrap();

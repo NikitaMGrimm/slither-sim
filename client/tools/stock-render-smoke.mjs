@@ -586,7 +586,7 @@ export function stockRenderSmoke(wasm, { control = true } = {}) {
             eq(view.current.value, null); eq(view.final.value, null);
           }
           gameplay.play({ endpoint: 'ws://192.0.2.9:1234/slither',
-            profile: { clientVersion: 7, password: Uint8Array.from({ length: 20 }, (_, i) => i + 1), protocolVersion: 19 },
+            profile: { clientVersion: 7, pageEcho: Uint8Array.from({ length: 20 }, (_, i) => i + 1), protocolVersion: 19 },
             nickname: 'Synthetic', skin: 27, customSkin: new Uint8Array() });
           eq(sockets.length, 0);
           gameplay.frame(now); drain();
@@ -740,7 +740,7 @@ export function stockRenderSmoke(wasm, { control = true } = {}) {
             },
           });
           gameplay.play({ endpoint: 'ws://192.0.2.9:1234/slither',
-            profile: { clientVersion: 7, password: new Uint8Array(20).fill(3), protocolVersion: 19 },
+            profile: { clientVersion: 7, pageEcho: new Uint8Array(20).fill(3), protocolVersion: 19 },
             nickname: 'Authored readout failure', skin: 27, customSkin: new Uint8Array() });
           gameplay.frame(now); drain();
           const socket = sockets[0]; socket.readyState = 1; socket.onopen(); drain();
@@ -799,7 +799,7 @@ export function stockRenderSmoke(wasm, { control = true } = {}) {
           session.subscribeWithHud({ packet: (bytes, elapsed, plan) => f.client.packetWithHud(bytes, elapsed, plan),
             hud() {}, state() {}, error: value => failures.push(value) });
           session.play({ endpoint: 'ws://192.0.2.9:1234/slither',
-            profile: { clientVersion: 7, password: new Uint8Array(20).fill(3), protocolVersion: 19 },
+            profile: { clientVersion: 7, pageEcho: new Uint8Array(20).fill(3), protocolVersion: 19 },
             nickname: 'Synthetic lifecycle', skin: 27, customSkin: new Uint8Array() });
           const frame = time => {
             now = time;

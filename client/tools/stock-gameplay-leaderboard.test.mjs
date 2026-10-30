@@ -12,7 +12,7 @@ import { createStockClient } from './fixtures/stock-client-fixture.mjs';
 import { requireLeaderboardState } from '../web/stock-leaderboard-state.mjs';
 
 const login = () => ({ endpoint: 'ws://192.0.2.9:1234/slither',
-  profile: { clientVersion: 1, password: new Uint8Array(20), protocolVersion: 19 },
+  profile: { clientVersion: 1, pageEcho: new Uint8Array(20), protocolVersion: 19 },
   nickname: 'Own 1234567', skin: 0, customSkin: new Uint8Array() });
 const noOwn = tableMax => ({ schema: 1, enabled: true, tableMax, own: null,
   status: 'no-own', score: null, error: null });
@@ -115,7 +115,7 @@ function harness({ configure, callback, rows = true } = {}) {
     leaderboardProjector: projector,
     wasm: { DesktopInput: TestDesktopInput, SessionPolicy: TestSessionPolicy, LeaderboardHistory: LeaderboardHistoryDouble, HudHistory: HudHistoryDouble,
       ProfileLiteralParser: ProfileLiteralParserDouble,
-      encode_login(_version, _password, nickname) { hit('encode'); faults.encodedNickname = nickname; return Uint8Array.of(115); },
+      encode_login(_version, _pageEcho, nickname) { hit('encode'); faults.encodedNickname = nickname; return Uint8Array.of(115); },
       solve_challenge() { return new Uint8Array(27); }, setup_protocol_version() { return 19; },
       decode_frame(bytes) {
         hit('decode'); commands = [];

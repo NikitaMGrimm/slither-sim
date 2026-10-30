@@ -137,11 +137,11 @@ pub fn server_endpoint(value: &str) -> Result<url::Url> {
 #[derive(Default)]
 pub struct LoginProfile {
     pub client_version: u16,
-    pub password: [u8; 20],
+    pub page_echo: [u8; 20],
 }
 impl Drop for LoginProfile {
     fn drop(&mut self) {
-        self.password.fill(0);
+        self.page_echo.fill(0);
     }
 }
 
@@ -305,7 +305,7 @@ impl LocalGame {
         menu.select(skin, &[])?;
         let login = protocol::encode_login(
             profile.client_version,
-            &profile.password,
+            &profile.page_echo,
             nickname,
             skin,
             None,
