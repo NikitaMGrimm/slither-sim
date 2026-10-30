@@ -70,19 +70,25 @@ Historical exact DOM baseline probes are not current acceptance gates.
 
 ## Installed faces
 
-Native Windows uses `arial.ttf`, `arialbd.ttf`, `ariali.ttf`, `arialbi.ttf`, and
-`l_10646.ttf` (Lucida Sans Unicode regular). Windows has no styled faces for that
-Lucida family: all native styled Lucida requests keep the regular Lucida Sans
-Unicode face, never Arial. `TextCache::native_face` exposes the exact choice;
-missing selected files fail explicitly. No font is bundled or sheared. Canvas
-requests the explicit Arial or Lucida Sans Unicode / Lucida Grande CSS stack
-and lets the browser resolve installed fonts. **Known non-parity:**
-[Chromium's Windows font matching](https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc#L484-L498)
-keeps the matched family and asks Skia to synthesize missing bold/oblique styles.
-The official Lucida uses relevant to later panels are the end-screen length
-line's bold number and the champion instruction's regular text; there is no
-italic Lucida producer. Synthesis or an explicitly accepted approximation is
-deferred to end-screen backlog item 5, and is not implemented here.
+Native Windows uses installed Arial regular/italic for Arial text and Lucida
+Sans Unicode regular for regular Lucida text. Every bold request uses real
+Arial Bold (or Bold Italic), including text styled as Lucida. Linux uses the
+corresponding installed DejaVu Sans regular/bold/oblique faces. Browser WebGPU
+requests `Arial, DejaVu Sans, sans-serif` for bold and retains the regular family
+stack otherwise. No synthetic weight, font matching engine or bundled fonts
+are needed. Missing selected native files return explicit errors; failed cache
+replacement retains the prior prepared resources.
+
+Measurement and rasterization share a display-only control policy: whitespace
+controls become spaces, other C0/C1 controls, DEL and soft hyphen become one
+replacement glyph with its ordinary advance. Other whitespace, including NBSP,
+retains its normal glyph. Chromium/SimSun fallback widths are not emulated.
+Control-heavy display strings can change width substantially; ordinary visible
+strings have a 15% width budget and 2px baseline budget, with readable emphasis
+and no clipping or overlap. This policy never changes retained nickname bytes,
+editor normalization, login encoding or game decisions; byte-exact protocol
+regressions still admit DEL.
+
 Native coverage uses one luminance-dependent curve after the 4×4 average and
 before premultiplication, through the same raster loop as existing text.
 

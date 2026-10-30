@@ -10,6 +10,22 @@ mod platform;
 #[path = "text_web.rs"]
 mod platform;
 
+// Display only: protocol owners retain the original bytes and normalization.
+// One scalar maps to at most one ordinary glyph; both platform paths use this.
+fn display_character(c: char) -> char {
+    if c.is_whitespace() && c.is_control() {
+        ' '
+    } else if c.is_control() || c == '\u{ad}' {
+        '\u{fffd}'
+    } else {
+        c
+    }
+}
+#[cfg(target_arch = "wasm32")]
+fn display_text(text: &str) -> String {
+    text.chars().map(display_character).collect()
+}
+
 pub const MINIMAP_CACHE_BYTES: usize = 1024 * 1024;
 pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // Allocation rationale: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/panel-text.md#aggregate-resource-proof;
@@ -282,7 +298,7 @@ impl TextCache {
     ) -> Result<slither_client::presentation::TextMeasurement> {
         self.rasterizer.measure(text, style)
     }
-    /// Exact deterministic native face choice, including Lucida substitutions.
+    /// Installed native face selected for this display style.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn native_face(style: TextStyle) -> &'static str {
         platform::face_name(style)
