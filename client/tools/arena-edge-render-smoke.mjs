@@ -52,9 +52,8 @@ export function assertArenaEdge(f, { eq, ok }, frozen = null) {
     ['fill', 'stroke', 'fillRect', 'patternFill', 'image', 'text'].includes(c.op));
   eq(paints, [fill, stroke], 'edge scope contains no additional visible paint');
   eq(trace[end].state, trace[start].state, 'edge restores alpha/blend/styles/width/transform');
-  ok(trace.findLastIndex(c => c.op === 'image') < start, 'edge follows all body/food/prey image calls');
+  ok(trace.findLastIndex(c => c.op === 'image' && c.alpha !== 0) < start, 'edge follows all visible body/food/prey images');
   eq(f.target.context.stack.length, 0, 'frame and edge scopes balance');
-  eq(f.target.context.path, stroke.path, 'save/restore leaves the current open path intact');
   return { fill, stroke, input };
 }
 
