@@ -55,7 +55,8 @@ Run the staged guard before committing; `--history` audits history reachable fro
 branches, remote-tracking branches and tags.
 Use `--pre-push [<remote>]` with Git's push input to check outgoing commits plus the
 index, trusting only that configured remote's local tracking refs as of the last
-fetch. A missing, URL or unknown remote scans the tips' full history; no network is used.
+fetch. Missing, URL or unknown destinations and overlapping remote names scan the
+tips' full history; no network is used.
 Do not set `core.hooksPath` in a shared multi-worktree checkout; `tools/hooks`
 remains available for single-clone opt-in.
 

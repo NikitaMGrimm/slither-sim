@@ -215,6 +215,34 @@ test('pre-push excludes only the receiving remote and conservatively scans unkno
   assert.equal(option.status, 0, option.stderr);
 }));
 
+test('overlapping remote names scan full tip history in both prefix directions', () => withRepository(async (directory, git, env) => {
+  fs.writeFileSync(path.join(directory, 'web/bridge.mjs'), '// SYNTHETIC overlapping-remote root\n');
+  git(['add', 'web/bridge.mjs']);
+  git(['commit', '--quiet', '-m', 'test: synthetic overlapping-remote root']);
+  const root = git(['rev-parse', 'HEAD']).toString().trim();
+  fs.writeFileSync(path.join(directory, 'web/program.js.map'), 'SYNTHETIC prohibited ancestor on team/fork');
+  git(['add', 'web/program.js.map']);
+  git(['commit', '--quiet', '-m', 'test: synthetic team/fork artifact']);
+  git(['rm', '--quiet', 'web/program.js.map']);
+  git(['commit', '--quiet', '-m', 'test: synthetic clean descendant']);
+  const tip = git(['rev-parse', 'HEAD']).toString().trim();
+  git(['update-ref', 'refs/remotes/team/main', root]);
+  git(['update-ref', 'refs/remotes/team/fork/main', tip]);
+  const input = `refs/heads/candidate ${tip} refs/heads/candidate ${root}\n`;
+  const push = (remote, names) => spawnSync(process.execPath, [guard, '--pre-push', remote], {
+    cwd: directory, env: withRemotes(env, ...names), input, encoding: 'utf8', timeout: 5_000,
+  });
+  for (const remote of ['team', 'team/fork']) {
+    const result = push(remote, ['team', 'team/fork']);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /program\.js\.map/);
+  }
+  // A shared text prefix without the slash delimiter is not an overlap.
+  git(['update-ref', 'refs/remotes/team/main', tip]);
+  const distinct = push('team', ['team', 'teammate']);
+  assert.equal(distinct.status, 0, distinct.stderr);
+}));
+
 test('the CLI retains the usage error for arguments outside the supported modes', () => withRepository(async (directory, git, env) => {
   for (const args of [['--unknown'], ['a'], ['--history', 'a'], ['--pre-push', 'a', 'extra']]) {
     const result = spawnSync(process.execPath, [guard, ...args], { cwd: directory, env, encoding: 'utf8', input: '' });

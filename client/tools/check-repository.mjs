@@ -149,9 +149,15 @@ export async function checkRepository(directory, history = false, outgoingTips =
       }
       const exclusions = [];
       // Trust only local tracking refs of a configured destination; otherwise scan all tip history without network access.
-      if (!history && remote && git(directory, ['remote']).toString('utf8').split('\n').includes(remote)) {
-        const literal = remote.replace(/[\\*?[\]]/g, '\\$&');
-        exclusions.push('--not', `--glob=refs/remotes/${literal}/*`);
+      if (!history && remote) {
+        const configured = git(directory, ['remote']).toString('utf8').split('\n').filter(Boolean);
+        const overlap = configured.some(name => name !== remote
+          && (name.startsWith(`${remote}/`) || remote.startsWith(`${name}/`)));
+        // Prefix-related remote names share tracking namespaces, so scan all tip history on overlap.
+        if (configured.includes(remote) && !overlap) {
+          const literal = remote.replace(/[\\*?[\]]/g, '\\$&');
+          exclusions.push('--not', `--glob=refs/remotes/${literal}/*`);
+        }
       }
       const revisions = history ? ['--branches', '--remotes', '--tags', ...outgoingTips]
         : [...outgoingTips, ...exclusions];
