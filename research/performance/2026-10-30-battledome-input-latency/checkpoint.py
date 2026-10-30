@@ -21,7 +21,10 @@ def checkpoint(root, directory, api, endpoint):
     for source, target in [("clients.jsonl", "clients.jsonl"), ("icmp.log", "icmp.log")]:
         path = root / source
         data = path.read_bytes() if path.exists() else b""
-        (directory / target).write_bytes(data[:data.rfind(b"\n") + 1])
+        prefix = data[:data.rfind(b"\n") + 1]
+        # Every row needs RTT samples; an empty ICMP log must not qualify.
+        assert prefix or source != "icmp.log", "ICMP log is missing or has no complete line"
+        (directory / target).write_bytes(prefix)
     for name in ["pins.json", "build-ready.json"]:
         (directory / name).write_bytes((root / name).read_bytes())
     if (root / "control-manifest.json").exists():

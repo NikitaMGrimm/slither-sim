@@ -44,6 +44,8 @@ manifest outside Git, publishing its one digest. Preserve failed build logs.
 the producer of `pins.json` and `source-manifest.json`: run `python3 pin_build.py`
 from that directory after the binaries are copied. It pins this study's runtime,
 toolchain, native binaries and helper sources and verifies unchanged runtime source.
+After the recorded run, review made it find `rustc` on `PATH` and made
+`checkpoint.py` refuse a row without ICMP samples; neither changes a measurement.
 
 The probe command is:
 

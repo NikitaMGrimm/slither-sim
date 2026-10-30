@@ -31,7 +31,7 @@ attempt 3 after a controller-file race invalidated attempt 2's 320. Selection
 changed prospectively by completeness/gates, never by latency. All failed and
 supplementary runs remain in [ATTEMPTS.md](ATTEMPTS.md). Every primary passes the
 >=300 echo quota, six-worker whole-window coverage and unchanged generator gates.
-At 320 the worst worker CPU p99 is 19.1% of its core, worst input-p99 report
+At 320 the worst worker CPU p99 is 19.0% of its core, worst input-p99 report
 14.434 ms; all loaded workers report 100% boost actions among eligible actions.
 This is action duty, not a claim that a dead/pending snake is boosting.
 
