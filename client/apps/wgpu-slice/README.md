@@ -98,8 +98,10 @@ frame completion. Failed frame completion releases staged pixels.
 
 `text::TextCache::draw(TextRun, scale)` returns ordered draw/resource pairs for
 Arial regular/bold, RGB, size, opacity, alignment and baseline; no shadows.
-The text cache holds at most 256 runs / 4 MiB: 40 replaceable HUD slots with a
-2 MiB allowance, and a separate 216-run / 2 MiB nickname LRU. Changing scores
+The text cache holds at most 258 runs / 6 MiB: 40 replaceable HUD slots with a
+2 MiB allowance, a separate 216-run / 2 MiB nickname LRU, and one replacing
+minimap label slot with a 1 MiB allowance plus a separately keyed 1 MiB black
+shadow raster. Changing scores and server labels
 replace their slots without evicting nicknames. Runs admit 1024 UTF-8 bytes,
 1..=128 backing font pixels and an 8192x512 raster, tiled into 512px textures.
 HUD names are rasterized only to their visible column width. HUD raster scale
@@ -120,7 +122,9 @@ from Canvas; tests do not establish visual parity or player feel.
 The minimap uses shared retained occupancy, crossfade, marker and session opacity
 plans, with Canvas CSS sizing and bottom/right insets across DPR changes. Its
 layers compose before holder alpha, and the marker keeps visible overflow.
-Server-label text awaits `minimap::Minimap::append_server_label` and the text adapter.
+The centred server label uses platform text with its shared style, shadow,
+normal whitespace wrapping, hidden overflow and holder fade. Its raster scale
+is capped at 3x as for the HUD.
 
 The synthetic slither-wgpu-diagnostic executable, web/diagnostic.html and examples
 are renderer development aids. Offline tests use authored synthetic packets and

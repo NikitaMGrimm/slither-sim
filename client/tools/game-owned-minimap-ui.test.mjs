@@ -57,6 +57,7 @@ test('Rust plans submit independent local opacity, geometry, quadrants, diameter
   assert.equal(f.style(alternate).get('z-index'), f.style(marker).get('z-index'));
   assert.equal(f.style(marker).get('left'), '3.2px'); assert.equal(f.style(marker).get('top'), '5.6px');
   assert.equal(f.style(label).get('font-size'), '14px'); assert.equal(f.style(label).get('overflow'), 'hidden');
+  assert.equal(f.style(label).get('white-space'), 'normal', 'narrow labels wrap at spaces, as in the reference');
   assert.equal(f.style(label).get('text-shadow'), '1px 2px 3px black');
   assert.equal(label.children[0].data, '<b>server</b>'); assert.equal(label.children.length, 1);
   const backgroundContext = f.native.minimap.canvas(background).context;

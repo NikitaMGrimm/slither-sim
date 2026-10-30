@@ -228,7 +228,7 @@ export function createOwnedMinimapUi({ document, parent, dom, construct, canvas,
     style(label, { left: pixels(l.left), top: pixels(l.top), width: pixels(l.width), height: pixels(l.height),
       'font-size': pixels(l.fontSize), 'font-family': l.fontFamily, 'text-align': l.textAlign,
       overflow: l.overflowHidden ? 'hidden' : 'visible', color: color(l.fill), opacity: l.opacity,
-      'white-space': 'nowrap', 'text-shadow': `${pixels(l.shadowOffset.x)} ${pixels(l.shadowOffset.y)} ${pixels(l.shadowBlur)} black` });
+      'white-space': 'normal', 'text-shadow': `${pixels(l.shadowOffset.x)} ${pixels(l.shadowOffset.y)} ${pixels(l.shadowBlur)} black` });
     effect(dom.setText, text.node, l.text);
   }
   function dispose() {

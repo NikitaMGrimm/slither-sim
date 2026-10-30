@@ -928,12 +928,13 @@ pub fn prepare(
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
-    bank.minimap.append(client, &mut frame, &mut resources)?;
+    bank.minimap
+        .append(client, &mut bank.text, &mut frame, &mut resources)?;
     Ok(PreparedFrame { frame, resources })
 }
 // Text tiles have no rotation. Intersect both the logical destination and its
 // source crop, so long names cannot paint into score/rank columns or offscreen.
-fn clip_text(draw: &mut Draw, clip: BodyRect) -> bool {
+pub(crate) fn clip_text(draw: &mut Draw, clip: BodyRect) -> bool {
     let r = draw.destination;
     let x = r.x + draw.translation[0];
     let y = r.y + draw.translation[1];

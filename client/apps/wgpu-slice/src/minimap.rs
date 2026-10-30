@@ -4,15 +4,18 @@ use crate::{
     frame::{Draw, Frame},
     materials::RgbaImage,
     scene::Resource,
+    text::{Align, Baseline, TextCache, TextRun, TextStyle, Weight},
 };
 use slither_client::{presentation::*, state::Point};
 
 use crate::bank::MINIMAP_HANDLE_BASE as HANDLE;
-/// The largest holder (map plus 12px insets), tiled at 510px, and four marker strips.
+/// Largest holder tiles, four marker strips, and the centred text/shadow tiles
+/// (536 logical pixels at capped 3x, with blur support on either side).
 pub const MAX_DRAWS: usize = (slither_client::protocol::minimap::MAX_MINIMAP_DIMENSION as usize
     + 24)
     .div_ceil(510)
     .pow(2)
+    + 4
     + 4;
 
 #[derive(Default)]
@@ -233,6 +236,7 @@ impl Minimap {
     pub fn append(
         &mut self,
         client: &AnimatedClient,
+        text: &mut TextCache,
         frame: &mut Frame,
         resources: &mut Vec<Resource>,
     ) -> Result<()> {
@@ -373,20 +377,67 @@ impl Minimap {
         if outside {
             resources.push(marker);
         }
-        self.append_server_label(&widget.label, origin, alpha, frame, resources)?;
+        self.append_server_label(&widget.label, origin, alpha, text, frame, resources)?;
         Ok(())
     }
 
-    /// Integration point for the shared text renderer. The server label is the
-    /// only deferred minimap primitive; keep its plan and holder opacity intact.
+    /// Submit the shared plain-text label after the map/marker, with the same
+    /// group opacity and CSS hidden-overflow rectangle as the reference DOM.
     fn append_server_label(
         &mut self,
-        _label: &MinimapLabelPlan,
-        _origin: [f64; 2],
-        _holder_opacity: f64,
-        _frame: &mut Frame,
-        _resources: &mut Vec<Resource>,
+        label: &MinimapLabelPlan,
+        origin: [f64; 2],
+        holder_opacity: f64,
+        text: &mut TextCache,
+        frame: &mut Frame,
+        resources: &mut Vec<Resource>,
     ) -> Result<()> {
+        if label.text.is_empty() || holder_opacity <= 0. || label.opacity <= 0. {
+            return Ok(());
+        }
+        let scale = frame.viewport_scale;
+        let raster_scale = scale.min(crate::text::MAX_HUD_RASTER_SCALE);
+        let anchor = label.text_anchor();
+        let clip = BodyRect {
+            x: origin[0] + label.top_left.x,
+            y: origin[1] + label.top_left.y,
+            width: label.size.x,
+            height: label.size.y,
+        };
+        let viewport = BodyRect {
+            x: 0.,
+            y: 0.,
+            width: f64::from(frame.extent[0]) / scale,
+            height: f64::from(frame.extent[1]) / scale,
+        };
+        for (mut draw, resource) in text.draw_minimap(
+            TextRun {
+                text: &label.text,
+                style: TextStyle {
+                    size: label.font_size,
+                    weight: Weight::Normal,
+                    color: label.fill,
+                },
+                position: [origin[0] + anchor.x, origin[1] + anchor.y],
+                align: Align::Center,
+                baseline: Baseline::Alphabetic,
+                alpha: holder_opacity.clamp(0., 1.) * label.opacity.clamp(0., 1.),
+            },
+            raster_scale,
+            [label.shadow_offset.x, label.shadow_offset.y],
+            label.shadow_blur,
+            label.size.x,
+        )? {
+            if frame.draws.len() >= crate::frame::MAX_DRAWS {
+                break;
+            }
+            if (!label.overflow_hidden || crate::render::clip_text(&mut draw, clip))
+                && crate::render::clip_text(&mut draw, viewport)
+            {
+                frame.draws.push(draw);
+                resources.push(resource);
+            }
+        }
         Ok(())
     }
 }
@@ -449,6 +500,232 @@ mod tests {
                 frame.quads(&[(asset.into(), asset)].into()).unwrap().len(),
                 1
             );
+        }
+    }
+
+    #[cfg(windows)]
+    fn label(text: &str) -> MinimapLabelPlan {
+        MinimapLabelPlan {
+            text: text.into(),
+            top_left: Point { x: 0., y: 153. },
+            size: Point { x: 160., y: 37. },
+            font_size: 14.,
+            font_family: crate::text::FONT_FAMILY,
+            text_align: "center",
+            overflow_hidden: true,
+            fill: [255; 3],
+            opacity: 0.5,
+            shadow_offset: Point { x: 0., y: 1. },
+            shadow_blur: 8.,
+        }
+    }
+
+    #[cfg(windows)]
+    fn frame(dpr: f64) -> Frame {
+        Frame {
+            identity: 1,
+            tick: 0,
+            extent: [(480. * dpr) as u32, (320. * dpr) as u32],
+            viewport_scale: dpr,
+            draws: vec![],
+            snakes: vec![],
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn label_matches_centred_platform_text_and_multiplies_holder_fades() {
+        let mut map = Minimap::default();
+        let mut cache = TextCache::default();
+        let mut resources = vec![];
+        let l = label("server 42");
+        let mut previous = None;
+        for opacity in [1., 0.025, 0.4, 0.] {
+            let mut f = frame(1.);
+            map.append_server_label(
+                &l,
+                [304., 144.],
+                opacity,
+                &mut cache,
+                &mut f,
+                &mut resources,
+            )
+            .unwrap();
+            if opacity == 0. {
+                assert!(f.draws.is_empty());
+                continue;
+            }
+            assert!(!f.draws.is_empty());
+            for d in &f.draws {
+                assert_eq!(d.effective_alpha, 0.5 * opacity);
+            }
+            let assets: Vec<_> = f.draws.iter().map(|d| d.asset).collect();
+            if let Some(old) = previous {
+                assert_eq!(assets, old);
+            }
+            previous = Some(assets);
+            let expected = cache
+                .draw_minimap(
+                    TextRun {
+                        text: "server 42",
+                        style: TextStyle {
+                            size: 14.,
+                            weight: Weight::Normal,
+                            color: [255; 3],
+                        },
+                        position: [384., 310.],
+                        align: Align::Center,
+                        baseline: Baseline::Alphabetic,
+                        alpha: opacity * 0.5,
+                    },
+                    1.,
+                    [0., 1.],
+                    8.,
+                    160.,
+                )
+                .unwrap();
+            let mut draws = vec![];
+            for (mut d, _) in expected {
+                if crate::render::clip_text(
+                    &mut d,
+                    BodyRect {
+                        x: 304.,
+                        y: 297.,
+                        width: 160.,
+                        height: 37.,
+                    },
+                ) && crate::render::clip_text(
+                    &mut d,
+                    BodyRect {
+                        x: 0.,
+                        y: 0.,
+                        width: 480.,
+                        height: 320.,
+                    },
+                ) {
+                    draws.push(d);
+                }
+            }
+            assert_eq!(f.draws, draws);
+        }
+        let mut f = frame(1.);
+        map.append_server_label(
+            &label(""),
+            [304., 144.],
+            1.,
+            &mut cache,
+            &mut f,
+            &mut resources,
+        )
+        .unwrap();
+        assert!(f.draws.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn overlong_label_clips_css_overflow_at_every_dpr() {
+        let mut map = Minimap::default();
+        let mut cache = TextCache::default();
+        for dpr in [1., 2., 16., 1.25, 2.75] {
+            let mut f = frame(dpr);
+            let mut resources = vec![];
+            let mut l = label(&"W".repeat(100));
+            l.size.x = 32.;
+            map.append_server_label(&l, [50.25, 20.5], 0.4, &mut cache, &mut f, &mut resources)
+                .unwrap();
+            assert!(!f.draws.is_empty());
+            for d in &f.draws {
+                assert!(d.destination.x >= 50.25);
+                assert!(d.destination.x + d.destination.width <= 82.25);
+                assert!(d.destination.y >= 173.5);
+                assert!(d.destination.y + d.destination.height <= 210.5);
+                assert_eq!(d.effective_alpha, 0.2);
+            }
+            assert!(
+                resources.iter().any(|r| r
+                    .image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .any(|p| p[0] > 0)),
+                "visible glyphs must survive the label crop"
+            );
+            f.quads(
+                &resources
+                    .iter()
+                    .map(|r| (r.asset.into(), r.asset))
+                    .collect(),
+            )
+            .unwrap();
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn high_dpr_reuses_the_three_times_raster_without_changing_logical_placement() {
+        let mut map = Minimap::default();
+        let mut cache = TextCache::default();
+        let mut previous = None;
+        for dpr in [3., 16.] {
+            let mut f = frame(dpr);
+            let mut resources = vec![];
+            map.append_server_label(
+                &label("server 42"),
+                [304., 144.],
+                1.,
+                &mut cache,
+                &mut f,
+                &mut resources,
+            )
+            .unwrap();
+            let pixels: Vec<_> = resources
+                .iter()
+                .map(|r| (r.asset, r.image.pixels.clone()))
+                .collect();
+            if let Some((draws, old_pixels)) = previous {
+                assert_eq!(f.draws, draws);
+                assert_eq!(pixels, old_pixels);
+            }
+            previous = Some((f.draws, pixels));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn label_reserve_and_full_frame_degradation_keep_the_global_limit() {
+        let mut map = Minimap::default();
+        let mut cache = TextCache::default();
+        let mut bank = crate::bank::Bank::new().unwrap();
+        let filler = draw(
+            bank.solid([255; 3]),
+            BodyRect {
+                x: 1.,
+                y: 1.,
+                width: 1.,
+                height: 1.,
+            },
+            None,
+            1.,
+        );
+        for count in [
+            crate::frame::MAX_DRAWS - MAX_DRAWS - crate::hud::MAX_DRAWS,
+            crate::frame::MAX_DRAWS - 1,
+            crate::frame::MAX_DRAWS,
+        ] {
+            let mut f = frame(16.);
+            f.draws = vec![filler.clone(); count];
+            let mut resources = vec![];
+            let mut l = label(&"W".repeat(100));
+            l.size.x = 536.;
+            map.append_server_label(&l, [0., 0.], 1., &mut cache, &mut f, &mut resources)
+                .unwrap();
+            assert!(f.draws.len() <= crate::frame::MAX_DRAWS);
+            assert!(f.draws.len() - count <= 4);
+            assert_eq!(&f.draws[..count], vec![filler.clone(); count]);
+            if count < crate::frame::MAX_DRAWS {
+                assert!(f.draws.len() > count);
+            }
         }
     }
 }
