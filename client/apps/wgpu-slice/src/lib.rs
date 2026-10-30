@@ -1,6 +1,7 @@
 //! Shared explicit local gameplay and offline diagnostics. The existing core owns state/plans.
 #![forbid(unsafe_code)]
 
+pub mod announcement;
 pub mod bank;
 pub mod cosmetics;
 pub mod frame;

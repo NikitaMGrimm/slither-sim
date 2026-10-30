@@ -233,6 +233,7 @@ struct Arial {
     em_ascent: f64,
     font_ascent: f32,
     font_descent: f32,
+    font_line_gap: f32,
 }
 fn canvas_character(c: char) -> Option<char> {
     match c {
@@ -277,15 +278,28 @@ impl Rasterizer {
             let upem = f32::from(face.units_per_em());
             let font_ascent = f32::from(os2.windows_ascender()) / upem;
             let font_descent = -f32::from(os2.windows_descender()) / upem;
+            let font_line_gap = f32::from(face.line_gap()) / upem;
             slot.insert(Arial {
                 font: Font::from_bytes(bytes, FontSettings::default())
                     .map_err(|e| format!("font ({file}): {e}"))?,
                 em_ascent: ascent / (ascent - descent),
                 font_ascent,
                 font_descent,
+                font_line_gap,
             });
         }
         Ok(&self.faces[&key])
+    }
+    pub fn normal_line_height(&mut self, style: TextStyle, scale: f64) -> Result<f64> {
+        let device = TextStyle {
+            size: f64::from(style.size as f32 * scale as f32),
+            ..style
+        };
+        let m = self.measure("", device)?;
+        // CSS normal includes the hhea line gap as well as the rounded font box.
+        // Installed-face regression: tests/announcements.rs; docs/announcements.md.
+        let gap = (device.size as f32 * self.face(device)?.font_line_gap).round();
+        Ok((m.font_ascent.round() + m.font_descent.round() + f64::from(gap)) / scale)
     }
     pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
         let face = self.face(style)?;

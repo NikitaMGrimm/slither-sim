@@ -48,8 +48,26 @@ left 8, top 4, width 300, height 228 CSS pixels, clips overflow, collapses norma
 whitespace and wraps overlong words. Full text is submitted to browser layout;
 the browser clips the visible region. `AnnouncementTextBlock::panel_text` also
 admits each full block into the [bounded panel primitives](panel-text.md), whose
-repeated layout visits only a bounded visible prefix. GPU announcement
-submission and draw reservations remain inactive; enabling them is separate work.
+repeated layout visits only a bounded visible prefix. Production `LocalGame`
+enables tracking before ingress and passes the existing
+step lifecycle to the shared owner. Native and browser WebGPU preserve source
+fragment indices through bounded layout and multiply each alpha by the retained
+fade at submission. CSS-normal line height includes the backend font box and
+line gap; the quote
+keeps its 5px gap. Native reads installed Windows font metrics. Browser WebGPU
+measures one invisible DOM span per face/size/density, removes it immediately and
+retains a bounded 16-entry metric cache; Canvas TextMetrics omits the line gap.
+At DPR1 the quote occupies 20px, then 5px gap, with 15px attribution/length rows.
+The world precedes announcements, then minimap and HUD.
+Announcement slots are independent of HUD/nickname quotas. The 96-draw reserve
+applies only while the captured view has present content, projected blocks and
+positive opacity, including through the fade. The same snapshot supplies both
+the reserve and submission. Before a record, while Setup hides it, at zero fade
+and after the return sentinel, the reserve stays at HUD/minimap 140 (8052 world
+draws); visible announcements reserve 236 (7956 world draws).
+Setup callbacks, ordinary work and resize prepare immutable announcement draws
+and resources at the same boundary as the world; retained/retried pictures never
+consult later live text. Same-content fades reuse texture identities.
 
 Rust tests cover wording/styles, admission, receipt order and lifecycle. Node
 tests cover passive DOM submission, fixed node counts, stale-document/topology

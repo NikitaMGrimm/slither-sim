@@ -1,14 +1,10 @@
 # Bounded styled panel text
 
-This is a synthetic rendering primitive, with no enabled wgpu gameplay producer.
-The shared [announcement projection](announcements.md) supplies its semantic
-blocks to Canvas and can admit each block through these types; GPU submission
-remains inactive.
-Later announcement and result/editor work can use the shared line breaker,
-`prepare_reserved` and one `draw_panel_composition` call containing all active
-panels. Its output preserves producer order so the compositor can place the
-announcement before HUD/minimap and the result/editor after them. The existing
-64 MiB active-resource admission still applies to the completed frame.
+Production `LocalGame` enables the [announcement producer](announcements.md),
+using one panel composition before minimap and HUD submission. Result/editor
+remains inactive. The existing 64 MiB active-resource admission applies to the
+completed frame. Each Setup, ordinary-work and resize preparation captures its
+own announcement projection and immutable resource copies.
 
 Admit `PanelText::new` once when content changes; retain it across compositions
 and resizes. Admission is linear and explicitly bounded to 2 MiB / 4096 raw
@@ -32,8 +28,12 @@ clipped to the line cell and box, with up to one em of overhang on each run's
 sides. Visited invalid metrics return an error without publishing a partial plan.
 
 Supported panels have 16–32px line cells, fonts up to 24px, height at most 228px,
-and width at most 300px (announcement) or 600px (result/editor). The namespaces
-have 48 and 16 replacing slots. A composition preflights every producer before
+and width at most 300px (announcement) or 600px (result/editor). The announcement source-aware layout also admits rounded normal font boxes
+from 14px; its fonts are limited to 13/17px. `preserving_fragments` and
+`layout_panel_text_with_sources` keep inline boundaries and source indices
+through normalization, wrapping and chunking. Per-run alpha is separate metadata
+in `draw_panel_composition_with_run_alphas`, never a raster-key field.
+The namespaces have 48 and 16 replacing slots. A composition preflights every producer before
 committing any replacement/retirement; duplicate namespaces and aggregate byte
 or tiled-draw excesses fail explicitly. An empty composition retires all panels.
 Position, opacity and future pulse values are outside raster keys. Relative
@@ -85,6 +85,15 @@ The probe preserves that raw value and reads a post-layout `scale(DPR)` ruler,
 which changes coordinate units without changing inline layout. Assertions use
 exact device values, with no tolerance or numerical rounding of DOM results.
 This does not claim unconstrained multiline DOM flow or pixel/shaping parity.
+
+CSS `normal` line spacing also includes the rounded line gap. The announcement
+producer obtains it from the backend rather than treating font-box A+D as the
+line height. On these Windows Arial faces, hhea has a 67/2048-em gap:
+17px rounds the gap to 1px (20px cell), while 13px rounds to zero (15px cell).
+This follows [Blink simple font data](https://chromium.googlesource.com/chromium/src/+/1c59996a4c179450c5ebceddad113bce94602fd2/third_party/blink/renderer/platform/fonts/simple_font_data.cc)
+which sums separately rounded ascent, descent and leading. Browser WebGPU uses
+a temporary invisible native span for normal spacing, with a bounded metric
+cache. Fixed-height general panel layout remains unchanged.
 
 ## Installed faces
 
@@ -138,12 +147,28 @@ regression also checks both grow-early/shrink-later producer orders and rollback
 
 Both named draw reserves are 96: up to 88 text draws plus 8 fills/borders/controls.
 Current minimap reserve is **12**, rather than the earlier plan's 8. With HUD 128,
-opting in both panels reserves **332**, leaving **7860** non-overlay draws out of
-the unchanged 8192. With neither producer enabled the reserve stays **140**.
-This does not change existing dense-world overflow behavior or establish dense
-gameplay coverage. Future producers must preflight the entire mandatory panel,
+two visible panels reserve **332**, leaving **7860** non-overlay draws out of
+the unchanged 8192. While a captured announcement view is visible (present
+content, projected blocks and positive opacity), production reserves **236**,
+leaving **7956** non-overlay draws, including through the fade. Before any record,
+while Setup hides it, at zero opacity and after the return sentinel, announcements
+reserve no draws: the existing **140** HUD/minimap reserve leaves **8052** world
+draws. Admission and submission use the same captured view; retries reuse its
+prepared resources. With neither producer enabled the reserve stays **140**.
+Dense mandatory geometry still fails admission explicitly; a visible producer
+requires the full named reserve before optional world draws, and rejects a world
+that consumes it. This does not establish dense gameplay coverage.
+Future producers must preflight the entire mandatory panel,
 then preserve the final whole-frame draw/pixel checks.
 
 Tests use authored fake metrics and installed Windows fonts. Offscreen native
 and Canvas specimens are synthetic resource/layout evidence, not gameplay or
 official-client perceptual parity.
+
+The enabled announcement has a tighter font envelope than the general panel:
+17 partial/full cells at the 14px lower bound, at most 17px fonts and 48 slots.
+At raster scale 3 its overhang width is 104px and its tiled bound is
+`48 + floor((900 * 17 + 48 * 104) / 510) = 87`, within 88 text draws.
+Keeping the result/editor's 73 draws, all 64 fragment heights conservatively at
+98 raster pixels, and 17 rounding allowances for both boxes gives an aggregate
+10,752,416 bytes, below the existing 12 MiB. No cache quota or reserve increases.
