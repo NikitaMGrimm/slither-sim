@@ -419,6 +419,79 @@ fn desktop_superseded_setup_counts_for_quality_once_without_an_extra_draw() {
     }
 }
 
+#[test]
+fn setup_resize_discards_retain_quality_counts() {
+    for (zero_backing, animation_draws) in [(false, 22), (false, 23), (true, 22), (true, 23)] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), snake(44)]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        for g in [&mut game, &mut control] {
+            if zero_backing {
+                g.viewport([0, 0], 1.).unwrap();
+            }
+            g.viewport([1024, 768], 1.).unwrap();
+            g.viewport([1024, 768], 1.).unwrap();
+            assert!(!g.has_frame());
+        }
+        // Reset + Setup + 22/23 animation draws straddle the <=24 fallback
+        // threshold, catching both missing and duplicated Setup credit.
+        for now in (1..=animation_draws)
+            .map(|n| f64::from(n) * 40.)
+            .chain([1040.])
+        {
+            pump(&mut game, now);
+            pump(&mut control, now);
+        }
+        let high_quality = animation_draws == 23;
+        assert_eq!(control.quality().high_quality, high_quality);
+        assert_eq!(game.quality().high_quality, high_quality);
+        assert_eq!(
+            game.quality().low_fps_counter,
+            if high_quality { 0. } else { 1. }
+        );
+    }
+}
+
+#[test]
+fn setup_pressure_discards_retain_quality_counts() {
+    let mut game = negotiating();
+    let mut control = negotiating();
+    for now in [3., 4.] {
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup()]), now).unwrap();
+        }
+        pictures(&mut control);
+    }
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[snake(44)]), 5.)
+            .unwrap();
+    }
+    // Fill the 64-packet deferral queue, then trigger pressure recovery. Both
+    // its initial Setup queue and the Setup admitted inside the drain count once.
+    for index in 0..63 {
+        for g in [&mut game, &mut control] {
+            g.receive(
+                g.generation(),
+                &bundle(&[received_food(index)]),
+                6. + f64::from(index),
+            )
+            .unwrap();
+        }
+    }
+    assert_eq!(game.client().foods().foods().len(), 63);
+    for now in (0..22).map(|n| 80. + f64::from(n) * 40.).chain([1040.]) {
+        pump(&mut game, now);
+        pump(&mut control, now);
+    }
+    assert!(control.quality().high_quality);
+    assert!(game.quality().high_quality);
+    assert_eq!(game.quality().low_fps_counter, 0.);
+}
+
 fn zero_header_preserves_readout(rank: u16, population: u16) {
     let mut g = playing();
     let before = g.hud_view();

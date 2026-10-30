@@ -536,14 +536,14 @@ impl LocalGame {
             // update exactly once, without claiming a successful GPU present.
             self.commit_work()?;
         }
-        self.packet_frames.clear();
+        self.supersede_setup_frames()?;
         while let Some((generation, bytes, now)) = self.deferred.pop_front() {
             self.deferred_bytes -= bytes.len();
             if self.active(generation) {
                 self.ingest(&bytes, now)?;
             }
             // Setup pictures are superseded, not their admitted world/HUD state.
-            self.packet_frames.clear();
+            self.supersede_setup_frames()?;
             if !self.effects.is_empty() {
                 break;
             }
@@ -1165,7 +1165,7 @@ impl LocalGame {
     pub fn viewport(&mut self, extent: [u32; 2], scale: f64) -> Result<()> {
         if extent.contains(&0) {
             self.suspended = true;
-            self.packet_frames.clear();
+            self.supersede_setup_frames()?;
             return Ok(());
         }
         render::dimensions(extent, scale)?;
@@ -1175,7 +1175,7 @@ impl LocalGame {
             let mut skipped = false;
             self.extent = extent;
             self.scale = scale;
-            self.packet_frames.clear();
+            self.supersede_setup_frames()?;
             let view = self.work.as_ref().map_or_else(
                 || self.hud_view(),
                 |w| self.format_hud(&w.hud, w.reset_rows),
