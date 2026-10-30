@@ -48,6 +48,135 @@ fn board_at(g: &mut LocalGame, now: f64) {
     g.receive(g.generation(), &bundle(&[board()]), now).unwrap();
 }
 #[test]
+fn production_reserves_announcements_only_while_the_captured_view_is_visible() {
+    use slither_wgpu_slice::{bank::Bank, frame::MAX_DRAWS};
+    let mut g = negotiating();
+    let mut commands = vec![setup(), snake(44)];
+    // Authored mandatory geometry: 259 world draws + 1109*7 food draws +
+    // 5*6 prey draws = 8052. Optional labels have no room at this capacity.
+    for i in 0..1109 {
+        commands.push(vec![b'F', 11, 10, 41, (i % 40) as u8, (i / 40) as u8, 20]);
+    }
+    for id in 1000_u16..1005 {
+        let mut packet = prey();
+        packet[1..3].copy_from_slice(&id.to_be_bytes());
+        commands.push(packet);
+    }
+    g.receive(g.generation(), &bundle(&commands), 3.).unwrap();
+    pictures(&mut g);
+    let old_capacity =
+        MAX_DRAWS - slither_wgpu_slice::hud::MAX_DRAWS - slither_wgpu_slice::minimap::MAX_DRAWS;
+    assert_eq!(old_capacity, 8052);
+    let quality = g.quality();
+    let alive = AnnouncementLifecycle {
+        death_pending: false,
+        return_active: false,
+        return_completed: false,
+        return_fraction: 1.,
+    };
+    let prepare = |client: &AnimatedClient, bank: &mut Bank, life, identity| {
+        // Every candidate starts from the same retained world/clock. Advancing
+        // the owner makes all food/prey calls valid without hand-building draws.
+        let mut world = client.clone();
+        world
+            .advance_with_control::<ClientPresentationError, _>(40., false, |_, _| {
+                Ok(ClientControlActions {
+                    connected: Some(true),
+                    announcement_lifecycle: life,
+                    ..Default::default()
+                })
+            })
+            .unwrap();
+        let view = world.announcement_view();
+        let prepared =
+            render::prepare_gameplay(&mut world, bank, [960, 540], 1., identity, quality);
+        (view, prepared)
+    };
+    let client = g.client().clone();
+    let (view, before_record) = prepare(&client, &mut g.bank, Some(alive), 100);
+    assert!(!view.present && view.text.blocks.is_empty());
+    let before_record = before_record.expect("no record must retain the old world capacity");
+    assert_eq!(before_record.frame.draws.len(), old_capacity);
+    // Production finishing still admits the HUD and validates the complete frame.
+    let mut hud = g.hud_view();
+    let ScoreStatus::Ready(score) = g.client().score_view().status else {
+        panic!("ready score");
+    };
+    hud.score = score.to_string();
+    hud.opacity.readout = 1.;
+    hud.opacity.header = 0.85;
+    hud.opacity.rows = 1.;
+    let finished = render::finish_hud(before_record, &mut g.bank, &hud).unwrap();
+    assert!(finished.frame.draws.len() > old_capacity);
+    assert!(finished.frame.draws.len() <= MAX_DRAWS);
+    assert!(finished.pixel_bytes() <= slither_wgpu_slice::bank::PIXEL_BUDGET);
+
+    board_at(&mut g, 4.);
+    let client = g.client().clone();
+    let (view, no_projection) = prepare(&client, &mut g.bank, Some(alive), 101);
+    assert!(view.opacity > 0. && !view.present && view.text.blocks.is_empty());
+    assert_eq!(no_projection.unwrap().frame.draws.len(), old_capacity);
+
+    g.receive(g.generation(), &bundle(&[message("N", "retained")]), 5.)
+        .unwrap();
+    let client = g.client().clone();
+    let (view, zero_fade) = prepare(&client, &mut g.bank, None, 102);
+    assert!(view.present && !view.text.blocks.is_empty());
+    assert_eq!(view.opacity, 0.);
+    assert_eq!(zero_fade.unwrap().frame.draws.len(), old_capacity);
+    for (identity, fraction) in [(103, 0.01), (104, 0.5), (105, 1.)] {
+        let (view, visible) = prepare(
+            &client,
+            &mut g.bank,
+            Some(AnnouncementLifecycle {
+                death_pending: true,
+                return_active: true,
+                return_completed: false,
+                return_fraction: fraction,
+            }),
+            identity,
+        );
+        assert!(view.present);
+        assert_eq!(view.opacity, fraction);
+        assert_eq!(
+            MAX_DRAWS
+                - render::PanelDrawReserve {
+                    announcement: true,
+                    result: false
+                }
+                .late_draws(),
+            7956
+        );
+        assert_eq!(
+            visible.err().as_deref(),
+            Some("frame extent/scale/budget: mandatory overlay reserve")
+        );
+    }
+    let (view, returned) = prepare(
+        &client,
+        &mut g.bank,
+        Some(AnnouncementLifecycle {
+            death_pending: false,
+            return_active: true,
+            return_completed: true,
+            return_fraction: 0.,
+        }),
+        106,
+    );
+    assert!(view.present);
+    assert_eq!(view.opacity, -1.);
+    assert_eq!(returned.unwrap().frame.draws.len(), old_capacity);
+
+    // An actual next Setup hides the record while retaining the same geometry.
+    g.receive(g.generation(), &bundle(&[setup()]), 6.).unwrap();
+    pictures(&mut g);
+    let client = g.client().clone();
+    let (view, setup_hidden) = prepare(&client, &mut g.bank, Some(alive), 107);
+    assert!(view.present);
+    assert_eq!(view.opacity, 0.);
+    assert_eq!(setup_hidden.unwrap().frame.draws.len(), old_capacity);
+}
+#[test]
 fn all_four_branches_preserve_fragment_alpha_gap_geometry_and_fade_resources() {
     for (name, message) in [("N", "M"), ("", "M"), ("N", ""), ("", "")] {
         let mut g = ready(name, message);

@@ -147,10 +147,15 @@ regression also checks both grow-early/shrink-later producer orders and rollback
 
 Both named draw reserves are 96: up to 88 text draws plus 8 fills/borders/controls.
 Current minimap reserve is **12**, rather than the earlier plan's 8. With HUD 128,
-opting in both panels reserves **332**, leaving **7860** non-overlay draws out of
-the unchanged 8192. With only announcements enabled, production reserves **236**, leaving **7956**
-non-overlay draws. With neither producer enabled the reserve stays **140**.
-Dense mandatory geometry still fails admission explicitly; enabling a producer
+two visible panels reserve **332**, leaving **7860** non-overlay draws out of
+the unchanged 8192. While a captured announcement view is visible (present
+content, projected blocks and positive opacity), production reserves **236**,
+leaving **7956** non-overlay draws, including through the fade. Before any record,
+while Setup hides it, at zero opacity and after the return sentinel, announcements
+reserve no draws: the existing **140** HUD/minimap reserve leaves **8052** world
+draws. Admission and submission use the same captured view; retries reuse its
+prepared resources. With neither producer enabled the reserve stays **140**.
+Dense mandatory geometry still fails admission explicitly; a visible producer
 requires the full named reserve before optional world draws, and rejects a world
 that consumes it. This does not establish dense gameplay coverage.
 Future producers must preflight the entire mandatory panel,

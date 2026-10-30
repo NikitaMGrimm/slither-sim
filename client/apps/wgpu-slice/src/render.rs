@@ -613,6 +613,10 @@ pub fn prepare_gameplay(
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
     let announcement = client.announcement_view();
+    // Select admission from the same snapshot submitted below. Hidden content
+    // (including Setup and the return sentinel) must not reduce world capacity.
+    let visible =
+        announcement.present && announcement.opacity > 0. && !announcement.text.blocks.is_empty();
     prepare_composed(
         client,
         bank,
@@ -621,7 +625,7 @@ pub fn prepare_gameplay(
         identity,
         applied,
         PanelDrawReserve {
-            announcement: true,
+            announcement: visible,
             result: false,
         },
         Some(&announcement),
