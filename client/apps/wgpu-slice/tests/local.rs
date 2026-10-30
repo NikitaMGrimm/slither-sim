@@ -492,6 +492,63 @@ fn setup_pressure_discards_retain_quality_counts() {
     assert_eq!(game.quality().low_fps_counter, 0.);
 }
 
+#[test]
+fn retried_setup_supersession_keeps_one_quality_credit_and_releases_its_fence() {
+    for (ingress, animation_draws) in [(false, 22), (false, 23), (true, 22), (true, 23)] {
+        let mut game = negotiating();
+        let mut control = negotiating();
+        for g in [&mut game, &mut control] {
+            g.receive(g.generation(), &bundle(&[setup(), snake(44)]), 3.)
+                .unwrap();
+        }
+        pictures(&mut control);
+        let picture = game.take_frame().unwrap();
+        let old_identity = picture.frame.identity;
+        assert!(picture.pixel_bytes() > 0);
+        game.retry_frame(picture).unwrap(); // ownership and pixels return to the queue
+        assert!(game.has_frame());
+        assert!(game.presented(true).is_err()); // no host-owned acknowledgment remains
+        if ingress {
+            for g in [&mut game, &mut control] {
+                g.receive(g.generation(), &bundle(&[received_food(1)]), 4.)
+                    .unwrap();
+            }
+            game.service_ingress().unwrap();
+            assert!(!game.has_frame());
+            assert_eq!(game.client().foods().foods().len(), 1);
+        }
+        for now in (1..=animation_draws)
+            .map(|n| f64::from(n) * 40.)
+            .chain([1040.])
+        {
+            game.begin_redraw(now, [960, 540], 1.).unwrap();
+            assert_eq!(effects(&mut game), pump(&mut control, now));
+            let fresh = game.take_frame().unwrap();
+            assert!(fresh.frame.identity > old_identity);
+            let resources = fresh
+                .resources
+                .iter()
+                .map(|r| (r.asset.into(), r.asset))
+                .collect();
+            fresh.frame.quads(&resources).unwrap();
+            game.presented(true).unwrap();
+            assert!(!game.has_frame());
+            assert!(game.presented(true).is_err());
+        }
+        assert_eq!(game.quality().high_quality, animation_draws == 23);
+        assert_eq!(game.quality(), control.quality());
+        // Completed pictures own their Vec pixel buffers; clearing the queue
+        // drops those copies. Neither retry path leaves additional bank residency.
+        assert_eq!(game.bank.cached_sources(), control.bank.cached_sources());
+        assert_eq!(
+            game.bank.text.cached_bytes(),
+            control.bank.text.cached_bytes()
+        );
+        #[cfg(feature = "feel-trace")]
+        assert_eq!(game.feel_pending(), [0, 0]);
+    }
+}
+
 fn zero_header_preserves_readout(rank: u16, population: u16) {
     let mut g = playing();
     let before = g.hud_view();

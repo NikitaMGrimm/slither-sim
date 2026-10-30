@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { desktopSteps, classifyPath, coreHistoryComparison } from './feel-replay/desktop.mjs';
+import { validateSuccessfulDraws } from './feel-replay/schema.mjs';
+
+test('draw accounting counts only receipted preparations once in sample order', () => {
+  const sample = (phase, committed, count) => ({ phase, status: { committed }, quality: { successfulDraws: count } });
+  const trace = { samples: [sample('draw', true, 1), sample('draw', false, 1),
+    sample('update', false, 1), sample('draw', true, 2)] };
+  assert.equal(validateSuccessfulDraws(trace), 2);
+  trace.samples[0].quality.successfulDraws = 2;
+  assert.throws(() => validateSuccessfulDraws(trace), /samples\[0\].quality.successfulDraws/);
+});
 
 const step = (kind, at) => ({ event: { kind, sourceId: `${kind}-${at}`, actualMs: at, scheduledMs: at }, actions: [] });
 test('zero-delay desktop lane preserves the authored schedule', () => {

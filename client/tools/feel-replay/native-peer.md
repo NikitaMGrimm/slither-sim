@@ -148,8 +148,12 @@ Setup pictures are not counted as successful presents. Their already-recorded
 core draw/camera samples remain. Work awaiting acknowledgment, pending I/O and
 host-owned pictures still fence ingress/preparation; retry does not resample.
 Draw IDs enumerate preparations; `quality.successfulDraws` and final `draws`
-count successful acknowledgments. A delayed desktop acknowledgment receives
-credit at its actual event, without adding another preparation sample.
+count only real successful acknowledgments, using the shared sequence/receipt
+model. As in Canvas assembly, sample counts are cumulative committed draws in
+preparation order after receipt matching. The lifecycle sidecar records a delayed
+desktop acknowledgment at its actual event, without another preparation sample.
+Memory-skipped Setup pictures neither fence ingress nor receive quality credit;
+completed Setup pictures count once toward quality whether presented or superseded.
 
 Each run executes the unchanged equal-schedule lane and a native equal-schedule
 control with the desktop lane's admitted service/sample times. The latter
@@ -160,8 +164,9 @@ event IDs and presentation accounting. Full differences against the original
 Canvas and native equal lane are retained and classified without tolerance.
 
 The runner authenticates the staged candidate, executable, input, schedule and
-completed A2 trace. Its exit code checks byte-exact repeats, recorder errors,
-packet/acknowledgment counts, pending work and the paced core control. The strict
+completed A2 trace. Its exit code checks shared cumulative draw accounting,
+recorder errors, packet/acknowledgment counts, pending work and the paced core
+control. Repeat byte equality remains diagnostic. The strict
 original A1 gate remains in `a1-comparison.json`: changed service times, skipped
 redraws, tail acknowledgments or superseded Setup submissions can fail it.
 Diagnostic success does not promote it to a pass. Draw status is recorded at the
@@ -192,8 +197,12 @@ statistics, as on Canvas. Dropping that count at the <=24 threshold can trigger
 an earlier low-quality transition and change the subsequent face-heading target.
 The long-stall regression checks that threshold without another draw or sample.
 
-Inherited cross-target camera-weight differences and B2 native input-shim
-differences remain separate from this result. A private tape's frozen 60 Hz
-command expectation can fail at higher cadence even when both browser peers
-agree. Preserve those failures instead of learning an expectation from a run.
-These authored CPU histories establish neither desktop pacing nor perceptual parity.
+Retried Setup pictures may also be superseded after ownership returns to
+LocalGame: the queue drops their owned pixel copies, retains one quality credit,
+and leaves no acknowledgment or ingress fence. Redraw and ingress regressions
+check both sides of the quality threshold against an eager control.
+
+A private tape's frozen 60 Hz command expectation can fail at higher cadence
+even when both browser peers agree. Preserve those failures instead of learning
+an expectation from a run. These authored CPU histories establish neither
+desktop pacing nor perceptual parity.

@@ -23,8 +23,6 @@ pub struct Driver {
     pub extent: [u32; 2],
     pub desktop: bool,
     pub lifecycle: Vec<Value>,
-    pub issued: Option<slither_client::feel_trace::Observation>,
-    pub successful_draws: usize,
     pending_ack: Option<f64>,
     socket: Option<u32>,
     sends: usize,
@@ -45,8 +43,6 @@ impl Driver {
             extent: render::backing_size([width, height])?,
             desktop: false,
             lifecycle: vec![],
-            issued: None,
-            successful_draws: 0,
             pending_ack: None,
             socket: None,
             sends: 0,
@@ -111,23 +107,26 @@ impl Driver {
             let Some(_picture) = self.game.take_frame() else {
                 return Ok(());
             };
-            // The issued candidate is observable before its world is committed.
-            let observation = self.game.issued_feel_observation().map(|row| row.sequence);
-            if observation.is_none() && !self.recorder.has_failed() {
-                return Err("Issued picture has no observation".into());
-            }
-            self.game.presented(true)?;
-            if let Some(sequence) = observation
-                && !self.acknowledged_pictures.insert(sequence)
-            {
-                return Err("Picture observation acknowledged twice".into());
-            }
+            self.present_picture()?;
         }
         if self.game.has_frame() {
             Err("Picture drain budget".into())
         } else {
             Ok(())
         }
+    }
+    fn present_picture(&mut self) -> Result<()> {
+        let observation = self.game.issued_feel_observation().map(|row| row.sequence);
+        if observation.is_none() && !self.recorder.has_failed() {
+            return Err("Issued picture has no observation".into());
+        }
+        self.game.presented(true)?;
+        if let Some(sequence) = observation
+            && !self.acknowledged_pictures.insert(sequence)
+        {
+            return Err("Picture observation acknowledged twice".into());
+        }
+        Ok(())
     }
     pub fn flush(&mut self, now: f64) -> Result<()> {
         self.game.observe_time(now)?;
@@ -154,7 +153,6 @@ impl Driver {
         self.game.begin_redraw(now, self.extent, 1.)?;
         self.drain_effects(now)?;
         if let Some(picture) = self.game.take_frame() {
-            self.issued = self.game.issued_feel_observation().cloned();
             self.lifecycle.push(json!({"kind":"issue", "atMs":now,
                 "identity":picture.frame.identity.to_string(), "ackMs":ack_at}));
             self.pending_ack = Some(ack_at);
@@ -169,13 +167,12 @@ impl Driver {
             if due != now {
                 return Err("Desktop picture acknowledgment at wrong time".into());
             }
-            self.game.presented(true)?;
-            self.successful_draws += 1;
-            self.lifecycle.push(json!({"kind":"presented", "atMs":now}));
+            self.present_picture()?;
             self.drain_effects(now)?;
         }
         Ok(())
     }
+    #[cfg(test)]
     pub fn awaiting_picture(&self) -> bool {
         self.pending_ack.is_some()
     }
@@ -277,7 +274,7 @@ mod tests {
         let mut d = playing();
         d.desktop = true;
         d.recorder.take();
-        let before = d.successful_draws;
+        d.acknowledged_pictures.clear();
         // Authored protocol-19 Setup, completed but superseded before display.
         let setup = [
             b'a', 0, 3, 232, 1, 174, 0, 100, 0, 20, 48, 2, 27, 0, 40, 5, 120, 0, 33, 0, 28, 1, 174,
@@ -285,7 +282,7 @@ mod tests {
         ];
         d.packet(&setup, 30.).unwrap();
         d.redraw(40., 80.).unwrap();
-        assert_eq!(d.successful_draws, before);
+        assert!(d.acknowledged_pictures.is_empty());
         assert!(d.awaiting_picture());
         assert_eq!(
             d.recorder
@@ -296,10 +293,9 @@ mod tests {
             2
         );
         d.ack_picture(80.).unwrap();
-        assert_eq!(d.successful_draws, before + 1);
-        assert_eq!(d.lifecycle.last().unwrap()["atMs"].as_f64(), Some(80.));
+        assert_eq!(d.acknowledged_pictures.len(), 1);
         d.ack_picture(80.).unwrap();
-        assert_eq!(d.successful_draws, before + 1);
+        assert_eq!(d.acknowledged_pictures.len(), 1);
     }
     #[test]
     fn delayed_issue_retry_and_commit_keep_the_exact_staged_snapshot() {

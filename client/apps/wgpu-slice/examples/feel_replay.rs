@@ -10,6 +10,7 @@ mod observation;
 mod synthetic_tape;
 use serde_json::{Value, json};
 use slither_wgpu_slice::Result;
+use std::collections::BTreeMap;
 use std::io::{self, Read};
 
 fn number(v: &Value) -> Result<f64> {
@@ -46,6 +47,7 @@ fn replay(request: Value) -> Result<Value> {
     let mut frame = 0;
     let mut draw = 0;
     let mut successful_draws = 0;
+    let mut observed = BTreeMap::new();
     let mut appeared = false;
     let mut errors = vec![];
     for (seq, step) in request["steps"]
@@ -58,7 +60,6 @@ fn replay(request: Value) -> Result<Value> {
         let now = number(&event["actualMs"])?;
         d.effects.clear();
         d.commands.clear();
-        d.issued = None;
         if step["skippedRedraw"] == true {
             d.lifecycle
                 .push(json!({"kind":"blocked-redraw", "atMs":now}));
@@ -151,10 +152,6 @@ fn replay(request: Value) -> Result<Value> {
                 "pre-appearance"
             };
             let drawing = row.phase == "draw";
-            let acknowledged = d.acknowledged_pictures.remove(&row.sequence);
-            if acknowledged {
-                successful_draws += 1;
-            }
             let draw_id = if drawing {
                 let id = draw;
                 draw += 1;
@@ -162,23 +159,45 @@ fn replay(request: Value) -> Result<Value> {
             } else {
                 Value::Null
             };
+            observed.insert(row.sequence, samples.len());
             samples.push(json!({"id":format!("{}-{}-{}",text(&event["sourceId"])?,row.phase,samples.len()),
                 "eventSeq":seq,"phase":row.phase,"frameId":frame,"drawId":draw_id,"atMs":now,"eligibility":eligibility,
                 "delta":o["delta"], "lag":{"active":session.lagging,"multiplier":o["multiplier"],
                     "pingPending":session.ping_pending,"pongAgeMs":(now-session.last_ping_ms).max(0.)},
                 "own":o["own"],"camera":o["camera"],"quality":{"requested":"high",
-                    "active":if d.game.quality().high_quality {"high"} else {"low"},"successfulDraws":successful_draws},
-                "geometry":geometry,"status":{"prepared":drawing,"submitted":acknowledged,"committed":acknowledged,
+                    "active":if d.game.quality().high_quality {"high"} else {"low"},"successfulDraws":0},
+                "geometry":geometry,"status":{"prepared":drawing,"submitted":false,"committed":false,
                     "retries":0,"sendFailed":false,"presentFailed":false}}));
         }
-        if !d.acknowledged_pictures.is_empty() {
-            return Err("Acknowledged picture has no recorded observation".into());
+        for sequence in std::mem::take(&mut d.acknowledged_pictures) {
+            let index = *observed
+                .get(&sequence)
+                .ok_or("Acknowledged picture has no recorded observation")?;
+            let sample = &mut samples[index];
+            if sample["phase"] != "draw" || sample["status"]["committed"] == true {
+                return Err("Invalid/duplicate picture acknowledgement".into());
+            }
+            sample["status"]["submitted"] = json!(true);
+            sample["status"]["committed"] = json!(true);
+            if d.desktop {
+                d.lifecycle
+                    .push(json!({"kind":"presented", "atMs":now, "eventSeq":seq,
+                    "sequence":sequence.to_string(), "drawId":sample["drawId"]}));
+            }
         }
         errors.extend(d.recorder.take_errors());
         if event["kind"] == "frame" {
             frame += 1;
         }
         events.push(event);
+    }
+    // Like browser assembly, receipt identities determine final commitment and
+    // cumulative sample counts. Receipt times remain on their actual events.
+    for sample in &mut samples {
+        if sample["phase"] == "draw" && sample["status"]["committed"] == true {
+            successful_draws += 1;
+        }
+        sample["quality"]["successfulDraws"] = json!(successful_draws);
     }
     let pending = d.game.feel_pending();
     let body = json!({"schema":2,"events":events,"commands":commands,"samples":samples,
@@ -196,11 +215,40 @@ fn replay(request: Value) -> Result<Value> {
 }
 
 #[cfg(test)]
-mod tests {
+mod desktop_tests {
     use super::*;
 
     #[test]
-    fn desktop_trace_reports_successes_only_after_their_ack_event() {
+    fn equal_setup_pair_has_per_row_acknowledgment_counts() {
+        use synthetic_tape::{bundle, challenge, setup};
+        let backing = slither_wgpu_slice::render::backing_size([960., 540.]).unwrap();
+        let steps = vec![
+            json!({"event":{"sourceId":"startup","kind":"frame","actualMs":0.}}),
+            json!({"event":{"sourceId":"challenge","kind":"packet","actualMs":1.},"packet":challenge()}),
+            json!({"event":{"sourceId":"setups","kind":"packet","actualMs":2.},"packet":bundle(&[setup(),setup()])}),
+        ];
+        let result = replay(json!({"geometry":{"css":{"width":960.,"height":540.},
+            "backing":{"width":backing[0] as f64,"height":backing[1] as f64}},
+            "pointer":{"x":480.,"y":270.},"durationMs":2.,"steps":steps}))
+        .unwrap();
+        let draws: Vec<_> = result["body"]["samples"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|s| s["phase"] == "draw")
+            .collect();
+        assert_eq!(draws.len(), 3);
+        for (i, row) in draws.iter().enumerate() {
+            assert_eq!(
+                row["quality"]["successfulDraws"].as_u64(),
+                Some(i as u64 + 1)
+            );
+            assert_eq!(row["status"]["committed"], true);
+        }
+    }
+
+    #[test]
+    fn desktop_trace_matches_receipts_across_later_ack_events() {
         let step = |id: &str, kind: &str, now: f64| json!({"event":{"sourceId":id,"kind":kind,"scheduledMs":now,"actualMs":now}});
         let mut startup = step("startup", "frame", 0.);
         startup["ackAtMs"] = json!(40.);
@@ -224,10 +272,7 @@ mod tests {
         assert_eq!(draws.len(), 2);
         for (id, sample) in draws.iter().enumerate() {
             assert_eq!(sample["drawId"].as_u64(), Some(id as u64));
-            assert_eq!(
-                sample["quality"]["successfulDraws"].as_u64(),
-                Some(id as u64)
-            );
+            assert_eq!(sample["quality"]["successfulDraws"].as_u64(), Some(1));
         }
         let mut last_ack = step("next-ack", "input", 90.);
         last_ack["acknowledgment"] = json!(true);
@@ -243,6 +288,15 @@ mod tests {
             .map(|e| e["atMs"].as_f64().unwrap())
             .collect();
         assert_eq!(ack_times, [40., 90.]);
+        let receipts = done["lifecycle"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|e| e["kind"] == "presented");
+        for receipt in receipts {
+            let event = &done["body"]["events"][receipt["eventSeq"].as_u64().unwrap() as usize];
+            assert_eq!(event["actualMs"], receipt["atMs"]);
+        }
     }
 }
 

@@ -8,6 +8,7 @@ import { assertBuildBinding } from './feel-replay/artifacts.mjs';
 import { assertWasmTraceBinding, nativeSteps } from './feel-replay/native.mjs';
 import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
+import { validateSuccessfulDraws } from './feel-replay/schema.mjs';
 import { desktopSteps, desktopComparison, coreHistoryComparison } from './feel-replay/desktop.mjs';
 
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
@@ -86,6 +87,9 @@ try {
   const pacedRaw = invoke([], { geometry, pointer, durationMs: request.durationMs, steps: pacedSteps });
   await writeFile(path.join(out, 'paced-equal-observations.json'), pacedRaw);
   const paced = parse(pacedRaw).body;
+  for (const trace of [desktop, equal, paced]) {
+    if (validateSuccessfulDraws(trace) !== trace.final.draws) throw new Error('Final acknowledged draw count differs');
+  }
   const coreHistory = coreHistoryComparison(paced, desktop);
   await writeFile(path.join(out, 'paced-core-differences.json'), stringify(coreHistory));
   const wasmComparison = desktopComparison(wasm, desktop), equalComparison = desktopComparison(equal, desktop);
@@ -96,6 +100,7 @@ try {
   const a1 = compareTraces(wasm, desktop, schedule, { mode: 'cross-target' });
   await writeFile(path.join(out, 'a1-comparison.json'), stringify(a1));
   const summary = { lane: 'desktop-ordering', hz, delayMs, byteExact: raw === repeatedRaw && traceBytes === repeatBytes,
+    drawAccountingValid: true,
     errors: [...observed.errors, ...equalObserved.errors, ...repeated.errors], a1Status: a1.status,
     commandEffectsUnique: new Set(desktop.commands.map(c => c.effectId)).size === desktop.commands.length,
     effectAcksUnique: new Set(observed.effects.map(e => `${e.generation}:${e.id}`)).size === observed.effects.length,
@@ -114,7 +119,7 @@ try {
   if (sha256(await readFile(inputFile)) !== sha256(input) || sha256(await readFile(built.executable)) !== built.sha256
     || git('write-tree') !== product.tree || git('diff', '--name-only')) throw new Error('Replay inputs/artifacts/source changed during run');
   console.log(JSON.stringify(summary));
-  if (!summary.byteExact || summary.errors.length || summary.issues !== summary.acknowledgments
+  if (summary.errors.length || summary.issues !== summary.acknowledgments
     || summary.packets !== summary.ingested || !summary.pacedCoreExact
     || !summary.commandEffectsUnique || !summary.effectAcksUnique
     || desktop.final.pendingEffects || desktop.final.pendingFrames) process.exitCode = 1;

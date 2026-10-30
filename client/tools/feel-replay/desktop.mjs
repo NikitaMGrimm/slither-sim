@@ -67,6 +67,7 @@ export function desktopComparison(left, right) {
   const firstOwn = trace => trace.samples.find(s => s.own !== null)?.atMs ?? null;
   return { classes, rows, counts: [left, right].map(trace => ({ events: trace.events.length,
     commands: trace.commands.length, samples: trace.samples.length, draws: trace.final.draws,
+    preparedDraws: trace.samples.filter(s => s.phase === 'draw').length,
     frameUpdates: frames(trace).length, firstOwnMs: firstOwn(trace), pending: [trace.final.pendingEffects, trace.final.pendingFrames] })) };
 }
 
