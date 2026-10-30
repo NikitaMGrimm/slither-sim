@@ -238,6 +238,10 @@ impl GameplayPolicy {
     pub fn profile_failed(&mut self) {
         self.inner.profile_failed()
     }
+    /// Copy a local pre-game transport failure classification.
+    pub fn retry_transport_failure(&self, phase: &str, playing: bool, reason: &str) -> bool {
+        self.inner.retry_transport_failure(phase, playing, reason)
+    }
     /// Explicit local session replacement.
     pub fn replace_local(&self, disconnected: bool, returned_victory: bool) -> bool {
         self.inner.replace_local(disconnected, returned_victory)

@@ -23,7 +23,9 @@ that copied the official login.
 
 ## Official servers
 
-`--official` plays on the official servers (native only). Each Play fetches the
+`--official` configures official play (native only). The window opens on login;
+`--nickname`/`--skin` are initial values. Click Play or press Enter to connect.
+Each explicit Play fetches the
 homepage, its `/s/game<digits>.js` script and the server directory as inert data,
 parses `client_version`/`cpw` with the core's closed literal grammar (code is
 never evaluated), pings one address per cluster over `ws://address:80/ptc` and
@@ -89,7 +91,8 @@ cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
 
 The full check command also generates bindings in dist/wgpu-slice/pkg. To try the
 WebGPU host, copy web/index.html and web/*.mjs from this app alongside that pkg
-folder, serve the output over loopback HTTP, and enter a local simulator endpoint.
+folder and serve the output over loopback HTTP with the simulator endpoint
+configured by the dev server. The shared DOM login opens before any connection.
 A WebGPU-capable browser is required. There is no Canvas fallback.
 
 On Windows, from this app directory, `cargo run --release --example sprite_parity -- <private-pack-dir>`

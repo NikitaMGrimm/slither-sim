@@ -9,9 +9,9 @@ test('default minimap publishes Rust views, reuses image buffers and stays outsi
       prepareWasm(api, run) {
         api.LeaderboardScoreProjector = run('(class { project() { throw Error("No board projection expected"); } free() {} })');
       } });
-    graph.hudWasm();
+    graph.hudWasm();graph.stubLogin();
     const entry = await graph.load('bootstrap.mjs'), runtime = await entry.gamePageRuntime;
-    const root = graph.f.document.getElementById('slither-client-root'), holder = root.children[6];
+    const root = graph.f.document.getElementById('slither-client-root'), holder = root.children[5];
     const style = node => graph.f.edit.hud.style(node.style);
     const uploads = () => graph.f.edit.minimap.trace.filter(call => call[0] === 'putImageData');
     const frame = now => {

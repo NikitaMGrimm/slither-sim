@@ -1,0 +1,14 @@
+{
+  "archiveSha256": "cbf61c18d8b9d30af807463243bf006e71f5caeaf12cbce26e56397d88f6147e",
+  "fullResultEqual": true,
+  "onlineFullResultSha256": "a866c116ccbaa0a5a78d2b6e01aebd293b483ed12959076eeb6645f784954620",
+  "offlineFullResultSha256": "a866c116ccbaa0a5a78d2b6e01aebd293b483ed12959076eeb6645f784954620",
+  "omittedFields": [],
+  "tailAndMaximumMutationsDetected": [
+    "p50",
+    "p99",
+    "p999",
+    "max"
+  ],
+  "scope": "Post-result retained-data verification; no selection or gate changes"
+}

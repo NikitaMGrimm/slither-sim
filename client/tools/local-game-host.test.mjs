@@ -538,7 +538,7 @@ test('default local bootstrap initializes once before sources and shares the exa
   };
   const start = startDefault(async options => {
     runtimeHost = options.localHost;
-    assert.equal(options.ownedAppearancePreview, true); assert.equal(options.ownedLoadingUi, true);
+    assert.equal(options.loginScreen, true); assert.equal(options.ownedAppearancePreview, undefined); assert.equal(options.ownedLoadingUi, undefined);
     assert.equal(options.initialize(), ready); assert.equal(options.initialize(), ready);
     await options.initialize();
     runtimeHost.bindSkinPolicy(localRuleDouble);

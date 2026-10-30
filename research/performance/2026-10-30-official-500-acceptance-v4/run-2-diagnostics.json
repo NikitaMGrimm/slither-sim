@@ -1,0 +1,362 @@
+{
+  "scope": "Whole one-second intervals covering the full requested window; descriptive, no exclusions",
+  "intervalCount": 1801,
+  "sampledWallSeconds": 1801.0000500679016,
+  "maxSampleGapSeconds": 1.0018479824066162,
+  "maxScanSeconds": 0.017897605895996094,
+  "meanCpuMillisecondsPerWallSecond": {
+    "diagnostic": 5.541365753778704,
+    "observer": 7.867850975054531,
+    "other": 3.3647972412724387,
+    "server": 677.3125852795004
+  },
+  "userCounterResidualCpuSeconds": -50.18,
+  "coreCpuSeconds": {
+    "user": 539.68,
+    "nice": 0.0,
+    "system": 461.86,
+    "idle": 494.58,
+    "iowait": 0.03,
+    "irq": 0.0,
+    "softirq": 203.3,
+    "steal": 0.01
+  },
+  "ctxtDelta": 6629163,
+  "procsRunningSampleRange": [
+    1,
+    5
+  ],
+  "largestMatchedOtherCpuIntervals": [
+    {
+      "fromOffsetSeconds": 852.7288386821747,
+      "toOffsetSeconds": 853.7288298606873,
+      "wallSeconds": 0.9999911785125732,
+      "userCounterResidualSeconds": -0.030000000000000027,
+      "matchedOtherUserSeconds": 0.0,
+      "matchedOtherCpuSeconds": 0.03,
+      "ctxtDelta": 3592,
+      "procsRunning": 2,
+      "coreSeconds": [
+        0.31,
+        0.0,
+        0.27,
+        0.25,
+        0.0,
+        0.0,
+        0.13,
+        0.0
+      ],
+      "newOrUnmatchedProcesses": 0
+    },
+    {
+      "fromOffsetSeconds": 20.728835582733154,
+      "toOffsetSeconds": 21.728839635849,
+      "wallSeconds": 1.0000040531158447,
+      "userCounterResidualSeconds": -0.019999999999999962,
+      "matchedOtherUserSeconds": 0.0,
+      "matchedOtherCpuSeconds": 0.02,
+      "ctxtDelta": 3846,
+      "procsRunning": 1,
+      "coreSeconds": [
+        0.28,
+        0.0,
+        0.21,
+        0.36,
+        0.0,
+        0.0,
+        0.1,
+        0.0
+      ],
+      "newOrUnmatchedProcesses": 0
+    },
+    {
+      "fromOffsetSeconds": 62.72883605957031,
+      "toOffsetSeconds": 63.72886657714844,
+      "wallSeconds": 1.000030517578125,
+      "userCounterResidualSeconds": -0.020000000000000018,
+      "matchedOtherUserSeconds": 0.0,
+      "matchedOtherCpuSeconds": 0.02,
+      "ctxtDelta": 3820,
+      "procsRunning": 2,
+      "coreSeconds": [
+        0.3,
+        0.0,
+        0.22,
+        0.34,
+        0.0,
+        0.0,
+        0.1,
+        0.0
+      ],
+      "newOrUnmatchedProcesses": 0
+    },
+    {
+      "fromOffsetSeconds": 67.72920322418213,
+      "toOffsetSeconds": 68.72885513305664,
+      "wallSeconds": 0.9996519088745117,
+      "userCounterResidualSeconds": -0.019999999999999962,
+      "matchedOtherUserSeconds": 0.0,
+      "matchedOtherCpuSeconds": 0.02,
+      "ctxtDelta": 3838,
+      "procsRunning": 1,
+      "coreSeconds": [
+        0.28,
+        0.0,
+        0.22,
+        0.34,
+        0.0,
+        0.0,
+        0.11,
+        0.0
+      ],
+      "newOrUnmatchedProcesses": 0
+    },
+    {
+      "fromOffsetSeconds": 90.7288122177124,
+      "toOffsetSeconds": 91.72927975654602,
+      "wallSeconds": 1.0004675388336182,
+      "userCounterResidualSeconds": -0.020000000000000018,
+      "matchedOtherUserSeconds": 0.0,
+      "matchedOtherCpuSeconds": 0.02,
+      "ctxtDelta": 3815,
+      "procsRunning": 3,
+      "coreSeconds": [
+        0.29,
+        0.0,
+        0.22,
+        0.35,
+        0.0,
+        0.0,
+        0.12,
+        0.0
+      ],
+      "newOrUnmatchedProcesses": 0
+    }
+  ],
+  "timersPresent": [
+    "apt-daily-upgrade.timer",
+    "apt-daily.timer",
+    "fstrim.timer",
+    "fwupd-refresh.timer",
+    "man-db.timer"
+  ],
+  "timersAbsent": [],
+  "servicesStopped": [
+    "fwupd.service",
+    "snap.amazon-ssm-agent.amazon-ssm-agent.service",
+    "snapd.service",
+    "snapd.socket"
+  ],
+  "stopOnlyEtcUnits": [
+    "snap.amazon-ssm-agent.amazon-ssm-agent.service"
+  ],
+  "preWindowStateOffsetSeconds": -254.43932843208313,
+  "afterStateOffsetSeconds": 5.704408884048462,
+  "beforeWindowAndAfterStates": {
+    "apt-daily-upgrade.service": [
+      [
+        "inactive",
+        "static"
+      ],
+      [
+        "inactive",
+        "static"
+      ]
+    ],
+    "apt-daily-upgrade.timer": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "apt-daily.service": [
+      [
+        "inactive",
+        "static"
+      ],
+      [
+        "inactive",
+        "static"
+      ]
+    ],
+    "apt-daily.timer": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "chrony.service": [
+      [
+        "active",
+        "enabled"
+      ],
+      [
+        "active",
+        "enabled"
+      ]
+    ],
+    "fstrim.service": [
+      [
+        "inactive",
+        "static"
+      ],
+      [
+        "inactive",
+        "static"
+      ]
+    ],
+    "fstrim.timer": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "fwupd-refresh.service": [
+      [
+        "inactive",
+        "static"
+      ],
+      [
+        "inactive",
+        "static"
+      ]
+    ],
+    "fwupd-refresh.timer": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "fwupd.service": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "man-db.service": [
+      [
+        "inactive",
+        "static"
+      ],
+      [
+        "inactive",
+        "static"
+      ]
+    ],
+    "man-db.timer": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "rsyslog.service": [
+      [
+        "active",
+        "enabled"
+      ],
+      [
+        "active",
+        "enabled"
+      ]
+    ],
+    "snap.amazon-ssm-agent.amazon-ssm-agent.service": [
+      [
+        "inactive",
+        "enabled"
+      ],
+      [
+        "inactive",
+        "enabled"
+      ]
+    ],
+    "snapd.service": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "snapd.socket": [
+      [
+        "inactive",
+        "masked-runtime"
+      ],
+      [
+        "inactive",
+        "masked-runtime"
+      ]
+    ],
+    "ssh.service": [
+      [
+        "active",
+        "disabled"
+      ],
+      [
+        "active",
+        "disabled"
+      ]
+    ],
+    "systemd-journald.service": [
+      [
+        "active",
+        "static"
+      ],
+      [
+        "active",
+        "static"
+      ]
+    ],
+    "systemd-networkd.service": [
+      [
+        "active",
+        "enabled"
+      ],
+      [
+        "active",
+        "enabled"
+      ]
+    ],
+    "systemd-resolved.service": [
+      [
+        "active",
+        "enabled"
+      ],
+      [
+        "active",
+        "enabled"
+      ]
+    ]
+  },
+  "beforeAndAfterTimerInventoriesRetained": true,
+  "journalBytes": 8267,
+  "journalEntriesWithinWindow": 20,
+  "limits": "User counter residual includes nice CPU and may be negative: global/task classification and sampling do not reconcile exactly; it is not other-process CPU. Matched-process CPU omits tasks absent at either sample. Sequential scans, 10 ms counters and own-sampler runnable state limit attribution; no per-tick off-CPU trace. Raw identities/journal stay private.",
+  "archiveSha256": "cbf61c18d8b9d30af807463243bf006e71f5caeaf12cbce26e56397d88f6147e"
+}

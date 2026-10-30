@@ -2,13 +2,13 @@
 import test from 'node:test';
 import { runGameModuleTest } from './game-module-test-fixture.mjs';
 
-test('default bootstrap selects authored loading without changing its existing owner choices', async () => {
+test('default bootstrap selects login and preserves HUD ownership', async () => {
   await runGameModuleTest(async ({assert,createGraph}) => {
     const graph=createGraph({armed:false});
     graph.sources.set('https://authored-package.invalid/game/runtime.mjs', 'export async function startGamePage(options){return options;}');
     const bootstrap=await graph.load('bootstrap.mjs');
     const options=await bootstrap.startGamePage({realm:{location:{href:'https://authored.invalid/'}},initialize(){},wasmApi:{}});
-    assert.equal(options.ownedLoadingUi,true); assert.equal(options.ownedMenuUi,true);
+    assert.equal(options.loginScreen,true); assert.equal(options.ownedLoadingUi,undefined); assert.equal(options.ownedMenuUi,undefined);
     assert.equal(options.ownedPlayUi,true); assert.equal(options.diagnosticUi,false);
   });
 });

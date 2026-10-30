@@ -6,7 +6,7 @@ Read the full original criteria and amendment, then recorded the maintaining
 agent's prospective lower-only end-class correction and generator fixes in the
 new plan. V1 and its failed outcome remain unchanged. Runtime pin is current
 main `388be59aebf3108f5c510aa7269c08b67851b202`; runtime src/Cargo files are
-unchanged from v1. No local Rust work or instabox access.
+unchanged from v1. No local Rust work or access to the private bench host.
 
 The initial tagged Spot request failed with `InsufficientInstanceCapacity`
 before either instance launched. No host world, warmup or measured data existed.

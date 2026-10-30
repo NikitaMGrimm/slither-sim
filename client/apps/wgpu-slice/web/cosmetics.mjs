@@ -1,6 +1,7 @@
+import { menuEntries } from './menu-art.mjs';
 // Optional startup resources. Each path is attempted once; failures leave Play available.
-export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory = -1, signal,
-  fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
+export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory = -1, signal, includeMenu = true,
+  isCurrent = () => true, fetch: request = globalThis.fetch, warn = message => console.warn(message) }) {
   let images = new CosmeticImages();
   try {
     const localBase = new URL(baseUrl);
@@ -26,28 +27,27 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
     const cosmeticPaths = CosmeticImages.paths();
     try {
       const manifest = await read('menu/manifest.txt', 4096);
-      const reserved = new Set(cosmeticPaths);
-      const rows = new TextDecoder('utf-8', { fatal: true }).decode(manifest).split('\n').slice(1);
-      // Match Rust's ASCII field separators and exact logical path bindings.
-      if (rows.some(row => {
-        const fields = row.split(/[\t\f\r ]+/).filter(Boolean);
-        return fields.length === 3 && reserved.has(fields[2]);
-      })) throw new Error('Menu manifest path collides with cosmetic');
+      menuEntries(manifest,cosmeticPaths);
       images.manifest(manifest);
     }
     catch (error) {
-      if (signal?.aborted) return;
+      if (signal?.aborted || !isCurrent()) return;
       warn(`Menu manifest unavailable: ${String(error)}`);
     }
-    for (const path of [...cosmeticPaths, ...images.menu_paths()]) {
+    for (const path of [...cosmeticPaths, ...(includeMenu ? images.menu_paths() : [])]) {
       try {
-        images.add(path, await read(path, 4 * 1024 * 1024));
+        const bytes=await read(path,4*1024*1024);
+        if(signal?.aborted || !isCurrent())return;
+        images.add(path,bytes);
       } catch (error) {
-        if (signal?.aborted) return;
+        if (signal?.aborted || !isCurrent()) return;
         warn(`Cosmetic ${path} unavailable: ${String(error)}`);
       }
     }
+    if(signal?.aborted || !isCurrent())return;
+    const pixelBytes=includeMenu ? undefined : images.pixel_bytes();
     const ready = images; images = undefined;
     owner.cosmetics(ready, accessory);
+    return pixelBytes;
   } finally { images?.free(); }
 }

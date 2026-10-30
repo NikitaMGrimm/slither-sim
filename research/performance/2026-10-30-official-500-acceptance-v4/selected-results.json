@@ -1,0 +1,962 @@
+{
+  "runtime": "388be59aebf3108f5c510aa7269c08b67851b202",
+  "build": {
+    "runtime": "388be59aebf3108f5c510aa7269c08b67851b202",
+    "archiveSha256": "938fd0177e11803ea214ddba1456ef161acdb5ffa0051704e3de35e6a262fb7b",
+    "priorHarnessSha256": "d5ded01411369473944c6084492fd98b172ccfd98f46df36d0b879dc0ad7be5b",
+    "clientSourceSha256": "d989c9291403a093ad5d0f72d3a8937cf047d3565771380a45c4fda4833e8f09",
+    "cpuTarget": "x86-64",
+    "instrumentedRustAggregateSha256": "e63fb3faff687b8742305335211329c85a097a3c6a86961e1e395e37f911378d",
+    "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "binaries": {
+      "clients": "f8424b4bd4e997c06d9d648a356f9d2ea07f3a651953474d4ae68f25ba3387fe",
+      "host": "d7ddbc80efcd0c0b5fb8e1d61d3931eb3aaf3c64b40171fb8687b533a184c780"
+    }
+  },
+  "platform": {
+    "host": "c7a.medium",
+    "hostVcpus": 1,
+    "generator": "c8a.2xlarge",
+    "generatorVcpus": 8,
+    "clientWorkers": 6,
+    "region": "Frankfurt",
+    "market": "On-demand",
+    "privateSameAvailabilityZone": true,
+    "quietHostImage": true,
+    "sameImageAsV3": true
+  },
+  "runs": [
+    {
+      "run": 1,
+      "matureScreen": [
+        {
+          "deaths": 298,
+          "deferred": 0,
+          "food": 29709,
+          "living": 500,
+          "maxSegments": 273,
+          "meanSegments": 55.396,
+          "occupied": 500,
+          "p50Segments": 31,
+          "p90Segments": 181,
+          "p99Segments": 247,
+          "prey": 27,
+          "radius": 14981.655449248592,
+          "tick": 192000
+        },
+        {
+          "deaths": 302,
+          "deferred": 0,
+          "food": 29783,
+          "living": 500,
+          "maxSegments": 275,
+          "meanSegments": 55.828,
+          "occupied": 500,
+          "p50Segments": 31,
+          "p90Segments": 183,
+          "p99Segments": 247,
+          "prey": 28,
+          "radius": 14981.655449248592,
+          "tick": 192500
+        },
+        {
+          "deaths": 306,
+          "deferred": 0,
+          "food": 30314,
+          "living": 500,
+          "maxSegments": 277,
+          "meanSegments": 55.908,
+          "occupied": 500,
+          "p50Segments": 31,
+          "p90Segments": 183,
+          "p99Segments": 247,
+          "prey": 29,
+          "radius": 14981.655449248592,
+          "tick": 193000
+        }
+      ],
+      "result": {
+        "label": "acceptance-500",
+        "bots": 500,
+        "ticks": 257100,
+        "tickRange": [
+          194500,
+          451600
+        ],
+        "wallSeconds": 1799.7022898197174,
+        "ticksPerSecond": 142.85696109535684,
+        "worldCpuMsPerTick": {
+          "n": 257100,
+          "mean": 4.822147136320498,
+          "p50": 4.75066,
+          "p99": 7.01876,
+          "p999": 8.23852,
+          "max": 11.90661
+        },
+        "simulationCpuMsPerTick": {
+          "n": 257100,
+          "mean": 2.43838514655387,
+          "p50": 2.41552,
+          "p99": 4.56684,
+          "p999": 4.93791,
+          "max": 7.39276
+        },
+        "socketCpuMsPerTick": {
+          "n": 257100,
+          "mean": 2.3837619897666276,
+          "p50": 2.29554,
+          "p99": 4.11521,
+          "p999": 4.52545,
+          "max": 6.01005
+        },
+        "deferredTicks": 0,
+        "clientValid": true,
+        "passes": true,
+        "client": {
+          "headroom": true,
+          "workerCpuFraction": {
+            "1": {
+              "p50": 0.16027468247475707,
+              "p99": 0.16972922197024906,
+              "mean": 0.15930196785212236,
+              "max": 0.26189473243934486
+            },
+            "2": {
+              "p50": 0.15765801555699252,
+              "p99": 0.16785977688080256,
+              "mean": 0.15670930707091338,
+              "max": 0.17151882733830356
+            },
+            "3": {
+              "p50": 0.15747343671764738,
+              "p99": 0.16554404982076373,
+              "mean": 0.15618117173065868,
+              "max": 0.22207996174937789
+            },
+            "4": {
+              "p50": 0.15860586407334729,
+              "p99": 0.1687497862691504,
+              "mean": 0.15728766699940933,
+              "max": 0.17090858109277524
+            },
+            "5": {
+              "p50": 0.15844078482484147,
+              "p99": 0.16999105668218636,
+              "mean": 0.15757173942104324,
+              "max": 0.2550299160168763
+            },
+            "6": {
+              "p50": 0.15729387187370714,
+              "p99": 0.16776351465770944,
+              "mean": 0.15614091226811128,
+              "max": 0.2588988268308675
+            }
+          },
+          "worstInputP99Ms": 1.579167,
+          "counterDeltas": {
+            "frames": 99769465,
+            "bytes": 2426442339,
+            "decisions": 21442052,
+            "joins": 1675,
+            "deaths": 1675,
+            "forced": 0,
+            "admissionRefusals": 0
+          },
+          "everyWorkerFrameProgress": true,
+          "maxReceiptAgeSeconds": 0.20714847999988706,
+          "metricIntervals": [
+            {
+              "worker": 1,
+              "seconds": 1800.1963777542114,
+              "startOffsetSeconds": -0.01820540428161621,
+              "endOffsetSeconds": 0.0006783008575439453
+            },
+            {
+              "worker": 6,
+              "seconds": 1800.196410894394,
+              "startOffsetSeconds": -0.018137693405151367,
+              "endOffsetSeconds": 0.0007791519165039062
+            },
+            {
+              "worker": 5,
+              "seconds": 1800.1963403224945,
+              "startOffsetSeconds": -0.018092870712280273,
+              "endOffsetSeconds": 0.0007534027099609375
+            },
+            {
+              "worker": 3,
+              "seconds": 1800.1961572170258,
+              "startOffsetSeconds": -0.018000125885009766,
+              "endOffsetSeconds": 0.0006630420684814453
+            },
+            {
+              "worker": 4,
+              "seconds": 1800.1962366104126,
+              "startOffsetSeconds": -0.01800084114074707,
+              "endOffsetSeconds": 0.0007417201995849609
+            },
+            {
+              "worker": 2,
+              "seconds": 1800.1964485645294,
+              "startOffsetSeconds": -0.018140316009521484,
+              "endOffsetSeconds": 0.0008141994476318359
+            }
+          ],
+          "frameGapMs": {
+            "n": 99698302,
+            "mean": 9.02650822749218,
+            "p50": 7.102,
+            "p99": 28.023,
+            "p999": 42.015,
+            "max": 237.774
+          },
+          "gapResidualMs": {
+            "n": 99698302,
+            "mean": -0.0005098354633963576,
+            "p50": -0.012,
+            "p99": 3.08,
+            "p999": 5.274,
+            "max": 17.5
+          },
+          "frameExcessMs": {
+            "n": 99698302,
+            "mean": 0.859829331285903,
+            "p50": 0.683,
+            "p99": 4.073,
+            "p999": 6.95,
+            "max": 18.272
+          },
+          "processCpuCoresMean": 0.9431426905013904
+        },
+        "socket": {
+          "errors": {
+            "writeBlocks": 0,
+            "bufferFull": 0,
+            "rejects": 0
+          },
+          "queues": {
+            "queueBytes": {
+              "maxBytes": 0,
+              "slopeBytesPerSecond": 0.0,
+              "firstThirdMean": 0,
+              "lastThirdMean": 0
+            },
+            "kernelSendBytes": {
+              "maxBytes": 483506,
+              "slopeBytesPerSecond": -1.1225463179966795,
+              "firstThirdMean": 7605.2810344827585,
+              "lastThirdMean": 6061.836206896552
+            }
+          },
+          "playersRange": [
+            498,
+            500
+          ]
+        },
+        "human": {
+          "externalPlayingRange": [
+            0,
+            0
+          ],
+          "affected": false,
+          "statsPlayersRange": [
+            498,
+            500
+          ]
+        },
+        "census": {
+          "living": {
+            "first": 500,
+            "last": 500,
+            "min": 498,
+            "max": 500
+          },
+          "occupied": {
+            "first": 500,
+            "last": 500,
+            "min": 499,
+            "max": 500
+          },
+          "meanSegments": {
+            "first": 57.568,
+            "last": 101.24,
+            "min": 57.264,
+            "max": 105.25
+          },
+          "p90Segments": {
+            "first": 184,
+            "last": 234,
+            "min": 177,
+            "max": 234
+          },
+          "p99Segments": {
+            "first": 248,
+            "last": 289,
+            "min": 248,
+            "max": 297
+          },
+          "food": {
+            "first": 30266,
+            "last": 32551,
+            "min": 27091,
+            "max": 34722
+          },
+          "prey": {
+            "first": 26,
+            "last": 32,
+            "min": 23,
+            "max": 45
+          },
+          "radius": {
+            "first": 14981.655449248592,
+            "last": 14981.655449248592,
+            "min": 14981.655449248592,
+            "max": 14981.655449248592
+          }
+        },
+        "hostMetricsQualified": true,
+        "maintenance": {
+          "ticks": 3571,
+          "worldCpuMsPerTick": {
+            "n": 3571,
+            "mean": 7.150233103612433,
+            "p50": 6.98834,
+            "p99": 8.91175,
+            "p999": 10.48417,
+            "max": 11.90661
+          },
+          "simulationCpuMsPerTick": {
+            "n": 3571,
+            "mean": 4.62467112433492,
+            "p50": 4.6492,
+            "p99": 5.29464,
+            "p999": 6.94261,
+            "max": 7.39276
+          },
+          "socketCpuMsPerTick": {
+            "n": 3571,
+            "mean": 2.5255619792775135,
+            "p50": 2.36511,
+            "p99": 4.16483,
+            "p999": 4.91144,
+            "max": 6.01005
+          }
+        },
+        "ordinary": {
+          "ticks": 253529,
+          "worldCpuMsPerTick": {
+            "n": 253529,
+            "mean": 4.78935564111009,
+            "p50": 4.74068,
+            "p99": 6.74403,
+            "p999": 7.70771,
+            "max": 10.24884
+          },
+          "simulationCpuMsPerTick": {
+            "n": 253529,
+            "mean": 2.4075909288247104,
+            "p50": 2.41319,
+            "p99": 3.84321,
+            "p999": 4.54805,
+            "max": 6.75402
+          },
+          "socketCpuMsPerTick": {
+            "n": 253529,
+            "mean": 2.3817647122853796,
+            "p50": 2.29476,
+            "p99": 4.11468,
+            "p999": 4.52296,
+            "max": 5.41432
+          }
+        },
+        "endpointCensus": {
+          "startInterior": {
+            "deaths": 313,
+            "deferred": 0,
+            "food": 30266,
+            "living": 500,
+            "maxSegments": 278,
+            "meanSegments": 57.568,
+            "occupied": 500,
+            "p50Segments": 33,
+            "p90Segments": 184,
+            "p99Segments": 248,
+            "prey": 26,
+            "radius": 14981.655449248592,
+            "tick": 194500
+          },
+          "endInterior": {
+            "deaths": 1988,
+            "deferred": 0,
+            "food": 32551,
+            "living": 500,
+            "maxSegments": 324,
+            "meanSegments": 101.24,
+            "occupied": 500,
+            "p50Segments": 84,
+            "p90Segments": 234,
+            "p99Segments": 289,
+            "prey": 32,
+            "radius": 14981.655449248592,
+            "tick": 451600
+          },
+          "fullWindowBefore": {
+            "deaths": 313,
+            "deferred": 0,
+            "food": 30329,
+            "living": 500,
+            "maxSegments": 278,
+            "meanSegments": 57.448,
+            "occupied": 500,
+            "p50Segments": 33,
+            "p90Segments": 184,
+            "p99Segments": 248,
+            "prey": 26,
+            "radius": 14981.655449248592,
+            "tick": 194400
+          },
+          "fullWindowAfter": {
+            "deaths": 1988,
+            "deferred": 0,
+            "food": 32240,
+            "living": 500,
+            "maxSegments": 324,
+            "meanSegments": 101.434,
+            "occupied": 500,
+            "p50Segments": 84,
+            "p90Segments": 234,
+            "p99Segments": 289,
+            "prey": 32,
+            "radius": 14981.655449248592,
+            "tick": 451700
+          },
+          "beforeOffsetSeconds": 0.47458529472351074,
+          "afterOffsetSeconds": 0.4481940269470215
+        },
+        "deferredTicksInterior": 0,
+        "requestedWallSeconds": 1800.1774940490723,
+        "gates": {
+          "zeroDeferredTicks": true,
+          "startInMatureClass": true,
+          "endInMatureClass": true,
+          "clientsQueuesGenerator": true,
+          "cpuClockReconciliation": true
+        },
+        "p99AtMost7ms": false,
+        "generatorInfrastructureFailure": false,
+        "accounting": {
+          "reconciles": true,
+          "worldTaskCpuMeanMsPerTick": 4.822117558122094,
+          "clockMinusTaskMeanMsPerTick": 2.9578198404323075e-05,
+          "hostProcessCpuMeanMsPerTick": 4.823012151665462,
+          "collectorCpuMeanMsPerTick": 0.055124895770216745,
+          "threads": [
+            {
+              "role": "host",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 0.00035005834305717624,
+              "kernelMsPerTick": 0.000544535200311163
+            },
+            {
+              "role": "slither-simulat",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 2.2609806130944228,
+              "kernelMsPerTick": 0.17737463917305907
+            },
+            {
+              "role": "slither-sockets",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 0.4325962497681942,
+              "kernelMsPerTick": 1.9511660560864172
+            }
+          ]
+        },
+        "hostVcpuContextMsPerTick": {
+          "user": 2.2042971612427062,
+          "nice": 0.0,
+          "system": 1.891194981100895,
+          "idle": 1.8753075474559298,
+          "iowait": 0.00011668611435239206,
+          "irq": 0.0,
+          "softirq": 0.7662081889407352,
+          "steal": 7.77907429015947e-05
+        },
+        "stealPercent": 0.0011546445957195163
+      }
+    },
+    {
+      "run": 2,
+      "matureScreen": [
+        {
+          "deaths": 317,
+          "deferred": 0,
+          "food": 31206,
+          "living": 500,
+          "maxSegments": 291,
+          "meanSegments": 53.844,
+          "occupied": 500,
+          "p50Segments": 29,
+          "p90Segments": 179,
+          "p99Segments": 246,
+          "prey": 35,
+          "radius": 14981.655449248592,
+          "tick": 192000
+        },
+        {
+          "deaths": 322,
+          "deferred": 0,
+          "food": 31849,
+          "living": 500,
+          "maxSegments": 271,
+          "meanSegments": 53.728,
+          "occupied": 500,
+          "p50Segments": 29,
+          "p90Segments": 178,
+          "p99Segments": 244,
+          "prey": 35,
+          "radius": 14981.655449248592,
+          "tick": 192500
+        },
+        {
+          "deaths": 324,
+          "deferred": 0,
+          "food": 31388,
+          "living": 500,
+          "maxSegments": 272,
+          "meanSegments": 54.46,
+          "occupied": 500,
+          "p50Segments": 30,
+          "p90Segments": 178,
+          "p99Segments": 244,
+          "prey": 37,
+          "radius": 14981.655449248592,
+          "tick": 193000
+        }
+      ],
+      "result": {
+        "label": "acceptance-500",
+        "bots": 500,
+        "ticks": 257100,
+        "tickRange": [
+          194500,
+          451600
+        ],
+        "wallSeconds": 1799.7029719352722,
+        "ticksPerSecond": 142.8569069503358,
+        "worldCpuMsPerTick": {
+          "n": 257100,
+          "mean": 4.740371929451575,
+          "p50": 4.63194,
+          "p99": 7.0777,
+          "p999": 8.24633,
+          "max": 12.01936
+        },
+        "simulationCpuMsPerTick": {
+          "n": 257100,
+          "mean": 2.411049425530922,
+          "p50": 2.39097,
+          "p99": 4.47551,
+          "p999": 4.86174,
+          "max": 7.60949
+        },
+        "socketCpuMsPerTick": {
+          "n": 257100,
+          "mean": 2.3293225039206535,
+          "p50": 2.2434,
+          "p99": 4.08988,
+          "p999": 4.54622,
+          "max": 5.53951
+        },
+        "deferredTicks": 0,
+        "clientValid": true,
+        "passes": true,
+        "client": {
+          "headroom": true,
+          "workerCpuFraction": {
+            "1": {
+              "p50": 0.15819761131595705,
+              "p99": 0.16695742857474596,
+              "mean": 0.15619027217092066,
+              "max": 0.25341695858857904
+            },
+            "2": {
+              "p50": 0.15566737915351792,
+              "p99": 0.16442122886827815,
+              "mean": 0.154499310139578,
+              "max": 0.24926337026821946
+            },
+            "3": {
+              "p50": 0.15534770653987212,
+              "p99": 0.16425091894107216,
+              "mean": 0.15398736251827713,
+              "max": 0.24937570343442222
+            },
+            "4": {
+              "p50": 0.15736012057776608,
+              "p99": 0.16682866642153185,
+              "mean": 0.15495993251035806,
+              "max": 0.25112823043753396
+            },
+            "5": {
+              "p50": 0.1560541895631126,
+              "p99": 0.1654988771191086,
+              "mean": 0.15467668187057743,
+              "max": 0.2535855350532725
+            },
+            "6": {
+              "p50": 0.15558786965611895,
+              "p99": 0.16689065183336,
+              "mean": 0.1542104406608713,
+              "max": 0.25006432522803296
+            }
+          },
+          "worstInputP99Ms": 1.928134,
+          "counterDeltas": {
+            "frames": 99270547,
+            "bytes": 2420766930,
+            "decisions": 21441952,
+            "joins": 1757,
+            "deaths": 1757,
+            "forced": 0,
+            "admissionRefusals": 0
+          },
+          "everyWorkerFrameProgress": true,
+          "maxReceiptAgeSeconds": 0.20452566600010869,
+          "metricIntervals": [
+            {
+              "worker": 4,
+              "seconds": 1800.092885017395,
+              "startOffsetSeconds": -0.020064115524291992,
+              "endOffsetSeconds": 0.0006742477416992188
+            },
+            {
+              "worker": 1,
+              "seconds": 1800.0927996635437,
+              "startOffsetSeconds": -0.01990222930908203,
+              "endOffsetSeconds": 0.0007507801055908203
+            },
+            {
+              "worker": 2,
+              "seconds": 1800.092856645584,
+              "startOffsetSeconds": -0.01995396614074707,
+              "endOffsetSeconds": 0.0007560253143310547
+            },
+            {
+              "worker": 6,
+              "seconds": 1800.0929737091064,
+              "startOffsetSeconds": -0.020061016082763672,
+              "endOffsetSeconds": 0.0007660388946533203
+            },
+            {
+              "worker": 3,
+              "seconds": 1800.0930397510529,
+              "startOffsetSeconds": -0.020119190216064453,
+              "endOffsetSeconds": 0.0007739067077636719
+            },
+            {
+              "worker": 5,
+              "seconds": 1800.093101978302,
+              "startOffsetSeconds": -0.020056962966918945,
+              "endOffsetSeconds": 0.0008983612060546875
+            }
+          ],
+          "frameGapMs": {
+            "n": 99193139,
+            "mean": 9.071895435348608,
+            "p50": 7.107,
+            "p99": 28.077,
+            "p999": 42.044,
+            "max": 238.25
+          },
+          "gapResidualMs": {
+            "n": 99193139,
+            "mean": -0.0005159035041728037,
+            "p50": -0.01,
+            "p99": 2.998,
+            "p999": 5.049,
+            "max": 14.377
+          },
+          "frameExcessMs": {
+            "n": 99193139,
+            "mean": 0.872591744697181,
+            "p50": 0.71,
+            "p99": 3.899,
+            "p999": 6.636,
+            "max": 20.823
+          },
+          "processCpuCoresMean": 0.9283609836490486
+        },
+        "socket": {
+          "errors": {
+            "writeBlocks": 0,
+            "bufferFull": 0,
+            "rejects": 0
+          },
+          "queues": {
+            "queueBytes": {
+              "maxBytes": 0,
+              "slopeBytesPerSecond": 0.0,
+              "firstThirdMean": 0,
+              "lastThirdMean": 0
+            },
+            "kernelSendBytes": {
+              "maxBytes": 475372,
+              "slopeBytesPerSecond": -1.019425446925005,
+              "firstThirdMean": 7558.051107325383,
+              "lastThirdMean": 5330.700680272109
+            }
+          },
+          "playersRange": [
+            499,
+            500
+          ]
+        },
+        "human": {
+          "externalPlayingRange": [
+            0,
+            0
+          ],
+          "affected": false,
+          "statsPlayersRange": [
+            498,
+            500
+          ]
+        },
+        "census": {
+          "living": {
+            "first": 500,
+            "last": 500,
+            "min": 498,
+            "max": 500
+          },
+          "occupied": {
+            "first": 500,
+            "last": 500,
+            "min": 498,
+            "max": 500
+          },
+          "meanSegments": {
+            "first": 55.248,
+            "last": 96.89,
+            "min": 55.248,
+            "max": 104.942
+          },
+          "p90Segments": {
+            "first": 180,
+            "last": 229,
+            "min": 172,
+            "max": 237
+          },
+          "p99Segments": {
+            "first": 244,
+            "last": 293,
+            "min": 244,
+            "max": 299
+          },
+          "food": {
+            "first": 32156,
+            "last": 33191,
+            "min": 27549,
+            "max": 36285
+          },
+          "prey": {
+            "first": 38,
+            "last": 31,
+            "min": 23,
+            "max": 43
+          },
+          "radius": {
+            "first": 14981.655449248592,
+            "last": 14981.655449248592,
+            "min": 14981.655449248592,
+            "max": 14981.655449248592
+          }
+        },
+        "hostMetricsQualified": true,
+        "maintenance": {
+          "ticks": 3571,
+          "worldCpuMsPerTick": {
+            "n": 3571,
+            "mean": 7.086836701764212,
+            "p50": 7.00244,
+            "p99": 8.93738,
+            "p999": 9.99869,
+            "max": 12.01936
+          },
+          "simulationCpuMsPerTick": {
+            "n": 3571,
+            "mean": 4.535321348361803,
+            "p50": 4.5657,
+            "p99": 5.36025,
+            "p999": 6.83293,
+            "max": 7.00941
+          },
+          "socketCpuMsPerTick": {
+            "n": 3571,
+            "mean": 2.5515153534024084,
+            "p50": 2.51323,
+            "p99": 4.07772,
+            "p999": 4.76407,
+            "max": 5.12119
+          }
+        },
+        "ordinary": {
+          "ticks": 253529,
+          "worldCpuMsPerTick": {
+            "n": 253529,
+            "mean": 4.707321565580269,
+            "p50": 4.61844,
+            "p99": 6.7255,
+            "p999": 7.77391,
+            "max": 11.64572
+          },
+          "simulationCpuMsPerTick": {
+            "n": 253529,
+            "mean": 2.381128686536846,
+            "p50": 2.38857,
+            "p99": 3.84065,
+            "p999": 4.47577,
+            "max": 7.60949
+          },
+          "socketCpuMsPerTick": {
+            "n": 253529,
+            "mean": 2.326192879043423,
+            "p50": 2.24143,
+            "p99": 4.09003,
+            "p999": 4.54589,
+            "max": 5.53951
+          }
+        },
+        "endpointCensus": {
+          "startInterior": {
+            "deaths": 336,
+            "deferred": 0,
+            "food": 32156,
+            "living": 500,
+            "maxSegments": 274,
+            "meanSegments": 55.248,
+            "occupied": 500,
+            "p50Segments": 31,
+            "p90Segments": 180,
+            "p99Segments": 244,
+            "prey": 38,
+            "radius": 14981.655449248592,
+            "tick": 194500
+          },
+          "endInterior": {
+            "deaths": 2091,
+            "deferred": 0,
+            "food": 33191,
+            "living": 500,
+            "maxSegments": 301,
+            "meanSegments": 96.89,
+            "occupied": 500,
+            "p50Segments": 73,
+            "p90Segments": 229,
+            "p99Segments": 293,
+            "prey": 31,
+            "radius": 14981.655449248592,
+            "tick": 451600
+          },
+          "fullWindowBefore": {
+            "deaths": 335,
+            "deferred": 0,
+            "food": 31700,
+            "living": 500,
+            "maxSegments": 274,
+            "meanSegments": 55.56,
+            "occupied": 500,
+            "p50Segments": 31,
+            "p90Segments": 182,
+            "p99Segments": 245,
+            "prey": 37,
+            "radius": 14981.655449248592,
+            "tick": 194400
+          },
+          "fullWindowAfter": {
+            "deaths": 2091,
+            "deferred": 0,
+            "food": 33031,
+            "living": 500,
+            "maxSegments": 301,
+            "meanSegments": 97.036,
+            "occupied": 500,
+            "p50Segments": 73,
+            "p90Segments": 229,
+            "p99Segments": 293,
+            "prey": 31,
+            "radius": 14981.655449248592,
+            "tick": 451700
+          },
+          "beforeOffsetSeconds": 0.5026595592498779,
+          "afterOffsetSeconds": 0.5256550312042236
+        },
+        "deferredTicksInterior": 0,
+        "requestedWallSeconds": 1800.072146654129,
+        "gates": {
+          "zeroDeferredTicks": true,
+          "startInMatureClass": true,
+          "endInMatureClass": true,
+          "clientsQueuesGenerator": true,
+          "cpuClockReconciliation": true
+        },
+        "p99AtMost7ms": false,
+        "generatorInfrastructureFailure": false,
+        "accounting": {
+          "reconciles": true,
+          "worldTaskCpuMeanMsPerTick": 4.740380459330139,
+          "clockMinusTaskMeanMsPerTick": -8.529878564367266e-06,
+          "hostProcessCpuMeanMsPerTick": 4.741275052873507,
+          "collectorCpuMeanMsPerTick": 0.05509157690777584,
+          "threads": [
+            {
+              "role": "host",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 0.00027226760015558146,
+              "kernelMsPerTick": 0.0005906162414694091
+            },
+            {
+              "role": "slither-simulat",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 2.2105720634344475,
+              "kernelMsPerTick": 0.2004982034704317
+            },
+            {
+              "role": "slither-sockets",
+              "affinity": [
+                0
+              ],
+              "userMsPerTick": 0.42249946916182196,
+              "kernelMsPerTick": 1.9068107232634377
+            }
+          ]
+        },
+        "hostVcpuContextMsPerTick": {
+          "user": 2.0976008133776816,
+          "nice": 0.0,
+          "system": 1.795131102345923,
+          "idle": 1.9222256580073245,
+          "iowait": 0.00011668611435239206,
+          "irq": 0.0,
+          "softirq": 0.790247519181961,
+          "steal": 3.889537145079735e-05
+        },
+        "stealPercent": 0.0005888455357411368
+      }
+    }
+  ],
+  "twoRunAcceptancePassed": true,
+  "rawAccess": "Local-only, outside repositories; raw logs, binaries and cloud identities are not public downloads.",
+  "frozenCollectorCommit": "2abc874e275c7e9ed62d7cb358fc9cc8efe1d6d2",
+  "quantileMethod": "Nearest-rank world/frame tails; unchanged ladder headroom gate"
+}
