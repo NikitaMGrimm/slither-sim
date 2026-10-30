@@ -184,6 +184,8 @@ jobs:
       - run: cargo build --release --locked
       - name: Build the headless client
         working-directory: client
+        env:
+          CARGO_PROFILE_DEV_DEBUG: 0
         run: cargo build --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-client-e2e --target-dir target/wgpu-slice-e2e
       - run: node client/tools/e2e-local-host.mjs --host-bin target/release/slither-sim --client-bin client/target/wgpu-slice-e2e/debug/slither-client-e2e
 
