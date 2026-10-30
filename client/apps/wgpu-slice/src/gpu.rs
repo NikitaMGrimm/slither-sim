@@ -198,11 +198,13 @@ impl Renderer {
         if self.lost.load(Ordering::SeqCst) {
             return Err("GPU device lost; host stopped, scene retained".into());
         }
+        // WebGL2's 2048px downlevel cap keeps the future WebGL2 extension path valid.
+        let max_dimension = wgpu::Limits::downlevel_webgl2_defaults().max_texture_dimension_2d;
         if a.status != BodyAssetStatus::Ready
             || a.width == 0
             || a.height == 0
-            || a.width > 512
-            || a.height > 512
+            || a.width > max_dimension
+            || a.height > max_dimension
             || r.image.width != a.width
             || r.image.height != a.height
             || r.image.pixels.len() != a.width as usize * a.height as usize * 4

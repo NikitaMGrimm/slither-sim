@@ -683,8 +683,8 @@ fn prepare_composed(
         high_quality: applied.high_quality,
         blend: applied.quality_blend,
     };
-    let tile = bank.assets[bank.tile.asset];
-    let backdrop = bank.assets[bank.backdrop.asset];
+    let tile = bank.background_art(crate::cosmetics::BackgroundArt::HexTile);
+    let backdrop = bank.background_art(crate::cosmetics::BackgroundArt::Backdrop);
     let background = client
         .prepare_background(BackgroundInput {
             width: logical[0],
