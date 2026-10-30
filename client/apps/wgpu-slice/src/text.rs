@@ -1489,6 +1489,7 @@ mod hud_budget_tests {
             for _ in 0..2 {
                 let out = render::finish_hud(
                     render::PreparedFrame {
+                        overlay: None,
                         frame: Frame {
                             identity: 1,
                             tick: 0,

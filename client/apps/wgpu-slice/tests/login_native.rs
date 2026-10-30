@@ -81,8 +81,13 @@ fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
 }
 
 #[test]
-fn host_backing_drawn_controls_use_logical_pointer_and_ime_coordinates() {
-    for (physical, dpr) in [([960, 540], 1.), ([1200, 675], 1.25), ([1920, 1080], 2.)] {
+fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
+    for (physical, dpr) in [
+        ([960, 540], 1.),
+        ([1200, 675], 1.25),
+        ([1920, 1080], 2.),
+        ([3840, 2160], 1.5),
+    ] {
         for element in [E::Play, E::NicknameHolder, E::Quality] {
             let mut login = NativeLogin::new("Test").unwrap();
             login.step(0., true, false).unwrap();
@@ -92,7 +97,7 @@ fn host_backing_drawn_controls_use_logical_pointer_and_ime_coordinates() {
             let rect = login.layout.viewport_rect(element);
             let center = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
             // Select a real painted quad, then project its centre exactly as the
-            // host blits the backing into the physical window and routes input.
+            // host projects CSS quads to physical pixels and routes logical input.
             let index = logical
                 .frame
                 .draws
@@ -111,16 +116,15 @@ fn host_backing_drawn_controls_use_logical_pointer_and_ime_coordinates() {
                 .unwrap()
                 .0;
             let host = login.prepare_host(physical, dpr, true, None).unwrap();
-            assert_eq!(host.frame.extent, [1500, 845]);
+            assert_eq!(host.frame.extent, physical);
+            assert_eq!(host.frame.viewport_scale, dpr);
             let draw = &host.frame.draws[index];
             let point = [
                 (draw.destination.x + draw.destination.width / 2. + draw.translation[0])
-                    * f64::from(physical[0])
-                    / f64::from(host.frame.extent[0])
+                    * host.frame.viewport_scale
                     / dpr,
                 (draw.destination.y + draw.destination.height / 2. + draw.translation[1])
-                    * f64::from(physical[1])
-                    / f64::from(host.frame.extent[1])
+                    * host.frame.viewport_scale
                     / dpr,
             ];
             assert!(
@@ -279,6 +283,45 @@ fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
     }));
 }
 
+#[test]
+fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
+    for dpr in [1., 1.5, 2.] {
+        let mut login = NativeLogin::new("Player").unwrap();
+        login.step(0., true, false).unwrap();
+        let first = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
+        let second = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
+        let resized = login.prepare_host([3600, 2025], dpr, true, None).unwrap();
+        let assets = |p: &slither_wgpu_slice::menu::MenuFrame| {
+            p.resources.iter().map(|r| r.asset).collect::<Vec<_>>()
+        };
+        assert_eq!(assets(&first), assets(&second));
+        assert_eq!(assets(&first), assets(&resized));
+        assert!(
+            first
+                .resources
+                .iter()
+                .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+        );
+        assert!(
+            first
+                .resources
+                .iter()
+                .map(|r| r.image.pixels.len())
+                .sum::<usize>()
+                < slither_wgpu_slice::text::MENU_CACHE_BYTES
+        );
+        if dpr == 2. {
+            // Nickname control/shadow now uses more than the old 1.5x raster.
+            assert!(
+                first
+                    .resources
+                    .iter()
+                    .any(|r| r.asset.handle >> 60 == 7 && r.asset.width > 500)
+            );
+        }
+    }
+}
+
 #[path = "support/announcement_tape.rs"]
 mod endpoint_tape;
 
@@ -348,17 +391,14 @@ fn login_menu_composes_over_the_world_picture() {
     let mut game = slither_wgpu_slice::game::LocalGame::new(0.).unwrap();
     let mut login = NativeLogin::new("Player").unwrap();
     // Same sizes as the desktop redraw: world at the backing size, menu at physical.
-    let extent = slither_wgpu_slice::render::backing_size([960., 540.]).unwrap();
+    let extent = game.window_viewport([960, 540], 1.).unwrap();
     for t in [16., 32., 48.] {
         game.begin_redraw(t, extent, 1.).unwrap();
         while let Some(e) = game.effect() {
             game.acknowledge(e.generation, e.id, true).unwrap();
         }
         let p = game.take_frame().expect("world picture");
-        let mut picture = slither_wgpu_slice::render::PreparedFrame {
-            frame: p.frame.clone(),
-            resources: p.resources.clone(),
-        };
+        let mut picture = p.clone();
         login
             .prepare_host([960, 540], 1., true, game.menu_cosmetics())
             .unwrap()
@@ -370,6 +410,7 @@ fn login_menu_composes_over_the_world_picture() {
             .map(|r| (r.asset.into(), r.asset))
             .collect();
         picture.frame.quads(&resident).unwrap();
+        picture.overlay.as_ref().unwrap().quads(&resident).unwrap();
         game.presented(true).unwrap();
     }
     game.begin_redraw(64., extent, 1.).unwrap();

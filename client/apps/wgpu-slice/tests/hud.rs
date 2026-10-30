@@ -48,7 +48,16 @@ fn frame(extent: [u32; 2], scale: f64) -> Frame {
 }
 fn finish(v: &View, bank: &mut Bank, frame: Frame) -> render::PreparedFrame {
     let resources = bank.resources(&frame).unwrap();
-    render::finish_hud(render::PreparedFrame { frame, resources }, bank, v).unwrap()
+    render::finish_hud(
+        render::PreparedFrame {
+            frame,
+            overlay: None,
+            resources,
+        },
+        bank,
+        v,
+    )
+    .unwrap()
 }
 #[cfg(windows)]
 #[test]
@@ -205,6 +214,7 @@ fn a_full_or_nearly_full_frame_never_overruns_the_draw_limit() {
         assert_eq!(
             render::finish_hud(
                 render::PreparedFrame {
+                    overlay: None,
                     frame: f,
                     resources
                 },
