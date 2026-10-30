@@ -1,6 +1,7 @@
 //! Native official-site discovery. Downloads are inert, bounded, and never persisted.
 use crate::{
     Result,
+    endpoint_login::{self, Mode, Source},
     game::{LoginProfile, server_endpoint},
     native,
 };
@@ -29,6 +30,7 @@ const DIRECTORY_LIMIT: usize = 256 * 1024;
 pub struct Prepared {
     pub endpoint: String,
     pub profile: LoginProfile,
+    pub source: Source,
 }
 
 /// One preparation per Play, outside the event loop and before the session deadline starts.
@@ -39,13 +41,32 @@ pub struct Preparation {
 }
 impl Preparation {
     pub fn start(server: Option<String>) -> Result<Self> {
+        Self::start_with(move |flag| prepare(server.as_deref(), flag))
+    }
+    /// Profile only: never discovers servers or pings, and preserves the endpoint verbatim.
+    pub fn start_endpoint(endpoint: String, mode: Mode) -> Result<Self> {
+        Self::start_with(move |flag| {
+            let resolved = endpoint_login::resolve_with(&endpoint, mode, || {
+                fetch_profile(flag, Instant::now() + Duration::from_secs(10))
+            })?;
+            check_cancel(flag)?;
+            Ok(Prepared {
+                endpoint,
+                profile: resolved.profile,
+                source: resolved.source,
+            })
+        })
+    }
+    fn start_with(
+        work: impl FnOnce(&Arc<AtomicBool>) -> Result<Prepared> + Send + 'static,
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::sync_channel(1);
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
         let worker = thread::Builder::new()
             .name("official-discovery".into())
             .spawn(move || {
-                let result = prepare(server.as_deref(), &flag);
+                let result = work(&flag);
                 let _ = sender.send(result);
             })
             .map_err(|e| e.to_string())?;
@@ -72,7 +93,8 @@ impl Preparation {
 impl Drop for Preparation {
     fn drop(&mut self) {
         self.cancel();
-        if let Some(worker) = self.worker.take() {
+        // Closing the window must not wait for a bounded in-flight HTTP request.
+        if let Some(worker) = self.worker.take().filter(|worker| worker.is_finished()) {
             let _ = worker.join();
         }
     }
@@ -149,15 +171,25 @@ fn read_decoded(
 
 /// The recorded homepage can redirect to HTTP; HTTPS script/directory URLs cannot.
 fn fetch(url: &Url, limit: usize, cancel: &AtomicBool) -> Result<(Url, Inert)> {
-    let deadline = Instant::now() + Duration::from_secs(5);
+    fetch_before(url, limit, cancel, Instant::now() + Duration::from_secs(5))
+}
+
+fn fetch_before(
+    url: &Url,
+    limit: usize,
+    cancel: &AtomicBool,
+    deadline: Instant,
+) -> Result<(Url, Inert)> {
+    let deadline = deadline.min(Instant::now() + Duration::from_secs(5));
     let original = url.clone();
     let mut url = url.clone();
     for _ in 0..=3 {
         check_cancel(cancel)?;
-        admit_fetch_url(&original, &url)?;
         let left = deadline
             .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
             .ok_or("Site request deadline")?;
+        admit_fetch_url(&original, &url)?;
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .max_redirects(0)
             .http_status_as_error(false)
@@ -542,6 +574,39 @@ pub fn prepare(server: Option<&str>, cancel: &Arc<AtomicBool>) -> Result<Prepare
     prepare_with(server, cancel, fetch, probe_clusters)
 }
 
+/// Fetch only the inert page and script, within both the normal limits and the caller's budget.
+pub fn fetch_profile(cancel: &AtomicBool, deadline: Instant) -> Result<LoginProfile> {
+    profile_only_with(cancel, |url, limit, cancel| {
+        fetch_before(url, limit, cancel, deadline)
+    })
+}
+
+fn profile_script_with(
+    cancel: &AtomicBool,
+    mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+) -> Result<(LoginProfile, Inert)> {
+    check_cancel(cancel)?;
+    let (page_url, page) = get(&Url::parse(PAGE).expect("constant URL"), PAGE_LIMIT, cancel)?;
+    check_cancel(cancel)?;
+    let script_url = client_script(
+        std::str::from_utf8(&page.0).map_err(|_| "Invalid page encoding")?,
+        &page_url,
+    )?;
+    drop(page);
+    check_cancel(cancel)?;
+    let (_, script) = get(&script_url, SCRIPT_LIMIT, cancel)?;
+    check_cancel(cancel)?;
+    Ok((profile(&script.0)?, script))
+}
+
+fn profile_only_with(
+    cancel: &AtomicBool,
+    get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+) -> Result<LoginProfile> {
+    let (profile, _) = profile_script_with(cancel, get)?;
+    Ok(profile)
+}
+
 fn prepare_with(
     server: Option<&str>,
     cancel: &Arc<AtomicBool>,
@@ -549,15 +614,7 @@ fn prepare_with(
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
 ) -> Result<Prepared> {
     let forced = server.map(explicit_endpoint).transpose()?;
-    check_cancel(cancel)?;
-    let (page_url, page) = get(&Url::parse(PAGE).expect("constant URL"), PAGE_LIMIT, cancel)?;
-    let script_url = client_script(
-        std::str::from_utf8(&page.0).map_err(|_| "Invalid page encoding")?,
-        &page_url,
-    )?;
-    drop(page);
-    let (_, script) = get(&script_url, SCRIPT_LIMIT, cancel)?;
-    let profile = profile(&script.0)?;
+    let (profile, script) = profile_script_with(cancel, &mut get)?;
     let directory = if forced.is_none() {
         Some(directory_url(
             std::str::from_utf8(&script.0).map_err(|_| "Invalid script encoding")?,
@@ -581,7 +638,11 @@ fn prepare_with(
         servers[select_server(&servers, &pings, rand::random())?].endpoint()
     };
     check_cancel(cancel)?;
-    Ok(Prepared { endpoint, profile })
+    Ok(Prepared {
+        endpoint,
+        profile,
+        source: Source::Official,
+    })
 }
 
 #[cfg(test)]
@@ -591,6 +652,129 @@ mod tests {
     // ORIGINAL SYNTHETIC page/script; no retained reference or acquisition authority.
     const SCRIPT: &[u8] =
         b"var client_version=4242; var cpw=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19];";
+    #[test]
+    fn profile_only_stops_after_page_and_script_without_a_directory_literal() {
+        let mut calls = Vec::new();
+        let profile = profile_only_with(&AtomicBool::new(false), |url, limit, _| {
+            calls.push((url.to_string(), limit));
+            let bytes = match calls.len() {
+                1 => b"<script src='/s/game999.js'></script>".as_slice(),
+                2 => SCRIPT,
+                _ => panic!("profile-only must never request a directory"),
+            };
+            Ok((url.clone(), Inert(bytes.to_vec())))
+        })
+        .unwrap();
+        assert_eq!(profile.client_version, 4242);
+        assert_eq!(profile.page_echo, std::array::from_fn(|i| i as u8));
+        assert_eq!(
+            calls,
+            [
+                (PAGE.to_string(), PAGE_LIMIT),
+                ("https://slither.io/s/game999.js".into(), SCRIPT_LIMIT)
+            ]
+        );
+    }
+
+    #[test]
+    fn profile_failures_fall_back_with_exactly_one_safe_message() {
+        for failure in ["page", "script", "grammar"] {
+            let mut requests = 0;
+            let resolved =
+                endpoint_login::resolve_with("ws://game.example:19491/slither", Mode::Auto, || {
+                    profile_only_with(&AtomicBool::new(false), |url, _, _| {
+                        requests += 1;
+                        if failure == "page" || (failure == "script" && requests == 2) {
+                            return Err("injected fetch failure".into());
+                        }
+                        Ok((
+                            url.clone(),
+                            Inert(if requests == 1 {
+                                b"<script src='/s/game999.js'></script>".to_vec()
+                            } else {
+                                b"var client_version=1+1; var cpw=arbitrary_code();".to_vec()
+                            }),
+                        ))
+                    })
+                })
+                .unwrap();
+            assert_eq!(requests, if failure == "page" { 1 } else { 2 });
+            assert_eq!(resolved.source, Source::ZeroFallback);
+            assert_eq!(resolved.profile.client_version, 0);
+            assert_eq!(resolved.profile.page_echo, [0; 20]);
+            let messages: Vec<_> = resolved.source.fallback_message().into_iter().collect();
+            assert_eq!(
+                messages,
+                ["Official login profile unavailable; using zero credentials."]
+            );
+        }
+    }
+
+    #[test]
+    fn profile_cancel_before_or_during_each_response_prevents_further_requests() {
+        for cancel_after in 0..=2 {
+            let cancel = AtomicBool::new(cancel_after == 0);
+            let mut calls = 0;
+            assert!(
+                profile_only_with(&cancel, |url, _, flag| {
+                    calls += 1;
+                    if calls == cancel_after {
+                        flag.store(true, Ordering::SeqCst);
+                    }
+                    Ok((
+                        url.clone(),
+                        Inert(if calls == 1 {
+                            b"<script src='/s/game999.js'></script>".to_vec()
+                        } else {
+                            SCRIPT.to_vec()
+                        }),
+                    ))
+                })
+                .is_err()
+            );
+            assert_eq!(calls, cancel_after);
+        }
+    }
+
+    #[test]
+    fn endpoint_worker_keeps_fetch_off_the_caller_and_cancel_suppresses_play() {
+        let (entered, receiving) = mpsc::sync_channel(1);
+        let (release, released) = mpsc::sync_channel(1);
+        let mut preparation = Preparation::start_with(move |flag| {
+            entered.send(thread::current().id()).unwrap();
+            released.recv_timeout(Duration::from_secs(2)).unwrap();
+            check_cancel(flag)?;
+            panic!("cancelled work must not prepare Play");
+        })
+        .unwrap();
+        assert_ne!(
+            receiving.recv_timeout(Duration::from_secs(2)).unwrap(),
+            thread::current().id()
+        );
+        assert!(preparation.poll().is_none());
+        preparation.cancel();
+        release.send(()).unwrap();
+        assert!(
+            preparation
+                .receiver
+                .recv_timeout(Duration::from_secs(2))
+                .unwrap()
+                .is_err()
+        );
+        assert!(preparation.cancelled());
+    }
+
+    #[test]
+    fn expired_profile_budget_admits_no_request() {
+        // Use loopback even for preflight rejection, so a regression cannot contact the site.
+        let result = fetch_before(
+            &Url::parse("http://127.0.0.1:19491/").unwrap(),
+            PAGE_LIMIT,
+            &AtomicBool::new(false),
+            Instant::now() - Duration::from_secs(1),
+        );
+        assert!(matches!(result, Err(ref error) if error == "Site request deadline"));
+    }
     #[test]
     fn automatic_preparation_composes_page_profile_directory_and_selection() {
         let mut calls = Vec::new();

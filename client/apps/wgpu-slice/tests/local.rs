@@ -239,6 +239,8 @@ fn negotiating() -> LocalGame {
         .unwrap();
     let packets = effects(&mut g);
     assert_eq!(packets[0], b"DHLPTXBFJNRVZDHLPTXBFJNRVZD");
+    assert_eq!(&packets[1][..2], &[b's', 30]);
+    assert_eq!(&packets[1][2..24], &[0; 22]);
     assert_eq!(packets[1][24], 44);
     assert_eq!(&packets[1][26..32], b"Player");
     assert_eq!(&packets[1][32..], [0, 255]);
@@ -758,7 +760,21 @@ fn synthetic_profile_reaches_existing_challenge_login_without_local_credentials(
     assert_eq!(g.phase(), Phase::Setup);
     g.stop();
     effects(&mut g);
-    g.play("ws://127.0.0.1:19491/slither", "Local", 0).unwrap();
+    // Pure LocalGame drives effects only: even a remote endpoint must retain the zero default.
+    g.play("ws://game.example:19491/slither", "Local", 0)
+        .unwrap();
+    pump(&mut g, 4.);
+    let e = g.effect().unwrap();
+    g.construct(e.generation, e.id, 4.).unwrap();
+    g.acknowledge(e.generation, e.id, true).unwrap();
+    g.opened(g.generation(), 5.).unwrap();
+    effects(&mut g);
+    g.receive(g.generation(), &bundle(&[challenge()]), 6.)
+        .unwrap();
+    assert_eq!(
+        effects(&mut g)[1],
+        slither_client::protocol::encode_login(0, &[0; 20], "Local", 0, None).unwrap()
+    );
 }
 #[test]
 fn actual_ingress_food_prey_face_score_and_board_reach_plans() {

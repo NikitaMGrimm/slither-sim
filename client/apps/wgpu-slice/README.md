@@ -17,6 +17,20 @@ Enter starts Play, Escape stops; pointer/arrows/Space and mouse boost feed the
 shared input policy. No connection starts until Play, and reconnect is explicit.
 Use `--endpoint ws://host:port/slither` for a simulator elsewhere.
 
+Desktop endpoints default to `--login-profile auto`, fetching only the official
+page and script for `client_version`/`cpw` with the limits and closed grammar
+below; there is no server discovery, directory request or ping. This supports
+compatibility with custom server implementations that copied the official login.
+Auto uses zero credentials without any fetch for loopback IPs (all of 127/8 and
+`::1`) and `localhost`. `--login-profile official` forces fetching even on
+loopback; `--login-profile zero` forces zero credentials and skips fetching for
+any host. Fetch or grammar failure prints one warning and continues Play with
+zero credentials. Interactive acquisition starts only on Play in a background
+worker, polled by the event loop; Escape cancels it. Endpoint sockets retain
+`Origin: http://slither.io`. The library's `LocalGame::play`, `slither-client-e2e`,
+feel-replay and browser/Wasm builds keep the zero profile without fetching;
+tests and CI use authored injected fetchers and loopback peers only.
+
 ## Official servers
 
 `--official` plays on the official servers (native only). Each Play fetches the
@@ -43,8 +57,10 @@ choice; check slither.io's terms before you do.
 `--endpoint <url> --headless --duration <s> --frames <new-dir> [--frame-every <s>]`
 starts one Play without a window, wanders along broad drifting arcs with a periodic boost through the
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
-(server, profile version, handshake/login/Setup, packet and frame counts, own
+(server, profile source/version, handshake/login/Setup, packet and frame counts, own
 length over time, exit reason). Page echo bytes and raw packets are never printed.
+Profile acquisition happens before Play within `--duration`; the summary source
+is `official`, `zero-loopback`, `zero-forced` or `zero-fallback`.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and
