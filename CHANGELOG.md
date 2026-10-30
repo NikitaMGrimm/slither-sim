@@ -26,6 +26,9 @@
 
 ### Performance
 
+- Food pickup copies surviving pellets in bulk when removing eaten food,
+  instead of rotating the removed values through the list. Pickup results,
+  event order and food order are unchanged.
 - Food pickup keeps its fast grid in arenas up to a radius of about 131,000,
   official density for about 38,000 snakes, instead of 65,536 (about 9,700).
   Larger arenas fell back to a slower path: at 9,800 snakes a world step cost
