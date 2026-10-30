@@ -47,6 +47,20 @@ from actual native request-tagged observations, independently of Wasm. Native
 input mapping reuses A2's normalized CSS coordinates/physical-mouse expansion and
 the production browser target-admission predicate. It calls the real LocalGame
 methods and does not establish OS/DOM event routing or physical-input parity.
+It follows the post-#304 browser families: only primary `mousedown` presses,
+both `pointermove` and `mousemove` movements, and paired release de-duplication.
+An isolated pointer move retains its fractional CSS coordinates; a compatibility
+mousemove overwrites them with the mouse getter's integer position. Pointerdown
+is not canceled, so it does not suppress compatibility mouse events.
+
+This A2 lane constructs DOM events from normalized **CSS** options. Its synthetic
+MouseEvent getters floor those double options, including explicit `dom-event`
+records; the native mapper observes and submits that same position. It reuses
+`normalizeInput`, `mouseReplay` and the production admission predicate rather
+than applying the physical-coordinate conversion to CSS again. Production winit
+still uses shared `desktop_input::mouse_client_position` for physical/f32/DPR
+admission. These are distinct input boundaries, not an extra f32 rounding step
+on already initialized CSS DOM events.
 Semantic socket IDs match A2; the `effects` array in `native-observations.json`
 retains every real Rust effect's generation/ID and acknowledgment time. Negotiation/login bytes are discarded.
 
