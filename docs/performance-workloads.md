@@ -97,74 +97,66 @@ Sandbox, official and Battledome registrations expand into `<id>-step` (one
 buffer through `observe_all_into`). When `perf_compare --base` targets an older
 API without it, the harness falls back to `observe_all`.
 
-## Simulation-thread catalog row
+## Battledome spawn row
 
-`engine-battledome-spawn-318` is an optional `full` row requiring
-`perf-internals` (which enables `networking`). This public Cargo feature exists
-only for the benchmark harness: its internals are hidden and carry no stability
-or semver promise. It is off by default. The row runs the raw host's serial
-simulation tick, including per-recipient stock protocol-19 encoding and food presentation.
-There are no sockets, client decoders or bot workers. Controls, construction,
-wire draining and serialization are outside each timed interval. `--profile`
-is unavailable because the raw host tick has no phase-profile API; ordinary
-timing still reports tick percentiles. `--parallel` is rejected.
-On Linux, `timing.operationCpuSeconds` also sums process CPU around those same
-operations; it excludes setup and draining and is null on other platforms.
+`engine-battledome-spawn-318` is an optional `full` row for spawn admission and
+the simulation tick in a crowded Battledome. It needs the `perf-internals` Cargo
+feature, which also enables `networking`. That feature exists only for this
+harness: it is off by default, and its hidden internals carry no stability or
+semver promise. Ordinary builds and the packaged build script are unchanged.
 
-The Battledome row imports only the ordered head/body geometry, mass and speed
-of the 320-slot, 318-living synthetic constant-boost fixture from the
-[spawn index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md).
-The bounded binary fixture stores little-endian f64 values: an alive flag for
-each slot, then head x/y, heading, fractional mass, speed, body count and ordered
-body x/y for living slots. It contains no session data or recording. Lives and
-timers start at zero, with exactly 18,346 fresh ambient pellets in a fixed-radius
-11,333.603134043473 Battledome. Pit, spawn band and ecology scale with that wall
-before automatic sizing is disabled. Food takes the first 18,346 admitted
-pellets from a separate seed-7 construction with `foodCount=100000` before
-pit-area scaling (at most 100,000 attempts); this bounded setup retains the
-ordinary ambient cell limit. This is a new catalog scene derived
-from that geometry, rather than an exact checkpoint continuation. Setup needs
-one untimed initial broadcast, preserving the seed-0 opening before any motion,
-and measured about 0.067 seconds in the validation run;
-normal execution never repeats the study's 642.684-second warmup.
-Every measured operation performs complete waited=0 spawn searches with RNG
-seeds 40 and 0, then one ordinary constant-boost raw tick. Search construction,
-refusal and successful pose results are all timed, but poses are not installed.
-The default sample uses 192 operations, rebuilding after each 16 ticks to bound
-drift. Each epoch lasts 112 virtual milliseconds, before the first food-update
-tick. Reports count both search outcomes and minimum living population.
-The 317,440-byte geometry file was regenerated at revision `556e73f0`; its
-SHA-256 is part of the catalog definition. The ignored
-`regenerate_spawn_fixture` example test reproduces it with seed 7 and 15,302
-decisions, checking the selected living and anchor counts before writing. This
-slow, explicit maintenance operation is separate from catalog setup:
+**Scene.** The geometry comes from the 320-slot synthetic constant-boost fixture
+of the [spawn index study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md),
+with 318 snakes alive. `examples/support/catalog_spawn.bin` (317,440 bytes)
+stores little-endian f64 values: an alive flag for each slot, then head x/y,
+heading, fractional mass, speed, body count and ordered body x/y for each living
+slot. It holds no session data or recording. Lives and timers start at zero in a
+fixed-radius 11,333.603134043473 Battledome; pit, spawn band and ecology scale
+with that wall before automatic sizing is turned off. Food is the first 18,346
+pellets admitted by a separate seed-7 construction with `foodCount=100000` before
+pit-area scaling (at most 100,000 attempts, ordinary ambient cell limit).
+Recipients attach before the first tick, and one untimed initial broadcast (about
+0.067 s) gives them presentation history, so later food births flow through the
+backend. The scene is derived from the study's geometry rather than continuing
+its checkpoint, and setup never repeats the study's 642.684-second warmup.
 
-```sh
-cargo test --release --locked --features perf-internals --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
-```
+**Operation.** Each operation runs two complete waited=0 spawn searches (RNG seeds
+40 and 0), timing construction, refusal and pose selection without installing
+poses. It then runs one ordinary constant-boost tick on the raw host's serial
+simulation thread, including per-recipient stock protocol-19 encoding and food
+presentation. There are no sockets, client decoders or bot workers. Controls,
+construction, wire draining and serialization stay outside the timed interval.
+The default sample has 192 operations. The scene is rebuilt every 16 ticks, so
+each 112 ms epoch ends before the first food-update tick. On Linux,
+`timing.operationCpuSeconds` sums process CPU over the same operations; elsewhere
+it is null. `--profile` is unavailable because the raw host tick has no phase
+profile, and `--parallel` is rejected. Reports count both search outcomes and the
+minimum living population. The census adds mean known snakes, held food entries
+per recipient and body points.
 
-The construction begins with ambient food only, attaches recipients before the
-first tick and processes subsequent food births through the backend. This avoids
-missing presentation history. The row measures engine cost in a prescribed
-synthetic world, not live capacity.
-
-Traces retain initial/final authoritative state, census and ordered per-tick
-wire/search results. The trace uses four operations. Presentation
-and connection internals are not serialized, so parity covers these outputs
-and state boundaries. Public checkpoint/state adapters construct the core;
-minimal hidden library hooks attach recipients, advance raw ticks and run
-admission searches. All measured engine code belongs to the compiled library.
-The off-by-default feature leaves ordinary builds and packaged build-script
-behavior unchanged. The comparison overlay copies helpers and geometry, while
-each revision supplies its own library. Historical bases predating the hooks
-need the same explicitly recorded hook-only patch on both sides.
+**Parity.** Traces cover four operations. They retain the initial and final
+authoritative state, the census and the ordered per-tick wire and search results.
+Presentation and connection internals are not serialized, so parity covers only
+these outputs and state boundaries. Public checkpoint and state adapters build the
+world, and hidden library hooks attach recipients, advance raw ticks and run
+searches, so all measured engine code is the compiled library. The comparison
+overlay copies only helpers and geometry. A base older than the hooks needs the
+same recorded hook-only patch on both sides.
 
 ```sh
 python -B tools/perf_compare.py --base BASE --features perf-internals --output outputs/perf/engine-check --cases engine-battledome-spawn-318
 ```
 
-Census reports include mean known snakes, held food entries per recipient,
-body points and minimum living population.
+**Fixture.** The catalog definition pins the fixture's SHA-256; it was last
+regenerated at `556e73f0`. The ignored `regenerate_spawn_fixture` test rebuilds it
+from seed 7 with 15,302 decisions and checks the living and anchor counts before
+writing. It is a slow, explicit maintenance step, separate from catalog setup:
+
+```sh
+cargo test --release --locked --features perf-internals --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
+```
+
+The row measures engine cost in a prescribed synthetic world, not live capacity.
 
 ## Shared-policy workload
 
