@@ -5,8 +5,12 @@ from pathlib import Path
 import statistics
 import subprocess
 import sys
+import threading
 import time
 from run import digest, emit
+
+
+WARMUP_BACKSTOP_SECONDS=7800
 
 
 def stable_storm(records,n):
@@ -54,6 +58,10 @@ def execute(root):
         with (output/'warm.jsonl').open('w') as log:
             child=subprocess.Popen([str(binary),'warm',str(fixture),str(n)],stdout=subprocess.DEVNULL,
                                    stderr=subprocess.PIPE,text=True)
+            # Leave ten minutes beyond the native guard to finish its checkpoint.
+            watchdog=threading.Timer(WARMUP_BACKSTOP_SECONDS,child.kill)
+            watchdog.daemon=True
+            watchdog.start()
             try:
                 for line in child.stderr:
                     log.write(line);log.flush()
@@ -68,6 +76,7 @@ def execute(root):
                             if acceptance is not None:(fixture/'STOP_WARM').write_text('first stability screen passed\n')
                 assert child.wait()==0,'botstorm warmup failed'
             finally:
+                watchdog.cancel();watchdog.join()
                 if child.poll() is None:child.terminate();child.wait(timeout=15)
         receipt={'population':n,'stabilized':acceptance is not None,'acceptance':acceptance,
                  'fixtureSha256':digest(fixture/'world.json'),'metaSha256':digest(fixture/'meta.json')}

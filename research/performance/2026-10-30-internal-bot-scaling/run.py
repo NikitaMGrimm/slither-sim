@@ -16,6 +16,9 @@ import sys
 import time
 
 
+CHILD_TIMEOUT_SECONDS=3600
+
+
 def stable(records, population):
     """First eligible four complete census bins; no performance-based selection."""
     if not records or records[-1]['tick'] * .007 < 300:
@@ -114,7 +117,7 @@ def execute(root, populations):
         verified={}
         for mode in ['serial','parallel']:
             path=destination/f'verify-{mode}.json'
-            subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','verify',str(path)],check=True)
+            subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','verify',str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
             verified[mode]=json.loads(path.read_text())
         for field in ['actionSha256','finalStateSha256']:
             assert verified['serial'][field]==verified['parallel'][field],field
@@ -128,13 +131,13 @@ def execute(root, populations):
             for mode in order:
                 path=destination/f'pair-{pair}-{mode}.json'
                 emit('measurement-start',population=n,pair=pair,mode=mode)
-                subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','plain',str(path)],check=True)
+                subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','plain',str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
                 row=json.loads(path.read_text())
                 assert row['finalStateSha256']==reference,(n,pair,mode,'state mismatch')
                 emit('measurement-end',population=n,pair=pair,mode=mode)
         for mode in ['serial','parallel']:
             path=destination/f'profile-{mode}.json'
-            subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','profile',str(path)],check=True)
+            subprocess.run([str(binary),'measure',str(checkpoint),mode,'512','profile',str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
             assert json.loads(path.read_text())['finalStateSha256']==reference
         emit('population-complete',population=n)
     assert digest(binary)==frozen['binarySha256']

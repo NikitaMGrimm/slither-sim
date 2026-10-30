@@ -4,7 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-from run import digest, emit
+from run import CHILD_TIMEOUT_SECONDS, digest, emit
 
 
 def execute(root,study):
@@ -18,7 +18,7 @@ def execute(root,study):
     verified={}
     def measure(path,mode,kind):
         assert not path.exists()
-        subprocess.run([str(binary),'measure',str(fixture),mode,'512',kind,str(path)],check=True)
+        subprocess.run([str(binary),'measure',str(fixture),mode,'512',kind,str(path)],check=True,timeout=CHILD_TIMEOUT_SECONDS)
         return json.loads(path.read_text())
     for mode in ['serial','parallel']:
         verified[mode]=measure(directory/f'verify-{mode}.json',mode,'verify')

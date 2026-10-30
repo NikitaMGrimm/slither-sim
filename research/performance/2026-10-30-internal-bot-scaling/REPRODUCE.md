@@ -1,7 +1,9 @@
 # Reproduce the direct-bot scaling profile
 
 Linux only, an otherwise idle four-CPU guest, Rust 1.99, locked dependencies,
-Python standard library and enough private output space. Never run the study
+Python 3.11.4+ standard library and enough private output space. The #331
+source extraction uses `tarfile`'s `filter='data'`, introduced in 3.11.4;
+unfiltered extraction is never a fallback. Never run the study
 on the maintainer's Windows PC. No AWS or game-server connection is used.
 The runtime is pinned in `selected-results.json` once counting completes.
 
@@ -140,6 +142,15 @@ Keep raw checkpoints, tapes, binaries, samples and logs private/local-only.
 Close and member-verify an archive, transfer it, check its digest, and only then
 remove task-owned guest data and targets. The public report needs selected values
 and a table script, not full recordings or host-identifying command inventories.
+
+Post-collection robustness fixes add a shared 3,600-second deadline to each A4
+verify/plain/profile child, including guarded counting. Botstorm warmup has a
+parent watchdog at 7,800 seconds, ten minutes beyond the native 7,200-second
+guard to allow checkpoint saving. A watchdog failure stops collection rather
+than qualifying a partial fixture. Archive creation now requires all method-test
+and reducer exit codes to be zero, after retaining their logs and status JSON.
+These safeguards do not alter or regenerate the historical measurements/pins;
+the private archive retains the original as-run controller sources.
 
 ## Added center-seeking comparison and observation attribution
 

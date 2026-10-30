@@ -43,6 +43,8 @@ def execute(root,study,source_archive):
         checks.append({'check':label,'exit':result.returncode})
         emit('reduction-end',**checks[-1])
     (root/'reduction-status.json').write_text(json.dumps(checks,indent=2)+'\n')
+    if any(check['exit']!=0 for check in checks):
+        raise RuntimeError('Method tests or reducers failed; retain logs and do not archive')
     pins=json.loads((root/'measurement-pins.json').read_text())
     assert digest(source_archive)==pins['sourceArchiveSha256']
     # The archived input source plus execution sources, tools, binaries and raw
