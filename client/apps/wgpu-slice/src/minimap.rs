@@ -430,12 +430,10 @@ impl Minimap {
             label.shadow_blur,
             label.size.x,
         )? {
-            if frame.draws.len() >= crate::frame::MAX_DRAWS {
-                break;
-            }
             if (!label.overflow_hidden || crate::render::clip_text(&mut draw, clip))
                 && crate::render::clip_text(&mut draw, viewport)
             {
+                crate::frame::check_draw_count(frame.draws.len() + 1)?;
                 frame.draws.push(draw);
                 resources.push(resource);
             }
@@ -697,7 +695,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn label_reserve_and_full_frame_degradation_keep_the_global_limit() {
+    fn large_world_keeps_complete_label() {
         let mut map = Minimap::default();
         let mut cache = TextCache::default();
         let mut bank = crate::bank::Bank::new().unwrap();
@@ -714,8 +712,8 @@ mod tests {
         );
         for count in [
             crate::frame::MAX_DRAWS - MAX_DRAWS - crate::hud::MAX_DRAWS,
-            crate::frame::MAX_DRAWS - 1,
-            crate::frame::MAX_DRAWS,
+            32_768,
+            8192,
         ] {
             let mut f = frame(16.);
             f.draws = vec![filler.clone(); count];

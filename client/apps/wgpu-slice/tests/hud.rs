@@ -181,7 +181,7 @@ fn a_full_or_nearly_full_frame_never_overruns_the_draw_limit() {
         effective_alpha: 1.,
         blend: BodyBlend::SourceOver,
     };
-    for count in [MAX_DRAWS, MAX_DRAWS - 1, MAX_DRAWS - 40] {
+    for count in [8192, 32_768, MAX_DRAWS - hud::MAX_DRAWS] {
         let mut f = frame([960, 540], 1.);
         f.draws = vec![draw.clone(); count];
         let out = finish(&v, &mut bank, f);

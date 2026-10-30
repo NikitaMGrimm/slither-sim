@@ -145,21 +145,14 @@ baselines translate ink inside the same clipped line cells, so rounding,
 overhang and tile padding retain these bounds. The near-full replacement
 regression also checks both grow-early/shrink-later producer orders and rollback.
 
-Both named draw reserves are 96: up to 88 text draws plus 8 fills/borders/controls.
-Current minimap reserve is **12**, rather than the earlier plan's 8. With HUD 128,
-two visible panels reserve **332**, leaving **7860** non-overlay draws out of
-the unchanged 8192. While a captured announcement view is visible (present
-content, projected blocks and positive opacity), production reserves **236**,
-leaving **7956** non-overlay draws, including through the fade. Before any record,
-while Setup hides it, at zero opacity and after the return sentinel, announcements
-reserve no draws: the existing **140** HUD/minimap reserve leaves **8052** world
-draws. Admission and submission use the same captured view; retries reuse its
-prepared resources. With neither producer enabled the reserve stays **140**.
-Dense mandatory geometry still fails admission explicitly; a visible producer
-requires the full named reserve before optional world draws, and rejects a world
-that consumes it. This does not establish dense gameplay coverage.
-Future producers must preflight the entire mandatory panel,
-then preserve the final whole-frame draw/pixel checks.
+Each panel has a producer limit of 96 draws: up to 88 text draws plus 8
+fills/borders/controls. HUD 128 and minimap 12 remain independent producer
+limits. They no longer reserve space from world geometry, and announcement
+visibility does not change world capacity. The [chunked renderer](draw-chunks.md)
+checks complete pictures against its memory-derived bound. Future producers
+must preflight their entire panel and preserve the final draw-memory/pixel checks.
+Admission and submission use the same captured view; retries reuse its prepared
+resources.
 
 Tests use authored fake metrics and installed Windows fonts. Offscreen native
 and Canvas specimens are synthetic resource/layout evidence, not gameplay or
@@ -171,4 +164,4 @@ At raster scale 3 its overhang width is 104px and its tiled bound is
 `48 + floor((900 * 17 + 48 * 104) / 510) = 87`, within 88 text draws.
 Keeping the result/editor's 73 draws, all 64 fragment heights conservatively at
 98 raster pixels, and 17 rounding allowances for both boxes gives an aggregate
-10,752,416 bytes, below the existing 12 MiB. No cache quota or reserve increases.
+10,752,416 bytes, below the existing 12 MiB. Cache quotas are unchanged.

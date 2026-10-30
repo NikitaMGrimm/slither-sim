@@ -124,9 +124,7 @@ impl Announcement {
                 &[&alpha],
             )?
             .remove(0);
-        if draws.len() > crate::render::PANEL_PRODUCER_DRAWS
-            || frame.draws.len() + draws.len() > crate::frame::MAX_DRAWS
-        {
+        if draws.len() > crate::render::PANEL_PRODUCER_DRAWS {
             return Err("Announcement frame draw budget".into());
         }
         let viewport = BodyRect {
@@ -137,6 +135,7 @@ impl Announcement {
         };
         for (mut draw, resource) in draws {
             if crate::render::clip_text(&mut draw, viewport) {
+                crate::frame::check_draw_count(frame.draws.len() + 1)?;
                 frame.draws.push(draw);
                 resources.push(resource);
             }

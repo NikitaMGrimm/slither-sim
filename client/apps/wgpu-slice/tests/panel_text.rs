@@ -1,7 +1,7 @@
 //! Authored bounded panels; no game server or native window.
 use slither_client::presentation::*;
 use slither_wgpu_slice::{
-    render::{PANEL_CONTROL_DRAWS, PANEL_PRODUCER_DRAWS, PanelDrawReserve},
+    render::{PANEL_CONTROL_DRAWS, PANEL_PRODUCER_DRAWS},
     text::*,
 };
 
@@ -41,16 +41,6 @@ fn aggregate_clipped_allocation_envelope_includes_overhang_rounding_and_tiles() 
         (64, 322, 18 * 1024 * 1024)
     );
     assert_eq!((PANEL_PRODUCER_DRAWS, PANEL_CONTROL_DRAWS), (96, 8));
-    let both = PanelDrawReserve {
-        announcement: true,
-        result: true,
-    };
-    assert_eq!(both.late_draws(), 332);
-    assert_eq!(
-        slither_wgpu_slice::frame::MAX_DRAWS - both.late_draws(),
-        7860
-    );
-    assert_eq!(PanelDrawReserve::default().late_draws(), 140);
 }
 
 #[cfg(windows)]

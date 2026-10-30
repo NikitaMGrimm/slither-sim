@@ -6,8 +6,40 @@ use slither_client::presentation::{
 };
 use std::collections::BTreeMap;
 
-pub const MAX_DRAWS: usize = 8192;
+/// Per-picture CPU draw records, independent of GPU buffer size. See docs/draw-chunks.md.
+pub const DRAW_RECORD_BUDGET: usize = 64 * 1024 * 1024;
+pub const MAX_DRAWS: usize = DRAW_RECORD_BUDGET / std::mem::size_of::<Draw>();
+pub const DRAW_MEMORY_LIMIT: &str = "frame draw-record memory budget exceeded; picture skipped";
+pub const VERTEX_CHUNK_QUADS: usize = 8192;
+pub const QUAD_VERTEX_BYTES: usize = 6 * 5 * 4;
 pub const MAX_EXTENT: u32 = 8192;
+
+pub fn check_draw_count(count: usize) -> Result<()> {
+    if count > MAX_DRAWS {
+        Err(DRAW_MEMORY_LIMIT.into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Recoverable picture failures, separate from session failure and bot observations.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DrawDiagnostics {
+    pub skipped_frames: u64,
+    pub last_skipped_identity: Option<u64>,
+}
+impl DrawDiagnostics {
+    pub(crate) fn admit<T>(&mut self, identity: u64, result: Result<T>) -> Result<Option<T>> {
+        match result {
+            Err(error) if error == DRAW_MEMORY_LIMIT => {
+                self.skipped_frames = self.skipped_frames.saturating_add(1);
+                self.last_skipped_identity = Some(identity);
+                Ok(None)
+            }
+            other => other.map(Some),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceKey {
@@ -178,20 +210,38 @@ fn rect_finite(r: BodyRect) -> bool {
 }
 
 impl Frame {
-    /// Preflight the whole frame before any GPU submission. Zero backing extent is suspended.
-    pub fn quads(&self, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<Vec<Quad>> {
+    pub fn check_limits(&self) -> Result<()> {
+        check_draw_count(self.draws.len())?;
         if self.extent.iter().any(|n| *n > MAX_EXTENT)
             || !self.viewport_scale.is_finite()
             || self.viewport_scale <= 0.
-            || self.draws.len() > MAX_DRAWS
         {
             return Err("invalid frame extent/scale/budget".into());
         }
-        if self.extent.contains(&0) {
-            return Ok(Vec::new());
-        }
-        self.draws
+        Ok(())
+    }
+    /// Diagnostic collecting API. Production converts directly into vertex chunks.
+    pub fn quads(&self, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<Vec<Quad>> {
+        self.quad_iter(resident)?.collect()
+    }
+    pub fn validate(&self, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<()> {
+        self.quad_iter(resident)?
+            .try_for_each(|quad| quad.map(|_| ()))
+    }
+    /// Validate and convert each draw once, before the renderer submits any commands.
+    pub fn quad_iter<'a>(
+        &'a self,
+        resident: &'a BTreeMap<ResourceKey, BodyAsset>,
+    ) -> Result<impl Iterator<Item = Result<Quad>> + 'a> {
+        self.check_limits()?;
+        Ok(self
+            .draws
             .iter()
+            .take(if self.extent.contains(&0) {
+                0
+            } else {
+                self.draws.len()
+            })
             .map(|d| {
                 let key = ResourceKey::from(d.asset);
                 if d.asset.status != BodyAssetStatus::Ready
@@ -275,8 +325,7 @@ impl Frame {
                         corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
                     ],
                 })
-            })
-            .collect()
+            }))
     }
 }
 
