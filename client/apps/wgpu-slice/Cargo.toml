@@ -17,6 +17,10 @@ path = "src/main.rs"
 name = "slither-wgpu-diagnostic"
 path = "src/diagnostic_main.rs"
 
+[[bin]]
+name = "slither-client-e2e"
+path = "src/e2e_main.rs"
+
 [[example]]
 name = "feel-replay"
 path = "examples/feel_replay.rs"
@@ -33,7 +37,6 @@ feel-trace = ["slither-client/feel-trace"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 mio = { version = "=1.2.4", features = ["os-poll", "net"] }
-winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }
 pollster = "=0.4.0"
 tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 ureq = { version = "=3.5.0", default-features = false, features = ["rustls", "gzip"] }
@@ -45,6 +48,9 @@ ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"]
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "=5.4.3"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"
