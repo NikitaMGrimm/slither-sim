@@ -119,6 +119,9 @@ pub struct StartMenuView {
     pub play_alpha: f64,
     /// Current tip; initially a nonbreaking space until the first phase wrap.
     pub tip: &'static str,
+    /// False permanently after the first outgoing fade completes; adapters must
+    /// remove the row and pass this value to MenuLayout, not just set opacity.
+    pub tips_visible: bool,
     /// Rounded tip opacity.
     pub tip_alpha: f64,
     /// Hover overlay, suppressed when disabled.
@@ -216,10 +219,21 @@ impl StartMenuState {
         }
     }
 
-    /// Observe pointer state; overlays advance per callback, not per elapsed unit.
-    pub fn play_pointer(&mut self, hovered: bool, pressed: bool) {
-        self.hovered = hovered;
-        self.pressed = pressed;
+    /// Observe pointer state using the current admission availability. Disabled
+    /// controls reject activation but still accept leave/release cleanup.
+    /// Overlays advance per callback, not per elapsed unit.
+    pub fn play_pointer(&mut self, hovered: bool, pressed: bool, admission_available: bool) {
+        let enabled = self.play_enabled(admission_available);
+        if !hovered || enabled {
+            self.hovered = hovered;
+        }
+        if !pressed || enabled {
+            self.pressed = pressed;
+        }
+    }
+
+    fn play_enabled(&self, admission_available: bool) -> bool {
+        self.phase == MenuPhase::Login && !self.champion && admission_available
     }
 
     /// Route an action. `admission_available` must come from the existing admission
@@ -408,7 +422,7 @@ impl StartMenuState {
                 label_alpha: 0.45,
             },
         );
-        let disabled = self.phase != MenuPhase::Login || self.champion || !admission_available;
+        let disabled = !self.play_enabled(admission_available);
         StartMenuView {
             phase: self.phase,
             visible: self.phase != MenuPhase::World
@@ -439,6 +453,7 @@ impl StartMenuState {
             skin_alpha: (5. * (self.nickname_progress - 0.05)).clamp(0., 1.),
             play_alpha: (5. * (self.nickname_progress - 0.01)).clamp(0., 1.),
             tip: self.tip_index.map_or("\u{a0}", |i| wording.tips[i]),
+            tips_visible: self.tips_active,
             tip_alpha: if self.tips_active { self.tip_alpha } else { 0. },
             hover_alpha: if disabled { 0. } else { self.hover_alpha },
             press_alpha: if disabled { 0. } else { self.press_alpha },

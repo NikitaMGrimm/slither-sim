@@ -23,6 +23,15 @@ login transform. The spinner uses its own center-origin scale from the view.
 `hit_test` only tests geometry; adapters must also check visibility and enabled
 state before dispatching actions.
 
+Initialize `MenuLayout::new` only at creation or an actual viewport resize.
+Between resizes, call `update(view.transition, view.tips_visible, metrics)`;
+this retains the last resize's top offset even when combined scale crosses 1.
+The first completed outgoing fade permanently removes the tips row. A false
+`tips_visible` removes its 30px flow space and makes its hit rectangle empty:
+returning Play starts at y396 instead of y426 in the 1280x720 authored fixture.
+Pass current admission availability to `play_pointer`; disabled Play rejects
+new hover/press activation while still accepting leave/release cleanup.
+
 Pass clock milliseconds relative to state creation. Logo/outgoing use elapsed/25;
 the frame clock clamps elapsed/8 to 0..5 before damping. Button layers advance
 once per callback. A Play action consumes the menu's click lock immediately;
@@ -49,6 +58,25 @@ champion editing/acknowledgement and all adapter activation remain later work.
 Incoming/API skin 65 and the existing chooser are untouched; the later official
 chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
 
+## Label width
+
+The width metric is the padded label's untransformed, zoom-adjusted CSS layout
+width, not an ink or transformed bounding box. Before adding 35px, convert it to
+the integer `offsetWidth` that the source reads at button creation and relabeling
+(`source/03-buttons.js:441-442,491-492`). The source's subsequent ceiling is then
+redundant. Authored widths 52.2, 52.49, 52.5 and 52.51 yield button widths
+87, 87, 88 and 88; 90.01 yields 125, not 126.
+
+Blink is pinned to commit `4dfbf1c0f8e59669a8d578f02c258a759d5c0b70`:
+[`HTMLElement::offsetWidthForBinding` and `AdjustedOffsetForZoom`, lines4458-4462/4503-4511](https://chromium.googlesource.com/chromium/src/+/4dfbf1c0f8e59669a8d578f02c258a759d5c0b70/third_party/blink/renderer/core/html/html_element.cc#4458)
+read the layout width, adjust for zoom and round it.
+[`LayoutUnit::Round`, lines294-297](https://chromium.googlesource.com/chromium/src/+/4dfbf1c0f8e59669a8d578f02c258a759d5c0b70/third_party/blink/renderer/platform/geometry/layout_unit.h#294)
+rounds to nearest with positive half ties upward. This binding path neither
+floors the width nor snaps its two edges. Native metrics must already represent
+CSS layout units after zoom adjustment; browser adapters may pass the already
+integer `offsetWidth` directly. Font shaping and layout quantization remain the
+metric provider's responsibility. No browser execution is claimed by this audit.
+
 ## Authored numeric fixtures and source rationale
 
 The private readable source snapshot is a read-only behavioral specification.
@@ -61,13 +89,15 @@ constant used by this slice to independently authored checkpoints.
 | --- | --- | --- |
 | Login margin 64; logo 450x115, top 50; last slot top gap 44; tips 360x30 | `site/index.html:232-249` | `layout_border_boxes_and_measured_flow`: logo (415,114), result y273, tips y291 at 1280x720 |
 | Nickname content holder 244x43, border 2; input 220x24 at left12/top10; nickname top gap34 | `site/index.html:21-65,248-249` | `layout_border_boxes_and_measured_flow`: outer 248x47 at (516,355), input (530,367) |
-| Play height47, top20/bottom50; width ceil(padded label+35) | `source/06-login-and-hud.js:264-273`; `source/03-buttons.js:416-451` | `layout_border_boxes_and_measured_flow`: width88/y426, remeasured width126/y431; bottom margin documented as trailing space |
+| Play height47, top20/bottom50; integer offsetWidth then +35 | `source/06-login-and-hud.js:264-273`; `source/03-buttons.js:441-442,491-492`; pinned Blink above | `layout_border_boxes_and_measured_flow`: width87/y426, remeasured width125/y431; `round1_label_width_rounds_offset_width_before_adding_padding` |
 | Skin left20/bottom16, 95x89; server right20/bottom16, 107x89; quality right20/top16, 90x87 | `site/index.html:288-301,347-350` | `layout_border_boxes_and_measured_flow`: corners (20,615), (1153,615), (1170,16) |
 | Height threshold560, floor50; combined scale and top rounded to 1e-5; scale multiplier 1+0.1p² | `source/16-eyes-and-layout.js:194-206`; `source/06-login-and-hud.js:70-72` | `resize_small_height_rounding_and_transform_origin`: heights559/280/40, scale0.99821/0.5/0.08929; `inverse_hit_test_round_trips` |
+| Top changes only on resize, including the scale1 branch; fades retain it | `source/16-eyes-and-layout.js:199-206`; `source/06-login-and-hud.js:70-73`; `source/13-update-frame.js:574-581` | `round1_animation_retains_resize_top_when_scale_crosses_one`: height540/p0.60858 gives scale1, retained top-19.28571 |
+| Tips row removed after first outgoing transition, never restored on return | `source/06-login-and-hud.js:52-53`; `source/13-update-frame.js:522-605` | `round1_return_removes_tips_from_flow_and_hits`: returning Play y396, removed row cannot hit, second life stays hidden |
 | Logo elapsed/25, alpha +0.05, reveal +0.00375, nickname progress +0.006; nickname min(1,6p), skin clamp(5(p-0.05)), Play clamp(5(p-0.01)) | `source/21-logo.js:137-184,292-302` | `logo_clock_checkpoints_are_not_clamped_or_lagged`: 25/250/10000ms, animated versus initially complete |
 | Tips initial phase1.9/index-1; phase +0.017delta, wrap2π; alpha sqrt((1-cos phase)/2), round1e-5 | `source/06-login-and-hud.js:273-293`; `source/13-update-frame.js:495-508` | `tip_cycle_clamp_lag_and_rounding`: first tip at step52, alpha0.01841, full three-tip cycle; initial blank/alpha0 |
 | Frame elapsed/8, clamp0..5; lag *=0.85 floor0.2, recovery +0.05 cap1 | `source/13-update-frame.js:15-52` | `tip_cycle_clamp_lag_and_rounding`: 8000ms clamps to5 then4.25, alpha0.83389, negative elapsed0; `strict_return_boundary_lag_floor_recovery_and_focus` |
-| Hover/press +0.33 or -0.2 per callback; disabled rendered layers0 | `source/03-buttons.js:355-408` | `overlays_are_per_callback_and_disabled_layers_are_zero`: 0.33/0.66/0.99/1/0.8 |
+| Hover/press +0.33 or -0.2 per callback; disabled layers0 and activation rejected; releases accepted | `source/03-buttons.js:271-318,320-348,355-408` | `overlays_are_per_callback_and_disabled_layers_are_zero`: 0.33/0.66/0.99/1/0.8; `round1_disabled_pointer_rejects_activation_but_accepts_releases` |
 | Click-once; nickname/Play disabled; request on subsequent update | `source/06-login-and-hud.js:294-307`; `source/13-update-frame.js:70-73` | `click_once_deferred_admission_focus_and_links`: one request, composed Enter ignored, explicit focus/link intents |
 | Spinner128, viewport center offset64; unlagged opacity/86, scale-progress/93; scale round(0.1+1e5*0.9p(1+2(1-alpha)²))/1e5 | `source/06-login-and-hud.js:118-126`; `source/13-update-frame.js:105-169`; `source/16-eyes-and-layout.js:178-179` | `layout_border_boxes_and_measured_flow`: (576,296,128,128); `spinner_uses_unlagged_clamped_clock_and_fades_out`: first alpha5/86, scale0.13424, completed scale0.9/fade |
 | Outgoing elapsed/25 *0.05 cap1; login1-p, worldp | `source/06-login-and-hud.js:10-94` | `outgoing_elapsed_clock_and_rounding`: 250ms gives0.5, scale0.98839 at960x540; `early_death_does_not_stop_the_independent_outgoing_clock` |

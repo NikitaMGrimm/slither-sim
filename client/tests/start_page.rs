@@ -49,7 +49,7 @@ fn world(state: &mut StartMenuState, at: f64) {
 
 #[test]
 fn layout_border_boxes_and_measured_flow() {
-    let layout = MenuLayout::new(1280., 720., 0., metrics()).unwrap();
+    let layout = MenuLayout::new(1280., 720., 0., true, metrics()).unwrap();
     assert_eq!((layout.base_scale, layout.scale, layout.top), (1., 1., 0.));
     let fixtures = [
         (E::Logo, [415., 114., 450., 115.]),
@@ -57,7 +57,7 @@ fn layout_border_boxes_and_measured_flow() {
         (E::Tips, [460., 291., 360., 30.]),
         (E::NicknameHolder, [516., 355., 248., 47.]),
         (E::Nickname, [530., 367., 220., 24.]),
-        (E::Play, [596., 426., 88., 47.]),
+        (E::Play, [596.5, 426., 87., 47.]),
         (E::Skin, [20., 615., 95., 89.]),
         (E::Server, [1153., 615., 107., 89.]),
         (E::Quality, [1170., 16., 90., 87.]),
@@ -71,9 +71,9 @@ fn layout_border_boxes_and_measured_flow() {
     changed.last_length_line_height = 21.;
     changed.nickname_baseline_space = 6.;
     changed.padded_play_label_width = 90.01;
-    let changed = MenuLayout::new(1280., 720., 0., changed).unwrap();
+    let changed = MenuLayout::new(1280., 720., 0., true, changed).unwrap();
     assert_eq!(changed.viewport_rect(E::Play).y, 431.);
-    assert_eq!(changed.viewport_rect(E::Play).width, 126.);
+    assert_eq!(changed.viewport_rect(E::Play).width, 125.);
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn resize_small_height_rounding_and_transform_origin() {
         (280., 0.5, 0.5125, -140.),
         (720., 1., 1.1, 0.),
     ] {
-        let layout = MenuLayout::new(960., height, p, metrics()).unwrap();
+        let layout = MenuLayout::new(960., height, p, true, metrics()).unwrap();
         assert_eq!(layout.scale, scale);
         assert_eq!(layout.top, top);
         let center = layout.to_viewport(480., height / 2.);
@@ -96,17 +96,17 @@ fn resize_small_height_rounding_and_transform_origin() {
         near(center.1, 64. + top + height / 2.);
         assert_eq!(layout.viewport_rect(E::Quality).y, 16.);
     }
-    let small = MenuLayout::new(960., 280., 0., metrics()).unwrap();
+    let small = MenuLayout::new(960., 280., 0., true, metrics()).unwrap();
     assert_eq!(small.viewport_rect(E::Logo).y, 19.);
     assert_eq!(small.viewport_rect(E::Play).y, 175.);
-    let wide = MenuLayout::new(1920., 280., 0., metrics()).unwrap();
+    let wide = MenuLayout::new(1920., 280., 0., true, metrics()).unwrap();
     near(
         wide.viewport_rect(E::Play).x - small.viewport_rect(E::Play).x,
         480.,
     );
     for invalid in [0., -1., f64::NAN, f64::INFINITY] {
-        assert!(MenuLayout::new(invalid, 720., 0., metrics()).is_err());
-        assert!(MenuLayout::new(1280., invalid, 0., metrics()).is_err());
+        assert!(MenuLayout::new(invalid, 720., 0., true, metrics()).is_err());
+        assert!(MenuLayout::new(1280., invalid, 0., true, metrics()).is_err());
     }
 }
 
@@ -114,7 +114,7 @@ fn resize_small_height_rounding_and_transform_origin() {
 fn inverse_hit_test_round_trips() {
     for (w, h) in [(1280., 720.), (960., 540.), (320., 180.), (200., 40.)] {
         for p in [0., 0.5, 1.] {
-            let layout = MenuLayout::new(w, h, p, metrics()).unwrap();
+            let layout = MenuLayout::new(w, h, p, true, metrics()).unwrap();
             for e in [
                 E::Logo,
                 E::LastLength,
@@ -138,7 +138,7 @@ fn inverse_hit_test_round_trips() {
             }
         }
     }
-    let layout = MenuLayout::new(1280., 720., 0., metrics()).unwrap();
+    let layout = MenuLayout::new(1280., 720., 0., true, metrics()).unwrap();
     let r = layout.viewport_rect(E::Play);
     assert!(!layout.hit_test(E::Play, r.x + r.width, r.y));
 }
@@ -323,14 +323,14 @@ fn tip_cycle_clamp_lag_and_rounding() {
 #[test]
 fn overlays_are_per_callback_and_disabled_layers_are_zero() {
     let mut state = menu();
-    state.play_pointer(true, true);
+    state.play_pointer(true, true, true);
     for (time, expected) in [(1., 0.33), (2., 0.66), (5000., 0.99), (5001., 1.)] {
         state.step(time, true).unwrap();
         near(state.view(true).hover_alpha, expected);
         near(state.view(true).press_alpha, expected);
     }
     assert_eq!(state.view(false).hover_alpha, 0.);
-    state.play_pointer(false, false);
+    state.play_pointer(false, false, true);
     state.step(5002., false).unwrap();
     near(state.view(true).hover_alpha, 0.8);
     state.action(A::Play, true);
@@ -431,7 +431,7 @@ fn outgoing_elapsed_clock_and_rounding() {
         (v.transition, v.login_alpha, v.world_alpha),
         (0.5, 0.5, 0.5)
     );
-    let layout = MenuLayout::new(960., 540., v.transition, metrics()).unwrap();
+    let layout = MenuLayout::new(960., 540., v.transition, v.tips_visible, metrics()).unwrap();
     near(layout.scale, 0.98839);
     state.step(500., true).unwrap();
     assert_eq!(state.view(true).phase, P::World);
@@ -585,4 +585,125 @@ fn quality_memory_survives_missing_storage_and_snapshots_on_play() {
     );
     state.disconnected();
     assert_eq!(state.action(A::Quality, true), Some(I::PersistQuality("1")));
+}
+
+#[test]
+fn round1_return_removes_tips_from_flow_and_hits() {
+    let mut state = menu();
+    let initial = state.view(true);
+    assert!(initial.tips_visible);
+    let mut layout = MenuLayout::new(
+        1280.,
+        720.,
+        initial.transition,
+        initial.tips_visible,
+        metrics(),
+    )
+    .unwrap();
+    assert_eq!(layout.viewport_rect(E::Play).y, 426.);
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)), 500.)
+        .unwrap();
+    for frame in 0..=51 {
+        state.step(2101. + f64::from(frame) * 40., false).unwrap();
+        let view = state.view(true);
+        assert!(!view.tips_visible);
+        layout
+            .update(view.transition, view.tips_visible, metrics())
+            .unwrap();
+        let tips = layout.viewport_rect(E::Tips);
+        assert_eq!(tips.height, 0.);
+        assert!(!layout.hit_test(E::Tips, tips.x + tips.width / 2., tips.y));
+        let play = layout.viewport_rect(E::Play);
+        assert!(layout.hit_test(E::Play, play.x + play.width / 2., play.y + play.height / 2.));
+    }
+    assert_eq!(state.view(true).phase, P::Login);
+    assert_eq!(layout.viewport_rect(E::Play).y, 396.);
+    assert_eq!(layout.viewport_rect(E::NicknameHolder).y, 325.);
+    assert!(layout.hit_test(E::Play, 640., 400.));
+    assert!(!layout.hit_test(E::Play, 640., 460.)); // old row's lower hit area
+    state.disconnected();
+    assert!(!state.view(true).tips_visible);
+    state.action(A::Play, true);
+    assert!(!state.view(true).tips_visible); // never restored on a second life
+}
+
+#[test]
+fn round1_animation_retains_resize_top_when_scale_crosses_one() {
+    let mut layout = MenuLayout::new(1280., 540., 0., true, metrics()).unwrap();
+    assert_eq!(layout.top, -19.28571);
+    for progress in [0.6085, 0.60858, 0.6087, 1., 0.60858, 0.] {
+        layout.update(progress, true, metrics()).unwrap();
+        assert_eq!(layout.top, -19.28571);
+        let r = layout.viewport_rect(E::Nickname);
+        assert!(layout.hit_test(E::Nickname, r.x + r.width / 2., r.y + r.height / 2.));
+        if progress == 0.60858 {
+            assert_eq!(layout.scale, 1.);
+            near(layout.viewport_rect(E::Logo).y, 94.71429);
+        }
+    }
+    // An actual resize at scale 1 *does* clear top, and later animation retains it.
+    let mut resized = MenuLayout::new(1280., 540., 0.60858, false, metrics()).unwrap();
+    assert_eq!(resized.top, 0.);
+    resized.update(0.5, false, metrics()).unwrap();
+    assert_eq!(resized.top, 0.);
+    let before = resized.clone();
+    assert!(resized.update(f64::NAN, false, metrics()).is_err());
+    assert_eq!(resized, before);
+}
+
+#[test]
+fn round1_disabled_pointer_rejects_activation_but_accepts_releases() {
+    let mut state = menu();
+    state.action(A::Play, true);
+    state.play_pointer(true, true, true); // disabled by the connection attempt
+    state.step(8., false).unwrap();
+    state.disconnected();
+    assert_eq!(state.view(true).hover_alpha, 0.);
+    assert_eq!(state.view(true).press_alpha, 0.);
+
+    state.play_pointer(true, true, false); // disabled only by admission availability
+    state.step(16., false).unwrap();
+    assert_eq!(state.view(true).hover_alpha, 0.);
+    assert_eq!(state.view(true).press_alpha, 0.);
+
+    state.play_pointer(true, true, true);
+    state.step(24., false).unwrap();
+    near(state.view(true).hover_alpha, 0.33);
+    near(state.view(true).press_alpha, 0.33);
+    state.action(A::Play, true);
+    state.play_pointer(false, false, false); // releases must clear retained input
+    for now in [32., 40., 48.] {
+        state.step(now, false).unwrap();
+    }
+    state.disconnected();
+    assert_eq!(state.view(true).hover_alpha, 0.);
+    assert_eq!(state.view(true).press_alpha, 0.);
+}
+
+#[test]
+fn round1_label_width_rounds_offset_width_before_adding_padding() {
+    // Blink 4dfbf1c0f8e59669a8d578f02c258a759d5c0b70, html_element.cc:
+    // 4458-4462,4503-4511 and platform/geometry/layout_unit.h:294-297.
+    // Width itself rounds nearest, positive .5 upward: no floor or edge snapping.
+    // Pinned links and input-metric contract: ../docs/start-menu.md#label-width.
+    for (measured, expected) in [
+        (52., 87.),
+        (52.2, 87.),
+        (52.49, 87.),
+        (52.5, 88.),
+        (52.51, 88.),
+        (90.01, 125.),
+    ] {
+        let mut m = metrics();
+        m.padded_play_label_width = measured;
+        let mut layout = MenuLayout::new(1280., 720., 0., true, m).unwrap();
+        assert_eq!(layout.viewport_rect(E::Play).width, expected);
+        near(layout.viewport_rect(E::Play).x, (1280. - expected) / 2.);
+        // Remeasure a replay label through the animation update seam too.
+        m.padded_play_label_width = 110.5;
+        layout.update(0., false, m).unwrap();
+        assert_eq!(layout.viewport_rect(E::Play).width, 146.);
+    }
 }

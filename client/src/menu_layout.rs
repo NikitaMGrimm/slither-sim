@@ -28,7 +28,8 @@ pub struct MenuMetrics {
     pub last_length_line_height: f64,
     /// Inline nickname holder's trailing baseline space in its containing row.
     pub nickname_baseline_space: f64,
-    /// Measured 20px bold label, including a nonbreaking space on each side.
+    /// Untransformed, zoom-adjusted CSS layout width of the padded 20px bold
+    /// label, before offsetWidth's nearest-integer conversion. Not ink bounds.
     pub padded_play_label_width: f64,
 }
 
@@ -66,6 +67,8 @@ pub struct MenuLayout {
     pub scale: f64,
     /// Login's top adjustment, excluding its 64px margin.
     pub top: f64,
+    /// Whether the tips row participates in layout and hit testing.
+    pub tips_visible: bool,
     origin: (f64, f64),
     rects: [(MenuElement, MenuRect); 10],
 }
@@ -84,12 +87,14 @@ pub(crate) fn round5(value: f64) -> f64 {
 }
 
 impl MenuLayout {
-    /// Compute from a logical viewport, measured text and transition fraction.
+    /// Initialize at a resize from logical viewport pixels and measured text.
     /// Corner links are viewport-fixed siblings, so they fade but never scale.
+    /// Use `update` between resizes to retain the resize-time top adjustment.
     pub fn new(
         width: f64,
         height: f64,
         progress: f64,
+        tips_visible: bool,
         metrics: MenuMetrics,
     ) -> Result<Self, &'static str> {
         if !width.is_finite()
@@ -124,13 +129,18 @@ impl MenuLayout {
         let origin = (width / 2., height / 2.);
         let last_y = 50. + 115. + 44.;
         let tips_y = last_y + metrics.last_length_line_height;
-        let nick_y = tips_y + 30. + 34.;
+        let tips_height = if tips_visible { 30. } else { 0. };
+        let nick_y = tips_y + tips_height + 34.;
         let play_y = nick_y + 47. + metrics.nickname_baseline_space + 20.;
-        let play_width = (metrics.padded_play_label_width + 35.).ceil();
+        // Blink rounds the zoom-adjusted layout width, not the two edges.
+        // Source and pinned Blink rationale: docs/start-menu.md#label-width.
+        // The source's outer ceil is a no-op after the integer measurement.
+        let play_width = metrics.padded_play_label_width.round() + 35.;
         Ok(Self {
             base_scale,
             scale,
             top,
+            tips_visible,
             origin,
             rects: [
                 (
@@ -143,7 +153,7 @@ impl MenuLayout {
                 ),
                 (
                     MenuElement::Tips,
-                    rect((width - 360.) / 2., tips_y, 360., 30.),
+                    rect((width - 360.) / 2., tips_y, 360., tips_height),
                 ),
                 // CSS width/height exclude the two-pixel border on each side.
                 (
@@ -170,6 +180,27 @@ impl MenuLayout {
                 ),
             ],
         })
+    }
+
+    /// Update animation, text metrics and row visibility without a resize.
+    /// Source fade callbacks change only the transform, leaving top untouched.
+    /// Invalid inputs leave this layout unchanged.
+    pub fn update(
+        &mut self,
+        progress: f64,
+        tips_visible: bool,
+        metrics: MenuMetrics,
+    ) -> Result<(), &'static str> {
+        let mut next = Self::new(
+            self.origin.0 * 2.,
+            self.origin.1 * 2.,
+            progress,
+            tips_visible,
+            metrics,
+        )?;
+        next.top = self.top;
+        *self = next;
+        Ok(())
     }
 
     /// Map login-local coordinates to viewport coordinates, including margins.
