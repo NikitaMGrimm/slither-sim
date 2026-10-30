@@ -1,0 +1,588 @@
+//! Authored synthetic fixtures; no official program, assets or curve data.
+//! Constant-to-test/source table: ../docs/start-menu.md (private reference citations).
+
+use slither_client::menu_layout::{MenuElement as E, MenuLayout, MenuMetrics};
+use slither_client::menu_preferences::MenuQuality;
+use slither_client::presentation::{
+    HudFinal, HudHistory, HudHistoryEvent, HudSample, SnakeObjectToken,
+};
+use slither_client::session_policy::Phase;
+use slither_client::start_page::{
+    MenuAction as A, MenuLocale as L, MenuPhase as P, StartMenuIntent as I, StartMenuState,
+    normalize_nickname, normalize_nickname_units,
+};
+
+fn near(a: f64, b: f64) {
+    assert!((a - b).abs() < 1e-10, "{a} != {b}");
+}
+fn metrics() -> MenuMetrics {
+    // Authored platform metrics, not measured official font claims.
+    MenuMetrics {
+        last_length_line_height: 18.,
+        nickname_baseline_space: 4.,
+        padded_play_label_width: 52.2,
+    }
+}
+fn menu() -> StartMenuState {
+    StartMenuState::new(L::English, false, MenuQuality::High)
+}
+fn capture(score: f64) -> HudFinal {
+    HudHistory::default()
+        .packet(&[HudHistoryEvent::FinalScore(HudSample {
+            score,
+            token: SnakeObjectToken::new(7).unwrap(),
+        })])
+        .unwrap()
+        .final_capture
+        .unwrap()
+}
+fn world(state: &mut StartMenuState, at: f64) {
+    state.action(A::Play, true);
+    assert!(matches!(
+        state.step(at, false).unwrap().as_slice(),
+        [I::Play { .. }]
+    ));
+    assert!(state.begin_outgoing());
+    state.step(at + 500., false).unwrap();
+    assert_eq!(state.view(true).phase, P::World);
+}
+
+#[test]
+fn layout_border_boxes_and_measured_flow() {
+    let layout = MenuLayout::new(1280., 720., 0., metrics()).unwrap();
+    assert_eq!((layout.base_scale, layout.scale, layout.top), (1., 1., 0.));
+    let fixtures = [
+        (E::Logo, [415., 114., 450., 115.]),
+        (E::LastLength, [0., 273., 1280., 18.]),
+        (E::Tips, [460., 291., 360., 30.]),
+        (E::NicknameHolder, [516., 355., 248., 47.]),
+        (E::Nickname, [530., 367., 220., 24.]),
+        (E::Play, [596., 426., 88., 47.]),
+        (E::Skin, [20., 615., 95., 89.]),
+        (E::Server, [1153., 615., 107., 89.]),
+        (E::Quality, [1170., 16., 90., 87.]),
+        (E::Spinner, [576., 296., 128., 128.]),
+    ];
+    for (element, values) in fixtures {
+        let r = layout.viewport_rect(element);
+        assert_eq!([r.x, r.y, r.width, r.height], values, "{element:?}");
+    }
+    let mut changed = metrics();
+    changed.last_length_line_height = 21.;
+    changed.nickname_baseline_space = 6.;
+    changed.padded_play_label_width = 90.01;
+    let changed = MenuLayout::new(1280., 720., 0., changed).unwrap();
+    assert_eq!(changed.viewport_rect(E::Play).y, 431.);
+    assert_eq!(changed.viewport_rect(E::Play).width, 126.);
+}
+
+#[test]
+fn resize_small_height_rounding_and_transform_origin() {
+    // Base ratio remains unrounded; only combined scale and top round to 1e-5.
+    for (height, p, scale, top) in [
+        (560., 0., 1., 0.),
+        (559., 0., 0.99821, -0.99821),
+        (280., 0., 0.5, -140.),
+        (40., 0., 0.08929, -36.42857),
+        (720., 0.5, 1.025, 0.),
+        (280., 0.5, 0.5125, -140.),
+        (720., 1., 1.1, 0.),
+    ] {
+        let layout = MenuLayout::new(960., height, p, metrics()).unwrap();
+        assert_eq!(layout.scale, scale);
+        assert_eq!(layout.top, top);
+        let center = layout.to_viewport(480., height / 2.);
+        near(center.0, 480.);
+        near(center.1, 64. + top + height / 2.);
+        assert_eq!(layout.viewport_rect(E::Quality).y, 16.);
+    }
+    let small = MenuLayout::new(960., 280., 0., metrics()).unwrap();
+    assert_eq!(small.viewport_rect(E::Logo).y, 19.);
+    assert_eq!(small.viewport_rect(E::Play).y, 175.);
+    let wide = MenuLayout::new(1920., 280., 0., metrics()).unwrap();
+    near(
+        wide.viewport_rect(E::Play).x - small.viewport_rect(E::Play).x,
+        480.,
+    );
+    for invalid in [0., -1., f64::NAN, f64::INFINITY] {
+        assert!(MenuLayout::new(invalid, 720., 0., metrics()).is_err());
+        assert!(MenuLayout::new(1280., invalid, 0., metrics()).is_err());
+    }
+}
+
+#[test]
+fn inverse_hit_test_round_trips() {
+    for (w, h) in [(1280., 720.), (960., 540.), (320., 180.), (200., 40.)] {
+        for p in [0., 0.5, 1.] {
+            let layout = MenuLayout::new(w, h, p, metrics()).unwrap();
+            for e in [
+                E::Logo,
+                E::LastLength,
+                E::Tips,
+                E::NicknameHolder,
+                E::Nickname,
+                E::Play,
+                E::Skin,
+                E::Server,
+                E::Quality,
+            ] {
+                let r = layout.viewport_rect(e);
+                assert!(layout.hit_test(e, r.x + r.width / 2., r.y + r.height / 2.));
+                assert!(!layout.hit_test(e, r.x - 1., r.y - 1.));
+            }
+            for (x, y) in [(0., 0.), (50., 355.), (500., 220.)] {
+                let v = layout.to_viewport(x, y);
+                let l = layout.to_login(v.0, v.1);
+                near(l.0, x);
+                near(l.1, y);
+            }
+        }
+    }
+    let layout = MenuLayout::new(1280., 720., 0., metrics()).unwrap();
+    let r = layout.viewport_rect(E::Play);
+    assert!(!layout.hit_test(E::Play, r.x + r.width, r.y));
+}
+
+#[test]
+fn translations_and_source_order() {
+    let fixtures = [
+        (
+            "en",
+            L::English,
+            "Play",
+            "Play Again",
+            "Nickname",
+            "Your final length was",
+            [
+                "Eat to grow longer!",
+                "Don't run into other players!",
+                "When longer, hold the mouse for a speed boost!",
+            ],
+        ),
+        (
+            "de",
+            L::German,
+            "Spielen",
+            "Play Again",
+            "Nickname",
+            "Deine endgültige Länge war",
+            [
+                "Esse um zu wachsen!",
+                "Klicke für mehr Geschwindigkeit!",
+                "Bewege dich nicht in andere Schlangen!",
+            ],
+        ),
+        (
+            "fr",
+            L::French,
+            "Jouer",
+            "Jouer",
+            "Surnom",
+            "Votre longueur finale était de",
+            [
+                "Mange pour croître !",
+                "Clique pour courir !",
+                "Ne laissez pas votre tête toucher d'autres serpents !",
+            ],
+        ),
+        (
+            "pt",
+            L::Portuguese,
+            "Joga",
+            "Joga",
+            "Apelido",
+            "Seu comprimento final foi de",
+            [
+                "Coma para crescer!",
+                "Clique para correr!",
+                "Não deixe que sua cabeça para tocar outras cobras!",
+            ],
+        ),
+    ];
+    for (code, locale, play, again, nickname, final_length, tips) in fixtures {
+        assert_eq!(L::from_code(code), locale);
+        let text = locale.wording();
+        assert_eq!(
+            (
+                text.play,
+                text.play_again,
+                text.nickname,
+                text.final_length,
+                text.tips
+            ),
+            (play, again, nickname, final_length, tips)
+        );
+    }
+    assert_eq!(L::from_code("unknown"), L::English);
+}
+
+#[test]
+fn nickname_utf16_del_surrogates_and_limit() {
+    assert_eq!(
+        normalize_nickname("A\u{1f}\u{20}\u{7f}\u{80}é😀Z"),
+        "A  \u{7f}    Z"
+    );
+    assert_eq!(
+        normalize_nickname_units(&[31, 32, 126, 127, 128, 0xd800, 0xdc00]),
+        "  ~\u{7f}   "
+    );
+    assert_eq!(
+        normalize_nickname(&format!("{}😀Z", "a".repeat(23))),
+        format!("{} ", "a".repeat(23))
+    );
+    assert_eq!(normalize_nickname(&"😀".repeat(20)), " ".repeat(24));
+    let mut state = menu();
+    state.edit_nickname(&"a😀é".encode_utf16().collect::<Vec<_>>());
+    assert_eq!(state.view(true).nickname, "a   ");
+    state.action(A::Play, true);
+    state.edit_nickname(&[b'x' as u16]);
+    assert_eq!(state.view(true).nickname, "a   ");
+}
+
+#[test]
+fn logo_clock_checkpoints_are_not_clamped_or_lagged() {
+    let mut state = StartMenuState::new(L::English, true, MenuQuality::High);
+    let first = state.view(true);
+    assert_eq!(first.tip_alpha, 0.);
+    assert_eq!(
+        (
+            first.logo_alpha,
+            first.logo_reveal,
+            first.nickname_alpha,
+            first.skin_alpha,
+            first.play_alpha
+        ),
+        (0., 0., 0., 0., 0.)
+    );
+    state.step(25., true).unwrap();
+    let v = state.view(true);
+    near(v.logo_alpha, 0.05);
+    near(v.logo_reveal, 0.00375);
+    near(v.nickname_alpha, 0.036);
+    near(v.skin_alpha, 0.);
+    near(v.play_alpha, 0.);
+    state.step(250., true).unwrap();
+    let v = state.view(true);
+    near(v.logo_alpha, 0.5);
+    near(v.logo_reveal, 0.0375);
+    near(v.nickname_alpha, 0.36);
+    near(v.skin_alpha, 0.05);
+    near(v.play_alpha, 0.25);
+    state.step(10_000., true).unwrap();
+    let v = state.view(true);
+    assert_eq!(
+        (
+            v.logo_alpha,
+            v.logo_reveal,
+            v.nickname_alpha,
+            v.skin_alpha,
+            v.play_alpha
+        ),
+        (1., 1., 1., 1., 1.)
+    );
+    assert_eq!(menu().view(true).logo_reveal, 1.);
+}
+
+#[test]
+fn tip_cycle_clamp_lag_and_rounding() {
+    let mut state = menu();
+    for step in 1..=51 {
+        state.step(f64::from(step) * 40., false).unwrap();
+    }
+    assert_eq!(state.view(true).tip, "\u{a0}");
+    state.step(2080., false).unwrap();
+    assert_eq!(state.view(true).tip, "Eat to grow longer!");
+    near(state.view(true).tip_alpha, 0.01841);
+    for step in 53..=126 {
+        state.step(f64::from(step) * 40., false).unwrap();
+    }
+    assert_eq!(state.view(true).tip, "Don't run into other players!");
+    for step in 127..=200 {
+        state.step(f64::from(step) * 40., false).unwrap();
+    }
+    assert_eq!(
+        state.view(true).tip,
+        "When longer, hold the mouse for a speed boost!"
+    );
+    for step in 201..=274 {
+        state.step(f64::from(step) * 40., false).unwrap();
+    }
+    assert_eq!(state.view(true).tip, "Eat to grow longer!");
+    let mut slow = menu();
+    slow.step(8000., true).unwrap();
+    // Clamp 1000 units to 5, then damp to 4.25; phase 1.97225.
+    near(slow.view(true).tip_alpha, 0.83389);
+    let before = slow.view(true).tip_alpha;
+    slow.step(7999., false).unwrap();
+    assert_eq!(slow.view(true).tip_alpha, before); // negative elapsed clamps to zero
+    let before = slow.clone();
+    assert!(slow.step(f64::NAN, false).is_err());
+    assert_eq!(slow, before);
+}
+
+#[test]
+fn overlays_are_per_callback_and_disabled_layers_are_zero() {
+    let mut state = menu();
+    state.play_pointer(true, true);
+    for (time, expected) in [(1., 0.33), (2., 0.66), (5000., 0.99), (5001., 1.)] {
+        state.step(time, true).unwrap();
+        near(state.view(true).hover_alpha, expected);
+        near(state.view(true).press_alpha, expected);
+    }
+    assert_eq!(state.view(false).hover_alpha, 0.);
+    state.play_pointer(false, false);
+    state.step(5002., false).unwrap();
+    near(state.view(true).hover_alpha, 0.8);
+    state.action(A::Play, true);
+    assert_eq!(state.view(true).press_alpha, 0.);
+}
+
+#[test]
+fn click_once_deferred_admission_focus_and_links() {
+    let mut state = menu();
+    assert_eq!(state.step(0., false).unwrap(), vec![I::FocusNickname]);
+    assert!(state.step(0., false).unwrap().is_empty());
+    assert_eq!(
+        state.action(A::FocusNickname, false),
+        Some(I::FocusNickname)
+    );
+    assert_eq!(state.action(A::Skin, false), Some(I::OpenSkinChooser));
+    assert_eq!(state.action(A::Server, false), Some(I::OpenServerPicker));
+    assert_eq!(state.action(A::Enter { composing: true }, true), None);
+    state.action(A::Play, false);
+    assert_eq!(state.view(true).phase, P::Login);
+    state.action(A::Enter { composing: false }, true);
+    assert!(!state.begin_outgoing()); // request must reach its later update first
+    assert!(state.view(true).disabled && state.view(true).spinner_visible);
+    for action in [
+        A::Play,
+        A::Enter { composing: false },
+        A::Skin,
+        A::Server,
+        A::FocusNickname,
+        A::Quality,
+    ] {
+        assert_eq!(state.action(action, true), None);
+    }
+    assert_eq!(
+        state.step(8., false).unwrap(),
+        vec![I::Play {
+            nickname: String::new(),
+            quality: MenuQuality::High
+        }]
+    );
+    assert!(state.step(16., false).unwrap().is_empty());
+}
+
+#[test]
+fn early_death_does_not_stop_the_independent_outgoing_clock() {
+    let mut state = menu();
+    state.action(A::Play, true);
+    state.step(0., false).unwrap();
+    state.begin_outgoing();
+    state.step(100., false).unwrap();
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(5.)), 100.)
+        .unwrap();
+    assert!(state.view(true).visible);
+    state.step(500., false).unwrap();
+    assert_eq!(state.view(true).phase, P::DeathHold);
+    assert_eq!(state.view(true).transition, 1.);
+    assert!(!state.view(true).visible);
+    state.step(1700., false).unwrap();
+    assert_eq!(state.view(true).phase, P::DeathHold);
+    state.step(1701., false).unwrap();
+    assert_eq!(state.view(true).phase, P::Returning);
+}
+
+#[test]
+fn spinner_uses_unlagged_clamped_clock_and_fades_out() {
+    let mut state = menu();
+    state.action(A::Play, true);
+    state.step(8000., true).unwrap();
+    let v = state.view(true);
+    assert_eq!(v.spinner_time, 5.);
+    near(v.spinner_alpha, 5. / 86.);
+    near(v.spinner_scale, 0.13424);
+    for step in 1..=18 {
+        state.step(8000. + f64::from(step) * 40., true).unwrap();
+    }
+    let v = state.view(true);
+    assert_eq!(v.spinner_alpha, 1.);
+    near(v.spinner_scale, 0.9);
+    assert!(state.begin_outgoing());
+    state.step(8760., false).unwrap();
+    near(state.view(true).spinner_alpha, 81. / 86.);
+    for step in 1..=18 {
+        state.step(8760. + f64::from(step) * 40., false).unwrap();
+    }
+    assert!(!state.view(true).spinner_visible);
+}
+
+#[test]
+fn outgoing_elapsed_clock_and_rounding() {
+    let mut state = menu();
+    state.action(A::Play, true);
+    state.step(0., false).unwrap();
+    assert!(state.begin_outgoing());
+    state.step(250., true).unwrap();
+    let v = state.view(true);
+    assert_eq!(
+        (v.transition, v.login_alpha, v.world_alpha),
+        (0.5, 0.5, 0.5)
+    );
+    let layout = MenuLayout::new(960., 540., v.transition, metrics()).unwrap();
+    near(layout.scale, 0.98839);
+    state.step(500., true).unwrap();
+    assert_eq!(state.view(true).phase, P::World);
+    assert!(!state.view(true).visible);
+    assert_eq!(state.view(true).tip_alpha, 0.);
+}
+
+#[test]
+fn lengths_1000_and_1001_and_translated_replay() {
+    for locale in [L::English, L::German, L::French, L::Portuguese] {
+        for (score, number, suffix) in [(1000., "1000", ""), (1001., "1001", "!")] {
+            let mut state = StartMenuState::new(locale, false, MenuQuality::High);
+            world(&mut state, 0.);
+            assert!(
+                state
+                    .accepted_game_over(Phase::Dead, Some(capture(score)), 500.)
+                    .unwrap()
+            );
+            let v = state.view(true);
+            assert_eq!(v.last_life.label, locale.wording().final_length);
+            assert_eq!(v.last_life.number, number);
+            assert_eq!(v.last_life.suffix, suffix);
+            assert_eq!(v.last_life.label_alpha, 0.45);
+            assert_eq!(v.play_label, locale.wording().play_again);
+            assert!(!v.visible);
+        }
+    }
+}
+
+#[test]
+fn strict_return_boundary_lag_floor_recovery_and_focus() {
+    let mut state = menu();
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)), 500.)
+        .unwrap();
+    state.step(2100., false).unwrap();
+    assert_eq!(state.view(true).phase, P::DeathHold);
+    state.action(A::Play, true);
+    state.step(2101., false).unwrap();
+    let v = state.view(true);
+    assert_eq!(v.phase, P::Returning);
+    assert!(v.visible && v.disabled);
+    near(v.transition, 0.9995);
+    near(v.play_return_alpha, 0.5);
+    state.step(2141., true).unwrap();
+    near(state.view(true).transition, 0.9825); // .004 * 5 * .85
+    let mut expected = 0.9825;
+    let mut lag: f64 = 0.85;
+    for step in 1..=12 {
+        lag = (lag * 0.85).max(0.2);
+        expected -= 0.004 * 5. * lag;
+        state.step(2141. + f64::from(step) * 40., true).unwrap();
+        near(state.view(true).transition, expected);
+    }
+    state.step(2661., false).unwrap();
+    expected -= 0.004 * 5. * 0.25;
+    near(state.view(true).transition, expected);
+    let mut focus_count = 0;
+    for step in 1..=100 {
+        focus_count += state
+            .step(2661. + f64::from(step) * 40., false)
+            .unwrap()
+            .iter()
+            .filter(|i| **i == I::FocusNickname)
+            .count();
+    }
+    assert_eq!(focus_count, 1);
+    assert_eq!(state.view(true).phase, P::Login);
+    assert!(!state.view(true).disabled);
+    assert!(state.view(false).disabled);
+}
+
+#[test]
+fn persistent_last_life_second_life_and_disconnect_has_no_result_authority() {
+    let mut state = menu();
+    assert_eq!(state.view(true).last_life.number, "\u{a0}");
+    assert!(
+        !state
+            .accepted_game_over(Phase::Disconnected, Some(capture(99.)), 0.)
+            .unwrap()
+    );
+    state.disconnected();
+    assert_eq!(state.view(true).last_life.number, "\u{a0}");
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(1234567.)), 500.)
+        .unwrap();
+    let retained = state.view(true).last_life;
+    assert!(
+        !state
+            .accepted_game_over(Phase::Dead, Some(capture(2.)), 600.)
+            .unwrap()
+    );
+    state.disconnected(); // accepted outcome and hold survive close
+    assert_eq!(state.view(true).phase, P::DeathHold);
+    for step in 0..=51 {
+        state.step(2101. + f64::from(step) * 40., false).unwrap();
+    }
+    assert_eq!(state.view(true).phase, P::Login);
+    assert_eq!(state.view(true).last_life, retained);
+    world(&mut state, 4200.);
+    assert_eq!(state.view(true).last_life, retained);
+    state.disconnected();
+    assert_eq!(state.view(true).last_life, retained);
+    assert_eq!(state.view(true).play_label, "Play Again");
+    world(&mut state, 4800.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(88.)), 5300.)
+        .unwrap();
+    assert_eq!(state.view(true).last_life.number, "88");
+}
+
+#[test]
+fn champion_suppresses_ordinary_controls_without_fake_editor() {
+    let mut state = menu();
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Victory, Some(capture(1001.)), 500.)
+        .unwrap();
+    for step in 0..=51 {
+        state.step(2101. + f64::from(step) * 40., false).unwrap();
+    }
+    let v = state.view(true);
+    assert!(v.champion_pending && v.disabled);
+    assert!(!v.ordinary_controls_visible);
+    assert_eq!(state.action(A::Enter { composing: false }, true), None);
+}
+
+#[test]
+fn quality_memory_survives_missing_storage_and_snapshots_on_play() {
+    for (stored, quality) in [
+        (None, MenuQuality::High),
+        (Some("1"), MenuQuality::High),
+        (Some("bad"), MenuQuality::High),
+        (Some("0"), MenuQuality::Low),
+    ] {
+        assert_eq!(MenuQuality::restore(stored), quality);
+    }
+    let mut state = menu();
+    assert_eq!(state.action(A::Quality, true), Some(I::PersistQuality("0")));
+    // Intentionally do not execute the storage intent: memory remains low.
+    assert_eq!(state.view(true).quality, MenuQuality::Low);
+    state.action(A::Play, true);
+    assert_eq!(
+        state.step(8., false).unwrap(),
+        vec![I::Play {
+            nickname: String::new(),
+            quality: MenuQuality::Low
+        }]
+    );
+    state.disconnected();
+    assert_eq!(state.action(A::Quality, true), Some(I::PersistQuality("1")));
+}

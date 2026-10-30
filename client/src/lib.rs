@@ -24,6 +24,7 @@ pub mod challenge;
 pub mod desktop_input;
 pub mod desktop_layout;
 pub mod gameplay_policy;
+pub mod menu_layout;
 pub mod menu_loading;
 pub mod menu_preferences;
 pub mod play_admission;

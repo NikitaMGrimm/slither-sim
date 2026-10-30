@@ -2,6 +2,44 @@
 
 use crate::presentation::resolve_skin;
 
+/// Requested graphics mode, separate from adaptive presentation quality.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum MenuQuality {
+    /// Full graphics; also the default when storage is absent or unreadable.
+    #[default]
+    High,
+    /// Reduced graphics selected explicitly by the player.
+    Low,
+}
+
+impl MenuQuality {
+    /// Restore the independent graphics key. A failed storage read supplies None.
+    pub fn restore(stored: Option<&str>) -> Self {
+        if stored == Some("0") {
+            Self::Low
+        } else {
+            Self::High
+        }
+    }
+
+    /// Change in memory before requesting persistence; write failure cannot undo it.
+    pub fn toggle(&mut self) -> &'static str {
+        *self = match self {
+            Self::High => Self::Low,
+            Self::Low => Self::High,
+        };
+        self.storage_value()
+    }
+
+    /// Value for the independent graphics storage key, not the appearance record.
+    pub fn storage_value(self) -> &'static str {
+        match self {
+            Self::High => "1",
+            Self::Low => "0",
+        }
+    }
+}
+
 /// Upper bound for our versioned ASCII preference record, before parsing.
 pub const MAX_PREFERENCE_BYTES: usize = 600;
 /// Complete positive count/palette pairs after the existing eight-byte prefix.
