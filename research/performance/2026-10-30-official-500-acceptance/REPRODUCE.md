@@ -95,8 +95,36 @@ failures; only the single predeclared infrastructure replacement is available.
 
 To replay privately retained data, stage the same linked harness, extract that
 run's `load-run`, `host-run`, `pins.json` and `run-summary.json` beside `select.py`,
-then run it again. Run [tables.py](tables.py) on the published selected results to
-recompute report tables. No access to cloud resources is needed for reduction.
+then run it again. Keep each run's selector output separately. Use
+[assemble.py](assemble.py) to wrap one or both results without pooling, then
+[tables.py](tables.py) to recompute report tables:
+
+```sh
+python3 assemble.py selected-results.json PRIVATE_RUN1_SELECTED.json
+# Add PRIVATE_RUN2_SELECTED.json only if that independent run was authorized.
+python3 tables.py selected-results.json
+```
+
+No access to cloud resources is needed for reduction.
+
+The retained run-1 archive is local-only, SHA-256
+`4002cf60512b63558e163e252db84f9f33782fb17efe415c35d70dda3a6323f9`
+(12,205,258 bytes); retrieval was verified before termination. The selected
+JSON retains the binary/source bindings without a per-file hash map. The final
+post-collection checks ran on the AWS generator:
+
+```sh
+python3 check_acceptance.py
+python3 check_markers.py
+# From the source checkout, with this study and its index row overlaid:
+python3 -B -m unittest discover -s tools -p test_documentation.py
+```
+
+Both synthetic checks and all seven documentation tests passed. Recomputed
+tables matched the collection-side tables byte-for-byte. The retained client log
+contains neither `CLIENT_ERROR` nor `panicked at`; the failing client predicate
+is the selected worst one-second input-lateness p99, not CPU headroom or queues.
+No new Rust test matrix was run for this research-only change.
 
 Stop and retrieve within the fixed ninety-minute per-pair plan. Cancel task Spot
 requests by recorded instance/request identity, terminate the instances, verify

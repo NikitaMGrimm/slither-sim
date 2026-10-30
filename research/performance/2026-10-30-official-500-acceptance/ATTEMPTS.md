@@ -30,3 +30,29 @@ labelled pre-data correction in PLAN.md adds a generator-side normalizer for onl
 those metric tokens. Host and client processes and their full tick-zero history
 continue unchanged. This is an instrumentation correction before data, not an
 infrastructure replacement or a restarted acceptance attempt.
+
+## Run 1: completed, acceptance failed
+
+One fresh pair was launched and its shutdown timers verified. The three warm
+screen endpoints at ticks 192,000/192,500/193,000 passed. Ten seconds settling
+preceded the uninterrupted 1,800.025-second requested window. The selected CPU
+interval contains 257,100 ticks in complete interior blocks; the exterior census
+bracket records zero deferred ticks.
+
+The end-class gate fails: living 499, mean 99.034, p90 224 and p99 298; mean and
+p90 exceed the frozen upper limits 65 and 196. The client-validity gate fails
+because worst one-second input-lateness p99 is 505.683 ms against <42 ms.
+Headroom, queues, progress, population and error checks pass. CPU reconciliation
+passes. World p99 7.331 ms is report-only, not a failing gate.
+
+Raw archive retrieval and SHA-256 verification completed, and the AWS-side
+selector exactly reproduced the online result. The independent end-class
+failure stops the series even though the generator predicate also fails. No
+run 2, replacement, tuning or earlier-window substitution is used. All data and
+the pre-count correction remain retained. Final teardown/cost receipts accompany
+the report.
+
+The pair was terminated after verified archive retrieval. Final cleanup scanned
+all 17 enabled regions with none unavailable; task instances, requests, volumes,
+key and security group are gone. The conservative compute-plus-reserve bound is
+$1.405219, below $3. No second pair or infrastructure replacement was launched.
