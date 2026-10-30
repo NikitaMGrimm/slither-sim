@@ -25,7 +25,7 @@ def replace(target,new,path):
     assert set(target)==set(new)
     for key,value in new.items():
         if target[key]!=value:
-            assert key in ['p50','p99','p999','max'],(path,key,target[key],value)
+            assert key in ['p50','p99','p999'],(path,key,target[key],value)
             changes.append({'path':path+'.'+key,'beforeMs':target[key],'afterMs':value,'absoluteChangeMs':abs(value-target[key])})
     target.update(new)
 due=lambda t:math.floor(t*.007/.504)>math.floor((t-1)*.007/.504)

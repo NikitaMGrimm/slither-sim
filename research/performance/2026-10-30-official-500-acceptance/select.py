@@ -12,9 +12,9 @@ def non_tail_values(value):
  value=copy.deepcopy(value)
  for parent in [value,value['maintenance'],value['ordinary']]:
   for name in ['worldCpuMsPerTick','simulationCpuMsPerTick','socketCpuMsPerTick']:
-   for key in ['p50','p99','p999','max']:parent[name].pop(key)
+   for key in ['p50','p99','p999']:parent[name].pop(key)
  for name in ['frameGapMs','gapResidualMs','frameExcessMs']:
-  for key in ['p50','p99','p999','max']:value['client'][name].pop(key)
+  for key in ['p50','p99','p999']:value['client'][name].pop(key)
  value.pop('p99AtMost7ms') # Derived report-only flag, never an acceptance gate.
  return value
 assert non_tail_values(result)==non_tail_values(window['result']),'Gates or non-tail replay values differ'

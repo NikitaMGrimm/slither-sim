@@ -111,7 +111,8 @@ Post-result nearest-rank correction (the historical ladder is unchanged):
 
 ```sh
 python3 check_quantiles.py
-git show 55f2921594aff00044624e47a8a1f90c4ee0b073:research/performance/2026-10-30-official-500-acceptance/selected-results.json > prior-selected.json
+SOURCE_CHECKOUT=/path/to/slither-sim  # any clone containing the commit below
+git -C "$SOURCE_CHECKOUT" show 55f2921594aff00044624e47a8a1f90c4ee0b073:research/performance/2026-10-30-official-500-acceptance/selected-results.json > prior-selected.json
 python3 correct_tails.py PRIVATE_RUN1_RESULTS.tar.gz prior-selected.json tail-correction.json
 python3 tables.py prior-selected.json
 ```
@@ -120,8 +121,9 @@ The correction reuses the actual helper definitions and verified raw CPU rows /
 histograms. It asserts every non-tail value is identical. `prior-selected.json`
 then equals the corrected published selected results; the correction receipt
 lists all four changed values. `select.py` now compares every gate, count, mean
-and non-tail replay value exactly, allowing the declared report-only quantiles
-and their derived seven-ms flag to differ from the retained online calculation.
+and non-tail replay value exactly, including maxima, which both rank methods
+share. Only the declared report-only p50/p99/p999 values and their derived
+seven-ms flag may differ from the retained online calculation.
 The pre-correction exact online/offline replay was already verified on AWS.
 
 The retained run-1 archive is local-only, SHA-256
