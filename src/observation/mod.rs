@@ -36,7 +36,7 @@ impl<'a> VisibleState<'a> {
     /// Observation of one slot, without the batch index.
     pub(crate) fn observe(self, index: usize) -> Result<Observation, SimError> {
         let mut slot = None;
-        Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot)?;
+        Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot, None)?;
         Ok(slot.expect("observed"))
     }
 }
@@ -129,16 +129,20 @@ impl FoodGrid {
                 }
             })
             .collect();
-        for c in 0..cols * rows {
-            grid.starts[c + 1] += grid.starts[c];
+        // Start each cell's insertion cursor at c + 1. Filling it advances the
+        // cursor to that cell's end, leaving final offsets without a scratch copy.
+        let mut placed = 0;
+        for start in &mut grid.starts[1..] {
+            let count = *start;
+            *start = placed;
+            placed += count;
         }
-        let placed = grid.starts[cols * rows] as usize;
+        let placed = placed as usize;
         grid.points = vec![Point::default(); placed];
         grid.ids = vec![0; placed];
-        let mut next = grid.starts[..cols * rows].to_vec();
         for (i, &c) in cells.iter().enumerate() {
             if c != u32::MAX {
-                let slot = &mut next[c as usize];
+                let slot = &mut grid.starts[c as usize + 1];
                 grid.points[*slot as usize] = food[i].point();
                 grid.ids[*slot as usize] = i as u32;
                 *slot += 1;
@@ -156,97 +160,8 @@ impl FoodGrid {
     }
 }
 
-// Compile the summary separately so small lists keep the original mark loop.
-fn visit_food<const SPARSE: bool>(
-    grid: &FoodGrid,
-    w: VisibleState<'_>,
-    head: Point,
-    b: Bounds,
-    marks: &mut Vec<u64>,
-    sink: &mut impl Sink,
-) {
-    let vision = w.vision;
-    let reach = vision + 1.0;
-    let visible = |p: Point| {
-        (p.x - head.x).abs() <= vision
-            && (p.y - head.y).abs() <= vision
-            && p.distance_le(head, vision)
-    };
-    let words = w.food.len().div_ceil(64);
-    marks.resize(words + if SPARSE { words.div_ceil(64) } else { 0 }, 0);
-    let (marks, summary) = marks.split_at_mut(words);
-    let mut count = 0;
-    let mut first = usize::MAX;
-    // Branch-free: about half the candidates are visible, unpredictably.
-    let mut mark = |i: usize, seen: bool| {
-        marks[i / 64] |= u64::from(seen) << (i % 64);
-        if SPARSE {
-            summary[i / 4096] |= u64::from(seen) << (i / 64 % 64);
-        }
-        count += usize::from(seen);
-        first = first.min(if seen { i / 64 } else { usize::MAX });
-    };
-    for row in grid.row(b.min.y)..=grid.row(b.max.y) {
-        // Only a chord of the circle can be visible in this row. Moving
-        // the row a unit closer and using `reach` as the radius leave the
-        // squared chord a margin above 2 * vision, far beyond its rounding
-        // error for tame values, and the added unit covers the rest.
-        let top = grid.origin.y + row as f64 * grid.cell;
-        let dy = (top - head.y).max(head.y - (top + grid.cell)).max(1.0) - 1.0;
-        let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
-        let (lo, hi) = (grid.col(head.x - half), grid.col(head.x + half));
-        let cells = row * grid.cols;
-        let span = grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
-        for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
-            // The same pure conjunction as `visible`, without short-circuits.
-            let seen = ((p.x - head.x).abs() <= vision)
-                & ((p.y - head.y).abs() <= vision)
-                & p.distance_le(head, vision);
-            mark(i as usize, seen);
-        }
-    }
-    for &i in &grid.outliers {
-        mark(i as usize, visible(w.food[i as usize].point()));
-    }
-    // Ascending bit order restores the original food order.
-    sink.reserve_food(count);
-    let mut reported = 0;
-    if SPARSE {
-        // Each summary bit selects one nonempty word of 64 food indices.
-        for (group, bits) in summary.iter_mut().enumerate().skip(first / 64) {
-            if reported == count {
-                break;
-            }
-            let mut active = std::mem::take(bits);
-            while active != 0 {
-                let word = group * 64 + active.trailing_zeros() as usize;
-                let mut bits = std::mem::take(&mut marks[word]);
-                while bits != 0 {
-                    sink.food(word * 64 + bits.trailing_zeros() as usize);
-                    reported += 1;
-                    bits &= bits - 1;
-                }
-                active &= active - 1;
-            }
-        }
-    } else {
-        for (word, bits) in marks.iter_mut().enumerate().skip(first) {
-            if reported == count {
-                break;
-            }
-            let mut bits = std::mem::take(bits);
-            while bits != 0 {
-                sink.food(word * 64 + bits.trailing_zeros() as usize);
-                reported += 1;
-                bits &= bits - 1;
-            }
-        }
-    }
-}
-
 struct Index {
     bodies: Vec<Bounds>,
-    snakes: Option<SnakeIndex>,
     food: Option<FoodGrid>,
 }
 struct Observer<'a> {
@@ -258,8 +173,8 @@ impl<'a> Observer<'a> {
         // Exact visibility tests still decide every candidate; the index only
         // skips food and snakes that cannot pass them.
         let food = world.food.len();
-        let index = (observers >= 2 && (0.0..=TAME).contains(&world.vision)).then(|| {
-            let bodies: Vec<_> = world
+        let index = (observers >= 2 && (0.0..=TAME).contains(&world.vision)).then(|| Index {
+            bodies: world
                 .snakes
                 .iter()
                 .map(|s| {
@@ -269,23 +184,26 @@ impl<'a> Observer<'a> {
                     }
                     b
                 })
-                .collect();
-            Index {
-                // Fresh official 1/6 batches, five pairs: forcing a tree at 64
-                // snakes was noise (11.75 -> 11.66 us/decision); at 256 the tree
-                // alone improved 16.21 -> 15.91 us. Keep smaller batches scanning.
-                snakes: (world.snakes.len() >= 256 && observers >= 8)
-                    .then(|| SnakeIndex::new(world.snakes, &bodies)),
-                bodies,
-                // Building the grid costs a few passes over the food list, so small
-                // batches scan it directly instead.
-                food: (observers >= 8
-                    && observers.saturating_mul(food) >= 1 << 15
-                    && food < u32::MAX as usize)
-                    .then(|| FoodGrid::new(world.food, world.vision, observers)),
-            }
+                .collect(),
+            // Building the grid costs a few passes over the food list, so small
+            // batches scan it directly instead.
+            food: (observers >= 8
+                && observers.saturating_mul(food) >= 1 << 15
+                && food < u32::MAX as usize)
+                .then(|| FoodGrid::new(world.food, world.vision, observers)),
         });
         Self { world, index }
+    }
+    fn snake_index(&self, observers: usize) -> Option<SnakeIndex> {
+        // Keep the tree batch-local so the small-batch constructor/layout stays
+        // unchanged. It needs only the bounds already built by this observer.
+        // Fresh official 1/6 batches, five pairs: forcing a tree at 64 snakes was
+        // noise (11.75 -> 11.66 us/decision); at 256 the tree alone improved
+        // 16.21 -> 15.91 us. Keep smaller batches scanning.
+        self.index
+            .as_ref()
+            .filter(|_| self.world.snakes.len() >= 256 && observers >= 8)
+            .map(|i| SnakeIndex::new(self.world.snakes, &i.bodies))
     }
     /// Refill `slot` for `index`, reusing its vectors. `marks` is zeroed scratch
     /// space for food bits and optional word summaries; it is zeroed on return.
@@ -294,6 +212,7 @@ impl<'a> Observer<'a> {
         index: usize,
         marks: &mut Vec<u64>,
         slot: &mut Option<Observation>,
+        snakes: Option<&SnakeIndex>,
     ) -> Result<(), SimError> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or_else(|| {
@@ -312,7 +231,7 @@ impl<'a> Observer<'a> {
             opponents: &mut opponents,
             kept: 0,
         };
-        self.visit(index, marks, &mut copies)?;
+        self.visit(index, marks, &mut copies, snakes)?;
         let kept = copies.kept;
         opponents.truncate(kept);
         let me = match previous_me {
@@ -343,6 +262,26 @@ impl<'a> Observer<'a> {
         index: usize,
         marks: &mut Vec<u64>,
         sink: &mut impl Sink,
+        snakes: Option<&SnakeIndex>,
+    ) -> Result<(), SimError> {
+        // Specialize both flags: earlier shared hot loops regressed small catalog
+        // batches by 2-5%. The scan variant keeps their indexed branches out.
+        // Five paired immutable official trials: summaries reduced observation
+        // CPU from 25.0 to 20.6 us at 264k food, and 74.7 to 41.6 us at 1.06M.
+        match (snakes.is_some(), self.world.food.len() >= 262_144) {
+            (false, false) => self.visit_indexed::<false, false>(index, marks, sink, snakes),
+            (false, true) => self.visit_indexed::<false, true>(index, marks, sink, snakes),
+            (true, false) => self.visit_indexed::<true, false>(index, marks, sink, snakes),
+            (true, true) => self.visit_indexed::<true, true>(index, marks, sink, snakes),
+        }
+    }
+    #[inline(always)]
+    fn visit_indexed<const SPATIAL: bool, const SPARSE: bool>(
+        &self,
+        index: usize,
+        marks: &mut Vec<u64>,
+        sink: &mut impl Sink,
+        snakes: Option<&SnakeIndex>,
     ) -> Result<(), SimError> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or_else(|| {
@@ -377,13 +316,79 @@ impl<'a> Observer<'a> {
                 },
                 b,
             )) => {
-                // Five paired fresh official runs: summaries cut observation CPU
-                // from 25.0 to 20.6 us at 264k pellets, and 74.7 to 41.6 us at
-                // 1.06M (staggered 1/6 batches). Keep smaller lists unchanged.
-                if w.food.len() >= 262_144 {
-                    visit_food::<true>(grid, w, me.head, b, marks, sink);
+                let words = w.food.len().div_ceil(64);
+                marks.resize(words + if SPARSE { words.div_ceil(64) } else { 0 }, 0);
+                let (marks, summary) = marks.split_at_mut(words);
+                let mut count = 0;
+                let mut first = usize::MAX;
+                // Branch-free: about half the candidates are visible, unpredictably.
+                let mut mark = |i: usize, seen: bool| {
+                    marks[i / 64] |= u64::from(seen) << (i % 64);
+                    if SPARSE {
+                        summary[i / 4096] |= u64::from(seen) << (i / 64 % 64);
+                    }
+                    count += usize::from(seen);
+                    first = first.min(if seen { i / 64 } else { usize::MAX });
+                };
+                for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+                    // Only a chord of the circle can be visible in this row. Moving
+                    // the row a unit closer and using `reach` as the radius leave the
+                    // squared chord a margin above 2 * vision, far beyond its rounding
+                    // error for tame values, and the added unit covers the rest.
+                    let top = grid.origin.y + row as f64 * grid.cell;
+                    let dy = (top - me.head.y)
+                        .max(me.head.y - (top + grid.cell))
+                        .max(1.0)
+                        - 1.0;
+                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
+                    let cells = row * grid.cols;
+                    let span =
+                        grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
+                    for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
+                        // The same pure conjunction as `visible`, without short-circuits.
+                        let seen = ((p.x - me.head.x).abs() <= vision)
+                            & ((p.y - me.head.y).abs() <= vision)
+                            & p.distance_le(me.head, vision);
+                        mark(i as usize, seen);
+                    }
+                }
+                for &i in &grid.outliers {
+                    mark(i as usize, visible(w.food[i as usize].point()));
+                }
+                // Ascending bit order restores the original food order.
+                sink.reserve_food(count);
+                let mut reported = 0;
+                if SPARSE {
+                    // Each summary bit selects one nonempty word of 64 food indices.
+                    for (group, bits) in summary.iter_mut().enumerate().skip(first / 64) {
+                        if reported == count {
+                            break;
+                        }
+                        let mut active = std::mem::take(bits);
+                        while active != 0 {
+                            let word = group * 64 + active.trailing_zeros() as usize;
+                            let mut bits = std::mem::take(&mut marks[word]);
+                            while bits != 0 {
+                                sink.food(word * 64 + bits.trailing_zeros() as usize);
+                                reported += 1;
+                                bits &= bits - 1;
+                            }
+                            active &= active - 1;
+                        }
+                    }
                 } else {
-                    visit_food::<false>(grid, w, me.head, b, marks, sink);
+                    for (word, bits) in marks.iter_mut().enumerate().skip(first) {
+                        if reported == count {
+                            break;
+                        }
+                        let mut bits = std::mem::take(bits);
+                        while bits != 0 {
+                            sink.food(word * 64 + bits.trailing_zeros() as usize);
+                            reported += 1;
+                            bits &= bits - 1;
+                        }
+                    }
                 }
             }
             _ => {
@@ -399,15 +404,7 @@ impl<'a> Observer<'a> {
                 sink.prey(i);
             }
         }
-        if let Some((
-            Index {
-                snakes: Some(tree),
-                bodies,
-                ..
-            },
-            q,
-        )) = query
-        {
+        if SPATIAL && let (Some((Index { bodies, .. }, q)), Some(tree)) = (query, snakes) {
             let mut opponents = Vec::new();
             tree.visit(q, |i| opponents.push(i));
             // Tree traversal is spatial; predicates and sinks retain world order.
@@ -558,6 +555,7 @@ impl Simulator {
         sightings.truncate(self.snakes().len());
         sightings.resize_with(self.snakes().len(), || None);
         let observer = Observer::new(VisibleState::of(self), self.living());
+        let snakes = observer.snake_index(self.living());
         for (i, slot) in sightings.iter_mut().enumerate() {
             if !self.snakes()[i].alive {
                 *slot = None;
@@ -568,7 +566,7 @@ impl Simulator {
             sighting.prey.clear();
             sighting.opponents.clear();
             observer
-                .visit(i, marks, sighting)
+                .visit(i, marks, sighting, snakes.as_ref())
                 .expect("existing slots are observable");
         }
     }
@@ -597,11 +595,12 @@ impl Simulator {
         observations.truncate(self.snakes().len());
         observations.resize_with(self.snakes().len(), || None);
         let observer = Observer::new(VisibleState::of(self), observers);
+        let snakes = observer.snake_index(observers);
         let observe_range = |range: Range<usize>, slots: &mut [Option<Observation>]| {
             let mut marks = Vec::new();
             for (i, slot) in range.zip(slots) {
                 if wanted[i] {
-                    observer.observe_into(i, &mut marks, slot)?;
+                    observer.observe_into(i, &mut marks, slot, snakes.as_ref())?;
                 } else {
                     *slot = None;
                 }

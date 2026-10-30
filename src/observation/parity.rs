@@ -217,10 +217,13 @@ fn randomized_batches_match_full_scans_including_extreme_geometry() {
                     vision,
                 };
                 let batch = Observer::new(w, n);
+                let tree = batch.snake_index(n);
                 for i in 0..n {
                     let expected = scan(w, i);
                     let mut actual = Sighting::default();
-                    batch.visit(i, &mut marks, &mut actual).unwrap();
+                    batch
+                        .visit(i, &mut marks, &mut actual, tree.as_ref())
+                        .unwrap();
                     assert_eq!(
                         actual.food, expected.food,
                         "food n={n}, i={i}, vision={vision}"
@@ -230,7 +233,9 @@ fn randomized_batches_match_full_scans_including_extreme_geometry() {
                         actual.opponents, expected.opponents,
                         "snakes n={n}, i={i}, vision={vision}"
                     );
-                    batch.observe_into(i, &mut marks, &mut slot).unwrap();
+                    batch
+                        .observe_into(i, &mut marks, &mut slot, tree.as_ref())
+                        .unwrap();
                     equal_observation(slot.as_ref().unwrap(), &materialize(w, i, &expected));
                     assert!(marks.iter().all(|&word| word == 0));
                 }
@@ -388,9 +393,11 @@ fn large_food_marks_keep_order_and_clear_summaries_across_resizes() {
             for i in 0..8 {
                 let expected = scan(w, i);
                 let mut seen = Sighting::default();
-                observer.visit(i, &mut marks, &mut seen).unwrap();
+                observer.visit(i, &mut marks, &mut seen, None).unwrap();
                 assert_eq!(seen.food, expected.food);
-                observer.observe_into(i, &mut marks, &mut slot).unwrap();
+                observer
+                    .observe_into(i, &mut marks, &mut slot, None)
+                    .unwrap();
                 equal_observation(slot.as_ref().unwrap(), &materialize(w, i, &expected));
                 assert!(marks.iter().all(|&word| word == 0));
             }
