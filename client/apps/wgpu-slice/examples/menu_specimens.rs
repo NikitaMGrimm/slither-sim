@@ -220,7 +220,7 @@ async fn run(output: &Path) -> Result<()> {
                 vec![r.x, r.y, r.width, r.height]
             })
             .collect();
-            measurements.push(serde_json::json!({"extent":extent,"logical":extent,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len(),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+            measurements.push(serde_json::json!({"extent":extent,"logical":extent,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len() + usize::from(picture.backdrop.is_some()),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
         }
         login.focus(1);
         login.activate(true);
