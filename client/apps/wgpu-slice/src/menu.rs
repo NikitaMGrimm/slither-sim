@@ -175,6 +175,8 @@ impl Composition<'_> {
                     .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
                 let rgb = match kind {
+                    6 => [96, 255, 112],
+                    7 => [152, 80, 255],
                     8 => [224, 224, 255],
                     10 => [22, 28, 34],
                     _ => [150, 108, 213],
@@ -283,6 +285,63 @@ impl Composition<'_> {
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
         self.push(image(resource, r, alpha))?;
         self.art.push(resource.clone());
+        Ok(())
+    }
+    fn ribbon_quad(&mut self, corners: [[f64; 2]; 4], kind: u8, alpha: f64) -> Result<()> {
+        // All segments share two cached solid texels; deformation uploads only vertices.
+        self.solid(
+            MenuRect {
+                x: 0.,
+                y: 0.,
+                width: 1.,
+                height: 1.,
+            },
+            kind,
+            alpha,
+        )?;
+        self.draws.last_mut().unwrap().corners = Some(corners);
+        Ok(())
+    }
+    fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
+        use std::f64::consts::PI;
+        let center = [r.x + r.width / 2., r.y + r.height / 2.];
+        // Shared time advances by elapsed_ms / 8: time/44 turns once in ~2.21s.
+        let phase = view.spinner_time / 44.;
+        let project = |radius: f64, angle: f64| {
+            let (sin, cos) = angle.sin_cos();
+            [
+                center[0] + 1.25 * radius * cos * view.spinner_scale,
+                center[1] + radius * sin * view.spinner_scale,
+            ]
+        };
+        for (offset, kind) in [(0., 6), (PI, 7)] {
+            let edge = |progress: f64, head: bool| {
+                let radius = 32. + 5. * (offset + view.spinner_time / 6. + 8. * progress).cos();
+                let half_width = 8. * progress + if head { 10. } else { 0. };
+                let angle = offset + phase + 0.8 * PI * progress;
+                [
+                    project(radius + half_width, angle),
+                    project(radius - half_width, angle),
+                ]
+            };
+            let mut previous = edge(0., false);
+            // 32 strips per ribbon bound work and keep curvature smooth at menu size.
+            for segment in 1..=32 {
+                let next = edge(f64::from(segment) / 32., segment == 32);
+                self.ribbon_quad(
+                    [previous[0], next[0], next[1], previous[1]],
+                    kind,
+                    view.spinner_alpha,
+                )?;
+                previous = next;
+            }
+            let tip = project(32., offset + phase + 0.8 * PI * 1.1875);
+            self.ribbon_quad(
+                [previous[0], tip, previous[1], previous[1]],
+                kind,
+                view.spinner_alpha,
+            )?;
+        }
         Ok(())
     }
 }
@@ -534,27 +593,11 @@ impl Menu {
                 }
             }
         }
+        let spinner_start = c.draws.len();
         if view.spinner_visible {
-            let r = layout.viewport_rect(E::Spinner);
-            let center = [r.x + r.width / 2., r.y + r.height / 2.];
-            for n in 0..16 {
-                let phase = n as f64 * std::f64::consts::TAU / 16. + view.spinner_time * 0.05;
-                let radius = 40. * view.spinner_scale;
-                let side = 10. * view.spinner_scale;
-                if side > 0. {
-                    c.control(
-                        MenuRect {
-                            x: center[0] + radius * phase.cos() - side / 2.,
-                            y: center[1] + radius * phase.sin() - side / 2.,
-                            width: side,
-                            height: side,
-                        },
-                        if n < 8 { 6 } else { 7 },
-                        view.spinner_alpha * (0.35 + 0.65 * n as f64 / 15.),
-                    )?;
-                }
-            }
+            c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
+        let spinner_draws = c.draws.split_off(spinner_start);
         let material_bytes = c
             .materials
             .values()
@@ -609,7 +652,12 @@ impl Menu {
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
-                check_menu_draws(c.draws.len() + usize::from(backdrop.is_some()))?;
+                // The spinner is above the login's text, including the fading tips.
+                check_menu_draws(
+                    c.draws.len() + spinner_draws.len() + usize::from(backdrop.is_some()),
+                )?;
+                frame::reserve_draws(&mut c.draws, spinner_draws.len())?;
+                c.draws.extend(spinner_draws);
                 let frame = Frame {
                     identity: 0,
                     extent,

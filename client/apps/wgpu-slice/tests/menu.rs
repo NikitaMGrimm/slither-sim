@@ -567,3 +567,83 @@ fn explicit_backdrop_is_below_all_world_draws_and_absent_for_hidden_login() {
         assert_eq!(&picture.frame.draws[first_world + world.len()..], controls);
     }
 }
+
+#[test]
+fn spinner_ribbon_phase_follows_shared_time_with_stable_colour_resources() {
+    use slither_client::menu_layout::MenuElement as E;
+    use std::f64::consts::TAU;
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
+    view.visible = false;
+    view.spinner_visible = true;
+    view.spinner_alpha = 0.6;
+    view.spinner_scale = 0.9;
+    let layout = layout();
+    let r = layout.viewport_rect(E::Spinner);
+    let center = [r.x + r.width / 2., r.y + r.height / 2.];
+    let mut previous_assets = None;
+    for (time, phase) in [
+        (0., 0.),
+        (44., 1.),
+        (88., 2.),
+        (125., 2.840909090909091),
+        (276.4601535159018, TAU),
+    ] {
+        view.spinner_time = time;
+        let p = menu
+            .prepare(&mut text, &view, &layout, [1280, 720], 1., None, 0)
+            .unwrap();
+        assert_eq!(p.resources.len(), 2);
+        let assets: Vec<_> = p.resources.iter().map(|r| r.asset).collect();
+        if let Some(previous) = &previous_assets {
+            assert_eq!(&assets, previous);
+        }
+        previous_assets = Some(assets);
+        for (color, offset) in [
+            ([96, 255, 112, 255], 0.),
+            ([152, 80, 255, 255], std::f64::consts::PI),
+        ] {
+            let resource = p
+                .resources
+                .iter()
+                .find(|r| r.image.pixels == color)
+                .unwrap();
+            assert_eq!((resource.asset.width, resource.asset.height), (1, 1));
+            let draw = p
+                .frame
+                .draws
+                .iter()
+                .find(|d| d.asset == resource.asset)
+                .unwrap();
+            let tail = draw.corners.unwrap()[0];
+            let angle = (tail[1] - center[1]).atan2((tail[0] - center[0]) / 1.25);
+            let error = (angle - phase - offset)
+                .sin()
+                .atan2((angle - phase - offset).cos());
+            assert!(
+                error.abs() < 1e-10,
+                "time={time} phase={phase} angle={angle}"
+            );
+        }
+        assert!(p.frame.draws.iter().all(|d| d.effective_alpha == 0.6));
+        p.frame
+            .validate(
+                &p.resources
+                    .iter()
+                    .map(|r| (r.asset.into(), r.asset))
+                    .collect(),
+            )
+            .unwrap();
+    }
+    view.visible = true;
+    let p = menu
+        .prepare(&mut text, &view, &layout, [1280, 720], 1., None, 0)
+        .unwrap();
+    let purple = p
+        .resources
+        .iter()
+        .find(|r| r.image.pixels == [152, 80, 255, 255])
+        .unwrap();
+    assert_eq!(p.frame.draws.last().unwrap().asset, purple.asset);
+}

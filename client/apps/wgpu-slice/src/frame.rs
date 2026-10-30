@@ -81,7 +81,7 @@ impl From<BodyAsset> for ResourceKey {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Draw {
-    /// Backend polygon corners only for existing arena path tessellation; images keep None.
+    /// Bounded backend polygon corners (arena paths and menu ribbons); images keep None.
     pub corners: Option<[[f64; 2]; 4]>,
     pub asset: BodyAsset,
     pub source: Option<BodyRect>,
