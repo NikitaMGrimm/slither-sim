@@ -47,11 +47,10 @@ include = [
 publish = ["crates-io"]
 
 [workspace]
-members = ["ffi", "python"]
+resolver = "3"
+members = ["ffi", "python", "client", "client/apps/wgpu-slice"]
 # Plain cargo commands at the root keep building and packaging only this crate.
 default-members = ["."]
-# The client keeps its own lockfile and toolchain until it joins the workspace.
-exclude = ["client"]
 
 # One version for the simulator, the C ABI crate and the Python package;
 # release-plz bumps it here.

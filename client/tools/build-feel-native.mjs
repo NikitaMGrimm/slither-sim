@@ -14,7 +14,7 @@ const source = () => {
   return { tree: git('write-tree'), core: git('write-tree', '--prefix=client/src/') };
 };
 const built = source();
-const env = { ...process.env, CARGO_BUILD_JOBS: '2', CARGO_TARGET_DIR: path.resolve('apps/wgpu-slice/target') };
+const env = { ...process.env, CARGO_BUILD_JOBS: '2', CARGO_PROFILE_DEV_DEBUG: '0', CARGO_TARGET_DIR: path.resolve('apps/wgpu-slice/target') };
 execFileSync('cargo', ['build', '--locked', '--features', 'feel-trace', '--manifest-path', 'apps/wgpu-slice/Cargo.toml', '--example', 'feel-replay'], { env, stdio: 'inherit' });
 if (stringify(source()) !== stringify(built)) throw new Error('Source changed during build');
 const executable = path.join(env.CARGO_TARGET_DIR, 'debug/examples/feel-replay' + (process.platform === 'win32' ? '.exe' : ''));

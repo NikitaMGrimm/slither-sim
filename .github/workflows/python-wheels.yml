@@ -83,6 +83,14 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.11'
+      # The sdist omits the client crates but would ship the whole workspace
+      # lock, which its `locked = true` build can't prune. Drop them first;
+      # Cargo then keeps every remaining locked version.
+      - name: Drop the client crates from the sdist's workspace
+        run: |
+          sed -i 's|, "client", "client/apps/wgpu-slice"\]|]|' Cargo.toml
+          if grep -q '"client' Cargo.toml; then echo "client members still listed" >&2; exit 1; fi
+          cargo metadata --format-version 1 > /dev/null
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           maturin-version: v1.15.0

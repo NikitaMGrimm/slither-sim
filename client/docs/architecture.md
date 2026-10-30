@@ -44,8 +44,8 @@ fix/http-com-module-integrity, fix/http-com-live-play and feat/default-appearanc
 
 ## Shared wgpu client
 
-apps/wgpu-slice is a separate crate with its own lockfile and a path dependency
-on the core. game::LocalGame owns the shared protocol/session/input/presentation
+apps/wgpu-slice is a separate crate in the root Cargo workspace with a path
+dependency on the core. game::LocalGame owns the shared protocol/session/input/presentation
 flow. Windows uses winit and tungstenite; the browser uses WebSocket and RAF.
 Both submit ordered frames and authored materials through the same wgpu renderer.
 

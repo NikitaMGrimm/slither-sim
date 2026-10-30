@@ -1,0 +1,23 @@
+{
+  "portableTarget": "x86-64",
+  "linked256MatchesPublishedPatch": true,
+  "frozenSourcesVerifiedBeforeWarmup": true,
+  "copiedHostBinaryHashVerified": true,
+  "syntheticLadderControlsPassed": true,
+  "amendedAcceptanceControlsPassed": true,
+  "metricTokenRegressionPassed": true,
+  "onlineOfflineReplayIdentical": true,
+  "onlineOfflineReplayScope": "Original pre-correction reduction; nearest-rank correction subsequently changes only report tails, with every other field checked identical",
+  "nearestRankRegressionPassed": true,
+  "tailCorrectionLargestAbsoluteMs": 0.0004,
+  "allHostThreadsSingleVcpu": true,
+  "clientWorkers": 6,
+  "noCheckpoint": true,
+  "rootReadmeUnchanged": true,
+  "documentationTests": {"passed": true, "tests": 7, "command": "python3 -B -m unittest discover -s tools -p test_documentation.py", "execution": "AWS generator, after collection"},
+  "finalSyntheticControls": {"amendedAcceptance": true, "metricTokens": true, "execution": "AWS generator, after collection"},
+  "publishedTablesRecomputedOnAws": true,
+  "clientLogHasPanicOrClientError": false,
+  "rawArchive": {"sha256": "4002cf60512b63558e163e252db84f9f33782fb17efe415c35d70dda3a6323f9", "bytes": 12205258, "retrievalVerified": true},
+  "rawAccess": "local-only outside repositories"
+}

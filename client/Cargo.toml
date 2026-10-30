@@ -8,7 +8,7 @@ repository = "https://github.com/NikitaMGrimm/slither-sim"
 readme = "README.md"
 license = "MIT"
 publish = false
-include = ["/src", "/Cargo.lock", "/README.md", "/LICENSE"]
+include = ["/src", "/README.md", "/LICENSE"]
 
 [lib]
 crate-type = ["rlib", "cdylib"]
@@ -24,7 +24,3 @@ feel-trace = []
 js-sys = "=0.3.106"
 wasm-bindgen = "=0.2.129"
 web-sys = { version = "=0.3.106", features = ["CanvasPattern", "CanvasRenderingContext2d", "HtmlCanvasElement", "HtmlImageElement", "Path2d"] }
-
-[profile.release]
-lto = "thin"
-codegen-units = 1
