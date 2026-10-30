@@ -12,7 +12,7 @@ import { launchBrowser } from './feel-replay/browser.mjs';
 import { replayServer } from './feel-replay/server.mjs';
 import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
 import { floatBits } from './feel-replay/io.mjs';
-import { validateNumericalPolicy } from './feel-replay/schema.mjs';
+import { validateNumericalPolicy, validateTrace } from './feel-replay/schema.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2), options = {};
@@ -89,9 +89,11 @@ try {
     traceSha256[peer.name] = sha256(traceBytes);
     await writeFile(path.join(out, `${peer.name}.json`), traceBytes);
     await writeFile(path.join(out, `${peer.name}-receipts.json`), stringify({ receipts: finish.receipts, recorderErrors: finish.recorderErrors,
+      pictureAcknowledgements: assembly.pictureDrawIds(),
       entropyRequests: randomStream, queuedRaf: finish.queuedRaf, deniedRequests: peer.page.denied() }));
     await writeFile(path.join(out, `${peer.name}-manifest.json`), stringify(manifest));
     await peer.page.close();
+    validateTrace(trace, schedule, assembly.pictureDrawIds());
   }
   const report = compareTraces(...traces, schedule, { mode: 'same-core' });
   if (observationFailures.length) {

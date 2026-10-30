@@ -78,11 +78,14 @@ The native host discards its acquired surface image and uses its existing
 `last_skipped_identity`, separately from session failure and bot observations.
 The counter saturates; it stores no unbounded diagnostic history.
 
-The native feel replay retains the core draw observation of a skipped picture
+Native and browser feel replays retain the core draw observation of a skipped picture
 with v2 status `prepared: true, submitted: false, committed: false`. Submission,
 picture commit, `quality.successfulDraws` and `final.draws` require an actual
 picture acknowledgement. Recorder-local identities match even equal-valued
-observations to issued pictures; they do not change the flat observation ABI.
+observations to issued pictures. Browser peers carry these identities outside
+the unchanged numeric cells and drain actual picture acknowledgements from
+both Canvas and WebGPU. Every sample's `quality.successfulDraws` is the cumulative
+committed draw count at that boundary; skipped and update rows retain it.
 
 Other errors, including invalid geometry, missing resources and pixel-budget
 failures, retain their existing failure behavior. Direct renderer callers get

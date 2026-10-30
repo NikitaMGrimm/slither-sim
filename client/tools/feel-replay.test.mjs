@@ -53,6 +53,24 @@ test('v2 retains skipped draw boundaries but counts only acknowledged pictures',
   trace.final.draws = 2;
   assert.throws(() => validateTrace(trace, schedule), /incomplete final boundary\/counters/);
 });
+test('every sample reports the cumulative committed draw count, including updates and skips', () => {
+  const { schedule, trace } = syntheticFixture();
+  assert.equal(validateTrace(trace, schedule), trace);
+  for (const index of [0, 2, 3, 4]) {
+    const changed = parse(stringify(trace));
+    changed.samples[index].quality.successfulDraws++;
+    assert.throws(() => validateTrace(changed, schedule), /quality.successfulDraws: expected cumulative committed draw count/);
+  }
+  const skipped = trace.samples[4];
+  Object.assign(skipped.status, { submitted: false, committed: false });
+  trace.final.draws = 1;
+  assert.throws(() => validateTrace(trace, schedule), /quality.successfulDraws: expected cumulative committed draw count/);
+  skipped.quality.successfulDraws = 1;
+  assert.equal(validateTrace(trace, schedule, [0]), trace);
+  assert.throws(() => validateTrace(trace, schedule, []), /picture acknowledgement mismatch/);
+  assert.throws(() => validateTrace(trace, schedule, [0, 0]), /duplicate ID/);
+  assert.throws(() => validateTrace(trace, schedule, [2]), /no matching draw/);
+});
 test('stable equal-time schedule is packet -> input -> frame, preserving source order', () => {
   const events = ['frame', 'input', 'packet', 'packet', 'input'].map((kind, i) => ({ kind, sourceId: String(i), atMs: 0 }));
   assert.deepEqual(orderEvents(events).map(e => e.sourceId), ['2', '3', '1', '4', '0']);
@@ -302,6 +320,7 @@ function fiveFrameCameraErrors(errors) {
         scheduledMs: event.atMs, actualMs: event.atMs });
       for (const boundary of p.schedule.boundaries.slice(-2)) trace.samples.push({
         ...structuredClone(trace.samples[boundary.phase === 'update' ? 1 : 2]), ...boundary,
+        quality: { ...trace.samples[2].quality, successfulDraws: frameId + (boundary.phase === 'draw' ? 1 : 0) },
       });
     }
   }

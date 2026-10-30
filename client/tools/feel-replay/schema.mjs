@@ -171,10 +171,20 @@ export function safeCommand(bytes) {
   return (bytes.length === 1 && bytes[0] <= 254 && bytes[0] !== 252)
     || (bytes.length === 2 && bytes[0] === 252 && bytes[1] !== 0 && bytes[1] !== 128);
 }
-export function validateTrace(trace, schedule) {
+// Hosts may supply actual acknowledged draw ordinals as an external witness.
+// A standalone v2 file has status/counts, but cannot authenticate host receipts.
+export function validateTrace(trace, schedule, acknowledgedDrawIds) {
   validateSchedule(schedule);
   validate(trace, traceSchema, 'trace');
   validateManifest(trace.manifest);
+  let pictures;
+  if (acknowledgedDrawIds !== undefined) {
+    validate(acknowledgedDrawIds, list('uint'), 'pictureAcknowledgements');
+    unique(acknowledgedDrawIds, 'pictureAcknowledgements');
+    pictures = new Set(acknowledgedDrawIds);
+    const draws = new Set(trace.samples.filter(s => s.phase === 'draw').map(s => s.drawId));
+    for (const id of pictures) if (!draws.has(id)) fail('pictureAcknowledgements', 'no matching draw');
+  }
   if (trace.events.length !== schedule.events.length) fail('trace.events', `count ${trace.events.length}, expected ${schedule.events.length} (truncation/extra/duplicate event)`);
   if (trace.commands.length !== schedule.expectedCommands) fail('trace.commands', `count ${trace.commands.length}, expected ${schedule.expectedCommands}`);
   if (trace.samples.length !== schedule.boundaries.length) fail('trace.samples', `boundary count ${trace.samples.length}, expected ${schedule.boundaries.length} (truncation/extra draw)`);
@@ -200,7 +210,7 @@ export function validateTrace(trace, schedule) {
     if (!schedule.boundaries.some(b => b.frameId === c.frameId)) fail(`trace.commands[${i}].frameId`, 'unknown frame');
     lastSend = c.sendMs; lastEvent = c.eventSeq;
   });
-  let appeared = false, betweenLives = false, lastOwn;
+  let appeared = false, betweenLives = false, lastOwn, committedDraws = 0;
   // Trace-wide lifecycle contract: tools/feel-replay/README.md; regressions in
   // tools/feel-replay-expiry.test.mjs. Retained expired observations may repeat.
   const retiredOwnTokens = new Set();
@@ -236,12 +246,19 @@ export function validateTrace(trace, schedule) {
     if ((s.status.submitted && !s.status.prepared) || (s.status.committed && !s.status.submitted)) {
       fail(`trace.samples[${i}].status`, 'invalid prepare/submit/commit order');
     }
+    if (pictures && s.phase === 'draw' && (s.status.submitted !== pictures.has(s.drawId) || s.status.committed !== pictures.has(s.drawId))) {
+      fail(`trace.samples[${i}].status`, 'picture acknowledgement mismatch');
+    }
+    if (s.phase === 'draw' && s.status.committed) committedDraws++;
+    if (s.quality.successfulDraws !== committedDraws) {
+      fail(`trace.samples[${i}].quality.successfulDraws`, 'expected cumulative committed draw count');
+    }
   });
   const f = trace.final;
   if (betweenLives) fail('trace.final', 'incomplete restart: still between lives');
   if (!f.completed || f.unexpectedNetwork || f.pendingEffects !== 0 || f.pendingFrames !== 0 || !same(f.atMs, schedule.durationMs)
     || f.events !== trace.events.length || f.commands !== trace.commands.length
-    || f.samples !== trace.samples.length || f.draws !== trace.samples.filter(s => s.phase === 'draw' && s.status.committed).length
+    || f.samples !== trace.samples.length || f.draws !== committedDraws
     || f.lastBoundaryId !== schedule.boundaries.at(-1).id) fail('trace.final', 'incomplete final boundary/counters or unexpected network');
   return trace;
 }

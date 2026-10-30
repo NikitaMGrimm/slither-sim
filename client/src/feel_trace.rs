@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 /// An immutable copy of one exact core boundary, including a staged draw.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Observation {
-    /// Recorder-local identity for picture acknowledgements; absent from the flat ABI.
+    /// Recorder-local identity for picture acknowledgements, outside numeric cells.
     pub sequence: u64,
     /// Core boundary kind.
     pub phase: &'static str,
@@ -28,6 +28,7 @@ struct Journal {
     errors: Vec<String>,
     failed: bool,
     last_draw: Option<Observation>,
+    pictures: Vec<u64>,
     random: Vec<(&'static str, f64)>,
     step: Option<FrameStep>,
     extent: [u32; 2],
@@ -75,6 +76,39 @@ impl Recorder {
     /// Copy the most recently prepared draw into its host-owned picture envelope.
     pub fn last_draw(&self) -> Option<Observation> {
         self.0.lock().expect("trace journal").last_draw.clone()
+    }
+
+    /// Identity only, without copying the numeric row into a Canvas plan.
+    pub fn last_draw_sequence(&self) -> Option<u64> {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .last_draw
+            .as_ref()
+            .map(|row| row.sequence)
+    }
+
+    /// Called by a host only after successful submission and picture commit.
+    pub fn acknowledge_picture(&self, sequence: u64) {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .pictures
+            .push(sequence);
+    }
+
+    /// Drain acknowledgements independently of prepared observations.
+    pub fn take_pictures(&self) -> Vec<u64> {
+        std::mem::take(&mut self.0.lock().expect("trace journal").pictures)
+    }
+
+    /// Decimal identities avoid truncating u64 through JavaScript Numbers.
+    #[cfg(target_arch = "wasm32")]
+    pub fn take_pictures_js(&self) -> Vec<String> {
+        self.take_pictures()
+            .into_iter()
+            .map(|sequence| sequence.to_string())
+            .collect()
     }
 
     pub(crate) fn observe(
@@ -236,6 +270,7 @@ impl Recorder {
                         .unwrap_or(wasm_bindgen::JsValue::NULL),
                 );
                 record.push(&js_sys::Float64Array::from(row.values.as_slice()));
+                record.push(&row.sequence.to_string().into());
                 record
             })
             .collect()
@@ -275,6 +310,22 @@ mod tests {
         assert_eq!(recorder.last_draw(), Some(rows[1].clone()));
         recorder.observe(&client, "draw", None, None);
         assert!(recorder.take()[0].sequence > rows[1].sequence);
+    }
+
+    #[test]
+    fn pictures_acknowledge_only_the_submitted_identity_across_row_drains() {
+        let recorder = Recorder::default();
+        let client = AnimatedClient::new(0.).unwrap();
+        recorder.observe(&client, "draw", None, None);
+        let skipped = recorder.last_draw_sequence().unwrap();
+        recorder.observe(&client, "draw", None, None);
+        let submitted = recorder.last_draw_sequence().unwrap();
+        assert_eq!(recorder.take().len(), 2);
+        assert!(recorder.take_pictures().is_empty());
+        recorder.acknowledge_picture(submitted);
+        assert_ne!(skipped, submitted);
+        assert_eq!(recorder.take_pictures(), [submitted]);
+        assert!(recorder.take_pictures().is_empty());
     }
 
     #[test]

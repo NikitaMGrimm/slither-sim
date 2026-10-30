@@ -8,6 +8,7 @@ import { traceAssembly } from './feel-replay/assembly.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
 import { parse, stringify } from './feel-replay/io.mjs';
 import { syntheticFixture } from './feel-replay/synthetic.mjs';
+import { validateTrace } from './feel-replay/schema.mjs';
 import { differences } from './feel-replay/differences.mjs';
 import { assertBuildBinding } from './feel-replay/artifacts.mjs';
 
@@ -80,8 +81,8 @@ test('clock installs before bootstrap, runs ordered timers and does not invent R
 test('assembly retains actual boundaries and raw signed zeros; never fills missing rows', () => {
   const { schedule, trace } = syntheticFixture();
   const assembly = traceAssembly(schedule, trace.manifest);
-  const row = ['draw', null, [0, 0, 0, 0, 1, -0, 0, 0, 0, 0, 0, 1, 1, ...Array(124).fill(0)]];
-  const ack = { seq: 0, sourceId: 'packet-0', atMs: 0, event: trace.events[0], observations: [row], commands: [],
+  const row = ['draw', null, [0, 0, 0, 0, 1, -0, 0, 0, 0, 0, 0, 1, 1, ...Array(124).fill(0)], '0'];
+  const ack = { seq: 0, sourceId: 'packet-0', atMs: 0, event: trace.events[0], observations: [row], pictures: ['0'], commands: [],
     geometry: trace.manifest.geometry, lag: { active: false, pingPending: false, pongAgeMs: 0 }, highQuality: true, failed: false, sendFailed: false };
   assembly.append(ack);
   const result = assembly.finish({ atMs: 0, pendingEffects: 0, pendingFrames: 0, completed: true, unexpectedNetwork: false });
@@ -89,6 +90,67 @@ test('assembly retains actual boundaries and raw signed zeros; never fills missi
   assert(Object.is(parse(stringify(result)).samples[0].camera.x, -0));
   assert.throws(() => assembly.append(ack), /Duplicate/);
   assert.equal(compareTraces(result, result, schedule).passed, false);
+});
+
+test('recoverable overflow keeps a prepared row without a picture; the next equal-valued draw succeeds', () => {
+  const { trace } = syntheticFixture();
+  const schedule = { schema: 2, label: 'SYNTHETIC recoverable DRAW_MEMORY_LIMIT', durationMs: 10, expectedCommands: 0,
+    events: [0, 10].map((atMs, i) => ({ sourceId: `frame-${i}`, kind: 'frame', atMs })),
+    boundaries: [0, 1].flatMap(i => ['update', 'draw'].map((phase, j) => ({
+      id: `frame-${i}-${phase}-${i * 2 + j}`, eventSeq: i, phase, frameId: i,
+      drawId: phase === 'draw' ? i : null, atMs: i * 10, eligibility: 'pre-appearance',
+    }))) };
+  const assembly = traceAssembly(schedule, trace.manifest);
+  const cells = [0, 0, 0, 0, 1, -0, 0, 0, 0, 0, 0, 1, 1, ...Array(124).fill(0)];
+  for (let i = 0; i < 2; i++) assembly.append({ seq: i, sourceId: `frame-${i}`, atMs: i * 10,
+    event: { ...trace.events[0], seq: i, sourceId: `frame-${i}`, kind: 'frame', type: 'frame', scheduledMs: i * 10, actualMs: i * 10, effectIds: [] },
+    observations: [['update', null, cells, String(i * 2)], ['draw', null, cells, String(i * 2 + 1)]],
+    // Production memory skips leave failed=false and issue no picture.
+    pictures: i === 0 ? [] : ['3'], commands: [], geometry: trace.manifest.geometry,
+    lag: { active: false, pingPending: false, pongAgeMs: 0 }, highQuality: true, failed: false, sendFailed: false });
+  const result = assembly.finish({ atMs: 10, pendingEffects: 0, pendingFrames: 0, completed: true, unexpectedNetwork: false });
+  assert.deepEqual(result.samples.map(s => s.quality.successfulDraws), [0, 0, 0, 1]);
+  assert.deepEqual(result.samples[1].status, { prepared: true, submitted: false, committed: false, retries: 0, sendFailed: false, presentFailed: false });
+  assert.equal(result.samples[3].status.committed, true);
+  assert.equal(result.final.draws, 1);
+  assert.deepEqual(assembly.pictureDrawIds(), [1]);
+  assert.equal(validateTrace(result, schedule, [1]), result);
+  assert.throws(() => validateTrace(result, schedule, []), /picture acknowledgement mismatch/);
+  const wrongQuality = clone(result); wrongQuality.samples[1].quality.successfulDraws = 1;
+  assert.throws(() => validateTrace(wrongQuality, schedule), /cumulative committed draw count/);
+  const falseSuccess = clone(result);
+  Object.assign(falseSuccess.samples[1].status, { submitted: true, committed: true });
+  for (const sample of falseSuccess.samples.slice(1)) sample.quality.successfulDraws++;
+  falseSuccess.final.draws++;
+  assert.throws(() => validateTrace(falseSuccess, schedule, [1]), /picture acknowledgement mismatch/);
+});
+
+test('assembly requires picture metadata and rejects duplicate, orphan and non-draw receipts', () => {
+  const { schedule, trace } = syntheticFixture();
+  const cells = [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, ...Array(124).fill(0)];
+  const ack = { seq: 0, sourceId: 'packet-0', atMs: 0, event: trace.events[0],
+    observations: [['draw', null, cells, '0']], commands: [], pictures: [], geometry: trace.manifest.geometry,
+    lag: { active: false, pingPending: false, pongAgeMs: 0 }, highQuality: true, failed: false, sendFailed: false };
+  assert.throws(() => traceAssembly(schedule, trace.manifest).append({ ...ack, pictures: undefined }), /acknowledgements required/);
+  assert.throws(() => traceAssembly(schedule, trace.manifest).append({ ...ack, pictures: ['0', '0'] }), /duplicate picture/);
+  assert.throws(() => traceAssembly(schedule, trace.manifest).append({ ...ack, observations: [...ack.observations, ...ack.observations] }), /duplicate observation/);
+  for (const [phase, pictures] of [['draw', ['99']], ['update', ['0']]]) {
+    const assembly = traceAssembly(schedule, trace.manifest);
+    assembly.append({ ...ack, observations: [[phase, null, cells, '0']], pictures });
+    assert.throws(() => assembly.finish({ completed: true }), /no matching draw observation/);
+  }
+  const assembly = traceAssembly(schedule, trace.manifest);
+  assembly.append(ack);
+  const skipped = assembly.finish({ completed: true });
+  assert.equal(skipped.final.draws, 0, 'zero acknowledged pictures cannot count as successful draws');
+  assert.equal(skipped.samples[0].quality.successfulDraws, 0);
+  assert.equal(skipped.samples[0].status.prepared, true);
+  assert.equal(skipped.samples[0].status.submitted, false);
+  assert.equal(skipped.samples[0].status.committed, false);
+  assembly.append({ ...ack, seq: 1, sourceId: 'input-0', event: trace.events[1], observations: [], pictures: ['0'] });
+  const result = assembly.finish({ completed: true });
+  assert.equal(result.samples[0].status.committed, true, 'a later acknowledgement matches the earlier drained row');
+  assert.equal(result.final.draws, 1);
 });
 test('diagnostics retain all differences without bypassing the entropy gate', () => {
   const { schedule, trace } = syntheticFixture(), other = clone(trace);

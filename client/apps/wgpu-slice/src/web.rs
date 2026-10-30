@@ -91,7 +91,15 @@ impl LocalGameplay {
                 GameplaySurface::Cpu => Ok(true),
             };
             match presented {
-                Ok(true) => self.game.presented(true)?,
+                Ok(true) => {
+                    #[cfg(feature = "feel-trace")]
+                    let picture = self.game.issued_feel_observation().map(|row| row.sequence);
+                    self.game.presented(true)?;
+                    #[cfg(feature = "feel-trace")]
+                    if let (Some(trace), Some(sequence)) = (&self.trace, picture) {
+                        trace.acknowledge_picture(sequence);
+                    }
+                }
                 Ok(false) => {
                     self.game.retry_frame(p)?;
                     return Ok(());
@@ -148,6 +156,14 @@ impl LocalGameplay {
     #[cfg(feature = "feel-trace")]
     pub fn take_feel_trace(&self) -> js_sys::Array {
         self.trace.as_ref().expect("replay owner").take_js()
+    }
+    /// Actual submitted and committed pictures, matched by recorder identity.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_pictures(&self) -> Vec<String> {
+        self.trace
+            .as_ref()
+            .expect("replay owner")
+            .take_pictures_js()
     }
     /// A1 completeness failures from the exact candidate's recorder.
     #[cfg(feature = "feel-trace")]

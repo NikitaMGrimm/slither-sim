@@ -40,6 +40,7 @@ export function syntheticFixture() {
       .map(([k, count]) => [k, { index: 0, pending: 0, values: Array(count).fill(0) }])),
     projected: Object.fromEntries(['backing', 'css'].map(k => [k, { head: zero, pupils: [zero, zero] }])),
   };
+  let successfulDraws = 0;
   const trace = {
     schema: 2, manifest,
     events: schedule.events.map((e, seq) => ({
@@ -56,7 +57,7 @@ export function syntheticFixture() {
       lag: { active: false, multiplier: 1, pingPending: false, pongAgeMs: 0 },
       own: b.eligibility === 'own' ? own : null,
       camera: { x: 1, y: 2, offset: zero, index: 0, pending: 0, ring: Array(124).fill(0), follow: true, zoom: 1, targetZoom: 1 },
-      quality: { requested: 'high', active: 'high', successfulDraws: b.drawId === null ? 0 : b.drawId + 1 },
+      quality: { requested: 'high', active: 'high', successfulDraws: b.phase === 'draw' ? ++successfulDraws : successfulDraws },
       geometry, status: { prepared: true, submitted: true, committed: true, retries: 0,
         sendFailed: false, presentFailed: false },
     })),
