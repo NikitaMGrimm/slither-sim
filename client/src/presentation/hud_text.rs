@@ -8,6 +8,33 @@ use crate::{
 
 /// Canvas font stack; native Windows uses the installed Arial faces.
 pub const PLATFORM_FONT_FAMILY: &str = "Arial, Helvetica Neue, Helvetica, sans-serif";
+/// Explicit official panel stacks. Native adapters document face substitution.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TextFamily {
+    /// Arial, Helvetica Neue, Helvetica, sans-serif.
+    #[default]
+    Arial,
+    /// Lucida Sans Unicode, Lucida Grande, sans-serif.
+    Lucida,
+}
+impl TextFamily {
+    /// CSS font-family value, shared with Canvas adapters.
+    pub fn css(self) -> &'static str {
+        match self {
+            Self::Arial => PLATFORM_FONT_FAMILY,
+            Self::Lucida => "Lucida Sans Unicode, Lucida Grande, sans-serif",
+        }
+    }
+}
+/// A real face selection; never an artificial shear.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TextSlant {
+    /// Upright face.
+    #[default]
+    Normal,
+    /// Installed italic face.
+    Italic,
+}
 /// Maximum active readout, message, heading and top-ten column spans.
 pub const MAX_HUD_TEXT_SPANS: usize = 40;
 
@@ -22,6 +49,10 @@ pub enum TextWeight {
 /// Raster style, independent of placement and lifecycle opacity.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextStyle {
+    /// Explicit platform stack.
+    pub family: TextFamily,
+    /// Requested face slant.
+    pub slant: TextSlant,
     /// Logical viewport pixels.
     pub size: f64,
     /// Requested face weight.
@@ -170,6 +201,8 @@ fn span(text: &str, size: f64, weight: TextWeight, color: [u8; 3], alpha: f64) -
     HudTextSpan {
         text: text.into(),
         style: TextStyle {
+            family: TextFamily::Arial,
+            slant: TextSlant::Normal,
             size,
             weight,
             color,

@@ -12,12 +12,18 @@ mod platform;
 
 pub const MINIMAP_CACHE_BYTES: usize = 1024 * 1024;
 pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
+// Allocation rationale: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/panel-text.md#aggregate-resource-proof;
+// regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
+pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
+pub const PANEL_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
 pub const CACHE_RUNS: usize = 258;
+pub const TOTAL_CACHE_RUNS: usize = CACHE_RUNS + PANEL_CACHE_RUNS;
+pub const TOTAL_CACHE_BYTES: usize = CACHE_BYTES + PANEL_CACHE_BYTES;
 
 pub use slither_client::presentation::{
-    PLATFORM_FONT_FAMILY as FONT_FAMILY, TextAlign as Align, TextBaseline as Baseline, TextStyle,
-    TextWeight as Weight,
+    PLATFORM_FONT_FAMILY as FONT_FAMILY, TextAlign as Align, TextBaseline as Baseline,
+    TextFamily as Family, TextSlant as Slant, TextStyle, TextWeight as Weight,
 };
 // HUD slots replace their previous content and have a separate allowance. Fast
 // score updates cannot evict world labels from the nickname LRU.
@@ -25,8 +31,7 @@ pub const HUD_CACHE_BYTES: usize = 2 * 1024 * 1024;
 // Preserve ordinary DPR 1–3 text. Denser displays upscale these bounded rasters
 // rather than exhausting the HUD allowance or exceeding the font-pixel limit.
 pub const MAX_HUD_RASTER_SCALE: f64 = 3.;
-const NICKNAME_CACHE_RUNS: usize =
-    CACHE_RUNS - slither_client::presentation::MAX_HUD_TEXT_SPANS - 2;
+const NICKNAME_CACHE_RUNS: usize = 216;
 pub const MAX_NICKNAME_RUNS_PER_FRAME: usize = 128;
 
 pub struct TextRun<'a> {
@@ -36,6 +41,42 @@ pub struct TextRun<'a> {
     pub align: Align,
     pub baseline: Baseline,
     pub alpha: f64,
+}
+
+/// Stable namespaces; a producer cannot replace another producer's slots.
+#[derive(Clone, Copy)]
+pub enum PanelGroup {
+    Announcement,
+    Result,
+}
+impl PanelGroup {
+    fn slots(self) -> (u8, usize) {
+        match self {
+            Self::Announcement => (0, 48),
+            Self::Result => (48, 16),
+        }
+    }
+}
+/// All active panel producers are submitted together, once per composition.
+pub struct PanelSubmission<'a> {
+    pub group: PanelGroup,
+    pub plan: &'a slither_client::presentation::PanelTextPlan,
+    pub alpha: f64,
+}
+/// Text and its immutable resource copies in producer order.
+pub type PanelDraws = Vec<Vec<(Draw, Resource)>>;
+
+/// Admission is shared by real clipped allocations and the conservative proof.
+/// Counts include every horizontal tile (510 content pixels plus neighbours).
+pub fn preflight_panel_totals(bytes: usize, text_draws: [usize; 2]) -> Result<()> {
+    if bytes > PANEL_CACHE_BYTES
+        || text_draws
+            .into_iter()
+            .any(|n| n > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS)
+    {
+        return Err("Aggregate panel byte/draw budget".into());
+    }
+    Ok(())
 }
 
 /// Pixel bounds relative to a left-aligned alphabetic anchor, plus advance and
@@ -52,16 +93,44 @@ struct Content {
     max_width: Option<u32>,
     size: u64,
     weight: Weight,
+    family: Family,
+    slant: Slant,
+    clip: Option<[u64; 4]>,
     // Exact RGB also identifies the native luminance-dependent coverage table.
     color: [u8; 3],
     shadow: Option<[u64; 3]>,
     line_height: Option<u64>,
+}
+impl Content {
+    fn panel(run: &slither_client::presentation::PanelTextRun, scale: f64) -> Self {
+        Self {
+            text: run.text.clone(),
+            max_width: None,
+            size: (run.style.size * scale).to_bits(),
+            weight: run.style.weight,
+            family: run.style.family,
+            slant: run.style.slant,
+            color: run.style.color,
+            clip: Some(
+                [
+                    run.clip.x - run.position[0],
+                    run.clip.y - run.position[1],
+                    run.clip.width,
+                    run.clip.height,
+                ]
+                .map(f64::to_bits),
+            ),
+            shadow: None,
+            line_height: None,
+        }
+    }
 }
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum Key {
     Nickname(Content),
     Hud(u8),
     Minimap,
+    Panel(u8),
 }
 impl Key {
     #[cfg(all(test, windows))]
@@ -73,9 +142,11 @@ impl Key {
             Self::Nickname(_) => 0,
             Self::Hud(_) => 1,
             Self::Minimap => 2,
+            Self::Panel(_) => 3,
         }
     }
 }
+#[derive(Clone)]
 struct Entry {
     content: Content,
     tiles: Vec<Tile>,
@@ -85,6 +156,7 @@ struct Entry {
     middle: f64,
     used: u64,
 }
+#[derive(Clone)]
 struct Tile {
     resource: Resource,
     start: u32,
@@ -118,6 +190,150 @@ impl Default for TextCache {
     }
 }
 impl TextCache {
+    /// Fontdue/Canvas metrics are copied into the shared line breaker.
+    pub fn measure_panel(
+        &mut self,
+        text: &str,
+        style: TextStyle,
+    ) -> Result<slither_client::presentation::TextMeasurement> {
+        self.rasterizer.measure(text, style)
+    }
+    /// Exact deterministic native face choice, including Lucida substitutions.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn native_face(style: TextStyle) -> &'static str {
+        platform::face_name(style)
+    }
+
+    /// Aggregate preflight, replacement and retirement form one transaction.
+    /// No producer starts its own cleanup. An empty composition retires panels.
+    /// Old prepared frames keep their owned resource copies after replacement.
+    pub fn draw_panel_composition(
+        &mut self,
+        panels: &[PanelSubmission<'_>],
+        scale: f64,
+    ) -> Result<PanelDraws> {
+        if !scale.is_finite() || scale <= 0. {
+            return Err("Invalid panel scale".into());
+        }
+        let scale = scale.min(MAX_HUD_RASTER_SCALE);
+        let mut active = [false; 2];
+        for p in panels {
+            let (base, limit) = p.group.slots();
+            let i = usize::from(base != 0);
+            if active[i] || p.plan.runs.len() > limit || !(0. ..=1.).contains(&p.alpha) {
+                return Err("Panel namespace/slot budget".into());
+            }
+            active[i] = true;
+            for run in &p.plan.runs {
+                let c = run.clip;
+                if ![
+                    c.x,
+                    c.y,
+                    c.width,
+                    c.height,
+                    run.position[0],
+                    run.position[1],
+                    run.style.size,
+                ]
+                .into_iter()
+                .all(f64::is_finite)
+                    || c.width < 0.
+                    || c.width > if base == 0 { 300. } else { 600. }
+                    || c.height < 0.
+                    || c.height > 32.
+                    || run.style.size <= 0.
+                    || run.style.size > 24.
+                {
+                    return Err("Panel clipped allocation bounds".into());
+                }
+            }
+        }
+        let mut staged = Self {
+            rasterizer: std::mem::take(&mut self.rasterizer),
+            entries: self
+                .entries
+                .iter()
+                .filter(|(k, _)| matches!(k, Key::Panel(_)))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+            next_handle: self.next_handle,
+            clock: self.clock,
+            ..Self::default()
+        };
+        // Retire every obsolete entry before allocating any replacement: a
+        // growing early slot must not compete with a shrinking later slot.
+        // Only the staged copy changes until aggregate admission succeeds.
+        staged.entries.retain(|k, entry| {
+            panels.iter().any(|p| {
+                let (base, _) = p.group.slots();
+                matches!(k, Key::Panel(s) if *s >= base && p.plan.runs.get(usize::from(*s-base)).is_some_and(|r| !r.text.is_empty() && r.clip.width > 0. && r.clip.height > 0. && entry.content == Content::panel(r, scale)))
+            })
+        });
+        staged.bytes = staged.entries.values().map(|e| e.bytes).sum();
+        let result = (|| {
+            let mut output = Vec::new();
+            for p in panels {
+                let (base, _) = p.group.slots();
+                let mut draws = Vec::new();
+                for (i, r) in p.plan.runs.iter().enumerate() {
+                    if r.clip.width == 0. || r.clip.height == 0. {
+                        continue;
+                    }
+                    let clip = BodyRect {
+                        x: r.clip.x - r.position[0],
+                        y: r.clip.y - r.position[1],
+                        ..r.clip
+                    };
+                    for (mut draw, resource) in staged
+                        .try_draw(
+                            TextRun {
+                                text: &r.text,
+                                style: r.style,
+                                position: r.position,
+                                align: Align::Left,
+                                baseline: Baseline::Alphabetic,
+                                alpha: p.alpha,
+                            },
+                            scale,
+                            Some(Key::Panel(base + i as u8)),
+                            None,
+                            None,
+                            Some(clip),
+                        )?
+                        .1
+                    {
+                        if crate::render::clip_text(&mut draw, r.clip) {
+                            draws.push((draw, resource));
+                        }
+                    }
+                }
+                // Eight draws remain for flat fills, border strips and controls.
+                if draws.len()
+                    > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS
+                {
+                    return Err("Panel draw budget".into());
+                }
+                output.push(draws);
+            }
+            let mut counts = [0; 2];
+            for (key, entry) in &staged.entries {
+                if let Key::Panel(slot) = key {
+                    counts[usize::from(*slot >= 48)] += entry.tiles.len();
+                }
+            }
+            preflight_panel_totals(staged.bytes, counts)?;
+            Ok(output)
+        })();
+        self.rasterizer = std::mem::take(&mut staged.rasterizer);
+        if result.is_ok() {
+            self.entries.retain(|k, _| !matches!(k, Key::Panel(_)));
+            self.entries.extend(staged.entries);
+            self.bytes = self.entries.values().map(|e| e.bytes).sum();
+            self.clock = staged.clock;
+            self.next_handle = staged.next_handle;
+        }
+        result
+    }
     /// Rasterize at backing resolution. Position and opacity are deliberately
     /// outside the cache key, so movement/fading never uploads a new texture.
     /// The returned owned resource remains valid after cache eviction.
@@ -125,7 +341,7 @@ impl TextCache {
     /// fonts, platform errors and raster budgets cannot terminate gameplay.
     pub fn draw(&mut self, run: TextRun<'_>, backing_scale: f64) -> Result<Vec<(Draw, Resource)>> {
         Ok(self
-            .try_draw(run, backing_scale, None, None, None)
+            .try_draw(run, backing_scale, None, None, None, None)
             .unwrap_or_default()
             .1)
     }
@@ -142,7 +358,14 @@ impl TextCache {
         if usize::from(slot) >= slither_client::presentation::MAX_HUD_TEXT_SPANS {
             return Err("HUD text slot budget".into());
         }
-        self.try_draw(run, backing_scale, Some(Key::Hud(slot)), max_width, None)
+        self.try_draw(
+            run,
+            backing_scale,
+            Some(Key::Hud(slot)),
+            max_width,
+            None,
+            None,
+        )
     }
     /// One replacing slot with its own pixel allowance; neither HUD retirement
     /// nor changing servers can evict nickname entries or consume HUD pixels.
@@ -160,6 +383,7 @@ impl TextCache {
             Some(Key::Minimap),
             Some(width),
             Some([shadow_offset[0], shadow_offset[1], shadow_blur]),
+            None,
         )
         .map(|(_, tiles)| tiles)
     }
@@ -168,7 +392,7 @@ impl TextCache {
         // Prepared/queued frames already own their immutable resource copies.
         self.entries.retain(|key, _| match key {
             Key::Hud(slot) => usize::from(*slot) < spans,
-            Key::Nickname(_) | Key::Minimap => true,
+            Key::Nickname(_) | Key::Minimap | Key::Panel(_) => true,
         });
         self.bytes = self.entries.values().map(|entry| entry.bytes).sum();
     }
@@ -179,6 +403,7 @@ impl TextCache {
         slot: Option<Key>,
         max_width: Option<f64>,
         shadow: Option<[f64; 3]>,
+        clip: Option<BodyRect>,
     ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         let px = run.style.size * backing_scale;
         if !run.position.into_iter().all(f64::is_finite)
@@ -201,6 +426,9 @@ impl TextCache {
             text: run.text.into(),
             size: px.to_bits(),
             weight: run.style.weight,
+            family: run.style.family,
+            slant: run.style.slant,
+            clip: clip.map(|c| [c.x, c.y, c.width, c.height].map(f64::to_bits)),
             color: run.style.color,
             shadow: shadow.map(|s| s.map(|v| (v * backing_scale).to_bits())),
             line_height: shadow.map(|_| (16. * backing_scale).to_bits()),
@@ -208,7 +436,7 @@ impl TextCache {
         let key = slot.unwrap_or_else(|| Key::Nickname(content.clone()));
         self.clock += 1;
         if self.entries.get(&key).is_none_or(|e| e.content != content) {
-            let raster = if matches!(key, Key::Minimap) {
+            let mut raster = if matches!(key, Key::Minimap) {
                 let glyphs = self.rasterize_minimap(&content)?;
                 // A shadow uses its own colour's coverage transfer, never the
                 // fill's already-preblended alpha. Its key keeps black and all
@@ -232,14 +460,12 @@ impl TextCache {
                 }
                 compose_shadow(glyphs, &self.minimap_shadow.as_ref().unwrap().raster)?
             } else {
-                self.rasterizer.rasterize_limited(
-                    run.text,
-                    px,
-                    run.style.weight,
-                    run.style.color,
-                    max_width,
-                )?
+                self.rasterizer
+                    .rasterize_styled(run.text, px, run.style, max_width)?
             };
+            if let Some(clip) = clip {
+                raster = crop_panel(raster, clip, backing_scale)?;
+            }
             let [w, h] = [raster.image.width, raster.image.height];
             if w == 0
                 || h == 0
@@ -299,6 +525,7 @@ impl TextCache {
                     slither_client::presentation::MAX_HUD_TEXT_SPANS,
                 ),
                 Key::Minimap => (MINIMAP_CACHE_BYTES, 1),
+                Key::Panel(_) => (PANEL_CACHE_BYTES, PANEL_CACHE_RUNS),
                 Key::Nickname(_) => (
                     CACHE_BYTES
                         - HUD_CACHE_BYTES
@@ -399,11 +626,16 @@ impl TextCache {
     fn rasterize_minimap(&mut self, content: &Content) -> Result<Raster> {
         let px = f64::from_bits(content.size);
         let width = f64::from(content.max_width.unwrap());
-        let mut raster = self.rasterizer.rasterize_limited(
+        let mut raster = self.rasterizer.rasterize_styled(
             &content.text,
             px,
-            content.weight,
-            content.color,
+            TextStyle {
+                size: px,
+                weight: content.weight,
+                family: content.family,
+                slant: content.slant,
+                color: content.color,
+            },
             None,
         )?;
         if raster.advance > width {
@@ -416,19 +648,29 @@ impl TextCache {
                 } else {
                     format!("{line} {word}")
                 };
-                let measured = self.rasterizer.rasterize_limited(
+                let measured = self.rasterizer.rasterize_styled(
                     &candidate,
                     px,
-                    content.weight,
-                    content.color,
+                    TextStyle {
+                        size: px,
+                        weight: content.weight,
+                        family: content.family,
+                        slant: content.slant,
+                        color: content.color,
+                    },
                     None,
                 )?;
                 if !line.is_empty() && measured.advance > width {
-                    lines.push(self.rasterizer.rasterize_limited(
+                    lines.push(self.rasterizer.rasterize_styled(
                         &line,
                         px,
-                        content.weight,
-                        content.color,
+                        TextStyle {
+                            size: px,
+                            weight: content.weight,
+                            family: content.family,
+                            slant: content.slant,
+                            color: content.color,
+                        },
                         None,
                     )?);
                     line = word.into();
@@ -437,11 +679,16 @@ impl TextCache {
                 }
             }
             if !line.is_empty() {
-                lines.push(self.rasterizer.rasterize_limited(
+                lines.push(self.rasterizer.rasterize_styled(
                     &line,
                     px,
-                    content.weight,
-                    content.color,
+                    TextStyle {
+                        size: px,
+                        weight: content.weight,
+                        family: content.family,
+                        slant: content.slant,
+                        color: content.color,
+                    },
                     None,
                 )?);
             }
@@ -463,6 +710,60 @@ impl TextCache {
                 .as_ref()
                 .map_or(0, |s| s.raster.image.pixels.len())
     }
+}
+
+impl slither_client::presentation::TextMetrics for TextCache {
+    fn measure(
+        &mut self,
+        text: &str,
+        style: TextStyle,
+    ) -> std::result::Result<slither_client::presentation::TextMeasurement, &'static str> {
+        self.measure_panel(text, style)
+            .map_err(|_| "Platform panel metrics unavailable")
+    }
+}
+
+fn crop_panel(mut raster: Raster, c: BodyRect, scale: f64) -> Result<Raster> {
+    let [x, y] = raster.offset;
+    let left = (c.x * scale - x)
+        .floor()
+        .max(0.)
+        .min(f64::from(raster.image.width)) as u32;
+    let top = (c.y * scale - y)
+        .floor()
+        .max(0.)
+        .min(f64::from(raster.image.height)) as u32;
+    let right = ((c.x + c.width) * scale - x)
+        .ceil()
+        .max(f64::from(left))
+        .min(f64::from(raster.image.width)) as u32;
+    let bottom = ((c.y + c.height) * scale - y)
+        .ceil()
+        .max(f64::from(top))
+        .min(f64::from(raster.image.height)) as u32;
+    if right == left || bottom == top {
+        // A blank glyph still owns one transparent pixel, never an invalid asset.
+        raster.image = RgbaImage {
+            width: 1,
+            height: 1,
+            pixels: vec![0; 4],
+        };
+    } else {
+        let mut pixels = Vec::new();
+        for row in top..bottom {
+            let start = ((row * raster.image.width + left) * 4) as usize;
+            pixels.extend_from_slice(
+                &raster.image.pixels[start..start + ((right - left) * 4) as usize],
+            );
+        }
+        raster.image = RgbaImage {
+            width: right - left,
+            height: bottom - top,
+            pixels,
+        };
+    }
+    raster.offset = [x + f64::from(left), y + f64::from(top)];
+    Ok(raster)
 }
 
 // The input mask has already gone through the shadow colour's own transfer.
@@ -632,6 +933,8 @@ mod hud_budget_tests {
         TextRun {
             text: "server 42",
             style: TextStyle {
+                family: slither_client::presentation::TextFamily::Arial,
+                slant: slither_client::presentation::TextSlant::Normal,
                 size: 14.,
                 weight: Weight::Normal,
                 color,
@@ -754,6 +1057,8 @@ mod hud_budget_tests {
             let run = TextRun {
                 text,
                 style: TextStyle {
+                    family: slither_client::presentation::TextFamily::Arial,
+                    slant: slither_client::presentation::TextSlant::Normal,
                     size,
                     weight,
                     color: [255; 3],
@@ -774,6 +1079,8 @@ mod hud_budget_tests {
                 TextRun {
                     text: "server 42",
                     style: TextStyle {
+                        family: slither_client::presentation::TextFamily::Arial,
+                        slant: slither_client::presentation::TextSlant::Normal,
                         size: 14.,
                         weight: Weight::Normal,
                         color: [255; 3],
@@ -831,6 +1138,8 @@ mod hud_budget_tests {
             TextRun {
                 text,
                 style: TextStyle {
+                    family: slither_client::presentation::TextFamily::Arial,
+                    slant: slither_client::presentation::TextSlant::Normal,
                     size: 14.,
                     weight: Weight::Normal,
                     color: [255; 3],
@@ -927,6 +1236,8 @@ mod hud_budget_tests {
         let nickname = TextRun {
             text: "World nickname",
             style: TextStyle {
+                family: slither_client::presentation::TextFamily::Arial,
+                slant: slither_client::presentation::TextSlant::Normal,
                 size: 15.,
                 weight: Weight::Normal,
                 color: [255; 3],

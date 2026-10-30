@@ -37,6 +37,7 @@ mod length;
 mod minimap;
 mod mouth_face;
 mod nickname;
+mod panel_text;
 mod prey;
 mod prey_painter;
 mod quality;
@@ -107,7 +108,8 @@ pub use hud_history::{
 };
 pub use hud_text::{
     HudTextLine, HudTextPlan, HudTextSpan, HudTextView, MAX_HUD_TEXT_SPANS, PLATFORM_FONT_FAMILY,
-    TextAlign, TextBaseline, TextStyle, TextWeight, plan_hud_diagnostic, plan_hud_text,
+    TextAlign, TextBaseline, TextFamily, TextSlant, TextStyle, TextWeight, plan_hud_diagnostic,
+    plan_hud_text,
 };
 pub use leaderboard_history::{
     LeaderboardEvent, LeaderboardEventKind, LeaderboardHistory, LeaderboardPlan, LeaderboardRawRow,
@@ -567,3 +569,5 @@ impl AngleCorrections {
         &self.ring.weights
     }
 }
+
+pub use panel_text::*;

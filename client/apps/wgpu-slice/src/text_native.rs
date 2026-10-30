@@ -1,7 +1,9 @@
 //! Windows adapter: no bundled fonts, desktop APIs or window creation.
-use super::{Raster, Weight};
+use super::{Family, Raster, Slant, TextStyle, Weight};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
+use slither_client::presentation::TextMeasurement;
+use std::collections::BTreeMap;
 
 fn expand_luminance(bucket: u8) -> u8 {
     (bucket << 5) | (bucket << 2) | (bucket >> 1)
@@ -32,11 +34,11 @@ fn encoded_srgb(value: f64) -> f64 {
 
 fn coverage_table(bucket: u8) -> [u8; 256] {
     // Windows Chromium uses sRGB (gamma=0 sentinel) and contrast=1.0:
-    // https://github.com/chromium/chromium/blob/152.0.7977.167/skia/BUILD.gn#L137-L142
+    // https://github.com/chromium/chromium/blob/dd78960ccd8a03a2fe1f629543d27783885b78e9/skia/BUILD.gn#L137-L142
     // Skia's model guesses the encoded background as 1 - foreground, boosts
     // coverage by c*(1-c)*contrast*linear(background), then solves for the alpha
     // that reproduces a linear-light blend in an encoded source-over texture.
-    // https://skia.org/docs/dev/design/raster_tragedy/
+    // https://github.com/google/skia/blob/c0c46ee9f938fa32c086bea666199686ad7cf26e/site/docs/dev/design/raster_tragedy/_index.md
     // https://github.com/google/skia/blob/0789f2ab93b844c5f2f5a96eb80c7c8f1ef6f570/src/core/SkMaskGamma.cpp#L74-L125
     // This is a grey-mask approximation over fontdue, not DirectWrite hinting
     // or LCD rendering. Three-bit luminance avoids the singular middle grey.
@@ -68,8 +70,7 @@ fn coverage_lut(color: [u8; 3]) -> &'static [u8; 256] {
 
 #[derive(Default)]
 pub struct Rasterizer {
-    regular: Option<Arial>,
-    bold: Option<Arial>,
+    faces: BTreeMap<(Family, Weight, Slant), Arial>,
 }
 
 #[cfg(test)]
@@ -230,6 +231,8 @@ mod tests {
 struct Arial {
     font: Font,
     em_ascent: f64,
+    font_ascent: f32,
+    font_descent: f32,
 }
 fn canvas_character(c: char) -> Option<char> {
     match c {
@@ -254,6 +257,87 @@ impl Rasterizer {
     pub fn new() -> Self {
         Self::default()
     }
+    fn face(&mut self, style: TextStyle) -> Result<&Arial> {
+        let key = (style.family, style.weight, style.slant);
+        if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
+            let file = face_name(style);
+            let bytes = std::fs::read(std::path::Path::new("C:/Windows/Fonts").join(file))
+                .map_err(|e| format!("installed face ({file}): {e}"))?;
+            let face = ttf_parser::Face::parse(&bytes, 0)
+                .map_err(|e| format!("font metrics ({file}): {e}"))?;
+            let ascent = f64::from(face.typographic_ascender().unwrap_or(face.ascender()));
+            let descent = f64::from(face.typographic_descender().unwrap_or(face.descender()));
+            if ascent <= descent {
+                return Err("font typographic metrics".into());
+            }
+            // These installed Windows faces use OS/2 usWinAscent/usWinDescent
+            // for DirectWrite/Skia's font box, not OS/2's normalized typo box.
+            // Source/rounding rationale: client/docs/panel-text.md#font-box-and-baselines.
+            let os2 = face.tables().os2.ok_or("font OS/2 metrics")?;
+            let upem = f32::from(face.units_per_em());
+            let font_ascent = f32::from(os2.windows_ascender()) / upem;
+            let font_descent = -f32::from(os2.windows_descender()) / upem;
+            slot.insert(Arial {
+                font: Font::from_bytes(bytes, FontSettings::default())
+                    .map_err(|e| format!("font ({file}): {e}"))?,
+                em_ascent: ascent / (ascent - descent),
+                font_ascent,
+                font_descent,
+            });
+        }
+        Ok(&self.faces[&key])
+    }
+    pub fn measure(&mut self, text: &str, style: TextStyle) -> Result<TextMeasurement> {
+        let face = self.face(style)?;
+        let font = &face.font;
+        let font_ascent = style.size as f32 * face.font_ascent;
+        let font_descent = style.size as f32 * face.font_descent;
+        // Blink's AscentDescentWithHacks rounds ordinary font boxes; Canvas
+        // retains subpixels for tiny fonts (ascent <3 or total height <2).
+        let tiny = font_ascent < 3. || font_ascent + font_descent < 2.;
+        let size = style.size as f32 * 4.;
+        let mut pen = 0_f32;
+        let mut previous = None;
+        let mut ascent = 0_f64;
+        let mut descent = 0_f64;
+        for c in text.chars() {
+            if c == '\u{7f}' {
+                pen += del_advance(style.size, style.weight) * 4.;
+                previous = None;
+                continue;
+            }
+            let Some(c) = canvas_character(c) else {
+                previous = None;
+                continue;
+            };
+            if let Some(p) = previous
+                && p != ' '
+                && c != ' '
+            {
+                pen += font.horizontal_kern(p, c, size).unwrap_or(0.);
+            }
+            let m = font.metrics(c, size);
+            ascent = ascent.max(f64::from(m.ymin + m.height as i32) / 4.);
+            descent = descent.max(-f64::from(m.ymin) / 4.);
+            pen += m.advance_width;
+            previous = Some(c);
+        }
+        Ok(TextMeasurement {
+            advance: f64::from(pen) / 4.,
+            ascent,
+            descent,
+            font_ascent: f64::from(if tiny {
+                font_ascent
+            } else {
+                font_ascent.round()
+            }),
+            font_descent: f64::from(if tiny {
+                font_descent
+            } else {
+                font_descent.round()
+            }),
+        })
+    }
     #[cfg(test)]
     pub fn rasterize(
         &mut self,
@@ -264,6 +348,7 @@ impl Rasterizer {
     ) -> Result<Raster> {
         self.rasterize_limited(text, px, weight, color, None)
     }
+    #[cfg(test)]
     pub fn rasterize_limited(
         &mut self,
         text: &str,
@@ -272,38 +357,29 @@ impl Rasterizer {
         color: [u8; 3],
         max_width: Option<u32>,
     ) -> Result<Raster> {
-        let slot = match weight {
-            Weight::Normal => &mut self.regular,
-            Weight::Bold => &mut self.bold,
-        };
-        if slot.is_none() {
-            let file = match weight {
-                Weight::Normal => "arial.ttf",
-                Weight::Bold => "arialbd.ttf",
-            };
-            let bytes = std::fs::read(std::path::Path::new("C:/Windows/Fonts").join(file))
-                .map_err(|e| format!("system Arial ({file}): {e}"))?;
-            let face = ttf_parser::Face::parse(&bytes, 0)
-                .map_err(|e| format!("system Arial metrics: {e}"))?;
-            let ascent = f64::from(
-                face.typographic_ascender()
-                    .ok_or("Arial typographic ascent")?,
-            );
-            let descent = f64::from(
-                face.typographic_descender()
-                    .ok_or("Arial typographic descent")?,
-            );
-            if ascent <= descent {
-                return Err("Arial typographic metrics".into());
-            }
-            let em_ascent = ascent / (ascent - descent);
-            *slot = Some(Arial {
-                font: Font::from_bytes(bytes, FontSettings::default())
-                    .map_err(|e| format!("system Arial: {e}"))?,
-                em_ascent,
-            });
-        }
-        let arial = slot.as_ref().unwrap();
+        self.rasterize_styled(
+            text,
+            px,
+            TextStyle {
+                size: px,
+                weight,
+                family: Family::Arial,
+                slant: Slant::Normal,
+                color,
+            },
+            max_width,
+        )
+    }
+    pub fn rasterize_styled(
+        &mut self,
+        text: &str,
+        px: f64,
+        style: TextStyle,
+        max_width: Option<u32>,
+    ) -> Result<Raster> {
+        let weight = style.weight;
+        let color = style.color;
+        let arial = self.face(style)?;
         let font = &arial.font;
         // Supersampling retains fractional advances and kerning without ClearType
         // color fringes in the renderer's transparent premultiplied textures.
@@ -402,5 +478,20 @@ impl Rasterizer {
             // Normalize OS/2 typography to one em, at the browser's 1/64px grid.
             middle: (px * arial.em_ascent * 64.).round() / 64. - px / 2.,
         })
+    }
+}
+
+/// Keep styled Lucida in the matched family, using its regular installed face.
+/// Known non-parity: Chromium/Skia synthesizes bold/oblique; synthesis or an
+/// accepted approximation belongs to end-screen backlog item 5, not this PR.
+/// https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc#L484-L498
+/// Missing selected files are explicit errors; no fonts are bundled or sheared.
+pub fn face_name(style: TextStyle) -> &'static str {
+    match (style.family, style.weight, style.slant) {
+        (Family::Lucida, _, _) => "l_10646.ttf",
+        (_, Weight::Normal, Slant::Normal) => "arial.ttf",
+        (_, Weight::Bold, Slant::Normal) => "arialbd.ttf",
+        (_, Weight::Normal, Slant::Italic) => "ariali.ttf",
+        (_, Weight::Bold, Slant::Italic) => "arialbi.ttf",
     }
 }
