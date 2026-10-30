@@ -159,7 +159,7 @@ fn raw_preedit_commit_and_composition_enter_are_separate() {
     input.apply(EditIntent::KeyText("unexpected".into()));
     assert_eq!(text(&input, field), "old");
     assert_eq!(input.editor(field).preedit().unwrap().text, "界😀");
-    assert!(input.apply(enter(true, false)).is_empty());
+    assert!(input.apply(EditIntent::ImeEnterPressed).is_empty());
     input.apply(EditIntent::Preedit("".into(), None));
     assert!(!input.editor(field).composing());
     input.apply(EditIntent::ImeCommit("界😀".into()));
@@ -171,7 +171,7 @@ fn raw_preedit_commit_and_composition_enter_are_separate() {
         input.apply(enter(true, false)),
         vec![HostEditEffect::Activate(field)]
     );
-    assert!(input.apply(enter(true, false)).is_empty());
+    assert!(input.apply(enter(true, true)).is_empty());
     input.apply(EditIntent::Undo);
     assert_eq!(text(&input, field), "old");
 }
@@ -187,7 +187,10 @@ fn ime_commit_always_inserts_and_cancel_discards_only_preedit() {
     );
     input.apply(EditIntent::ImeCommit("é".into()));
     input.apply(EditIntent::ImeEnabled(false));
-    assert!(input.apply(enter(true, false)).is_empty());
+    assert_eq!(
+        input.apply(enter(true, false)),
+        vec![HostEditEffect::Activate(field)]
+    );
     assert_eq!(text(&input, field), "a ");
     input.apply(enter(false, false));
     input.apply(EditIntent::Preedit("discard".into(), None));
@@ -236,7 +239,7 @@ fn round3_composition_enter_release_then_fresh_a_keeps_both_edits() {
         let mut input = editor(field, "");
         input.apply(EditIntent::ImeEnabled(true));
         input.apply(EditIntent::Preedit("a".into(), None));
-        assert!(input.apply(enter(true, false)).is_empty());
+        assert!(input.apply(EditIntent::ImeEnterPressed).is_empty());
         input.apply(EditIntent::Preedit("".into(), None));
         input.apply(EditIntent::ImeCommit("a".into()));
         input.apply(EditIntent::ImeEnabled(false));
@@ -266,6 +269,7 @@ fn ordinary_edit_then_new_composition_keeps_both() {
     let mut input = editor(field, "a");
     input.apply(EditIntent::ImeEnabled(true));
     input.apply(EditIntent::Preedit("a".into(), None));
+    input.apply(EditIntent::ImeEnterPressed);
     input.apply(EditIntent::Preedit("".into(), None));
     input.apply(EditIntent::ImeCommit("a".into()));
     assert_eq!(text(&input, field), "aa");
@@ -312,6 +316,7 @@ fn round3_interleaved_compositions_preserve_each_commit_and_history() {
 fn composition_enter_barrier_survives_preedit_clear_but_clears_on_blur() {
     let mut input = editor(TextField::Nickname, "");
     input.apply(EditIntent::Preedit("a".into(), None));
+    input.apply(EditIntent::ImeEnterPressed);
     input.apply(EditIntent::Preedit("".into(), None));
     input.apply(EditIntent::ImeCommit("a".into()));
     assert!(input.apply(enter(true, false)).is_empty());
@@ -321,6 +326,57 @@ fn composition_enter_barrier_survives_preedit_clear_but_clears_on_blur() {
         input.apply(enter(true, false)),
         vec![HostEditEffect::Activate(TextField::Nickname)]
     );
+}
+
+#[test]
+fn round4_no_consumed_enter_means_the_first_enter_activates() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        for steps in [
+            vec![
+                EditIntent::Preedit("a".into(), None),
+                EditIntent::Preedit("".into(), None),
+                EditIntent::ImeCommit("a".into()),
+                EditIntent::ImeEnabled(false),
+            ],
+            vec![EditIntent::ImeCommit("a".into())],
+            vec![
+                EditIntent::Preedit("cancel".into(), None),
+                EditIntent::Preedit("".into(), None),
+            ],
+            vec![
+                EditIntent::Preedit("cancel".into(), None),
+                EditIntent::ImeEnabled(false),
+            ],
+        ] {
+            let mut input = editor(field, "ready");
+            input.apply(EditIntent::ImeEnabled(true));
+            for step in steps {
+                input.apply(step);
+            }
+            assert_eq!(
+                input.apply(enter(true, false)),
+                vec![HostEditEffect::Activate(field)]
+            );
+        }
+    }
+}
+
+#[test]
+fn logical_enter_repeats_never_activate_play_or_save() {
+    for field in [TextField::Nickname, TextField::Champion] {
+        let mut input = editor(field, "ready");
+        assert!(input.apply(enter(true, true)).is_empty());
+        assert_eq!(
+            input.apply(enter(true, false)),
+            vec![HostEditEffect::Activate(field)]
+        );
+        assert!(input.apply(enter(true, true)).is_empty());
+        input.apply(enter(false, false));
+        assert_eq!(
+            input.apply(enter(true, false)),
+            vec![HostEditEffect::Activate(field)]
+        );
+    }
 }
 
 #[test]
@@ -594,7 +650,7 @@ fn menu_focus_and_enter_keep_deferred_play_and_admission_authority() {
     assert_eq!(input.focus(), Some(TextField::Nickname));
     input.apply_menu(EditIntent::KeyText("é😀 name".into()), &mut menu, true);
     input.apply_menu(EditIntent::Preedit("候補".into(), None), &mut menu, true);
-    input.apply_menu(enter(true, false), &mut menu, true);
+    input.apply_menu(EditIntent::ImeEnterPressed, &mut menu, true);
     assert!(menu.step(8., false).unwrap().is_empty());
     input.apply_menu(EditIntent::ImeCommit("x".into()), &mut menu, true);
     input.apply_menu(enter(false, false), &mut menu, true);

@@ -288,8 +288,9 @@ pub enum EditIntent {
     Modal(bool),
     /// Keyboard-produced text (ignored while IME owns composition).
     KeyText(String),
-    /// A non-Enter key press outside IME processing retires the Enter barrier.
-    UnrelatedKeyPress,
+    /// Host observed a physical Enter press consumed by IME (Process or preedit).
+    /// This records ownership only and never activates a control.
+    ImeEnterPressed,
     /// Raw preedit text and optional UTF-8 byte selection.
     Preedit(String, Option<(usize, usize)>),
     /// IME enabled/disabled; Disabled cancels uncommitted text.
@@ -342,7 +343,7 @@ pub enum EditIntent {
     Undo,
     /// Restore the next committed text and selection.
     Redo,
-    /// Enter down/up; repeats never activate controls.
+    /// Logical Enter press, or physical Enter release; repeats never activate.
     Enter {
         /// Press state.
         pressed: bool,
@@ -411,7 +412,6 @@ pub struct MenuInputState {
     focus: Option<TextField>,
     window_focused: bool,
     modal: bool,
-    enter_held: bool,
     composition_enter: bool,
     token: u64,
     pending: Option<(u64, bool)>,
@@ -425,7 +425,6 @@ impl Default for MenuInputState {
             focus: None,
             window_focused: true,
             modal: false,
-            enter_held: false,
             composition_enter: false,
             token: 0,
             pending: None,
@@ -459,7 +458,6 @@ impl MenuInputState {
         self.nickname.cancel();
         self.champion.cancel();
         self.composition_enter = false;
-        self.enter_held = false;
         self.pending = None;
     }
     fn releases(effects: &mut Vec<HostEditEffect>) {
@@ -488,11 +486,6 @@ impl MenuInputState {
     pub fn apply(&mut self, intent: EditIntent) -> Vec<HostEditEffect> {
         let mut effects = Vec::new();
         match intent {
-            EditIntent::UnrelatedKeyPress => {
-                self.composition_enter = false;
-                self.enter_held = false;
-                return effects;
-            }
             EditIntent::Focus(focus) => {
                 if self.focus != focus {
                     self.clear_composition();
@@ -540,6 +533,11 @@ impl MenuInputState {
             return effects;
         };
         match intent {
+            EditIntent::ImeEnterPressed => {
+                // Only a host-observed IME-consumed physical Enter can arm this
+                // flag. Preedit, commits and cancellation carry no key identity.
+                self.composition_enter = true;
+            }
             EditIntent::ImeEnabled(enabled) => {
                 self.pending = None;
                 if !enabled {
@@ -548,9 +546,6 @@ impl MenuInputState {
             }
             EditIntent::Preedit(text, selection) => {
                 self.pending = None;
-                if !text.is_empty() {
-                    self.composition_enter = true;
-                }
                 let selection = selection.map(|(a, c)| (boundary(&text, a), boundary(&text, c)));
                 let editor = self.editor_mut(field);
                 // Empty preedit clears the preview, including before Commit.
@@ -572,37 +567,30 @@ impl MenuInputState {
                 // X11/macOS need a platform-specific rule before support.
                 self.pending = None;
                 self.editor_mut(field).replace(&text);
-                self.composition_enter = true;
             }
             EditIntent::KeyText(text) => {
                 // winit 0.30.13 src/window.rs:1260-1268 excludes these events
                 // during preedit. Ignore unexpected host text defensively while
                 // composing; it cannot replace or truncate the raw preview.
                 if !self.editor(field).composing() {
-                    self.composition_enter = false;
-                    self.enter_held = false;
                     self.pending = None;
                     self.editor_mut(field).replace(&text);
                 }
             }
             EditIntent::Enter { pressed, repeat } => {
                 if !pressed {
-                    self.enter_held = false;
                     self.composition_enter = false;
                 } else {
                     let owned = self.editor(field).composing() || self.composition_enter;
-                    if !owned && !repeat && !self.enter_held {
+                    if !owned && !repeat {
                         effects.push(HostEditEffect::Activate(field));
                     }
                     // The OS owns composition completion; never insert raw preedit ourselves.
-                    self.enter_held = true;
                 }
             }
             EditIntent::CancelComposition => {
                 self.pending = None;
                 self.editor_mut(field).cancel();
-                self.composition_enter = false;
-                self.enter_held = false;
                 effects.push(HostEditEffect::ImeAllowed(false));
                 self.ime_effects(&mut effects);
             }

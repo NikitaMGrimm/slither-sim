@@ -71,24 +71,31 @@ impl NativeMenuInput {
             intents.push(EditIntent::Gameplay { key, pressed });
         }
         // winit 0.30.13 src/platform_impl/windows/keyboard_layout.rs:946 maps
-        // VK_PROCESSKEY to Process; src/keyboard.rs:1576-1586 gives it no text.
-        // These are IME-owned keys, never text/shortcuts.
+        // VK_PROCESSKEY to Process. On Windows KeyEvent.text can still carry a
+        // payload for Process; reject it regardless, before text/shortcut mapping.
         // Still accept a physical Enter key-up, including a Process key-up, to
         // release the composition Enter barrier without activating anything.
-        let enter_release = !pressed
-            && matches!(
-                event.physical,
-                PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter)
-            );
+        let physical_enter = matches!(
+            event.physical,
+            PhysicalKey::Code(KeyCode::Enter | KeyCode::NumpadEnter)
+        );
+        let enter_release = !pressed && physical_enter;
+        let composing = self
+            .state
+            .focus()
+            .is_some_and(|field| self.state.editor(field).composing());
+        let ime_enter_press = pressed && physical_enter && (process || composing);
         if enter_release {
             intents.push(EditIntent::Enter {
                 pressed: false,
                 repeat: false,
             });
+        } else if ime_enter_press {
+            intents.push(EditIntent::ImeEnterPressed);
         }
-        if process || enter_release {
+        if process || enter_release || ime_enter_press {
             return NativeInputResult {
-                consumed: process || editing,
+                consumed: process || ime_enter_press || editing,
                 effects: intents
                     .into_iter()
                     .flat_map(|intent| self.state.apply(intent))
@@ -97,13 +104,12 @@ impl NativeMenuInput {
         }
         let control = self.modifiers.control_key() && !self.modifiers.alt_key();
         let shift = self.modifiers.shift_key();
-        if matches!(event.logical, Key::Named(NamedKey::Enter)) {
+        if pressed && matches!(event.logical, Key::Named(NamedKey::Enter)) {
             intents.push(EditIntent::Enter {
                 pressed,
                 repeat: event.repeat,
             });
         } else if pressed && editing {
-            intents.push(EditIntent::UnrelatedKeyPress);
             let intent = match event.logical {
                 Key::Named(NamedKey::ArrowLeft) => Some(EditIntent::Move {
                     movement: if control {

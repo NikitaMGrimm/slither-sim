@@ -96,9 +96,10 @@ that the window receives no `KeyboardInput` during preedit. Its
 `src/platform_impl/windows/event_loop.rs:1526-1576` emits the composed result from
 `WM_IME_COMPOSITION` and returns without `DefWindowProc`, so it generates no
 second `WM_CHAR` text for that result. `keyboard_layout.rs:946` in the same
-Windows directory maps `VK_PROCESSKEY` to `Key::Named(Process)`;
-`src/keyboard.rs:1576-1586` gives that named key no text. These citations were
-checked against the local registry source, not inferred from synthetic events.
+Windows directory maps `VK_PROCESSKEY` to `Key::Named(Process)`. This does not
+imply an empty `KeyEvent.text`: Windows can provide a payload for Process, which
+the adapter rejects regardless of content. These citations were checked against
+the local registry source, not inferred from synthetic events.
 
 Every `Ime::Commit` inserts and normalizes its text. `KeyEvent.text` inserts
 while not composing, including ordinary typing and repeats with IME allowed.
@@ -108,14 +109,23 @@ no string comparison for duplicate suppression or retrospective rollback.
 `Process` events never insert text or trigger shortcuts; key releases still
 clear held gameplay keys and the composition Enter state.
 
-A simple composition Enter flag suppresses the Enter that finishes composition.
-It clears on that key's release (including a physical Enter released as
-`Process`), focus loss, or the next unrelated key press. A consumed Enter stays
-held until release or an unrelated key press, so repeats cannot activate Play
-or Save. No event-batch hook controls this barrier. X11 and macOS input are unsupported
+A composition Enter flag is armed only by an observed physical Enter press
+consumed by IME: logical `Process`, or a key event delivered while composing.
+Preedit, commit, candidate selection and cancellation never arm it themselves.
+It clears on that physical key's release (including a release reported as
+`Process`) or blur/focus teardown. Unrelated key presses and releases do not
+release a held IME Enter. Normal activation requires a non-repeat logical Enter
+press while not composing and without an owned IME Enter. No event-batch hook
+controls this barrier. X11 and macOS input are unsupported
 by this Windows rule; they need a platform-specific rule before support.
 Real OS ordering still needs physical-host validation; synthetic traces are
 not that acceptance.
+
+The private `source/21-logo.js:303,339-347` keydown handler does not filter
+repeat events. Its Play and Save callbacks reject disabled controls and disable
+after acceptance (`source/06-login-and-hud.js:294-307,320-344`). This native seam
+uses the explicit non-repeat activation rule; its event-level filtering differs
+from the source dispatch, while menu admission still owns once-only execution.
 
 Clipboard effects carry tokens. Focus, selection, editing and composition
 changes invalidate pending work; failed cuts retain their selection and text,
