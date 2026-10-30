@@ -1,0 +1,8 @@
+<svg class="slither-brand" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" color="#15171b" role="img" aria-label="SlitherClient snake C icon">
+  <style>
+    .slither-brand { color: #15171b; }
+    @media (prefers-color-scheme: dark) {
+      .slither-brand { color: #f4f6f8; }
+    }
+  </style>
+  <path fill="currentColor" fill-rule="evenodd" d="M117 48C119 43 113 36 106 29C100 23 93 29 86 22C63 3 39 5 19 23C-3 43-2 83 17 106C37 128 73 131 98 113C109 105 116 94 119 83Q120 79 116 76L111 72Q108 70 107 74C101 89 94 97 83 102C62 110 38 101 29 83C19 62 30 40 47 32C63 24 76 31 82 43C86 51 100 50 111 51C115 51 117 50 117 48ZM106 39a3 3 0 1 0-6 0a3 3 0 1 0 6 0Z"/></svg>
