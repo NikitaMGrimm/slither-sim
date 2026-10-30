@@ -43,6 +43,11 @@ Run the ABI suite again after changing Rust/browser boundaries. For wgpu, the
 full check command uses one build job and target/wgpu-slice-check to limit memory
 and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 
+The pure Node [feel replay contract](../tools/feel-replay/README.md) defines
+offline schedules, manifests and bit-preserving trace comparison for future
+Canvas/WebGPU and native peers. Run `node --test tools/feel-replay.test.mjs` for
+its authored synthetic fault checks; these do not establish runtime or feel parity.
+
 ## Source guard
 
 ```sh
