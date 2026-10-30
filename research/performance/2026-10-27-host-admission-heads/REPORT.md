@@ -75,6 +75,9 @@ the useful target. Arena code is untouched.
 
 ## Validation and reproduction
 
+The retained [legacy overlay](legacy_overlay.py) drains protocol-13 output
+while driving an equal stock-world twin and checking its physical state.
+
 Full Rust group and docs pass on Linux, repeated after #197 integration,
 including seven safety tests; changing
 the inclusive head threshold to strict fails the new ULP boundary test for both

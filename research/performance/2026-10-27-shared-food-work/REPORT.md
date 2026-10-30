@@ -91,6 +91,9 @@ Existing handle-stability and recipient packet oracles remain in place.
 
 ## Reproduction and limits
 
+The [result selector](select.py) combines the whole-tick and food profiles
+with the retained comparison and mutation evidence.
+
 ```sh
 STUDY=research/performance/2026-10-27-shared-food-work
 OUT=/tmp/shared-food-new

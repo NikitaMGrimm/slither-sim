@@ -5,6 +5,12 @@ Before changing behavior, read README.md and the relevant API guide; use
 [server rules](docs/server-rules.md) for mechanics and
 [research workflow](docs/research-workflow.md) before collecting evidence.
 
+`client/` holds slither-client, the Rust slither.io client: a shared Rust core
+with wgpu desktop and browser front ends, plus a Canvas2D reference renderer.
+For files under `client/`, `client/AGENTS.md` adds client rules and wins where
+they differ, except that the commit, PR, AI-disclosure and offline-test rules
+below apply everywhere.
+
 - Use the [task map and evidence tiers](CONTRIBUTING.md#find-the-change).
   Keep changes small and deterministic. Tool/API fixes need a minimal repro and
   regression, not fresh capture. Mechanics corrections need supporting evidence

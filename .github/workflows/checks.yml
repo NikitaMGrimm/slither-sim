@@ -27,8 +27,38 @@ env:
   CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
 
 jobs:
+  # Pull requests run only the checks for the areas they change; pushes and
+  # manual runs check everything, since publication waits for main's full run.
+  changes:
+    name: Changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sim: ${{ steps.diff.outputs.sim }}
+      client: ${{ steps.diff.outputs.client }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "sim=true" >> "$GITHUB_OUTPUT"
+            echo "client=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The checked-out merge commit's first parent is the base branch head.
+          files=$(git diff --name-only HEAD^1 HEAD)
+          echo "sim=$(grep -qv '^client/' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "client=$(grep -qE '^(client/|\.github/workflows/client\.yml$|\.gitattributes$)' <<<"$files" && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint (ubuntu-latest)
+    needs: changes
+    if: needs.changes.outputs.sim == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,6 +77,8 @@ jobs:
 
   test:
     name: Rust (${{ matrix.os }}, ${{ matrix.toolchain }})
+    needs: changes
+    if: needs.changes.outputs.sim == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +111,8 @@ jobs:
 
   tools:
     name: Tools (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.sim == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -104,16 +138,47 @@ jobs:
       - run: uv sync --locked --only-group tools
       - run: uv run --locked --only-group tools python tools/check.py tools
 
+  client:
+    name: Client
+    needs: changes
+    if: needs.changes.outputs.client == 'true'
+    uses: ./.github/workflows/client.yml
+
+  # Content rules (no official client artifacts, keys or source maps) cover the
+  # whole repository, so this runs on every change.
+  guard:
+    name: Repository guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: node client/tools/check-repository.mjs
+
   required:
     name: Required checks
     if: always()
-    needs: [lint, test, tools]
+    needs: [changes, lint, test, tools, client, guard]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require every test job to succeed
+      - name: Require every needed job to succeed
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          GUARD_RESULT: ${{ needs.guard.result }}
+          SIM: ${{ needs.changes.outputs.sim }}
+          CLIENT: ${{ needs.changes.outputs.client }}
           LINT_RESULT: ${{ needs.lint.result }}
           TEST_RESULT: ${{ needs.test.result }}
           TOOLS_RESULT: ${{ needs.tools.result }}
-        run: test "$LINT_RESULT" = success && test "$TEST_RESULT" = success && test "$TOOLS_RESULT" = success
+          CLIENT_RESULT: ${{ needs.client.result }}
+        run: |
+          # A job may be skipped only when its area is unchanged.
+          ok() { [ "$1" = success ] || { [ "$1" = skipped ] && [ "$2" = false ]; }; }
+          test "$CHANGES_RESULT" = success && test "$GUARD_RESULT" = success &&
+            ok "$LINT_RESULT" "$SIM" && ok "$TEST_RESULT" "$SIM" && ok "$TOOLS_RESULT" "$SIM" &&
+            ok "$CLIENT_RESULT" "$CLIENT"

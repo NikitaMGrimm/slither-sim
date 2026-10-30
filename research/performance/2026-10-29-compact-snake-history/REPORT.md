@@ -7,7 +7,7 @@ The following study verdict is historical and unchanged. The separate
 mature-500 whole-window CPU in all ten protocol-specific pairs, with median
 paired ratios **0.8579 / 0.8199**, but three short controls exceed 1.02 in all
 five pairs. Production code remains unchanged; the complete implementation and
-oracle are retained in [measured-bounded.patch](measured-bounded.patch).
+oracle are retained in the [archived measured patch](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-29-compact-snake-history/measured-bounded.patch).
 
 The [memory diagnostic](../2026-10-29-simulation-memory/REPORT.md) identified
 sparse recipient histories as the strongest portable layout lead: hundreds of
@@ -129,7 +129,7 @@ single-vector structure compared with the previous two-vector layout.
 No retry, tuning or threshold change is applied to the study. Its verdict
 remains rejection under its own gate. The measured implementation is restored
 in #274 against main after #273, with only a short sorted-merge explanation
-in the runtime source. `measured-bounded.patch` preserves the historical measured
+in the runtime source. The [archived measured patch](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-29-compact-snake-history/measured-bounded.patch) preserves the historical measured
 snapshot under its new name; it was previously `rejected-bounded.patch`.
 [Integrated-head verification](adoption-verification.json) repeats the focused
 oracle, its three mutations and restoration, the full Rust group, all 27
@@ -211,7 +211,7 @@ superseded-primary observation enters the final-primary table.
 mutations and source restore, imports from earlier studies, warm-stream and
 continuation checks, counter scope, pairs, gate and cleanup. The measurement
 overlay is retained as [harness.patch](harness.patch); the historical measured
-runtime snapshot and oracle remain in [measured-bounded.patch](measured-bounded.patch).
+runtime snapshot and oracle remain in the [archived measured patch](https://github.com/NikitaMGrimm/slither-sim/blob/76772d07098c884e9643783a0ba874bce0567e5e/research/performance/2026-10-29-compact-snake-history/measured-bounded.patch).
 The adopted runtime and oracle are part of #274. Raw streams,
 sources, binaries, counters, inventories and
 failed attempts remain local-only in verified ignored-output archives.
