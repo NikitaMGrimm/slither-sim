@@ -29,11 +29,7 @@ def verify_fixture(directory,qualification):
 
 
 def population_directory(root,n):
-    selection=Path(root)/'selection.json'
-    if selection.exists():
-        values=json.loads(selection.read_text())
-        assert values=={'10000':'10000-continuation'},'unexpected follow-up selection'
-        if n==10000:return Path(root)/'results/10000-continuation'
+    assert not (Path(root)/'selection.json').exists(),'No warmup follow-up is selected under the amendment'
     return Path(root)/'results'/str(n)
 
 
@@ -126,24 +122,21 @@ def reduce(root):
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         population={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config}
-        if directory.name.endswith('-continuation'):
-            original=root/'results'/str(n)
-            verify_fixture(original,json.loads((original/'warm-qualification.json').read_text()))
-            population['priorCensoredAttempt']={
-                'qualification':json.loads((original/'warm-qualification.json').read_text()),
-                'census':json.loads((original/'fixture/census.json').read_text())}
-            population['followupPins']=json.loads((directory/'pins.json').read_text())
         guarded=directory/'censored-counts.json'
         if not qualification['stabilized'] and not guarded.exists():
             selected['populations'].append(population)
             continue
-        if guarded.exists():population['guardedCounting']=json.loads(guarded.read_text())
+        if guarded.exists():
+            population['guardedCounting']=json.loads(guarded.read_text())
+            assert population['guardedCounting']['masterPinsSha256']==digest(root/'measurement-pins.json')
         serial=json.loads((directory/'verify-serial.json').read_text())
         parallel=json.loads((directory/'verify-parallel.json').read_text())
         assert serial['actionSha256']==parallel['actionSha256']
         assert digest(directory/'verify-serial.tape')==digest(directory/'verify-parallel.tape')
         assert digest(directory/'fixture/tape.bin')==digest(directory/'verify-serial.tape')
         reference=serial['finalStateSha256']
+        assert {k:v for k,v in census.items() if k!='memoryKiB'}=={k:v for k,v in serial['initial'].items() if k!='memoryKiB'}
+        if guarded.exists():assert population['guardedCounting']['allFinalStateSha256']==reference
         reference_work=tuple(sum(s[key] for s in serial['samples']) for key in ['admitted','refused','poses'])
         population['parity']={'serialParallelActionSha256':serial['actionSha256'],
                               'allFinalStateSha256':reference}

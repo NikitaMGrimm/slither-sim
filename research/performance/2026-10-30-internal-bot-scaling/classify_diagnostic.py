@@ -127,14 +127,14 @@ def classify(root):
             all_samples['operation']+=weight
             phases[phase]+=weight
             if phase=='observation':
-                if any(name in record for name in ['8FoodGrid3new','::FoodGrid::new']):label='food grid construction'
-                elif any(name in record for name in ['8Observer3new','::Observer::new']):label='other shared-index construction'
+                if any(name in record for name in ['8FoodGrid3new','::FoodGrid::new']):bucket='food grid construction'
+                elif any(name in record for name in ['8Observer3new','::Observer::new']):bucket='other shared-index construction'
                 else:
                     matches=re.findall(r'/src/observation/mod\.rs:(\d+)',record)
                     line=int(matches[0]) if matches else None
-                    label=next((key for key,(first,last) in ranges.items() if line is not None and first<=line<=last),
+                    bucket=next((key for key,(first,last) in ranges.items() if line is not None and first<=line<=last),
                                'other observation / copying / unresolved source')
-                observations[label]+=weight
+                observations[bucket]+=weight
         assert all_samples['all']>0,'No recognized cpu-clock periods; inspect perf script format'
         assert all_samples['operation']>0,'No tick stacks recognized; inspect symbols/unwinding'
         assert world_events['all world ticks']>0,'No samples matched monotonic world/admission brackets'
