@@ -137,7 +137,8 @@ def reduce(root):
         verify_fixture(directory,qualification)
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
-        population={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config}
+        population={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config,
+                    'savedCheckpointTick':json.loads((directory/'fixture/meta.json').read_text())['tick']}
         guarded=directory/'censored-counts.json'
         if not qualification['stabilized'] and not guarded.exists():
             selected['populations'].append(population)

@@ -31,6 +31,7 @@ def summarize(root):
         census=json.loads((directory/'fixture/census.json').read_text())
         config=json.loads((directory/'fixture/world.json').read_text())['config']
         out={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config,
+             'savedCheckpointTick':json.loads((directory/'fixture/meta.json').read_text())['tick'],
              'warmFoodBins':warm_food_bins(directory,qualification),
              'densityRelativeToOfficial':n*670.0**2/config['radius']**2,
              'status':'stabilized' if qualification['stabilized'] else 'warmup censored'}
