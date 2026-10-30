@@ -27,6 +27,8 @@ pub struct Family {
     pub glow: BodyAssetUse,
 }
 pub struct Bank {
+    /// Opt-in native DOM composition; browser/reference callers keep one backing layer.
+    pub overlay_viewport: Option<([u32; 2], f64)>,
     pub cosmetics: Option<crate::cosmetics::Cosmetics>,
     pub assets: Vec<BodyAsset>,
     recipes: Vec<CanvasRecipe>,
@@ -57,6 +59,7 @@ impl Bank {
     pub fn new() -> Result<Self> {
         let r = authored_source_recipes();
         let mut b = Self {
+            overlay_viewport: None,
             cosmetics: None,
             assets: Vec::new(),
             recipes: Vec::new(),

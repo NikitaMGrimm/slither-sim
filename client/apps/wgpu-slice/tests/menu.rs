@@ -272,6 +272,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
         resources: p.resources.clone(),
     };
     let mut empty = slither_wgpu_slice::render::PreparedFrame {
+        overlay: None,
         frame: slither_wgpu_slice::frame::Frame {
             draws: Vec::new(),
             ..p.frame.clone()
@@ -284,6 +285,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
     assert!(make(513).append_to(&mut empty).is_err());
     assert_eq!(empty.frame, before_frame);
     let mut picture = slither_wgpu_slice::render::PreparedFrame {
+        overlay: None,
         frame: p.frame.clone(),
         resources: p.resources.clone(),
     };
@@ -329,7 +331,7 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
             assert!(p.frame.draws.len() < 512);
             let nick =
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
-            let material_scale = dpr.min(1.5);
+            let material_scale = dpr.min(3.).min(509. / (nick.width.max(nick.height) + 80.));
             let pad = (40. * material_scale).ceil() / material_scale;
             let shape = p.frame.draws[0].destination;
             assert!((shape.x + pad - nick.x).abs() <= 2.);

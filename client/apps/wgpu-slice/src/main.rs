@@ -327,10 +327,8 @@ mod desktop {
             let size = self.window.inner_size();
             let physical = [size.width, size.height];
             let dpr = self.window.scale_factor();
-            let extent =
-                slither_wgpu_slice::render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
             self.host.resize(physical)?;
-            self.game.viewport(extent, 1.)?;
+            let extent = self.game.window_viewport(physical, dpr)?;
             if !self.host.prepare_present()? {
                 if self.host.is_occluded() {
                     self.surface_occluded = true;
@@ -393,12 +391,14 @@ mod desktop {
             };
             let view = self.login.state.view(admission);
             let composed = if view.visible || view.spinner_visible {
-                let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                    frame: p.frame.clone(),
-                    resources: p.resources.clone(),
-                };
+                let mut picture = p.clone();
                 for draw in &mut picture.frame.draws {
                     draw.effective_alpha *= view.world_alpha;
+                }
+                if let Some(overlay) = &mut picture.overlay {
+                    for draw in &mut overlay.draws {
+                        draw.effective_alpha *= view.world_alpha;
+                    }
                 }
                 self.login
                     .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
@@ -415,7 +415,10 @@ mod desktop {
                 return Err(e);
             }
             self.window.pre_present_notify();
-            match self.host.present_scaled(&picture.frame) {
+            match self
+                .host
+                .present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
+            {
                 Ok(true) => {
                     self.game.presented(true)?;
                     self.schedule.presented();

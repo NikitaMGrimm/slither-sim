@@ -220,10 +220,7 @@ impl NativeLogin {
         cosmetics: Option<&Cosmetics>,
     ) -> Result<MenuFrame> {
         crate::render::dimensions(physical, window_scale)?;
-        let area = physical.map(|n| f64::from(n) / window_scale);
-        let backing = crate::render::backing_size(area)?;
-        self.prepare_scaled(physical, window_scale, admission, cosmetics)?
-            .into_backing(backing)
+        self.prepare_scaled(physical, window_scale, admission, cosmetics)
     }
     fn prepare_scaled(
         &mut self,

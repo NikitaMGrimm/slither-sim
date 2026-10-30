@@ -7,9 +7,10 @@ renderers do not draw login controls. Chooser/picker screens remain later work.
 This layer owns no clock, hit test, focus or Play admission policy.
 
 Native login layout, pointer input and IME candidate rectangles use logical window
-pixels. `NativeLogin::prepare_host` maps the menu into the world backing before
-`SurfaceHost` scales the complete picture to the physical window. Login specimens
-use this same mapping and final linear blit before offscreen readback.
+pixels. `NativeLogin::prepare_host` prepares physical-resolution menu resources;
+`SurfaceHost` paints them directly over the world blit, alongside the DOM-style HUD
+and minimap. Nicknames remain in the capped world backing. The diagnostic
+`MenuFrame::into_backing` mapping remains available for retained comparisons.
 A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
@@ -42,8 +43,8 @@ use solid materials without capsule shadows.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Text caps at 3x. Capsules cap at 1.5x to fit the existing 512px texture limit
-  with shadows. Logical edges remain at core rectangles. Decoded menu art is
+- Text caps at 3x. Each capsule's raster scale fits the existing 512px texture
+  limit including shadows and ceiling slack. Logical edges remain at core rectangles. Decoded menu art is
   filtered to at most 512px on its longest axis, preserving aspect ratio.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
   controls use the Menu group's own allowance, so a full cosmetics bank cannot

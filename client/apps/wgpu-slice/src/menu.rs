@@ -33,9 +33,8 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
-    /// Map the menu's logical quads into the world backing before the native
-    /// host scales that complete picture to the physical window. Input/IME keep
-    /// the original logical layout, including fractional window DPR.
+    /// Diagnostic backing composition for retained comparisons. The native
+    /// host submits the physical menu directly; input/IME stay in CSS pixels.
     pub fn into_backing(mut self, extent: [u32; 2]) -> Result<Self> {
         crate::render::dimensions(extent, 1.)?;
         let scale = [
@@ -69,8 +68,8 @@ impl MenuFrame {
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
         let count = self.frame.draws.len() + usize::from(self.backdrop.is_some());
         check_menu_draws(count)?;
-        if self.frame.extent != picture.frame.extent
-            || self.frame.viewport_scale != picture.frame.viewport_scale
+        if self.frame.extent != picture.ui_frame().extent
+            || self.frame.viewport_scale != picture.ui_frame().viewport_scale
         {
             return Err("Menu picture extent/scale mismatch".into());
         }
@@ -92,11 +91,24 @@ impl MenuFrame {
         {
             return Err("Menu whole-picture pixel budget".into());
         }
-        frame::reserve_draws(&mut picture.frame.draws, count)?;
-        if let Some(backdrop) = self.backdrop {
+        frame::check_draw_count(picture.draw_count() + count)?;
+        if let Some(overlay) = &mut picture.overlay {
+            frame::reserve_draws(&mut overlay.draws, self.frame.draws.len())?;
+            frame::reserve_draws(&mut picture.frame.draws, usize::from(self.backdrop.is_some()))?;
+        } else {
+            frame::reserve_draws(&mut picture.frame.draws, count)?;
+        }
+        if let Some(mut backdrop) = self.backdrop {
+            // The page fills the world backing; controls keep their physical UI coordinates.
+            backdrop.destination = BodyRect {
+                x: 0.,
+                y: 0.,
+                width: f64::from(picture.frame.extent[0]) / picture.frame.viewport_scale,
+                height: f64::from(picture.frame.extent[1]) / picture.frame.viewport_scale,
+            };
             picture.frame.draws.insert(0, backdrop);
         }
-        picture.frame.draws.extend(self.frame.draws);
+        picture.ui_frame_mut().draws.extend(self.frame.draws);
         picture.resources = std::mem::take(&mut resources).into_values().collect();
         Ok(())
     }
@@ -192,8 +204,6 @@ impl Composition<'_> {
         frame::push_draw(&mut self.draws, draw)
     }
     fn control(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        // Capsules need few pixels; keep their complete shadow inside the
-        // renderer's existing 512px texture limit. Text retains its 3x raster.
         let surface = match kind {
             0 => materials::MenuSurface::Play,
             1..=2 => materials::MenuSurface::Overlay,
@@ -204,7 +214,6 @@ impl Composition<'_> {
         // leave room for the three independent ceil operations below.
         let scale = self
             .scale
-            .min(1.5)
             .min(509. / (r.width.max(r.height) + 2. * surface.padding()));
         let size = [
             (r.width * scale).ceil() as u32,
