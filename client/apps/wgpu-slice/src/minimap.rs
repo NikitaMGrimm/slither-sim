@@ -414,6 +414,8 @@ impl Minimap {
             TextRun {
                 text: &label.text,
                 style: TextStyle {
+                    family: slither_client::presentation::TextFamily::Arial,
+                    slant: slither_client::presentation::TextSlant::Normal,
                     size: label.font_size,
                     weight: Weight::Normal,
                     color: label.fill,
@@ -569,6 +571,8 @@ mod tests {
                     TextRun {
                         text: "server 42",
                         style: TextStyle {
+                            family: slither_client::presentation::TextFamily::Arial,
+                            slant: slither_client::presentation::TextSlant::Normal,
                             size: 14.,
                             weight: Weight::Normal,
                             color: [255; 3],

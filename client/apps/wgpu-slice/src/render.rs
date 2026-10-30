@@ -21,6 +21,22 @@ pub struct PreparedFrame {
 // Nicknames are already in the scene before antenna admission. Only these
 // bounded overlay producers append draws after it; body/face draws are counted too.
 const ANTENNA_LATE_DRAW_RESERVE: usize = crate::hud::MAX_DRAWS + crate::minimap::MAX_DRAWS;
+/// Includes tiled text plus flat fills, borders and controls; see panel-text.md.
+pub const PANEL_PRODUCER_DRAWS: usize = 96;
+pub const PANEL_CONTROL_DRAWS: usize = 8;
+/// No current gameplay producer opts in. Future producers reserve before world
+/// nicknames/antennas are admitted, then preflight their entire panel together.
+#[derive(Clone, Copy, Default)]
+pub struct PanelDrawReserve {
+    pub announcement: bool,
+    pub result: bool,
+}
+impl PanelDrawReserve {
+    pub fn late_draws(self) -> usize {
+        ANTENNA_LATE_DRAW_RESERVE
+            + (usize::from(self.announcement) + usize::from(self.result)) * PANEL_PRODUCER_DRAWS
+    }
+}
 impl PreparedFrame {
     pub fn pixel_bytes(&self) -> usize {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
@@ -563,6 +579,27 @@ pub fn prepare(
     identity: u64,
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
+    prepare_reserved(
+        client,
+        bank,
+        extent,
+        scale,
+        identity,
+        applied,
+        PanelDrawReserve::default(),
+    )
+}
+/// Opt-in reservation seam. It enables no lifecycle or producer by itself.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_reserved(
+    client: &mut AnimatedClient,
+    bank: &mut Bank,
+    extent: [u32; 2],
+    scale: f64,
+    identity: u64,
+    applied: QualitySnapshot,
+    panels: PanelDrawReserve,
+) -> Result<PreparedFrame> {
     let logical = dimensions(extent, scale)?;
     let full_stock = bank.cosmetics.is_some();
     // Mix the draw identity before the local stream so successive draws do not
@@ -867,7 +904,7 @@ pub fn prepare(
     }
     let mut text_draws = Vec::new();
     let mut text_resources = std::collections::BTreeMap::new();
-    let nickname_budget = MAX_DRAWS.saturating_sub(draws.len() + ANTENNA_LATE_DRAW_RESERVE);
+    let nickname_budget = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
     for name in client
         .nickname_draws()
         .iter()
@@ -881,6 +918,8 @@ pub fn prepare(
             TextRun {
                 text: &name.text,
                 style: TextStyle {
+                    family: TextFamily::Arial,
+                    slant: TextSlant::Normal,
                     // The core's nickname font is fixed in backing pixels.
                     size: name.font_size / scale,
                     weight: Weight::Normal,
@@ -905,7 +944,7 @@ pub fn prepare(
     draws.splice(nickname_index..nickname_index, text_draws);
     // Admit antennas against the complete non-antenna scene, then restore each
     // original barrier position (including its relation to death passes).
-    let mut remaining = MAX_DRAWS.saturating_sub(draws.len() + ANTENNA_LATE_DRAW_RESERVE);
+    let mut remaining = MAX_DRAWS.saturating_sub(draws.len() + panels.late_draws());
     let mut inserted = 0;
     for (index, skin, antenna) in antennas {
         let mut commands = Vec::new();

@@ -5,6 +5,8 @@ fn run(text: &str) -> TextRun<'_> {
     TextRun {
         text,
         style: TextStyle {
+            family: slither_client::presentation::TextFamily::Arial,
+            slant: slither_client::presentation::TextSlant::Normal,
             size: 15.,
             weight: Weight::Normal,
             color: [132, 182, 255],
@@ -100,6 +102,8 @@ fn native_arial_preserves_style_alpha_scale_and_evicted_frame_pixels() {
             .draw(
                 TextRun {
                     style: TextStyle {
+                        family: slither_client::presentation::TextFamily::Arial,
+                        slant: slither_client::presentation::TextSlant::Normal,
                         size: 128.,
                         weight: Weight::Normal,
                         color: [255; 3]

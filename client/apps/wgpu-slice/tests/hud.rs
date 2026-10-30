@@ -112,6 +112,8 @@ fn changing_scores_replace_slots_without_evicting_nicknames_or_growing_work() {
     let nickname = |text| TextRun {
         text,
         style: TextStyle {
+            family: slither_client::presentation::TextFamily::Arial,
+            slant: slither_client::presentation::TextSlant::Normal,
             size: 15.,
             weight: Weight::Normal,
             color: [255; 3],
