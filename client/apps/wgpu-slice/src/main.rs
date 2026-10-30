@@ -769,6 +769,11 @@ mod desktop {
                 cosmetics,
             );
         }
+        if !options.official && options.endpoint.is_none() {
+            eprintln!(
+                "No connection mode configured; Play stays disabled. Use --official or --endpoint."
+            );
+        }
         let event_loop = EventLoop::<TransportWake>::with_user_event()
             .build()
             .map_err(|e| e.to_string())?;

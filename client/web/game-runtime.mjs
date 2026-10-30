@@ -1211,7 +1211,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       loginArtLease = loginArt({realm,current});
       loginUi = mountLogin({ realm, art: loginArtLease.art, world:target, LoginMenu: wasmApi.LoginMenu, parent: root, nickname:initial.nickname,onEdit:remember,
         isCurrent: () => !disposed && generation === playGeneration && hudCapabilities.isCurrentDocument(),
-        available: () => playFlag('available') && !playFlag('accepted'),
+        available: () => !!localHost && playFlag('available') && !playFlag('accepted'),
         playing: () => gameplay.diagnostics().session.playing,
         cancel: () => {runNative(() => gameplay.stop());publishHud();},
         release() {

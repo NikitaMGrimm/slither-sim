@@ -42,3 +42,32 @@ test('login routes Window-targeted resize without passing non-Nodes to contains'
     assert.equal(contains,1);assert.equal(graph.f.sockets,0);runtime.dispose();
   });
 });
+
+test('simulator-only login without a local host disables Play without consuming admission',async()=>{
+  await runGameModuleTest(async({assert,createGraph})=>{
+    const owners=[];
+    const graph=createGraph({armed:false,hudNative:true,ownedHudNative:true,ownedPlayNative:true,leaderboardNative:true,minimapNative:true,
+      prepareWasm(api,run){
+        api.LeaderboardScoreProjector=run('(class { project(){throw Error("No scores expected");} free(){} })');
+        const Base=api.PlayAdmission;
+        api.PlayAdmission=run('(capture=>class {constructor(...args){return capture(...args);}})')((...args)=>{
+          const owner=new Base(...args);owners.push(owner);return owner;
+        });
+        Object.defineProperties(api.PlayAdmission.prototype,Object.getOwnPropertyDescriptors(Base.prototype));
+      }});
+    graph.stubLogin();graph.hudWasm();
+    const profile=graph.profileNative();
+    const entry=await graph.load('bootstrap.mjs');graph.arm();
+    const realm=graph.nativeBoundary(native=>Object.freeze({...native,liveProfile:profile.capabilities}));
+    const runtime=await entry.startGamePage({realm,initialize(){},wasmApi:graph.wasm.api});
+    // Profile capability alone must not enable the simulator-only overlay.
+    assert.equal(owners[0].available(),true);
+    assert.equal(graph.login.available(),false);
+    for(const now of [16,32,48])graph.f.frame(now);
+    assert.equal(graph.login.available(),false);
+    assert.equal(owners[0].accepted(),false);
+    assert.equal(runtime.diagnostics().gameplay.session.phase,'ready');
+    assert.equal(profile.counts.fetch,0);assert.equal(graph.f.sockets,0);
+    runtime.dispose();
+  });
+});

@@ -165,9 +165,9 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
       // Renderer boundary double for HUD composition/cleanup tests. The actual
       // DOM overlay has its own tests and real-Wasm headless product-page run.
       f.context.loginCompositionCounts=login;
-      sources.set(origin+'login-overlay.mjs',`export function mountLogin({realm,parent,nickname,onEdit}) {
+      sources.set(origin+'login-overlay.mjs',`export function mountLogin({realm,parent,nickname,onEdit,available}) {
         loginCompositionCounts.mounts++;
-        loginCompositionCounts.nickname=nickname;loginCompositionCounts.onEdit=onEdit;
+        loginCompositionCounts.nickname=nickname;loginCompositionCounts.onEdit=onEdit;loginCompositionCounts.available=available;
         const root=realm.document.createElement('div');root.contains=()=>false;parent.appendChild(root);loginCompositionCounts.root=root;
         return {root,frame(now){loginCompositionCounts.frames.push(now);},dispose(){loginCompositionCounts.disposed++;parent.removeChild(root);}};
       }`);
