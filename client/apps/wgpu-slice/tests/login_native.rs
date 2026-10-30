@@ -278,3 +278,67 @@ fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
             .any(|p| p[3] > 0 && p[..3] == [112, 112, 176])
     }));
 }
+
+#[path = "support/announcement_tape.rs"]
+mod endpoint_tape;
+
+#[test]
+fn native_login_endpoint_enter_pointer_and_terminal_retry_send_fixed_profile() {
+    use endpoint_tape::{bundle, challenge, effects, pump};
+    use slither_wgpu_slice::{endpoint_login, game::LocalGame};
+    for cancel in [false, true] {
+        let mut game = LocalGame::new(0.).unwrap();
+        let mut login = NativeLogin::new("Fixed").unwrap();
+        for attempt in 0..2 {
+            let now = f64::from(attempt) * 32.;
+            login.step(now, game.can_play(), false).unwrap();
+            if attempt == 0 {
+                login.activate(game.can_play());
+            } else {
+                login
+                    .prepare_host([960, 540], 1., game.can_play(), None)
+                    .unwrap();
+                let play = login.layout.viewport_rect(E::Play);
+                let point = [play.x + play.width / 2., play.y + play.height / 2.];
+                login.pointer(point, Some(true), game.can_play());
+                login.pointer(point, Some(false), game.can_play());
+            }
+            let (intents, _) = login.step(now + 16., game.can_play(), false).unwrap();
+            let [StartMenuIntent::Play { nickname, .. }] = intents.as_slice() else {
+                panic!("one explicit native Play");
+            };
+            // The native host dispatches the shared menu intent through this
+            // same desktop endpoint helper; no socket or acquisition is needed.
+            assert_eq!(
+                endpoint_login::play(&mut game, "ws://127.0.0.1:19491/slither", nickname, 9)
+                    .unwrap(),
+                291
+            );
+            pump(&mut game, now + 1.);
+            effects(&mut game);
+            game.opened(game.generation(), now + 2.).unwrap();
+            effects(&mut game);
+            game.receive(game.generation(), &bundle(&[challenge()]), now + 3.)
+                .unwrap();
+            let packets = effects(&mut game);
+            assert_eq!(packets.len(), 2);
+            assert_eq!(
+                &packets[1][..24],
+                &[
+                    115, 30, 1, 35, 54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106,
+                    236, 8, 208, 136, 213, 140, 111,
+                ]
+            );
+            assert_eq!(&packets[1][24..], b"\x09\x05Fixed\x00\xff");
+            if cancel {
+                game.stop();
+            } else {
+                game.fail("Synthetic failed login");
+            }
+            effects(&mut game);
+            assert!(game.can_play());
+            assert!(login.observe_session(game.phase()));
+            assert!(!login.state.view(true).spinner_visible);
+        }
+    }
+}

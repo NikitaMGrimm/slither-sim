@@ -371,7 +371,12 @@ mod desktop {
                             Err(error) => self.game.fail(&error),
                         }
                     } else if let Some(endpoint) = &self.endpoint
-                        && let Err(error) = self.game.play(endpoint, &self.nickname, self.skin)
+                        && let Err(error) = slither_wgpu_slice::endpoint_login::play(
+                            &mut self.game,
+                            endpoint,
+                            &self.nickname,
+                            self.skin,
+                        )
                     {
                         self.game.fail(&error);
                     }
