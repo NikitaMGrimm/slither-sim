@@ -44,7 +44,7 @@ def summarize(root):
         profile=json.loads((directory/'profile.json').read_text())
         assert profile['finalStateSha256']==reference
         assert all(sum(s[key] for s in profile['samples'])*5==counts[key] for key in counts)
-        out.update({'windows':5,'ticks':len(samples),'worldCpuMs':timing('worldCpu'),
+        out.update({'windows':5,'ticks':len(samples),'finalCensus':rows[0]['final'],'worldCpuMs':timing('worldCpu'),
                     'firstRestoredTickWorldCpuMs':stats([r['samples'][0]['worldCpu']*1000 for r in rows]),
                     'worldCpuMsExcludingFirstTick':stats([s['worldCpu']*1000 for r in rows for s in r['samples'][1:]]),
                     'worldWallMs':timing('worldWall'),'admissionCpuMs':timing('admissionCpu'),

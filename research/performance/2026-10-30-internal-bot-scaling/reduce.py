@@ -134,6 +134,7 @@ def reduce(root):
             assert population['guardedCounting']['masterPinsSha256']==digest(root/'measurement-pins.json')
         serial=json.loads((directory/'verify-serial.json').read_text())
         parallel=json.loads((directory/'verify-parallel.json').read_text())
+        population['finalCensus']=serial['final']
         assert serial['actionSha256']==parallel['actionSha256']
         assert digest(directory/'verify-serial.tape')==digest(directory/'verify-parallel.tape')
         assert digest(directory/'fixture/tape.bin')==digest(directory/'verify-serial.tape')
