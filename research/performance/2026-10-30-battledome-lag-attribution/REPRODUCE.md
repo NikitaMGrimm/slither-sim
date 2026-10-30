@@ -216,7 +216,8 @@ was compared with that path and is equal. Both call the same tested function.
 ## Post-collection controller correction
 
 CodeQL found assertion-based RPC path guards, which disappear under `python -O`.
-The current `server.py` explicitly rejects invalid labels/modes before mutation.
+The current `server.py` resolves row labels to trusted constants from the frozen
+row set and rejects invalid modes before mutation.
 The as-measured controller versions remain in the pinned native/follow-up tool
 archives and the pre-correction published revision
 `f1333bbec1babe14500c3cafbafb720d3b857251`. Original source pins and results are
@@ -224,7 +225,7 @@ unchanged. Current helper hashes therefore differ for this controller; use the
 as-run archive when checking the original source manifest. Reassembling with the
 corrected helper updates that helper-manifest digest, not quantitative rows.
 
-Two short offline boundary checks pass both normally and under optimization:
+Three short offline boundary checks pass both normally and under optimization:
 
 ```sh
 python -B -m unittest discover -s research/performance/2026-10-30-battledome-lag-attribution -p test_server.py

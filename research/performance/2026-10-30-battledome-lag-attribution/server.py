@@ -22,6 +22,16 @@ trace_stream = None
 trace_label = None
 
 
+def row_label(candidate):
+    # Return trusted constants, not request text, at the filesystem boundary.
+    for known in ("smoke","01-off","02-light","03-trace","04-trace","05-light","06-off",
+                  "07-primary","08-primary","09-primary","11-light","12-sched",
+                  "13-sched","14-light","15-followup","16-followup","17-followup"):
+        if candidate==known:
+            return known
+    raise ValueError("Invalid study row label")
+
+
 def lines(process):
     with (session / "host.jsonl").open("w") as stream:
         for line in process.stderr:
@@ -123,9 +133,7 @@ class Handler(BaseHTTPRequestHandler):
             elif action=="status":
                 result={"alive":host is not None and host.poll() is None,"unix":time.time()}
             elif action=="mode":
-                label=request["label"]
-                if not isinstance(label,str) or not re.fullmatch(r"[a-z0-9-]+",label):
-                    raise ValueError("Invalid study row label")
+                label=row_label(request["label"])
                 mode=request["mode"]
                 if mode not in ["off","light","trace","sched"]:
                     raise ValueError("Invalid observation mode")
@@ -150,9 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                         "tickBytes":(session/"ticks.bin").stat().st_size,
                         "label":request["label"]}
             elif action=="checkpoint":
-                label=request["label"]
-                if not isinstance(label,str) or not re.fullmatch(r"[a-z0-9-]+",label):
-                    raise ValueError("Invalid study row label")
+                label=row_label(request["label"])
                 stop_trace();(session/"RECORD").unlink(missing_ok=True);time.sleep(.3)
                 directory=root/"checkpoints"/label;directory.mkdir(parents=True)
                 for name in ["host.jsonl","telemetry.jsonl","ticks.meta.json","config.json"]:

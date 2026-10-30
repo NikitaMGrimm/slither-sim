@@ -37,10 +37,10 @@
   "cleanupComplete": true,
   "cleanupReceiptsAppendedAfterAnalysisArchive": true,
   "postCollectionControllerCorrection": {
-    "scope": "Explicit RPC path/mode validation; not a measured runtime change",
+    "scope": "Frozen row labels resolved to trusted constants; explicit mode validation; not a measured runtime change",
     "measuredHelperRevision": "f1333bbec1babe14500c3cafbafb720d3b857251",
     "measuredArchivesAndPinsPreserved": true,
-    "offlineBoundaryTests": 2,
+    "offlineBoundaryTests": 3,
     "normalAndOptimizedPass": true,
     "shortLocalChecksOnly": true
   }

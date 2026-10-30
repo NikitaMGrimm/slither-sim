@@ -30,11 +30,21 @@ class ServerBoundaryTests(unittest.TestCase):
 
     def test_invalid_labels_cannot_reach_filesystem(self):
         for action in ["mode","checkpoint"]:
-            for label in ["../escape","/absolute",r"..\escape","a/b","",None]:
+            for label in ["../escape","/absolute",r"..\escape","a/b","","unplanned-row",None]:
                 with self.subTest(action=action,label=label):self.exercise(action,label)
 
     def test_invalid_mode_is_explicitly_rejected(self):
         self.exercise("mode","07-primary","unknown")
+
+    def test_all_frozen_row_names_are_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source=Path(__file__).with_name("server.py")
+            with patch.object(sys,"argv",[str(source),temporary,"0"]),patch("http.server.HTTPServer"):
+                namespace=runpy.run_path(str(source))
+            for label in ["smoke","01-off","02-light","03-trace","04-trace","05-light","06-off",
+                          "07-primary","08-primary","09-primary","11-light","12-sched",
+                          "13-sched","14-light","15-followup","16-followup","17-followup"]:
+                self.assertEqual(namespace["row_label"](label),label)
 
 
 if __name__=="__main__":unittest.main()

@@ -259,7 +259,7 @@ change; ordinary PR CI remains separate. No independent review is claimed.
 
 Post-publication CodeQL found that controller RPC path guards used assertions,
 which disappear under `python -O`. The future helper now rejects invalid labels
-and modes explicitly, before mutation. Two short offline boundary tests pass
+and modes explicitly, before mutation. Three short offline boundary tests pass
 normally and under `-O` locally (under one second per invocation); no native or
 scientific reduction runs locally. The as-measured helper archives/pins and all
 results are preserved, rather than pretending this guard correction was timed.

@@ -38,3 +38,8 @@
   while the other five count windows have zero; hard-IRQ jiffies are zero and
   softirq jiffies nonzero in all six. Corrected the prose to match the already
   correct selected data/generated table. No data, pins or timing changed.
+
+- CodeQL still traced request text through the explicit regex guard. Restrict
+  filesystem row names to the frozen study set and return trusted constants,
+  rather than request text. Three short boundary tests now pass normally and
+  under `-O`, including every legitimate row. As-measured pins stay unchanged.
