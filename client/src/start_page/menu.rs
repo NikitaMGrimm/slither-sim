@@ -302,6 +302,19 @@ impl StartMenuState {
         Ok(true)
     }
 
+    /// Return only the dispatched connecting attempt. A queued explicit retry
+    /// must not be cancelled by the previous session's terminal observation.
+    pub fn attempt_ended(&mut self, phase: Phase) -> bool {
+        if self.phase != MenuPhase::Connecting
+            || self.pending_play.is_some()
+            || !matches!(phase, Phase::Failed | Phase::Disconnected)
+        {
+            return false;
+        }
+        self.disconnected();
+        true
+    }
+
     /// Explicit transport-failure return; retains prior last-life content and never
     /// invents an outcome. A champion still needs the later editor/ack handoff.
     pub fn disconnected(&mut self) {
@@ -313,6 +326,12 @@ impl StartMenuState {
         self.outgoing_active = false;
         self.pending_play = None;
         self.focus_pending = !self.champion;
+        self.spinner_visible = false;
+        self.spinner_alpha = 0.;
+        self.spinner_progress = 0.;
+        self.spinner_time = 0.;
+        self.hovered = false;
+        self.pressed = false;
     }
 
     /// Advance one animation callback at a finite monotonic clock. Frame delta is

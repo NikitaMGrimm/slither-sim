@@ -10,8 +10,16 @@ use slither_wgpu_slice::{
 use std::{io::Cursor, path::Path, sync::mpsc, time::Duration};
 
 fn capture(renderer: &mut Renderer, p: &MenuFrame, file: &Path) -> Result<()> {
+    capture_scaled(renderer, p, file, None)
+}
+fn capture_scaled(
+    renderer: &mut Renderer,
+    p: &MenuFrame,
+    file: &Path,
+    physical: Option<[u32; 2]>,
+) -> Result<()> {
     renderer.sync_resources(&p.resources)?;
-    let [width, height] = p.frame.extent;
+    let [width, height] = physical.unwrap_or(p.frame.extent);
     let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("menu specimen"),
         size: wgpu::Extent3d {
@@ -26,7 +34,42 @@ fn capture(renderer: &mut Renderer, p: &MenuFrame, file: &Path) -> Result<()> {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
         view_formats: &[],
     });
-    renderer.render(&p.frame, &texture.create_view(&Default::default()))?;
+    if physical.is_some() {
+        let [w, h] = p.frame.extent;
+        let backing = renderer.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("native host backing"),
+            size: wgpu::Extent3d {
+                width: w,
+                height: h,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let source = backing.create_view(&Default::default());
+        renderer.render(&p.frame, &source)?;
+        // Same linear final scaling as SurfaceHost::present_scaled.
+        let blitter = wgpu::util::TextureBlitterBuilder::new(
+            &renderer.device,
+            wgpu::TextureFormat::Rgba8Unorm,
+        )
+        .sample_type(wgpu::FilterMode::Linear)
+        .build();
+        let mut encoder = renderer.device.create_command_encoder(&Default::default());
+        blitter.copy(
+            &renderer.device,
+            &mut encoder,
+            &source,
+            &texture.create_view(&Default::default()),
+        );
+        renderer.queue.submit([encoder.finish()]);
+    } else {
+        renderer.render(&p.frame, &texture.create_view(&Default::default()))?;
+    }
     let row = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("menu readback"),
@@ -109,6 +152,92 @@ fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--login") {
+        use slither_client::menu_layout::MenuElement as E;
+        use slither_wgpu_slice::login_native::NativeLogin;
+        let art = std::env::args_os()
+            .nth(3)
+            .map(|dir| Cosmetics::directory(Path::new(&dir), None))
+            .transpose()?;
+        let mut login = NativeLogin::new("")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        let mut measurements = Vec::new();
+        let mut text = TextCache::default();
+        let mut text_widths = Vec::new();
+        for (label, size, bold) in [
+            ("slither", 40., true),
+            ("Nickname", 15., false),
+            ("Play", 20., true),
+            ("Change Skin", 14., false),
+            ("High quality", 14., false),
+            ("When longer, hold the mouse for a speed boost!", 14., false),
+        ] {
+            let style = slither_wgpu_slice::text::TextStyle {
+                size,
+                weight: if bold {
+                    slither_wgpu_slice::text::Weight::Bold
+                } else {
+                    slither_wgpu_slice::text::Weight::Normal
+                },
+                family: slither_wgpu_slice::text::Family::Arial,
+                slant: slither_wgpu_slice::text::Slant::Normal,
+                color: [255; 3],
+            };
+            text_widths.push(serde_json::json!({"text":label,"size":size,"bold":bold,"advance":text.measure_panel(label,style)?.advance}));
+        }
+        std::fs::write(
+            output.join("text-widths.json"),
+            serde_json::to_vec_pretty(&text_widths).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        for extent in [[960, 540], [1280, 720], [640, 360]] {
+            let picture = login.prepare_host(extent, 1., true, art.as_ref())?;
+            capture_scaled(
+                &mut renderer,
+                &picture,
+                &output.join(format!("native-{}x{}.png", extent[0], extent[1])),
+                Some(extent),
+            )?;
+            let rects: Vec<_> = [
+                E::Logo,
+                E::NicknameHolder,
+                E::Nickname,
+                E::Play,
+                E::Skin,
+                E::Quality,
+                E::Spinner,
+            ]
+            .into_iter()
+            .map(|e| {
+                let r = login.layout.viewport_rect(e);
+                vec![r.x, r.y, r.width, r.height]
+            })
+            .collect();
+            measurements.push(serde_json::json!({"extent":extent,"logical":extent,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len(),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+        }
+        login.focus(1);
+        login.activate(true);
+        login.step(9616., true, false)?;
+        for now in (9632..=10400).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
+        capture_scaled(
+            &mut renderer,
+            &picture,
+            &output.join("native-spinner.png"),
+            Some([960, 540]),
+        )?;
+        std::fs::write(
+            output.join("native.json"),
+            serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     println!(
         "adapter={:?} samples={}",
         renderer.adapter_info, renderer.sample_count

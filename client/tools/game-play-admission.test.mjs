@@ -4,7 +4,7 @@ import { runGameModuleTest } from './game-module-test-fixture.mjs';
 
 test('selected Play requires captured own-data synchronous Rust methods before initialization', async () => {
   await runGameModuleTest(async ({ assert, createGraph }) => {
-    for (const name of ['PlayAdmission', 'available', 'accepted', 'nickname_valid', 'accept', 'lock_unavailable', 'return_ready', 'complete_return', 'free']) {
+    for (const name of ['PlayAdmission', 'available', 'accepted', 'nickname_valid', 'accept', 'lock_unavailable', 'return_ready', 'attempt_return_ready', 'complete_return', 'free']) {
       for (const kind of ['missing', 'accessor', 'async']) {
         const graph = createGraph({ hudNative: true, ownedHudNative: true, ownedPlayNative: true });
         let reads = 0;

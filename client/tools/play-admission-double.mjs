@@ -19,6 +19,9 @@ export function createPlayAdmissionDouble() {
       if (this.hasCapability) return false;
       this.consumed = true; return true;
     }
+    attempt_return_ready(phase) {
+      this.live();this.returnPending=this.local&&this.consumed&&['failed','disconnected'].includes(phase);return this.returnPending;
+    }
     return_ready(phase, playing) {
       this.live();
       this.returnPending = this.local && this.consumed && (phase === 'disconnected' || phase === 'victory' && !playing);

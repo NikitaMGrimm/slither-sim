@@ -31,12 +31,11 @@ const setup = (center = 32550) => {
 };
 const units = request => Float64Array.from({ length: 2 * request.randomPairCount }, (_, i) =>
   ((i * 37 + request.drawOrdinal * 13 + Number(request.drawSerial % 97n) * 11) % 251 + 0.25) / 252);
-let angles;
 function angle(dx, dy) {
   for (const [bound, multiplier] of [[4, 32], [8, 16], [16, 8], [127, 1]]) {
     if (dx >= -bound && dx < bound && dy >= -bound && dy < bound) {
-      angles ??= Float32Array.from({ length: 65536 }, (_, i) => Math.atan2((i >>> 8) - 128, (i & 255) - 128));
-      return angles[((dy * multiplier + 128) << 8) | (dx * multiplier + 128)];
+      const index = ((dy * multiplier + 128) << 8) | (dx * multiplier + 128);
+      return Math.fround(Math.atan2((index >>> 8) - 128, (index & 255) - 128));
     }
   }
   return Math.atan2(dy, dx);

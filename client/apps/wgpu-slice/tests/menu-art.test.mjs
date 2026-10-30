@@ -17,6 +17,12 @@ test('menu manifest admits semantic revisions and rejects malformed or escaping 
     assert.throws(() => menuPaths(bytes(`menu-art-v1\n${line}`)));
   }
   assert.throws(() => menuPaths(new Uint8Array(4097)));
+  assert.throws(() => menuPaths(bytes('\ufeffmenu-art-v1\nlogo:0 1 menu/logo.png')));
+  assert.throws(() => menuPaths(bytes('menu-art-v1\nquality-high 1 s/a_cap.png')));
+  assert.deepEqual(menuPaths(bytes('menu-art-v1\nquality-high 1 menu/high.png\nquality-low 2 menu/low.png')),['menu/high.png','menu/low.png']);
+  assert.throws(()=>menuPaths(bytes('menu-art-v1\nserver 1 menu/server.png')));
+  assert.deepEqual(menuPaths(bytes('menu-art-v1\nquality-high\f1\fmenu/high.png')),['menu/high.png']);
+  assert.throws(()=>menuPaths(bytes('menu-art-v1\n\u00a0quality-high 1 menu/high.png')));
 });
 test('served art is limited to manifest paths, defaults and contained real paths', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'menu-art-'));
@@ -63,7 +69,7 @@ test('browser resolves manifest-selected local bytes before publishing one compl
 });
 
 test('browser rejects colliding menu paths before manifest publication and preserves cosmetics', async () => {
-  for (const row of ['skin 1 s/a_cap.png', 'logo:0\t1\ts/a_cap.png', 'cosmetic\f1\fs/jmou3.png']) {
+  for (const row of ['quality-high 1 s/a_cap.png', 'skin 1 s/a_cap.png', 'logo:0\t1\ts/a_cap.png', 'cosmetic\f1\fs/jmou3.png']) {
     const paths=['s/a_cap.png','s/jmou3.png'];
     const warnings=[]; let manifestCalls=0, published;
     class Images {
@@ -82,4 +88,29 @@ test('browser rejects colliding menu paths before manifest publication and prese
     assert.equal(warnings.length,1);
     assert.match(warnings[0],/Menu manifest path collides with cosmetic/);
   }
+});
+
+test('cosmetics loader rejects BOM before calling the Rust manifest setter',async()=>{
+  let setters=0,published=false;
+  class Images {static paths(){return [];}manifest(){setters++;}menu_paths(){return [];}free(){}}
+  await loadCosmetics({owner:{cosmetics(){published=true;}},CosmeticImages:Images,
+    baseUrl:'http://127.0.0.1/cosmetics/',warn(){},fetch:async()=>new Response('\ufeffmenu-art-v1\n')});
+  assert.equal(setters,0);assert.equal(published,true);
+});
+
+test('web allowlist still rejects a symlink leaving its canonical root',async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'menu-web-'));
+  const server=createServer({webDir:path.join(root,'web')});
+  try {
+    await mkdir(path.join(root,'web'));await mkdir(path.join(root,'outside'));
+    await writeFile(path.join(root,'outside/local.mjs'),'private synthetic');
+    await writeFile(path.join(root,'web/index.html'),'synthetic');
+    // A directory junction works on Windows without symlink privileges.
+    await symlink(path.join(root,'outside'),path.join(root,'web/pkg'),process.platform==='win32'?'junction':'dir');
+    await writeFile(path.join(root,'outside/slither_wgpu_slice.js'),'private synthetic');
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const base=`http://127.0.0.1:${server.address().port}/`;
+    assert.equal((await fetch(base)).status,200);
+    assert.equal((await fetch(base+'pkg/slither_wgpu_slice.js')).status,404);
+  } finally {await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}
 });

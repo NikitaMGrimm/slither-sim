@@ -33,6 +33,47 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(list((self.study / "raw").iterdir()), [])
 
     @patch("collect.shutil.which", return_value="node")
+    def test_mismatched_provenance_is_rejected_without_launching_or_reserving_attempts(self, _which):
+        for origin, ip in (("local-simulator", "192.0.2.1"),
+                           ("local-simulator", "0.0.0.0"),
+                           ("official-server", "127.0.0.1"),
+                           ("community-server", "127.0.0.1")):
+            with self.subTest(origin=origin, ip=ip):
+                plan = evidence.read_plan(self.study)
+                plan["dataOrigin"] = origin
+                plan["capture"]["server"]["ip"] = ip
+                source = self.directory / "outside.json"
+                source.write_text(json.dumps(plan), encoding="utf-8")
+                study = evidence.create_study(source, self.directory / f"{origin}-{ip}")
+                with patch("collect.subprocess.Popen") as process:
+                    with self.assertRaisesRegex(ValueError, "loopback"):
+                        collect.capture_command(study, self.directory / "unused")
+                    with self.assertRaisesRegex(ValueError, "loopback"):
+                        collect.collect(study)
+                process.assert_not_called()
+                self.assertEqual((study / "attempts.jsonl").read_bytes(), b"")
+                self.assertEqual(list((study / "raw").iterdir()), [])
+
+    @patch("collect.shutil.which", return_value="node")
+    def test_supplied_endpoints_and_matching_provenance_need_no_outside_flag(self, _which):
+        for origin in ("community-server", "official-server"):
+            for scenario, bots in (("movement", 1), ("paired-collision", 2), ("food-lanes", 1)):
+                with self.subTest(origin=origin, scenario=scenario):
+                    plan = evidence.read_plan(self.study)
+                    plan["dataOrigin"] = origin
+                    plan["capture"].update(server={"ip": "192.0.2.1", "port": 8766},
+                                           scenario=scenario, bots=bots)
+                    source = self.directory / "supplied.json"
+                    source.write_text(json.dumps(plan), encoding="utf-8")
+                    study = evidence.create_study(source, self.directory / f"{origin}-{scenario}")
+                    with patch("collect.subprocess.Popen") as process:
+                        command = collect.capture_command(study, self.directory / "unused")
+                    process.assert_not_called()
+                    self.assertIn("192.0.2.1:8766", command)
+                    self.assertNotIn("--allow-outside", command)
+                    self.assertEqual((study / "attempts.jsonl").read_bytes(), b"")
+
+    @patch("collect.shutil.which", return_value="node")
     def test_origin_is_explicit_and_forwarded_from_the_frozen_plan(self, _which):
         self.assertNotIn("--origin", collect.capture_command(self.study, self.directory / "unused"))
         plan = evidence.read_plan(self.study)

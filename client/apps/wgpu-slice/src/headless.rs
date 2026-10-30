@@ -7,7 +7,7 @@ use slither_client::{
 use slither_wgpu_slice::{
     Result,
     frame::Frame,
-    game::{EffectKind, LocalGame, LoginProfile},
+    game::{EffectKind, LocalGame},
     gpu::{Renderer, instance},
     native::{Event, Transport},
 };
@@ -568,8 +568,6 @@ pub fn run(
     let result = (|| {
         output_directory(&options.frames)?;
         let gpu = Offscreen::new()?;
-        let profile = LoginProfile::default();
-        summary.version = Some(profile.client_version);
         if started.elapsed() >= options.duration {
             return Err("duration reached before Play".into());
         }
@@ -577,8 +575,7 @@ pub fn run(
         if let Some(cosmetics) = cosmetics {
             game.configure_cosmetics(cosmetics)?;
         }
-        game.play_with_profile(endpoint, nickname, skin, &profile)?;
-        drop(profile);
+        play_endpoint(&mut game, endpoint, nickname, skin, &mut summary)?;
         Host {
             game,
             transport: Transport::default(),
@@ -596,10 +593,38 @@ pub fn run(
     result
 }
 
+fn play_endpoint(
+    game: &mut LocalGame,
+    endpoint: &str,
+    nickname: &str,
+    skin: u8,
+    summary: &mut Summary,
+) -> Result<()> {
+    summary.version = Some(slither_wgpu_slice::endpoint_login::play(
+        game, endpoint, nickname, skin,
+    )?);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     // ORIGINAL SYNTHETIC settings/output fixtures; no connection or GPU.
     use super::*;
+    #[test]
+    fn headless_endpoint_uses_fixed_profile_version() {
+        let mut game = LocalGame::new(0.).unwrap();
+        let mut summary = Summary::default();
+        play_endpoint(
+            &mut game,
+            "ws://127.0.0.1:19491/slither",
+            "Player",
+            9,
+            &mut summary,
+        )
+        .unwrap();
+        assert_eq!(summary.version, Some(291));
+        assert!(!game.can_play());
+    }
     #[test]
     fn autopilot_crosses_distance_over_the_first_minute_with_gentle_turns() {
         let mut distance = [0.0, 0.0];

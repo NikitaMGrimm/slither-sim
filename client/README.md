@@ -56,6 +56,15 @@ choice; check slither.io's terms before you do.
 
 Official play is interactive only: headless runs accept only `--endpoint`.
 
+Desktop `--endpoint` sends a fixed official-format login (the same values as the
+simulator's portable_bot), for compatibility with custom server implementations
+that copied the official login.
+
+The window opens on login. `--nickname` and `--skin` seed the initial values;
+edit the nickname, then click Play or press Enter to acquire the profile/server
+and connect once. Quality selects the requested mode for that Play.
+
+
 Browser (Canvas2D):
 
 ```sh

@@ -129,12 +129,14 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
   const sources = new Map();
   const targeting = 'apps/wgpu-slice/web/input-targeting.mjs';
   sources.set(new URL('../' + targeting, origin).href, readFileSync(new URL(targeting, root), 'utf8'));
+  for(const name of ['login-overlay','login-art','menu-art']) sources.set(origin+name+'.mjs',readFileSync(new URL('apps/wgpu-slice/web/'+name+'.mjs',root),'utf8'));
   for (const name of webNames) sources.set(origin + name, readFileSync(new URL('web/' + name, root), 'utf8'));
   for (const [name, file] of Object.entries(entryNames)) {
     const url = new URL('web/' + file, root);
     sources.set(origin + name, readFileSync(url, 'utf8'));
   }
   const modules = new Map();
+  const login={mounts:0,frames:[],disposed:0};
   const wasmUrl = origin + 'pkg/slither_client.js';
   const init = () => { counts.initialize++; return initialize?.(); };
   const generated = new vm.SyntheticModule(['default', ...Object.keys(wasm.api)], function () {
@@ -158,7 +160,18 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
     if (module.status === 'linked') await module.evaluate();
     return module.namespace;
   };
-  return { f, wasm, counts, minimap, announcements, previewCalls, load, sources, run: source => vm.runInContext(source, f.context),
+  return { f, wasm, counts, minimap, announcements, previewCalls, login, load, sources, run: source => vm.runInContext(source, f.context),
+    stubLogin() {
+      // Renderer boundary double for HUD composition/cleanup tests. The actual
+      // DOM overlay has its own tests and real-Wasm headless product-page run.
+      f.context.loginCompositionCounts=login;
+      sources.set(origin+'login-overlay.mjs',`export function mountLogin({realm,parent,nickname,onEdit,available}) {
+        loginCompositionCounts.mounts++;
+        loginCompositionCounts.nickname=nickname;loginCompositionCounts.onEdit=onEdit;loginCompositionCounts.available=available;
+        const root=realm.document.createElement('div');root.contains=()=>false;parent.appendChild(root);loginCompositionCounts.root=root;
+        return {root,frame(now){loginCompositionCounts.frames.push(now);},dispose(){loginCompositionCounts.disposed++;parent.removeChild(root);}};
+      }`);
+    },
     message(values) {
       // Native WebSocket delivery supplies an ArrayBuffer from the document's own realm.
       const data = vm.runInContext(`(values => {

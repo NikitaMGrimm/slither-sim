@@ -16,7 +16,7 @@ const POLICY_METHOD_NAMES = [
   'control_done', 'include_announcements', 'include_minimap', 'controller_done', 'score_done',
   'commit_profile', 'frame_commit_done', 'finish_frame', 'profile_needs_current', 'profile_available',
   'profile_idle', 'begin_profile', 'profile_started', 'profile_retry_allowed', 'profile_retry',
-  'profile_ready', 'profile_failed', 'replace_local', 'begin_dispose', 'claim_fatal_notification',
+  'profile_ready', 'profile_failed', 'retry_transport_failure', 'replace_local', 'begin_dispose', 'claim_fatal_notification',
   'frame_score_required', 'frame_commit_allowed', 'frame_publication_allowed', 'input_allowed', 'history_reset',
   'free',
 ];
@@ -123,7 +123,7 @@ export function createStockGameplay(options) {
   let session, gameplayOwner, policyMethods, policyStatics;
   let policyLeases = 0, releaseRequested = false, retiredPolicy;
   try {
-  session = createStockSession({ wasm, createSocket, now, SessionPolicy: wasm.SessionPolicy });
+  session = createStockSession({ wasm, createSocket, now, SessionPolicy: wasm.SessionPolicy, deferConstructionError: localSession });
   const injectedPolicy = options.GameplayPolicy;
   const Policy = injectedPolicy === undefined ? wasm.GameplayPolicy : injectedPolicy;
   if (typeof Policy !== 'function') throw new TypeError('GameplayPolicy capability required');
@@ -244,7 +244,10 @@ export function createStockGameplay(options) {
     // A notification can be inside session ingress OR a mutable Wasm control borrow.
     // Only captured microtasks may reconcile/free after BOTH stacks have unwound.
     state() { if (!gameplayOwner) return; return lease(() => { policy('mark_dirty'); schedule(); }); },
-    error: error => { if (gameplayOwner) return lease(() => latchError(error)); },
+    error: (error,wasPlaying) => { if (gameplayOwner) return lease(() => {
+      const state=session.snapshot();
+      if (!policy('retry_transport_failure',[state.phase,wasPlaying,state.reason??''])) latchError(error);
+    }); },
   };
   const hudObserver = {
     ...observer,
@@ -452,7 +455,7 @@ export function createStockGameplay(options) {
     try {
       const admitted = leaderboardRows ? ownRecord(request, ['endpoint', 'profile', 'nickname', 'skin', 'customSkin']) : request;
       const status = localSession ? session.snapshot() : null;
-      if (policy('replace_local', [localSession && status.phase === 'disconnected',
+      if (policy('replace_local', [localSession && (status.phase === 'disconnected' || status.phase === 'failed'),
         localSession && status.phase === 'victory' && status.playing === false])) {
         try {
           clearUiTimer();
@@ -460,7 +463,7 @@ export function createStockGameplay(options) {
           unsubscribe();
           leaderboardCompanion = null; policy('clear_companion');
           if (policy('fatal')) throw fatal;
-          session = createStockSession({ wasm, createSocket, now, SessionPolicy: wasm.SessionPolicy });
+          session = createStockSession({ wasm, createSocket, now, SessionPolicy: wasm.SessionPolicy, deferConstructionError: localSession });
           unsubscribe = subscribeSession();
         } catch (error) { latchError(error); throw error; }
       }
@@ -606,6 +609,10 @@ export function createStockGameplay(options) {
     },
     render() { return draw('render', []); },
     resize(width, height) { return draw('resize', [width, height]); },
+    stop() { return run(() => {
+      if (acquiring()) { cancelProfile(profileIntent); policy('profile_failed'); }
+      else session.close('explicit-cancel');
+    }); },
     hudSnapshot: () => pairs[0].hud,
     leaderboardSnapshot: () => pairs[0].rows,
     event(event, viewport) {
