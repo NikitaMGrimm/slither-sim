@@ -7,6 +7,16 @@ successful presentation. It creates no socket, window, winit loop or GPU device.
 The #299 `feel-trace` recorder supplies the observations; staged pictures retain
 their own copies through issuance and retry, before world commit.
 
+This driver reproduces **A2's equal-schedule lane**: `Driver::packet` and
+`Driver::close` eagerly drain and acknowledge prepared pictures before the next
+scheduled event. It does not reproduce the desktop host's queued-picture guard
+or one-picture-per-redraw order. In [`src/main.rs`](../../apps/wgpu-slice/src/main.rs),
+`Running::frame` skips `begin_frame` while a picture is queued and presents at
+most one picture per redraw, called from `ApplicationHandler::window_event` on
+`RedrawRequested`. Two Setup pictures and subsequent ingress can therefore
+interleave differently on desktop. Native-host ordering/backpressure belongs
+to plan items C/D; A3's equal-schedule results do not establish that parity.
+
 Run from `client/`, with Rust 1.99 and Node 24. Stage the candidate first. Builds
 are explicit and sequential; replay requires the prebuilt executable and a Canvas
 Wasm run of that same candidate/input/schedule:
@@ -43,6 +53,15 @@ zero), with A1's sorted keys and formatting. Node hashes the entropy/artifacts
 and supplies the manifest; Rust's `--assemble` completes the v2 trace using the
 same bit-preserving codec. No decimal JSON serialization precedes bit capture.
 `--codec` is a standalone interoperability check for an A1 document on stdin.
+
+Its codec domain is narrower than general JS A1: object keys must be ASCII and
+must not be canonical array indices (`0` through `4294967294`, in canonical
+decimal form). Reads and writes reject these unsupported keys recursively,
+including BMP/non-BMP keys whose Rust and JS UTF-16 sort orders can disagree.
+String values may contain any Unicode scalar values. Lone surrogates are
+rejected on read and are unrepresentable in Rust strings on write. Non-index
+keys such as `"01"` and `"4294967295"` are admitted. No key/string normalization
+or silently reordered output extends this domain.
 
 Each native run replays the same executable twice, preserving both observation
 documents and final traces. `repeat-comparison.json` requires A1 exact parity and

@@ -49,6 +49,16 @@ The reader rejects bare JSON numbers, invalid encodings and non-finite numbers.
 Rust peers can emit this same format directly. A normal JSON round trip before
 this writer irreversibly destroys signed-zero evidence.
 
+The [native Rust example](native-peer.md) supports an explicit subset of general
+A1 documents: every object key must be ASCII and must not be a canonical array
+index (decimal `0` through `4294967294`, without leading zeros). Both reading and
+writing reject unsupported keys recursively. This avoids JS's numeric ordering
+of index keys and UTF-16 versus Rust ordering of non-ASCII keys. String values
+may contain any Unicode scalar values; lone UTF-16 surrogates accepted by the JS
+reader fail native decoding and cannot inhabit the writer's Rust strings. The
+subset restriction changes no A1 schema or policy and does not normalize keys or
+strings. Admitted documents retain byte-compatible output.
+
 Build a manifest with `buildManifest({ schedule, artifactFiles, inputFile,
 ...fields })`: `artifactFiles` maps semantic artifact names to existing files;
 the optional `inputFile` hashes private bytes without copying or parsing them.
