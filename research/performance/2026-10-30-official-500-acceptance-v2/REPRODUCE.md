@@ -53,3 +53,22 @@ before launching another pair. The selector calls this study's `acceptance.py`,
 which changes only final maturity to the prospective lower bounds; start screen,
 deferrals, queues, input lateness, accounting and report-only tails are retained.
 Finish by scanning every enabled AWS region and deleting the task key/group.
+
+## Retained v2 evidence and limit
+
+This execution never produced an eligible full-window archive: the generator
+was reclaimed during counting, after the sole replacement had been consumed.
+Its client log and complete run summary are unavailable after configured root
+deletion. Therefore the full-window selector/assembly steps above cannot be
+replayed for this attempt. No partial interval replaces them.
+
+The selected results instead curate the retained control status, entry screen,
+binary bindings and the AWS state reason `Server.SpotInstanceTermination`.
+The available host archive is local-only, SHA-256
+`68675c54b7f8475c9545ab8431337499440a15843f58c9aa69fa1fbee5cc9603`
+(2,631,076 bytes), verified against the remote digest before teardown. The
+preflight archive (test/build logs and pins) is local-only, SHA-256
+`75f5791874408c39a003bddf2098020ac30134e863d77de7a005c610374c71b6`
+(6,506 bytes). No CPU/cadence table is derived from those partial records.
+Selected cleanup/cost receipts retain all-region counts and conservative
+lifetime/bid inputs; cloud identities and complete API receipts stay private.
