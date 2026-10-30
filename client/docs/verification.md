@@ -50,6 +50,9 @@ authored synthetic fault checks. The [browser peer command](../tools/feel-replay
 uses prebuilt, feature-gated Wasm in background headless Edge/Chromium and a CPU
 GPU-boundary sink. It is a separate local run, not part of npm test or proof of
 pixel, physical-input or perceptual parity.
+The [native CPU peer](../tools/feel-replay/native-peer.md) adds feature-gated
+LocalGame driver tests, bit-exact native repeats and native/Wasm cross-target
+reports; it opens no window and does not measure GPU or desktop pacing.
 
 ## Source guard
 

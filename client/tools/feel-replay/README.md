@@ -13,6 +13,8 @@ Never replace it with private recordings. Historical tapes and tools stay intact
 
 The [browser peers](browser-peers.md) now drive the production Canvas runtime and
 WebGPU LocalGameplay offline. The contract/comparator below remains pure Node.
+The [native CPU peer](native-peer.md) drives production LocalGame and compares
+against the same frozen Canvas Wasm schedule in cross-target mode.
 
 Run from `client/`:
 
