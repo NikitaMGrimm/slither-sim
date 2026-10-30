@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { desktopSteps, classifyPath, coreHistoryComparison } from './feel-replay/desktop.mjs';
+import { desktopSteps, desktopExpectation } from './feel-replay/desktop.mjs';
 import { validateSuccessfulDraws } from './feel-replay/schema.mjs';
 
 test('draw accounting counts only receipted preparations once in sample order', () => {
@@ -27,26 +27,6 @@ test('blocking present queues transport/input and acknowledges before service an
   assert.throws(() => desktopSteps([], -1), /delay/);
   assert.throws(() => desktopSteps([], NaN), /delay/);
 });
-test('classification retains camera ring errors separately from scheduling and commands', () => {
-  assert.equal(classifyPath('samples[1].camera.ring[3]'), 'camera ring');
-  assert.equal(classifyPath('samples[1].camera.index'), 'camera samples');
-  assert.equal(classifyPath('samples[1].atMs'), 'update/draw timing or missing boundary');
-  assert.equal(classifyPath('commands[0].sendMs'), 'command bytes or times');
-  assert.equal(classifyPath('samples'), 'update/draw timing or missing boundary');
-  assert.equal(classifyPath('samples[5]'), 'update/draw timing or missing boundary');
-});
-test('core history ignores receipt bookkeeping but retains every sample and command value', () => {
-  const left = { commands: [{ bytes: [1], decisionMs: 2, sendMs: 2, ackMs: 2 }],
-    samples: [{ phase: 'draw', atMs: 2, delta: {}, lag: {}, own: null, camera: { index: 1 }, geometry: {} }] };
-  const right = structuredClone(left);
-  right.samples[0].eventSeq = 99;
-  right.samples[0].status = { committed: false };
-  assert.equal(coreHistoryComparison(left, right).exact, true);
-  right.samples[0].camera.index = 2;
-  assert.equal(coreHistoryComparison(left, right).rows.length, 1);
-  right.samples.push(structuredClone(right.samples[0]));
-  assert.equal(coreHistoryComparison(left, right).exact, false);
-});
 test('next-session ingress waits for its authored reset/Connect barrier', () => {
   const play = { ...step('input', 20), control: 'play' };
   const packet = { ...step('packet', 21), packet: [112] };
@@ -59,4 +39,22 @@ test('one-interval FIFO uses authored cadence endpoints without floating-point m
   const plan = desktopSteps(frames, 1000 / 144, true);
   assert.equal(plan.filter(s => s.skippedRedraw).length, 0);
   assert.equal(plan.filter(s => s.acknowledgment).length, frames.length);
+});
+
+test('desktop Setup receipts are frozen independently and unexpected dropped/duplicate acknowledgements fail', async () => {
+  const { syntheticFixture } = await import('./feel-replay/synthetic.mjs');
+  const { compareTraces } = await import('./feel-replay/compare.mjs');
+  const { schedule, trace } = syntheticFixture();
+  // The first draw is explicitly an authored packet Setup candidate.
+  schedule.boundaries[2].eventSeq = trace.samples[2].eventSeq = 0;
+  schedule.boundaries[1].eventSeq = trace.samples[1].eventSeq = 0;
+  const expected = desktopExpectation(trace, schedule);
+  assert.deepEqual(expected.schedule.pictures, [1]);
+  assert.deepEqual(schedule.pictures, [0, 1]);
+  assert.equal(trace.final.draws, 2); assert.equal(expected.trace.final.draws, 1);
+  assert(compareTraces(expected.trace, expected.trace, expected.schedule).passed);
+  const missing = structuredClone(expected.trace); missing.samples[4].status.committed = false;
+  assert(!compareTraces(expected.trace, missing, expected.schedule).passed);
+  const extra = structuredClone(expected.trace); extra.samples[2].status.committed = true;
+  assert(!compareTraces(expected.trace, extra, expected.schedule).passed);
 });

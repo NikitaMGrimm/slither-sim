@@ -58,7 +58,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless: automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses authored zero credentials for simulators. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses authored zero credentials for simulators. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -124,8 +124,9 @@ mod desktop {
             return Err("--server requires --official".into());
         }
         if headless {
-            if !o.official && o.endpoint.is_none() {
-                return Err("Headless requires --official or --endpoint".into());
+            // Owner decision 2026-10-30: official logins only from a person pressing Play.
+            if o.official || o.endpoint.is_none() {
+                return Err("Headless requires --endpoint; --official is interactive only".into());
             }
             o.headless = Some(crate::headless::Options::new(
                 duration,
@@ -664,9 +665,10 @@ mod desktop {
                 .transpose()?;
             return crate::headless::run(
                 headless,
-                options.endpoint.as_deref(),
-                options.official,
-                options.server.as_deref(),
+                options
+                    .endpoint
+                    .as_deref()
+                    .ok_or("Headless requires --endpoint")?,
                 &options.nickname,
                 options.skin,
                 cosmetics,
@@ -724,14 +726,12 @@ mod desktop {
             }
         }
         #[test]
-        fn headless_admits_both_modes_and_requires_bounded_explicit_output() {
-            for mode in [
-                vec!["--official"],
-                vec!["--endpoint", "ws://127.0.0.1:19491/slither"],
-            ] {
-                let args = [
-                    mode,
-                    vec![
+        fn headless_requires_an_endpoint_and_bounded_explicit_output() {
+            let endpoint = ["--endpoint", "ws://127.0.0.1:19491/slither"];
+            let options = parse(
+                &[
+                    &endpoint[..],
+                    &[
                         "--headless",
                         "--duration",
                         "10",
@@ -745,37 +745,45 @@ mod desktop {
                         "30",
                     ],
                 ]
-                .concat();
-                let options = parse(&args).unwrap().unwrap();
-                assert!(options.headless.is_some());
-                assert_eq!(options.accessory, Some(30));
-                assert_eq!(
-                    options.cosmetics_dir.as_deref(),
-                    Some(std::path::Path::new("synthetic-artwork"))
-                );
-            }
+                .concat(),
+            )
+            .unwrap()
+            .unwrap();
+            assert!(options.headless.is_some());
+            assert_eq!(options.accessory, Some(30));
+            assert_eq!(
+                options.cosmetics_dir.as_deref(),
+                Some(std::path::Path::new("synthetic-artwork"))
+            );
             for args in [
                 vec!["--headless"],
-                vec!["--official", "--headless"],
-                vec!["--official", "--frames", "unused"],
-                vec![
-                    "--official",
-                    "--headless",
-                    "--frames",
-                    "unused",
-                    "--duration",
-                    "NaN",
-                ],
-                vec![
-                    "--official",
-                    "--headless",
-                    "--frames",
-                    "unused",
-                    "--frame-every",
-                    "inf",
-                ],
+                vec!["--headless", "--frames", "unused"],
+                [&endpoint[..], &["--headless"]].concat(),
+                [&endpoint[..], &["--frames", "unused"]].concat(),
+                [
+                    &endpoint[..],
+                    &["--headless", "--frames", "unused", "--duration", "NaN"],
+                ]
+                .concat(),
+                [
+                    &endpoint[..],
+                    &["--headless", "--frames", "unused", "--frame-every", "inf"],
+                ]
+                .concat(),
             ] {
                 assert!(parse(&args).is_err());
+            }
+        }
+        #[test]
+        fn headless_never_uses_the_official_mode() {
+            // Otherwise complete headless runs; only the official mode differs.
+            for mode in [
+                vec!["--official"],
+                vec!["--official", "--server", "game.example:445"],
+            ] {
+                let args = [mode, vec!["--headless", "--frames", "unused"]].concat();
+                let error = parse(&args).err().expect("official headless run");
+                assert!(error.contains("--official is interactive only"), "{error}");
             }
         }
     }

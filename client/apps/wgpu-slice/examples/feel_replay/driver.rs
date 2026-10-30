@@ -361,7 +361,7 @@ mod tests {
         assert_eq!(view.camera.y.to_bits(), row.values[6].to_bits());
         assert_eq!(
             view.own.unwrap().raw_head.x.to_bits(),
-            row.values[139].to_bits()
+            row.values[15].to_bits()
         );
         assert!(d.recorder.take().is_empty());
         assert!(d.game.presented(true).is_err());

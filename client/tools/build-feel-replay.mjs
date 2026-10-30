@@ -10,7 +10,7 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const source = () => {
   git('diff', '--exit-code', '--', '.');
   if (git('ls-files', '--others', '--exclude-standard')) throw new Error('Stage replay source files before building');
-  return { tree: git('write-tree'), core: git('write-tree', '--prefix=client/src/') };
+  return { tree: git('write-tree') };
 };
 await rebuildArtifacts('dist/feel-replay', async () => {
   const built = source();

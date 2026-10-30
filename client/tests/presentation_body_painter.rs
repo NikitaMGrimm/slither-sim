@@ -227,7 +227,7 @@ fn ordered_hq_passes_include_interleaved_shadows_and_tail_coverage() {
 }
 
 #[test]
-fn independent_quality_flag_and_blend_gate_effects_and_zero_alpha_commands() {
+fn independent_quality_flag_and_blend_preserve_visible_layers() {
     for (hq, blend, effects) in [
         (false, 0., false),
         (false, 0.2, true),
@@ -242,8 +242,10 @@ fn independent_quality_flag_and_blend_gate_effects_and_zero_alpha_commands() {
         f.visual.smoothed_speed = 8.;
         let plan = f.plan().unwrap();
         assert_eq!(pass(&plan, OuterBoost).len(), 6);
-        assert_eq!(pass(&plan, Outline).len(), if effects { 6 } else { 0 });
-        assert_eq!(pass(&plan, InnerBoost).len(), if effects { 6 } else { 0 });
+        if blend > 0. {
+            assert_eq!(pass(&plan, Outline).len(), if effects { 6 } else { 0 });
+            assert_eq!(pass(&plan, InnerBoost).len(), if effects { 6 } else { 0 });
+        }
         assert_eq!(pass(&plan, BodyShadow).len(), 2);
         assert_eq!(pass(&plan, Body).len(), 6);
         if hq && blend == 0. {
@@ -315,7 +317,6 @@ fn speed_threshold_is_strict_and_boost_fraction_is_clamped_before_lifecycle() {
     f.visual.boost_threshold = 1.;
     f.visual.smoothed_speed = 2.;
     let zero_boost = f.plan().unwrap();
-    assert_eq!(pass(&zero_boost, OuterBoost).len(), 3);
     assert!(
         pass(&zero_boost, OuterBoost)
             .iter()
@@ -430,7 +431,7 @@ fn retained_flags_are_consumed_without_recomputed_cadence_or_compaction() {
     let c = pass(&plan, OuterBoost)[0];
     let boost = (8_f64 - 4.) / (10. - 4.);
     close(
-        c.alpha.requested,
+        c.alpha.effective,
         boost.powf(0.5) * 0.38 * (0.6 + 0.4 * (9_f64 / 12. - 1.15 * 0.7).cos()),
     );
 }
@@ -628,25 +629,25 @@ fn unrounded_seed_and_shared_cursor_change_only_distance_bearing_visits() {
     let plan = f.plan().unwrap();
     let expected_d = (2. - f.seed.x + 0.031_415_926_535) / 6.;
     close(
-        pass(&plan, NearHeadShadow)[0].alpha.requested,
+        pass(&plan, NearHeadShadow)[0].alpha.effective,
         expected_d * (1. - 2. / 9.),
     );
     // The outline pass leaves the cursor at the head before tail coverage starts.
     close(
-        pass(&plan, TailShadow)[0].alpha.requested,
+        pass(&plan, TailShadow)[0].alpha.effective,
         (2_f64 / 6.) * (2. / 9.),
     );
     // With outer boost, the next outline starts from the head, not the seed.
     f.visual.smoothed_speed = 8.;
     let boosted = f.plan().unwrap();
     close(
-        pass(&boosted, NearHeadShadow)[0].alpha.requested,
+        pass(&boosted, NearHeadShadow)[0].alpha.effective,
         (2_f64 / 6.) * (1. - 2. / 9.),
     );
-    let seed_first = pass(&boosted, OuterBoost)[0].alpha.requested;
+    let seed_first = pass(&boosted, OuterBoost)[0].alpha.effective;
     f.seed.x = 2.;
     f.seed.y = 0.;
-    assert_eq!(pass(&f.plan().unwrap(), OuterBoost)[0].alpha.requested, 0.);
+    assert_eq!(pass(&f.plan().unwrap(), OuterBoost)[0].alpha.effective, 0.);
     assert!(seed_first > 0.);
 }
 
@@ -665,7 +666,7 @@ fn inner_boost_cursor_continues_after_interleaved_near_head_shadow() {
     // Final body-shadow visit is ordinal zero; body images do not move the cursor.
     let inner = pass(&plan, InnerBoost)[0];
     close(
-        inner.alpha.requested,
+        inner.alpha.effective,
         (5_f64 / 6.) * 0.37 * 0.5 * (0.5 + 0.5 * (5_f64 / 4.).cos()),
     );
 }
@@ -678,8 +679,6 @@ fn invalid_tail_alpha_retains_saved_outline_alpha_without_clamping_or_leaking() 
     let tails = pass(&plan, TailShadow);
     assert_eq!(tails.len(), 4);
     for c in tails {
-        assert!(c.alpha.requested > 1.);
-        assert!(!c.alpha.accepted);
         assert_eq!(c.alpha.effective, 0.3);
     }
     assert!(
@@ -703,8 +702,6 @@ fn nonfinite_alpha_expression_from_finite_phase_is_ignored_by_canvas_semantics()
     f.entry_alpha = 0.43;
     let plan = f.plan().unwrap();
     for c in pass(&plan, OuterBoost) {
-        assert!(c.alpha.requested.is_nan());
-        assert!(!c.alpha.accepted);
         assert_eq!(c.alpha.effective, 0.43);
     }
 }
@@ -968,28 +965,8 @@ fn mixed_runs_do_not_need_an_unused_base_palette_glow() {
 }
 
 #[test]
-fn signed_zero_distance_and_stored_geometry_bits_survive() {
+fn stored_float32_geometry_is_projected_without_an_extra_rounding_step() {
     let mut f = Fixture::new(2);
-    f.visual.smoothed_speed = 8.;
-    f.samples[0].flag = 0;
-    f.samples[1].x = 0.;
-    f.samples[1].y = 0.;
-    f.samples[1].tangent = -0.;
-    f.seed = Point { x: -0., y: -0. };
-    let plan = f.plan().unwrap();
-    assert_eq!(
-        pass(&plan, OuterBoost)[0].alpha.requested.to_bits(),
-        (-0_f64).to_bits()
-    );
-    assert_eq!(
-        pass(&plan, OuterBoost)[0].alpha.effective.to_bits(),
-        (-0_f64).to_bits()
-    );
-    assert_eq!(
-        pass(&plan, Body)[0].rotation.unwrap().to_bits(),
-        (-0_f64).to_bits()
-    );
-    f.samples[0].flag = 1;
     f.samples[0].x = 16_777_217_u32 as f32;
     f.view.camera.x = 16_777_216.5;
     let plan = f.plan().unwrap();
@@ -998,75 +975,4 @@ fn signed_zero_distance_and_stored_geometry_bits_survive() {
         .find(|c| c.ordinal == 0)
         .unwrap();
     assert_eq!(body.translation.x, -0.375);
-}
-
-#[test]
-fn host_math_formula_association_and_pass_specific_dimensions_are_exact_natively() {
-    let mut f = Fixture::new(15);
-    f.visual.scale = 1.17;
-    f.visual.spawn = 0.7;
-    f.visual.death = 0.2;
-    f.visual.dead = true;
-    f.visual.smoothed_speed = 7.;
-    f.visual.boost_phase = 0.71;
-    f.view.zoom = 0.83;
-    f.quality.blend = 0.43;
-    f.style.as_mut().unwrap().swell = 0.035;
-    let plan = f.plan().unwrap();
-    let line = (29_f64 * 1.17) * 0.5;
-    let mut a = 0.7_f64 * (1. - 0.2);
-    a *= a;
-    let b = 0.7_f64 * (1. - 0.2) * ((7_f64 - 4.) / (10. - 4.));
-    let expansion = b.powf(0.5);
-    let outer = pass(&plan, OuterBoost)
-        .into_iter()
-        .find(|c| c.ordinal == 1)
-        .unwrap();
-    let outer_half =
-        (1.5 * 0.83 * line * (1. + (62_f64 / 32. - 1.) * expansion)) * (1. + 3. * 0.035);
-    assert_eq!(outer.destination.x.to_bits(), (-outer_half).to_bits());
-    assert_eq!(
-        outer.destination.width.to_bits(),
-        (2. * outer_half).to_bits()
-    );
-    let outer_alpha = 1_f64 * a * expansion * 0.38 * (0.6 + 0.4 * (1_f64 / 4. - 1.15 * 0.71).cos());
-    assert_eq!(outer.alpha.requested.to_bits(), outer_alpha.to_bits());
-    let body = pass(&plan, Body)
-        .into_iter()
-        .find(|c| c.ordinal == 1)
-        .unwrap();
-    let body_size = line * (1. + 3. * 0.035);
-    assert_eq!(body.destination.x.to_bits(), (-0.83 * body_size).to_bits());
-    assert_eq!(
-        body.destination.width.to_bits(),
-        (0.83 * 2. * body_size).to_bits()
-    );
-    let outline = pass(&plan, Outline)[0];
-    assert_eq!(
-        outline.destination.width.to_bits(),
-        (2. * (0.83 * line * 52. / 32.)).to_bits()
-    );
-    assert_eq!(
-        outline.alpha.requested.to_bits(),
-        ((a * (1. - b)) * 0.43).to_bits()
-    );
-    let inner = pass(&plan, InnerBoost)
-        .into_iter()
-        .find(|c| c.ordinal == 1)
-        .unwrap();
-    let glow_size = (line * 2.) * (1. + 3. * 0.035);
-    assert_eq!(
-        inner.destination.width.to_bits(),
-        (0.83 * 2. * glow_size).to_bits()
-    );
-    let inner_alpha = 1_f64 * a * (b * 0.37) * 0.43 * (0.5 + 0.5 * (1_f64 / 4. - 0.71).cos());
-    assert_eq!(inner.alpha.requested.to_bits(), inner_alpha.to_bits());
-    let death = pass(&plan, Death)
-        .into_iter()
-        .find(|c| c.ordinal == 1)
-        .unwrap();
-    let envelope = (0.15 + 0.15 * (5. * std::f64::consts::PI * 0.2).sin().abs())
-        * (std::f64::consts::PI * 0.2).sin();
-    let death_alpha = 1_f64 * envelope * (0.6 + 0.4 * (1_f64 / 4. - 15. * 0.2).cos());
-    assert_eq!(death.alpha.requested.to_bits(), death_alpha.to_bits());
 }

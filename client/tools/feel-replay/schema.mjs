@@ -1,10 +1,11 @@
-// Authored offline contract: schedule/trace v2, manifest v1. No packet bodies.
+// Authored offline contract: schedule/trace v3, manifest v2. No packet bodies.
 const nullable = schema => ({ nullable: schema });
 const list = (schema, length) => ({ list: schema, ...(length === undefined ? {} : { length }) });
 const choice = (...values) => ({ choice: values });
 const point = type => ({ x: type, y: type });
 const extent = { width: 'uint', height: 'uint' };
-const ring = (slots, channels = 1) => ({ index: 'uint', pending: 'int', values: list('f32-exact', slots * channels) });
+// Above production camera targets; also bounds zoom * safe-integer CSS extents.
+export const MAX_REPLAY_ZOOM = 16;
 const geometry = { css: extent, backing: extent, surface: extent, dpr: 'positive' };
 const boundary = {
   id: 'string', eventSeq: 'uint', phase: choice('update', 'draw', 'prepare', 'submit', 'commit'),
@@ -12,38 +13,31 @@ const boundary = {
   eligibility: choice('own', 'pre-appearance', 'between-lives'),
 };
 export const scheduleSchema = {
-  schema: choice(2), label: 'string', durationMs: 'time',
+  schema: choice(3), label: 'string', durationMs: 'time',
   events: list({ sourceId: 'string', kind: choice('packet', 'input', 'frame'), atMs: 'time' }),
-  boundaries: list(boundary), expectedCommands: 'uint',
+  boundaries: list(boundary), pictures: list('uint'), expectedCommands: 'uint',
 };
-export const numericalPolicySchema = nullable({
-  cause: 'string', worldCap: 'positive', angleCap: 'positive', zoomCap: 'positive', f32Ulps: 'uint',
-});
+export const policyVersion = 'feel-perceptual-v1';
 export const manifestSchema = {
-  schema: choice(1), product: { commit: 'gitHash', tree: 'gitHash', core: 'string' },
+  schema: choice(2), source: { commit: 'gitHash', tree: 'gitHash' },
   artifacts: list({ name: 'string', sha256: 'hash' }),
-  toolVersions: list({ name: 'string', version: 'string' }),
   input: { label: 'string', sha256: nullable('hash') }, scheduleSha256: 'hash',
-  peer: choice('canvas-wasm', 'webgpu-wasm', 'native'),
-  entropy: { seed: 'string', requestStreamSha256: 'hash' }, startup: list('string'),
-  geometry, qualityRequest: 'string',
-  presentation: { gpu: nullable('string'), mode: nullable('string'), maxFrameLatency: nullable('uint') },
-  numericalPolicy: numericalPolicySchema,
+  peer: choice('canvas-wasm', 'webgpu-wasm', 'native'), geometry,
+  policy: choice(policyVersion), completed: 'boolean',
 };
 const own = {
-  token: 'string', expired: 'boolean', deathProgress: 'number', rawHead: point('world'), correctedHead: point('world'),
+  token: 'string', expired: 'boolean', deathProgress: 'number', spawnProgress: 'unit', opacity: 'unit', rawHead: point('world'), correctedHead: point('world'),
   rawHeading: 'radians', correctedHeading: 'radians', wantedHeading: 'radians', gaze: 'radians',
   pupils: { left: point('number'), right: point('number') },
-  offsets: { x: 'f32', y: 'f32', fraction: 'f32', heading: 'f32' },
+  offsets: { x: 'number', y: 'number', fraction: 'number', heading: 'radians' },
   speed: 'number', visualSpeed: 'number', boost: 'boolean', boostPhase: 'number',
   size: { segments: 'uint', fraction: 'number', length: 'number' },
-  // Storage stays exactly f32-representable; cross-target allowances live in compare.mjs.
-  rings: { head: ring(53, 3), angle: ring(26), length: ring(53) },
+  body: { list: point('css-px'), maxLength: 8193 },
   projected: nullable({ backing: { head: point('number'), pupils: list(point('number'), 2) },
     css: { head: point('number'), pupils: list(point('number'), 2) } }),
 };
 export const traceSchema = {
-  schema: choice(2), manifest: manifestSchema,
+  schema: choice(3), manifest: manifestSchema,
   events: list({
     seq: 'uint', sourceId: 'string', kind: choice('packet', 'input', 'frame'),
     scheduledMs: 'time', actualMs: 'time', target: 'string', type: 'string',
@@ -56,12 +50,11 @@ export const traceSchema = {
     bytes: list('byte'), decisionMs: 'time', sendMs: 'time', ackMs: 'time', succeeded: 'boolean',
   }),
   samples: list({
-    ...boundary,
+    ...boundary, acknowledgedMs: nullable('time'),
     delta: { raw: 'number', lagged: 'number', steps: 'uint', doubledSteps: 'uint' },
     lag: { active: 'boolean', multiplier: 'number', pingPending: 'boolean', pongAgeMs: 'time' },
     own: nullable(own),
-    camera: { x: 'world', y: 'world', offset: point('world'), index: 'uint', pending: 'uint',
-      ring: list('number', 124), follow: 'boolean', zoom: 'zoom', targetZoom: 'zoom' },
+    camera: { x: 'world', y: 'world', offset: point('world'), follow: 'boolean', zoom: 'zoom', targetZoom: 'zoom' },
     quality: { requested: 'string', active: 'string', successfulDraws: 'uint' }, geometry,
     status: { prepared: 'boolean', submitted: 'boolean', committed: 'boolean', retries: 'uint',
       sendFailed: 'boolean', presentFailed: 'boolean' },
@@ -74,16 +67,17 @@ export const traceSchema = {
 export function fail(path, message) { throw new Error(`${path}: ${message}`); }
 export function validate(value, schema, path = '$') {
   if (typeof schema === 'string') {
-    const numeric = ['number', 'world', 'radians', 'zoom', 'f32', 'f32-exact', 'time', 'positive', 'int', 'uint', 'byte'];
+    const numeric = ['number', 'css-px', 'unit', 'world', 'radians', 'zoom', 'time', 'positive', 'int', 'uint', 'byte'];
     let ok;
     if (numeric.includes(schema)) {
       ok = typeof value === 'number' && Number.isFinite(value);
+      if (schema === 'unit') ok &&= value >= 0 && value <= 1;
       if (schema === 'time') ok &&= value >= 0;
-      if (schema === 'positive') ok &&= value > 0;
+      if (schema === 'positive' || schema === 'zoom') ok &&= value > 0;
+      if (schema === 'zoom') ok &&= value <= MAX_REPLAY_ZOOM;
       if (schema === 'int') ok &&= Number.isSafeInteger(value);
       if (schema === 'uint' || schema === 'byte') ok &&= Number.isSafeInteger(value) && value >= 0;
       if (schema === 'byte') ok &&= value <= 255;
-      if (schema === 'f32' || schema === 'f32-exact') ok &&= Object.is(Math.fround(value), value);
     } else if (schema === 'string') ok = typeof value === 'string' && value.length > 0;
     else if (schema === 'boolean') ok = typeof value === 'boolean';
     else if (schema === 'hash') ok = typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
@@ -94,6 +88,7 @@ export function validate(value, schema, path = '$') {
   } else if (schema.list) {
     if (!Array.isArray(value)) fail(path, 'required array');
     if (schema.length !== undefined && value.length !== schema.length) fail(path, `required ${schema.length} values, got ${value.length}`);
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) fail(path, `at most ${schema.maxLength} values required`);
     for (let i = 0; i < value.length; i++) validate(value[i], schema.list, `${path}[${i}]`);
   } else if (schema.choice) {
     if (!schema.choice.some(x => Object.is(x, value))) fail(path, `expected ${schema.choice.join('|')}`);
@@ -112,7 +107,7 @@ export function orderEvents(events) {
     .sort((a, b) => a.event.atMs - b.event.atMs || priority[a.event.kind] - priority[b.event.kind]
       || a.ordinal - b.ordinal).map(x => x.event);
 }
-const same = (a, b) => Object.is(a, b);
+const same = (a, b) => a === b;
 function unique(values, path) {
   if (new Set(values).size !== values.length) fail(path, 'duplicate ID');
 }
@@ -142,27 +137,19 @@ export function validateSchedule(schedule) {
   for (const { index, drawId } of referencedDraws) {
     if (drawId >= nextDraw) fail(`schedule.boundaries[${index}].drawId`, 'unknown draw');
   }
+  unique(schedule.pictures, 'schedule.pictures');
+  if (schedule.pictures.some(id => id >= nextDraw)) fail('schedule.pictures', 'unknown prepared draw');
   const last = schedule.boundaries.at(-1);
   if (last.eventSeq !== schedule.events.length - 1 || !same(last.atMs, schedule.durationMs)) {
     fail('schedule.boundaries', 'missing final boundary at duration and final event');
   }
   return schedule;
 }
-export function validateNumericalPolicy(policy, path = 'numericalPolicy') {
-  validate(policy, numericalPolicySchema, path);
-  if (policy && (policy.worldCap > 1e-9 || policy.angleCap > 1e-9 || policy.zoomCap > 1e-12 || policy.f32Ulps > 1)) {
-    fail(path, 'exceeds world/radians 1e-9, zoom 1e-12 or f32 1 ULP caps');
-  }
-  return policy;
-}
 export function validateManifest(manifest) {
   validate(manifest, manifestSchema, 'manifest');
-  if (!manifest.artifacts.length || !manifest.toolVersions.length || !manifest.startup.length) {
-    fail('manifest', 'artifacts, tool versions and startup required');
-  }
+  if (!manifest.artifacts.length) fail('manifest.artifacts', 'built artifact required');
   unique(manifest.artifacts.map(x => x.name), 'manifest.artifacts');
-  unique(manifest.toolVersions.map(x => x.name), 'manifest.toolVersions');
-  validateNumericalPolicy(manifest.numericalPolicy, 'manifest.numericalPolicy');
+  if (!manifest.completed) fail('manifest.completed', 'incomplete run');
   return manifest;
 }
 
@@ -182,11 +169,12 @@ export function validateSuccessfulDraws(trace) {
   return committedDraws;
 }
 // Hosts may supply actual acknowledged draw ordinals as an external witness.
-// A standalone v2 file has status/counts, but cannot authenticate host receipts.
+// A standalone v3 file has status/counts, but cannot authenticate host receipts.
 export function validateTrace(trace, schedule, acknowledgedDrawIds) {
   validateSchedule(schedule);
   validate(trace, traceSchema, 'trace');
   validateManifest(trace.manifest);
+  const expectedPictures = new Set(schedule.pictures);
   let pictures;
   if (acknowledgedDrawIds !== undefined) {
     validate(acknowledgedDrawIds, list('uint'), 'pictureAcknowledgements');
@@ -241,17 +229,15 @@ export function validateTrace(trace, schedule, acknowledgedDrawIds) {
       if (lastOwn && lastOwn.token !== s.own.token) retiredOwnTokens.add(lastOwn.token);
       if (s.own.expired) retiredOwnTokens.add(s.own.token);
       if (s.own.expired !== (s.own.projected === null)) fail(`trace.samples[${i}].own.projected`, 'only expired own skips projection');
+      if ((s.phase !== 'draw' || s.own.expired) && s.own.body.length) fail(`trace.samples[${i}].own.body`, 'prepared body only at a visible draw boundary');
       appeared = true;
       betweenLives = false;
       lastOwn = s.own;
-      // Fixed ring geometry and signed cleanup sentinel are shared core constants:
-      // src/presentation.rs Head/AngleCorrections and presentation/length.rs.
-      for (const [name, slots] of [['head', 53], ['angle', 26], ['length', 53]]) {
-        const r = s.own.rings[name];
-        if (r.index >= slots || r.pending < -1 || r.pending > slots) fail(`trace.samples[${i}].own.rings.${name}`, 'invalid ring index/pending');
-      }
     }
-    if (s.camera.index >= 62 || s.camera.pending > 62) fail(`trace.samples[${i}].camera`, 'invalid camera ring index/pending');
+    if (s.phase === 'draw' && (s.status.submitted !== expectedPictures.has(s.drawId)
+      || s.status.committed !== expectedPictures.has(s.drawId))) fail(`trace.samples[${i}].status`, 'frozen picture count/identity mismatch');
+    if (s.status.committed !== (s.acknowledgedMs !== null)
+      || s.acknowledgedMs !== null && (s.acknowledgedMs < s.atMs || s.acknowledgedMs > schedule.durationMs)) fail(`trace.samples[${i}].acknowledgedMs`, 'invalid acknowledgement time');
     if (s.status.sendFailed || s.status.presentFailed) fail(`trace.samples[${i}].status`, 'send/present failure');
     if ((s.status.submitted && !s.status.prepared) || (s.status.committed && !s.status.submitted)) {
       fail(`trace.samples[${i}].status`, 'invalid prepare/submit/commit order');

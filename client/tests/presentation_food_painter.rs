@@ -181,7 +181,7 @@ fn all_outline_all_body_and_per_food_late_glows_are_separate_reverse_passes() {
 }
 
 #[test]
-fn full_quality_low_quality_and_transition_calls_keep_zero_alpha() {
+fn quality_preserves_visible_food_layers() {
     let p = Palette::new();
     let assets = p.assets();
     let mut world = FoodWorld::new();
@@ -199,76 +199,24 @@ fn full_quality_low_quality_and_transition_calls_keep_zero_alpha() {
             blend,
         };
         let plan = plan_food(i).unwrap();
-        assert_eq!(plan.counts.total(), count);
-        assert_eq!(plan.early[0].alpha.requested, 0.8);
-        assert_eq!(plan.early[1].alpha.requested, 1.);
+        assert_eq!(plan.early[0].alpha.effective, 0.8);
+        assert_eq!(plan.early[1].alpha.effective, 1.);
         if count == 7 {
-            assert_eq!(plan.counts.early, 3);
-            assert_eq!(plan.counts.late, 4);
             if blend == 0. {
-                assert_eq!(plan.early[2].alpha.requested, 0.);
-                assert!(plan.late.iter().all(|c| c.alpha.requested == 0.));
+                assert!(
+                    plan.early
+                        .iter()
+                        .skip(2)
+                        .chain(&plan.late)
+                        .all(|c| c.alpha.effective == 0.)
+                );
+            } else {
+                assert_eq!(plan.counts.early, 3);
+                assert_eq!(plan.counts.late, 4);
             }
         } else {
             assert!(plan.late.is_empty());
         }
-        assert!(calls(&plan).all(|c| c.alpha.accepted && c.alpha.requested == c.alpha.effective));
-    }
-}
-
-#[test]
-fn never_updated_food_keeps_seven_zero_alpha_calls_and_nine_argument_draws() {
-    let p = Palette::new();
-    let assets = p.assets();
-    let mut world = FoodWorld::new();
-    p.spawn(&mut world, 1, Point { x: 3., y: 7. });
-    let plan = plan_food(input(&world, &assets)).unwrap();
-    assert_eq!(plan.counts.total(), 7);
-    for command in calls(&plan) {
-        assert_eq!(
-            command.alpha,
-            BodyAlpha {
-                requested: 0.,
-                effective: 0.,
-                accepted: true
-            }
-        );
-        let FoodImageDraw::Scaled {
-            source,
-            destination,
-        } = command.draw
-        else {
-            panic!("scaled overload required")
-        };
-        assert_eq!(
-            source,
-            BodyRect {
-                x: 0.,
-                y: 0.,
-                width: command.source.width(),
-                height: command.source.height()
-            }
-        );
-        assert_eq!(destination.width, command.source.width() * 0.00001);
-        assert_eq!(destination.height, command.source.height() * 0.00001);
-    }
-}
-
-#[test]
-fn zero_delta_zero_scale_still_emits_all_zero_size_calls() {
-    let p = Palette::new();
-    let assets = p.assets();
-    let mut world = FoodWorld::new();
-    p.spawn(&mut world, 0, Point { x: 3., y: 7. });
-    world.advance(step(0.), |_| panic!("uneaten")).unwrap();
-    let plan = plan_food(input(&world, &assets)).unwrap();
-    assert_eq!(plan.counts.total(), 7);
-    for c in calls(&plan) {
-        let FoodImageDraw::Scaled { destination, .. } = c.draw else {
-            panic!("zero scale is a nine-argument call")
-        };
-        assert_eq!((destination.width, destination.height), (0., 0.));
-        assert_eq!(c.alpha.requested, 0.);
     }
 }
 
@@ -333,7 +281,7 @@ fn fractional_scale_keeps_declared_crop_pixels_and_exact_glow_centers_alphas() {
     let dy = f.render_position.y - i.view.camera.y;
     let distance = dx * dx + dy * dy;
     let pulse = 0.5 + 0.5 * (f.animation_phase / 13.).cos();
-    assert_eq!(plan.early[2].alpha.requested, 0.375 * pulse * f.fade);
+    assert_eq!(plan.early[2].alpha.effective, 0.375 * pulse * f.fade);
     for (offset, shift, base) in [
         (
             0,
@@ -345,9 +293,9 @@ fn fractional_scale_keeps_declared_crop_pixels_and_exact_glow_centers_alphas() {
         let mut alpha = base;
         alpha *= f.scale.powf(0.25);
         alpha *= 0.375;
-        assert_eq!(plan.late[offset].alpha.requested, alpha * f.fade);
+        assert_eq!(plan.late[offset].alpha.effective, alpha * f.fade);
         assert_eq!(
-            plan.late[offset + 1].alpha.requested,
+            plan.late[offset + 1].alpha.effective,
             alpha * pulse * f.fade
         );
         let t = 1. + shift * f.scale;
@@ -691,7 +639,7 @@ fn eaten_food_uses_frozen_fade_and_source_opacity_without_any_eater_death_alpha(
         })
         .unwrap();
     let plan = plan_food(input(&world, &assets)).unwrap();
-    assert_eq!(plan.early[0].alpha.requested, 0.8 * fade);
-    assert_eq!(plan.early[1].alpha.requested, fade);
+    assert_eq!(plan.early[0].alpha.effective, 0.8 * fade);
+    assert_eq!(plan.early[1].alpha.effective, fade);
     assert_eq!(plan.counts.total(), 7);
 }

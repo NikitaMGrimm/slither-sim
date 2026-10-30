@@ -1,0 +1,22 @@
+{
+  "archiveSha256": "6207e45561438ed30bf55f688982dcb2b15c33daeeb24e8763cf1012354906fd",
+  "archiveBytes": 362665997,
+  "manifestSha256": "91313d4db2b1da9cb94be80ac9493f409a7ff67ef5a074ff7f06aa4d2b5b6e08",
+  "verifiedMembers": 727,
+  "closedAndMemberVerified": true,
+  "sourcePreserved": true,
+  "reductionChecks": [
+    {
+      "check": "method-tests",
+      "exit": 0
+    },
+    {
+      "check": "a4-reduction",
+      "exit": 0
+    },
+    {
+      "check": "botstorm-reduction",
+      "exit": 0
+    }
+  ]
+}

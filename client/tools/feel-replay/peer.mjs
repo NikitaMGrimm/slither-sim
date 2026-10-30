@@ -1,4 +1,4 @@
-import { parse, stringify } from './codec.mjs';
+import { parse, stringify } from './json.mjs';
 import { virtualClock } from './clock.mjs';
 import { normalizeInput, packetTypes, targetFor } from './schedule.mjs';
 import { safeCommand } from './schema.mjs';
