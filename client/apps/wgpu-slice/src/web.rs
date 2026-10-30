@@ -18,6 +18,9 @@ pub struct LocalGameplay {
 // LocalGame still prepares every resource and acknowledges every actual picture.
 // Keep the existing inline production host instead of adding a heap allocation
 // solely to shrink the feature-only empty sink variant.
+// [Contract](../../../tools/feel-replay/README.md),
+// [peer rules](../../../tools/feel-replay/browser-peers.md) and authored
+// [fixture](../../../tools/feel-replay/browser-synthetic.json): replace GPU I/O only.
 #[cfg_attr(feature = "feel-trace", allow(clippy::large_enum_variant))]
 enum GameplaySurface {
     Gpu(SurfaceHost),
@@ -145,6 +148,11 @@ impl LocalGameplay {
     #[cfg(feature = "feel-trace")]
     pub fn take_feel_trace(&self) -> js_sys::Array {
         self.trace.as_ref().expect("replay owner").take_js()
+    }
+    /// A1 completeness failures from the exact candidate's recorder.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_trace_errors(&self) -> Vec<String> {
+        self.trace.as_ref().expect("replay owner").take_errors()
     }
     /// Observe the private factory RNG without adding an entropy provider seam.
     #[cfg(feature = "feel-trace")]

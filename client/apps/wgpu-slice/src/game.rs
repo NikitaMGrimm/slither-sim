@@ -45,6 +45,9 @@ struct Pending {
 }
 // The prepared candidate and its observation travel together through retries and
 // queueing. Native callers keep the existing PreparedFrame API.
+// [Contract](../../../tools/feel-replay/README.md),
+// [peers](../../../tools/feel-replay/browser-peers.md),
+// [synthetic fixture](../../../tools/feel-replay/browser-synthetic.json).
 struct Picture<T> {
     value: T,
     #[cfg(feature = "feel-trace")]

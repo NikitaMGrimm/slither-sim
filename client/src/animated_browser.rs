@@ -499,6 +499,8 @@ impl AnimatedScene {
     }
 
     /// Test-only copied update/draw observations; excluded from production builds.
+    /// [Contract](../tools/feel-replay/README.md), [peer rules](../tools/feel-replay/browser-peers.md)
+    /// and authored [fixture](../tools/feel-replay/browser-synthetic.json).
     #[cfg(feature = "feel-trace")]
     pub fn enable_feel_trace(&mut self) {
         let recorder = crate::feel_trace::Recorder::default();
@@ -513,6 +515,15 @@ impl AnimatedScene {
             .as_ref()
             .expect("enable trace first")
             .take_js()
+    }
+
+    /// A1 completeness failures, separate from immutable numeric rows.
+    #[cfg(feature = "feel-trace")]
+    pub fn take_feel_trace_errors(&self) -> Vec<String> {
+        self.feel_trace
+            .as_ref()
+            .expect("enable trace first")
+            .take_errors()
     }
 
     /// Supply the optional loaded screen-filling image from the asset map.

@@ -7,9 +7,11 @@ import { buildSchedule, coordinate } from './feel-replay/schedule.mjs';
 import { traceAssembly } from './feel-replay/assembly.mjs';
 import { compareTraces } from './feel-replay/compare.mjs';
 import { differences } from './feel-replay/differences.mjs';
-import { assertBuildBinding } from './feel-replay/artifacts.mjs';
+import { verifyArtifacts } from './feel-replay/artifacts.mjs';
 import { launchBrowser } from './feel-replay/browser.mjs';
 import { replayServer } from './feel-replay/server.mjs';
+import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
+import { floatBits } from './feel-replay/io.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2), options = {};
@@ -34,7 +36,7 @@ try {
   const product = { commit: git('rev-parse', 'HEAD'), tree: git('write-tree'), core: git('write-tree', '--prefix=client/src/') };
   if (git('diff', '--name-only') || git('ls-files', '--others', '--exclude-standard')) throw new Error('Stage intended changes before replay');
   const built = parse(await readFile(path.join(root, 'dist/feel-replay/build.json'), 'utf8'));
-  assertBuildBinding(built, product);
+  await verifyArtifacts(path.join(root, 'dist/feel-replay'), built, product);
   const artifactFiles = {};
   async function artifacts(dir, prefix) {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -47,22 +49,27 @@ try {
   for (const file of git('ls-files', '-z').split('\0').filter(Boolean)) artifactFiles[`source/${file}`] = path.join(root, file);
   server = await replayServer(); browser = await launchBrowser(options['--browser']);
   const area = { width: Number(options['--width'] ?? 960), height: Number(options['--height'] ?? 540), dpr: Number(options['--dpr'] ?? 1) };
+  const pointer = startupPointer(record, area);
   const peers = [];
   for (const name of ['canvas-wasm', 'webgpu-wasm']) {
-    const page = await browser.page(`${server.origin}/replay/${name}.html`, area);
+    const page = await browser.page(`${server.origin}/replay/${name}.html`, area, pointer);
     peers.push({ name, page, acks: [], step: async (event, data, seq) => parse(await page.evaluate(`window.replayStepEncoded(${JSON.stringify(stringify([event, data, seq]))})`)) });
   }
   await coordinate(schedule, deliveries, peers, (peer, ack) => { peer.acks.push(ack); });
   const traces = [];
+  const observationFailures = [];
   for (const peer of peers) {
     const finish = parse(await peer.page.evaluate('window.replayFinish()'));
+    observationFailures.push(...finish.recorderErrors.map(e => `${peer.name}.recorder[${e.seq}]: ${e.reason}`));
     const randomStream = finish.random;
     const manifest = await buildManifest({ schedule, artifactFiles, inputFile, product,
       toolVersions: [{ name: 'node', version: process.version }, { name: 'browser', version: (await browser.call('Browser.getVersion')).product },
         { name: 'rustc', version: built.rustc }, { name: 'wasm-bindgen', version: built.bindgen }],
       input: { label: 'offline schema-1 input', sha256: null }, peer: peer.name,
       entropy: { seed: '17', requestStreamSha256: sha256(stringify(randomStream)) },
-      startup: ['clock-zero', 'empty-timers-and-raf', 'high-quality', 'play', 'center-pointer-both-families', 'scheduled-startup-raf'],
+      startup: ['clock-zero', 'empty-timers-and-raf', 'high-quality', 'play',
+        `startup-pointer:${pointer.source}:${floatBits(pointer.x)}:${floatBits(pointer.y)}`,
+        `input-normalization:${inputNormalization}`, 'scheduled-startup-raf'],
       geometry: peer.acks[0].geometry, qualityRequest: 'high', presentation: { gpu: null, mode: 'cpu-boundary-sink', maxFrameLatency: null }, numericalPolicy: null });
     const assembly = traceAssembly(schedule, manifest);
     for (const ack of peer.acks) assembly.append(ack);
@@ -70,12 +77,16 @@ try {
       pendingEffects: finish.pendingEffects, pendingFrames: finish.pendingFrames, unexpectedNetwork: finish.unexpectedNetwork || peer.page.denied() !== 0 });
     traces.push(trace);
     await writeFile(path.join(out, `${peer.name}.json`), stringify(trace));
-    await writeFile(path.join(out, `${peer.name}-receipts.json`), stringify({ receipts: finish.receipts,
+    await writeFile(path.join(out, `${peer.name}-receipts.json`), stringify({ receipts: finish.receipts, recorderErrors: finish.recorderErrors,
       entropyRequests: randomStream, queuedRaf: finish.queuedRaf, deniedRequests: peer.page.denied() }));
     await writeFile(path.join(out, `${peer.name}-manifest.json`), stringify(manifest));
     await peer.page.close();
   }
   const report = compareTraces(...traces, schedule, { mode: 'same-core' });
+  if (observationFailures.length) {
+    report.errors.push(...observationFailures);
+    report.status = 'invalid'; report.passed = false; report.exact = false;
+  }
   await writeFile(path.join(out, 'comparison.json'), stringify(report));
   const rows = differences(...traces);
   await writeFile(path.join(out, 'differences.json'), stringify(rows));

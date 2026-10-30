@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "framing": "header-free",
-  "provenance": "AUTHORED SYNTHETIC: closed challenge, two Setup commands, own appearance, pong; no recorded data",
+  "provenance": "AUTHORED SYNTHETIC v2: challenge, unsplit Setup pair, own appearance, explicit DOM pair and normalized physical mouse movement, boost, editor keys and pong",
   "durationMs": 300,
   "packets": [
     {
@@ -32,6 +32,13 @@
       "at": 10,
       "type": "mousemove",
       "x": 0.7,
+      "y": 0.4,
+      "encoding": "dom-event"
+    },
+    {
+      "at": 20,
+      "type": "mousemove",
+      "x": 0.75,
       "y": 0.4
     },
     {

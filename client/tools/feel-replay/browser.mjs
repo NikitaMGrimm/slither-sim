@@ -1,8 +1,18 @@
 import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { stringify } from './codec.mjs';
+
+// Subscribe at spawn time, before Browser.close or a signal can end the process.
+// See browser-peers.md (cleanup) and browser-synthetic.json (offline run).
+export function processTermination(child) {
+  const terminated = new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
+  return async () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await terminated;
+  };
+}
 
 // A dedicated headless process, never the user's profile or desktop session.
 export async function launchBrowser(executable) {
@@ -13,6 +23,7 @@ export async function launchBrowser(executable) {
     '--disable-features=MediaRouter,OptimizationHints,AutofillServerCommunication', '--metrics-recording-only',
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1', 'about:blank'],
   { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
+  const terminate = processTermination(child);
   child.stderr.resume();
   // Chromium CDP pipe uses NUL-delimited UTF-8 JSON on fd 3/4. No debugging listener.
   let serial = 0, buffer = '', ended = false;
@@ -43,11 +54,12 @@ export async function launchBrowser(executable) {
   }
   return {
     call,
-    async page(url, geometry) {
+    async page(url, geometry, startup) {
       const { targetId } = await call('Target.createTarget', { url: 'about:blank', background: true });
       const { sessionId } = await call('Target.attachToTarget', { targetId, flatten: true });
       const send = (method, params) => call(method, params, sessionId);
       await send('Page.enable'); await send('Runtime.enable');
+      await send('Page.addScriptToEvaluateOnNewDocument', { source: `globalThis.replayStartupEncoded=${JSON.stringify(stringify(startup))};` });
       await send('Emulation.setDeviceMetricsOverride', { width: geometry.width, height: geometry.height,
         deviceScaleFactor: geometry.dpr, mobile: false });
       await send('Emulation.setFocusEmulationEnabled', { enabled: true });
@@ -78,7 +90,7 @@ export async function launchBrowser(executable) {
     },
     async close() {
       try { await call('Browser.close'); } catch { /* Process may close before reply. */ }
-      if (child.exitCode === null) { child.kill(); await once(child, 'exit'); }
+      await terminate();
       if (!profile.startsWith(path.resolve(tmpdir()) + path.sep) || !path.basename(profile).startsWith('feel-replay-')) throw new Error('Unsafe browser profile cleanup');
       await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     },

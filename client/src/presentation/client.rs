@@ -3261,6 +3261,9 @@ impl AnimatedClient {
     }
 
     /// Attach the offline recorder before startup. Ordinary builds contain no hook.
+    /// See the [contract](../../tools/feel-replay/README.md),
+    /// [peer rules](../../tools/feel-replay/browser-peers.md) and authored
+    /// [fixture](../../tools/feel-replay/browser-synthetic.json) for boundary rules.
     #[cfg(feature = "feel-trace")]
     pub fn record_feel(&mut self, recorder: crate::feel_trace::Recorder) {
         self.trace = Some(recorder);

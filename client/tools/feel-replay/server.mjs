@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSceneServer } from '../scene-server.mjs';
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const modules = ['peer', 'clock', 'codec', 'schema', 'schedule'];
+const modules = ['peer', 'clock', 'codec', 'schema', 'schedule', 'input'];
 export async function replayServer() {
   const server = createSceneServer();
   const original = server.listeners('request')[0]; server.removeAllListeners('request');

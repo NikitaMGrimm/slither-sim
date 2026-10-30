@@ -1,5 +1,8 @@
 //! Opt-in offline observations. No renderer, update, random request or policy is invoked.
 //! The flat numeric ABI is decoded by tools/feel-replay/observation.mjs.
+//! Contract: [A1](../tools/feel-replay/README.md),
+//! [browser peers](../tools/feel-replay/browser-peers.md) and the authored
+//! [synthetic fixture](../tools/feel-replay/browser-synthetic.json).
 
 use crate::presentation::{AnimatedClient, EyeLayoutInput, FaceGeometry, FrameStep};
 use crate::state::Point;
@@ -19,6 +22,9 @@ pub struct Observation {
 #[derive(Debug, Default)]
 struct Journal {
     rows: Vec<Observation>,
+    errors: Vec<String>,
+    failed: bool,
+    last_draw: Option<Observation>,
     random: Vec<(&'static str, f64)>,
     step: Option<FrameStep>,
     extent: [u32; 2],
@@ -34,6 +40,16 @@ impl PartialEq for Recorder {
     }
 }
 impl Recorder {
+    /// Explicit observation failures; draining them never clears the failure gate.
+    pub fn take_errors(&self) -> Vec<String> {
+        std::mem::take(&mut self.0.lock().expect("trace journal").errors)
+    }
+
+    /// A missing/unsupported observation makes this run incomplete.
+    pub fn has_failed(&self) -> bool {
+        self.0.lock().expect("trace journal").failed
+    }
+
     /// Observe an existing random request without supplying or changing entropy.
     pub fn random(&self, tag: &'static str, value: f64) {
         self.0
@@ -55,14 +71,7 @@ impl Recorder {
 
     /// Copy the most recently prepared draw into its host-owned picture envelope.
     pub fn last_draw(&self) -> Option<Observation> {
-        self.0
-            .lock()
-            .expect("trace journal")
-            .rows
-            .iter()
-            .rev()
-            .find(|r| r.phase == "draw")
-            .cloned()
+        self.0.lock().expect("trace journal").last_draw.clone()
     }
 
     pub(crate) fn observe(
@@ -73,6 +82,9 @@ impl Recorder {
         extent: Option<[u32; 2]>,
     ) {
         let mut journal = self.0.lock().expect("trace journal");
+        if phase == "draw" {
+            journal.last_draw = None;
+        }
         if let Some(step) = step {
             journal.step = Some(step);
         }
@@ -148,32 +160,42 @@ impl Recorder {
                 half.x + (m.corrected_head.x - position.x) * camera.zoom(),
                 half.y + (m.corrected_head.y - position.y) * camera.zoom(),
             ]);
-            // This lane currently authors paired-eye fixtures. Reject unsupported
-            // faces rather than manufacture their projected pupil observations.
-            if let FaceGeometry::Paired(face) = snake.active_face_geometry() {
-                if let Ok(layout) = face.eyes.layout(
-                    snake.eyes().heading(),
-                    pupil,
-                    EyeLayoutInput {
-                        corrected_head: m.corrected_head,
-                        camera: position,
-                        viewport_half: half,
-                        scale: m.scale,
-                        zoom: camera.zoom(),
-                        death_progress: m.death_progress,
-                    },
-                ) {
-                    for pair in layout.pairs {
-                        values.extend([pair.pupil.x, pair.pupil.y]);
+            // Fail closed BEFORE publishing a partial numeric row. A1 requires
+            // both projected pupils (contract/fixture links at module entry).
+            match projected_pupils(
+                snake.active_face_geometry(),
+                snake.eyes().heading(),
+                pupil,
+                EyeLayoutInput {
+                    corrected_head: m.corrected_head,
+                    camera: position,
+                    viewport_half: half,
+                    scale: m.scale,
+                    zoom: camera.zoom(),
+                    death_progress: m.death_progress,
+                },
+            ) {
+                Ok(pupils) => {
+                    for p in pupils {
+                        values.extend([p.x, p.y]);
                     }
+                }
+                Err(reason) => {
+                    journal.failed = true;
+                    journal.errors.push(format!("{phase}: {reason}"));
+                    return;
                 }
             }
         }
-        journal.rows.push(Observation {
+        let row = Observation {
             phase,
             token,
             values,
-        });
+        };
+        if phase == "draw" {
+            journal.last_draw = Some(row.clone());
+        }
+        journal.rows.push(row);
     }
 
     /// Copy into JS native Numbers before the A1 writer; never plain JSON.
@@ -193,5 +215,60 @@ impl Recorder {
                 record
             })
             .collect()
+    }
+}
+
+fn projected_pupils(
+    face: &FaceGeometry,
+    heading: f64,
+    pupil: Point,
+    view: EyeLayoutInput,
+) -> Result<[Point; 2], &'static str> {
+    let FaceGeometry::Paired(face) = face else {
+        return Err("unsupported face layout");
+    };
+    let layout = face
+        .eyes
+        .layout(heading, pupil, view)
+        .map_err(|_| "paired pupil layout rejected")?;
+    Ok(layout.pairs.map(|pair| pair.pupil))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::presentation::SingleEyeGeometry;
+
+    #[test]
+    fn unsupported_face_and_failed_layout_return_explicit_errors() {
+        let view = EyeLayoutInput {
+            corrected_head: Point::default(),
+            camera: Point::default(),
+            viewport_half: Point { x: 750., y: 422.5 },
+            scale: 1.,
+            zoom: 1.,
+            death_progress: 0.,
+        };
+        let image = FaceGeometry::SingleImage(SingleEyeGeometry {
+            base_size: 24.,
+            pupil_size: 8.,
+            pupil_travel: 4.,
+        });
+        assert_eq!(
+            projected_pupils(&image, 0., Point::default(), view),
+            Err("unsupported face layout")
+        );
+        assert_eq!(
+            projected_pupils(
+                &FaceGeometry::default(),
+                0.,
+                Point::default(),
+                EyeLayoutInput {
+                    death_progress: 1.,
+                    ..view
+                }
+            ),
+            Err("paired pupil layout rejected")
+        );
     }
 }

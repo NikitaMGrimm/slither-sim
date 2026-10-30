@@ -2,6 +2,7 @@ import { parse, stringify } from './codec.mjs';
 import { virtualClock } from './clock.mjs';
 import { normalizeInput, packetTypes, targetFor } from './schedule.mjs';
 import { safeCommand } from './schema.mjs';
+import { mouseReplay } from './input.mjs';
 
 const peer = location.pathname.includes('canvas-wasm') ? 'canvas-wasm' : 'webgpu-wasm';
 const clock = virtualClock(window), endpoint = `ws://${location.host}/slither`;
@@ -13,6 +14,7 @@ const settle = () => new Promise(resolve => {
 let activeSocket, runtime, owner, host, scene, quality, raf, seq = -1, failed = false, sendFailed = false;
 let currentCommands = [], receipts = [], random = [], rng = 17, blocked = 0;
 let currentEffects = [], socketGeneration = 0;
+const recorderErrors = [];
 // Observe the existing page RNG; the WebGPU factory keeps its own production RNG.
 Math.random = () => {
   rng = (Math.imul(rng, 1664525) + 1013904223) >>> 0;
@@ -55,7 +57,8 @@ class ReplaySocket extends EventTarget {
 window.WebSocket = ReplaySocket;
 
 // Read-only receipts at each production adapter's real filtering boundary.
-const observeInput = (event, stage) => receipts.push({ seq, stage, ...received(event), prevented: event.defaultPrevented });
+const observeInput = (event, stage) => receipts.push({ seq, stage, ...received(event), pointerType: event.pointerType ?? null,
+  button: event.button ?? null, prevented: event.defaultPrevented });
 function received(event) {
   return { type: event.type, target: event.target === window ? 'window' : event.target.id || event.target.localName,
     coordinates: /^(mouse|pointer)/.test(event.type) ? { x: event.clientX, y: event.clientY } : null,
@@ -68,21 +71,27 @@ function geometry() {
   return { css: { width: innerWidth, height: innerHeight }, backing: { width: canvas.width, height: canvas.height },
     surface: { width: canvas.width, height: canvas.height }, dpr: devicePixelRatio };
 }
-function dispatch(input) {
-  const n = normalizeInput(input, { width: innerWidth, height: innerHeight });
+function dispatchDom(n) {
   const target = n.type === 'blur' || n.type === 'resize' ? window : document.querySelector(targetFor(peer, n.target));
   if (!target) throw new Error('Mapped DOM target missing');
   let event;
   const options = { bubbles: true, cancelable: true, clientX: n.x, clientY: n.y, button: n.button, buttons: n.buttons,
-    code: n.code, key: n.code === 'Space' ? ' ' : n.code, repeat: n.repeat, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+    code: n.code, key: n.code === 'Space' ? ' ' : n.code, repeat: n.repeat, pointerId: 1, pointerType: 'mouse', isPrimary: true,
+    pressure: n.buttons ? 0.5 : 0 };
   if (n.type.startsWith('pointer')) event = new PointerEvent(n.type, options);
   else if (n.type.startsWith('mouse')) event = new MouseEvent(n.type, options);
   else if (n.type.startsWith('key')) event = new KeyboardEvent(n.type, options);
   else event = new Event(n.type, options);
   target.dispatchEvent(event);
   const observed = received(event);
-  receipts.push({ seq, stage: 'dispatched', ...observed, prevented: event.defaultPrevented });
-  return observed;
+  receipts.push({ seq, stage: 'dispatched', ...observed, pointerType: event.pointerType ?? null, button: event.button ?? null, prevented: event.defaultPrevented });
+  return { ...observed, prevented: event.defaultPrevented };
+}
+const dispatchMouse = mouseReplay(dispatchDom, n => receipts.push({ seq, stage: 'suppressed-compatibility', type: n.type,
+  target: n.target, coordinates: { x: n.x, y: n.y } }));
+function dispatch(input) {
+  return dispatchMouse({ ...normalizeInput(input, { width: innerWidth, height: innerHeight }),
+    buttonsExplicit: input.buttons !== undefined, encoding: input.encoding });
 }
 function metadata() {
   if (peer === 'canvas-wasm') {
@@ -122,9 +131,11 @@ window.replayReady = (async () => {
     const tick = time => { host.frame(time); raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick); start();
   }
-  // Equal explicit startup pointer/key state, before any recorded input or RAF.
-  // Use both families: their actual filtering is retained in receipt sidecars.
-  for (const type of ['pointermove', 'mousemove']) dispatch({ type, x: 0.5, y: 0.5 });
+  // Resting mouse position: direct integer CSS coordinates avoid fractional
+  // pointer / integer compatibility disagreement on odd extents. Contract and
+  // authored regression: browser-peers.md and browser-synthetic.json.
+  const p = parse(globalThis.replayStartupEncoded);
+  dispatchMouse({ type: 'mousemove', target: 'surface', x: p.x, y: p.y, button: 0, buttons: 0 });
   return true;
 })();
 window.replayStep = async (event, data, ordinal) => {
@@ -138,17 +149,19 @@ window.replayStep = async (event, data, ordinal) => {
     const bytes = Uint8Array.from(atob(data.body), c => c.charCodeAt(0));
     if (packetTypes(data.body).includes(97)) activeSocket.controls = true;
     activeSocket.emit('message', new MessageEvent('message', { data: bytes.buffer }));
-  } else if (event.kind === 'input') observed = dispatch(data);
+  } else if (event.kind === 'input') { const { prevented, ...fields } = dispatch(data); observed = fields; }
   else clock.frame();
   // A task boundary drains the entire microtask queue, including recursively
   // queued publication work, without advancing virtual time or adding a draw.
   await settle();
   const observations = (peer === 'canvas-wasm' ? scene.take_feel_trace() : owner.take_feel_trace()).map(([phase, token, cells]) => [phase, token, Array.from(cells)]);
-  return stringify({ seq, sourceId: event.sourceId, atMs: clock.now(), observations, commands: currentCommands, effects: currentEffects,
+  const observationErrors = (peer === 'canvas-wasm' ? scene : owner).take_feel_trace_errors();
+  recorderErrors.push(...observationErrors.map(reason => ({ seq, reason })));
+  return stringify({ seq, sourceId: event.sourceId, atMs: clock.now(), observations, observationErrors, commands: currentCommands, effects: currentEffects,
     event: { seq, sourceId: event.sourceId, kind: event.kind, scheduledMs: event.atMs, actualMs: clock.now(),
       ...observed, target: event.kind === 'input' ? (data.target ?? 'surface') : observed.target },
     geometry: geometry(), ...metadata(), failed, sendFailed });
 };
-window.replayFinish = () => stringify({ atMs: clock.now(), completed: !failed, unexpectedNetwork: blocked !== 0,
-  ...metadata(), receipts, random: peer === 'canvas-wasm' ? random : owner.take_feel_random(), queuedRaf: clock.pendingFrames() });
+window.replayFinish = () => stringify({ atMs: clock.now(), completed: !failed && !recorderErrors.length, unexpectedNetwork: blocked !== 0,
+  ...metadata(), receipts, recorderErrors, random: peer === 'canvas-wasm' ? random : owner.take_feel_random(), queuedRaf: clock.pendingFrames() });
 window.replayStepEncoded = encoded => window.replayStep(...parse(encoded));

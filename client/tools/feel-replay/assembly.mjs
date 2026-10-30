@@ -3,9 +3,11 @@ import { safeCommand } from './schema.mjs';
 export function traceAssembly(schedule, manifest) {
   const events = [], commands = [], samples = [];
   let frame = 0, draw = 0, successfulDraws = 0;
+  let complete = true;
   return {
     append(ack) {
       const eventSeq = events.length;
+      if (ack.observationErrors?.length) complete = false;
       if (ack.seq !== eventSeq) throw new Error('Duplicate/out-of-order acknowledgment');
       const event = { ...ack.event, effectIds: [...(ack.effects ?? [])] };
       events.push(event);
@@ -32,7 +34,7 @@ export function traceAssembly(schedule, manifest) {
     finish(state) {
       return { schema: 1, manifest, events, commands, samples, final: {
         atMs: state.atMs, events: events.length, commands: commands.length, samples: samples.length,
-        draws: draw, lastBoundaryId: samples.at(-1)?.id ?? 'missing', ...state,
+        draws: draw, lastBoundaryId: samples.at(-1)?.id ?? 'missing', ...state, completed: state.completed && complete,
       } };
     },
   };

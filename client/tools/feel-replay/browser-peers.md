@@ -12,7 +12,11 @@ node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-synthetic.
 ```
 
 Stage intended source changes before the explicit build. Its receipt binds the
-artifacts to the staged tree/core; replay rejects stale builds or unstaged source.
+artifacts to the staged tree/core and the hashes of every completed binding,
+Wasm binary and generated snippet. The previous receipt is invalidated before
+building; interrupted rebuilds leave no authenticating receipt. Replay checks the
+hashes before launching either peer and rejects stale/replaced artifacts or
+unstaged source. Cleanup tracks process termination from spawn, including signals.
 
 `--commands` is the frozen expected control count, and `--appearance-at` the
 independently declared first own-appearance time. Neither is learned from a peer
@@ -50,7 +54,12 @@ preparation, gameplay, effects and presentation acknowledgments remain productio
 paths. This gate does not compare pixels, GPU completion, physical input or pacing.
 
 The virtual Date/performance origin, timer/RAF history, high quality, viewport,
-center pointer and empty keys are equal before bootstrap. Both peers receive
+resting mouse pointer and empty keys are equal before bootstrap. An optional
+`startupPointer` records normalized `x/y` (or explicit `coordinateSpace: "css"`).
+It restores the legacy mouse's integer CSS position. Otherwise the fallback is
+the integer CSS viewport center, including at odd dimensions. Startup uses those
+CSS coordinates directly through DOM events, avoiding a divide/multiply round
+trip. The manifest records the source and actual coordinate bits. Both peers receive
 one scheduled reset/Connect RAF and then the ordinary frame at time zero; there
 is no one-sided warmup. Packets at time zero are rejected because they would
 precede the initial Connect acknowledgment. Packet/input/frame ties retain A1
@@ -59,11 +68,38 @@ Each event drains synchronous effects and queued ingress before acknowledgment.
 The perpetual next RAF is reported separately from unfinished model work.
 
 Normalized coordinates become real DOM events at explicit per-peer selectors.
-Historical mouse events remain mouse events; the runner does not manufacture a
-pointer event to conceal a host filtering difference. Fixtures can explicitly
-schedule both families. Production listeners record received, routed, gameplay
-and filtered events, including compatibility suppression, in receipt sidecars.
-Trace targets are shared semantic IDs; sidecars retain actual DOM target IDs.
+The named manifest normalization `chromium-primary-mouse-compat-v1` treats legacy
+`mousemove`/primary-button records as physical mouse inputs: dispatch the mouse
+PointerEvent first, then the compatibility MouseEvent on the same target. This
+expansion is identical for both peers, without changing the tape or inserting a
+frame between events. An authored input with `encoding: "dom-event"` is already
+an explicit DOM event and is not expanded again. The A1 source event remains one
+physical input; receipts retain both actual dispatches and any suppressed event.
+
+[Pointer Events 3 §11.2](https://www.w3.org/TR/pointerevents3/#mapping-for-devices-that-support-hover)
+defines this mapping for hovering pointers. A canceled primary `pointerdown`
+suppresses compatibility `mousedown`, subsequent `mousemove` and `mouseup` until
+release; canceling a hover `pointermove` alone does not suppress its mouse event.
+Chromium implements the order and suppression in
+[SendMousePointerEvent](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/third_party/blink/renderer/core/input/pointer_event_manager.cc),
+including clearing suppression on a no-buttons hover move. Its
+[MouseEvent coordinate getters](https://github.com/chromium/chromium/blob/main/third_party/blink/renderer/core/events/mouse_event.h)
+floor coordinates, while [PointerEvent getters](https://github.com/chromium/chromium/blob/main/third_party/blink/renderer/core/events/pointer_event.h)
+retain fractional move coordinates. For the admitted nonnegative viewport
+coordinates the mapper's integer conversion has that same result. It does not
+force either host to admit the same event family or coordinates. Residual
+differences remain failures. This DOM-listener lane does not claim browser click,
+boundary/focus-default or physical-input acceptance.
+
+Production listeners record received, routed, gameplay and filtered events,
+including compatibility suppression, in receipt sidecars. Trace targets are
+shared semantic IDs; sidecars retain actual DOM target IDs. The authored
+`browser-startup-synthetic.json` has no recorded inputs, so an odd-viewport full
+path checks the first gaze/command without subsequent input masking startup:
+
+```sh
+node tools/feel-browser-replay.mjs --record tools/feel-replay/browser-startup-synthetic.json --out <fresh-directory-outside-repository> --browser '<headless Edge or Chromium executable>' --commands 1 --appearance-at 3 --width 961 --height 541
+```
 
 `feel-trace` is absent from ordinary builds, including its fields, hooks and CPU
 sink. The reusable Rust `Recorder` copies raw state at the existing core update
@@ -73,7 +109,9 @@ prepares another draw. LocalGame's picture envelope carries a copied observation
 through staging/queueing/retry; `issued_feel_observation()` is available before
 world commit for A3. Native A3 can attach the same recorder and consume the same
 flat numeric ABI (`observation.mjs`). Unsupported projected face layouts fail
-closed; the current authored fixture uses paired eyes.
+closed: the recorder emits an explicit error and no partial numeric row. The
+trace is marked incomplete, and receipts/comparison errors retain the reason.
+The current full-path fixtures use paired eyes.
 
 The browser applies the A1 writer (`io.mjs` re-exports its browser-safe codec) to
 raw native Numbers before CDP transport. No plain JSON round trip loses signed
