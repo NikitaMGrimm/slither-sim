@@ -1,4 +1,4 @@
-//! Windows adapter: no bundled fonts, desktop APIs or window creation.
+//! Native adapter: no bundled fonts, desktop APIs or window creation.
 use super::{Family, Raster, Slant, TextStyle, Weight};
 use crate::{Result, materials::RgbaImage};
 use fontdue::{Font, FontSettings};
@@ -262,7 +262,12 @@ impl Rasterizer {
         let key = (style.family, style.weight, style.slant);
         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
             let file = face_name(style);
-            let bytes = std::fs::read(std::path::Path::new("C:/Windows/Fonts").join(file))
+            let directory = if cfg!(target_os = "linux") {
+                "/usr/share/fonts/truetype/dejavu"
+            } else {
+                "C:/Windows/Fonts"
+            };
+            let bytes = std::fs::read(std::path::Path::new(directory).join(file))
                 .map_err(|e| format!("installed face ({file}): {e}"))?;
             let face = ttf_parser::Face::parse(&bytes, 0)
                 .map_err(|e| format!("font metrics ({file}): {e}"))?;
@@ -500,6 +505,7 @@ impl Rasterizer {
 /// accepted approximation belongs to end-screen backlog item 5, not this PR.
 /// https://github.com/chromium/chromium/blob/a7453b805045ac88d29dfee5262913dcdad7508f/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc#L484-L498
 /// Missing selected files are explicit errors; no fonts are bundled or sheared.
+#[cfg(not(target_os = "linux"))]
 pub fn face_name(style: TextStyle) -> &'static str {
     match (style.family, style.weight, style.slant) {
         (Family::Lucida, _, _) => "l_10646.ttf",
@@ -507,5 +513,17 @@ pub fn face_name(style: TextStyle) -> &'static str {
         (_, Weight::Bold, Slant::Normal) => "arialbd.ttf",
         (_, Weight::Normal, Slant::Italic) => "ariali.ttf",
         (_, Weight::Bold, Slant::Italic) => "arialbi.ttf",
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn face_name(style: TextStyle) -> &'static str {
+    // CPU-only local-host CI still prepares real text resources. Linux uses
+    // its installed DejaVu faces; this probe makes no Arial/pixel parity claim.
+    match (style.weight, style.slant) {
+        (Weight::Normal, Slant::Normal) => "DejaVuSans.ttf",
+        (Weight::Bold, Slant::Normal) => "DejaVuSans-Bold.ttf",
+        (Weight::Normal, Slant::Italic) => "DejaVuSans-Oblique.ttf",
+        (Weight::Bold, Slant::Italic) => "DejaVuSans-BoldOblique.ttf",
     }
 }

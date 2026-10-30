@@ -50,6 +50,12 @@ The deterministic autopilot keeps its existing input cadence/boost schedule;
 its slow heading drift makes the first minute travel across the map rather than
 repeat a small orbit. It does not avoid opponents or the arena edge.
 
+For GPU-free offline host/client coverage, build the separate
+`slither-client-e2e` binary and run [the local-host runner](../../docs/verification.md#offline-hostclient-end-to-end-run).
+It uses production transport and LocalGame presentation preparation with a CPU
+sink, and has no official-server mode. The desktop `--headless` option above
+continues to render offscreen through a GPU.
+
 The browser build stays simulator-only: browser fetches need CORS permission for
 the official page, script and directory, JavaScript cannot set WebSocket Origin,
 and HTTPS pages block the original `ws://` endpoints. Options are a same-origin

@@ -481,6 +481,17 @@ impl Transport {
         }
         events
     }
+    /// Start a WebSocket close handshake; continue polling until Closed or a caller deadline.
+    /// Unlike close(), this retains the socket to observe the peer's acknowledgement.
+    pub fn begin_close(&mut self) -> Result<()> {
+        let socket = self.socket.as_mut().ok_or("Socket is not open")?;
+        match socket.close(None) {
+            Ok(()) => {}
+            Err(error) if would_block(&error) => {}
+            Err(error) => return Err(error.to_string()),
+        }
+        self.interest()
+    }
     pub fn close(&mut self) {
         if let Some(mut c) = self.connector.take() {
             c.cancel.store(true, Ordering::SeqCst);
@@ -551,6 +562,62 @@ mod tests {
                 return (transport, wakes);
             }
         }
+    }
+
+    #[test]
+    fn initiated_close_waits_for_the_peer_and_flushes_under_backpressure() {
+        // ORIGINAL SYNTHETIC peer. A delayed echo distinguishes a completed
+        // handshake from merely sending Close then dropping the TCP connection.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
+        let (closed, observed) = mpsc::channel();
+        let (reply, replies) = mpsc::channel();
+        let peer = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut socket = tungstenite::accept(stream).unwrap();
+            assert!(matches!(socket.read().unwrap(), Message::Close(None)));
+            closed.send(()).unwrap();
+            replies.recv_timeout(Duration::from_secs(3)).unwrap();
+            match socket.flush() {
+                Ok(()) | Err(Error::ConnectionClosed) => {}
+                result => panic!("close reply: {result:?}"),
+            }
+        });
+        let (mut transport, wakes) = waking_connection(endpoint);
+        transport
+            .socket
+            .as_mut()
+            .unwrap()
+            .get_mut()
+            .test_io
+            .block_writes = true;
+        transport.begin_close().unwrap();
+        assert!(transport.writable);
+        assert!(transport.socket.is_some());
+        transport
+            .socket
+            .as_mut()
+            .unwrap()
+            .get_mut()
+            .test_io
+            .block_writes = false;
+        assert!(transport.poll().is_empty());
+        observed.recv_timeout(Duration::from_secs(3)).unwrap();
+        assert!(transport.poll().is_empty());
+        reply.send(()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let events = wake_and_poll(&mut transport, &wakes, deadline);
+            if !events.is_empty() {
+                assert!(matches!(events.as_slice(), [Event::Closed(1)]));
+                break;
+            }
+        }
+        assert!(transport.socket.is_none());
+        peer.join().unwrap();
     }
 
     #[test]
