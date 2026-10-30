@@ -147,9 +147,15 @@ export function compareTraces(left, right, schedule) {
   }
   // Preserve chronological first failure even if an aggregate limit failed.
   mismatches.sort((a, b) => (Number(a.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1) - Number(b.path.match(/^samples\[(\d+)\]/)?.[1] ?? -1)));
+  // Body points are separate channels, so attribute in one pass over mismatches.
+  const owner = new Map(), first = new Map();
+  for (const [name, paths] of channelPaths) for (const path of paths) owner.set(path, name);
+  for (const m of mismatches) {
+    const name = owner.get(m.path.replace(/\.endpoint$/, ''));
+    if (name !== undefined && !first.has(name)) first.set(name, m);
+  }
   for (const channel of channels) {
-    const paths = channelPaths.get(channel.channel);
-    if (paths) channel.firstFailure = mismatches.find(m => paths.has(m.path.replace(/\.endpoint$/, ''))) ?? null;
+    if (channelPaths.has(channel.channel)) channel.firstFailure = first.get(channel.channel) ?? null;
   }
   return result(channels);
 }
