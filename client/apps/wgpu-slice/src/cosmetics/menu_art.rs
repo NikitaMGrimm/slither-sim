@@ -70,6 +70,7 @@ impl MenuManifest {
             return Err("Menu manifest version".into());
         }
         let mut entries: Vec<MenuArtEntry> = Vec::new();
+        let cosmetic_paths = paths();
         for line in lines.filter(|s| !s.is_empty()) {
             if entries.len() == 35 {
                 return Err("Menu manifest entry budget".into());
@@ -95,6 +96,10 @@ impl MenuManifest {
                 .filter(|r| *r > 0 && fields[1].bytes().all(|b| b.is_ascii_digit()))
                 .ok_or("Menu art revision")?;
             let path = fields[2];
+            // Existing image bindings keep their meaning in both loaders.
+            if cosmetic_paths.iter().any(|p| p == path) {
+                return Err("Menu manifest path collides with cosmetic".into());
+            }
             if !safe_path(path) || entries.iter().any(|e| e.art == art || e.path == path) {
                 return Err("Menu manifest duplicate or unsafe path".into());
             }

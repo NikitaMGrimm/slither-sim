@@ -59,6 +59,8 @@ Rows are role, positive u32 source revision and relative PNG/JPEG path. At most
 Paths are at most 128 ASCII characters (letters, digits, `_`, `-`, `.`, `/`).
 Empty, `.` and `..` components, absolute paths, URLs and duplicate roles/paths
 are rejected. Native/served reads check canonical containment, including links.
+Rust and browser loaders also reject menu paths already bound to an existing
+cosmetic, preserving accessory and skin-image bindings when a manifest is invalid.
 Images retain 4 MiB/file and 1,024px decode limits. Browser streaming reads cap
 manifest/image bytes before Rust decode; redirects/credentials are disabled and
 the source must have the page's origin. No official art or pack is included.

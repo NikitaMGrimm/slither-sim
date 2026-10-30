@@ -68,6 +68,39 @@ fn manifests_reject_malformed_duplicates_and_escaping_paths() {
     assert!(images.add("../menu/logo.png", &png(1, [0; 4])).is_err());
 }
 #[test]
+fn colliding_menu_manifest_preserves_existing_cosmetic_bindings() {
+    use slither_wgpu_slice::cosmetics::{MANIFEST_PATH, paths};
+    for path in paths() {
+        let manifest = format!("menu-art-v1\nskin 1 {path}\n");
+        assert!(
+            MenuManifest::parse(manifest.as_bytes())
+                .unwrap_err()
+                .contains("collides with cosmetic"),
+            "{path}"
+        );
+    }
+    let manifest = b"menu-art-v1\nskin 1 s/a_cap.png\n";
+    let bytes = png(8, [20, 80, 50, 255]);
+    // The browser's Rust batch seam also keeps the default manifest on failure.
+    let mut images = Images::default();
+    assert!(images.manifest(manifest).is_err());
+    images.add("s/a_cap.png", &bytes).unwrap();
+    let batch = Cosmetics::from_images(images, Some(30)).unwrap();
+    assert!(batch.accessory(true).is_some());
+    assert!(batch.menu_art(MenuArt::Skin).is_none());
+    let loaded = Cosmetics::load(
+        |path| match path {
+            MANIFEST_PATH => Ok(manifest.to_vec()),
+            "s/a_cap.png" => Ok(bytes.clone()),
+            _ => Err("Authored missing image".into()),
+        },
+        Some(30),
+    )
+    .unwrap();
+    assert!(loaded.accessory(true).is_some());
+    assert!(loaded.menu_art(MenuArt::Skin).is_none());
+}
+#[test]
 fn two_logo_frames_and_failed_replacement_preserve_prepared_resources() {
     let mut art = art();
     let first = art.menu_art(MenuArt::Logo(0)).unwrap().clone();

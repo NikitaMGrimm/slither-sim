@@ -61,3 +61,25 @@ test('browser resolves manifest-selected local bytes before publishing one compl
   assert.deepEqual(published,['s/a_cap.png','rasters/static.png']);
   assert.equal(attempted.length,3); assert.equal(warnings.length,0);
 });
+
+test('browser rejects colliding menu paths before manifest publication and preserves cosmetics', async () => {
+  for (const row of ['skin 1 s/a_cap.png', 'logo:0\t1\ts/a_cap.png', 'cosmetic\f1\fs/jmou3.png']) {
+    const paths=['s/a_cap.png','s/jmou3.png'];
+    const warnings=[]; let manifestCalls=0, published;
+    class Images {
+      sources=[];
+      static paths() { return paths; }
+      manifest() { manifestCalls++; throw new Error('Invalid manifest reached decoder'); }
+      menu_paths() { return []; }
+      add(p) { this.sources.push(p); }
+      free() {}
+    }
+    await loadCosmetics({owner:{cosmetics(images,accessory){published=images.sources; assert.equal(accessory,30);}},
+      CosmeticImages:Images,accessory:30,baseUrl:'http://127.0.0.1/cosmetics/',warn:m=>warnings.push(m),
+      fetch:async url=>new Response(url.pathname.endsWith('manifest.txt') ? `menu-art-v1\n${row}\n` : 'synthetic')});
+    assert.equal(manifestCalls,0);
+    assert.deepEqual(published,paths);
+    assert.equal(warnings.length,1);
+    assert.match(warnings[0],/Menu manifest path collides with cosmetic/);
+  }
+});

@@ -23,12 +23,23 @@ export async function loadCosmetics({ owner, CosmeticImages, baseUrl, accessory 
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
         return bytes;
     };
-    try { images.manifest(await read('menu/manifest.txt', 4096)); }
+    const cosmeticPaths = CosmeticImages.paths();
+    try {
+      const manifest = await read('menu/manifest.txt', 4096);
+      const reserved = new Set(cosmeticPaths);
+      const rows = new TextDecoder('utf-8', { fatal: true }).decode(manifest).split('\n').slice(1);
+      // Match Rust's ASCII field separators and exact logical path bindings.
+      if (rows.some(row => {
+        const fields = row.split(/[\t\f\r ]+/).filter(Boolean);
+        return fields.length === 3 && reserved.has(fields[2]);
+      })) throw new Error('Menu manifest path collides with cosmetic');
+      images.manifest(manifest);
+    }
     catch (error) {
       if (signal?.aborted) return;
       warn(`Menu manifest unavailable: ${String(error)}`);
     }
-    for (const path of [...CosmeticImages.paths(), ...images.menu_paths()]) {
+    for (const path of [...cosmeticPaths, ...images.menu_paths()]) {
       try {
         images.add(path, await read(path, 4 * 1024 * 1024));
       } catch (error) {
