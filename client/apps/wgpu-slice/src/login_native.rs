@@ -44,7 +44,7 @@ impl NativeLogin {
         state.edit_nickname(&nickname.encode_utf16().collect::<Vec<_>>());
         let mut input = NativeMenuInput::default();
         input.state.sync_menu(&state.view(true), &[]);
-        let mut text = TextCache::default();
+        let mut text = TextCache::menu();
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         Ok(Self {
             input,

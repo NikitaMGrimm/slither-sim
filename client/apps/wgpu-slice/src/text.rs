@@ -230,6 +230,12 @@ impl Default for TextCache {
     }
 }
 impl TextCache {
+    pub fn menu() -> Self {
+        Self {
+            next_handle: crate::bank::MENU_TEXT_HANDLE_BASE,
+            ..Self::default()
+        }
+    }
     /// Menu text and authored material allocations share a separate quota.
     /// The final frame admission runs inside `finish`, before cache publication.
     /// Only immutable resource copies leave this transaction.
@@ -610,12 +616,11 @@ impl TextCache {
                     pixels.extend_from_slice(&row[left as usize * 4..right as usize * 4]);
                 }
                 bytes += pixels.len();
+                let namespace = self.next_handle / crate::bank::HANDLE_NAMESPACE_SIZE;
                 self.next_handle = self
                     .next_handle
                     .checked_add(1)
-                    .filter(|handle| {
-                        *handle < crate::bank::TEXT_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE
-                    })
+                    .filter(|handle| handle / crate::bank::HANDLE_NAMESPACE_SIZE == namespace)
                     .ok_or("text handle overflow")?;
                 tiles.push(Tile {
                     resource: Resource {

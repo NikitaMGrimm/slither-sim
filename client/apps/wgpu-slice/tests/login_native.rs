@@ -342,3 +342,34 @@ fn native_login_endpoint_enter_pointer_and_terminal_retry_send_fixed_profile() {
         }
     }
 }
+
+#[test]
+fn login_menu_composes_over_the_world_picture() {
+    let mut game = slither_wgpu_slice::game::LocalGame::new(0.).unwrap();
+    let mut login = NativeLogin::new("Player").unwrap();
+    // Same sizes as the desktop redraw: world at the backing size, menu at physical.
+    let extent = slither_wgpu_slice::render::backing_size([960., 540.]).unwrap();
+    for t in [16., 32., 48.] {
+        game.begin_redraw(t, extent, 1.).unwrap();
+        while let Some(e) = game.effect() {
+            game.acknowledge(e.generation, e.id, true).unwrap();
+        }
+        let p = game.take_frame().expect("world picture");
+        let mut picture = slither_wgpu_slice::render::PreparedFrame {
+            frame: p.frame.clone(),
+            resources: p.resources.clone(),
+        };
+        login
+            .prepare_host([960, 540], 1., true, game.menu_cosmetics())
+            .unwrap()
+            .append_to(&mut picture)
+            .unwrap();
+        let resident = picture
+            .resources
+            .iter()
+            .map(|r| (r.asset.into(), r.asset))
+            .collect();
+        picture.frame.quads(&resident).unwrap();
+        game.presented(true).unwrap();
+    }
+}
