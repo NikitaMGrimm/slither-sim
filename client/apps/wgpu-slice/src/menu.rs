@@ -20,7 +20,7 @@ use crate::bank::MENU_MATERIAL_HANDLE_BASE;
 // Reserved menu-material handles; the generic allocator starts above them.
 const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
-type MaterialKey = (u32, u32, u8, u64);
+type MaterialKey = (u32, u32, u8, u64, u64);
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
@@ -193,6 +193,7 @@ pub struct Menu {
     pub skin_hovered: bool,
     pub skin_pressed: bool,
     materials: BTreeMap<MaterialKey, Resource>,
+    art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     next_handle: u64,
     spinner_revision: u64,
 }
@@ -205,12 +206,13 @@ struct Label {
 }
 struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
+    old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
     spinner_revision: u64,
     scale: f64,
     draws: Vec<Draw>,
-    art: Vec<Resource>,
+    art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
 }
 fn body(r: MenuRect) -> BodyRect {
@@ -237,7 +239,18 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
 }
 impl Composition<'_> {
     fn solid_draw(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<Draw> {
-        let key = (1, 1, kind, 0);
+        let size = if kind == 10 {
+            [1, 1]
+        } else {
+            [
+                (r.width * self.scale).round().max(1.) as u32,
+                (r.height * self.scale).round().max(1.) as u32,
+            ]
+        };
+        if size.into_iter().any(|n| n > 2048) {
+            return Err("Menu solid texture budget".into());
+        }
+        let key = (size[0], size[1], kind, 0, 0);
         if !self.materials.contains_key(&key) {
             let resource = if let Some(resource) = self.old.get(&key) {
                 resource.clone()
@@ -256,26 +269,34 @@ impl Composition<'_> {
                     asset: BodyAsset {
                         handle: self.next_handle,
                         revision: 1,
-                        width: 1,
-                        height: 1,
+                        width: size[0],
+                        height: size[1],
                         status: BodyAssetStatus::Ready,
                     },
                     image: materials::RgbaImage {
-                        width: 1,
-                        height: 1,
-                        pixels: vec![rgb[0], rgb[1], rgb[2], 255],
+                        width: size[0],
+                        height: size[1],
+                        pixels: [rgb[0], rgb[1], rgb[2], 255]
+                            .repeat(size[0] as usize * size[1] as usize),
                     },
                 }
             };
             self.materials.insert(key, resource);
         }
-        Ok(image(&self.materials[&key], r, alpha))
+        let mut draw = image(&self.materials[&key], r, alpha);
+        if kind != 10 {
+            draw.destination.width = f64::from(size[0]) / self.scale;
+            draw.destination.height = f64::from(size[1]) / self.scale;
+            draw.snap_overlay(self.scale);
+        }
+        Ok(draw)
     }
     fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
         let draw = self.solid_draw(r, kind, alpha)?;
         self.push(draw)
     }
-    fn push(&mut self, draw: Draw) -> Result<()> {
+    fn push(&mut self, mut draw: Draw) -> Result<()> {
+        draw.snap_overlay(self.scale);
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
     }
@@ -286,16 +307,12 @@ impl Composition<'_> {
             5 => materials::MenuSurface::Nickname,
             _ => materials::MenuSurface::Compact,
         };
-        // Include the broader nickname shadow and the menu's outgoing growth;
-        // leave room for the three independent ceil operations below.
-        let scale = self
-            .scale
-            .min(509. / (r.width.max(r.height) + 2. * surface.padding()));
+        let scale = self.scale;
         let size = [
             (r.width * scale).ceil() as u32,
             (r.height * scale).ceil() as u32,
         ];
-        let key = (size[0], size[1], kind, scale.to_bits());
+        let key = (size[0], size[1], kind, scale.to_bits(), 0);
         if !self.materials.contains_key(&key) {
             let resource = if let Some(r) = self.old.get(&key) {
                 r.clone()
@@ -354,17 +371,85 @@ impl Composition<'_> {
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
-        self.push(image(resource, r, alpha))?;
-        self.art.push(resource.clone());
+        let size = [
+            (r.width * self.scale).round().max(1.) as u32,
+            (r.height * self.scale).round().max(1.) as u32,
+        ];
+        if size.into_iter().any(|n| n > 2048) {
+            return Err("Menu art destination budget".into());
+        }
+        let key = (resource.asset.into(), size);
+        if !self.art.contains_key(&key) {
+            let resized = if let Some(old) = self.old_art.get(&key) {
+                old.clone()
+            } else if [resource.image.width, resource.image.height] == size {
+                resource.clone()
+            } else {
+                // Filter premultiplied pixels once per source revision/physical
+                // size. GPU minification would reconstruct this edge every frame.
+                let source = image::RgbaImage::from_raw(
+                    resource.image.width,
+                    resource.image.height,
+                    resource.image.pixels.clone(),
+                )
+                .ok_or("Menu art pixels")?;
+                let mut pixels = image::imageops::resize(
+                    &source,
+                    size[0],
+                    size[1],
+                    image::imageops::FilterType::CatmullRom,
+                )
+                .into_raw();
+                for p in pixels.as_chunks_mut::<4>().0 {
+                    for i in 0..3 {
+                        p[i] = p[i].min(p[3]);
+                    }
+                }
+                self.next_handle = self
+                    .next_handle
+                    .checked_add(1)
+                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
+                    .ok_or("Menu material handle overflow")?;
+                Resource {
+                    asset: BodyAsset {
+                        handle: self.next_handle,
+                        revision: 1,
+                        width: size[0],
+                        height: size[1],
+                        status: BodyAssetStatus::Ready,
+                    },
+                    image: materials::RgbaImage {
+                        width: size[0],
+                        height: size[1],
+                        pixels,
+                    },
+                }
+            };
+            let bytes: usize = self.art.values().map(|r| r.image.pixels.len()).sum();
+            if bytes + resized.image.pixels.len() > crate::cosmetics::COSMETIC_PIXEL_BUDGET {
+                return Err("Menu art pixel budget".into());
+            }
+            self.art.insert(key, resized);
+        }
+        let r = MenuRect {
+            width: f64::from(size[0]) / self.scale,
+            height: f64::from(size[1]) / self.scale,
+            ..r
+        };
+        self.push(image(&self.art[&key], r, alpha))?;
         Ok(())
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
-        let side = (128. * self.scale).ceil() as u32;
-        let key = (side, side, 6, view.spinner_time.to_bits());
+        if view.spinner_scale <= 0. {
+            return Ok(());
+        }
+        let scale = self.scale * view.spinner_scale;
+        let side = (128. * scale).ceil().max(1.) as u32;
+        let key = (side, side, 6, scale.to_bits(), view.spinner_time.to_bits());
         let resource = if let Some(old) = self.old.get(&key) {
             old.clone()
         } else {
-            let pixels = materials::menu_spinner(view.spinner_time, side)?;
+            let pixels = materials::menu_spinner(view.spinner_time, scale)?;
             self.spinner_revision = self
                 .spinner_revision
                 .checked_add(1)
@@ -380,7 +465,7 @@ impl Composition<'_> {
                 image: pixels,
             }
         };
-        let width = 128. * view.spinner_scale;
+        let width = f64::from(side) / self.scale;
         self.push(image(
             &resource,
             MenuRect {
@@ -396,7 +481,7 @@ impl Composition<'_> {
     }
 }
 impl Menu {
-    /// Raster scale is bounded at 3x. Geometry comes only from the core layout;
+    /// Rasterize at the physical overlay scale. Geometry comes from the core layout;
     /// a caller supplies the selected logo frame, never a filesystem path.
     #[allow(clippy::too_many_arguments)]
     pub fn prepare(
@@ -427,12 +512,13 @@ impl Menu {
         crate::render::dimensions(extent, dpr)?;
         let mut c = Composition {
             old: &self.materials,
+            old_art: &self.art,
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
-            scale: dpr.min(3.),
+            scale: dpr,
             draws: Vec::new(),
-            art: Vec::new(),
+            art: BTreeMap::new(),
             labels: Vec::new(),
         };
         let a = view.login_alpha;
@@ -729,7 +815,6 @@ impl Menu {
         // Measure replacement faces normally. Fit full labels into their authored
         // boxes, without synthetic bold or browser-specific metric machinery.
         for l in &mut c.labels {
-            l.style.size = l.style.size.min(128. / c.scale);
             let width = text.measure_panel(&l.text, l.style)?.advance;
             if width > l.rect.width {
                 l.style.size *= l.rect.width / width;
@@ -763,13 +848,12 @@ impl Menu {
                 let mut resources: BTreeMap<_, _> = c
                     .materials
                     .values()
-                    .chain(&c.art)
+                    .chain(c.art.values())
                     .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
                     .collect();
                 for group in groups {
                     for (draw, resource) in group {
-                        check_menu_draws(c.draws.len() + 1)?;
-                        frame::push_draw(&mut c.draws, draw)?;
+                        c.push(draw)?;
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
@@ -799,9 +883,17 @@ impl Menu {
                 })
             },
         )?;
-        self.next_handle = c.next_handle;
-        self.spinner_revision = c.spinner_revision;
-        self.materials = c.materials;
+        let Composition {
+            next_handle,
+            spinner_revision,
+            materials,
+            art,
+            ..
+        } = c;
+        self.next_handle = next_handle;
+        self.spinner_revision = spinner_revision;
+        self.materials = materials;
+        self.art = art;
         Ok(result)
     }
 }

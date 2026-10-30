@@ -95,6 +95,9 @@ pub fn paths() -> Vec<String> {
 
 /// PNG/JPEG only, with limits installed before decoding and RGBA allocation.
 pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
+    decode_bounded(bytes, 1024)
+}
+fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
     if bytes.is_empty() || bytes.len() > MAX_ENCODED_BYTES {
         return Err("Cosmetic encoded image budget".into());
     }
@@ -108,8 +111,8 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
         return Err("Cosmetic image must be PNG or JPEG".into());
     }
     let mut limits = image::Limits::default();
-    limits.max_image_width = Some(1024);
-    limits.max_image_height = Some(1024);
+    limits.max_image_width = Some(max_extent);
+    limits.max_image_height = Some(max_extent);
     limits.max_alloc = Some(16 * 1024 * 1024);
     reader.limits(limits);
     let rgba = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
@@ -163,7 +166,11 @@ impl Images {
     }
     pub fn add(&mut self, path: &str, bytes: &[u8]) -> Result<()> {
         if let Some(entry) = self.menu.manifest.0.iter().find(|e| e.path == path) {
-            return self.menu.insert(entry.art, decode(bytes)?, self.bytes);
+            return self.menu.insert(
+                entry.art,
+                decode_bounded(bytes, menu_art::MAX_EXTENT)?,
+                self.bytes,
+            );
         }
         if !paths().iter().any(|p| p == path) || self.images.contains_key(path) {
             return Err("Unknown or duplicate cosmetic path".into());
@@ -408,7 +415,11 @@ impl Cosmetics {
             .chain(self.accessories.values())
             .map(|r| r.image.pixels.len())
             .sum();
-        self.menu.insert(art, decode(bytes)?, other_bytes)
+        self.menu.insert(
+            art,
+            decode_bounded(bytes, menu_art::MAX_EXTENT)?,
+            other_bytes,
+        )
     }
 }
 

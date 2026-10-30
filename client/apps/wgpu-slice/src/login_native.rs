@@ -21,6 +21,7 @@ pub struct NativeLogin {
     menu: Menu,
     text: TextCache,
     area: [f64; 2],
+    pixel_scale: f64,
     pressed: bool,
     pressed_quality: bool,
 }
@@ -54,6 +55,7 @@ impl NativeLogin {
             menu: Menu::default(),
             text,
             area: [960., 540.],
+            pixel_scale: 1.,
             pressed: false,
             pressed_quality: false,
         })
@@ -261,6 +263,7 @@ impl NativeLogin {
             }
         };
         let area = extent.map(|n| f64::from(n) / dpr);
+        self.pixel_scale = dpr;
         let fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
         if self.area != area {
             self.layout = fresh;
@@ -337,8 +340,8 @@ impl NativeLogin {
         let fit = if width > r.width { r.width / width } else { 1. };
         let x = (self.text.measure_panel(&prefix, style)?.advance * fit).min(r.width - 1.);
         Ok(self.input.state.apply(EditIntent::CursorArea {
-            position: [r.x + x, r.y],
-            size: [1., r.height],
+            position: [r.x + x, r.y].map(|v| (v * self.pixel_scale).round() / self.pixel_scale),
+            size: [1., r.height].map(|v| (v * self.pixel_scale).round().max(1.) / self.pixel_scale),
         }))
     }
 }

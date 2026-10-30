@@ -46,8 +46,8 @@ pub use slither_client::presentation::{
 // HUD slots replace their previous content and have a separate allowance. Fast
 // score updates cannot evict world labels from the nickname LRU.
 pub const HUD_CACHE_BYTES: usize = 2 * 1024 * 1024;
-// Preserve ordinary DPR 1–3 text. Denser displays upscale these bounded rasters
-// rather than exhausting the HUD allowance or exceeding the font-pixel limit.
+// Backing-space diagnostics retain their bounded high-scale fallback. Native
+// physical overlays bypass it and rasterize at the exact window DPR.
 pub const MAX_HUD_RASTER_SCALE: f64 = 3.;
 const NICKNAME_CACHE_RUNS: usize = 216;
 pub const MAX_NICKNAME_RUNS_PER_FRAME: usize = 128;
@@ -327,6 +327,17 @@ impl TextCache {
         scale: f64,
         alphas: &[&[f64]],
     ) -> Result<PanelDraws> {
+        if !scale.is_finite() || scale <= 0. {
+            return Err("Invalid panel scale".into());
+        }
+        self.draw_overlay_panels_with_run_alphas(panels, scale.min(MAX_HUD_RASTER_SCALE), alphas)
+    }
+    pub(crate) fn draw_overlay_panels_with_run_alphas(
+        &mut self,
+        panels: &[PanelSubmission<'_>],
+        scale: f64,
+        alphas: &[&[f64]],
+    ) -> Result<PanelDraws> {
         if !alphas.is_empty()
             && (alphas.len() != panels.len()
                 || panels.iter().zip(alphas).any(|(p, a)| {
@@ -338,7 +349,6 @@ impl TextCache {
         if !scale.is_finite() || scale <= 0. {
             return Err("Invalid panel scale".into());
         }
-        let scale = scale.min(MAX_HUD_RASTER_SCALE);
         let mut active = [false; 2];
         for p in panels {
             let (base, limit) = p.group.slots();
@@ -425,7 +435,7 @@ impl TextCache {
                         )?
                         .1
                     {
-                        if crate::render::clip_text(&mut draw, r.clip) {
+                        if crate::render::clip_overlay_text(&mut draw, r.clip, scale) {
                             // Preserve the producer quota before growing its staged output.
                             if draws.len()
                                 == crate::render::PANEL_PRODUCER_DRAWS
@@ -530,13 +540,20 @@ impl TextCache {
         clip: Option<BodyRect>,
     ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         let px = run.style.size * backing_scale;
+        // The 40px fallback logo grows during outgoing login: at DPR 3 its
+        // exact raster exceeds 128px. Keep the Menu byte budget authoritative.
+        let font_limit = if matches!(slot, Some(Key::Menu(_))) {
+            256.
+        } else {
+            128.
+        };
         if !run.position.into_iter().all(f64::is_finite)
             || !(0. ..=1.).contains(&run.alpha)
             || !backing_scale.is_finite()
             || backing_scale <= 0.
             || !run.style.size.is_finite()
             || run.style.size <= 0.
-            || !(1. ..=128.).contains(&px)
+            || !(1. ..=font_limit).contains(&px)
             || run.text.len() > 1024
         {
             return Err("invalid text run/style/budget".into());
@@ -716,33 +733,34 @@ impl TextCache {
                 .tiles
                 .iter()
                 .map(|tile| {
-                    (
-                        Draw {
-                            corners: None,
-                            repeat_uv: None,
-                            black_effect: false,
-                            asset: tile.resource.asset,
-                            // Neighbor pixels outside the crop preserve linear sampling
-                            // across tile seams at fractional screen positions.
-                            source: Some(BodyRect {
-                                x: f64::from(tile.source_x),
-                                y: 0.,
-                                width: f64::from(tile.width),
-                                height: f64::from(tile.resource.asset.height),
-                            }),
-                            destination: BodyRect {
-                                x: (entry.offset[0] + f64::from(tile.start) - x) / backing_scale,
-                                y: (entry.offset[1] + y) / backing_scale,
-                                width: f64::from(tile.width) / backing_scale,
-                                height: f64::from(tile.resource.asset.height) / backing_scale,
-                            },
-                            translation: run.position,
-                            rotation: 0.,
-                            effective_alpha: run.alpha,
-                            blend: BodyBlend::SourceOver,
+                    let mut draw = Draw {
+                        corners: None,
+                        repeat_uv: None,
+                        black_effect: false,
+                        asset: tile.resource.asset,
+                        // Neighbor pixels outside the crop preserve linear sampling
+                        // across tile seams at fractional screen positions.
+                        source: Some(BodyRect {
+                            x: f64::from(tile.source_x),
+                            y: 0.,
+                            width: f64::from(tile.width),
+                            height: f64::from(tile.resource.asset.height),
+                        }),
+                        destination: BodyRect {
+                            x: (entry.offset[0] + f64::from(tile.start) - x) / backing_scale,
+                            y: (entry.offset[1] + y) / backing_scale,
+                            width: f64::from(tile.width) / backing_scale,
+                            height: f64::from(tile.resource.asset.height) / backing_scale,
                         },
-                        tile.resource.clone(),
-                    )
+                        translation: run.position,
+                        rotation: 0.,
+                        effective_alpha: run.alpha,
+                        blend: BodyBlend::SourceOver,
+                    };
+                    if !matches!(key, Key::Nickname(_)) {
+                        draw.snap_overlay(backing_scale);
+                    }
+                    (draw, tile.resource.clone())
                 })
                 .collect(),
         ))
@@ -1386,15 +1404,9 @@ mod hud_budget_tests {
             .collect();
         let mut first = None;
         for i in 0..300 {
-            let dpr: f64 = [1., 2., 16.][i % 3];
+            let dpr: f64 = [1., 2., 3.][i % 3];
             let tiles = cache
-                .draw_minimap(
-                    run(&format!("server {}", i + 1)),
-                    dpr.min(MAX_HUD_RASTER_SCALE),
-                    [0., 1.],
-                    8.,
-                    160.,
-                )
+                .draw_minimap(run(&format!("server {}", i + 1)), dpr, [0., 1.], 8., 160.)
                 .unwrap();
             if first.is_none() {
                 first = Some(tiles.clone());
@@ -1477,10 +1489,10 @@ mod hud_budget_tests {
             ([960, 540], 1., 37),
             ([1920, 1080], 2., 37),
             ([2880, 1620], 3., 37),
-            ([3000, 1500], 5., 37),
-            ([8192, 8192], 16., 37),
-            ([3000, 1500], 16., 6),
-            ([3000, 1500], 5., 37),
+            ([3840, 2160], 1.25, 37),
+            ([3840, 2160], 1.5, 37),
+            ([3808, 2156], 1.75, 37),
+            ([3840, 2160], 2., 37),
         ] {
             let plan = hud::plan(&view, extent, dpr).unwrap();
             let expected: Vec<_> = plan.lines.iter().flat_map(|line| &line.spans).collect();
@@ -1514,10 +1526,7 @@ mod hud_budget_tests {
                     assert_eq!(entry.content.text, span.text);
                     assert_eq!(entry.content.weight, span.style.weight);
                     assert_eq!(entry.content.color, span.style.color);
-                    assert_eq!(
-                        f64::from_bits(entry.content.size),
-                        span.style.size * dpr.min(MAX_HUD_RASTER_SCALE)
-                    );
+                    assert_eq!(f64::from_bits(entry.content.size), span.style.size * dpr);
                     assert!(f64::from_bits(entry.content.size) <= 128.);
                     assert!(
                         entry.tiles.iter().any(|tile| out

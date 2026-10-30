@@ -133,6 +133,34 @@ fn fixed_scale_reuses_text_rasters_across_frames_and_window_resize() {
     assert_ne!(text_assets(&first), text_assets(&scale_changed));
     assert!(text_assets(&first)[0].height > text_assets(&scale_changed)[0].height);
 }
+#[test]
+fn fractional_display_scales_keep_hud_text_on_physical_texels() {
+    let mut game = tape::playing();
+    for dpr in [1.25, 1.5, 1.75] {
+        game.window_viewport([3840, 2160], dpr).unwrap();
+        let picture = snapshot(&mut game, 100);
+        let text: Vec<_> = picture
+            .overlay
+            .as_ref()
+            .unwrap()
+            .draws
+            .iter()
+            .filter(|d| d.asset.handle >> 60 == 4)
+            .collect();
+        assert!(!text.is_empty());
+        for d in text {
+            let s = d.source.unwrap();
+            for v in [
+                (d.destination.x + d.translation[0]) * dpr,
+                (d.destination.y + d.translation[1]) * dpr,
+            ] {
+                assert!((v - v.round()).abs() < 1e-9);
+            }
+            assert!((d.destination.width * dpr - s.width).abs() < 1e-9);
+            assert!((d.destination.height * dpr - s.height).abs() < 1e-9);
+        }
+    }
+}
 
 #[test]
 fn setup_retry_and_resize_keep_immutable_overlay_with_its_picture() {

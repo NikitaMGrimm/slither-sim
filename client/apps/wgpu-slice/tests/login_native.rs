@@ -152,7 +152,29 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
                     let nick = login.layout.viewport_rect(E::Nickname);
                     let effects = login.cursor_area().unwrap();
-                    assert!(effects.iter().any(|e| matches!(e,HostEditEffect::ImeCursorArea{position,..} if position[0]>=nick.x && position[0]<=nick.x+nick.width && position[1]==nick.y)));
+                    assert!(effects.iter().any(|e| matches!(e,HostEditEffect::ImeCursorArea{position,..} if position[0]>=nick.x - 0.5/dpr && position[0]<=nick.x+nick.width && position[1]==(nick.y*dpr).round()/dpr)));
+                    let painted = login.prepare_host(physical, dpr, true, None).unwrap();
+                    let caret = painted
+                        .frame
+                        .draws
+                        .iter()
+                        .find(|d| {
+                            painted.resources.iter().any(|r| {
+                                r.asset == d.asset
+                                    && r.image
+                                        .pixels
+                                        .as_chunks::<4>()
+                                        .0
+                                        .iter()
+                                        .all(|p| *p == [224, 224, 255, 255])
+                            })
+                        })
+                        .unwrap();
+                    assert!(effects.iter().any(
+                        |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
+                        if *position == [caret.destination.x,caret.destination.y]
+                        && *size == [caret.destination.width,caret.destination.height])
+                    ));
                 }
                 E::Quality => assert_eq!(login.state.view(true).quality, MenuQuality::Low),
                 _ => unreachable!(),
@@ -261,17 +283,23 @@ fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
         .frame
         .draws
         .iter()
-        .find(|draw| draw.destination.width == 1. && draw.destination.height == nick.height)
+        .find(|draw| draw.destination.width == 1. && draw.destination.height == nick.height.round())
         .unwrap();
-    assert_eq!(caret.destination.x, nick.x);
-    assert_eq!(caret.destination.y, nick.y);
+    assert_eq!(caret.destination.x, nick.x.round());
+    assert_eq!(caret.destination.y, nick.y.round());
     let material = picture
         .resources
         .iter()
         .find(|r| r.asset.handle == caret.asset.handle)
         .unwrap();
-    assert_eq!((material.image.width, material.image.height), (1, 1));
-    assert_eq!(material.image.pixels, [224, 224, 255, 255]);
+    assert_eq!(
+        (material.image.width, material.image.height),
+        (1, nick.height.round() as u32)
+    );
+    assert_eq!(
+        material.image.pixels,
+        [224, 224, 255, 255].repeat(material.image.height as usize)
+    );
     // Text tint is baked into its padded raster, independently of caret material.
     assert!(picture.resources.iter().any(|r| {
         r.image
@@ -300,7 +328,7 @@ fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
             first
                 .resources
                 .iter()
-                .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+                .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
         );
         assert!(
             first

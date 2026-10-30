@@ -13,12 +13,12 @@ pub struct RgbaImage {
 /// Source-derived ribbon geometry, filled once per path with nonzero winding.
 /// Coverage is analytic in x and sampled on four subpixel scanlines in y.
 /// The 128 CSS-pixel canvas clips the paths before the host applies scale/opacity.
-pub fn menu_spinner(time: f64, side: u32) -> Result<RgbaImage> {
+pub fn menu_spinner(time: f64, scale: f64) -> Result<RgbaImage> {
     use std::f64::consts::PI;
-    if !time.is_finite() || time < 0. || !(1..=384).contains(&side) {
+    if !time.is_finite() || time < 0. || !scale.is_finite() || scale <= 0. || scale > 16. {
         return Err("Spinner raster bounds".into());
     }
-    let scale = f64::from(side) / 128.;
+    let side = (128. * scale).ceil() as u32;
     let point = |radius: f64, angle: f64| {
         let (sin, cos) = angle.sin_cos();
         [
@@ -138,18 +138,19 @@ pub fn menu_control(
     let [w, h] = size;
     if w == 0
         || h == 0
-        || w > 1024
-        || h > 256
+        || w > 2048
+        || h > 2048
         || !radius.is_finite()
         || radius < 0.
         || !scale.is_finite()
-        || !(0.01..=3.).contains(&scale)
+        || !(0. ..=2048.).contains(&scale)
+        || scale == 0.
     {
         return Err("Menu control material bounds".into());
     }
     let pad = (surface.padding() * scale).ceil() as u32;
     let (width, height) = (w + 2 * pad, h + 2 * pad);
-    if width > 512 || height > 512 {
+    if width > 2048 || height > 2048 {
         return Err("Menu control texture budget".into());
     }
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
