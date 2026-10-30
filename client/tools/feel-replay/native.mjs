@@ -18,14 +18,18 @@ export function assertWasmTraceBinding(summary, traceBytes) {
 export function nativeSteps(schedule, deliveries, area) {
   let actions, pendingMouseUp;
   const dispatch = mouseReplay(n => {
+    // A2 constructs DOM events from CSS options. MouseEvent getters floor these
+    // doubles; PointerEvent getters preserve them. The production physical/f32
+    // mouse_client_position boundary must not be applied to CSS a second time.
+    if (n.type.startsWith('mouse')) n = { ...n, x: Math.floor(n.x), y: Math.floor(n.y) };
     const editor = ['input', 'textarea', 'editable'].includes(n.target), menu = n.target === 'button';
     const admitted = admitsBrowserInput(n, { editor, menu });
     let prevented = false;
     if (['pointerdown', 'mousedown', 'keydown'].includes(n.type)) pendingMouseUp = undefined;
     if (admitted) {
-      if (n.type === 'pointermove' || n.type === 'pointerdown' && n.button === 0) {
-        actions.push({ kind: 'pointer', x: n.x, y: n.y, down: n.type === 'pointerdown' });
-        prevented = n.type === 'pointerdown';
+      if (n.type === 'pointermove' || n.type === 'mousemove' || n.type === 'mousedown' && n.button === 0) {
+        actions.push({ kind: 'pointer', x: n.x, y: n.y, down: n.type === 'mousedown' });
+        prevented = n.type === 'mousedown';
       } else if (['pointerup', 'mouseup'].includes(n.type)) {
         const duplicate = n.type === 'mouseup' && pendingMouseUp !== undefined && pendingMouseUp === n.button;
         pendingMouseUp = n.type === 'pointerup' ? n.button : undefined;
