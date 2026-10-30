@@ -244,9 +244,9 @@ export function createStockGameplay(options) {
     // A notification can be inside session ingress OR a mutable Wasm control borrow.
     // Only captured microtasks may reconcile/free after BOTH stacks have unwound.
     state() { if (!gameplayOwner) return; return lease(() => { policy('mark_dirty'); schedule(); }); },
-    error: error => { if (gameplayOwner) return lease(() => {
+    error: (error,wasPlaying) => { if (gameplayOwner) return lease(() => {
       const state=session.snapshot();
-      if (!policy('retry_transport_failure',[state.phase,state.playing,state.reason??''])) latchError(error);
+      if (!policy('retry_transport_failure',[state.phase,wasPlaying,state.reason??''])) latchError(error);
     }); },
   };
   const hudObserver = {

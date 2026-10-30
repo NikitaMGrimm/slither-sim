@@ -569,7 +569,8 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       }
       if (editNotifications.has(event.type)) { observeInput?.(event, 'filtered-notification'); return; }
       // Keep menu presses out of steering/boost; releases still clear existing held input.
-      if (!admitsBrowserInput(event, { menu: !!loginUi?.root.contains(event.target) || !!menuUi && menuActions.some(action => action.button === event.target) })) { observeInput?.(event, 'filtered-menu'); return; }
+      const loginTarget = !!loginUi && event.target instanceof realm.Node && loginUi.root.contains(event.target);
+      if (!admitsBrowserInput(event, { menu: loginTarget || !!menuUi && menuActions.some(action => action.button === event.target) })) { observeInput?.(event, 'filtered-menu'); return; }
       if (disposed || !controller) return;
       if (event.type === 'resize') {
         try {

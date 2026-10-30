@@ -20,3 +20,25 @@ test('login restores existing Canvas nickname and preserves its appearance recor
     graph.login.onEdit('Late');assert.equal(writes.length,1);
   });
 });
+
+test('login routes Window-targeted resize without passing non-Nodes to contains',async()=>{
+  await runGameModuleTest(async({assert,createGraph})=>{
+    const graph=createGraph({armed:false,hudNative:true,ownedHudNative:true,ownedPlayNative:true,leaderboardNative:true,minimapNative:true,
+      prepareWasm(api,run){api.LeaderboardScoreProjector=run('(class { project(){throw Error("No scores expected");} free(){} })');}});
+    graph.stubLogin();graph.hudWasm();
+    const entry=await graph.load('bootstrap.mjs');graph.arm();
+    const runtime=await entry.startGamePage({realm:graph.nativeBoundary(native=>native),initialize(){},wasmApi:graph.wasm.api});
+    let contains=0;
+    graph.login.root.contains=target=>{
+      if(!(target instanceof graph.f.realm.Node))throw TypeError('Synthetic Node.contains requires a Node');
+      contains++;return false;
+    };
+    for(const target of [graph.f.realm,null,graph.f.document]) {
+      const draws=runtime.diagnostics().draws;
+      assert.doesNotThrow(()=>graph.f.edit.dispatch('resize',{target}));
+      assert.equal(runtime.diagnostics().draws,draws+1);
+      assert.equal(runtime.diagnostics().disposed,false);
+    }
+    assert.equal(contains,1);assert.equal(graph.f.sockets,0);runtime.dispose();
+  });
+});

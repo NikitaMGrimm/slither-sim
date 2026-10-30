@@ -168,7 +168,7 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
       sources.set(origin+'login-overlay.mjs',`export function mountLogin({realm,parent,nickname,onEdit}) {
         loginCompositionCounts.mounts++;
         loginCompositionCounts.nickname=nickname;loginCompositionCounts.onEdit=onEdit;
-        const root=realm.document.createElement('div');root.contains=()=>false;parent.appendChild(root);
+        const root=realm.document.createElement('div');root.contains=()=>false;parent.appendChild(root);loginCompositionCounts.root=root;
         return {root,frame(now){loginCompositionCounts.frames.push(now);},dispose(){loginCompositionCounts.disposed++;parent.removeChild(root);}};
       }`);
     },

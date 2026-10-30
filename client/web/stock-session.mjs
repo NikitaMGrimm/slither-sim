@@ -136,6 +136,8 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
   }
   function stop(nextPhase, code, error, hasError = false) {
     if (terminal()) return;
+    // begin_stop clears playing; subscribers need the lifecycle at failure time.
+    const wasPlaying=owner().snapshot().playing;
     const retainFailure = secondary => { if (!hasError) { hasError = true; error = secondary; } };
     if (!owner().begin_stop(nextPhase === 'failed', Uint16Array.from({ length: code.length }, (_, index) => code.charCodeAt(index)))) return;
     launch?.login.fill(0); launch = undefined; generation++; detach(retainFailure);
@@ -149,7 +151,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     try { publish(); } catch (notificationError) { retainFailure(notificationError); }
     if (hasError) {
       notifying = true;
-      try { sink?.error(error); } catch { /* Original failure remains authoritative. */ }
+      try { sink?.error(error, wasPlaying); } catch { /* Original failure remains authoritative. */ }
       finally { notifying = false; }
     }
   }

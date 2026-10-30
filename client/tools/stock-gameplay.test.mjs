@@ -356,3 +356,14 @@ for(const outcome of ['cancel','close','error','construction']) {
     assert.equal(h.sockets.length,count+1);
   });
 }
+
+test('local gameplay socket errors retain the pre-stop playing observation and remain fatal',()=>{
+  const h=harness({localSession:true});h.connected();
+  assert.equal(h.gameplay.diagnostics().session.playing,true);
+  const primary=Error('Synthetic gameplay socket failure');h.sockets[0].onerror(primary);
+  assert.equal(h.gameplay.diagnostics().session.playing,false);
+  assert.equal(h.errors.length,0);h.flush();
+  assert.deepEqual(h.errors,[primary]);assert.equal(h.gameplay.diagnostics().disposed,true);
+  const count=h.sockets.length;
+  assert.throws(()=>h.gameplay.play(request()),/stopped/);assert.equal(h.sockets.length,count);
+});
