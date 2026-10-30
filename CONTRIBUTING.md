@@ -145,8 +145,12 @@ Within `0.x`, incompatible Rust API changes bump the minor version. Group
 unreleased changes in the changelog; no permanent freeze or multi-version support
 is promised.
 
-Write one user-facing changelog entry per change, with a link to its PR when
-useful. Avoid repeating generated commit titles in a second prose list.
+Write one user-facing changelog entry per change to what ships: runtime
+behavior, APIs, packaged tools, examples or guides. Link its PR when useful. A
+study that changes none of these, including a rejected candidate, gets only its
+[research index](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/README.md)
+row: the changelog ships in the package, so any entry there prompts a patch
+release. Avoid repeating generated commit titles in a second prose list.
 
 The `package` check builds the local crate. It ships the library, binary,
 user guides and examples, the release guide and the fixtures its unit tests read;
