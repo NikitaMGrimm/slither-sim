@@ -4,7 +4,6 @@ use std::{
     error::Error,
     f64::consts::{PI, TAU},
     fmt,
-    sync::OnceLock,
 };
 
 use super::{BodyPaintView, BodyRect};
@@ -415,8 +414,17 @@ impl AntennaDrawRequest {
 
     /// Validate the complete tape and return staged state and owned commands.
     pub fn finish(
+        self,
+        pairs: &[[f64; 2]],
+    ) -> Result<(AntennaState, PreparedAntenna), AntennaError> {
+        self.finish_with_angle(pairs, link_angle)
+    }
+
+    // The test reference reuses the unchanged solver with the pre-S8 angle.
+    fn finish_with_angle(
         mut self,
         pairs: &[[f64; 2]],
+        angle: impl Fn(f64, f64) -> Result<f64, AntennaError>,
     ) -> Result<(AntennaState, PreparedAntenna), AntennaError> {
         if pairs.len() != self.random_pair_count()
             || !pairs
@@ -463,7 +471,7 @@ impl AntennaDrawRequest {
             let mut qy = f64::from(s.y[j - 1]);
             qx += pair[0] * 2. - 1.;
             qy += pair[1] * 2. - 1.;
-            let phi = lookup_angle(f64::from(s.x[j]) - qx, f64::from(s.y[j]) - qy)?;
+            let phi = angle(f64::from(s.x[j]) - qx, f64::from(s.y[j]) - qy)?;
             qx += math::cos(phi) * 4. * scale;
             qy += math::sin(phi) * 4. * scale;
             s.velocity_x[j] = (f64::from(s.velocity_x[j]) + (qx - f64::from(s.x[j])) * 0.1) as f32;
@@ -479,7 +487,7 @@ impl AntennaDrawRequest {
                 return Err(AntennaError::Arithmetic);
             }
             if distance > 4. * scale {
-                let phi = lookup_angle(dx, dy)?;
+                let phi = angle(dx, dy)?;
                 s.x[j] = (f64::from(s.x[j - 1]) + math::cos(phi) * 4. * scale) as f32;
                 s.y[j] = (f64::from(s.y[j - 1]) + math::sin(phi) * 4. * scale) as f32;
             }
@@ -621,37 +629,27 @@ fn append(path: &mut Vec<Point>, point: Point) -> Result<(), AntennaError> {
     Ok(())
 }
 
-fn lookup_angle(dx: f64, dy: f64) -> Result<f64, AntennaError> {
-    let multiplier = [
-        (-4., 4., 32.),
-        (-8., 8., 16.),
-        (-16., 16., 8.),
-        (-127., 127., 1.),
-    ]
-    .into_iter()
-    .find(|&(low, high, _)| dx >= low && dx < high && dy >= low && dy < high)
-    .map(|(_, _, m)| m);
-    if let Some(m) = multiplier {
-        // The bounded shifted operands are nonnegative: these casts are ToInt32.
-        let x = (dx * m + 128.) as usize;
-        let y = (dy * m + 128.) as usize;
-        static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
-        let table = TABLE.get_or_init(|| {
-            (0..65536)
-                .map(|i| math::atan2((i >> 8) as f64 - 128., (i & 255) as f64 - 128.) as f32)
-                .collect()
-        });
-        // A component just below the strict upper bound can round to 256 after
-        // shifting. Preserve the combined index; an absent cell is arithmetic
-        // failure rather than a clamped angle or a native indexing panic.
-        table
-            .get((y << 8) | x)
-            .copied()
-            .map(f64::from)
-            .ok_or(AntennaError::Arithmetic)
-    } else {
-        Ok(math::atan2(dy, dx))
+fn link_angle(dx: f64, dy: f64) -> Result<f64, AntennaError> {
+    // Unquantized angles exceeded the trajectory envelopes. Retain the original
+    // coordinate bins, but compute the angle without a 65,536-cell table.
+    for (bound, multiplier) in [(4., 32.), (8., 16.), (16., 8.), (127., 1.)] {
+        if dx >= -bound && dx < bound && dy >= -bound && dy < bound {
+            let x = (dx * multiplier + 128.) as usize;
+            let y = (dy * multiplier + 128.) as usize;
+            // A rounded endpoint can carry into the next grid row, including
+            // an absent final row. Preserve that boundary without indexing.
+            let index = (y << 8) | x;
+            if index >= 65536 {
+                return Err(AntennaError::Arithmetic);
+            }
+            // Existing angular precision keeps the tiny sine at +/-PI from
+            // reversing the bulb's shortest-path easing.
+            return Ok(f64::from(
+                ((index >> 8) as f64 - 128.).atan2((index & 255) as f64 - 128.) as f32,
+            ));
+        }
     }
+    Ok(dy.atan2(dx))
 }
 
 #[cfg(test)]
@@ -702,48 +700,183 @@ mod tests {
             }),
         }
     }
+
+    // Authored synthetic reference: the angle function at 1425b653, evaluated
+    // without allocating its table. Verified against unchanged trajectories
+    // before S8; keep the f32 table cells and combined-index endpoint behavior.
+    fn reference_angle(dx: f64, dy: f64) -> Result<f64, AntennaError> {
+        for (bound, m) in [(4., 32.), (8., 16.), (16., 8.), (127., 1.)] {
+            if dx >= -bound && dx < bound && dy >= -bound && dy < bound {
+                let index = (((dy * m + 128.) as usize) << 8) | (dx * m + 128.) as usize;
+                if index >= 65536 {
+                    return Err(AntennaError::Arithmetic);
+                }
+                return Ok(f64::from(
+                    ((index >> 8) as f64 - 128.).atan2((index & 255) as f64 - 128.) as f32,
+                ));
+            }
+        }
+        Ok(dy.atan2(dx))
+    }
+
     #[test]
-    fn lookup_thresholds_to_int32_and_host_fallback_are_exact() {
-        let quantized = |dx: f64, dy: f64, m: f64| {
-            let x = (dx * m + 128.) as i32;
-            let y = (dy * m + 128.) as i32;
-            f64::from(((y - 128) as f64).atan2((x - 128) as f64) as f32)
-        };
-        for (dx, dy, m) in [
-            (-4., 0.1249, 32.),
-            (3.999999, -3.99999, 32.),
-            (4., 0.1249, 16.),
-            (-8., 7.999, 16.),
-            (8., 0.1249, 8.),
-            (-16., 15.999, 8.),
-            (16., 0.1249, 1.),
-            (-127., 126.999, 1.),
-            (-0.03126, 0.03126, 32.),
+    fn trajectory_envelopes() {
+        // One backing pixel per CSS pixel, 960x540, zoom 1 (and 0.5/1.5).
+        // Compare every node and draw; no path filtering or time alignment.
+        let mut failures = Vec::new();
+        for scenario in [
+            "bands",
+            "rounded-boundaries",
+            "coincident",
+            "tiny",
+            "straight",
+            "turning",
+            "reentry",
         ] {
-            assert_eq!(
-                lookup_angle(dx, dy).unwrap().to_bits(),
-                quantized(dx, dy, m).to_bits()
+            let mut errors = Vec::new();
+            let mut max_angle = 0_f64;
+            let mut seeds = vec![None];
+            if scenario == "bands" {
+                seeds = [4., 8., 16., 127.]
+                    .into_iter()
+                    .flat_map(|bound| {
+                        [-0.0001, 0., 0.0001].into_iter().flat_map(move |epsilon| {
+                            [-1., 1.].into_iter().flat_map(move |sign| {
+                                let v = sign * (bound + epsilon);
+                                [
+                                    Some(Point { x: v, y: 0.1249 }),
+                                    Some(Point { x: 0.1249, y: v }),
+                                ]
+                            })
+                        })
+                    })
+                    .collect();
+            } else if scenario == "rounded-boundaries" {
+                seeds = [4., 8., 16.]
+                    .into_iter()
+                    .map(|x| Some(Point { x, y: 0.1249 }))
+                    .collect();
+            } else if scenario == "coincident" || scenario == "tiny" {
+                let v = if scenario == "tiny" { 0.00001 } else { 0. };
+                seeds = vec![Some(Point { x: v, y: -v })];
+            }
+            for nodes in [8, 9, 11] {
+                for zoom in [0.5, 1., 1.5] {
+                    for seed in &seeds {
+                        let mut g = geometry();
+                        g.nodes = nodes;
+                        let mut actual =
+                            AntennaState::from_appearance(g, Point { x: 0., y: 0. }).unwrap();
+                        if let Some(p) = seed {
+                            actual.data.shown = true;
+                            for j in 0..nodes {
+                                actual.data.x[j] = (j as f64 * p.x) as f32;
+                                actual.data.y[j] = (j as f64 * p.y) as f32;
+                            }
+                        }
+                        let mut reference = actual.clone();
+                        for frame in 0..360 {
+                            let mut i = input();
+                            i.view.half_width = 480.;
+                            i.view.half_height = 270.;
+                            i.view.zoom = zoom;
+                            i.bounds = Some(AntennaCullBounds::from_view(i.view).unwrap());
+                            i.raw_heading = if scenario == "straight" {
+                                0.375
+                            } else {
+                                frame as f64 * 0.035
+                            };
+                            i.corrected_head = Point {
+                                x: 8. * i.raw_heading.cos() + frame as f64 * 0.2,
+                                y: 8. * i.raw_heading.sin()
+                                    + if scenario == "straight" {
+                                        0.
+                                    } else {
+                                        (frame as f64 * 0.025).sin() * 2.
+                                    },
+                            };
+                            i.spawn = (frame as f64 / 20.).min(1.);
+                            i.death = if frame >= 300 {
+                                (frame - 300) as f64 / 59.
+                            } else {
+                                0.
+                            };
+                            if scenario == "reentry" {
+                                i.whole_snake_visible = !(80..100).contains(&frame);
+                                if (160..180).contains(&frame) {
+                                    i.bounds = None;
+                                }
+                                i.death = if (200..240).contains(&frame) {
+                                    (frame - 200) as f64 / 39.
+                                } else {
+                                    0.
+                                };
+                                i.spawn = ((frame % 240) as f64 / 20.).min(1.);
+                                if frame == 240 {
+                                    actual =
+                                        AntennaState::from_appearance(g, i.corrected_head).unwrap();
+                                    reference = actual.clone();
+                                }
+                            }
+                            let request = actual.prepare_draw(i).unwrap();
+                            let old = reference.prepare_draw(i).unwrap();
+                            assert_eq!(request.random_pair_count(), old.random_pair_count());
+                            let tape: Vec<_> = (0..request.random_pair_count())
+                                .map(|j| {
+                                    if frame == 0 {
+                                        if scenario == "rounded-boundaries" {
+                                            [0.5 + seed.unwrap().x * f64::EPSILON / 4., 0.5]
+                                        } else {
+                                            [0.5; 2]
+                                        }
+                                    } else {
+                                        [
+                                            ((frame * 37 + j * 13) % 251) as f64 / 252.,
+                                            ((frame * 19 + j * 47) % 251) as f64 / 252.,
+                                        ]
+                                    }
+                                })
+                                .collect();
+                            let (next, plan) = request.finish(&tape).unwrap();
+                            let (baseline, old_plan) =
+                                old.finish_with_angle(&tape, reference_angle).unwrap();
+                            assert_eq!(next.data.shown, baseline.data.shown, "{scenario}/{frame}");
+                            assert_eq!(plan.bulb.is_some(), old_plan.bulb.is_some());
+                            assert_eq!(
+                                plan.strokes, old_plan.strokes,
+                                "spawn/death alpha and lifecycle"
+                            );
+                            for j in 0..nodes {
+                                let dx = f64::from(next.data.x[j]) - f64::from(baseline.data.x[j]);
+                                let dy = f64::from(next.data.y[j]) - f64::from(baseline.data.y[j]);
+                                errors.push(dx.hypot(dy) * zoom);
+                            }
+                            let delta = next.data.bulb_rotation - baseline.data.bulb_rotation;
+                            assert!(delta.is_finite());
+                            max_angle =
+                                max_angle.max(delta.sin().atan2(delta.cos()).abs().to_degrees());
+                            actual = next;
+                            reference = baseline;
+                        }
+                    }
+                }
+            }
+            assert!(errors.iter().all(|v| v.is_finite()));
+            errors.sort_by(f64::total_cmp);
+            let max = *errors.last().unwrap();
+            let p95 = errors[(errors.len() * 95).div_ceil(100) - 1];
+            println!(
+                "{scenario}: nodes={}, p95={p95:.9} CSS px, max={max:.9} CSS px, bulb={max_angle:.9} deg",
+                errors.len()
             );
-            assert_eq!(
-                lookup_angle(dy, dx).unwrap().to_bits(),
-                quantized(dy, dx, m).to_bits()
-            );
+            if p95 > 1. || max > 2. || max_angle > 2. {
+                failures.push((scenario, p95, max, max_angle));
+            }
         }
-        for (dx, dy) in [(127., 0.1249), (-127.000001, 0.1249), (0.1249, 127.)] {
-            assert_eq!(
-                lookup_angle(dx, dy).unwrap().to_bits(),
-                dy.atan2(dx).to_bits()
-            );
-        }
-        assert_ne!(
-            lookup_angle(-0.03126, 0.03126).unwrap(),
-            0.03126_f64.atan2(-0.03126)
+        assert!(
+            failures.is_empty(),
+            "antenna trajectory envelopes exceeded: {failures:?}"
         );
-        let below_four = f64::from_bits(4_f64.to_bits() - 1);
-        assert!(matches!(
-            lookup_angle(below_four, below_four),
-            Err(AntennaError::Arithmetic)
-        ));
     }
 
     #[test]
@@ -764,7 +897,7 @@ mod tests {
         let initial_y = i.corrected_head.y as f32;
         let qx0 = f64::from(root as f32);
         let qy0 = f64::from(initial_y);
-        let angle = lookup_angle(f64::from(initial_x) - qx0, f64::from(initial_y) - qy0).unwrap();
+        let angle = link_angle(f64::from(initial_x) - qx0, f64::from(initial_y) - qy0).unwrap();
         let target_x = qx0 + angle.cos() * 4.;
         let target_y = qy0 + angle.sin() * 4.;
         let vx = (0.375 + (target_x - f64::from(initial_x)) * 0.1) as f32;
@@ -774,7 +907,7 @@ mod tests {
         let dx = f64::from(expected_x) - qx0;
         let dy = f64::from(expected_y) - qy0;
         if (dx * dx + dy * dy).sqrt() > 4. {
-            let angle = lookup_angle(dx, dy).unwrap();
+            let angle = link_angle(dx, dy).unwrap();
             expected_x = (qx0 + angle.cos() * 4.) as f32;
             expected_y = (qy0 + angle.sin() * 4.) as f32;
         }
@@ -802,7 +935,7 @@ mod tests {
         g.rotate_bulb = false;
         let mut s = AntennaState::from_appearance(g, Point { x: 0., y: 0. }).unwrap();
         s.data.shown = true;
-        // An exact horizontal four-unit chain points along table angle zero.
+        // An exact horizontal four-unit chain points along angle zero.
         for j in 0..8 {
             s.data.x[j] = j as f32 * 4.;
         }
