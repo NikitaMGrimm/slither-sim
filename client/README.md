@@ -50,9 +50,11 @@ Official servers (Windows desktop):
 cargo run --release --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop -- --official --nickname Player --skin 0
 ```
 
-Add `--headless --duration 60 --frames <new-dir-outside-repo>` to play once on
-autopilot without a window and save periodic PNGs; see the
-[wgpu app README](apps/wgpu-slice/README.md#official-servers).
+slither-client is an independent project, not affiliated with or endorsed by
+slither.io or Lowtech Studios. Connecting to the official servers is your own
+choice; check slither.io's terms before you do.
+
+Official play is interactive only: headless runs accept only `--endpoint`.
 
 Browser (Canvas2D):
 
