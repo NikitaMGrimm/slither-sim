@@ -5,6 +5,7 @@ import { createStockHostSnapshot, isPendingStockCapture, assertStockHostCapture 
 import { createStockAccessoryRequest, hasFailedStockAccessoryRequest } from './stock-accessory-request.mjs';
 import { desktopBackingSize } from './desktop-layout.mjs';
 import { createStockGameplay } from './stock-gameplay.mjs';
+import { admitsBrowserInput } from '../apps/wgpu-slice/web/input-targeting.mjs';
 import { bindStockHudDom } from './stock-hud-dom.mjs';
 import { projectHudView } from './stock-hud-view.mjs';
 import { createOwnedHudUi } from './owned-hud-ui.mjs';
@@ -552,8 +553,7 @@ export async function startGamePage({ realm = globalThis, initialize, wasmApi, h
       }
       if (editNotifications.has(event.type)) return;
       // Keep menu presses out of steering/boost; releases still clear existing held input.
-      if (menuUi && menuActions.some(action => action.button === event.target)
-        && !['keyup', 'mouseup', 'pointerup', 'blur'].includes(event.type)) return;
+      if (!admitsBrowserInput(event, { menu: !!menuUi && menuActions.some(action => action.button === event.target) })) return;
       if (disposed || !controller) return;
       if (event.type === 'resize') {
         try {

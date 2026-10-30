@@ -9,6 +9,8 @@ import { captureLocalGameDocument, createLocalGameHost } from '../web/local-game
 import { createGateTestDom, issuedMinimapViewDouble } from './game-gate-test-fixture.mjs';
 import { createOwnedMinimapUi } from '../web/game-owned-minimap-ui.mjs';
 import { createClientInput } from './fixtures/client-input-fixture.mjs';
+import { installLocalInput } from '../apps/wgpu-slice/web/local-input.mjs';
+import { admitsBrowserInput } from '../apps/wgpu-slice/web/input-targeting.mjs';
 
 // Explicit DOM, generated-source and browser-capability doubles; no real sockets.
 function fixture({ href = 'http://127.0.0.1:18884/game', decode, minimap = false } = {}) {
@@ -421,6 +423,30 @@ test('releases over editable fields clear the existing game input owner without 
   assert.equal(input.snapshot().own.requestedBoost, false);
   assert.equal(keyRelease.defaultPrevented, false);
   host.dispose();
+});
+
+test('Canvas host plus runtime menu admission and WebGPU admit the same gameplay event set', async () => {
+  const f = fixture(), host = await create(f), native = claim(host), { field, button } = f.controls();
+  const canvas = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
+  const targets = [canvas, {}, field, new f.realm.HTMLTextAreaElement(), { isContentEditable: true }, button];
+  const canvasEvents = [], gpuEvents = [];
+  let sequence = 0;
+  native.setInput(event => {
+    // Same second admission stage as game-runtime, after the real Canvas host.
+    if (admitsBrowserInput(event, { menu: event.target === button })) canvasEvents.push(sequence);
+  });
+  f.realm.addEventListener = (type, fn, options) => Reflect.apply(f.realm.EventTarget.prototype.addEventListener, f.realm, [type, fn, options]);
+  const owner = { pointer() { gpuEvents.push(sequence); }, mouse_up() { gpuEvents.push(sequence); },
+    key() { gpuEvents.push(sequence); return true; }, blur() { gpuEvents.push(sequence); },
+    can_play: () => true, stop() { gpuEvents.push(sequence); } };
+  const abort = new AbortController();
+  installLocalInput({ realm: f.realm, canvas, owner, host: { call: fn => fn() }, start: () => gpuEvents.push(sequence), controls: [button], signal: abort.signal });
+  for (const target of targets) for (const type of ['mousemove', 'mousedown', 'mouseup', 'keydown', 'keyup', 'blur']) {
+    sequence++;
+    f.dispatch(f.realm, type, { target, code: 'Space', button: 0, clientX: 500, clientY: 200 });
+  }
+  assert.deepEqual(gpuEvents, canvasEvents);
+  abort.abort(); host.dispose();
 });
 
 test('Play lease binds once, admits trusted clicks and unregisters on owner disposal', async () => {

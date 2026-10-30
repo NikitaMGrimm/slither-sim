@@ -37,7 +37,7 @@ export function createServer({ webDir = path.join(app, 'web-dist'), cosmeticsDir
     const cosmetic = resource.startsWith('/cosmetics/');
     const relative = cosmetic ? resource.slice('/cosmetics/'.length) : resource === '/' ? 'index.html' : resource.slice(1);
     if (cosmetic && (!cosmeticsDir || !/^s2?\/[a-z0-9_]+\.(png|jpg)$/.test(relative))) { send(404, 'text/plain', 'Unavailable'); return; }
-    if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
+    if (!cosmetic && !/^(index\.html|diagnostic\.html|entry\.mjs|local\.mjs|local-host\.mjs|local-input\.mjs|input-targeting\.mjs|cosmetics\.mjs|pkg\/slither_wgpu_slice(?:_bg\.wasm|\.js)|pkg\/snippets\/slither-client-[a-f0-9]{16}\/web\/stock-hud-contract\.mjs)$/.test(relative)) { send(404, 'text/plain', 'Unavailable'); return; }
     try {
       const root = await realpath(cosmetic ? cosmeticsDir : webDir);
       const file = await realpath(path.join(root, relative));

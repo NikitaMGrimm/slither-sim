@@ -20,6 +20,7 @@ import { createStockClient } from './fixtures/stock-client-fixture.mjs';
 import { createStockEntityAssets } from '../web/stock-food-provider.mjs';
 import { desktopBackingSize } from '../web/desktop-layout.mjs';
 import { createStockGameplay } from './fixtures/stock-gameplay-fixture.mjs';
+import { admitsBrowserInput } from '../apps/wgpu-slice/web/input-targeting.mjs';
 
 const networkGlobals = ['fetch', 'WebSocket'].map(name => [name, Object.getOwnPropertyDescriptor(globalThis, name)]);
 let networkCalls = 0;
@@ -473,10 +474,10 @@ test('unregister, setInput, pagehide and reload share lifetime with no synthetic
 test('actual bootstrap/gameplay router can call the selected lease before its filter with no added observations', async () => {
   const bootstrapSource = readFileSync(new URL('../web/game-runtime.mjs', import.meta.url), 'utf8');
   const makeBootstrap = new Script(`(function(init,wasm,createStockHostSnapshot,createStockSkinAdapter, isUnsupportedStockAccessoryFace,
-    createStockClient,createStockEntityAssets,desktopBackingSize,createStockGameplay,assertStockHostCapture,createStockAccessoryRequest,hasFailedStockAccessoryRequest){
+    createStockClient,createStockEntityAssets,desktopBackingSize,createStockGameplay,assertStockHostCapture,createStockAccessoryRequest,hasFailedStockAccessoryRequest,admitsBrowserInput){
     ${bootstrapSource.replace(/^import .+;\r?$/gm, '').replace(/^export /gm, '')}\nreturn (options = {}) => startGamePage({initialize:init,wasmApi:wasm,...options});})`).runInThisContext();
   const startGamePage = makeBootstrap(async () => {}, {}, createStockHostSnapshot, createStockSkinAdapter, isUnsupportedStockAccessoryFace,
-    createStockClient, createStockEntityAssets, desktopBackingSize, createStockGameplay,assertStockHostCapture,createStockAccessoryRequest,hasFailedStockAccessoryRequest);
+    createStockClient, createStockEntityAssets, desktopBackingSize, createStockGameplay,assertStockHostCapture,createStockAccessoryRequest,hasFailedStockAccessoryRequest,admitsBrowserInput);
   const f = fixtureFactory(); f.host(); f.complete(); const wasm = wasmDouble(f);
   const slot = Symbol.for('slither.client.gate.v1'); let native, lease;
   const facade = { ...f.realm, top: null, document: f.document, location: f.realm.location }; facade.top = facade;

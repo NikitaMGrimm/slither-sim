@@ -127,6 +127,8 @@ function createGraph({ armed = true, hudNative = false, ownedHudNative = false, 
   })`, f.context);
   prepareWasm?.(wasm.api, source => vm.runInContext(source, f.context));
   const sources = new Map();
+  const targeting = 'apps/wgpu-slice/web/input-targeting.mjs';
+  sources.set(new URL('../' + targeting, origin).href, readFileSync(new URL(targeting, root), 'utf8'));
   for (const name of webNames) sources.set(origin + name, readFileSync(new URL('web/' + name, root), 'utf8'));
   for (const [name, file] of Object.entries(entryNames)) {
     const url = new URL('web/' + file, root);
