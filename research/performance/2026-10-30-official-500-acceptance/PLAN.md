@@ -169,3 +169,16 @@ selected results and what recomputes the tables, with links to earlier scripts.
 
 Current main is now `825c7cba904ae3465c5a1137a3caa0326c425ff1`. The intervening changes are research/CI only;
 simulator src/Cargo files are unchanged. Both runs will use this refreshed pin.
+
+## Pre-data instrumentation correction
+
+Before any counted timing, source inspection found that the linked text-control
+writer appends a newline to `RESET`, while the new client metric accumulator
+compares a bare `count` token. Add the bounded [marker normalizer](marker_tokens.py)
+on generator control CPU 7 before counting, on both pairs. It removes only the
+newline from the two report-only `count`/`end` tokens and journals each operation.
+The client records the actual metric interval, including normalization delay.
+No host/client restart, binary change, policy/cadence change, warm-history reset,
+criteria change or outcome-based retry occurs. The 1,800-second host window and
+all one-second generator/queue gates remain unchanged. Keep this correction and
+all earlier frozen source; do not tune the second run.

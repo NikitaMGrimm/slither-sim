@@ -18,3 +18,15 @@ Both runs will use one portable build of the refreshed pin.
 
 Attempt outcomes and any infrastructure replacement will be appended here; no
 failure or invalid window will be erased or pooled with a replacement.
+
+## Before the first counted window
+
+The first timer probe reached SSH before cloud-init scheduled shutdown; a later
+probe verified both boot-installed timers before setup. The portable build,
+linked-source equality, copied-binary identity and synthetic controls passed.
+
+Source inspection during warmup caught a report-marker newline mismatch. The
+labelled pre-data correction in PLAN.md adds a generator-side normalizer for only
+those metric tokens. Host and client processes and their full tick-zero history
+continue unchanged. This is an instrumentation correction before data, not an
+infrastructure replacement or a restarted acceptance attempt.
