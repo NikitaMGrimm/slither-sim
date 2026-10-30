@@ -46,11 +46,15 @@ and keep its artifacts separate from Canvas. Generated bindings stay in dist/.
 ## Source guard
 
 ```sh
-git config core.hooksPath client/tools/hooks
 git add <intended-files>
 node tools/check-repository.mjs
 node tools/check-repository.mjs --history
 ```
+
+Run the staged guard before committing; `--history` audits all reachable history.
+Use `--pre-push` with Git's push input to check only outgoing commits plus the index.
+Do not set `core.hooksPath` in a shared multi-worktree checkout; `tools/hooks`
+remains available for single-clone opt-in.
 
 The guard reads Git blobs, so inspect unstaged changes separately. It blocks
 known official bundles, raw captures, credentials, prohibited binary/generated

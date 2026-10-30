@@ -15,7 +15,10 @@ code, artwork, credentials or captures; see [source and license](docs/provenance
 The root [CONTRIBUTING.md](../CONTRIBUTING.md) rules for commits, PRs and AI
 disclosure apply here too. Use the client scope, such as `feat(client):`.
 
-Enable hooks with `git config core.hooksPath client/tools/hooks`. Stage and inspect your
-diff, run `npm run check`, and describe results and unrun checks in the PR.
+Stage and inspect your diff, run `node tools/check-repository.mjs` before committing,
+and use `--pre-push` with Git's push input for outgoing commits or `--history` for a
+full audit. Do not set `core.hooksPath` in a shared multi-worktree checkout;
+`tools/hooks` remains available for single-clone opt-in. Run `npm run check` and
+describe results and unrun checks in the PR.
 Tests and CI must not contact game servers or download official source. Use the
 root slither-sim binary for manual local play.
