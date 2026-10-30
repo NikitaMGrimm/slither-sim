@@ -1,36 +1,34 @@
-name: Checks
+name: Client
 
+# Called by checks.yml when client/ changes; the caller owns concurrency and the
+# required-check aggregation. The repository guard runs there for every change.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: checks-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 env:
   CARGO_TERM_COLOR: always
   CARGO_BUILD_JOBS: 2
 
+defaults:
+  run:
+    working-directory: client
+
 jobs:
-  repository:
-    name: Repository boundary
+  node:
+    name: Node tests
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-      - run: node tools/check-repository.mjs --history
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: node --test tools/*.test.mjs
       - name: Test shared gameplay socket adapter offline
@@ -38,7 +36,6 @@ jobs:
 
   native:
     name: Rust (${{ matrix.os }})
-    needs: repository
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +77,6 @@ jobs:
 
   wasm:
     name: WebAssembly build
-    needs: repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

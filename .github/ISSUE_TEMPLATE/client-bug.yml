@@ -1,6 +1,7 @@
-name: Bug report
+name: Client bug report
 description: Report a reproducible defect in the desktop or browser client.
-title: "bug: "
+title: "bug(client): "
+labels: [client]
 body:
   - type: markdown
     attributes:
