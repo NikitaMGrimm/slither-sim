@@ -68,7 +68,9 @@ by A2/A3; this tool neither splits nor transforms packet data.
 Each expected boundary names its source event ordinal, phase, frame, optional draw
 ordinal, virtual time and eligibility. Enumerate every update/draw and lifecycle
 boundary being compared, including startup, Setup, resize and retry draws. Draw
-ordinals start at zero and are consecutive. The last boundary must name the final
+ordinals start at zero and are consecutive. Non-draw references may precede their
+draw, but every referenced ordinal must be realized by a draw in the schedule.
+The last boundary must name the final
 event and occur at the declared duration. This explicit expectation is essential:
 two truncated peers must not pass by sharing the same missing tail. A future
 adapter that cannot predict these boundaries needs a separately frozen expected
@@ -121,9 +123,11 @@ representable; the comparator never rounds a double to make it pass. Signed-zero
 differences, ring storage, branch choices, speed/size/delta, pixels, commands and
 all times stay exact. Non-exact values without a declared cause fail.
 
-As a conservative accumulation guard, three consecutive nonzero same-sign,
-strictly growing errors in one sample channel fail even within its individual
-cap; an exact observation resets that channel. This guard screens a declared
+As a conservative accumulation guard, three nonzero same-sign growing error
+levels in one channel's ordered sample sequence fail even within its individual
+cap. Equal-magnitude plateaus retain the growth count without incrementing it,
+including interleaved update/draw observations. A sign change, strict decrease
+or exact observation resets that channel. This guard screens a declared
 numerical result; it cannot prove a platform-math explanation scientifically.
 The owner must substantiate that cause with independent evidence. A numerical
 match is always separate from exact parity and from any perceptual/visual claim.

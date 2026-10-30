@@ -127,14 +127,21 @@ export function validateSchedule(schedule) {
     if (e.atMs > schedule.durationMs) fail(`schedule.events[${i}]`, 'outside duration');
   });
   let previousEvent = -1, previousTime = 0, nextDraw = 0;
+  const referencedDraws = [];
   schedule.boundaries.forEach((b, i) => {
     const event = schedule.events[b.eventSeq];
     if (!event || b.eventSeq < previousEvent || b.atMs < event.atMs || b.atMs < previousTime
       || b.atMs > schedule.durationMs) fail(`schedule.boundaries[${i}]`, 'invalid event/time order');
     if (b.phase === 'draw' && b.drawId !== nextDraw++) fail(`schedule.boundaries[${i}].drawId`, 'draw order');
-    if (b.phase !== 'draw' && b.drawId !== null && b.drawId > nextDraw) fail(`schedule.boundaries[${i}].drawId`, 'unknown draw');
+    if (b.phase !== 'draw' && b.drawId !== null) {
+      if (b.drawId > nextDraw) fail(`schedule.boundaries[${i}].drawId`, 'unknown draw');
+      referencedDraws.push({ index: i, drawId: b.drawId });
+    }
     previousEvent = b.eventSeq; previousTime = b.atMs;
   });
+  for (const { index, drawId } of referencedDraws) {
+    if (drawId >= nextDraw) fail(`schedule.boundaries[${index}].drawId`, 'unknown draw');
+  }
   const last = schedule.boundaries.at(-1);
   if (last.eventSeq !== schedule.events.length - 1 || !same(last.atMs, schedule.durationMs)) {
     fail('schedule.boundaries', 'missing final boundary at duration and final event');

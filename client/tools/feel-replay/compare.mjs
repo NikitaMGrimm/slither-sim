@@ -69,12 +69,13 @@ export function compareTraces(left, right, schedule, { mode = 'same-core' } = {}
           delta: Number.isFinite(delta) ? delta : delta > 0 ? 'positive overflow' : 'negative overflow', tolerated };
         nonExactFloats.push(difference);
         if (!tolerated) mismatches.push(difference);
-        // Conservative drift guard: three consecutive, same-sign, strictly growing errors
-        // in a sample channel are accumulating drift, even if each is individually capped.
+        // Three growing same-sign error levels in one ordered sample channel fail.
+        // Repeated update/draw observations retain progress without counting as growth.
         if (tolerated && path.startsWith('samples[')) {
           const prior = drift.get(channel);
           const count = prior && Math.sign(prior.delta) === Math.sign(delta)
-            && Math.abs(delta) > Math.abs(prior.delta) ? prior.count + 1 : 1;
+            && Math.abs(delta) >= Math.abs(prior.delta)
+            ? prior.count + (Math.abs(delta) > Math.abs(prior.delta) ? 1 : 0) : 1;
           drift.set(channel, { delta, count });
           if (count >= 3) mismatches.push({ path, reason: 'accumulating numerical drift' });
         }

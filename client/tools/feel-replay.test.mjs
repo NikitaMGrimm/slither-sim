@@ -50,6 +50,28 @@ test('stable equal-time schedule is packet -> input -> frame, preserving source 
   [schedule.events[0], schedule.events[1]] = [schedule.events[1], schedule.events[0]];
   assert.throws(() => validateSchedule(schedule), /packet -> input -> frame/);
 });
+test('a dangling pre-draw reference fails even when identical traces have no draws', () => {
+  const { schedule, trace } = syntheticFixture();
+  schedule.boundaries = schedule.boundaries.filter(b => b.phase !== 'draw');
+  schedule.boundaries[1].drawId = 0;
+  trace.samples = trace.samples.filter(s => s.phase !== 'draw');
+  trace.samples[1].drawId = 0;
+  Object.assign(trace.final, { samples: 3, draws: 0, lastBoundaryId: 'update-1' });
+  // Hash the authored invalid schedule without invoking its validator.
+  trace.manifest.scheduleSha256 = sha256(stringify(schedule));
+  const report = compareTraces(trace, trace, schedule);
+  failure(report, /schedule.boundaries\[1\].drawId: unknown draw/);
+  assert.equal(report.status, 'invalid');
+  assert.throws(() => validateSchedule(schedule), /schedule.boundaries\[1\].drawId: unknown draw/);
+});
+test('a pre-draw reference passes when a later draw realizes its ordinal', () => {
+  const { schedule, trace } = syntheticFixture();
+  schedule.boundaries[1].drawId = 0;
+  trace.samples[1].drawId = 0;
+  trace.manifest.scheduleSha256 = scheduleHash(schedule);
+  assert.equal(validateSchedule(schedule), schedule);
+  assert.equal(compareTraces(trace, trace, schedule).status, 'exact-match');
+});
 test('bit encoding preserves signed zero, subnormals and finite extremes before JSON', () => {
   const numbers = [-0, 0, Number.MIN_VALUE, -Number.MIN_VALUE, Number.MAX_VALUE, next64(1)];
   const decoded = parse(stringify(numbers));
@@ -181,6 +203,61 @@ test('cross-target rejects accumulating drift within individual caps', () => {
     p.right.samples[i].camera.x = i * 1e-10;
   }
   failure(run(p), /accumulating numerical drift/);
+});
+// Authored SYNTHETIC five-frame history: each frame has an update and a draw.
+function fiveFrameCameraErrors(errors) {
+  const p = peers(true);
+  p.schedule.durationMs = 40;
+  for (let frameId = 2; frameId < 5; frameId++) {
+    const eventSeq = p.schedule.events.length;
+    const event = { sourceId: `frame-${frameId}`, kind: 'frame', atMs: frameId * 10 };
+    p.schedule.events.push(event);
+    for (const phase of ['update', 'draw']) p.schedule.boundaries.push({
+      id: `${phase}-${frameId}`, eventSeq, phase, frameId,
+      drawId: phase === 'draw' ? frameId : null, atMs: event.atMs, eligibility: 'own',
+    });
+    for (const trace of [p.left, p.right]) {
+      trace.events.push({ ...structuredClone(trace.events[3]), seq: eventSeq, sourceId: event.sourceId,
+        scheduledMs: event.atMs, actualMs: event.atMs });
+      for (const boundary of p.schedule.boundaries.slice(-2)) trace.samples.push({
+        ...structuredClone(trace.samples[boundary.phase === 'update' ? 1 : 2]), ...boundary,
+      });
+    }
+  }
+  for (const trace of [p.left, p.right]) {
+    trace.manifest.scheduleSha256 = scheduleHash(p.schedule);
+    Object.assign(trace.final, { atMs: 40, events: 7, samples: 11, draws: 5, lastBoundaryId: 'draw-4' });
+    trace.samples.slice(1).forEach((sample, i) => { sample.camera.x = trace === p.left ? 0 : errors[i] * 1e-10; });
+  }
+  return p;
+}
+test('cross-target update/draw plateaus cannot hide accumulating camera drift', () => {
+  for (const sign of [1, -1]) {
+    const p = fiveFrameCameraErrors([1, 1, 2, 2, 3, 3, 4, 4, 5, 5].map(x => sign * x));
+    const report = run(p);
+    failure(report, /accumulating numerical drift/);
+    assert.equal(report.status, 'mismatch');
+    assert.equal(report.mismatches[0].path, 'samples[5].camera.x');
+  }
+});
+test('cross-target constant update/draw error plateaus stay numerical matches', () => {
+  for (const sign of [1, -1]) {
+    const report = run(fiveFrameCameraErrors(Array(10).fill(sign * 2)));
+    assert.equal(report.status, 'numerical-match');
+    assert.equal(report.passed, true);
+    assert.equal(report.nonExactFloats.length, 10);
+  }
+});
+test('cross-target decrease or sign change resets growth before later update/draw growth', () => {
+  for (const sign of [1, -1]) {
+    const p = fiveFrameCameraErrors([1, 1, 2, 2, sign, sign, 2 * sign, 2 * sign, 2 * sign, 2 * sign]);
+    assert.equal(run(p).status, 'numerical-match');
+    p.right.samples[9].camera.x = p.right.samples[10].camera.x = sign * 3e-10;
+    const report = run(p);
+    failure(report, /accumulating numerical drift/);
+    assert.equal(report.status, 'mismatch');
+    assert.equal(report.mismatches[0].path, 'samples[9].camera.x');
+  }
 });
 test('hash, core, startup, geometry, entropy and input bindings fail closed', () => {
   for (const mutate of [
