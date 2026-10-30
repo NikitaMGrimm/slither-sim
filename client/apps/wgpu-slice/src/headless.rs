@@ -6,19 +6,17 @@ use slither_client::{
 };
 use slither_wgpu_slice::{
     Result,
-    endpoint_login::{self, Mode as LoginProfileMode, Source as ProfileSource},
     frame::Frame,
-    game::{EffectKind, LocalGame, LoginProfile},
+    game::{EffectKind, LocalGame},
     gpu::{Renderer, instance},
     native::{Event, Transport},
-    official,
 };
 use std::{
     collections::BTreeSet,
     fs::{self, OpenOptions},
     io::BufWriter,
     path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, mpsc},
+    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -134,7 +132,6 @@ impl Options {
 struct Summary {
     server: Option<String>,
     version: Option<u16>,
-    profile_source: Option<ProfileSource>,
     opened: bool,
     negotiated: bool,
     login_sent: bool,
@@ -172,12 +169,10 @@ impl Summary {
     fn print(&self, elapsed: Duration) {
         println!("Headless summary ({:.2}s):", elapsed.as_secs_f64());
         println!(
-            "server={} client_version={} login_profile={}",
+            "server={} client_version={}",
             self.server.as_deref().unwrap_or("not selected"),
             self.version
-                .map_or_else(|| "not acquired".into(), |v| v.to_string()),
-            self.profile_source
-                .map_or("not acquired", ProfileSource::as_str)
+                .map_or_else(|| "not acquired".into(), |v| v.to_string())
         );
         println!(
             "handshake: websocket={} negotiation={} challenge={} login={} Setup={}",
@@ -563,7 +558,6 @@ pub fn run(
     endpoint: &str,
     nickname: &str,
     skin: u8,
-    login_profile: LoginProfileMode,
     cosmetics: Option<slither_wgpu_slice::cosmetics::Cosmetics>,
 ) -> Result<()> {
     let started = Instant::now();
@@ -573,17 +567,6 @@ pub fn run(
     };
     let result = (|| {
         output_directory(&options.frames)?;
-        let profile = acquire_profile(
-            endpoint,
-            login_profile,
-            started + options.duration,
-            &mut summary,
-            official::fetch_profile,
-            |message| eprintln!("{message}"),
-        )?;
-        if started.elapsed() >= options.duration {
-            return Err("duration reached before Play".into());
-        }
         let gpu = Offscreen::new()?;
         if started.elapsed() >= options.duration {
             return Err("duration reached before Play".into());
@@ -592,8 +575,7 @@ pub fn run(
         if let Some(cosmetics) = cosmetics {
             game.configure_cosmetics(cosmetics)?;
         }
-        game.play_with_profile(endpoint, nickname, skin, &profile)?;
-        drop(profile);
+        play_endpoint(&mut game, endpoint, nickname, skin, &mut summary)?;
         Host {
             game,
             transport: Transport::default(),
@@ -611,22 +593,17 @@ pub fn run(
     result
 }
 
-fn acquire_profile(
+fn play_endpoint(
+    game: &mut LocalGame,
     endpoint: &str,
-    mode: LoginProfileMode,
-    deadline: Instant,
+    nickname: &str,
+    skin: u8,
     summary: &mut Summary,
-    fetch: impl FnOnce(&AtomicBool, Instant) -> Result<LoginProfile>,
-    report: impl FnOnce(&str),
-) -> Result<LoginProfile> {
-    let resolved =
-        endpoint_login::resolve_with(endpoint, mode, || fetch(&AtomicBool::new(false), deadline))?;
-    if let Some(message) = resolved.source.fallback_message() {
-        report(message);
-    }
-    summary.version = Some(resolved.profile.client_version);
-    summary.profile_source = Some(resolved.source);
-    Ok(resolved.profile)
+) -> Result<()> {
+    summary.version = Some(slither_wgpu_slice::endpoint_login::play(
+        game, endpoint, nickname, skin,
+    )?);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -634,86 +611,19 @@ mod tests {
     // ORIGINAL SYNTHETIC settings/output fixtures; no connection or GPU.
     use super::*;
     #[test]
-    fn headless_profile_sources_and_fetch_budget_are_reported() {
-        for (endpoint, mode, expected) in [
-            (
-                "ws://127.12.3.4:19491/slither",
-                LoginProfileMode::Auto,
-                ProfileSource::ZeroLoopback,
-            ),
-            (
-                "ws://[::1]:19491/slither",
-                LoginProfileMode::Auto,
-                ProfileSource::ZeroLoopback,
-            ),
-            (
-                "ws://localhost:19491/slither",
-                LoginProfileMode::Auto,
-                ProfileSource::ZeroLoopback,
-            ),
-            (
-                "ws://game.example:19491/slither",
-                LoginProfileMode::Zero,
-                ProfileSource::ZeroForced,
-            ),
-            (
-                "ws://localhost:19491/slither",
-                LoginProfileMode::Official,
-                ProfileSource::Official,
-            ),
-            (
-                "ws://game.example:19491/slither",
-                LoginProfileMode::Auto,
-                ProfileSource::Official,
-            ),
-        ] {
-            let deadline = Instant::now() + Duration::from_millis(10);
-            let mut summary = Summary::default();
-            let profile = acquire_profile(
-                endpoint,
-                mode,
-                deadline,
-                &mut summary,
-                |_, received| {
-                    assert_eq!(expected, ProfileSource::Official, "zero mode fetched");
-                    assert_eq!(received, deadline);
-                    Ok(LoginProfile {
-                        client_version: 4242,
-                        page_echo: [123; 20],
-                    })
-                },
-                |_| panic!("successful/zero selection must not warn"),
-            )
-            .unwrap();
-            assert_eq!(summary.profile_source, Some(expected));
-            assert_eq!(summary.version, Some(profile.client_version));
-            assert_eq!(
-                profile.client_version,
-                if expected == ProfileSource::Official {
-                    4242
-                } else {
-                    0
-                }
-            );
-        }
+    fn headless_endpoint_uses_fixed_profile_version() {
+        let mut game = LocalGame::new(0.).unwrap();
         let mut summary = Summary::default();
-        let mut messages = Vec::new();
-        let profile = acquire_profile(
-            "ws://game.example:19491/slither",
-            LoginProfileMode::Auto,
-            Instant::now(),
+        play_endpoint(
+            &mut game,
+            "ws://127.0.0.1:19491/slither",
+            "Player",
+            9,
             &mut summary,
-            |_, _| Err("injected deadline".into()),
-            |message| messages.push(message.to_owned()),
         )
         .unwrap();
-        assert_eq!(summary.profile_source, Some(ProfileSource::ZeroFallback));
-        assert_eq!(summary.version, Some(0));
-        assert_eq!(profile.page_echo, [0; 20]);
-        assert_eq!(
-            messages,
-            ["Official login profile unavailable; using zero credentials."]
-        );
+        assert_eq!(summary.version, Some(291));
+        assert!(!game.can_play());
     }
     #[test]
     fn autopilot_crosses_distance_over_the_first_minute_with_gentle_turns() {

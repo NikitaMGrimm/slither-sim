@@ -56,18 +56,9 @@ choice; check slither.io's terms before you do.
 
 Official play is interactive only: headless runs accept only `--endpoint`.
 
-Desktop `--endpoint ws://host:port/slither` defaults to `--login-profile auto`:
-each Play fetches only the official page and script for the login profile, with
-no directory lookup or pings. This supports compatibility with custom server
-implementations that copied the official login. Auto uses zero credentials and
-never fetches for loopback IPs (all of 127/8 and `::1`) and `localhost`.
-`--login-profile official` forces fetching, including on loopback;
-`--login-profile zero` forces zero credentials without fetching for any host.
-Fetch or grammar failure prints one warning and continues with zero credentials.
-Interactive fetching starts only on Play, runs in the background and Escape
-cancels it; headless fetching counts against `--duration`, and its summary
-reports the profile source. Library defaults, the offline e2e/feel-replay tools
-and browser builds keep zero credentials without fetching.
+Desktop `--endpoint` sends a fixed official-format login (the same values as the
+simulator's portable_bot), for compatibility with custom server implementations
+that copied the official login.
 
 Browser (Canvas2D):
 

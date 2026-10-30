@@ -11,7 +11,6 @@ mod desktop {
     use slither_client::session_policy::Phase;
     use slither_wgpu_slice::{
         Result,
-        endpoint_login::Mode as LoginProfileMode,
         game::LocalGame,
         gpu::{SurfaceHost, instance},
         menu_input_native::{NativeMenuInput, WindowEditHost},
@@ -34,7 +33,6 @@ mod desktop {
     #[derive(Default)]
     pub struct Options {
         endpoint: Option<String>,
-        login_profile: LoginProfileMode,
         nickname: String,
         skin: u8,
         official: bool,
@@ -56,12 +54,11 @@ mod desktop {
         let mut frame_every = 5.0;
         let mut frames = None;
         let mut headless_arguments = false;
-        let mut login_profile_argument = false;
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither [--login-profile auto|official|zero]] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\n--login-profile auto (default): fetch page/script for custom-server login compatibility; loopback hosts use zero without fetching. official forces fetching; zero forces no fetch. Fetch/grammar failure uses zero with one warning.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -71,10 +68,6 @@ mod desktop {
                     o.endpoint = Some(e);
                 }
                 "--official" => o.official = true,
-                "--login-profile" => {
-                    o.login_profile = args.next().ok_or("Login profile mode required")?.parse()?;
-                    login_profile_argument = true;
-                }
                 "--headless" => headless = true,
                 "--duration" | "--frame-every" => {
                     let value = args
@@ -130,11 +123,8 @@ mod desktop {
         if o.server.is_some() && !o.official {
             return Err("--server requires --official".into());
         }
-        if login_profile_argument && o.endpoint.is_none() {
-            return Err("--login-profile requires --endpoint".into());
-        }
         if headless {
-            // Official discovery/play remains interactive; endpoint profile selection is separate.
+            // Owner decision 2026-10-30: official logins only from a person pressing Play.
             if o.official || o.endpoint.is_none() {
                 return Err("Headless requires --endpoint; --official is interactive only".into());
             }
@@ -174,24 +164,6 @@ mod desktop {
         pacing_log: Option<(Instant, u32, Instant, f64)>,
     }
     impl Running {
-        // Keep Play admission together so the pending login-screen change can reuse this seam.
-        fn start_play(&mut self, options: &Options) -> Result<()> {
-            self.nickname.clone_from(&options.nickname);
-            self.skin = options.skin;
-            self.preparation = if options.official {
-                println!("Acquiring official profile and server; Escape cancels");
-                Some(Preparation::start(options.server.clone())?)
-            } else if let Some(endpoint) = &options.endpoint {
-                Some(Preparation::start_endpoint(
-                    endpoint.clone(),
-                    options.login_profile,
-                )?)
-            } else {
-                eprintln!("Use --official or --endpoint before Play");
-                None
-            };
-            Ok(())
-        }
         fn effects(&mut self) -> Result<()> {
             for _ in 0..64 {
                 let Some(e) = self.game.effect() else {
@@ -227,9 +199,6 @@ mod desktop {
                 if !cancelled {
                     match result {
                         Ok(prepared) => {
-                            if let Some(message) = prepared.source.fallback_message() {
-                                eprintln!("{message}");
-                            }
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
                             self.game.play_with_profile(
                                 &prepared.endpoint,
@@ -300,7 +269,7 @@ mod desktop {
             let title = format!(
                 "SlitherClient | {}{} | MSAA{}",
                 if self.preparation.is_some() {
-                    "Preparing login/server | "
+                    "Acquiring official profile/server | "
                 } else {
                     ""
                 },
@@ -612,7 +581,25 @@ mod desktop {
                         match event.physical_key {
                             PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {
                                 if r.game.can_play() && r.preparation.is_none() {
-                                    r.start_play(&self.options)?;
+                                    if self.options.official {
+                                        r.nickname.clone_from(&self.options.nickname);
+                                        r.skin = self.options.skin;
+                                        println!(
+                                            "Acquiring official profile and server; Escape cancels"
+                                        );
+                                        r.preparation =
+                                            Some(Preparation::start(self.options.server.clone())?);
+                                    } else if let Some(endpoint) = &self.options.endpoint {
+                                        slither_wgpu_slice::endpoint_login::play(
+                                            &mut r.game,
+                                            endpoint,
+                                            &self.options.nickname,
+                                            self.options.skin,
+                                        )?;
+                                        r.schedule.activity(true);
+                                    } else {
+                                        eprintln!("Use --official or --endpoint before Play");
+                                    }
                                 }
                             }
                             PhysicalKey::Code(KeyCode::Escape) if down => {
@@ -685,7 +672,6 @@ mod desktop {
                     .ok_or("Headless requires --endpoint")?,
                 &options.nickname,
                 options.skin,
-                options.login_profile,
                 cosmetics,
             );
         }
@@ -707,52 +693,6 @@ mod desktop {
         use super::*;
         fn parse(args: &[&str]) -> Result<Option<Options>> {
             parse_options(args.iter().map(|s| s.to_string()))
-        }
-        #[test]
-        fn endpoint_login_profile_defaults_and_overrides() {
-            let endpoint = ["--endpoint", "ws://game.example:19491/slither"];
-            assert_eq!(
-                parse(&endpoint).unwrap().unwrap().login_profile,
-                LoginProfileMode::Auto
-            );
-            for (value, expected) in [
-                ("auto", LoginProfileMode::Auto),
-                ("official", LoginProfileMode::Official),
-                ("zero", LoginProfileMode::Zero),
-            ] {
-                assert_eq!(
-                    parse(&[&endpoint[..], &["--login-profile", value]].concat())
-                        .unwrap()
-                        .unwrap()
-                        .login_profile,
-                    expected
-                );
-            }
-            for args in [
-                vec!["--login-profile", "zero"],
-                vec!["--official", "--login-profile", "zero"],
-                [&endpoint[..], &["--login-profile"]].concat(),
-                [&endpoint[..], &["--login-profile", "invalid"]].concat(),
-            ] {
-                assert!(parse(&args).is_err(), "{args:?}");
-            }
-            let headless = parse(
-                &[
-                    &endpoint[..],
-                    &[
-                        "--headless",
-                        "--frames",
-                        "unused",
-                        "--login-profile",
-                        "zero",
-                    ],
-                ]
-                .concat(),
-            )
-            .unwrap()
-            .unwrap();
-            assert_eq!(headless.login_profile, LoginProfileMode::Zero);
-            assert!(headless.headless.is_some());
         }
         #[test]
         fn cli_modes_are_explicit_and_validate_before_window_or_network() {
