@@ -111,16 +111,19 @@ operations; it excludes setup and draining and is null on other platforms.
 
 The official row directly constructs 500 living snakes: 250 with 16 anchors,
 150 with 60, 75 with 176 and 25 with 247 (mean 64.75, p90 176, p99 247).
-They occupy disjoint concentric lanes, starting at radius 3,000 with 180-unit
+They occupy disjoint concentric lanes, starting at radius 3,000 with 360-unit
 lane spacing and 600-unit gaps; adjacent body anchors span 42 units of arc.
+Placement visits slots in `(rank * 137) % 500` order, spreading lengths and IDs
+through the full arena instead of clustering short lives and low slots centrally.
 Tangential controls maintain the lanes. This approximates the length census
 in the [mature coverage study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md),
 without simulating hours of growth or claiming its spatial distribution.
 It retains `Config::official(500)` ecology and radius, with automatic radius
 and population sizing disabled. Setup is bounded by 500 snakes, 32,375 anchors,
-startup ecology and one raw tick. The default 144 timed ticks cover 1.008 virtual
-seconds and include the two 504 ms food updates. Longer samples rebuild this
-same scene after each 144 ticks, outside timing.
+startup ecology and one raw tick. The default 432 timed ticks use three
+144-tick epochs; each covers 1.008 virtual seconds and includes two 504 ms food
+updates. The same scene rebuilds after each 144 ticks, outside timing. The
+144-tick trace covers one complete epoch, including both food updates.
 
 The Battledome row imports only the ordered head/body geometry, mass and speed
 of the 320-slot, 318-living synthetic constant-boost fixture from the
@@ -131,15 +134,16 @@ body x/y for living slots. It contains no session data or recording. Lives and
 timers start at zero, with exactly 18,346 fresh ambient pellets in a fixed-radius
 11,333.603134043473 Battledome. Pit, spawn band and ecology scale with that wall
 before automatic sizing is disabled. Food takes the first 18,346 admitted
-pellets from a separate seed-7 construction with 100,000 startup attempts;
-this bounded setup retains the ordinary ambient cell limit. This is a new catalog scene derived
+pellets from a separate seed-7 construction with `foodCount=100000` before
+pit-area scaling (at most 100,000 attempts); this bounded setup retains the
+ordinary ambient cell limit. This is a new catalog scene derived
 from that geometry, rather than an exact checkpoint continuation. Setup needs
 one untimed initial broadcast, preserving the seed-0 opening before any motion;
 normal execution never repeats the study's 642.684-second warmup.
 Every measured operation performs complete waited=0 spawn searches with RNG
 seeds 40 and 0, then one ordinary constant-boost raw tick. Search construction,
 refusal and successful pose results are all timed, but poses are not installed.
-The default sample uses 64 operations, rebuilding after each 16 ticks to bound
+The default sample uses 192 operations, rebuilding after each 16 ticks to bound
 drift. Reports count both search outcomes and minimum living population.
 The 317,440-byte geometry file was regenerated at revision `556e73f0`; its
 SHA-256 is part of the catalog definition. The ignored

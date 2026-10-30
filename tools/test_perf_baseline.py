@@ -360,6 +360,12 @@ class SharedPolicyTrace(unittest.TestCase):
             self.assertEqual(trace["end"]["operations"], iterations)
             with gzip.open(root / (workload.name + ".jsonl.gz"), "rb") as source:
                 self.assertTrue(any(json.loads(line).get("kind") == "epoch" for line in source))
+            for name in ("engine-official-mature-500", "engine-battledome-spawn-318"):
+                with self.subTest(case=name):
+                    workload, = perf_baseline.load_catalog(binary).select([name])
+                    self.assertFalse(workload.legacy)
+                    trace = perf_baseline.capture_trace(binary, name, 1, root, terminal=True)
+                    self.assertEqual(trace["end"]["operations"], 1)
 
 
 class ProcessFailures(unittest.TestCase):

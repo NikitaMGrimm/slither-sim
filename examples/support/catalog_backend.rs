@@ -31,7 +31,16 @@ impl Fixture {
             .map(|s| s.body.len())
             .collect();
         lengths.sort_unstable();
+        let mut scratch = Vec::new();
+        let mut known = Vec::new();
+        for slot in &self.sim.backend.slots {
+            if slot.connection.setup {
+                slot.connection.snakes.candidates(&[], &mut scratch);
+                known.push(scratch.len());
+            }
+        }
         serde_json::json!({"living":lengths.len(),"bodyPoints":lengths.iter().sum::<usize>(),
+            "recipients":known.len(),"meanKnownSnakes":known.iter().sum::<usize>() as f64/known.len() as f64,
             "meanSegments":lengths.iter().sum::<usize>() as f64/lengths.len() as f64,
             "p90Segments":lengths[((lengths.len()-1) as f64*0.9).ceil() as usize],
             "p99Segments":lengths[((lengths.len()-1) as f64*0.99).ceil() as usize],
@@ -59,7 +68,11 @@ impl Fixture {
                 // bodies without a costly growth simulation or initial crash.
                 let mut radius = 3000.;
                 let mut used = 0.;
-                for (slot, snake) in snakes.iter_mut().enumerate() {
+                for rank in 0..count {
+                    // Interleave lengths and IDs across the full arena rather
+                    // than packing low slots and short lives into its center.
+                    let slot = rank * 137 % count;
+                    let snake = &mut snakes[slot];
                     let segments = match slot {
                         0..250 => 16,
                         250..400 => 60,
@@ -68,7 +81,7 @@ impl Fixture {
                     };
                     let extent = (segments as f64 + 1.) * 42. + 600.;
                     if used + extent > TAU * radius {
-                        radius += 180.;
+                        radius += 360.;
                         used = 0.;
                     }
                     let phase = (used + extent - 300.) / radius;
@@ -322,6 +335,7 @@ fn catalog_worlds_keep_their_load_and_emit_stock_wire() {
     ] {
         let mut fixture = Fixture::new(kind).unwrap();
         assert_eq!(fixture.world().living(), expected);
+        assert_eq!(fixture.census()["recipients"], expected);
         if matches!(kind, EngineWorld::MatureOfficial) {
             assert_eq!(fixture.census()["bodyPoints"], 32375);
             let food_updates = fixture.food_updates();

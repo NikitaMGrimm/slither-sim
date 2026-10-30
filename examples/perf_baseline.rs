@@ -354,8 +354,8 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::SharedPolicy(op(500, 16, Full)),
     Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
-    Registration::Engine(EngineWorld::MatureOfficial, op(144, 144, Full)),
-    Registration::Engine(EngineWorld::SpawnOverload, op(64, 4, Full)),
+    Registration::Engine(EngineWorld::MatureOfficial, op(432, 144, Full)),
+    Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
 ];
 
 #[derive(Clone, Copy)]

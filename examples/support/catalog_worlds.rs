@@ -67,8 +67,7 @@ impl EngineWorld {
         match self {
             Self::MatureOfficial => {
                 definition["segments"] = json!([[250, 16], [150, 60], [75, 176], [25, 247]]);
-                definition["lanes"] =
-                    json!({"firstRadius":3000,"spacing":180,"gap":600,"bodyArcSpacing":42});
+                definition["lanes"] = json!({"firstRadius":3000,"spacing":360,"gap":600,"bodyArcSpacing":42,"slotStride":137});
             }
             Self::SpawnOverload => {
                 use sha2::{Digest, Sha256};
@@ -80,7 +79,7 @@ impl EngineWorld {
                 definition["spawnSearchSeeds"] = json!([40, 0]);
                 definition["spawnSearchWaitedSeconds"] = json!(0);
                 definition["foodConstruction"] = json!(
-                    "first 18,346 admitted ambient pellets from a separate seed-7 world with 100,000 startup placement attempts, same fixed geometry; no imported food history"
+                    "first 18,346 admitted ambient pellets from a separate seed-7 world with foodCount=100,000 before pit-area scaling, same fixed geometry; no imported food history"
                 );
                 definition["fixtureFormat"] = json!(
                     "320 slots; little-endian f64 alive flag then living head/heading/fam/speed/body count/body xy; exact geometry, new life timers"
@@ -107,6 +106,10 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
             out,
             json!({"kind":"initial", "case":args.case, "snapshot":world_events(fixture.world())?, "census":initial, "wire":fixture.initial_wire()}),
         )?;
+        line(
+            out,
+            json!({"kind":"warmed","ticks": match world {EngineWorld::MatureOfficial=>1,EngineWorld::SpawnOverload=>0}}),
+        )?;
     }
     let epoch = match world {
         EngineWorld::MatureOfficial => 144,
@@ -121,6 +124,12 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
     for iteration in 0..args.iterations {
         if iteration > 0 && iteration % epoch == 0 {
             fixture = Fixture::new(world)?;
+            if args.trace {
+                line(
+                    out,
+                    json!({"kind":"epoch","iteration":iteration,"snapshot":world_events(fixture.world())?,"wire":fixture.initial_wire()}),
+                )?;
+            }
         }
         fixture.control(world);
         let previous_food = fixture.food_updates();
@@ -140,8 +149,8 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
         minimum = minimum.min(fixture.world().living());
         if args.trace {
             let mut record =
-                json!({"kind":"tick","iteration":iteration,"searches":searches,"wire":wire});
-            if (iteration + 1) % 72 == 0 {
+                json!({"kind":"step","iteration":iteration,"searches":searches,"wire":wire});
+            if (iteration + 1) % 72 == 0 || iteration + 1 == args.iterations {
                 record["snapshot"] = world_events(fixture.world())?;
             }
             line(out, record)?;
@@ -150,7 +159,7 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
     if args.trace {
         line(
             out,
-            json!({"kind":"final","snapshot":world_events(fixture.world())?,"census":fixture.census()}),
+            json!({"kind":"end","case":args.case,"operations":args.iterations,"census":fixture.census()}),
         )?;
     }
     if bytes == 0
