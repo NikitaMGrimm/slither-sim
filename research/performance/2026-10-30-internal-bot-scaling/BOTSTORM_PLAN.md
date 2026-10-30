@@ -6,8 +6,8 @@ It also requires timing the final guarded snapshot if the ecology screen fails,
 with its unsettled label preserved.
 
 The maintainer added this workload while the unchanged A4 series was running.
-A community server's reported 12k-snake world was 64,800 units across, used
-external vision-free center-seeking bots and an older, unspecified tick rate
+A 12k-snake single-core reference world (64,800 across, center-steering bots)
+reportedly used external vision-free bots and an older, unspecified tick rate
 on unknown hardware. Those are reported values, not measurements or an
 independently reproduced performance result. Do not identify the source.
 
