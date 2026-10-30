@@ -70,6 +70,9 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
+          # The wgpu crate's own `dev.debug = 0` no longer applies inside the
+          # root workspace; full debug info pushed this job past 15 minutes.
+          CARGO_PROFILE_DEV_DEBUG: 0
           RUST_TEST_THREADS: 1
         run: cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
       - name: Check shared wgpu Windows host
@@ -77,12 +80,14 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
+          CARGO_PROFILE_DEV_DEBUG: 0
         run: cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --all-targets -- -D warnings
       - name: Build shared wgpu Windows executable
         if: matrix.os == 'windows-latest'
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
+          CARGO_PROFILE_DEV_DEBUG: 0
         run: cargo build --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop
 
   wasm:
@@ -127,11 +132,13 @@ jobs:
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
+          CARGO_PROFILE_DEV_DEBUG: 0
         run: cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --target wasm32-unknown-unknown -- -D warnings
       - name: Build shared wgpu WebAssembly host
         env:
           CARGO_BUILD_JOBS: 1
           CARGO_TARGET_DIR: target/wgpu-slice-ci
+          CARGO_PROFILE_DEV_DEBUG: 0
         run: cargo build --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --target wasm32-unknown-unknown
       - name: Generate shared wgpu web bindings
         shell: bash
