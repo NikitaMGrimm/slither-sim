@@ -1,5 +1,5 @@
 //! Authored host-event traces. No window, clipboard, GPU or IME is opened.
-#![cfg(not(target_arch = "wasm32"))]
+#![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use slither_client::{
     menu_input::*,
     menu_preferences::MenuQuality,
