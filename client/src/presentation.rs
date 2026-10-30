@@ -9,7 +9,7 @@ use std::{
     fmt,
 };
 
-use crate::state::Point;
+use crate::{math, state::Point};
 
 mod accessory_request;
 mod announcement;
@@ -409,8 +409,9 @@ impl HeadMotion {
         }
         if alive {
             let travel = travel.min(self.segment_length);
-            next.position.x += next.heading.cos() * travel;
-            next.position.y += next.heading.sin() * travel;
+            // The predicted head also feeds pointer projection when follow is off.
+            next.position.x += math::cos(next.heading) * travel;
+            next.position.y += math::sin(next.heading) * travel;
             next.head_fraction += travel / self.segment_length;
         }
         finite(&[next.position.x, next.position.y, next.head_fraction])?;
@@ -432,7 +433,8 @@ impl<const N: usize, const C: usize> Default for CorrectionRing<N, C> {
     fn default() -> Self {
         Self {
             weights: std::array::from_fn(|index| {
-                (0.5 * (1. - (PI * (N - 1 - index) as f64 / (N - 1) as f64).cos())) as f32
+                // Head corrections can reach input through a subsequently frozen camera.
+                (0.5 * (1. - math::cos(PI * (N - 1 - index) as f64 / (N - 1) as f64))) as f32
             }),
             samples: [[0.; N]; C],
             index: 0,

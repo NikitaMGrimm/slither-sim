@@ -455,9 +455,10 @@ pub(super) fn single_anchor_eye_target(
         second.position.x - first.position.x,
         second.position.y - first.position.y,
     )?;
-    let angle = delta.y.atan2(delta.x);
-    finite(&[angle])?;
-    Ok(angle + PI)
+    let angle = delta.y.atan2(delta.x) as f32;
+    finite(&[f64::from(angle)])?;
+    // Tangent rounding selects the turn direction at the antipodal boundary.
+    Ok(f64::from(angle) + PI)
 }
 
 fn sample_curve_inner(
@@ -599,7 +600,6 @@ fn sample_curve_inner(
     let mut samples = Vec::with_capacity(scratch.vertices.len());
     let mut previous = head;
     let mut distance_cursor_seed = None;
-    let mut target_eye_heading = raw_heading;
     for (index, vertex) in scratch.vertices.iter().enumerate() {
         let p = vertex.position;
         let angle = if index == 0 {
@@ -609,9 +609,6 @@ fn sample_curve_inner(
             distance_cursor_seed = Some(delta);
             delta.y.atan2(delta.x)
         };
-        if index == 1 {
-            target_eye_heading = Some(angle + PI);
-        }
         let sample = CurveSample {
             x: p.x as f32,
             y: p.y as f32,
@@ -623,10 +620,13 @@ fn sample_curve_inner(
         samples.push(sample);
         previous = p;
     }
-    if samples.len() >= 2 {
+    let target_eye_heading = if samples.len() >= 2 {
         samples[0].angle = samples[1].angle;
-    }
-    let target_eye_heading = target_eye_heading.ok_or(PresentationError)?;
+        // Preserve the antipodal turn choice made by the stored tangent.
+        f64::from(samples[1].angle) + PI
+    } else {
+        raw_heading.ok_or(PresentationError)?
+    };
     Ok(CurveOutput {
         samples,
         point_spacing: spacing,

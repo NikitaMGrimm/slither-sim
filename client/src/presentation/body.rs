@@ -3,7 +3,7 @@
 use std::f64::consts::{PI, TAU};
 
 use super::{PresentationError, finite};
-use crate::state::{Appearance, MAX_BODY_POINTS, Point, Setup};
+use crate::{math, state::{Appearance, MAX_BODY_POINTS, Point, Setup}};
 
 /// Samples in each body's x, y, edge-length, and spacing correction channel.
 pub const BODY_SAMPLES: usize = 53;
@@ -284,9 +284,10 @@ impl BodyGeometry {
             Some(position) => position,
             None => {
                 let angle = f64::from(next_direction.ok_or(PresentationError)?) * (TAU / 65_536.);
+                // This anchor reanchors the predicted head used by pointer input.
                 Point {
-                    x: last.position.x + angle.cos() * self.segment_length,
-                    y: last.position.y + angle.sin() * self.segment_length,
+                    x: last.position.x + math::cos(angle) * self.segment_length,
+                    y: last.position.y + math::sin(angle) * self.segment_length,
                 }
             }
         };

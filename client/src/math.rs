@@ -1,4 +1,4 @@
-//! Host math seams retained only for received geometry, input and score semantics.
+//! Host math seams for received geometry, predicted head/camera input and scores.
 //! Visual-only code uses Rust floating-point methods on every target.
 
 #[cfg(target_arch = "wasm32")]
