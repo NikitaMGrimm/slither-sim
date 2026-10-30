@@ -25,6 +25,7 @@ TESTS = ("movement_turns", "physics")
 HARNESS = ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs",
            "examples/support/catalog_worlds.rs", "examples/support/catalog_backend.rs",
            "examples/support/catalog_spawn.bin", "examples/perf_baseline.rs",
+           "examples/support/catalog_mature.bin",
            "examples/perf_observation.rs", "examples/perf_client_retained.rs", "examples/perf_session.rs", "examples/perf_radius.rs",
            "examples/fidelity_metrics.rs", "examples/host_load.rs", "tests/support/mod.rs", *(f"tests/{name}.rs" for name in TESTS))
 FIXTURES = "tests/fixtures"
@@ -582,14 +583,14 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
     return builds, errors
 
 
-def prepare_local(root, ref, out, *, examples=("perf_baseline",), timeout=1800):
+def prepare_local(root, ref, out, *, examples=("perf_baseline",), timeout=1800, cargo_args=()):
     """Build `ref` (with the candidate's measurement inputs) and the current working tree."""
     targets = LocalTargets(root)
     with targets.hold(("baseline", "candidate")), Session(root, Path(out) / "work") as session:
         candidate = session.freeze("candidate")
         baseline = overlay(candidate, session.worktree("baseline", ref))
         builds, errors = build_all([baseline, candidate], targets, examples,
-                                   logs=Path(out), bins=Path(out), timeout=timeout)
+                                   logs=Path(out), bins=Path(out), timeout=timeout, cargo_args=cargo_args)
     if errors:
         raise RuntimeError("; ".join(errors) + f"; see build logs in {out}")
     return builds

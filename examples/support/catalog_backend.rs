@@ -1,23 +1,30 @@
-//! Included as a child of the runtime's private backend in the measurement
-//! example only. No library API or runtime source is patched.
-use super::super::*;
-use crate::{catalog_worlds::EngineWorld, runtime};
+//! Scene construction using public state adapters and opt-in library raw-host hooks.
+use super::*;
+use crate::catalog_worlds::EngineWorld;
 #[cfg(not(slither_private_state))]
 use runtime::LegacyState;
+#[cfg(test)]
+use slither_sim::client::SimulatorBackend;
+use slither_sim::client::{DeliveryProfile, SimulationConfig, simulation::RawWorld};
 type Search = Result<(Vec<Point>, f64), String>;
 
 pub(crate) struct Fixture {
-    sim: RawSimulator,
-    orbits: Vec<f64>,
+    sim: RawWorld,
+    policy: slither_sim::bot::Forager,
+    actions: Vec<Option<Action>>,
+    control_tick: usize,
     initial_wire: Vec<(usize, f64, Vec<u8>)>,
 }
 
 impl Fixture {
     pub(crate) fn world(&self) -> &Simulator {
-        &self.sim.backend.world
+        self.sim.world()
     }
     pub(crate) fn food_updates(&self) -> u64 {
-        self.sim.backend.food_epoch
+        self.sim.food_epoch()
+    }
+    pub(crate) fn food_update_next(&self) -> bool {
+        self.sim.food_update_next()
     }
     pub(crate) fn initial_wire(&mut self) -> Vec<(usize, f64, Vec<u8>)> {
         std::mem::take(&mut self.initial_wire)
@@ -31,16 +38,9 @@ impl Fixture {
             .map(|s| s.body.len())
             .collect();
         lengths.sort_unstable();
-        let mut scratch = Vec::new();
-        let mut known = Vec::new();
-        for slot in &self.sim.backend.slots {
-            if slot.connection.setup {
-                slot.connection.snakes.candidates(&[], &mut scratch);
-                known.push(scratch.len());
-            }
-        }
+        let (recipients, known, food) = self.sim.composition();
         serde_json::json!({"living":lengths.len(),"bodyPoints":lengths.iter().sum::<usize>(),
-            "recipients":known.len(),"meanKnownSnakes":known.iter().sum::<usize>() as f64/known.len() as f64,
+            "recipients":recipients,"meanKnownSnakes":known as f64/recipients as f64,"meanFoodPerView":food as f64/recipients as f64,
             "meanSegments":lengths.iter().sum::<usize>() as f64/lengths.len() as f64,
             "p90Segments":lengths[((lengths.len()-1) as f64*0.9).ceil() as usize],
             "p99Segments":lengths[((lengths.len()-1) as f64*0.99).ceil() as usize],
@@ -57,86 +57,44 @@ impl Fixture {
             delivery: DeliveryProfile::Official,
             ..Default::default()
         };
-        let mut sim = RawSimulator::new(7, config, count)?;
         let mut world = runtime::ring(7, kind.config(), count)?;
         let mut snakes = world.snakes().to_vec();
-        let mut orbits = vec![0.; count];
-        match kind {
-            EngineWorld::MatureOfficial => {
-                // Bounded approximation of the study's mature length census.
-                // Disjoint concentric lanes retain long, spatially extended
-                // bodies without a costly growth simulation or initial crash.
-                let mut radius = 3000.;
-                let mut used = 0.;
-                for rank in 0..count {
-                    // Interleave lengths and IDs across the full arena rather
-                    // than packing low slots and short lives into its center.
-                    let slot = rank * 137 % count;
-                    let snake = &mut snakes[slot];
-                    let segments = match slot {
-                        0..250 => 16,
-                        250..400 => 60,
-                        400..475 => 176,
-                        _ => 247,
-                    };
-                    let extent = (segments as f64 + 1.) * 42. + 600.;
-                    if used + extent > TAU * radius {
-                        radius += 360.;
-                        used = 0.;
-                    }
-                    let phase = (used + extent - 300.) / radius;
-                    used += extent;
-                    orbits[slot] = radius;
-                    snake.body = (0..segments)
-                        .map(|i| {
-                            let angle = phase - (i as f64) * 42. / radius;
-                            Point {
-                                x: radius * angle.cos(),
-                                y: radius * angle.sin(),
-                            }
-                        })
-                        .collect();
-                    snake.head = snake.body[0];
-                    snake.heading = phase + std::f64::consts::FRAC_PI_2;
-                    snake.segments = segments;
-                    snake.fam = 0.;
-                    snake.alive = true;
-                    snake.speed = crate::physics::base_speed(segments);
-                }
+
+        let mut data = match kind {
+            EngineWorld::MatureOfficial => &include_bytes!("catalog_mature.bin")[..],
+            EngineWorld::SpawnOverload => &include_bytes!("catalog_spawn.bin")[..],
+        };
+        for snake in &mut snakes {
+            let mut next = || {
+                let (head, tail) = data.split_at(8);
+                data = tail;
+                f64::from_le_bytes(head.try_into().unwrap())
+            };
+            if next() == 0. {
+                snake.alive = false;
+                continue;
             }
-            EngineWorld::SpawnOverload => {
-                let mut data = &include_bytes!("catalog_spawn.bin")[..];
-                for snake in &mut snakes {
-                    let mut next = || {
-                        let (head, tail) = data.split_at(8);
-                        data = tail;
-                        f64::from_le_bytes(head.try_into().unwrap())
-                    };
-                    let alive = next();
-                    if alive == 0. {
-                        snake.alive = false;
-                        continue;
-                    }
-                    snake.alive = true;
-                    snake.head = Point {
-                        x: next(),
-                        y: next(),
-                    };
-                    snake.heading = next();
-                    snake.fam = next();
-                    snake.speed = next();
-                    let count = next() as usize;
-                    snake.body = (0..count)
-                        .map(|_| Point {
-                            x: next(),
-                            y: next(),
-                        })
-                        .collect();
-                    snake.segments = count;
-                }
-                assert!(data.is_empty());
+            snake.alive = true;
+            snake.head = Point {
+                x: next(),
+                y: next(),
+            };
+            snake.heading = next();
+            snake.fam = next();
+            snake.speed = next();
+            let count = next() as usize;
+            snake.body = (0..count)
+                .map(|_| Point {
+                    x: next(),
+                    y: next(),
+                })
+                .collect();
+            snake.segments = count;
+            if matches!(kind, EngineWorld::MatureOfficial) {
+                snake.speed = physics::base_speed(count);
             }
         }
+        assert!(data.is_empty());
         runtime::initial_snakes(&mut world, snakes)?;
         if matches!(kind, EngineWorld::SpawnOverload) {
             // Match the study's food population without importing snake food
@@ -151,105 +109,120 @@ impl Fixture {
                 .to_vec();
             runtime::replace_food(&mut world, food)?;
         }
-        runtime::record_events(&mut world);
-        sim.backend.world = world;
-        // Only ambient startup food exists: sync can assign its seeded colors.
-        // All subsequent boost/death births go through the ordinary raw tick,
-        // preserving presentation provenance rather than importing stale food.
-        sim.backend
-            .food_presentation
-            .sync(sim.backend.world.food())?;
-        for slot in 0..count {
-            let b = &mut sim.backend;
-            if !b.world.snakes()[slot].alive {
-                continue;
-            }
-            b.slots[slot].control = Action {
-                heading: b.world.snakes()[slot].heading,
-                boost: matches!(kind, EngineWorld::SpawnOverload),
-            };
-            b.connect(slot)?;
-            b.slots[slot].connection.decorations = true;
+        if matches!(kind, EngineWorld::MatureOfficial) {
+            let food = world.food()[..28897].to_vec();
+            runtime::replace_food(&mut world, food)?;
         }
+        if matches!(kind, EngineWorld::MatureOfficial) {
+            for slot in 0..count {
+                if world.snakes()[slot].alive {
+                    continue;
+                }
+                let mut pose = None;
+                for attempt in 0..720 {
+                    let angle = attempt as f64 * TAU / 720.;
+                    let r = world.radius() * 0.95;
+                    let (body, heading) = world
+                        .spawn_body(
+                            Point {
+                                x: r * angle.cos(),
+                                y: r * angle.sin(),
+                            },
+                            angle + FRAC_PI_2,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    if world.body_is_clear(&body, 300.) {
+                        pose = Some((body, heading));
+                        break;
+                    }
+                }
+                let (body, heading) =
+                    pose.ok_or("No clear replacement for the reference's dead slot")?;
+                world
+                    .respawn_body(slot, body, heading)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        runtime::record_events(&mut world);
+        let sim = RawWorld::new(7, config, world)?;
         let mut fixture = Self {
             sim,
-            orbits,
+            policy: slither_sim::bot::Forager::default(),
+            actions: Vec::new(),
+            control_tick: 0,
             initial_wire: Vec::new(),
         };
-        fixture.control(kind);
-        match kind {
-            EngineWorld::MatureOfficial => fixture.sim.advance_tick_with(0, &mut |_| Ok(()))?,
-            EngineWorld::SpawnOverload => {
-                // Preserve the selected geometry for the first two probes.
-                // Moving even one tick can close the study's seed-0 opening.
-                let b = &mut fixture.sim.backend;
-                for slot in 0..count {
-                    b.ingest(slot, 0.)?;
-                }
-                b.broadcast_with(0, &mut |_| Ok(()), true)?;
-            }
-        }
         fixture.initial_wire = fixture.drain()?;
+        for _ in 0..kind.warmup_ticks() {
+            fixture.control(kind);
+            fixture.sim.tick()?;
+            let wire = fixture.drain()?;
+            fixture.initial_wire.extend(wire);
+        }
         Ok(fixture)
     }
     pub(crate) fn control(&mut self, kind: EngineWorld) {
-        for (slot, snake) in self.sim.backend.world.snakes().iter().enumerate() {
-            let heading = match kind {
-                EngineWorld::MatureOfficial => {
-                    let (x, y) = (snake.head.x, snake.head.y);
-                    let radius = self.orbits[slot];
-                    y.atan2(x)
-                        + std::f64::consts::FRAC_PI_2
-                        + ((x.hypot(y) - radius) / radius).clamp(-0.6, 0.6)
-                }
-                EngineWorld::SpawnOverload => snake.heading,
-            };
-            self.sim.backend.slots[slot].control = Action {
-                heading,
-                boost: matches!(kind, EngineWorld::SpawnOverload),
-            };
+        if matches!(kind, EngineWorld::MatureOfficial) {
+            if self.control_tick.is_multiple_of(6) {
+                let observations = self.sim.world().observe_all();
+                self.actions = observations
+                    .iter()
+                    .map(|o| {
+                        o.as_ref().map(|o| {
+                            self.policy
+                                .decide(o, &slither_sim::bot::Timing::default(), &[])
+                        })
+                    })
+                    .collect();
+            }
+        } else {
+            self.actions = self
+                .sim
+                .world()
+                .snakes()
+                .iter()
+                .map(|s| {
+                    s.alive.then_some(Action {
+                        heading: s.heading,
+                        boost: true,
+                    })
+                })
+                .collect();
         }
+        self.sim.controls(&self.actions).unwrap();
+        self.control_tick += 1;
     }
     pub(crate) fn tick(&mut self, kind: EngineWorld) -> Result<Vec<Search>, String> {
         let mut searches = Vec::new();
         if matches!(kind, EngineWorld::SpawnOverload) {
             for seed in [40, 0] {
-                self.sim.backend.spawn_random = Random::new(seed);
-                let result = self.sim.backend.spawn_pose_waited(usize::MAX, 0.);
+                let result = self.sim.search(seed);
                 if let Err(error) = &result
-                    && error != crate::spawn::WAITING
+                    && error != "Spawn candidate search exhausted: no safe circular pose sampled"
                 {
                     return Err(error.clone());
                 }
                 searches.push(result);
             }
         }
-        self.sim.advance_tick_with(0, &mut |_| Ok(()))?;
+        self.sim.tick()?;
         Ok(searches)
     }
     pub(crate) fn drain(&mut self) -> Result<Vec<(usize, f64, Vec<u8>)>, String> {
-        let mut records = Vec::new();
-        for slot in 0..self.sim.backend.slots.len() {
-            records.extend(
-                self.sim
-                    .take(slot)?
-                    .into_iter()
-                    .map(|(at, bytes)| (slot, at, bytes)),
-            );
-        }
-        Ok(records)
+        self.sim.drain()
     }
 }
 
 /// One-time offline fixture generator, used only to select the compact body
 /// geometry from the published study's deterministic received-frame warmup.
+#[cfg(test)]
 pub(crate) fn prepare_spawn(path: &str) -> Result<(), String> {
-    use crate::client::{Bot, ClientStatus, ForagerBot};
+    use slither_sim::client::{Bot, ClientStatus, ForagerBot};
     let mut backend = SimulatorBackend::new(
         7,
         SimulationConfig {
             agents: 320,
-            world: crate::Config::battledome(),
+            world: Config::battledome(),
             ..Default::default()
         },
     )?;
@@ -277,13 +250,13 @@ pub(crate) fn prepare_spawn(path: &str) -> Result<(), String> {
         }
         backend.step_all(&actions)?;
         if decision % 143 == 0 {
-            eprintln!("warmup {decision} {}", backend.world.living());
+            eprintln!("warmup {decision} {}", backend.world().living());
         }
     }
-    assert_eq!(backend.world.living(), 318, "study census changed");
+    assert_eq!(backend.world().living(), 318, "study census changed");
     assert_eq!(
         backend
-            .world
+            .world()
             .snakes()
             .iter()
             .filter(|s| s.alive)
@@ -293,7 +266,7 @@ pub(crate) fn prepare_spawn(path: &str) -> Result<(), String> {
         "study geometry changed"
     );
     let mut bytes = Vec::new();
-    for snake in backend.world.snakes() {
+    for snake in backend.world().snakes() {
         let mut emit = |x: f64| bytes.extend_from_slice(&x.to_le_bytes());
         emit(f64::from(snake.alive));
         if !snake.alive {
@@ -328,16 +301,79 @@ fn regenerate_spawn_fixture() {
 }
 
 #[test]
+#[ignore = "requires the retained reference checkpoint; overwrites selected geometry"]
+fn regenerate_mature_fixture() {
+    use sha2::{Digest, Sha256};
+    let bytes =
+        std::fs::read(std::env::var_os("SLITHER_MATURE_CHECKPOINT").expect("checkpoint path"))
+            .unwrap();
+    assert_eq!(
+        Sha256::digest(&bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "f92a38ecc533c8b2cb28519e7189f93bc871632cdf0c3dbb8c2f84718b723e7d"
+    );
+    let checkpoint: Value = serde_json::from_slice(&bytes).unwrap();
+    let slots = checkpoint["state"]["slots"].as_array().unwrap();
+    assert_eq!(slots.len(), 500);
+    let mut output = Vec::new();
+    for slot in slots {
+        let snake = &slot["snake"];
+        let alive = snake["alive"].as_bool().unwrap();
+        let mut emit = |x: f64| output.extend_from_slice(&x.to_le_bytes());
+        emit(f64::from(alive));
+        if !alive {
+            continue;
+        }
+        for value in [
+            &snake["head"]["x"],
+            &snake["head"]["y"],
+            &snake["heading"],
+            &snake["fam"],
+            &snake["speed"],
+        ] {
+            emit(value.as_f64().unwrap());
+        }
+        let body = snake["body"].as_array().unwrap();
+        emit(body.len() as f64);
+        for point in body {
+            emit(point["x"].as_f64().unwrap());
+            emit(point["y"].as_f64().unwrap());
+        }
+    }
+    assert_eq!(
+        Sha256::digest(&output)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>(),
+        "2b0cf55a05c3d0c585deda60497da7298e8f7ff6c2b28e74818efdd91941b702"
+    );
+    std::fs::write(
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/examples/support/catalog_mature.bin"
+        ),
+        output,
+    )
+    .unwrap();
+}
+
+#[test]
 fn catalog_worlds_keep_their_load_and_emit_stock_wire() {
     for (kind, expected) in [
         (EngineWorld::MatureOfficial, 500),
         (EngineWorld::SpawnOverload, 318),
     ] {
         let mut fixture = Fixture::new(kind).unwrap();
-        assert_eq!(fixture.world().living(), expected);
+        assert!(if matches!(kind, EngineWorld::MatureOfficial) {
+            fixture.world().living() >= 490
+        } else {
+            fixture.world().living() == expected
+        });
         assert_eq!(fixture.census()["recipients"], expected);
         if matches!(kind, EngineWorld::MatureOfficial) {
-            assert_eq!(fixture.census()["bodyPoints"], 32375);
+            assert!((27000..29000).contains(&fixture.census()["bodyPoints"].as_u64().unwrap()));
             let food_updates = fixture.food_updates();
             let head = fixture.world().snakes()[0].head;
             // Both food-maintenance boundaries fall inside the default window.

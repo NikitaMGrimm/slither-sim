@@ -53,6 +53,10 @@ pub(crate) struct PlayerAppearance {
 }
 
 mod broadcast;
+// The offline catalog needs raw host operations without copying the engine.
+#[cfg(feature = "perf-internals")]
+#[doc(hidden)]
+pub use broadcast::perf::RawWorld;
 mod config;
 mod connection;
 mod food;

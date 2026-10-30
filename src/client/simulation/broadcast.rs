@@ -1,4 +1,7 @@
 //! Shared tick scheduling and recipient-ordered broadcasts.
+#[cfg(feature = "perf-internals")]
+#[doc(hidden)]
+pub mod perf;
 use super::{
     EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
     connection::KnownPrey,

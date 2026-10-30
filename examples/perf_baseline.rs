@@ -3,16 +3,12 @@
 //! REGISTRATIONS below is the only case list. See docs/performance-workloads.md.
 //! --profile is a separate timed step case; --trace emits untimed canonical JSONL.
 //! Socket rows reuse host_load; all connections stay on loopback.
-// The raw-host fixture needs private seams. build.rs mirrors this revision's
-// engine into this example; all rows and adapters resolve to that one engine.
-extern crate self as slither_sim;
-#[allow(dead_code, unused_imports)]
-mod engine {
-    include!(concat!(env!("OUT_DIR"), "/perf-engine/lib.rs"));
-}
-use engine::json;
-#[allow(hidden_glob_reexports)]
-pub use engine::*;
+use slither_sim::{
+    Action, Config, DeathEvent, DeathReason, Observation, Point, Simulator, physics,
+};
+#[cfg(feature = "perf-internals")]
+#[path = "support/catalog_backend.rs"]
+mod catalog_backend;
 #[path = "support/catalog_worlds.rs"]
 mod catalog_worlds;
 use catalog_worlds::EngineWorld;
@@ -28,8 +24,8 @@ use runtime::LegacyState;
 
 #[path = "support/state.rs"]
 mod checkpoint_state;
-use profiling::{StepProfile, WorldStats};
 use serde_json::{Value, json};
+use slither_sim::profiling::{StepProfile, WorldStats};
 use std::{
     collections::{BTreeMap, VecDeque},
     f64::consts::{FRAC_PI_2, PI, TAU},
@@ -205,7 +201,6 @@ enum Controller {
 }
 
 /// A steady-state scene: deaths, death food and respawns happen during measurement.
-#[allow(hidden_glob_reexports)]
 struct Scenario {
     id: &'static str,
     world: World,
@@ -354,7 +349,7 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::SharedPolicy(op(500, 16, Full)),
     Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
-    Registration::Engine(EngineWorld::MatureOfficial, op(432, 144, Full)),
+    Registration::Engine(EngineWorld::MatureOfficial, op(1296, 144, Full)),
     Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
 ];
 
@@ -573,7 +568,7 @@ fn catalog_json() -> Result<Value, String> {
         .map(|workload| {
             let driver = workload.driver;
             Ok(json!({
-                "available": cfg!(feature = "networking") || !driver.networking(),
+                "available": if matches!(driver, Driver::Engine(_)) { cfg!(feature = "perf-internals") } else { cfg!(feature = "networking") || !driver.networking() },
                 "definition": driver.definition()?, "iterations": workload.operation.iterations,
                 "legacy": matches!(driver, Driver::Legacy(_)), "mode": driver.mode(),
                 "name": workload.name, "operation": driver.operation(), "profile": driver.profile(),
@@ -2226,8 +2221,10 @@ fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
     #[cfg(feature = "networking")]
     let cpu = host_load::cpu_seconds();
     let result = match args.driver {
-        #[cfg(feature = "networking")]
+        #[cfg(feature = "perf-internals")]
         Driver::Engine(world) => catalog_worlds::run(args, world, out)?,
+        #[cfg(not(feature = "perf-internals"))]
+        Driver::Engine(_) => return Err("engine rows require the perf-internals feature".into()),
         Driver::Legacy(
             Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody | Legacy::Observe,
         ) => run_core(args, out)?,
@@ -2253,8 +2250,7 @@ fn run_case(args: &Args, out: &mut impl Write) -> Result<Value, String> {
             )?
         }
         #[cfg(not(feature = "networking"))]
-        Driver::Engine(_)
-        | Driver::Legacy(Legacy::Portable | Legacy::Protocol)
+        Driver::Legacy(Legacy::Portable | Legacy::Protocol)
         | Driver::Client(_)
         | Driver::SharedPolicy
         | Driver::Socket(..) => {
@@ -2476,7 +2472,11 @@ mod tests {
             );
             assert_eq!(
                 workload["available"],
-                cfg!(feature = "networking") || !networking
+                if workload["name"].as_str().unwrap().starts_with("engine-") {
+                    cfg!(feature = "perf-internals")
+                } else {
+                    cfg!(feature = "networking") || !networking
+                }
             );
         }
     }

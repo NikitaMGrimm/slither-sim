@@ -31,8 +31,8 @@ cargo run --release --locked --example perf_baseline -- --list
 - `mode` and `operation`: informational labels such as `official` and
   `step+observe`.
 - `profile`: whether `--profile` is supported.
-- `available`: false when the row needs the `networking` feature and the
-  harness was built without it. The row is still listed; running it fails.
+- `available`: false when a required feature (`networking`, or `perf-internals`
+  for engine rows) is absent. The row is still listed; running it fails.
 - `legacy`: true only for the six historical cases.
 - `synthetic`: null, or what is synthetic about the scene.
 - `definition`: the resolved scene, including the serialized `Config`. A changed
@@ -100,7 +100,7 @@ API without it, the harness falls back to `observe_all`.
 ## Simulation-thread catalog rows
 
 `engine-official-mature-500` and `engine-battledome-spawn-318` are optional
-`full` rows requiring `networking`. Both run the raw host's serial simulation
+`full` rows requiring `perf-internals` (which enables `networking`). Both run the raw host's serial simulation
 tick, including per-recipient stock protocol-19 encoding and food presentation.
 There are no sockets, client decoders or bot workers. Controls, construction,
 wire draining and serialization are outside each timed interval. `--profile`
@@ -109,21 +109,26 @@ timing still reports tick percentiles. `--parallel` is rejected.
 On Linux, `timing.operationCpuSeconds` also sums process CPU around those same
 operations; it excludes setup and draining and is null on other platforms.
 
-The official row directly constructs 500 living snakes: 250 with 16 anchors,
-150 with 60, 75 with 176 and 25 with 247 (mean 64.75, p90 176, p99 247).
-They occupy disjoint concentric lanes, starting at radius 3,000 with 360-unit
-lane spacing and 600-unit gaps; adjacent body anchors span 42 units of arc.
-Placement visits slots in `(rank * 137) % 500` order, spreading lengths and IDs
-through the full arena instead of clustering short lives and low slots centrally.
-Tangential controls maintain the lanes. This approximates the length census
-in the [mature coverage study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-28-mature-covered-bounds/REPORT.md),
-without simulating hours of growth or claiming its spatial distribution.
-It retains `Config::official(500)` ecology and radius, with automatic radius
-and population sizing disabled. Setup is bounded by 500 snakes, 32,375 anchors,
-startup ecology and one raw tick. The default 432 timed ticks use three
-144-tick epochs; each covers 1.008 virtual seconds and includes two 504 ms food
-updates. The same scene rebuilds after each 144 ticks, outside timing. The
-144-tick trace covers one complete epoch, including both food updates.
+The official row uses a 469,712-byte geometry fixture selected from the synthetic
+fully grown world used by the [compact-history study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-compact-snake-history/REPORT.md).
+It retains 499 ordered heads/bodies and masses (27,610 anchors, p90 176, p99 247),
+starts new lives at cruise speed, and admits a normal newborn for the one dead
+slot. Replacement placement tries at most 720 tangent poses at 95% of the arena
+radius, with 300-unit clearance. No checkpoint timers, food or session history
+are imported. The definition records the source checkpoint and geometry hashes.
+The ignored `regenerate_mature_fixture` test reads `SLITHER_MATURE_CHECKPOINT`,
+verifies that source hash and reproduces the selected bytes.
+
+The row keeps the official 500-player radius, uses 20 prey and the first 28,897
+fresh ambient pellets, and disables automatic radius/population sizing. Direct
+A4-mean controls run every six ticks outside timing. Setup is bounded by the
+fixture, normal startup ecology, replacement search and 144 warmup ticks; it
+does not simulate hours of growth. Warmup builds real recipient food and snake
+history. The default 1,296 timed ticks use nine 144-tick epochs, each covering
+1.008 virtual seconds and two 504 ms food updates. Rebuilding between epochs
+is outside timing. The 144-tick trace covers one complete epoch, including both
+food updates. These are fresh synthetic lives with reference geometry, rather
+than a continuation of the original world.
 
 The Battledome row imports only the ordered head/body geometry, mass and speed
 of the 320-slot, 318-living synthetic constant-boost fixture from the
@@ -152,7 +157,7 @@ decisions, checking the selected living and anchor counts before writing. This
 slow, explicit maintenance operation is separate from catalog setup:
 
 ```sh
-cargo test --release --locked --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
+cargo test --release --locked --features perf-internals --example perf_baseline regenerate_spawn_fixture -- --ignored --nocapture
 ```
 
 Both constructions begin with ambient food only, attach recipients before the
@@ -165,14 +170,24 @@ Traces retain initial/final authoritative state, census and ordered per-tick
 wire/search results; the official 144-tick window also retains full state at
 both food boundaries. The Battledome trace uses four operations. Presentation
 and connection internals are not serialized, so parity covers these outputs
-and state boundaries. The example compiles an untimed source mirror of the
-checked-out engine with a private fixture child; the library's source and API
-are unchanged. The comparison overlay copies the measurement helpers and
-geometry, while each revision supplies its own engine code.
+and state boundaries. Public checkpoint/state adapters construct the core;
+minimal hidden library hooks attach recipients, advance raw ticks and run
+admission searches. All measured engine code belongs to the compiled library.
+The off-by-default feature leaves ordinary builds and packaged build-script
+behavior unchanged. The comparison overlay copies helpers and geometry, while
+each revision supplies its own library. Historical bases predating the hooks
+need the same explicitly recorded hook-only patch on both sides.
 
 ```sh
-python -B tools/perf_compare.py --base BASE --output outputs/perf/engine-check --cases engine-official-mature-500 engine-battledome-spawn-318
+python -B tools/perf_compare.py --base BASE --features perf-internals --output outputs/perf/engine-check --cases engine-official-mature-500 engine-battledome-spawn-318
 ```
+
+For separate Linux `perf record` diagnostics, `SLITHER_PERF_CONTROL` and
+`SLITHER_PERF_ACK` name the FIFOs passed to perf's `--control=fifo:CONTROL,ACK`
+with `--delay=-1`. `SLITHER_PERF_TICKS=ordinary`, `food` or `all` enables sampling
+only around selected timed operations. Leave these variables unset for timing;
+control synchronization adds overhead. Census reports include mean known snakes,
+held food entries per recipient, body points and minimum living population.
 
 ## Shared-policy workload
 
