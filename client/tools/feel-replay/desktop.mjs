@@ -52,7 +52,7 @@ export function classifyPath(path) {
   if (/^final/.test(path)) return 'completion/counts';
   if (/\.camera\.ring\[/.test(path)) return 'camera ring';
   if (/\.camera\./.test(path)) return 'camera samples';
-  if (/\.(atMs|eventSeq|frameId|drawId|id|phase|eligibility)$/.test(path)) return 'update/draw timing or missing boundary';
+  if (/^samples(\[\d+\])?$/.test(path) || /\.(atMs|eventSeq|frameId|drawId|id|phase|eligibility)$/.test(path)) return 'update/draw timing or missing boundary';
   if (/\.status\.|\.quality\./.test(path)) return 'presentation accounting';
   return 'world/input state at boundary';
 }

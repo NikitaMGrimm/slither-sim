@@ -22,6 +22,8 @@ test('classification retains camera ring errors separately from scheduling and c
   assert.equal(classifyPath('samples[1].camera.index'), 'camera samples');
   assert.equal(classifyPath('samples[1].atMs'), 'update/draw timing or missing boundary');
   assert.equal(classifyPath('commands[0].sendMs'), 'command bytes or times');
+  assert.equal(classifyPath('samples'), 'update/draw timing or missing boundary');
+  assert.equal(classifyPath('samples[5]'), 'update/draw timing or missing boundary');
 });
 test('core history ignores receipt bookkeeping but retains every sample and command value', () => {
   const left = { commands: [{ bytes: [1], decisionMs: 2, sendMs: 2, ackMs: 2 }],
