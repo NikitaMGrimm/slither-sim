@@ -49,7 +49,8 @@ ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"]
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "=5.4.3"
 
-[target.'cfg(target_os = "windows")'.dependencies]
+# Linux has no enabled x11/wayland backend; the GPU-free probe does not need winit.
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "linux")))'.dependencies]
 winit = { version = "=0.30.13", default-features = false, features = ["rwh_06"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

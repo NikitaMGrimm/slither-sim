@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { argumentsFor, allowedPort, readyEndpoint, assertSummary } from './e2e-local-host.mjs';
+import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup } from './e2e-local-host.mjs';
 
 test('arguments require a host, accept bounded seconds and prebuilt paths, reject ambiguous input', () => {
   assert.equal(argumentsFor(['--host-bin', 'host']).seconds, 8);
@@ -32,6 +32,37 @@ test('readiness requires a complete exact loopback announcement, independent of 
 const complete = () => ({ websocket: true, challenge: true, loginSent: true, protocol: 19, setup: true,
   ownSnake: true, steeringCommands: 3, boostOn: true, boostOff: true, moved: true, turned: true,
   accelerated: true, decelerated: true, leaderboard: true, minimap: true, preparedFrames: 5, cleanClose: true });
+
+test('cleanup failure preserves the original session error, stage and partial summary', async () => {
+  const client = { ...complete(), cleanClose: false };
+  const sessionError = Object.assign(new Error('session failed'), { stage: 'close', client });
+  const cleanupError = new Error('SIGKILL timeout');
+  const calls = [];
+  await assert.rejects(runWithCleanup(async () => {
+    calls.push('session'); throw sessionError;
+  }, async () => {
+    await Promise.resolve(); calls.push('cleanup'); throw cleanupError;
+  }), error => {
+    assert.equal(error, sessionError);
+    assert.equal(error.stage, 'close');
+    assert.equal(error.client, client);
+    assert.equal(error.cleanupError, cleanupError);
+    return true;
+  });
+  assert.deepEqual(calls, ['session', 'cleanup']);
+});
+
+test('cleanup is awaited after success and surfaces its own error only without a session failure', async () => {
+  const result = { ok: true };
+  let cleaned = false;
+  assert.equal(await runWithCleanup(async () => result, async () => {
+    await Promise.resolve(); cleaned = true;
+  }), result);
+  assert.equal(cleaned, true);
+  const cleanupError = new Error('cleanup failed');
+  await assert.rejects(runWithCleanup(async () => result, async () => { throw cleanupError; }), error => error === cleanupError);
+  await assert.rejects(runWithCleanup(async () => { throw undefined; }, async () => { throw cleanupError; }), error => error === undefined);
+});
 
 test('summary assertions require every observed stage, including server responses and close', () => {
   const summary = complete();

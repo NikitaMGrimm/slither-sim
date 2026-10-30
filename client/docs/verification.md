@@ -92,7 +92,7 @@ used by the [native feel peer proposal](https://github.com/NikitaMGrimm/slither-
 it does not depend on that unmerged branch. No window, GPU adapter/device,
 software Vulkan or submission is created. The ordinary desktop `--headless`
 mode still uses offscreen GPU rendering and PNG capture. Linux builds of this
-probe omit the Windows-only winit dependency and use installed DejaVu Sans for
+probe omit the winit dependency and use installed DejaVu Sans for
 real text preparation (`fonts-dejavu-core` on Ubuntu). This is a protocol and
 CPU presentation guard; it establishes no pixel, GPU or perceptual parity.
 
@@ -110,55 +110,12 @@ Only protocol 19 is covered. The host also supports 13, but this client's
 `SessionPolicy::admit_protocol` and state decoder currently reject it. This
 test does not add legacy support or relabel protocol 19 evidence.
 
-### Proposed CI job (not installed)
+### CI
 
-The following standalone workflow proposal runs when either lane changes;
-`src/**` includes host protocol/configuration owners. It can also be integrated
-by the workflow owner using the existing changed-area outputs. Actions reuse
-the repository's SHA pins. The gameplay portion is expected to take roughly
-10 seconds (Windows measurements below 9 seconds); Ubuntu has not been run
-locally. Cold builds take several minutes; the job allows 20 minutes including
-sequential builds and cache restoration. No workflows are changed by this PR.
-
-```yaml
-name: Offline host/client
-on:
-  pull_request:
-    paths: ['client/**', 'src/**', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.github/workflows/offline-client-e2e.yml']
-  push:
-    branches: [main]
-    paths: ['client/**', 'src/**', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', '.github/workflows/offline-client-e2e.yml']
-  workflow_dispatch:
-permissions:
-  contents: read
-jobs:
-  local-host:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      CARGO_BUILD_JOBS: 2
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: rustup toolchain install 1.99.0 --profile minimal
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: '24'
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          prefix-key: offline-host-client
-          workspaces: |
-            . -> target
-            client/apps/wgpu-slice -> ../../target/wgpu-slice-check
-          cache-bin: false
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: sudo apt-get update && sudo apt-get install -y fonts-dejavu-core
-      - run: cargo build --release --locked
-      - run: cargo build --manifest-path client/apps/wgpu-slice/Cargo.toml --locked --bin slither-client-e2e --target-dir client/target/wgpu-slice-check
-      - run: node --test client/tools/e2e-local-host.test.mjs
-      - run: node client/tools/e2e-local-host.mjs --host-bin target/release/slither-sim
-```
+CI runs this as the `e2e` job in `.github/workflows/checks.yml`, inside
+`Required checks`; the simulator lane owns that workflow. It builds the release
+host and debug `slither-client-e2e` with target directory
+`client/target/wgpu-slice-e2e`, and runs on Ubuntu with DejaVu fonts.
 
 ## Source guard
 

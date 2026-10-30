@@ -115,6 +115,24 @@ async function stop(state) {
   }
 }
 
+export async function runWithCleanup(session, cleanup) {
+  let result, sessionError, cleanupError;
+  let sessionFailed = false, cleanupFailed = false;
+  try { result = await session(); }
+  catch (error) { sessionError = error; sessionFailed = true; }
+  try { await cleanup(); }
+  catch (error) { cleanupError = error; cleanupFailed = true; }
+  // Keep the original stage and partial client summary if teardown also fails.
+  if (sessionFailed) {
+    if (cleanupFailed && sessionError instanceof Error && Object.isExtensible(sessionError)) {
+      sessionError.cleanupError = cleanupError;
+    }
+    throw sessionError;
+  }
+  if (cleanupFailed) throw cleanupError;
+  return result;
+}
+
 export async function runLocalHost(options) {
   const started = performance.now();
   const controller = new AbortController();
@@ -122,7 +140,7 @@ export async function runLocalHost(options) {
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
   let directory, host, client;
-  try {
+  return runWithCleanup(async () => {
     directory = await mkdtemp(path.join(os.tmpdir(), 'slither-client-e2e-'));
     const config = path.join(directory, 'host.json');
     await writeFile(config, JSON.stringify({
@@ -155,15 +173,16 @@ export async function runLocalHost(options) {
     }
     return { ok: true, endpoint, protocolCoverage: [19], client: summary,
       seconds: Number(((performance.now() - started) / 1000).toFixed(3)) };
-  } finally {
+  }, async () => {
     // All launched children are direct, shell-free binaries. Reap both even if one cleanup fails.
     const results = await Promise.allSettled([stop(client), stop(host)]);
-    if (directory) await rm(directory, { recursive: true, force: true });
+    try { if (directory) await rm(directory, { recursive: true, force: true }); }
+    catch (error) { results.push({ status: 'rejected', reason: error }); }
     process.removeListener('SIGINT', interrupt);
     process.removeListener('SIGTERM', interrupt);
     const error = results.find(result => result.status === 'rejected');
     if (error) throw error.reason;
-  }
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
