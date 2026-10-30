@@ -37,10 +37,6 @@
 
 ### Performance
 
-- Bot vision finds nearby snakes without scanning the whole population and
-  restores visible food order without walking the entire food list. In a fresh
-  10,000-snake official-density world, observation CPU falls from about 122 to
-  42 microseconds per decision. Every observation and its ordering are unchanged.
 - Collision checks keep each snake's body bounds until its body changes,
   instead of rescanning every body point on every tick. In a frozen
   10,000-snake world, world CPU per tick falls from about 14.2 to 11.6 ms, and
@@ -65,6 +61,10 @@
   failed search there costs 0.1 ms more; it was adopted anyway after the
   results, since that is about 1.5% of a 7 ms tick
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
+- Bot vision finds nearby snakes without scanning the whole population and
+  restores visible food order without walking the entire food list. In a fresh
+  10,000-snake official-density world, observation CPU falls from about 122 to
+  42 microseconds per decision. Every observation and its ordering are unchanged.
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 
