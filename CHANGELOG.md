@@ -33,6 +33,10 @@
 
 ### Performance
 
+- Bot vision finds nearby snakes without scanning the whole population and
+  restores visible food order without walking the entire food list. In a fresh
+  10,000-snake official-density world, observation CPU falls from about 122 to
+  42 microseconds per decision. Every observation and its ordering are unchanged.
 - Removing eaten food copies the surviving pellets in one pass instead of
   rotating them through the list. In a frozen 10,000-snake world, world CPU
   per tick falls from about 17.1 to 14.2 ms, and the 500-player catalog step

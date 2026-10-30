@@ -125,6 +125,13 @@ per batch, refining cells only when enough observers repay them. Construction is
 share of sequential cost but precedes the parallel split; the study explains
 why it is not reused across steps.
 
+With at least 256 snakes and eight observers, a batch also builds a bounds tree
+to skip distant snakes. Very long bodies need only one tree entry. Candidates
+are restored to world order before the unchanged visibility predicate runs;
+extreme or nonfinite bounds retain the original per-snake check. At 262,144 food
+items, an additional bit per food-mark word skips empty words when restoring
+food order. Both indexes live only for the batch's immutable world borrow.
+
 ## Controller transport
 
 `cargo run --release --locked --example perf_session` writes an untimed JSONL

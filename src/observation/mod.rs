@@ -3,6 +3,9 @@ use crate::{Constraint, ErrorKind, SimError};
 use crate::{model::*, physics::Bounds, prey::Prey, simulator::Simulator};
 use std::ops::Range;
 
+mod snakes;
+use snakes::SnakeIndex;
+
 /// Fewest observers worth a parallel task: one observation takes roughly 10-30
 /// microseconds, and waking pool threads costs tens of microseconds.
 #[cfg(feature = "parallel")]
@@ -153,8 +156,97 @@ impl FoodGrid {
     }
 }
 
+// Compile the summary separately so small lists keep the original mark loop.
+fn visit_food<const SPARSE: bool>(
+    grid: &FoodGrid,
+    w: VisibleState<'_>,
+    head: Point,
+    b: Bounds,
+    marks: &mut Vec<u64>,
+    sink: &mut impl Sink,
+) {
+    let vision = w.vision;
+    let reach = vision + 1.0;
+    let visible = |p: Point| {
+        (p.x - head.x).abs() <= vision
+            && (p.y - head.y).abs() <= vision
+            && p.distance_le(head, vision)
+    };
+    let words = w.food.len().div_ceil(64);
+    marks.resize(words + if SPARSE { words.div_ceil(64) } else { 0 }, 0);
+    let (marks, summary) = marks.split_at_mut(words);
+    let mut count = 0;
+    let mut first = usize::MAX;
+    // Branch-free: about half the candidates are visible, unpredictably.
+    let mut mark = |i: usize, seen: bool| {
+        marks[i / 64] |= u64::from(seen) << (i % 64);
+        if SPARSE {
+            summary[i / 4096] |= u64::from(seen) << (i / 64 % 64);
+        }
+        count += usize::from(seen);
+        first = first.min(if seen { i / 64 } else { usize::MAX });
+    };
+    for row in grid.row(b.min.y)..=grid.row(b.max.y) {
+        // Only a chord of the circle can be visible in this row. Moving
+        // the row a unit closer and using `reach` as the radius leave the
+        // squared chord a margin above 2 * vision, far beyond its rounding
+        // error for tame values, and the added unit covers the rest.
+        let top = grid.origin.y + row as f64 * grid.cell;
+        let dy = (top - head.y).max(head.y - (top + grid.cell)).max(1.0) - 1.0;
+        let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
+        let (lo, hi) = (grid.col(head.x - half), grid.col(head.x + half));
+        let cells = row * grid.cols;
+        let span = grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
+        for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
+            // The same pure conjunction as `visible`, without short-circuits.
+            let seen = ((p.x - head.x).abs() <= vision)
+                & ((p.y - head.y).abs() <= vision)
+                & p.distance_le(head, vision);
+            mark(i as usize, seen);
+        }
+    }
+    for &i in &grid.outliers {
+        mark(i as usize, visible(w.food[i as usize].point()));
+    }
+    // Ascending bit order restores the original food order.
+    sink.reserve_food(count);
+    let mut reported = 0;
+    if SPARSE {
+        // Each summary bit selects one nonempty word of 64 food indices.
+        for (group, bits) in summary.iter_mut().enumerate().skip(first / 64) {
+            if reported == count {
+                break;
+            }
+            let mut active = std::mem::take(bits);
+            while active != 0 {
+                let word = group * 64 + active.trailing_zeros() as usize;
+                let mut bits = std::mem::take(&mut marks[word]);
+                while bits != 0 {
+                    sink.food(word * 64 + bits.trailing_zeros() as usize);
+                    reported += 1;
+                    bits &= bits - 1;
+                }
+                active &= active - 1;
+            }
+        }
+    } else {
+        for (word, bits) in marks.iter_mut().enumerate().skip(first) {
+            if reported == count {
+                break;
+            }
+            let mut bits = std::mem::take(bits);
+            while bits != 0 {
+                sink.food(word * 64 + bits.trailing_zeros() as usize);
+                reported += 1;
+                bits &= bits - 1;
+            }
+        }
+    }
+}
+
 struct Index {
     bodies: Vec<Bounds>,
+    snakes: Option<SnakeIndex>,
     food: Option<FoodGrid>,
 }
 struct Observer<'a> {
@@ -166,8 +258,8 @@ impl<'a> Observer<'a> {
         // Exact visibility tests still decide every candidate; the index only
         // skips food and snakes that cannot pass them.
         let food = world.food.len();
-        let index = (observers >= 2 && (0.0..=TAME).contains(&world.vision)).then(|| Index {
-            bodies: world
+        let index = (observers >= 2 && (0.0..=TAME).contains(&world.vision)).then(|| {
+            let bodies: Vec<_> = world
                 .snakes
                 .iter()
                 .map(|s| {
@@ -177,18 +269,26 @@ impl<'a> Observer<'a> {
                     }
                     b
                 })
-                .collect(),
-            // Building the grid costs a few passes over the food list, so small
-            // batches scan it directly instead.
-            food: (observers >= 8
-                && observers.saturating_mul(food) >= 1 << 15
-                && food < u32::MAX as usize)
-                .then(|| FoodGrid::new(world.food, world.vision, observers)),
+                .collect();
+            Index {
+                // Fresh official 1/6 batches, five pairs: forcing a tree at 64
+                // snakes was noise (11.75 -> 11.66 us/decision); at 256 the tree
+                // alone improved 16.21 -> 15.91 us. Keep smaller batches scanning.
+                snakes: (world.snakes.len() >= 256 && observers >= 8)
+                    .then(|| SnakeIndex::new(world.snakes, &bodies)),
+                bodies,
+                // Building the grid costs a few passes over the food list, so small
+                // batches scan it directly instead.
+                food: (observers >= 8
+                    && observers.saturating_mul(food) >= 1 << 15
+                    && food < u32::MAX as usize)
+                    .then(|| FoodGrid::new(world.food, world.vision, observers)),
+            }
         });
         Self { world, index }
     }
-    /// Refill `slot` for `index`, reusing its vectors. `marks` is empty or has one
-    /// zeroed bit per food item; it is zeroed again on return.
+    /// Refill `slot` for `index`, reusing its vectors. `marks` is zeroed scratch
+    /// space for food bits and optional word summaries; it is zeroed on return.
     fn observe_into(
         &self,
         index: usize,
@@ -277,54 +377,13 @@ impl<'a> Observer<'a> {
                 },
                 b,
             )) => {
-                marks.resize(w.food.len().div_ceil(64), 0);
-                let mut count = 0;
-                let mut first = usize::MAX;
-                // Branch-free: about half the candidates are visible, unpredictably.
-                let mut mark = |i: usize, seen: bool| {
-                    marks[i / 64] |= u64::from(seen) << (i % 64);
-                    count += usize::from(seen);
-                    first = first.min(if seen { i / 64 } else { usize::MAX });
-                };
-                for row in grid.row(b.min.y)..=grid.row(b.max.y) {
-                    // Only a chord of the circle can be visible in this row. Moving
-                    // the row a unit closer and using `reach` as the radius leave the
-                    // squared chord a margin above 2 * vision, far beyond its rounding
-                    // error for tame values, and the added unit covers the rest.
-                    let top = grid.origin.y + row as f64 * grid.cell;
-                    let dy = (top - me.head.y)
-                        .max(me.head.y - (top + grid.cell))
-                        .max(1.0)
-                        - 1.0;
-                    let half = (reach * reach - dy * dy).max(0.0).sqrt() + 1.0;
-                    let (lo, hi) = (grid.col(me.head.x - half), grid.col(me.head.x + half));
-                    let cells = row * grid.cols;
-                    let span =
-                        grid.starts[cells + lo] as usize..grid.starts[cells + hi + 1] as usize;
-                    for (&p, &i) in grid.points[span.clone()].iter().zip(&grid.ids[span]) {
-                        // The same pure conjunction as `visible`, without short-circuits.
-                        let seen = ((p.x - me.head.x).abs() <= vision)
-                            & ((p.y - me.head.y).abs() <= vision)
-                            & p.distance_le(me.head, vision);
-                        mark(i as usize, seen);
-                    }
-                }
-                for &i in &grid.outliers {
-                    mark(i as usize, visible(w.food[i as usize].point()));
-                }
-                // Ascending bit order restores the original food order.
-                sink.reserve_food(count);
-                let mut reported = 0;
-                for (word, bits) in marks.iter_mut().enumerate().skip(first) {
-                    if reported == count {
-                        break;
-                    }
-                    let mut bits = std::mem::take(bits);
-                    while bits != 0 {
-                        sink.food(word * 64 + bits.trailing_zeros() as usize);
-                        reported += 1;
-                        bits &= bits - 1;
-                    }
+                // Five paired fresh official runs: summaries cut observation CPU
+                // from 25.0 to 20.6 us at 264k pellets, and 74.7 to 41.6 us at
+                // 1.06M (staggered 1/6 batches). Keep smaller lists unchanged.
+                if w.food.len() >= 262_144 {
+                    visit_food::<true>(grid, w, me.head, b, marks, sink);
+                } else {
+                    visit_food::<false>(grid, w, me.head, b, marks, sink);
                 }
             }
             _ => {
@@ -339,6 +398,34 @@ impl<'a> Observer<'a> {
             if visible(p.position) {
                 sink.prey(i);
             }
+        }
+        if let Some((
+            Index {
+                snakes: Some(tree),
+                bodies,
+                ..
+            },
+            q,
+        )) = query
+        {
+            let mut opponents = Vec::new();
+            tree.visit(q, |i| opponents.push(i));
+            // Tree traversal is spatial; predicates and sinks retain world order.
+            opponents.sort_unstable();
+            for i in opponents {
+                let s = &w.snakes[i];
+                let b = bodies[i];
+                if i != index
+                    && !(b.max.x < q.min.x
+                        || b.min.x > q.max.x
+                        || b.max.y < q.min.y
+                        || b.min.y > q.max.y)
+                    && (visible(s.head) || s.body.iter().any(|&p| visible(p)))
+                {
+                    sink.opponent(i);
+                }
+            }
+            return Ok(());
         }
         let visible_opponents = w
             .snakes
@@ -534,6 +621,9 @@ impl Simulator {
         observe_range(0..self.snakes().len(), observations)
     }
 }
+
+#[cfg(test)]
+mod parity;
 
 #[cfg(test)]
 mod tests {
