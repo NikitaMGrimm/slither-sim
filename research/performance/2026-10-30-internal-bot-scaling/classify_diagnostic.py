@@ -185,7 +185,10 @@ def classify(root):
                  'admissionCpuMs':s['admissionCpu']*1000} for s in tick_samples if s['tick'] in slow_ticks],
              'slowWorldTicksExcludingFirst':sorted(warm_slow),
              'worldTickAttribution':{key:{'samples':world_events[key],
-                 'weightedSampleNanoseconds':sum(counts.values()),'phases':shares(counts,sum(counts.values()))}
+                 'weightedSampleNanoseconds':sum(counts.values()),'phases':shares(counts,sum(counts.values())),
+                 'knownPickupShareOfWorldUserCpu':
+                     (counts['food pickup/cache']+counts['pickup grid construction'])/(sum(counts.values())-counts['spawn/admission'])
+                     if sum(counts.values())>counts['spawn/admission'] else None}
                  for key,counts in world_counts.items()},
              'operationPhases':shares(phases,all_samples['operation']),
              'observationBuckets':shares(observations,phases['observation'])})

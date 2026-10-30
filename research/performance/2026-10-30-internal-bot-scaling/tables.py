@@ -91,8 +91,8 @@ def render_storm(value):
 
 
 def render_diagnostic(value):
-    guards=['| Workload | Ticks | Box cells min–max | Food at pickup min–max | Cover area min–max | Declines a / b / c ticks | Dense / hashed / linear ticks | Pickup CPU share on matched slow ticks |',
-            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+    guards=['| Workload | Ticks | Box cells min–max | Food at pickup min–max | Cover area min–max | Declines a / b / c ticks | Dense / hashed / linear ticks | Sampled pickup share of slow world CPU | Pickup share of profiled world CPU on matched slow ticks |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
     slow=['| Workload | Sample group | Samples | Movement | Collisions | Food pickup/cache | Grid build | Death | Admission | Prey | Ambient | Unresolved |',
           '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
     overhead=['| Workload | Diagnostic / primary world CPU range | Sampled / ordinary CPU | Phase-profile / ordinary world CPU | Lost samples | Unparsed records |',
@@ -105,7 +105,9 @@ def render_diagnostic(value):
         if label=='1000':continue
         g=window['pickupGuards']['allTicks'];d=g['declines'];p=g['paths']
         bounds=window['sameVirtualSlowTicksPhaseDiagnostic']['phases']['foodSeconds']['cpuShareBounds']
-        guards.append(f"| {label} | {g['ticks']} | {span(g['boxCells'])} | {span(g['foodLen'])} | {span(g['coverArea'])} | {d['declineFixedCells']} / {d['declineFoodLength']} / {d['declineCoverArea']} | {p.get('dense',0)} / {p.get('hashed indexed',0)} / {p.get('linear',0)} | {100*bounds[0]:.1f}–{100*bounds[1]:.1f}% |")
+        share=window['worldTickAttribution']['slowest 1% excluding first']['knownPickupShareOfWorldUserCpu']
+        sampled='unresolved' if share is None else f'{100*share:.0f}%'
+        guards.append(f"| {label} | {g['ticks']} | {span(g['boxCells'])} | {span(g['foodLen'])} | {span(g['coverArea'])} | {d['declineFixedCells']} / {d['declineFoodLength']} / {d['declineCoverArea']} | {p.get('dense',0)} / {p.get('hashed indexed',0)} / {p.get('linear',0)} | {sampled} | {100*bounds[0]:.1f}–{100*bounds[1]:.1f}% |")
         for key in ['all world ticks','slowest 1% excluding first']:
             row=window['worldTickAttribution'][key]
             columns=[100*row['phases'].get(phase,{}).get('share',0) for phase in

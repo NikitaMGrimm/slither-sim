@@ -97,6 +97,10 @@ leaderboard have no code path in this direct core workload.
 After all timing ends, copy the current reducer/tests into the execution
 directory and run them there:
 
+Small table checks on Windows should use `python -X utf8` so Unicode units and
+range dashes survive the console's legacy encoding. Files are UTF-8; this does
+not change the guest measurements or reduction arithmetic.
+
 ```sh
 python3 test_reduce.py
 python3 reduce.py EXECUTION_DIRECTORY

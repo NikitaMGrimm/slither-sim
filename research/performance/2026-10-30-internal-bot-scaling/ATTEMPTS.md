@@ -60,3 +60,8 @@
   import the client workspace. The supplement verifies the selected simulator
   dependency tree/profile before building. It waits for baseline attribution,
   and the archive finisher waits for it. The baseline run is untouched.
+- All guarded 10k windows and both phase diagnostics completed with the original
+  reference world-state digest. The initial A4 reduction verifies fixtures,
+  serial/parallel action tapes, census and every counted final state. A small
+  Windows table preview without UTF-8 mode displayed replacement characters;
+  source/result files were intact. Use `python -X utf8` for that preview/check.
