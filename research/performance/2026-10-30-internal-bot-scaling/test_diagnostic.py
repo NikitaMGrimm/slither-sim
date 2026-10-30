@@ -1,5 +1,5 @@
 import unittest
-from classify_diagnostic import operation_phase
+from classify_diagnostic import operation_phase, header, world_phase
 
 
 class StackClassification(unittest.TestCase):
@@ -18,6 +18,18 @@ class StackClassification(unittest.TestCase):
             '_ZN22internal_scaling_debug5Scene4tick'),'observation')
         self.assertIsNone(operation_phase('slither_sim::observation::Observer::visit\n'
             'internal_scaling_debug::Scene::prime'))
+
+    def test_header_uses_perf_monotonic_timestamp_and_period(self):
+        self.assertEqual(header('internal_scalin 123 1245.123456789: 2004008 cpu-clock:u:\n'),
+                         (1245.123456789,2004008))
+        self.assertIsNone(header('PERF_RECORD_LOST'))
+
+    def test_world_source_context_and_admission(self):
+        ranges={'movement':(100,200),'food pickup/cache':(300,400),'pickup grid construction':(300,320)}
+        self.assertEqual(world_phase('/work/src/simulator.rs:305','world',ranges),'pickup grid construction')
+        self.assertEqual(world_phase('/work/src/simulator.rs:340','world',ranges),'food pickup/cache')
+        self.assertEqual(world_phase('unknown','admission',ranges),'spawn/admission')
+        self.assertEqual(world_phase('unknown','world',ranges),'unresolved world / clock brackets')
 
 
 if __name__=='__main__':unittest.main()

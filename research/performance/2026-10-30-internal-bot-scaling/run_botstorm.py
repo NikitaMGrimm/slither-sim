@@ -45,8 +45,8 @@ def execute(root):
     for n in [12000,6000,9000]:
         if n!=12000:
             primary=json.loads((destination/'12000/qualification.json').read_text())
-            if not primary['stabilized'] or primary['completeSeconds']>=1800:
-                emit('botstorm-optional-not-measured',population=n,reason='12k did not complete stabilized counting within 30 minutes')
+            if not primary['missedRealTime']:
+                emit('botstorm-optional-not-measured',population=n,reason='12k median unpaced throughput meets 1000/7 ticks/s')
                 continue
         output=destination/str(n);output.mkdir()
         fixture=output/'fixture'
@@ -71,23 +71,25 @@ def execute(root):
                 if child.poll() is None:child.terminate();child.wait(timeout=15)
         receipt={'population':n,'stabilized':acceptance is not None,'acceptance':acceptance,
                  'fixtureSha256':digest(fixture/'world.json'),'metaSha256':digest(fixture/'meta.json')}
-        if acceptance is not None:
-            reference=None;reference_work=None
-            for window in range(-1,5):
-                path=output/f'window-{window}.json'
-                emit('botstorm-measurement-start',population=n,window=window)
-                subprocess.run([str(binary),'measure',str(fixture),'512','plain',str(path)],check=True)
-                row=json.loads(path.read_text())
-                work=tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])
-                if reference is None:reference=row['finalStateSha256'];reference_work=work
-                assert row['finalStateSha256']==reference and work==reference_work
-                emit('botstorm-measurement-end',population=n,window=window)
-            path=output/'profile.json'
-            subprocess.run([str(binary),'measure',str(fixture),'512','profile',str(path)],check=True)
+        reference=None;reference_work=None;rates=[]
+        for window in range(-1,5):
+            path=output/f'window-{window}.json'
+            emit('botstorm-measurement-start',population=n,window=window)
+            subprocess.run([str(binary),'measure',str(fixture),'512','plain',str(path)],check=True)
             row=json.loads(path.read_text())
-            assert row['finalStateSha256']==reference
-            assert tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])==reference_work
-            receipt['finalStateSha256']=reference
+            work=tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])
+            if reference is None:reference=row['finalStateSha256'];reference_work=work
+            assert row['finalStateSha256']==reference and work==reference_work
+            if window>=0:rates.append(512/row['wallSeconds'])
+            emit('botstorm-measurement-end',population=n,window=window)
+        path=output/'profile.json'
+        subprocess.run([str(binary),'measure',str(fixture),'512','profile',str(path)],check=True)
+        row=json.loads(path.read_text())
+        assert row['finalStateSha256']==reference
+        assert tuple(sum(s[key] for s in row['samples']) for key in ['admitted','refused','poses','deaths'])==reference_work
+        receipt.update(finalStateSha256=reference,medianTicksPerSecond=statistics.median(rates),
+                       missedRealTime=statistics.median(rates)<1000/7,
+                       timingScope='screen passed' if acceptance is not None else 'final guarded snapshot; unsettled ecology')
         receipt['completeSeconds']=time.monotonic()-began
         (output/'qualification.json').write_text(json.dumps(receipt,indent=2)+'\n')
         emit('botstorm-population-complete',**receipt)

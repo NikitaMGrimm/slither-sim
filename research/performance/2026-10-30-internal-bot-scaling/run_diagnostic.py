@@ -1,15 +1,12 @@
-"""Post-count CPU samples for observation attribution; no production edits."""
-import hashlib
+"""Post-count user-CPU samples and slow-tick clocks; no production edits."""
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-from reduce import population_directory
-
-
-def digest(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+from diagnostic_source import instrument
+from run import digest
 
 
 def execute(root):
@@ -17,69 +14,94 @@ def execute(root):
     events=[json.loads(line) for line in (root/'run.log').read_text().splitlines() if line.startswith('{')]
     assert events[-1]['event']=='complete','Never build/profile during primary counting'
     master=json.loads((root/'measurement-pins.json').read_text())
-    original=root/'target/release/examples/internal_scaling'
-    assert digest(original)==master['binarySha256']
-    saved=root/'bin';saved.mkdir(exist_ok=True)
-    destination=saved/'internal_scaling'
-    if destination.exists():assert digest(destination)==master['binarySha256']
-    else:shutil.copy2(original,destination)
-    source=root/'examples/internal_scaling.rs'
-    assert digest(source)==master['harnessSha256']
-    debug_source=root/'examples/internal_scaling_debug.rs'
-    shutil.copyfile(source,debug_source)
+    storm=json.loads((root/'botstorm-build.json').read_text())
     output=root/'diagnostic';output.mkdir(exist_ok=False)
+    saved=root/'bin';saved.mkdir(exist_ok=True)
+    manifest=[]
+    for stem,pins,key in [('internal_scaling',master,'harnessSha256'),
+                          ('internal_botstorm',storm,'generatedHarnessSha256')]:
+        binary=root/'target/release/examples'/stem
+        assert digest(binary)==pins['binarySha256']
+        destination=saved/stem
+        if destination.exists():assert digest(destination)==pins['binarySha256']
+        else:shutil.copy2(binary,destination)
+        source=root/'examples'/(stem+'.rs')
+        assert digest(source)==pins[key]
+        generated=root/'examples'/(stem+'_debug.rs')
+        generated.write_text(instrument(source.read_text()))
+        manifest.append(generated.relative_to(root).as_posix()+'\0'+digest(generated)+'\n')
+    (output/'generated-source-manifest.txt').write_text(''.join(manifest))
     env=dict(os.environ,CARGO_BUILD_JOBS='2',CARGO_INCREMENTAL='0',
-             CARGO_TARGET_DIR=str(root/'target'),CARGO_PROFILE_RELEASE_DEBUG='2')
+             CARGO_TARGET_DIR=str(root/'target'),CARGO_PROFILE_RELEASE_DEBUG='2',DEBUGINFOD_URLS='')
     for key in ['RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS']:env.pop(key,None)
     for key,tool in [('RUSTC','rustc'),('RUSTDOC','rustdoc')]:
         env[key]=subprocess.check_output(['rustup','which',tool],text=True).strip()
-    command=['cargo','build','--release','--locked','--no-default-features','--features','bot,parallel','--example','internal_scaling_debug']
+    command=['cargo','build','--release','--locked','--no-default-features','--features','bot,parallel',
+             '--example','internal_scaling_debug','--example','internal_botstorm_debug']
     with (output/'build.log').open('wb') as out:
         subprocess.run(command,cwd=root,env=env,stdout=out,stderr=subprocess.STDOUT,check=True)
-    binary=root/'target/release/examples/internal_scaling_debug'
-    shutil.copy2(binary,saved/'internal_scaling_debug')
+    binaries={}
+    for stem in ['internal_scaling','internal_botstorm']:
+        binary=root/'target/release/examples'/(stem+'_debug')
+        shutil.copy2(binary,saved/(stem+'_debug'));binaries[stem]=binary
     pins={'masterPinsSha256':digest(root/'measurement-pins.json'),
-          'harnessSha256':digest(debug_source),'runnerSha256':digest(Path(__file__)),
-          'binarySha256':digest(binary),'buildLogSha256':digest(output/'build.log'),
-          'command':command,'profile':'portable default codegen with debug=2, no Rust flags; diagnostic only',
-          'sampling':'cpu-clock:u at 499 Hz, DWARF 8192-byte stacks'}
+          'botstormBuildSha256':digest(root/'botstorm-build.json'),
+          'generatedSourceManifestSha256':digest(output/'generated-source-manifest.txt'),
+          'runnerSha256':digest(Path(__file__)),
+          'instrumenterSha256':digest(Path(__file__).with_name('diagnostic_source.py')),
+          'a4BinarySha256':digest(binaries['internal_scaling']),
+          'botstormBinarySha256':digest(binaries['internal_botstorm']),
+          'buildLogSha256':digest(output/'build.log'),'command':command,
+          'profile':'portable default codegen, debug=2 and study-only timestamp fields; no Rust flags',
+          'sampling':'cpu-clock:u, 499 Hz, DWARF 4096-byte stacks, CLOCK_MONOTONIC',
+          'clockScope':'admission and world brackets only; absent from primary counted binaries'}
     (output/'pins.json').write_text(json.dumps(pins,indent=2)+'\n')
     os.sched_setaffinity(0,{3})
     summaries=[]
-    for n in [1000,10000]:
-        directory=population_directory(root,n)
-        if n==10000 and directory.name=='10000' and (root/'results/10000-continuation/fixture/world.json').exists():
-            directory=root/'results/10000-continuation'
-        fixture=directory/'fixture'
-        ordinary=output/f'{n}-ordinary.json';profiled=output/f'{n}-sampled.json'
-        args=[str(binary),'measure',str(fixture),'serial','512','plain']
-        subprocess.run([*args,str(ordinary)],check=True)
-        with (output/f'{n}-perf.log').open('wb') as out:
-            subprocess.run(['perf','record','-o',str(output/f'{n}.data'),
-                            '-e','cpu-clock:u','-F','499','--call-graph','dwarf,8192','--',
-                            *args,str(profiled)],stdout=out,stderr=out,check=True)
-        with (output/f'{n}-stacks.txt').open('wb') as out:
-            subprocess.run(['perf','script','-i',str(output/f'{n}.data'),
-                            '--inline','--full-source-path','-F','+srcline'],stdout=out,check=True)
-        with (output/f'{n}-report.txt').open('wb') as out:
-            subprocess.run(['perf','report','-i',str(output/f'{n}.data'),
-                            '--stdio','--no-children','-g','none','--percent-limit','0.5'],stdout=out,check=True)
-        a=json.loads(ordinary.read_text());b=json.loads(profiled.read_text())
+    for label,n,stem,directory in [
+        ('1000',1000,'internal_scaling',root/'results/1000'),
+        ('10000',10000,'internal_scaling',root/'results/10000'),
+        ('botstorm-12000',12000,'internal_botstorm',root/'botstorm-results/12000')]:
+        binary=binaries[stem];fixture=directory/'fixture'
+        ordinary=output/f'{label}-ordinary.json';sampled=output/f'{label}-sampled.json'
+        def args(kind,path):
+            return [str(binary),'measure',str(fixture),*(['serial'] if stem=='internal_scaling' else []),'512',kind,str(path)]
+        subprocess.run(args('plain',ordinary),env=env,check=True)
+        with (output/f'{label}-perf.log').open('wb') as out:
+            subprocess.run(['perf','record','--no-buildid-cache','--clockid','mono','-o',str(output/f'{label}.data'),
+                '-e','cpu-clock:u','-F','499','--call-graph','dwarf,4096','--',*args('plain',sampled)],
+                env=env,stdout=out,stderr=out,check=True)
+        with (output/f'{label}-stacks.txt').open('wb') as out:
+            subprocess.run(['perf','script','-i',str(output/f'{label}.data'),
+                '--ns','--inline','--full-source-path','-F','+srcline,+period'],env=env,stdout=out,check=True)
+        with (output/f'{label}-report.txt').open('wb') as out:
+            subprocess.run(['perf','report','-i',str(output/f'{label}.data'),
+                '--stdio','--no-children','-g','none','--percent-limit','0.5'],env=env,stdout=out,check=True)
+        a=json.loads(ordinary.read_text());b=json.loads(sampled.read_text())
         assert a['finalStateSha256']==b['finalStateSha256']
-        phase_path=output/f'{n}-phases.json'
-        subprocess.run([str(binary),'measure',str(fixture),'serial','512','profile',str(phase_path)],check=True)
+        phase_path=output/f'{label}-phases.json'
+        subprocess.run(args('profile',phase_path),env=env,check=True)
         assert json.loads(phase_path.read_text())['finalStateSha256']==a['finalStateSha256']
-        reference=directory/'verify-serial.json'
-        if reference.exists():assert a['finalStateSha256']==json.loads(reference.read_text())['finalStateSha256']
-        qualification=json.loads((directory/'warm-qualification.json').read_text())
-        summaries.append({'population':n,'fixtureAttempt':directory.name,'stabilized':qualification['stabilized'],
-                          'ordinaryProcessCpuSeconds':a['processCpuSeconds'],
-                          'sampledProcessCpuSeconds':b['processCpuSeconds'],
-                          'cpuRatio':b['processCpuSeconds']/a['processCpuSeconds'],
-                          'wallRatio':b['wallSeconds']/a['wallSeconds'],
-                          'finalStateSha256':a['finalStateSha256']})
+        if stem=='internal_scaling':
+            reference=json.loads((directory/'verify-serial.json').read_text())['finalStateSha256']
+            qualification=json.loads((directory/'warm-qualification.json').read_text())
+            rows=[json.loads((directory/f'pair-{i}-serial.json').read_text()) for i in range(5)]
+        else:
+            qualification=json.loads((directory/'qualification.json').read_text())
+            reference=qualification['finalStateSha256']
+            rows=[json.loads((directory/f'window-{i}.json').read_text()) for i in range(5)]
+        assert a['finalStateSha256']==reference
+        mean_world=lambda row:sum(s['worldCpu'] for s in row['samples'])/row['ticks']
+        summaries.append({'label':label,'population':n,'fixtureAttempt':directory.name,
+            'stabilized':qualification['stabilized'],
+            'timestampDebugToPrimaryWorldCpuRatios':[mean_world(a)/mean_world(row) for row in rows],
+            'timestampDebugToPrimaryWholeCpuRatios':[a['processCpuSeconds']/row['processCpuSeconds'] for row in rows],
+            'ordinaryProcessCpuSeconds':a['processCpuSeconds'],'sampledProcessCpuSeconds':b['processCpuSeconds'],
+            'cpuRatio':b['processCpuSeconds']/a['processCpuSeconds'],'wallRatio':b['wallSeconds']/a['wallSeconds'],
+            'finalStateSha256':a['finalStateSha256']})
     (output/'overhead.json').write_text(json.dumps(summaries,indent=2)+'\n')
-    assert digest(binary)==pins['binarySha256']
+    assert digest(binaries['internal_scaling'])==pins['a4BinarySha256']
+    assert digest(binaries['internal_botstorm'])==pins['botstormBinarySha256']
     print(json.dumps(summaries,indent=2),flush=True)
 
 

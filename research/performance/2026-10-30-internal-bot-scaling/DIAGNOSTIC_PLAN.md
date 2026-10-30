@@ -1,5 +1,10 @@
 # Exploratory observation attribution after primary counting
 
+The later [maintainer amendment](AMENDMENT.md) adds botstorm 12k and
+slow-tick timestamp matching, with the final method in REPRODUCE.md. The
+8,192-byte stack proposal below is superseded by 4,096-byte stacks before
+collection; the new overhead is measured. The original proposal is retained.
+
 This supplements, and does not replace, the frozen primary plan. Source
 inspection found three possible population-dependent observation costs:
 rebuilding the food/body indexes for each staggered batch; restoring food order

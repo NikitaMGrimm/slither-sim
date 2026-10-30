@@ -27,3 +27,16 @@
   stack classifier handled legacy symbols only. It now handles demangled
   symbols too and fails if it recognizes no tick samples. This was a tooling
   correction before sampled results, not a replacement measurement.
+- During 10k warmup, the maintainer requested bounded completion rather than
+  continued warmup retries, slow-tick attribution at 10k and botstorm 12k, and
+  optional botstorm 6k/9k only if 12k misses real time. AMENDMENT.md freezes
+  those changes before remaining timing. The unused extra-warmup proposal is
+  superseded. Sleeping post-count/archive controllers were replaced; the live
+  native warmup and all completed rows were untouched. Their earlier waiting
+  logs remain in the private archive.
+- A 0.3-second, unselected user-CPU format probe confirmed perf permissions,
+  the monotonic clock option and timestamp/period parsing before diagnostic
+  collection. The expected timeout ends its test workload; its data and logs
+  are retained. Perf script now explicitly requests `+srcline,+period` instead
+  of relying on version-specific default fields. No study timing is selected
+  from that probe.

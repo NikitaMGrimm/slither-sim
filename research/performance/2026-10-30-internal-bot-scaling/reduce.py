@@ -133,9 +133,11 @@ def reduce(root):
                 'qualification':json.loads((original/'warm-qualification.json').read_text()),
                 'census':json.loads((original/'fixture/census.json').read_text())}
             population['followupPins']=json.loads((directory/'pins.json').read_text())
-        if not qualification['stabilized']:
+        guarded=directory/'censored-counts.json'
+        if not qualification['stabilized'] and not guarded.exists():
             selected['populations'].append(population)
             continue
+        if guarded.exists():population['guardedCounting']=json.loads(guarded.read_text())
         serial=json.loads((directory/'verify-serial.json').read_text())
         parallel=json.loads((directory/'verify-parallel.json').read_text())
         assert serial['actionSha256']==parallel['actionSha256']

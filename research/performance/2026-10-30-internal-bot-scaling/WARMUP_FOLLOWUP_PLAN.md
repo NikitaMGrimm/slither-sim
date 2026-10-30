@@ -1,5 +1,9 @@
 # Conditional follow-up if the 10k wall guard fires
 
+**Superseded before execution by [AMENDMENT.md](AMENDMENT.md).** No extra
+warmup is run. This proposed protocol remains as history; `count_censored.py`
+instead measures the final guarded snapshot and retains its unsettled label.
+
 The original two-wall-hour limit and its censored verdict remain unchanged.
 The 5k warmup takes tens of wall minutes to advance the required virtual time;
 10k may hit that guard before the ecology screen can pass. No 10k timing has

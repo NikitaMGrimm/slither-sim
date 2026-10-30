@@ -5,6 +5,12 @@ Python standard library and enough private output space. Never run the study
 on the maintainer's Windows PC. No AWS or game-server connection is used.
 The runtime is pinned in `selected-results.json` once counting completes.
 
+Read [PLAN.md](PLAN.md), [BOTSTORM_PLAN.md](BOTSTORM_PLAN.md) and the later
+[maintainer amendment](AMENDMENT.md) together. The amendment supersedes the
+optional-row cost gate and the unexecuted extra-warmup proposal. If a warmup
+guard fires, the final snapshot is timed with its **unsettled ecology** label;
+it is not retried until a more favorable or steady state appears.
+
 Create a fresh execution directory from its runtime archive. Keep the original
 runtime and all of `src/` unchanged. Copy this study's `profile.rs` to
 `examples/internal_scaling.rs`, and `run.py`, `PLAN.md` and tests into the execution
@@ -129,11 +135,12 @@ and a table script, not full recordings or host-identifying command inventories.
 
 Keep [BOTSTORM_PLAN.md](BOTSTORM_PLAN.md) and
 [DIAGNOSTIC_PLAN.md](DIAGNOSTIC_PLAN.md) separate from the original frozen plan.
-The separate [warmup follow-up](WARMUP_FOLLOWUP_PLAN.md) applies only if 10k
-reaches the original wall guard before its stability screen. `resume_warmup.py`
-keeps that censored attempt and proves continuation against the unchanged
-counted executable. A qualifying follow-up is selected explicitly in
-`selection.json`; the original censored receipt remains in selected evidence.
+The separate [warmup follow-up](WARMUP_FOLLOWUP_PLAN.md) was proposed but
+superseded before execution. At a censored 10k checkpoint, `count_censored.py`
+runs the unchanged binary's verification, pairs and profiles without extra
+warmup, pinning the amendment and preserving the failed screen. The botstorm
+runner likewise times its final checkpoint if censored. Run 6k/9k only when
+12k's five-window median whole-loop rate is below `1000/7` ticks/s.
 Once the A4 runner has emitted `complete`, copy these study files into a tools
 directory on the guest. The botstorm builder checks that completion and the
 original binary/source pins before doing any build. It generates a new example
@@ -144,6 +151,7 @@ into a second checked-in file or changing `src/`.
 python3 build_botstorm.py EXECUTION_DIRECTORY STUDY_TOOLS_DIRECTORY
 # Optional read-only A4 view census, once for each frozen population:
 EXECUTION_DIRECTORY/bin/internal_botstorm views EXECUTION_DIRECTORY/results/1000/fixture VIEW_CENSUS.json
+EXECUTION_DIRECTORY/bin/internal_botstorm grid EXECUTION_DIRECTORY/botstorm-results/12000/fixture GRID_CENSUS.json
 python3 test_botstorm.py
 python3 run_botstorm.py EXECUTION_DIRECTORY
 python3 reduce_botstorm.py EXECUTION_DIRECTORY
@@ -157,9 +165,32 @@ The center policy runs without an observation or worker pool. Death/admission
 rates use virtual seconds; separate wall rates are also retained. Report the
 normal-public-admission caveat for this family too.
 
-The diagnostic uses another example name and debug=2, preserving portable
-codegen flags and all original primary binaries. It records an unsampled and
-sampled 512-tick serial continuation at 1k/10k, checks final-state identity and
-retains overhead ratios. Source-context buckets use the same source revision;
-unresolved and outside-operation samples remain explicit. These samples support
-ranking, not a replacement throughput measurement or a proven exact speedup.
+The diagnostic uses separate example names and debug=2, preserving portable
+codegen flags and all original primary binaries. `diagnostic_source.py` adds
+monotonic world/admission bracket fields only to generated copies. It records
+ordinary, sampled and phase-profiled 512-tick continuations at A4 1k/10k and
+botstorm 12k. Every final state must equal the corresponding counted reference.
+The selected overhead includes ordinary diagnostic/primary ratios and sampled/
+ordinary diagnostic ratios; these are distinct effects.
+
+Perf records user CPU at 499 Hz with 4,096-byte DWARF stacks and the explicit
+monotonic clock; script output retains nanosecond timestamps. The reducer matches
+samples to world/admission brackets and separately selects the six largest
+world+admission CPU ticks, including and excluding the first restored tick.
+Unresolved stacks, unparsed records, sample counts and unknown lost-sample
+counts remain explicit. Source-line brackets distinguish movement, collision,
+death, food pickup/cache, pickup-grid construction, prey and ambient work where
+debug context resolves them. Inclusive observations are a separate budget.
+These samples support ranking, not a replacement throughput measurement or a
+proven exact speedup. The original 8,192-byte/no-timestamp diagnostic proposal
+was superseded before collection; measured instrumentation costs are retained.
+
+The read-only `grid` mode constructs no observations. Its guard result is for
+checkpoint pickup geometry; real steps build after movement/deaths. Interpret
+that result with sampled fallback-path stacks and phase/work counters.
+
+`after_primary.py` waits on the main controller with a pidfd, then sequences
+post-count work. `finish_collection.py` waits for that controller, runs tests and
+reducers, creates a closed archive, verifies every member against its manifest,
+and writes `archive-ready.json` last. It never deletes sources. Download only
+after that receipt exists; check the downloaded SHA-256 before guest cleanup.

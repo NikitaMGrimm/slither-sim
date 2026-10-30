@@ -47,7 +47,7 @@ def execute(root,study):
         return value.returncode==0
     qualification=json.loads((root/'results/10000/warm-qualification.json').read_text())
     if not qualification['stabilized']:
-        run('warmup-continuation',[sys.executable,str(study/'resume_warmup.py'),str(root)])
+        run('guarded-counts',[sys.executable,str(study/'count_censored.py'),str(root),str(study)])
     if run('botstorm-build',[sys.executable,str(study/'build_botstorm.py'),str(root),str(study)]):
         binary=root/'bin/internal_botstorm'
         smoke=root/'storm-smoke';smoke.mkdir();(smoke/'STOP_WARM').write_text('unselected smoke\n')
@@ -66,6 +66,7 @@ def execute(root,study):
         for n in [1000,2500,5000,10000]:
             directory=population_directory(root,n)
             run(f'view-census-{n}',[str(binary),'views',str(directory/'fixture'),str(root/f'view-census-{n}.json')])
+        run('grid-census-botstorm-12000',[str(binary),'grid',str(root/'botstorm-results/12000/fixture'),str(root/'grid-census-botstorm-12000.json')])
     if run('cpu-diagnostic',[sys.executable,str(study/'run_diagnostic.py'),str(root)]):
         run('cpu-classification',[sys.executable,str(study/'classify_diagnostic.py'),str(root)])
     emit('post-count-complete',stages=results)

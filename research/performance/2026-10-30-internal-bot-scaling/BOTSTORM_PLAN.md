@@ -1,5 +1,10 @@
 # Added comparison: botstorm-12k
 
+[AMENDMENT.md](AMENDMENT.md) supersedes the optional-row trigger below before
+botstorm collection: run 6k/9k only if 12k misses the 142.86 ticks/s target.
+It also requires timing the final guarded snapshot if the ecology screen fails,
+with its unsettled label preserved.
+
 The maintainer added this workload while the unchanged A4 series was running.
 A community server's reported 12k-snake world was 64,800 units across, used
 external vision-free center-seeking bots and an older, unspecified tick rate

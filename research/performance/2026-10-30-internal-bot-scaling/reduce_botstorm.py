@@ -12,7 +12,7 @@ def summarize(root):
     result={'build':json.loads((root/'botstorm-build.json').read_text()),
             'reducerSha256':digest(Path(__file__)),
             'method':{'policy':'own-head center steering; staggered every six ticks; no observation or boost',
-                      'reportedReference':'a community server\u2019s reported 12k-snake world; reported, not measured here',
+                      'reportedReference':'a 12k-snake single-core reference world (64,800 across, center-steering bots); reported, not measured here',
                       'referenceHardwareAndTickRate':'unknown; older unspecified tick rate',
                       'rateUnit':'per virtual simulation second unless named wall'},'populations':[]}
     assert digest(root/'measurement-pins.json')==result['build']['masterPinsSha256']
@@ -30,8 +30,6 @@ def summarize(root):
         out={'population':n,'qualification':qualification,'census':census,'resolvedConfig':config,
              'densityRelativeToOfficial':n*670.0**2/config['radius']**2,
              'status':'stabilized' if qualification['stabilized'] else 'warmup censored'}
-        if not qualification['stabilized']:
-            result['populations'].append(out);continue
         rows=[json.loads((directory/f'window-{i}.json').read_text()) for i in range(5)]
         reference=qualification['finalStateSha256']
         assert all(r['finalStateSha256']==reference and r['ticks']==512 and not r['profiled'] for r in rows)

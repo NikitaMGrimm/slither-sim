@@ -91,7 +91,7 @@ fn main() {
     let args: Vec<_> = std::env::args().collect();
     let root = Path::new(&args[2]);
     assert_eq!(fs::read_dir("/proc/self/task").unwrap().count(), 1);
-    if args[1] == "views" {
+    if args[1] == "views" || args[1] == "grid" {
         // Read-only workload census, never the center-seeking policy path.
         let mut scene = Scene::load(root, false);
         let before = serde_json::to_vec(&scene.world.checkpoint().unwrap()).unwrap();
@@ -119,7 +119,8 @@ fn main() {
         }
         let cells = if circles==0 { 0 } else { ((hi[0]-lo[0]+1)*(hi[1]-lo[1]+1)) as usize };
         let food_limit = scene.world.food().len().saturating_mul(4).max(4096);
-        for phase in 0..6 {
+        let phases = if args[1] == "views" { 6 } else { 0 };
+        for phase in 0..phases {
             scene.world.observe_selected_into(&scene.masks[phase], &mut scene.observations[phase]).unwrap();
             for observation in scene.observations[phase].iter().flatten() {
                 food.push(observation.food.len());
@@ -142,7 +143,8 @@ fn main() {
                 "regularGeometry":regular,
                 "fitsDenseGridGuards":regular && cells<=1048576.min(food_limit) && area<=1048576,
                 "scope":"read-only checkpoint pickup circles; actual step builds after movement and deaths"},
-            "scope":"read-only checkpoint census, all six selected masks; no policy decisions or physics"})).unwrap()).unwrap();
+            "scope":if args[1]=="views" { "read-only checkpoint census, all six selected masks; no policy decisions or physics" }
+                else { "read-only checkpoint pickup-grid guards; no observations, decisions or physics" }})).unwrap()).unwrap();
     } else if args[1] == "warm" {
         fs::create_dir_all(root).unwrap();
         let n = args[3].parse().unwrap();
