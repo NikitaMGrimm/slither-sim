@@ -1,0 +1,2059 @@
+{
+  "attribution": "sampled user CPU, source context; inclusive subfunctions assigned once; not removable shares",
+  "pins": {
+    "masterPinsSha256": "2fbd47bc43efeb12fede35948c05336fa5da599c2c22aeee04e863712c4f3261",
+    "botstormBuildSha256": "4d82dd0024727f0a7a2eb1431e50c93c6d758fb7b8fc1587677c77550ac1e743",
+    "generatedSourceManifestSha256": "a668a7ce3bcf58f84689d959fb6e9280e22a31f200a547d4b9d2b159ad7bd5de",
+    "runnerSha256": "c3aa30126d149d6fee2cb050f52ea7e60593881b7604ef9830f23ceaf19f97c4",
+    "instrumenterSha256": "609cc59d45e83722d4e593fdd09850013a27c6b23cdb0e7af40b81c9a715c987",
+    "a4BinarySha256": "7660c6fcccdaf41824ef64146652c6d19c8e73fd920fd9bc0005ad7f5cea5355",
+    "botstormBinarySha256": "3830f2ad95cbb9c8bd5df08f261cadfee7a218428eb9908391661eee080284c5",
+    "buildLogSha256": "1a23cd2f986b234c1e0ff383b58c3be71d8840d40f74817d91b29a885c8f2a1c",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--no-default-features",
+      "--features",
+      "bot,parallel",
+      "--example",
+      "internal_scaling_debug",
+      "--example",
+      "internal_botstorm_debug"
+    ],
+    "profile": "portable default codegen, debug=2, timestamps and event-derived pickup guards; no Rust flags",
+    "sampling": "cpu-clock:u, 499 Hz, DWARF 4096-byte stacks, CLOCK_MONOTONIC",
+    "clockScope": "admission/world brackets; guard arithmetic after world end; event recording is inside step; primary binaries unchanged"
+  },
+  "classifierSha256": "0f445d160eebf3534a0469fdfbfd02b6cbba2fc19ad71c2e67f0b74f79f4b084",
+  "sourceRanges": {
+    "food order restoration": [
+      318,
+      337
+    ],
+    "prey candidate scan": [
+      338,
+      342
+    ],
+    "snake candidate scan": [
+      343,
+      362
+    ],
+    "food candidate queries": [
+      289,
+      314
+    ]
+  },
+  "worldPhaseSourceRanges": {
+    "movement": [
+      1573,
+      1780
+    ],
+    "collisions": [
+      1781,
+      1891
+    ],
+    "death processing": [
+      1892,
+      1930
+    ],
+    "food pickup/cache": [
+      1931,
+      2060
+    ],
+    "prey": [
+      2061,
+      2065
+    ],
+    "ambient/maintenance": [
+      2066,
+      2149
+    ],
+    "pickup grid construction": [
+      1949,
+      1982
+    ]
+  },
+  "slowTickDefinition": "top ceil(1% * 512) by sampled-run world+admission CPU; also report excluding the first restored tick",
+  "windows": [
+    {
+      "label": "1000",
+      "population": 1000,
+      "overhead": {
+        "label": "1000",
+        "population": 1000,
+        "fixtureAttempt": "1000",
+        "stabilized": true,
+        "timestampDebugToPrimaryWorldCpuRatios": [
+          1.0109058544030296,
+          1.1014402665031808,
+          1.056821233089536,
+          1.0885974700017416,
+          1.059571843377746
+        ],
+        "timestampDebugToPrimaryWholeCpuRatios": [
+          1.0241806805645421,
+          1.0703952731979476,
+          1.0469852583166455,
+          1.0565076286601878,
+          1.0438102451234346
+        ],
+        "ordinaryProcessCpuSeconds": 3.2160888389999998,
+        "sampledProcessCpuSeconds": 3.514101289,
+        "cpuRatio": 1.0926630030819247,
+        "wallRatio": 1.092818841027347,
+        "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+      },
+      "unsampledDiagnosticCosts": {
+        "ticks": 512,
+        "worldCpuMs": {
+          "n": 512,
+          "mean": 1.3599421874999909,
+          "min": 1.0883699999997276,
+          "p50": 1.2772499999997855,
+          "p95": 1.731170000000004,
+          "p99": 1.8636899999999734,
+          "max": 5.157499999999981
+        },
+        "worldPlusAdmissionCpuMs": {
+          "n": 512,
+          "mean": 1.361820878906239,
+          "min": 1.0890299999997133,
+          "p50": 1.277899999999832,
+          "p95": 1.738240000000113,
+          "p99": 1.864470000000007,
+          "max": 5.1583199999999945
+        },
+        "wholeWindowTicksPerSecond": 159.16938510878157,
+        "observationProcessCpuUsPerBot": 16.77438271243243,
+        "policyLoopCpuUsPerBot": 12.423574103805052
+      },
+      "stepProfileDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 1.4321076757812579,
+        "instrumentedAdmissionCpuMsPerTick": 0.0019175390624985664,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 1.4340252148437564,
+        "worldWallMsPerTick": 1.433254619140625,
+        "offCpuFractionBound": 0.000800236987936392,
+        "profileToOrdinaryCpuRatios": [
+          1.053065114785453
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 0.18433700390625,
+            "cpuMsPerTickBounds": [
+              0.18319006054688283,
+              0.18433700390625
+            ],
+            "cpuShareBounds": [
+              0.12791640157011738,
+              0.1287172794501563
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 0.690761423828125,
+            "cpuMsPerTickBounds": [
+              0.6896144804687578,
+              0.690761423828125
+            ],
+            "cpuShareBounds": [
+              0.4815381497711423,
+              0.48233902765118114
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.000419921875,
+            "cpuMsPerTickBounds": [
+              0.0001962343750027068,
+              0.000419921875
+            ],
+            "cpuShareBounds": [
+              0.0001370248748200131,
+              0.0002932194848902824
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 0.5032856289062501,
+            "cpuMsPerTickBounds": [
+              0.5021386855468829,
+              0.5032856289062501
+            ],
+            "cpuShareBounds": [
+              0.3506291419553708,
+              0.3514300198354097
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.031218123046875,
+            "cpuMsPerTickBounds": [
+              0.03007117968750784,
+              0.031218123046875
+            ],
+            "cpuShareBounds": [
+              0.020997848273596537,
+              0.021798726153635463
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.014184392578125,
+            "cpuMsPerTickBounds": [
+              0.01309676367188354,
+              0.014184392578125
+            ],
+            "cpuShareBounds": [
+              0.009145097043585678,
+              0.009904557330430469
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.009048124999999933,
+        "counts": {
+          "ticks": 512,
+          "bodyPairs": 3759360,
+          "segmentTests": 60621262,
+          "foodPairs": 864493,
+          "pickupTests": 52584
+        }
+      },
+      "sameVirtualSlowTicksPhaseDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 1.4890133333333628,
+        "instrumentedAdmissionCpuMsPerTick": 0.0007433333333491573,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 1.4897566666667121,
+        "worldWallMsPerTick": 1.4898350000000002,
+        "offCpuFractionBound": 0.0005515152125149508,
+        "profileToOrdinaryCpuRatios": [
+          1.0639368645939822
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 0.19609,
+            "cpuMsPerTickBounds": [
+              0.1952683333333629,
+              0.19609
+            ],
+            "cpuShareBounds": [
+              0.13113941222824893,
+              0.13169123177763986
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 0.7149333333333333,
+            "cpuMsPerTickBounds": [
+              0.7141116666666963,
+              0.7149333333333333
+            ],
+            "cpuShareBounds": [
+              0.4795871539095344,
+              0.48013897345892526
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.00011333333333333333,
+            "cpuMsPerTickBounds": [
+              0.0,
+              0.00011333333333333333
+            ],
+            "cpuShareBounds": [
+              0.0,
+              7.611304129803924e-05
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 0.5223099999999999,
+            "cpuMsPerTickBounds": [
+              0.5214883333333629,
+              0.5223099999999999
+            ],
+            "cpuShareBounds": [
+              0.35022408574806974,
+              0.3507759052974607
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.032051666666666666,
+            "cpuMsPerTickBounds": [
+              0.031230000000029564,
+              0.032051666666666666
+            ],
+            "cpuShareBounds": [
+              0.020973620115353083,
+              0.021525439664744014
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.01518,
+            "cpuMsPerTickBounds": [
+              0.014358333333362895,
+              0.01518
+            ],
+            "cpuShareBounds": [
+              0.009642850746822916,
+              0.010194670296213846
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.00915666666666693,
+        "counts": {
+          "ticks": 6,
+          "bodyPairs": 44295,
+          "segmentTests": 722954,
+          "foodPairs": 10250,
+          "pickupTests": 616
+        }
+      },
+      "phaseCadenceByTickMod6": [
+        {
+          "tickMod6": 0,
+          "ticks": 86,
+          "worldCpuMsMean": 1.483435465116264,
+          "ambientWallMsMean": 0.013881744186046513,
+          "foodWallMsMean": 0.5343764883720931
+        },
+        {
+          "tickMod6": 1,
+          "ticks": 86,
+          "worldCpuMsMean": 1.4290226744186199,
+          "ambientWallMsMean": 0.014216162790697675,
+          "foodWallMsMean": 0.49931401162790695
+        },
+        {
+          "tickMod6": 2,
+          "ticks": 85,
+          "worldCpuMsMean": 1.4187484705882354,
+          "ambientWallMsMean": 0.014471294117647061,
+          "foodWallMsMean": 0.4961979882352941
+        },
+        {
+          "tickMod6": 3,
+          "ticks": 85,
+          "worldCpuMsMean": 1.4379754117647405,
+          "ambientWallMsMean": 0.014300470588235295,
+          "foodWallMsMean": 0.49952408235294116
+        },
+        {
+          "tickMod6": 4,
+          "ticks": 85,
+          "worldCpuMsMean": 1.4165857647058877,
+          "ambientWallMsMean": 0.014141411764705883,
+          "foodWallMsMean": 0.49683596470588237
+        },
+        {
+          "tickMod6": 5,
+          "ticks": 85,
+          "worldCpuMsMean": 1.4063107058823598,
+          "ambientWallMsMean": 0.014098458823529413,
+          "foodWallMsMean": 0.4931461882352941
+        }
+      ],
+      "initialCensus": {
+        "maxLength": 259,
+        "meanLength": 95.374,
+        "memoryKiB": {
+          "RssAnon": 123832,
+          "RssFile": 2088,
+          "RssShmem": 1372,
+          "VmHWM": 140380,
+          "VmRSS": 127292,
+          "VmSize": 128744
+        },
+        "p50Length": 101,
+        "p90Length": 142,
+        "p99Length": 183,
+        "world": {
+          "ambientFood": 47946,
+          "arenaRadius": 21187.260323128143,
+          "boostFood": 2287,
+          "deathFood": 1729,
+          "deaths": 289,
+          "food": 51962,
+          "living": 1000,
+          "livingSegments": 95374,
+          "physicsTickMs": 7.0,
+          "prey": 24,
+          "spawned": 1000,
+          "time": 608.9999999995949
+        }
+      },
+      "finalCensus": {
+        "maxLength": 260,
+        "meanLength": 95.804,
+        "memoryKiB": {
+          "RssAnon": 123848,
+          "RssFile": 2136,
+          "RssShmem": 1372,
+          "VmHWM": 140380,
+          "VmRSS": 127356,
+          "VmSize": 131180
+        },
+        "p50Length": 101,
+        "p90Length": 143,
+        "p99Length": 184,
+        "world": {
+          "ambientFood": 47703,
+          "arenaRadius": 21187.260323128143,
+          "boostFood": 2333,
+          "deathFood": 1559,
+          "deaths": 291,
+          "food": 51595,
+          "living": 1000,
+          "livingSegments": 95804,
+          "physicsTickMs": 7.0,
+          "prey": 25,
+          "spawned": 1000,
+          "time": 612.5839999995684
+        }
+      },
+      "pickupGuards": {
+        "method": "post-step circle fields plus final food + food pickups - ambient births; exact pickup-entry reconstruction",
+        "allThreeGuardTracesEqual": true,
+        "allTicks": {
+          "ticks": 512,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 512,
+            "mean": 108642.216796875,
+            "min": 107912,
+            "p50": 108568,
+            "p95": 109230,
+            "p99": 109230,
+            "max": 109230
+          },
+          "foodLen": {
+            "n": 512,
+            "mean": 51815.4609375,
+            "min": 51594,
+            "p50": 51760,
+            "p95": 52080,
+            "p99": 52096,
+            "max": 52101
+          },
+          "coverArea": {
+            "n": 512,
+            "mean": 3342.552734375,
+            "min": 3257,
+            "p50": 3342,
+            "p95": 3389,
+            "p99": 3402,
+            "max": 3417
+          },
+          "circles": {
+            "n": 512,
+            "mean": 999.99609375,
+            "min": 999,
+            "p50": 1000,
+            "p95": 1000,
+            "p99": 1000,
+            "max": 1000
+          },
+          "foodGuardLimit": {
+            "n": 512,
+            "mean": 207261.84375,
+            "min": 206376,
+            "p50": 207040,
+            "p95": 208320,
+            "p99": 208384,
+            "max": 208404
+          },
+          "paths": {
+            "dense": 512
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 0,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": false,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 512
+            }
+          ]
+        },
+        "slowest1pctExcludingFirst": {
+          "ticks": 6,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 6,
+            "mean": 108457.66666666667,
+            "min": 108237,
+            "p50": 108237,
+            "p95": 109230,
+            "p99": 109230,
+            "max": 109230
+          },
+          "foodLen": {
+            "n": 6,
+            "mean": 51932,
+            "min": 51680,
+            "p50": 51944,
+            "p95": 52093,
+            "p99": 52093,
+            "max": 52093
+          },
+          "coverArea": {
+            "n": 6,
+            "mean": 3341.5,
+            "min": 3313,
+            "p50": 3336,
+            "p95": 3374,
+            "p99": 3374,
+            "max": 3374
+          },
+          "circles": {
+            "n": 6,
+            "mean": 1000,
+            "min": 1000,
+            "p50": 1000,
+            "p95": 1000,
+            "p99": 1000,
+            "max": 1000
+          },
+          "foodGuardLimit": {
+            "n": 6,
+            "mean": 207728,
+            "min": 206720,
+            "p50": 207776,
+            "p95": 208372,
+            "p99": 208372,
+            "max": 208372
+          },
+          "paths": {
+            "dense": 6
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 0,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": false,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 6
+            }
+          ]
+        }
+      },
+      "lostSamples": 0,
+      "unparsedRecords": 0,
+      "coverage": {
+        "all": 3755510992,
+        "outside operation or unwound": 1366733456,
+        "operation": 2388777536
+      },
+      "slowWorldTicks": [
+        {
+          "tick": 87000,
+          "worldCpuMs": 5.095660000000002,
+          "admissionCpuMs": 0.0008400000000019503
+        },
+        {
+          "tick": 87007,
+          "worldCpuMs": 2.742449999999952,
+          "admissionCpuMs": 0.0007699999999832841
+        },
+        {
+          "tick": 87023,
+          "worldCpuMs": 2.307210000000004,
+          "admissionCpuMs": 0.0007099999999593543
+        },
+        {
+          "tick": 87024,
+          "worldCpuMs": 2.3462799999999784,
+          "admissionCpuMs": 0.0008799999999808961
+        },
+        {
+          "tick": 87107,
+          "worldCpuMs": 2.2346900000000947,
+          "admissionCpuMs": 0.0007400000000545859
+        },
+        {
+          "tick": 87191,
+          "worldCpuMs": 2.196519999999813,
+          "admissionCpuMs": 0.001160000000055561
+        }
+      ],
+      "slowWorldTicksExcludingFirst": [
+        87007,
+        87023,
+        87024,
+        87107,
+        87191,
+        87447
+      ],
+      "worldTickAttribution": {
+        "all world ticks": {
+          "samples": 418,
+          "weightedSampleNanoseconds": 837675344,
+          "phases": {
+            "collisions": {
+              "sampleNanoseconds": 374749496,
+              "share": 0.4473684210526316
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 304609216,
+              "share": 0.36363636363636365
+            },
+            "movement": {
+              "sampleNanoseconds": 86172344,
+              "share": 0.10287081339712918
+            },
+            "prey": {
+              "sampleNanoseconds": 30060120,
+              "share": 0.03588516746411483
+            },
+            "pickup grid construction": {
+              "sampleNanoseconds": 20040080,
+              "share": 0.023923444976076555
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 12024048,
+              "share": 0.014354066985645933
+            },
+            "ambient/maintenance": {
+              "sampleNanoseconds": 8016032,
+              "share": 0.009569377990430622
+            },
+            "spawn/admission": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.0023923444976076554
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.38848920863309355
+        },
+        "slowest 1%": {
+          "samples": 10,
+          "weightedSampleNanoseconds": 20040080,
+          "phases": {
+            "movement": {
+              "sampleNanoseconds": 8016032,
+              "share": 0.4
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 8016032,
+              "share": 0.4
+            },
+            "collisions": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.1
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.1
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.4
+        },
+        "slowest 1% excluding first": {
+          "samples": 8,
+          "weightedSampleNanoseconds": 16032064,
+          "phases": {
+            "movement": {
+              "sampleNanoseconds": 6012024,
+              "share": 0.375
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 4008016,
+              "share": 0.25
+            },
+            "collisions": {
+              "sampleNanoseconds": 4008016,
+              "share": 0.25
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.125
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.25
+        }
+      },
+      "operationPhases": {
+        "observation": {
+          "sampleNanoseconds": 1527054096,
+          "share": 0.639261744966443
+        },
+        "world": {
+          "sampleNanoseconds": 833667328,
+          "share": 0.348993288590604
+        },
+        "guard audit outside world brackets": {
+          "sampleNanoseconds": 20040080,
+          "share": 0.008389261744966443
+        },
+        "other operation": {
+          "sampleNanoseconds": 6012024,
+          "share": 0.0025167785234899327
+        },
+        "admission": {
+          "sampleNanoseconds": 2004008,
+          "share": 0.0008389261744966443
+        }
+      },
+      "observationBuckets": {
+        "other observation / copying / unresolved source": {
+          "sampleNanoseconds": 767535064,
+          "share": 0.5026246719160105
+        },
+        "snake candidate scan": {
+          "sampleNanoseconds": 338677352,
+          "share": 0.22178477690288714
+        },
+        "food grid construction": {
+          "sampleNanoseconds": 216432864,
+          "share": 0.14173228346456693
+        },
+        "food candidate queries": {
+          "sampleNanoseconds": 94188376,
+          "share": 0.06167979002624672
+        },
+        "other shared-index construction": {
+          "sampleNanoseconds": 88176352,
+          "share": 0.05774278215223097
+        },
+        "food order restoration": {
+          "sampleNanoseconds": 22044088,
+          "share": 0.014435695538057743
+        }
+      }
+    },
+    {
+      "label": "10000",
+      "population": 10000,
+      "overhead": {
+        "label": "10000",
+        "population": 10000,
+        "fixtureAttempt": "10000",
+        "stabilized": false,
+        "timestampDebugToPrimaryWorldCpuRatios": [
+          1.0452914559411297,
+          1.0695401617359994,
+          1.0687256746541083,
+          1.0640584728540525,
+          0.9722979633524936
+        ],
+        "timestampDebugToPrimaryWholeCpuRatios": [
+          1.0292484146116694,
+          1.049337302881554,
+          1.050098196757186,
+          1.0493173848835786,
+          0.9504987037372833
+        ],
+        "ordinaryProcessCpuSeconds": 149.770741949,
+        "sampledProcessCpuSeconds": 155.860771246,
+        "cpuRatio": 1.0406623431102036,
+        "wallRatio": 1.0408084670360216,
+        "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+      },
+      "unsampledDiagnosticCosts": {
+        "ticks": 512,
+        "worldCpuMs": {
+          "n": 512,
+          "mean": 147.3012075605468,
+          "min": 137.6341600000046,
+          "p50": 146.8025699999984,
+          "p95": 155.34080000000472,
+          "p99": 158.72789000002285,
+          "max": 177.95815000000027
+        },
+        "worldPlusAdmissionCpuMs": {
+          "n": 512,
+          "mean": 147.37577066601554,
+          "min": 137.64087000001268,
+          "p50": 146.82262999999907,
+          "p95": 155.59958000000051,
+          "p99": 158.7385100000347,
+          "max": 177.96448000000044
+        },
+        "wholeWindowTicksPerSecond": 3.417197973765048,
+        "observationProcessCpuUsPerBot": 76.24402059568668,
+        "policyLoopCpuUsPerBot": 10.55711417451997
+      },
+      "stepProfileDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 169.17499587499995,
+        "instrumentedAdmissionCpuMsPerTick": 0.07544107421874821,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 169.2504369492187,
+        "worldWallMsPerTick": 169.25794216796874,
+        "offCpuFractionBound": 0.00049005849832721,
+        "profileToOrdinaryCpuRatios": [
+          1.1484970060782573
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 3.2195518242187497,
+            "cpuMsPerTickBounds": [
+              3.13660553124997,
+              3.2195518242187497
+            ],
+            "cpuShareBounds": [
+              0.018540597651721214,
+              0.019030896425129
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 6.822877775390625,
+            "cpuMsPerTickBounds": [
+              6.739931482421845,
+              6.822877775390625
+            ],
+            "cpuShareBounds": [
+              0.039839997911995495,
+              0.040330296685403284
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.00169982421875,
+            "cpuMsPerTickBounds": [
+              0.00012256054687721657,
+              0.00169982421875
+            ],
+            "cpuShareBounds": [
+              7.244601735812905e-07,
+              1.0047727265830504e-05
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 158.55663061523435,
+            "cpuMsPerTickBounds": [
+              158.4736843222656,
+              158.55663061523435
+            ],
+            "cpuShareBounds": [
+              0.9367441299620818,
+              0.9372344287354895
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.36025757617187504,
+            "cpuMsPerTickBounds": [
+              0.2860717558593184,
+              0.36025757617187504
+            ],
+            "cpuShareBounds": [
+              0.0016909813083175193,
+              0.0021294965861152564
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.115486283203125,
+            "cpuMsPerTickBounds": [
+              0.054693679687516095,
+              0.115486283203125
+            ],
+            "cpuShareBounds": [
+              0.00032329647419012303,
+              0.0006826439250423007
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.18143826953123665,
+        "counts": {
+          "ticks": 512,
+          "bodyPairs": 18056388,
+          "segmentTests": 121383209,
+          "foodPairs": 18739627696,
+          "pickupTests": 389179
+        }
+      },
+      "sameVirtualSlowTicksPhaseDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 171.09722833332992,
+        "instrumentedAdmissionCpuMsPerTick": 1.0306966666690325,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 172.12792499999895,
+        "worldWallMsPerTick": 171.15037816666666,
+        "offCpuFractionBound": 0.0003105446444587291,
+        "profileToOrdinaryCpuRatios": [
+          1.1410948514502302
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 3.1484565,
+            "cpuMsPerTickBounds": [
+              3.0953066666632556,
+              3.1484565
+            ],
+            "cpuShareBounds": [
+              0.01809092231834995,
+              0.01840156343074248
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 6.864589333333332,
+            "cpuMsPerTickBounds": [
+              6.811439499996588,
+              6.864589333333332
+            ],
+            "cpuShareBounds": [
+              0.03981034389830447,
+              0.040120985010697004
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.001,
+            "cpuMsPerTickBounds": [
+              0.0,
+              0.001
+            ],
+            "cpuShareBounds": [
+              0.0,
+              5.844630037207908e-06
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 159.498229,
+            "cpuMsPerTickBounds": [
+              159.44507916666325,
+              159.498229
+            ],
+            "cpuShareBounds": [
+              0.9318974989824729,
+              0.9322081400948653
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.35336833333333334,
+            "cpuMsPerTickBounds": [
+              0.3002184999965888,
+              0.35336833333333334
+            ],
+            "cpuShareBounds": [
+              0.001754666062805565,
+              0.002065307175198096
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 1.1054983333333335,
+            "cpuMsPerTickBounds": [
+              1.0523484999965889,
+              1.1054983333333335
+            ],
+            "cpuShareBounds": [
+              0.0061505876526907486,
+              0.00646122876508328
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.17923666666667484,
+        "counts": {
+          "ticks": 6,
+          "bodyPairs": 211489,
+          "segmentTests": 1415762,
+          "foodPairs": 220149707,
+          "pickupTests": 4542
+        }
+      },
+      "phaseCadenceByTickMod6": [
+        {
+          "tickMod6": 0,
+          "ticks": 85,
+          "worldCpuMsMean": 169.1256711411766,
+          "ambientWallMsMean": 0.10347998823529413,
+          "foodWallMsMean": 158.57118363529412
+        },
+        {
+          "tickMod6": 1,
+          "ticks": 85,
+          "worldCpuMsMean": 169.2096365529414,
+          "ambientWallMsMean": 0.10352176470588234,
+          "foodWallMsMean": 158.44826148235293
+        },
+        {
+          "tickMod6": 2,
+          "ticks": 85,
+          "worldCpuMsMean": 169.55561855294008,
+          "ambientWallMsMean": 0.17485328235294115,
+          "foodWallMsMean": 158.6443882
+        },
+        {
+          "tickMod6": 3,
+          "ticks": 85,
+          "worldCpuMsMean": 169.32733856470574,
+          "ambientWallMsMean": 0.10392363529411763,
+          "foodWallMsMean": 158.65149825882352
+        },
+        {
+          "tickMod6": 4,
+          "ticks": 86,
+          "worldCpuMsMean": 168.862096906977,
+          "ambientWallMsMean": 0.10338755813953489,
+          "foodWallMsMean": 158.46946729069768
+        },
+        {
+          "tickMod6": 5,
+          "ticks": 86,
+          "worldCpuMsMean": 168.97564005814,
+          "ambientWallMsMean": 0.10402860465116279,
+          "foodWallMsMean": 158.5560174883721
+        }
+      ],
+      "initialCensus": {
+        "maxLength": 181,
+        "meanLength": 51.3174,
+        "memoryKiB": {
+          "RssAnon": 897116,
+          "RssFile": 2204,
+          "RssShmem": 1404,
+          "VmHWM": 1014368,
+          "VmRSS": 900724,
+          "VmSize": 902112
+        },
+        "p50Length": 51,
+        "p90Length": 73,
+        "p99Length": 87,
+        "world": {
+          "ambientFood": 510711,
+          "arenaRadius": 67000.0,
+          "boostFood": 3154,
+          "deathFood": 1535,
+          "deaths": 398,
+          "food": 515400,
+          "living": 10000,
+          "livingSegments": 513174,
+          "physicsTickMs": 7.0,
+          "prey": 18,
+          "spawned": 10000,
+          "time": 238.0000000001175
+        }
+      },
+      "finalCensus": {
+        "maxLength": 185,
+        "meanLength": 51.8488,
+        "memoryKiB": {
+          "RssAnon": 897124,
+          "RssFile": 2252,
+          "RssShmem": 1404,
+          "VmHWM": 1014368,
+          "VmRSS": 900780,
+          "VmSize": 926272
+        },
+        "p50Length": 51,
+        "p90Length": 74,
+        "p99Length": 88,
+        "world": {
+          "ambientFood": 509884,
+          "arenaRadius": 67000.0,
+          "boostFood": 3189,
+          "deathFood": 1669,
+          "deaths": 407,
+          "food": 514742,
+          "living": 10000,
+          "livingSegments": 518488,
+          "physicsTickMs": 7.0,
+          "prey": 19,
+          "spawned": 10000,
+          "time": 241.58400000012006
+        }
+      },
+      "pickupGuards": {
+        "method": "post-step circle fields plus final food + food pickups - ambient births; exact pickup-entry reconstruction",
+        "allThreeGuardTracesEqual": true,
+        "allTicks": {
+          "ticks": 512,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 512,
+            "mean": 1095113.3125,
+            "min": 1094116,
+            "p50": 1095162,
+            "p95": 1096209,
+            "p99": 1096209,
+            "max": 1096209
+          },
+          "foodLen": {
+            "n": 512,
+            "mean": 515138.66796875,
+            "min": 514717,
+            "p50": 515147,
+            "p95": 515437,
+            "p99": 515471,
+            "max": 515485
+          },
+          "coverArea": {
+            "n": 512,
+            "mean": 28967.9609375,
+            "min": 28708,
+            "p50": 28960,
+            "p95": 29166,
+            "p99": 29283,
+            "max": 29339
+          },
+          "circles": {
+            "n": 512,
+            "mean": 9999.982421875,
+            "min": 9999,
+            "p50": 10000,
+            "p95": 10000,
+            "p99": 10000,
+            "max": 10000
+          },
+          "foodGuardLimit": {
+            "n": 512,
+            "mean": 2060554.671875,
+            "min": 2058868,
+            "p50": 2060588,
+            "p95": 2061748,
+            "p99": 2061884,
+            "max": 2061940
+          },
+          "paths": {
+            "hashed indexed": 512
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 512,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": true,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 512
+            }
+          ]
+        },
+        "slowest1pctExcludingFirst": {
+          "ticks": 6,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 6,
+            "mean": 1094813.5,
+            "min": 1094116,
+            "p50": 1094116,
+            "p95": 1096209,
+            "p99": 1096209,
+            "max": 1096209
+          },
+          "foodLen": {
+            "n": 6,
+            "mean": 515189.3333333333,
+            "min": 514938,
+            "p50": 515085,
+            "p95": 515467,
+            "p99": 515467,
+            "max": 515467
+          },
+          "coverArea": {
+            "n": 6,
+            "mean": 28903.333333333332,
+            "min": 28759,
+            "p50": 28854,
+            "p95": 29112,
+            "p99": 29112,
+            "max": 29112
+          },
+          "circles": {
+            "n": 6,
+            "mean": 10000,
+            "min": 10000,
+            "p50": 10000,
+            "p95": 10000,
+            "p99": 10000,
+            "max": 10000
+          },
+          "foodGuardLimit": {
+            "n": 6,
+            "mean": 2060757.3333333333,
+            "min": 2059752,
+            "p50": 2060340,
+            "p95": 2061868,
+            "p99": 2061868,
+            "max": 2061868
+          },
+          "paths": {
+            "hashed indexed": 6
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 6,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": true,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 6
+            }
+          ]
+        }
+      },
+      "lostSamples": 0,
+      "unparsedRecords": 0,
+      "coverage": {
+        "all": 158729457648,
+        "outside operation or unwound": 12084168240,
+        "operation": 146645289408
+      },
+      "slowWorldTicks": [
+        {
+          "tick": 34000,
+          "worldCpuMs": 192.55701999999974,
+          "admissionCpuMs": 0.025270000000077175
+        },
+        {
+          "tick": 34082,
+          "worldCpuMs": 165.95651899999808,
+          "admissionCpuMs": 0.00809000000145943
+        },
+        {
+          "tick": 34243,
+          "worldCpuMs": 163.24994000000004,
+          "admissionCpuMs": 0.013480000006893533
+        },
+        {
+          "tick": 34328,
+          "worldCpuMs": 163.30437999999958,
+          "admissionCpuMs": 0.027500000001623448
+        },
+        {
+          "tick": 34332,
+          "worldCpuMs": 167.87922999999694,
+          "admissionCpuMs": 3.7504699999999502
+        },
+        {
+          "tick": 34385,
+          "worldCpuMs": 163.39263999999787,
+          "admissionCpuMs": 0.00954000000774613
+        }
+      ],
+      "slowWorldTicksExcludingFirst": [
+        34013,
+        34082,
+        34243,
+        34328,
+        34332,
+        34385
+      ],
+      "worldTickAttribution": {
+        "all world ticks": {
+          "samples": 39350,
+          "weightedSampleNanoseconds": 78857714800,
+          "phases": {
+            "food pickup/cache": {
+              "sampleNanoseconds": 66098195864,
+              "share": 0.8381956797966963
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 7220440824,
+              "share": 0.09156289707750953
+            },
+            "collisions": {
+              "sampleNanoseconds": 3408817608,
+              "share": 0.0432274459974587
+            },
+            "movement": {
+              "sampleNanoseconds": 1693386760,
+              "share": 0.02147395171537484
+            },
+            "prey": {
+              "sampleNanoseconds": 186372744,
+              "share": 0.002363405336721728
+            },
+            "pickup grid construction": {
+              "sampleNanoseconds": 138276552,
+              "share": 0.0017534942820838628
+            },
+            "ambient/maintenance": {
+              "sampleNanoseconds": 76152304,
+              "share": 0.00096569250317662
+            },
+            "spawn/admission": {
+              "sampleNanoseconds": 34068136,
+              "share": 0.0004320203303684879
+            },
+            "death processing": {
+              "sampleNanoseconds": 2004008,
+              "share": 2.5412960609911054e-05
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.8403122060356444
+        },
+        "slowest 1%": {
+          "samples": 511,
+          "weightedSampleNanoseconds": 1024048088,
+          "phases": {
+            "food pickup/cache": {
+              "sampleNanoseconds": 819639272,
+              "share": 0.8003913894324853
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 88176352,
+              "share": 0.08610567514677103
+            },
+            "movement": {
+              "sampleNanoseconds": 62124248,
+              "share": 0.060665362035225046
+            },
+            "collisions": {
+              "sampleNanoseconds": 40080160,
+              "share": 0.03913894324853229
+            },
+            "ambient/maintenance": {
+              "sampleNanoseconds": 6012024,
+              "share": 0.005870841487279843
+            },
+            "prey": {
+              "sampleNanoseconds": 4008016,
+              "share": 0.003913894324853229
+            },
+            "spawn/admission": {
+              "sampleNanoseconds": 4008016,
+              "share": 0.003913894324853229
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.8035363457760314
+        },
+        "slowest 1% excluding first": {
+          "samples": 494,
+          "weightedSampleNanoseconds": 989979952,
+          "phases": {
+            "food pickup/cache": {
+              "sampleNanoseconds": 811623240,
+              "share": 0.819838056680162
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 102204408,
+              "share": 0.10323886639676114
+            },
+            "collisions": {
+              "sampleNanoseconds": 42084168,
+              "share": 0.04251012145748988
+            },
+            "movement": {
+              "sampleNanoseconds": 20040080,
+              "share": 0.020242914979757085
+            },
+            "spawn/admission": {
+              "sampleNanoseconds": 6012024,
+              "share": 0.006072874493927126
+            },
+            "ambient/maintenance": {
+              "sampleNanoseconds": 6012024,
+              "share": 0.006072874493927126
+            },
+            "prey": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.0020242914979757085
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.824847250509165
+        }
+      },
+      "operationPhases": {
+        "world": {
+          "sampleNanoseconds": 78799598568,
+          "share": 0.5373483109216136
+        },
+        "observation": {
+          "sampleNanoseconds": 67408817096,
+          "share": 0.4596725702416093
+        },
+        "guard audit outside world brackets": {
+          "sampleNanoseconds": 220440880,
+          "share": 0.0015032251011260522
+        },
+        "other operation": {
+          "sampleNanoseconds": 162324648,
+          "share": 0.001106920301738275
+        },
+        "admission": {
+          "sampleNanoseconds": 34068136,
+          "share": 0.00023231660653766261
+        },
+        "A4": {
+          "sampleNanoseconds": 20040080,
+          "share": 0.00013665682737509566
+        }
+      },
+      "observationBuckets": {
+        "snake candidate scan": {
+          "sampleNanoseconds": 29677354472,
+          "share": 0.44025923833873415
+        },
+        "other observation / copying / unresolved source": {
+          "sampleNanoseconds": 27917835448,
+          "share": 0.41415702946160476
+        },
+        "food grid construction": {
+          "sampleNanoseconds": 3967935840,
+          "share": 0.05886375122632815
+        },
+        "food candidate queries": {
+          "sampleNanoseconds": 2402805592,
+          "share": 0.03564527157594316
+        },
+        "food order restoration": {
+          "sampleNanoseconds": 1723446880,
+          "share": 0.025567083865980913
+        },
+        "other shared-index construction": {
+          "sampleNanoseconds": 1717434856,
+          "share": 0.02547789636412284
+        },
+        "prey candidate scan": {
+          "sampleNanoseconds": 2004008,
+          "share": 2.972916728602432e-05
+        }
+      }
+    },
+    {
+      "label": "botstorm-12000",
+      "population": 12000,
+      "overhead": {
+        "label": "botstorm-12000",
+        "population": 12000,
+        "fixtureAttempt": "12000",
+        "stabilized": true,
+        "timestampDebugToPrimaryWorldCpuRatios": [
+          1.0787928519579673,
+          0.9930422827889608,
+          1.0113796280426155,
+          1.0948083812823581,
+          1.175765793261604
+        ],
+        "timestampDebugToPrimaryWholeCpuRatios": [
+          1.1187247436948615,
+          1.035477512299965,
+          1.0527340563194003,
+          1.1342390785362504,
+          1.2106476153266292
+        ],
+        "ordinaryProcessCpuSeconds": 6.287997539,
+        "sampledProcessCpuSeconds": 6.685417529,
+        "cpuRatio": 1.0632029493547168,
+        "wallRatio": 1.0632025826051783,
+        "finalStateSha256": "767968ed74eda3ca67993868378a17419b3b1c5bddae8e8654541863eebac1a3"
+      },
+      "unsampledDiagnosticCosts": {
+        "ticks": 512,
+        "worldCpuMs": {
+          "n": 512,
+          "mean": 10.46813952929687,
+          "min": 7.663010000000137,
+          "p50": 10.825070000000103,
+          "p95": 11.876690000000245,
+          "p99": 12.456400000000034,
+          "max": 21.17570000000002
+        },
+        "worldPlusAdmissionCpuMs": {
+          "n": 512,
+          "mean": 11.718178064453124,
+          "min": 7.782560000000105,
+          "p50": 11.45328999999995,
+          "p95": 15.706819999999233,
+          "p99": 18.331530000000207,
+          "max": 21.446339999998898
+        },
+        "wholeWindowTicksPerSecond": 81.4038496438558,
+        "observationProcessCpuUsPerBot": null,
+        "policyLoopCpuUsPerBot": 0.0
+      },
+      "stepProfileDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 9.638880093749973,
+        "instrumentedAdmissionCpuMsPerTick": 1.211505078124987,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 10.850385171874962,
+        "worldWallMsPerTick": 9.64304272265625,
+        "offCpuFractionBound": 0.0004316717270676625,
+        "profileToOrdinaryCpuRatios": [
+          0.9207825389386458
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 1.687246943359375,
+            "cpuMsPerTickBounds": [
+              1.6830843144530991,
+              1.687246943359375
+            ],
+            "cpuShareBounds": [
+              0.17461409396973843,
+              0.17504595211775867
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 4.173009255859376,
+            "cpuMsPerTickBounds": [
+              4.1688466269530995,
+              4.173009255859376
+            ],
+            "cpuShareBounds": [
+              0.43250321473095776,
+              0.43293507287897803
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.023066912109375,
+            "cpuMsPerTickBounds": [
+              0.021771251953115803,
+              0.023066912109375
+            ],
+            "cpuShareBounds": [
+              0.0022586910244098463,
+              0.00239311122091165
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 3.254148666015625,
+            "cpuMsPerTickBounds": [
+              3.2499860371093487,
+              3.254148666015625
+            ],
+            "cpuShareBounds": [
+              0.33717465156732257,
+              0.33760650971534284
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.3681366953125,
+            "cpuMsPerTickBounds": [
+              0.363974066406224,
+              0.3681366953125
+            ],
+            "cpuShareBounds": [
+              0.037761032699455556,
+              0.03819289084747579
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.031086738281249998,
+            "cpuMsPerTickBounds": [
+              0.02722567578122414,
+              0.031086738281249998
+            ],
+            "cpuShareBounds": [
+              0.002824568364417954,
+              0.0032251400555762914
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.1063475117187504,
+        "counts": {
+          "ticks": 512,
+          "bodyPairs": 55673812,
+          "segmentTests": 121336916,
+          "foodPairs": 10061904,
+          "pickupTests": 281003
+        }
+      },
+      "sameVirtualSlowTicksPhaseDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 10.113841666666623,
+        "instrumentedAdmissionCpuMsPerTick": 7.532314999999993,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 17.646156666666617,
+        "worldWallMsPerTick": 10.115282666666667,
+        "offCpuFractionBound": 0.00014245770954011104,
+        "profileToOrdinaryCpuRatios": [
+          0.9615301123799176
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 1.671748,
+            "cpuMsPerTickBounds": [
+              1.6703069999999567,
+              1.671748
+            ],
+            "cpuShareBounds": [
+              0.1651505980665076,
+              0.16529307607313812
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 4.391283333333334,
+            "cpuMsPerTickBounds": [
+              4.3898423333332905,
+              4.391283333333334
+            ],
+            "cpuShareBounds": [
+              0.43404301530657824,
+              0.4341854933132088
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.020273333333333334,
+            "cpuMsPerTickBounds": [
+              0.01950699999997272,
+              0.020273333333333334
+            ],
+            "cpuShareBounds": [
+              0.0019287428697113416,
+              0.0020045136162404583
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 3.518086333333333,
+            "cpuMsPerTickBounds": [
+              3.51664533333329,
+              3.518086333333333
+            ],
+            "cpuShareBounds": [
+              0.34770618813655263,
+              0.34784866614318316
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.37411666666666665,
+            "cpuMsPerTickBounds": [
+              0.3726756666666231,
+              0.37411666666666665
+            ],
+            "cpuShareBounds": [
+              0.03684808196027966,
+              0.0369905599669102
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.032231666666666665,
+            "cpuMsPerTickBounds": [
+              0.030790666666623123,
+              0.032231666666666665
+            ],
+            "cpuShareBounds": [
+              0.0030444086116261384,
+              0.0031868866182566766
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.10754333333333362,
+        "counts": {
+          "ticks": 6,
+          "bodyPairs": 650603,
+          "segmentTests": 1422239,
+          "foodPairs": 118176,
+          "pickupTests": 3283
+        }
+      },
+      "phaseCadenceByTickMod6": [
+        {
+          "tickMod6": 0,
+          "ticks": 86,
+          "worldCpuMsMean": 9.727150918604595,
+          "ambientWallMsMean": 0.031299767441860464,
+          "foodWallMsMean": 3.2993733255813953
+        },
+        {
+          "tickMod6": 1,
+          "ticks": 86,
+          "worldCpuMsMean": 9.664617662790699,
+          "ambientWallMsMean": 0.031343604651162794,
+          "foodWallMsMean": 3.265256976744186
+        },
+        {
+          "tickMod6": 2,
+          "ticks": 85,
+          "worldCpuMsMean": 9.683415647058846,
+          "ambientWallMsMean": 0.03150058823529412,
+          "foodWallMsMean": 3.274793423529412
+        },
+        {
+          "tickMod6": 3,
+          "ticks": 85,
+          "worldCpuMsMean": 9.555687882352867,
+          "ambientWallMsMean": 0.030584117647058824,
+          "foodWallMsMean": 3.211166894117647
+        },
+        {
+          "tickMod6": 4,
+          "ticks": 85,
+          "worldCpuMsMean": 9.517226823529409,
+          "ambientWallMsMean": 0.030958470588235292,
+          "foodWallMsMean": 3.2310534588235296
+        },
+        {
+          "tickMod6": 5,
+          "ticks": 85,
+          "worldCpuMsMean": 9.68384035294113,
+          "ambientWallMsMean": 0.030828352941176473,
+          "foodWallMsMean": 3.242585176470588
+        }
+      ],
+      "initialCensus": {
+        "maxLength": 125,
+        "meanLength": 6.153833333333333,
+        "memoryKiB": {
+          "RssAnon": 298580,
+          "RssFile": 2144,
+          "RssShmem": 1272,
+          "VmHWM": 342280,
+          "VmRSS": 301996,
+          "VmSize": 303364
+        },
+        "p50Length": 4,
+        "p90Length": 11,
+        "p99Length": 54,
+        "world": {
+          "ambientFood": 110690,
+          "arenaRadius": 32400.0,
+          "boostFood": 0,
+          "deathFood": 22989,
+          "deaths": 46804,
+          "food": 133679,
+          "living": 12000,
+          "livingSegments": 73846,
+          "physicsTickMs": 7.0,
+          "prey": 75,
+          "spawned": 12000,
+          "time": 608.9999999995949
+        }
+      },
+      "finalCensus": {
+        "maxLength": 130,
+        "meanLength": 6.219768314026169,
+        "memoryKiB": {
+          "RssAnon": 298584,
+          "RssFile": 2208,
+          "RssShmem": 1272,
+          "VmHWM": 342280,
+          "VmRSS": 302064,
+          "VmSize": 309632
+        },
+        "p50Length": 4,
+        "p90Length": 11,
+        "p99Length": 54,
+        "world": {
+          "ambientFood": 111007,
+          "arenaRadius": 32400.0,
+          "boostFood": 0,
+          "deathFood": 20612,
+          "deaths": 47036,
+          "food": 131619,
+          "living": 11999,
+          "livingSegments": 74631,
+          "physicsTickMs": 7.0,
+          "prey": 76,
+          "spawned": 12000,
+          "time": 612.5839999995684
+        }
+      },
+      "pickupGuards": {
+        "method": "post-step circle fields plus final food + food pickups - ambient births; exact pickup-entry reconstruction",
+        "allThreeGuardTracesEqual": true,
+        "allTicks": {
+          "ticks": 512,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 512,
+            "mean": 249079.5,
+            "min": 247504,
+            "p50": 249000,
+            "p95": 250498,
+            "p99": 250498,
+            "max": 250500
+          },
+          "foodLen": {
+            "n": 512,
+            "mean": 132866.12109375,
+            "min": 131496,
+            "p50": 132973,
+            "p95": 133491,
+            "p99": 133635,
+            "max": 133726
+          },
+          "coverArea": {
+            "n": 512,
+            "mean": 29741.62109375,
+            "min": 29485,
+            "p50": 29735,
+            "p95": 29912,
+            "p99": 29980,
+            "max": 30004
+          },
+          "circles": {
+            "n": 512,
+            "mean": 11999.546875,
+            "min": 11997,
+            "p50": 12000,
+            "p95": 12000,
+            "p99": 12000,
+            "max": 12000
+          },
+          "foodGuardLimit": {
+            "n": 512,
+            "mean": 531464.484375,
+            "min": 525984,
+            "p50": 531892,
+            "p95": 533964,
+            "p99": 534540,
+            "max": 534904
+          },
+          "paths": {
+            "dense": 512
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 0,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": false,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 512
+            }
+          ]
+        },
+        "slowest1pctExcludingFirst": {
+          "ticks": 6,
+          "fixedCellLimit": 1048576,
+          "cellSize": 128,
+          "foodGuardMinimum": 4096,
+          "boxCells": {
+            "n": 6,
+            "mean": 248916.33333333334,
+            "min": 248000,
+            "p50": 248997,
+            "p95": 249500,
+            "p99": 249500,
+            "max": 249500
+          },
+          "foodLen": {
+            "n": 6,
+            "mean": 132845,
+            "min": 132065,
+            "p50": 132861,
+            "p95": 133491,
+            "p99": 133491,
+            "max": 133491
+          },
+          "coverArea": {
+            "n": 6,
+            "mean": 29727.166666666668,
+            "min": 29579,
+            "p50": 29693,
+            "p95": 29840,
+            "p99": 29840,
+            "max": 29840
+          },
+          "circles": {
+            "n": 6,
+            "mean": 11999.666666666666,
+            "min": 11999,
+            "p50": 12000,
+            "p95": 12000,
+            "p99": 12000,
+            "max": 12000
+          },
+          "foodGuardLimit": {
+            "n": 6,
+            "mean": 531380,
+            "min": 528260,
+            "p50": 531444,
+            "p95": 533964,
+            "p99": 533964,
+            "max": 533964
+          },
+          "paths": {
+            "dense": 6
+          },
+          "regularGeometryEveryTick": true,
+          "declines": {
+            "declineFixedCells": 0,
+            "declineFoodLength": 0,
+            "declineCoverArea": 0
+          },
+          "combinations": [
+            {
+              "aFixedCells": false,
+              "bFoodLength": false,
+              "cCoverArea": false,
+              "ticks": 6
+            }
+          ]
+        }
+      },
+      "lostSamples": 0,
+      "unparsedRecords": 0,
+      "coverage": {
+        "all": 7394789520,
+        "outside operation or unwound": 759519032,
+        "operation": 6635270488
+      },
+      "slowWorldTicks": [
+        {
+          "tick": 87000,
+          "worldCpuMs": 24.415819999999975,
+          "admissionCpuMs": 0.008389999999969255
+        },
+        {
+          "tick": 87051,
+          "worldCpuMs": 11.522899999999892,
+          "admissionCpuMs": 7.447660000000189
+        },
+        {
+          "tick": 87177,
+          "worldCpuMs": 11.72481000000003,
+          "admissionCpuMs": 8.463159999999803
+        },
+        {
+          "tick": 87260,
+          "worldCpuMs": 11.98338000000021,
+          "admissionCpuMs": 7.755119999999671
+        },
+        {
+          "tick": 87400,
+          "worldCpuMs": 11.197919999999861,
+          "admissionCpuMs": 7.919390000000526
+        },
+        {
+          "tick": 87443,
+          "worldCpuMs": 11.430059999999465,
+          "admissionCpuMs": 7.403599999999955
+        }
+      ],
+      "slowWorldTicksExcludingFirst": [
+        87051,
+        87159,
+        87177,
+        87260,
+        87400,
+        87443
+      ],
+      "worldTickAttribution": {
+        "all world ticks": {
+          "samples": 3198,
+          "weightedSampleNanoseconds": 6408817584,
+          "phases": {
+            "collisions": {
+              "sampleNanoseconds": 2298597176,
+              "share": 0.3586616635397123
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 1801603192,
+              "share": 0.2811131957473421
+            },
+            "movement": {
+              "sampleNanoseconds": 1174348688,
+              "share": 0.18323952470293933
+            },
+            "spawn/admission": {
+              "sampleNanoseconds": 681362720,
+              "share": 0.10631644777986242
+            },
+            "prey": {
+              "sampleNanoseconds": 180360720,
+              "share": 0.028142589118198873
+            },
+            "pickup grid construction": {
+              "sampleNanoseconds": 178356712,
+              "share": 0.02782989368355222
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 62124248,
+              "share": 0.00969355847404628
+            },
+            "ambient/maintenance": {
+              "sampleNanoseconds": 22044088,
+              "share": 0.0034396497811131957
+            },
+            "death processing": {
+              "sampleNanoseconds": 10020040,
+              "share": 0.0015634771732332708
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.3456962911126662
+        },
+        "slowest 1%": {
+          "samples": 59,
+          "weightedSampleNanoseconds": 118236472,
+          "phases": {
+            "spawn/admission": {
+              "sampleNanoseconds": 36072144,
+              "share": 0.3050847457627119
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 30060120,
+              "share": 0.2542372881355932
+            },
+            "collisions": {
+              "sampleNanoseconds": 28056112,
+              "share": 0.23728813559322035
+            },
+            "movement": {
+              "sampleNanoseconds": 16032064,
+              "share": 0.13559322033898305
+            },
+            "death processing": {
+              "sampleNanoseconds": 6012024,
+              "share": 0.05084745762711865
+            },
+            "prey": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.01694915254237288
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.36585365853658536
+        },
+        "slowest 1% excluding first": {
+          "samples": 57,
+          "weightedSampleNanoseconds": 114228456,
+          "phases": {
+            "spawn/admission": {
+              "sampleNanoseconds": 44088176,
+              "share": 0.38596491228070173
+            },
+            "collisions": {
+              "sampleNanoseconds": 26052104,
+              "share": 0.22807017543859648
+            },
+            "food pickup/cache": {
+              "sampleNanoseconds": 22044088,
+              "share": 0.19298245614035087
+            },
+            "movement": {
+              "sampleNanoseconds": 16032064,
+              "share": 0.14035087719298245
+            },
+            "pickup grid construction": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.017543859649122806
+            },
+            "unresolved world / clock brackets": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.017543859649122806
+            },
+            "prey": {
+              "sampleNanoseconds": 2004008,
+              "share": 0.017543859649122806
+            }
+          },
+          "knownPickupShareOfWorldUserCpu": 0.34285714285714286
+        }
+      },
+      "operationPhases": {
+        "world": {
+          "sampleNanoseconds": 5679358672,
+          "share": 0.855934762911507
+        },
+        "admission": {
+          "sampleNanoseconds": 681362720,
+          "share": 0.10268800966475385
+        },
+        "guard audit outside world brackets": {
+          "sampleNanoseconds": 238476952,
+          "share": 0.035940803382663845
+        },
+        "other operation": {
+          "sampleNanoseconds": 36072144,
+          "share": 0.005436424041075204
+        }
+      },
+      "observationBuckets": {}
+    }
+  ]
+}

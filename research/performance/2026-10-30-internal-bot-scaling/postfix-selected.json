@@ -1,0 +1,325 @@
+{
+  "pins": {
+    "head": "a6511aadf029adfc1f34b9cdb360a326e2ba5204",
+    "sourceArchiveUrl": "https://codeload.github.com/NikitaMGrimm/slither-sim/tar.gz/a6511aadf029adfc1f34b9cdb360a326e2ba5204",
+    "sourceArchiveSha256": "9761da4c51672acd2e8e4c341645492521e15dedf4010191473a7bc606af9b52",
+    "masterPinsSha256": "2fbd47bc43efeb12fede35948c05336fa5da599c2c22aeee04e863712c4f3261",
+    "controllerSha256": "cd1ec0c9e279417803de5bf7c245808e25fedd4d1ef66a89a9efbebbc6073e85",
+    "reducerSha256": "94a4e2de4afc6071783df46fa7d2a33bfee9ef16c5c3b6e74ef2e28cc82d3e33",
+    "planSha256": "b7f5d7d03f8f7aca8c391c611c2d8d5f0961f687b5369932038806161be0fd98",
+    "executionSourceManifestSha256": "c20bcb416217f8e63ac9be229022c101a1e8a88a7954509715b1b5facdb0eca8",
+    "selectedDependenciesSha256": "395b5b27ae07bdd769aa5e3941dd54972437e82b31e2bba714710fb5c7206d0f",
+    "cargoLockSha256": "c4d5da1d4856453d076ff54ff1bcfce9fcf3cfc1450a4198a8b4c88bc808c186",
+    "buildLogSha256": "94f874af7c33869ed23580885e74b9df079a872b387fd2db5f59d8ccb2c47863",
+    "command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked",
+      "--no-default-features",
+      "--features",
+      "bot,parallel",
+      "-p",
+      "slither-sim",
+      "--example",
+      "internal_scaling_331"
+    ],
+    "profile": "repository default portable release, debug=0, no Rust flags",
+    "runtimeSourceChange": "MAX_CELLS 2^20 to 2^22 only; comments/tests excluded from runtime comparison",
+    "workspaceDifference": "client workspace import; selected simulator dependency package versions verified equal",
+    "binaries": {
+      "internal_scaling": "083d5185f83ef2636944b5a748f990ee410badbf4fcec39c108312f970236056"
+    }
+  },
+  "mode": "world-only replay; no observation/A4 work in added row",
+  "order": "after main rows and attribution; descriptive, not alternating",
+  "rows": [
+    {
+      "label": "10000",
+      "referenceFinalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1",
+      "allFinalStatesIdentical": true,
+      "baselineReference": "selected-results.json:10000/simulation",
+      "candidate": {
+        "windows": 5,
+        "ticks": 2560,
+        "worldCpuMs": {
+          "n": 2560,
+          "mean": 17.55975245195313,
+          "min": 14.22209000000052,
+          "p50": 17.544909999999803,
+          "p95": 18.613440000000203,
+          "p99": 19.128929999999933,
+          "max": 110.27370999999997
+        },
+        "worldWallMs": {
+          "n": 2560,
+          "mean": 17.5738760578125,
+          "min": 14.222779,
+          "p50": 17.555739,
+          "p95": 18.630478999999998,
+          "p99": 19.138219000000003,
+          "max": 110.287524
+        },
+        "admissionCpuMs": {
+          "n": 2560,
+          "mean": 0.056252070312502817,
+          "min": 0.005959999999749499,
+          "p50": 0.008670000000154943,
+          "p95": 0.020020000000009475,
+          "p99": 2.513270000000123,
+          "max": 3.739640000000932
+        },
+        "wholeWindowTicksPerSecond": {
+          "n": 5,
+          "mean": 56.66558231331973,
+          "min": 56.35252376441839,
+          "p50": 56.54331280985936,
+          "p95": 57.1474792896603,
+          "p99": 57.1474792896603,
+          "max": 57.1474792896603
+        },
+        "worldPlusAdmissionCostTicksPerSecond": {
+          "n": 5,
+          "mean": 56.768324034492,
+          "min": 56.45686429597521,
+          "p50": 56.631514963257125,
+          "p95": 57.25416212869315,
+          "p99": 57.25416212869315,
+          "max": 57.25416212869315
+        },
+        "firstRestoredTickWorldCpuMs": {
+          "n": 5,
+          "mean": 102.40473000000003,
+          "min": 93.4739,
+          "p50": 103.74491000000008,
+          "p95": 110.27370999999997,
+          "p99": 110.27370999999997,
+          "max": 110.27370999999997
+        },
+        "worldCpuMsExcludingFirstTick": {
+          "n": 2555,
+          "mean": 17.39371531389433,
+          "min": 14.22209000000052,
+          "p50": 17.54391000000055,
+          "p95": 18.60571000000011,
+          "p99": 19.041879999999622,
+          "max": 24.174120000000077
+        },
+        "perWindow": [
+          {
+            "wallSeconds": 8.959275306,
+            "processCpuSeconds": 8.952131697,
+            "mainCpuSeconds": 8.952130567,
+            "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+          },
+          {
+            "wallSeconds": 9.085662288,
+            "processCpuSeconds": 9.078974776999999,
+            "mainCpuSeconds": 9.078972047,
+            "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+          },
+          {
+            "wallSeconds": 9.081970409,
+            "processCpuSeconds": 9.075727966999999,
+            "mainCpuSeconds": 9.075727417,
+            "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+          },
+          {
+            "wallSeconds": 9.05500535,
+            "processCpuSeconds": 9.050702878,
+            "mainCpuSeconds": 9.050701848000001,
+            "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+          },
+          {
+            "wallSeconds": 8.996793513,
+            "processCpuSeconds": 8.988746898,
+            "mainCpuSeconds": 8.988746268,
+            "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+          }
+        ]
+      },
+      "baselinePhaseDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 164.65104870312516,
+        "instrumentedAdmissionCpuMsPerTick": 0.05597406250019456,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 164.70702276562534,
+        "worldWallMsPerTick": 164.73487148632813,
+        "offCpuFractionBound": 0.000508834483231529,
+        "profileToOrdinaryCpuRatios": [
+          1.1855398443248846,
+          1.183687569206221,
+          1.181685958348634,
+          1.1539012191080082,
+          1.094303216254697
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 2.73785048046875,
+            "cpuMsPerTickBounds": [
+              2.6540276972657875,
+              2.73785048046875
+            ],
+            "cpuShareBounds": [
+              0.016119105940534544,
+              0.016628199468108118
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 5.567381300781251,
+            "cpuMsPerTickBounds": [
+              5.483558517578288,
+              5.567381300781251
+            ],
+            "cpuShareBounds": [
+              0.03330412141780793,
+              0.03381321494538151
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.00126216796875,
+            "cpuMsPerTickBounds": [
+              0.00010861132812765006,
+              0.00126216796875
+            ],
+            "cpuShareBounds": [
+              6.596455290332357e-07,
+              7.66571472633471e-06
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 155.83487137109375,
+            "cpuMsPerTickBounds": [
+              155.7510485878908,
+              155.83487137109375
+            ],
+            "cpuShareBounds": [
+              0.9459462895296734,
+              0.946455383057247
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.353611099609375,
+            "cpuMsPerTickBounds": [
+              0.27364117382829944,
+              0.353611099609375
+            ],
+            "cpuShareBounds": [
+              0.0016619461338608869,
+              0.0021476395224603465
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.114240970703125,
+            "cpuMsPerTickBounds": [
+              0.047817437500150564,
+              0.114240970703125
+            ],
+            "cpuShareBounds": [
+              0.00029041684141573867,
+              0.000693836884750778
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.12565409570311492,
+        "counts": {
+          "ticks": 512,
+          "bodyPairs": 18056388,
+          "segmentTests": 121383209,
+          "foodPairs": 18739627696,
+          "pickupTests": 389179
+        }
+      },
+      "candidatePhaseDiagnostic": {
+        "instrumentedWorldCpuMsPerTick": 18.20094929296876,
+        "instrumentedAdmissionCpuMsPerTick": 0.05585826171874454,
+        "instrumentedWorldPlusAdmissionCpuMsPerTick": 18.256807554687505,
+        "worldWallMsPerTick": 18.214379363281253,
+        "offCpuFractionBound": 0.0007373334026172863,
+        "profileToOrdinaryCpuRatios": [
+          1.0454121755768755,
+          1.0309456908994135,
+          1.0313282544166056,
+          1.033976781591348,
+          1.0410708640246062
+        ],
+        "phases": {
+          "movementSeconds": {
+            "wallMsPerTick": 2.6638309296875,
+            "cpuMsPerTickBounds": [
+              2.650400859375013,
+              2.6638309296875
+            ],
+            "cpuShareBounds": [
+              0.14561882551911143,
+              0.14635670298343004
+            ]
+          },
+          "collisionSeconds": {
+            "wallMsPerTick": 6.009284705078126,
+            "cpuMsPerTickBounds": [
+              5.995854634765638,
+              6.009284705078126
+            ],
+            "cpuShareBounds": [
+              0.3294253798664175,
+              0.33016325733073615
+            ]
+          },
+          "deathSeconds": {
+            "wallMsPerTick": 0.0021728710937499998,
+            "cpuMsPerTickBounds": [
+              0.0009533554687488095,
+              0.0021728710937499998
+            ],
+            "cpuShareBounds": [
+              5.2379436555932925e-05,
+              0.00011938229477895448
+            ]
+          },
+          "foodSeconds": {
+            "wallMsPerTick": 8.873824408203125,
+            "cpuMsPerTickBounds": [
+              8.860394337890638,
+              8.873824408203125
+            ],
+            "cpuShareBounds": [
+              0.48680946225774674,
+              0.48754733972206526
+            ]
+          },
+          "preySeconds": {
+            "wallMsPerTick": 0.368054765625,
+            "cpuMsPerTickBounds": [
+              0.35533318750000975,
+              0.368054765625
+            ],
+            "cpuShareBounds": [
+              0.01952278322303107,
+              0.020221734575524796
+            ]
+          },
+          "ambientSeconds": {
+            "wallMsPerTick": 0.172506828125,
+            "cpuMsPerTickBounds": [
+              0.16100157226563555,
+              0.172506828125
+            ],
+            "cpuShareBounds": [
+              0.008845778847800665,
+              0.009477902792226415
+            ]
+          }
+        },
+        "unbracketedWallMsPerTick": 0.12470485546875118,
+        "counts": {
+          "ticks": 512,
+          "bodyPairs": 18056388,
+          "segmentTests": 121383209,
+          "foodPairs": 7535997,
+          "pickupTests": 389179
+        }
+      }
+    }
+  ],
+  "botstormEligible": false,
+  "botstormBoxCellsMax": 250500
+}

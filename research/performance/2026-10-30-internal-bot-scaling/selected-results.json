@@ -1,0 +1,5011 @@
+{
+  "pins": {
+    "runtime": "d1bab317",
+    "sourceArchiveSha256": "12b878589f6cf584378010127a869c81733462601b20aee14ae9956a05c3dbeb",
+    "executionManifestSha256": "9b56123eda723075074e969d26ec1356827d43cf7dd1f5f71049df648424b528",
+    "harnessSha256": "b67785167c93e74c7adf368cd92d57adfde8659dcff04328a67b52ee2ab0da9a",
+    "runnerSha256": "e26741d5134b3c26789a9ec21a905a55b61ff565e6bedc77d7b74e7be922bd95",
+    "planSha256": "1544b4aec455cfe2557f5e195fa716d0f422736bd643142a09dcc8906e463ee0",
+    "binarySha256": "dd41f055b1ac0bae8847af3af841dfe3fefce6009d913d7f4da758d8fb98f85e",
+    "cargoLockSha256": "cbde2a495ec3f3cb113eb8919fdce76d03806037d6aa5cf0045842d135ad8e49",
+    "buildLogSha256": "20adbd7614ac229d3a58c1eec1dfb1db879ff2ac7471dd301ae080ea6c9a257e",
+    "profile": "repository default portable release; lto=thin, codegen-units=1, debug=0; empty Rust flags",
+    "command": "cargo build --release --locked --no-default-features --features bot,parallel --example internal_scaling",
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.0\nLLVM version: 23.1.1\n",
+    "finalSmoke": {
+      "population": 1000,
+      "ticks": 24,
+      "serialParallelActionsEqual": true,
+      "allThreeFinalStatesEqual": true,
+      "serialParallelTapesEqual": true
+    }
+  },
+  "reducerSha256": "94a4e2de4afc6071783df46fa7d2a33bfee9ef16c5c3b6e74ef2e28cc82d3e33",
+  "method": {
+    "cadenceTicks": 6,
+    "stagger": "(tick + slot) % 6 == 0",
+    "timing": "Timing::default(): all lag and processing fields zero",
+    "world": "Config::official(N), unchanged adaptive radius/density, no wire radius cap",
+    "structurallyAbsent": [
+      "wire encoding",
+      "socket egress",
+      "minimap",
+      "leaderboard",
+      "ForagerBot frame adapter"
+    ]
+  },
+  "populations": [
+    {
+      "population": 1000,
+      "qualification": {
+        "population": 1000,
+        "stabilized": true,
+        "acceptance": {
+          "firstQualifyingTick": 86000,
+          "binNumbers": [
+            16,
+            17,
+            18,
+            19
+          ],
+          "bins": [
+            {
+              "meanLength": 85.56425,
+              "p90Length": 123.25,
+              "food": 49794.75,
+              "minimumLiving": 1000
+            },
+            {
+              "meanLength": 88.3914,
+              "p90Length": 128.2,
+              "food": 50713,
+              "minimumLiving": 1000
+            },
+            {
+              "meanLength": 91.10575,
+              "p90Length": 133.25,
+              "food": 51324.75,
+              "minimumLiving": 1000
+            },
+            {
+              "meanLength": 93.49875,
+              "p90Length": 138,
+              "food": 51421.25,
+              "minimumLiving": 1000
+            }
+          ],
+          "definition": "four complete 30-virtual-second bins; length/food 5%, p90 10%, living >=99%; minimum 300 virtual seconds"
+        },
+        "elapsedSeconds": 337.62230142598855,
+        "fixtureSha256": "38ce261e146703a188448352debf9bbf2ececbef25dfb474d269d1093e1783d5",
+        "metaSha256": "6ba7c00090f5b52a47d790cb3643aba84cba975b54fdd2358962d30fde2e3a9b"
+      },
+      "census": {
+        "maxLength": 259,
+        "meanLength": 95.374,
+        "memoryKiB": {
+          "RssAnon": 111196,
+          "RssFile": 2196,
+          "RssShmem": 1236,
+          "VmHWM": 123576,
+          "VmRSS": 114628,
+          "VmSize": 249976
+        },
+        "p50Length": 101,
+        "p90Length": 142,
+        "p99Length": 183,
+        "world": {
+          "ambientFood": 47946,
+          "arenaRadius": 21187.260323128143,
+          "boostFood": 2287,
+          "deathFood": 1729,
+          "deaths": 289,
+          "food": 51962,
+          "living": 1000,
+          "livingSegments": 95374,
+          "physicsTickMs": 7.0,
+          "prey": 24,
+          "spawned": 1000,
+          "time": 608.9999999995949
+        }
+      },
+      "resolvedConfig": {
+        "radius": 21187.260323128143,
+        "dynamicRadius": true,
+        "sizeToPopulation": true,
+        "vision": 1500.0,
+        "foodCount": 109686,
+        "ambientRefillCountsAllFood": false,
+        "foodOnlyInsidePit": false,
+        "ambientReplenishPerSecond": 1604.5635608990813,
+        "dt": 0.007,
+        "foodIndex": true,
+        "emitBoostFood": true,
+        "speedModel": "retained_progress",
+        "prey": {
+          "count": 141,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625,
+          "fleeHalfWidth": 320.0,
+          "size": 6.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0
+        },
+        "radiusUpdates": [],
+        "boundaryMode": "sliding",
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "stationaryRadius": 800.0,
+          "shrinkPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "recoveryPerSecond": 0.005519633948746724
+        },
+        "deathFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 22
+        },
+        "ambientFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 2
+        },
+        "boostFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 9
+        },
+        "pit": null,
+        "spawnRadius": null,
+        "spawnRadiusMax": null,
+        "killScoreSeconds": null,
+        "minScore": null
+      },
+      "savedCheckpointTick": 87000,
+      "finalCensus": {
+        "maxLength": 260,
+        "meanLength": 95.804,
+        "memoryKiB": {
+          "RssAnon": 123848,
+          "RssFile": 2232,
+          "RssShmem": 1284,
+          "VmHWM": 140384,
+          "VmRSS": 127364,
+          "VmSize": 131172
+        },
+        "p50Length": 101,
+        "p90Length": 143,
+        "p99Length": 184,
+        "world": {
+          "ambientFood": 47703,
+          "arenaRadius": 21187.260323128143,
+          "boostFood": 2333,
+          "deathFood": 1559,
+          "deaths": 291,
+          "food": 51595,
+          "living": 1000,
+          "livingSegments": 95804,
+          "physicsTickMs": 7.0,
+          "prey": 25,
+          "spawned": 1000,
+          "time": 612.5839999995684
+        }
+      },
+      "parity": {
+        "serialParallelActionSha256": "3886d864c710e0760ba4eb959af0ac02cd5ca254d26623b38d08a18dd52185b4",
+        "allFinalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+      },
+      "modes": {
+        "serial": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 426665,
+          "observations": 426665,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 1.279906441015626,
+            "min": 1.0299300000000122,
+            "p50": 1.2446600000002306,
+            "p95": 1.5082900000003008,
+            "p99": 1.8658099999999678,
+            "max": 5.443190000000015
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 1.2813298171875,
+            "min": 1.03049,
+            "p50": 1.24605,
+            "p95": 1.50957,
+            "p99": 1.866889,
+            "max": 5.44502
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 5.310788,
+            "min": 5.165160000000002,
+            "p50": 5.308679999999982,
+            "p95": 5.443190000000015,
+            "p99": 5.443190000000015,
+            "max": 5.443190000000015
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 1.2720182187866937,
+            "min": 1.0299300000000122,
+            "p50": 1.2446200000000296,
+            "p95": 1.499920000000099,
+            "p99": 1.835399999999987,
+            "max": 2.8721699999998407
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 5.99542906796875,
+            "min": 5.30288,
+            "p50": 5.9468689999999995,
+            "p95": 6.481050000000001,
+            "p99": 7.102289000000001,
+            "max": 10.059629000000001
+          },
+          "totalTickWallFractionAbove7ms": 0.0140625,
+          "worldCpuFractionAbove7ms": 0.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.001803035156251417,
+            "min": 0.0005799999998057359,
+            "p50": 0.0006899999999698814,
+            "p95": 0.0009199999999598418,
+            "p99": 0.0010900000000368948,
+            "max": 0.4230299999998799
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.0020406484375,
+            "min": 0.00073,
+            "p50": 0.00092,
+            "p95": 0.00116,
+            "p99": 0.0015,
+            "max": 0.42358
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 2.713939923046875,
+            "min": 2.4565099999999997,
+            "p50": 2.70105,
+            "p95": 2.86943,
+            "p99": 3.147919,
+            "max": 3.892389
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 1.995769554296875,
+            "min": 1.7674100000000001,
+            "p50": 1.9920699999999998,
+            "p95": 2.1489,
+            "p99": 2.22615,
+            "max": 2.4032400000000003
+          },
+          "observationProcessCpuUsPerBot": 16.270039560310792,
+          "observationWallUsPerBot": 16.283703146496666,
+          "policyLoopCpuUsPerBot": 11.961727999718729,
+          "decisionProcessCpuUsPerBot": 11.967101723834864,
+          "decisionWallUsPerBot": 11.974664101812898,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 166.81675653217616,
+            "min": 163.00256002970252,
+            "p50": 166.60761928851645,
+            "p95": 170.34863196013075,
+            "p99": 170.34863196013075,
+            "max": 170.34863196013075
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 780.8938838089877,
+            "min": 742.3118385921739,
+            "p50": 778.0126099432831,
+            "p95": 808.7968920336567,
+            "p99": 808.7968920336567,
+            "max": 808.7968920336567
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 5.992843685546875,
+            "min": 5.8683214238281245,
+            "p50": 5.999533865234375,
+            "p95": 6.133120486328125,
+            "p99": 6.133120486328125,
+            "max": 6.133120486328125
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 5.992842615234375,
+            "min": 5.8683208964843745,
+            "p50": 5.999532283203125,
+            "p95": 6.133119333984375,
+            "p99": 6.133119333984375,
+            "max": 6.133119333984375
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 10,
+          "refused": 0,
+          "poses": 50,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 123832,
+              "RssFile": 2140,
+              "RssShmem": 1312,
+              "VmHWM": 140512,
+              "VmRSS": 127284,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123832,
+              "RssFile": 2080,
+              "RssShmem": 1352,
+              "VmHWM": 140512,
+              "VmRSS": 127264,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123832,
+              "RssFile": 2108,
+              "RssShmem": 1352,
+              "VmHWM": 140276,
+              "VmRSS": 127292,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123836,
+              "RssFile": 2176,
+              "RssShmem": 1332,
+              "VmHWM": 140436,
+              "VmRSS": 127344,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123828,
+              "RssFile": 2056,
+              "RssShmem": 1312,
+              "VmHWM": 140452,
+              "VmRSS": 127196,
+              "VmSize": 128736
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 123816,
+              "RssFile": 2012,
+              "RssShmem": 1312,
+              "VmHWM": 140512,
+              "VmRSS": 127140,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123820,
+              "RssFile": 1952,
+              "RssShmem": 1288,
+              "VmHWM": 140512,
+              "VmRSS": 127060,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123820,
+              "RssFile": 1980,
+              "RssShmem": 1288,
+              "VmHWM": 140276,
+              "VmRSS": 127088,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123820,
+              "RssFile": 2048,
+              "RssShmem": 1312,
+              "VmHWM": 140436,
+              "VmRSS": 127180,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123812,
+              "RssFile": 1992,
+              "RssShmem": 1312,
+              "VmHWM": 140452,
+              "VmRSS": 127116,
+              "VmSize": 128736
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 123848,
+              "RssFile": 2204,
+              "RssShmem": 1312,
+              "VmHWM": 140512,
+              "VmRSS": 127364,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123848,
+              "RssFile": 2144,
+              "RssShmem": 1352,
+              "VmHWM": 140512,
+              "VmRSS": 127344,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123852,
+              "RssFile": 2172,
+              "RssShmem": 1352,
+              "VmHWM": 140276,
+              "VmRSS": 127376,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123852,
+              "RssFile": 2240,
+              "RssShmem": 1332,
+              "VmHWM": 140436,
+              "VmRSS": 127424,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123844,
+              "RssFile": 2120,
+              "RssShmem": 1312,
+              "VmHWM": 140452,
+              "VmRSS": 127276,
+              "VmSize": 131172
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 3.141054962,
+              "processCpuSeconds": 3.140157689,
+              "mainCpuSeconds": 3.140157099,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 3.005600891,
+              "processCpuSeconds": 3.004580569,
+              "mainCpuSeconds": 3.0045802989999997,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 3.073088747,
+              "processCpuSeconds": 3.071761339,
+              "mainCpuSeconds": 3.071760529,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 3.045911568,
+              "processCpuSeconds": 3.0440753590000003,
+              "mainCpuSeconds": 3.044075049,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 3.083765296,
+              "processCpuSeconds": 3.0811048789999997,
+              "mainCpuSeconds": 3.0811041190000004,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            }
+          ]
+        },
+        "parallel": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 426665,
+          "observations": 426665,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 1.7319350460937504,
+            "min": 0.9608300000000236,
+            "p50": 1.7354099999999928,
+            "p95": 2.1214300000000907,
+            "p99": 2.3942999999999603,
+            "max": 7.89231999999998
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 1.73294220390625,
+            "min": 0.96119,
+            "p50": 1.7361,
+            "p95": 2.1219799999999998,
+            "p99": 2.3951900000000004,
+            "max": 7.922119
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 7.2243879999999985,
+            "min": 6.61160999999999,
+            "p50": 7.2855500000000015,
+            "p95": 7.89231999999998,
+            "p99": 7.89231999999998,
+            "max": 7.89231999999998
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 1.7211866058708418,
+            "min": 0.9608300000000236,
+            "p50": 1.735289999999834,
+            "p95": 2.1160000000000068,
+            "p99": 2.3040699999999914,
+            "max": 3.6320300000000083
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 4.221541014453125,
+            "min": 3.00665,
+            "p50": 4.225809,
+            "p95": 4.85166,
+            "p99": 5.242269,
+            "max": 10.31646
+          },
+          "totalTickWallFractionAbove7ms": 0.00234375,
+          "worldCpuFractionAbove7ms": 0.001171875,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.001733167968750158,
+            "min": 0.0005799999999167582,
+            "p50": 0.0006499999999354245,
+            "p95": 0.0008099999999622298,
+            "p99": 0.001009999999967981,
+            "max": 0.398569999999987
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.0019873515625,
+            "min": 0.00074,
+            "p50": 0.00089,
+            "p95": 0.00107,
+            "p99": 0.00141,
+            "max": 0.39926
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 1.685000256640625,
+            "min": 1.27826,
+            "p50": 1.7017200000000001,
+            "p95": 1.9987199999999998,
+            "p99": 2.18555,
+            "max": 3.92638
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 0.79643734296875,
+            "min": 0.62798,
+            "p50": 0.79526,
+            "p95": 0.90481,
+            "p99": 0.9637600000000001,
+            "max": 1.8159
+          },
+          "observationProcessCpuUsPerBot": 19.209497050379113,
+          "observationWallUsPerBot": 10.110041032191534,
+          "policyLoopCpuUsPerBot": 12.436512462939305,
+          "decisionProcessCpuUsPerBot": 12.872719440310346,
+          "decisionWallUsPerBot": 4.778642724385642,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 237.29625225715665,
+            "min": 222.2520899513261,
+            "p50": 237.77325105186264,
+            "p95": 252.10599363786204,
+            "p99": 252.10599363786204,
+            "max": 252.10599363786204
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 578.2652720182565,
+            "min": 542.1349622117101,
+            "p50": 583.5669329730293,
+            "p95": 623.8253700298777,
+            "p99": 623.8253700298777,
+            "max": 623.8253700298777
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 7.089147647265625,
+            "min": 6.61484685546875,
+            "p50": 7.102413767578125,
+            "p95": 7.487748845703124,
+            "p99": 7.487748845703124,
+            "max": 7.487748845703124
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 1.76159666328125,
+            "min": 1.6310982812500001,
+            "p50": 1.7399183789062502,
+            "p95": 1.87564396484375,
+            "p99": 1.87564396484375,
+            "max": 1.87564396484375
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 10,
+          "refused": 0,
+          "poses": 50,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 154248,
+              "RssFile": 2012,
+              "RssShmem": 1352,
+              "VmHWM": 157612,
+              "VmRSS": 157612,
+              "VmSize": 331536
+            },
+            {
+              "RssAnon": 154236,
+              "RssFile": 2128,
+              "RssShmem": 1328,
+              "VmHWM": 157692,
+              "VmRSS": 157692,
+              "VmSize": 331536
+            },
+            {
+              "RssAnon": 154240,
+              "RssFile": 2104,
+              "RssShmem": 1316,
+              "VmHWM": 157660,
+              "VmRSS": 157660,
+              "VmSize": 331536
+            },
+            {
+              "RssAnon": 154244,
+              "RssFile": 2104,
+              "RssShmem": 1308,
+              "VmHWM": 157656,
+              "VmRSS": 157656,
+              "VmSize": 331536
+            },
+            {
+              "RssAnon": 154240,
+              "RssFile": 2096,
+              "RssShmem": 1352,
+              "VmHWM": 157688,
+              "VmRSS": 157688,
+              "VmSize": 331536
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 123868,
+              "RssFile": 1948,
+              "RssShmem": 1288,
+              "VmHWM": 140560,
+              "VmRSS": 127104,
+              "VmSize": 265988
+            },
+            {
+              "RssAnon": 123860,
+              "RssFile": 2012,
+              "RssShmem": 1328,
+              "VmHWM": 140500,
+              "VmRSS": 127200,
+              "VmSize": 265988
+            },
+            {
+              "RssAnon": 123864,
+              "RssFile": 1984,
+              "RssShmem": 1312,
+              "VmHWM": 140516,
+              "VmRSS": 127160,
+              "VmSize": 265988
+            },
+            {
+              "RssAnon": 123864,
+              "RssFile": 1984,
+              "RssShmem": 1308,
+              "VmHWM": 140512,
+              "VmRSS": 127156,
+              "VmSize": 265988
+            },
+            {
+              "RssAnon": 123864,
+              "RssFile": 2032,
+              "RssShmem": 1288,
+              "VmHWM": 140428,
+              "VmRSS": 127184,
+              "VmSize": 265988
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 173524,
+              "RssFile": 2076,
+              "RssShmem": 1352,
+              "VmHWM": 176952,
+              "VmRSS": 176952,
+              "VmSize": 333972
+            },
+            {
+              "RssAnon": 173564,
+              "RssFile": 2192,
+              "RssShmem": 1328,
+              "VmHWM": 177084,
+              "VmRSS": 177084,
+              "VmSize": 333972
+            },
+            {
+              "RssAnon": 173236,
+              "RssFile": 2168,
+              "RssShmem": 1316,
+              "VmHWM": 176720,
+              "VmRSS": 176720,
+              "VmSize": 333972
+            },
+            {
+              "RssAnon": 173272,
+              "RssFile": 2168,
+              "RssShmem": 1308,
+              "VmHWM": 176748,
+              "VmRSS": 176748,
+              "VmSize": 333972
+            },
+            {
+              "RssAnon": 173564,
+              "RssFile": 2160,
+              "RssShmem": 1352,
+              "VmHWM": 177076,
+              "VmRSS": 177076,
+              "VmSize": 333972
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 2.3036903730000002,
+              "processCpuSeconds": 3.8337274089999998,
+              "mainCpuSeconds": 0.96032971,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 2.210606299,
+              "processCpuSeconds": 3.693459119,
+              "mainCpuSeconds": 0.942131979,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 2.030891819,
+              "processCpuSeconds": 3.38680159,
+              "mainCpuSeconds": 0.8908382100000001,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 2.109259134,
+              "processCpuSeconds": 3.59779401,
+              "mainCpuSeconds": 0.8351223200000001,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 2.153312022,
+              "processCpuSeconds": 3.636435849,
+              "mainCpuSeconds": 0.881265239,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            }
+          ]
+        },
+        "simulation": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 0,
+          "observations": 0,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 0.8907546402343756,
+            "min": 0.797180000000064,
+            "p50": 0.8760099999999826,
+            "p95": 0.9347100000000053,
+            "p99": 1.0500900000000035,
+            "max": 5.795850000000019
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 0.891348255078125,
+            "min": 0.7974100000000001,
+            "p50": 0.876389,
+            "p95": 0.9367,
+            "p99": 1.0506199999999999,
+            "max": 5.81479
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 5.4085880000000035,
+            "min": 5.234099999999992,
+            "p50": 5.331969999999991,
+            "p95": 5.795850000000019,
+            "p99": 5.795850000000019,
+            "max": 5.795850000000019
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 0.881913479060666,
+            "min": 0.797180000000064,
+            "p50": 0.8758999999999295,
+            "p95": 0.9341700000000119,
+            "p99": 1.0213000000000028,
+            "max": 2.7671000000000223
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 0.89501126640625,
+            "min": 0.79982,
+            "p50": 0.8790399999999999,
+            "p95": 0.9411499999999999,
+            "p99": 1.12272,
+            "max": 5.818280000000001
+          },
+          "totalTickWallFractionAbove7ms": 0.0,
+          "worldCpuFractionAbove7ms": 0.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.0016697187500000965,
+            "min": 0.0005899999999670058,
+            "p50": 0.0006200000000067263,
+            "p95": 0.0007000000000756401,
+            "p99": 0.0008300000000072139,
+            "max": 0.38965000000001915
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.001937573828125,
+            "min": 0.00075,
+            "p50": 0.00088,
+            "p95": 0.00101,
+            "p99": 0.00117,
+            "max": 0.38993
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "observationProcessCpuUsPerBot": null,
+          "observationWallUsPerBot": null,
+          "policyLoopCpuUsPerBot": null,
+          "decisionProcessCpuUsPerBot": null,
+          "decisionWallUsPerBot": null,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 1117.7108160989937,
+            "min": 1082.681117346875,
+            "p50": 1117.7815281725275,
+            "p95": 1156.8228270462005,
+            "p99": 1156.8228270462005,
+            "max": 1156.8228270462005
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 1121.0826163990218,
+            "min": 1085.9711154590505,
+            "p50": 1121.3600720503612,
+            "p95": 1160.3004471099941,
+            "p99": 1160.3004471099941,
+            "max": 1160.3004471099941
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 0.894930667578125,
+            "min": 0.8642087890625,
+            "p50": 0.894395251953125,
+            "p95": 0.9234594531249999,
+            "p99": 0.9234594531249999,
+            "max": 0.9234594531249999
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 0.894929683203125,
+            "min": 0.8642075,
+            "p50": 0.8943939042968752,
+            "p95": 0.92345869140625,
+            "p99": 0.92345869140625,
+            "max": 0.92345869140625
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.001613421875,
+            "min": 0.00095,
+            "p50": 0.0015799999999999998,
+            "p95": 0.00203,
+            "p99": 0.00233,
+            "max": 0.01945
+          },
+          "admitted": 10,
+          "refused": 0,
+          "poses": 50,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 123816,
+              "RssFile": 2048,
+              "RssShmem": 1312,
+              "VmHWM": 140496,
+              "VmRSS": 127176,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123820,
+              "RssFile": 2012,
+              "RssShmem": 1336,
+              "VmHWM": 140544,
+              "VmRSS": 127168,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123816,
+              "RssFile": 2012,
+              "RssShmem": 1276,
+              "VmHWM": 140544,
+              "VmRSS": 127104,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123812,
+              "RssFile": 2016,
+              "RssShmem": 1328,
+              "VmHWM": 140444,
+              "VmRSS": 127156,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123816,
+              "RssFile": 2028,
+              "RssShmem": 1312,
+              "VmHWM": 140544,
+              "VmRSS": 127156,
+              "VmSize": 128736
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 123816,
+              "RssFile": 2048,
+              "RssShmem": 1312,
+              "VmHWM": 140496,
+              "VmRSS": 127176,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123820,
+              "RssFile": 2012,
+              "RssShmem": 1336,
+              "VmHWM": 140544,
+              "VmRSS": 127168,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123816,
+              "RssFile": 2012,
+              "RssShmem": 1276,
+              "VmHWM": 140544,
+              "VmRSS": 127104,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123812,
+              "RssFile": 2016,
+              "RssShmem": 1312,
+              "VmHWM": 140444,
+              "VmRSS": 127140,
+              "VmSize": 128736
+            },
+            {
+              "RssAnon": 123816,
+              "RssFile": 2028,
+              "RssShmem": 1312,
+              "VmHWM": 140544,
+              "VmRSS": 127156,
+              "VmSize": 128736
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 123828,
+              "RssFile": 2240,
+              "RssShmem": 1312,
+              "VmHWM": 140496,
+              "VmRSS": 127380,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123832,
+              "RssFile": 2140,
+              "RssShmem": 1336,
+              "VmHWM": 140544,
+              "VmRSS": 127308,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123828,
+              "RssFile": 2140,
+              "RssShmem": 1340,
+              "VmHWM": 140544,
+              "VmRSS": 127308,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123824,
+              "RssFile": 2144,
+              "RssShmem": 1328,
+              "VmHWM": 140444,
+              "VmRSS": 127296,
+              "VmSize": 131172
+            },
+            {
+              "RssAnon": 123828,
+              "RssFile": 2204,
+              "RssShmem": 1312,
+              "VmHWM": 140544,
+              "VmRSS": 127344,
+              "VmSize": 131172
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 0.442591543,
+              "processCpuSeconds": 0.4424749,
+              "mainCpuSeconds": 0.44247424,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 0.454407152,
+              "processCpuSeconds": 0.45427478,
+              "mainCpuSeconds": 0.45427443999999995,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 0.463547352,
+              "processCpuSeconds": 0.46353122,
+              "mainCpuSeconds": 0.46353078000000003,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 0.458050153,
+              "processCpuSeconds": 0.457930369,
+              "mainCpuSeconds": 0.4579296790000001,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            },
+            {
+              "wallSeconds": 0.472900092,
+              "processCpuSeconds": 0.47281123999999997,
+              "mainCpuSeconds": 0.47281085,
+              "finalStateSha256": "1d4a4a7c16fa6e83f77b99feeea23c2ed6bb6720d29b93272bd0e3cce76b2405"
+            }
+          ]
+        }
+      },
+      "phaseDiagnostics": {
+        "serial": {
+          "instrumentedWorldCpuMsPerTick": 1.2716670292968815,
+          "instrumentedAdmissionCpuMsPerTick": 0.0016877539062499277,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 1.2733547832031316,
+          "worldWallMsPerTick": 1.2725338789062501,
+          "offCpuFractionBound": 0.0006811996314892394,
+          "profileToOrdinaryCpuRatios": [
+            0.94528698100818,
+            1.029944717155173,
+            0.98822194820752,
+            1.0179355589534758,
+            0.9907940137306813
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 0.16769027734375,
+              "cpuMsPerTickBounds": [
+                0.16682342773438147,
+                0.16769027734375
+              ],
+              "cpuShareBounds": [
+                0.13118483367978798,
+                0.1318664976605297
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 0.6361179375,
+              "cpuMsPerTickBounds": [
+                0.6352510878906314,
+                0.6361179375
+              ],
+              "cpuShareBounds": [
+                0.4995419974377009,
+                0.5002236614184427
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.0003551953125,
+              "cpuMsPerTickBounds": [
+                0.0001645390625008972,
+                0.0003551953125
+              ],
+              "cpuShareBounds": [
+                0.0001293884788315009,
+                0.0002793147139282138
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 0.41896902929687496,
+              "cpuMsPerTickBounds": [
+                0.41810217968750646,
+                0.41896902929687496
+              ],
+              "cpuShareBounds": [
+                0.3287827474135896,
+                0.32946441139433136
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.0284087265625,
+              "cpuMsPerTickBounds": [
+                0.027592345703131394,
+                0.0284087265625
+              ],
+              "cpuShareBounds": [
+                0.02169777549268341,
+                0.022339752394309926
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.013568611328124999,
+              "cpuMsPerTickBounds": [
+                0.012853968750006642,
+                0.013568611328124999
+              ],
+              "cpuShareBounds": [
+                0.01010796730108961,
+                0.010669940334638724
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.007424101562499962,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 3759360,
+            "segmentTests": 60621262,
+            "foodPairs": 864493,
+            "pickupTests": 52584
+          }
+        },
+        "parallel": {
+          "instrumentedWorldCpuMsPerTick": 1.5672501152343743,
+          "instrumentedAdmissionCpuMsPerTick": 0.0016667578124994866,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 1.5689168730468737,
+          "worldWallMsPerTick": 1.567745521484375,
+          "offCpuFractionBound": 0.0003159991485937644,
+          "profileToOrdinaryCpuRatios": [
+            0.8504527096652311,
+            0.865615854024526,
+            0.9155055968026853,
+            0.9787746474951117,
+            0.9256472946975448
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 0.217326615234375,
+              "cpuMsPerTickBounds": [
+                0.21683120898437425,
+                0.217326615234375
+              ],
+              "cpuShareBounds": [
+                0.13835137536547462,
+                0.1386674744010945
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 0.57834403125,
+              "cpuMsPerTickBounds": [
+                0.5778486249999993,
+                0.57834403125
+              ],
+              "cpuShareBounds": [
+                0.3687022380046755,
+                0.36901833704029535
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.000241560546875,
+              "cpuMsPerTickBounds": [
+                0.00011751171874976863,
+                0.000241560546875
+              ],
+              "cpuShareBounds": [
+                7.497955661799097e-05,
+                0.00015413018287695315
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 0.727429623046875,
+              "cpuMsPerTickBounds": [
+                0.7269342167968742,
+                0.727429623046875
+              ],
+              "cpuShareBounds": [
+                0.4638278279457424,
+                0.46414392698136225
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.02648607421875,
+              "cpuMsPerTickBounds": [
+                0.025990667968749253,
+                0.02648607421875
+              ],
+              "cpuShareBounds": [
+                0.016583612096185734,
+                0.016899711131805623
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.011781445312500001,
+              "cpuMsPerTickBounds": [
+                0.011286039062499252,
+                0.011781445312500001
+              ],
+              "cpuShareBounds": [
+                0.00720117290328703,
+                0.007517271938906922
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.006136171875000028,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 3759360,
+            "segmentTests": 60621262,
+            "foodPairs": 864493,
+            "pickupTests": 52584
+          }
+        }
+      }
+    },
+    {
+      "population": 2500,
+      "qualification": {
+        "population": 2500,
+        "stabilized": true,
+        "acceptance": {
+          "firstQualifyingTick": 86000,
+          "binNumbers": [
+            16,
+            17,
+            18,
+            19
+          ],
+          "bins": [
+            {
+              "meanLength": 83.9708,
+              "p90Length": 124.5,
+              "food": 125449,
+              "minimumLiving": 2500
+            },
+            {
+              "meanLength": 87.10184,
+              "p90Length": 130.4,
+              "food": 125477,
+              "minimumLiving": 2500
+            },
+            {
+              "meanLength": 89.97059999999999,
+              "p90Length": 134.75,
+              "food": 125984.75,
+              "minimumLiving": 2500
+            },
+            {
+              "meanLength": 92.4054,
+              "p90Length": 140,
+              "food": 126368.75,
+              "minimumLiving": 2500
+            }
+          ],
+          "definition": "four complete 30-virtual-second bins; length/food 5%, p90 10%, living >=99%; minimum 300 virtual seconds"
+        },
+        "elapsedSeconds": 1024.3839080219914,
+        "fixtureSha256": "c733fb8ec1628d352d58bfa2ade252e907afc3475c4fa9c9a3ed1b431c110c1a",
+        "metaSha256": "55a7609b1896b4ec188ede2281927339ed9c0de4af956b3946c4dfe1744330a2"
+      },
+      "census": {
+        "maxLength": 246,
+        "meanLength": 94.3992,
+        "memoryKiB": {
+          "RssAnon": 255976,
+          "RssFile": 2140,
+          "RssShmem": 1200,
+          "VmHWM": 282316,
+          "VmRSS": 259316,
+          "VmSize": 364600
+        },
+        "p50Length": 97,
+        "p90Length": 144,
+        "p99Length": 189,
+        "world": {
+          "ambientFood": 120461,
+          "arenaRadius": 33500.0,
+          "boostFood": 3576,
+          "deathFood": 3182,
+          "deaths": 644,
+          "food": 127219,
+          "living": 2500,
+          "livingSegments": 235998,
+          "physicsTickMs": 7.0,
+          "prey": 14,
+          "spawned": 2500,
+          "time": 608.9999999995949
+        }
+      },
+      "resolvedConfig": {
+        "radius": 33500.0,
+        "dynamicRadius": true,
+        "sizeToPopulation": true,
+        "vision": 1500.0,
+        "foodCount": 274217,
+        "ambientRefillCountsAllFood": false,
+        "foodOnlyInsidePit": false,
+        "ambientReplenishPerSecond": 4011.408902247704,
+        "dt": 0.007,
+        "foodIndex": true,
+        "emitBoostFood": true,
+        "speedModel": "retained_progress",
+        "prey": {
+          "count": 353,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625,
+          "fleeHalfWidth": 320.0,
+          "size": 6.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0
+        },
+        "radiusUpdates": [],
+        "boundaryMode": "sliding",
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "stationaryRadius": 800.0,
+          "shrinkPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "recoveryPerSecond": 0.005519633948746724
+        },
+        "deathFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 22
+        },
+        "ambientFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 2
+        },
+        "boostFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 9
+        },
+        "pit": null,
+        "spawnRadius": null,
+        "spawnRadiusMax": null,
+        "killScoreSeconds": null,
+        "minScore": null
+      },
+      "savedCheckpointTick": 87000,
+      "finalCensus": {
+        "maxLength": 246,
+        "meanLength": 94.7668,
+        "memoryKiB": {
+          "RssAnon": 305084,
+          "RssFile": 2120,
+          "RssShmem": 1312,
+          "VmHWM": 341372,
+          "VmRSS": 308516,
+          "VmSize": 316024
+        },
+        "p50Length": 97,
+        "p90Length": 145,
+        "p99Length": 190,
+        "world": {
+          "ambientFood": 120578,
+          "arenaRadius": 33500.0,
+          "boostFood": 3515,
+          "deathFood": 2761,
+          "deaths": 650,
+          "food": 126854,
+          "living": 2500,
+          "livingSegments": 236917,
+          "physicsTickMs": 7.0,
+          "prey": 16,
+          "spawned": 2500,
+          "time": 612.5839999995684
+        }
+      },
+      "parity": {
+        "serialParallelActionSha256": "f416cb876cd38b9a5ee1e8421eba971368fcfb25b5738d44d1e4cdca6248f48e",
+        "allFinalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+      },
+      "modes": {
+        "serial": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 1066665,
+          "observations": 1066665,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 4.794185525000012,
+            "min": 3.773360000000281,
+            "p50": 4.717400000000094,
+            "p95": 5.518960000000739,
+            "p99": 6.572780000000833,
+            "max": 16.436959999999946
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 4.797262415625,
+            "min": 3.774,
+            "p50": 4.7199599999999995,
+            "p95": 5.52475,
+            "p99": 6.57369,
+            "max": 16.439259
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 14.899843999999973,
+            "min": 13.945499999999944,
+            "p50": 14.80024000000002,
+            "p95": 16.436959999999946,
+            "p99": 16.436959999999946,
+            "max": 16.436959999999946
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 4.774409285322908,
+            "min": 3.773360000000281,
+            "p50": 4.716580000000192,
+            "p95": 5.507909999999505,
+            "p99": 6.52936000000004,
+            "max": 8.28159000000106
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 20.752805055859376,
+            "min": 17.510609,
+            "p50": 20.518818,
+            "p95": 23.274898,
+            "p99": 24.726679,
+            "max": 31.521988
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 0.0046875,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.011772320312494365,
+            "min": 0.001259999999447814,
+            "p50": 0.0015700000002283332,
+            "p95": 0.0020200000001580065,
+            "p99": 0.7023700000008404,
+            "max": 1.171379999999722
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.012066874609375,
+            "min": 0.00146,
+            "p50": 0.0018599999999999999,
+            "p95": 0.0023599999999999997,
+            "p99": 0.70293,
+            "max": 1.17642
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 10.36967185625,
+            "min": 8.793050000000001,
+            "p50": 10.198029,
+            "p95": 11.841939,
+            "p99": 12.79076,
+            "max": 15.141919
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 5.5654173625,
+            "min": 4.657379,
+            "p50": 5.58392,
+            "p95": 5.972449999999999,
+            "p99": 6.162719,
+            "max": 6.408129000000001
+          },
+          "observationProcessCpuUsPerBot": 24.875038530372684,
+          "observationWallUsPerBot": 24.88725134133022,
+          "policyLoopCpuUsPerBot": 13.346978842466937,
+          "decisionProcessCpuUsPerBot": 13.351126602072803,
+          "decisionWallUsPerBot": 13.357022540347717,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 48.19989518688431,
+            "min": 47.097160522844135,
+            "p50": 48.415700502836955,
+            "p95": 49.19655477718374,
+            "p99": 49.19655477718374,
+            "max": 49.19655477718374
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 208.30925581578217,
+            "min": 199.98060820851424,
+            "p50": 210.13376828396773,
+            "p95": 217.70554564597532,
+            "p99": 217.70554564597532,
+            "max": 217.70554564597532
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 20.746199474609377,
+            "min": 20.318544330078126,
+            "p50": 20.645851732421875,
+            "p95": 21.226180833984376,
+            "p99": 21.226180833984376,
+            "max": 21.226180833984376
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 20.746198283203125,
+            "min": 20.318543021484373,
+            "p50": 20.645850560546872,
+            "p95": 21.226179935546874,
+            "p99": 21.226179935546874,
+            "max": 21.226179935546874
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 30,
+          "refused": 0,
+          "poses": 155,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 305080,
+              "RssFile": 2152,
+              "RssShmem": 1336,
+              "VmHWM": 341392,
+              "VmRSS": 308568,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305080,
+              "RssFile": 2140,
+              "RssShmem": 1296,
+              "VmHWM": 341540,
+              "VmRSS": 308516,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305080,
+              "RssFile": 2148,
+              "RssShmem": 1308,
+              "VmHWM": 341448,
+              "VmRSS": 308536,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305076,
+              "RssFile": 2144,
+              "RssShmem": 1312,
+              "VmHWM": 341512,
+              "VmRSS": 308532,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305076,
+              "RssFile": 2144,
+              "RssShmem": 1328,
+              "VmHWM": 341460,
+              "VmRSS": 308548,
+              "VmSize": 310060
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 305048,
+              "RssFile": 1968,
+              "RssShmem": 1336,
+              "VmHWM": 341392,
+              "VmRSS": 308352,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305048,
+              "RssFile": 2028,
+              "RssShmem": 1296,
+              "VmHWM": 341540,
+              "VmRSS": 308372,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305048,
+              "RssFile": 2040,
+              "RssShmem": 1308,
+              "VmHWM": 341448,
+              "VmRSS": 308396,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2016,
+              "RssShmem": 1312,
+              "VmHWM": 341512,
+              "VmRSS": 308372,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305048,
+              "RssFile": 2080,
+              "RssShmem": 1312,
+              "VmHWM": 341460,
+              "VmRSS": 308440,
+              "VmSize": 310060
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 305088,
+              "RssFile": 2216,
+              "RssShmem": 1336,
+              "VmHWM": 341392,
+              "VmRSS": 308640,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305088,
+              "RssFile": 2204,
+              "RssShmem": 1296,
+              "VmHWM": 341540,
+              "VmRSS": 308588,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305088,
+              "RssFile": 2212,
+              "RssShmem": 1308,
+              "VmHWM": 341448,
+              "VmRSS": 308608,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305084,
+              "RssFile": 2208,
+              "RssShmem": 1312,
+              "VmHWM": 341512,
+              "VmRSS": 308604,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305084,
+              "RssFile": 2208,
+              "RssShmem": 1328,
+              "VmHWM": 341460,
+              "VmRSS": 308620,
+              "VmSize": 316024
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 10.450272687,
+              "processCpuSeconds": 10.446922857,
+              "mainCpuSeconds": 10.446922146999999,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 10.825411564,
+              "processCpuSeconds": 10.821772427,
+              "mainCpuSeconds": 10.821771817,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 10.871143702,
+              "processCpuSeconds": 10.867804587,
+              "mainCpuSeconds": 10.867804127,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 10.57508194,
+              "processCpuSeconds": 10.570676086999999,
+              "mainCpuSeconds": 10.570675486999999,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 10.40723283,
+              "processCpuSeconds": 10.403094697,
+              "mainCpuSeconds": 10.403094027,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            }
+          ]
+        },
+        "parallel": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 1066665,
+          "observations": 1066665,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 5.442988580859371,
+            "min": 3.6412699999999187,
+            "p50": 5.441279999999882,
+            "p95": 6.92361000000008,
+            "p99": 7.521220000000106,
+            "max": 20.682610000000047
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 5.446783854296875,
+            "min": 3.641899,
+            "p50": 5.442480000000001,
+            "p95": 6.935539,
+            "p99": 7.52583,
+            "max": 20.684858000000002
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 19.465912000000028,
+            "min": 17.452460000000002,
+            "p50": 19.803520000000074,
+            "p95": 20.682610000000047,
+            "p99": 20.682610000000047,
+            "max": 20.682610000000047
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 5.415546460665357,
+            "min": 3.6412699999999187,
+            "p50": 5.439490000000102,
+            "p95": 6.917659999999826,
+            "p99": 7.458590000000154,
+            "max": 9.998329999999722
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 13.081165798046875,
+            "min": 9.786449,
+            "p50": 13.178379,
+            "p95": 15.394419,
+            "p99": 16.609569,
+            "max": 27.569438
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 0.04375,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.010677980468756874,
+            "min": 0.0012600000000029254,
+            "p50": 0.0015400000001886127,
+            "p95": 0.002190000000013015,
+            "p99": 0.6218099999999449,
+            "max": 1.3851099999997452
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.010935791015625,
+            "min": 0.00143,
+            "p50": 0.00177,
+            "p95": 0.00244,
+            "p99": 0.62219,
+            "max": 1.3861800000000002
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 5.6356589265625,
+            "min": 4.2575,
+            "p50": 5.6578990000000005,
+            "p95": 6.84996,
+            "p99": 7.754149999999999,
+            "max": 11.068748999999999
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 1.976716797265625,
+            "min": 1.6649900000000002,
+            "p50": 1.9550100000000001,
+            "p95": 2.20062,
+            "p99": 2.326919,
+            "max": 3.0448
+          },
+          "observationProcessCpuUsPerBot": 26.90006013040649,
+          "observationWallUsPerBot": 13.525602557503996,
+          "policyLoopCpuUsPerBot": 13.317037892871722,
+          "decisionProcessCpuUsPerBot": 13.517156224306571,
+          "decisionWallUsPerBot": 4.744127726137072,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 76.74593867589587,
+            "min": 69.5550956978668,
+            "p50": 76.38516058377938,
+            "p95": 84.60727209362375,
+            "p99": 84.60727209362375,
+            "max": 84.60727209362375
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 184.744053891802,
+            "min": 157.7833471676611,
+            "p50": 187.96555946262373,
+            "p95": 205.86256042910483,
+            "p99": 205.86256042910483,
+            "max": 205.86256042910483
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 22.30983464453125,
+            "min": 20.692182625,
+            "p50": 22.31313460546875,
+            "p95": 23.77803515234375,
+            "p99": 23.77803515234375,
+            "max": 23.77803515234375
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 5.497703721484375,
+            "min": 4.89725361328125,
+            "p50": 5.362263923828125,
+            "p95": 6.391368708984375,
+            "p99": 6.391368708984375,
+            "max": 6.391368708984375
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 30,
+          "refused": 0,
+          "poses": 155,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 379368,
+              "RssFile": 2144,
+              "RssShmem": 1304,
+              "VmHWM": 382816,
+              "VmRSS": 382816,
+              "VmSize": 512860
+            },
+            {
+              "RssAnon": 379368,
+              "RssFile": 2152,
+              "RssShmem": 1304,
+              "VmHWM": 382824,
+              "VmRSS": 382824,
+              "VmSize": 512860
+            },
+            {
+              "RssAnon": 379372,
+              "RssFile": 2152,
+              "RssShmem": 1296,
+              "VmHWM": 382820,
+              "VmRSS": 382820,
+              "VmSize": 512860
+            },
+            {
+              "RssAnon": 379380,
+              "RssFile": 2120,
+              "RssShmem": 1320,
+              "VmHWM": 382820,
+              "VmRSS": 382820,
+              "VmSize": 512860
+            },
+            {
+              "RssAnon": 379368,
+              "RssFile": 2152,
+              "RssShmem": 1344,
+              "VmHWM": 382864,
+              "VmRSS": 382864,
+              "VmSize": 512860
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 305088,
+              "RssFile": 2080,
+              "RssShmem": 1304,
+              "VmHWM": 341544,
+              "VmRSS": 308472,
+              "VmSize": 447312
+            },
+            {
+              "RssAnon": 305092,
+              "RssFile": 2088,
+              "RssShmem": 1304,
+              "VmHWM": 341512,
+              "VmRSS": 308484,
+              "VmSize": 447312
+            },
+            {
+              "RssAnon": 305092,
+              "RssFile": 2088,
+              "RssShmem": 1296,
+              "VmHWM": 341500,
+              "VmRSS": 308476,
+              "VmSize": 447312
+            },
+            {
+              "RssAnon": 305096,
+              "RssFile": 2056,
+              "RssShmem": 1312,
+              "VmHWM": 341604,
+              "VmRSS": 308464,
+              "VmSize": 447312
+            },
+            {
+              "RssAnon": 305084,
+              "RssFile": 2044,
+              "RssShmem": 1280,
+              "VmHWM": 341392,
+              "VmRSS": 308408,
+              "VmSize": 447312
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 427672,
+              "RssFile": 2208,
+              "RssShmem": 1304,
+              "VmHWM": 431184,
+              "VmRSS": 431184,
+              "VmSize": 518824
+            },
+            {
+              "RssAnon": 427368,
+              "RssFile": 2216,
+              "RssShmem": 1304,
+              "VmHWM": 430888,
+              "VmRSS": 430888,
+              "VmSize": 518824
+            },
+            {
+              "RssAnon": 427152,
+              "RssFile": 2216,
+              "RssShmem": 1296,
+              "VmHWM": 430664,
+              "VmRSS": 430664,
+              "VmSize": 518824
+            },
+            {
+              "RssAnon": 427600,
+              "RssFile": 2184,
+              "RssShmem": 1320,
+              "VmHWM": 431104,
+              "VmRSS": 431104,
+              "VmSize": 518824
+            },
+            {
+              "RssAnon": 427780,
+              "RssFile": 2216,
+              "RssShmem": 1344,
+              "VmHWM": 431340,
+              "VmRSS": 431340,
+              "VmSize": 518824
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 6.565922068,
+              "processCpuSeconds": 11.272268583999999,
+              "mainCpuSeconds": 2.72789866,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 7.361071031,
+              "processCpuSeconds": 12.174353998,
+              "mainCpuSeconds": 3.272380779,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 6.702872601,
+              "processCpuSeconds": 11.424324918,
+              "mainCpuSeconds": 2.745479129,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 6.051489279,
+              "processCpuSeconds": 10.594397504,
+              "mainCpuSeconds": 2.50739385,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 6.808168434,
+              "processCpuSeconds": 11.647831686,
+              "mainCpuSeconds": 2.820969109,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            }
+          ]
+        },
+        "simulation": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 0,
+          "observations": 0,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 3.4058247523437486,
+            "min": 2.645999999999926,
+            "p50": 3.2107399999999897,
+            "p95": 4.579099999999947,
+            "p99": 6.068379999999873,
+            "max": 17.665059999999897
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 3.40799564453125,
+            "min": 2.64669,
+            "p50": 3.21383,
+            "p95": 4.582148999999999,
+            "p99": 6.082819,
+            "max": 17.667579
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 16.113715999999954,
+            "min": 15.04147,
+            "p50": 16.140999999999963,
+            "p95": 17.665059999999897,
+            "p99": 17.665059999999897,
+            "max": 17.665059999999897
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 3.380956080626222,
+            "min": 2.645999999999926,
+            "p50": 3.210380000000068,
+            "p95": 4.547230000000013,
+            "p99": 6.040360000000078,
+            "max": 6.901419999999936
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 3.42253829609375,
+            "min": 2.65191,
+            "p50": 3.22446,
+            "p95": 4.59783,
+            "p99": 6.092429,
+            "max": 17.673859
+          },
+          "totalTickWallFractionAbove7ms": 0.00234375,
+          "worldCpuFractionAbove7ms": 0.001953125,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.01002067578124914,
+            "min": 0.0012599999998919031,
+            "p50": 0.0013500000000110646,
+            "p95": 0.0016700000000646753,
+            "p99": 0.5482599999999671,
+            "max": 1.4005599999999951
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.010298499609375,
+            "min": 0.00142,
+            "p50": 0.00162,
+            "p95": 0.00199,
+            "p99": 0.54874,
+            "max": 1.40103
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "observationProcessCpuUsPerBot": null,
+          "observationWallUsPerBot": null,
+          "policyLoopCpuUsPerBot": null,
+          "decisionProcessCpuUsPerBot": null,
+          "decisionWallUsPerBot": null,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 294.01519540914416,
+            "min": 266.57183581866667,
+            "p50": 299.413942587311,
+            "p95": 323.6248724388636,
+            "p99": 323.6248724388636,
+            "max": 323.6248724388636
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 294.62175498860887,
+            "min": 267.1306504848024,
+            "p50": 300.0068849236285,
+            "p95": 324.3204903438988,
+            "p99": 324.3204903438988,
+            "max": 324.3204903438988
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 3.4217524984375,
+            "min": 3.088645173828125,
+            "p50": 3.338676484375,
+            "p95": 3.7499937480468746,
+            "p99": 3.7499937480468746,
+            "max": 3.7499937480468746
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 3.42175136953125,
+            "min": 3.088644041015625,
+            "p50": 3.3386758984375,
+            "p95": 3.7499929082031254,
+            "p99": 3.7499929082031254,
+            "max": 3.7499929082031254
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.003948538671875,
+            "min": 0.00232,
+            "p50": 0.00379,
+            "p95": 0.00507,
+            "p99": 0.00627,
+            "max": 0.022439999999999998
+          },
+          "admitted": 30,
+          "refused": 0,
+          "poses": 155,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 305044,
+              "RssFile": 2012,
+              "RssShmem": 1308,
+              "VmHWM": 341288,
+              "VmRSS": 308364,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2080,
+              "RssShmem": 1304,
+              "VmHWM": 341520,
+              "VmRSS": 308428,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2048,
+              "RssShmem": 1304,
+              "VmHWM": 341472,
+              "VmRSS": 308396,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305040,
+              "RssFile": 1992,
+              "RssShmem": 1300,
+              "VmHWM": 341424,
+              "VmRSS": 308332,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2016,
+              "RssShmem": 1336,
+              "VmHWM": 341412,
+              "VmRSS": 308396,
+              "VmSize": 310060
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 305044,
+              "RssFile": 2012,
+              "RssShmem": 1308,
+              "VmHWM": 341288,
+              "VmRSS": 308364,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2080,
+              "RssShmem": 1304,
+              "VmHWM": 341520,
+              "VmRSS": 308428,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2048,
+              "RssShmem": 1304,
+              "VmHWM": 341472,
+              "VmRSS": 308396,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305040,
+              "RssFile": 1992,
+              "RssShmem": 1300,
+              "VmHWM": 341424,
+              "VmRSS": 308332,
+              "VmSize": 310060
+            },
+            {
+              "RssAnon": 305044,
+              "RssFile": 2016,
+              "RssShmem": 1336,
+              "VmHWM": 341412,
+              "VmRSS": 308396,
+              "VmSize": 310060
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 305064,
+              "RssFile": 2140,
+              "RssShmem": 1308,
+              "VmHWM": 341288,
+              "VmRSS": 308512,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305064,
+              "RssFile": 2208,
+              "RssShmem": 1304,
+              "VmHWM": 341520,
+              "VmRSS": 308576,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305064,
+              "RssFile": 2240,
+              "RssShmem": 1304,
+              "VmHWM": 341472,
+              "VmRSS": 308608,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305060,
+              "RssFile": 2120,
+              "RssShmem": 1300,
+              "VmHWM": 341424,
+              "VmRSS": 308480,
+              "VmSize": 316024
+            },
+            {
+              "RssAnon": 305064,
+              "RssFile": 2144,
+              "RssShmem": 1336,
+              "VmHWM": 341412,
+              "VmRSS": 308544,
+              "VmSize": 316024
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 1.920683025,
+              "processCpuSeconds": 1.9199967989999998,
+              "mainCpuSeconds": 1.9199963690000001,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 1.913521866,
+              "processCpuSeconds": 1.913087439,
+              "mainCpuSeconds": 1.913086329,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 1.710007208,
+              "processCpuSeconds": 1.7094023600000001,
+              "mainCpuSeconds": 1.70940206,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 1.636327113,
+              "processCpuSeconds": 1.635813469,
+              "mainCpuSeconds": 1.635812999,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            },
+            {
+              "wallSeconds": 1.582078646,
+              "processCpuSeconds": 1.5813863289999999,
+              "mainCpuSeconds": 1.581385749,
+              "finalStateSha256": "aa96c009148fdbe17704aa82ddd8dfab8420e87001d233bc901092461a7271a9"
+            }
+          ]
+        }
+      },
+      "phaseDiagnostics": {
+        "serial": {
+          "instrumentedWorldCpuMsPerTick": 4.619591326171888,
+          "instrumentedAdmissionCpuMsPerTick": 0.011258300781199744,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 4.630849626953088,
+          "worldWallMsPerTick": 4.6230617675781245,
+          "offCpuFractionBound": 0.0007506803025161565,
+          "profileToOrdinaryCpuRatios": [
+            0.9868975000581659,
+            0.9290016358998613,
+            0.9260192549778716,
+            0.9731363265334343,
+            1.008293975483604
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 0.553418154296875,
+              "cpuMsPerTickBounds": [
+                0.5499477128906385,
+                0.553418154296875
+              ],
+              "cpuShareBounds": [
+                0.11904683208121855,
+                0.11979807632799316
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 2.17184919140625,
+              "cpuMsPerTickBounds": [
+                2.1683787500000133,
+                2.17184919140625
+              ],
+              "cpuShareBounds": [
+                0.46938757065267966,
+                0.47013881489945425
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.00111162109375,
+              "cpuMsPerTickBounds": [
+                0.0008673652343718646,
+                0.00111162109375
+              ],
+              "cpuShareBounds": [
+                0.00018775800133182414,
+                0.00024063191205945177
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 1.7568116015625,
+              "cpuMsPerTickBounds": [
+                1.7533411601562636,
+                1.7568116015625
+              ],
+              "cpuShareBounds": [
+                0.37954464721215997,
+                0.38029589145893455
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.07173695117187501,
+              "cpuMsPerTickBounds": [
+                0.06830074804688842,
+                0.07173695117187501
+              ],
+              "cpuShareBounds": [
+                0.014785019544897087,
+                0.015528852252677769
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.038746591796875,
+              "cpuMsPerTickBounds": [
+                0.03555319921876119,
+                0.038746591796875
+              ],
+              "cpuShareBounds": [
+                0.007696178451400595,
+                0.008387450114333618
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.029387656249999297,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 9404454,
+            "segmentTests": 155987963,
+            "foodPairs": 2055381,
+            "pickupTests": 125408
+          }
+        },
+        "parallel": {
+          "instrumentedWorldCpuMsPerTick": 4.736751660156257,
+          "instrumentedAdmissionCpuMsPerTick": 0.00956382812500019,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 4.746315488281256,
+          "worldWallMsPerTick": 4.738710095703126,
+          "offCpuFractionBound": 0.0004132845241248646,
+          "profileToOrdinaryCpuRatios": [
+            0.8983997345538417,
+            0.7488967670361396,
+            0.8920866121698019,
+            0.9771422857715063,
+            0.8674991004811895
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 0.5089497187500001,
+              "cpuMsPerTickBounds": [
+                0.5069912832031317,
+                0.5089497187500001
+              ],
+              "cpuShareBounds": [
+                0.1070335368154823,
+                0.10744699221432492
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 1.943748736328125,
+              "cpuMsPerTickBounds": [
+                1.9417903007812567,
+                1.943748736328125
+              ],
+              "cpuShareBounds": [
+                0.4099413353490439,
+                0.4103547907478865
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.00103044921875,
+              "cpuMsPerTickBounds": [
+                0.0008322910156243243,
+                0.00103044921875
+              ],
+              "cpuShareBounds": [
+                0.00017570923606260338,
+                0.00021754343328102773
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 2.15969463671875,
+              "cpuMsPerTickBounds": [
+                2.1577362011718817,
+                2.15969463671875
+              ],
+              "cpuShareBounds": [
+                0.45553078480384207,
+                0.4559442402026847
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.065782673828125,
+              "cpuMsPerTickBounds": [
+                0.06382423828125668,
+                0.065782673828125
+              ],
+              "cpuShareBounds": [
+                0.013474263136512257,
+                0.01388771853535487
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.03586398046875,
+              "cpuMsPerTickBounds": [
+                0.03404827539063104,
+                0.03586398046875
+              ],
+              "cpuShareBounds": [
+                0.007188106498601585,
+                0.0075714293342469445
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.02363990039062555,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 9404454,
+            "segmentTests": 155987963,
+            "foodPairs": 2055381,
+            "pickupTests": 125408
+          }
+        }
+      }
+    },
+    {
+      "population": 5000,
+      "qualification": {
+        "population": 5000,
+        "stabilized": true,
+        "acceptance": {
+          "firstQualifyingTick": 90000,
+          "binNumbers": [
+            17,
+            18,
+            19,
+            20
+          ],
+          "bins": [
+            {
+              "meanLength": 87.03832,
+              "p90Length": 129.4,
+              "food": 251393.6,
+              "minimumLiving": 5000
+            },
+            {
+              "meanLength": 90.02945,
+              "p90Length": 135.25,
+              "food": 251266,
+              "minimumLiving": 5000
+            },
+            {
+              "meanLength": 92.4793,
+              "p90Length": 139.75,
+              "food": 252660.5,
+              "minimumLiving": 5000
+            },
+            {
+              "meanLength": 94.93095,
+              "p90Length": 145,
+              "food": 253588.25,
+              "minimumLiving": 5000
+            }
+          ],
+          "definition": "four complete 30-virtual-second bins; length/food 5%, p90 10%, living >=99%; minimum 300 virtual seconds"
+        },
+        "elapsedSeconds": 2903.483226668992,
+        "fixtureSha256": "47c90d81676e02c4bd624fd6a12e9f18a7bcca97b3560e5cc956e827b57ee2cb",
+        "metaSha256": "939ed7a8f007442aca6f232b84a4e22d8dcdcb7f326910d8d29d5c0ce1acef38"
+      },
+      "census": {
+        "maxLength": 229,
+        "meanLength": 96.7632,
+        "memoryKiB": {
+          "RssAnon": 546708,
+          "RssFile": 2208,
+          "RssShmem": 1196,
+          "VmHWM": 596900,
+          "VmRSS": 550112,
+          "VmSize": 674268
+        },
+        "p50Length": 98,
+        "p90Length": 149,
+        "p99Length": 192,
+        "world": {
+          "ambientFood": 241084,
+          "arenaRadius": 47376.15433949869,
+          "boostFood": 6811,
+          "deathFood": 6209,
+          "deaths": 1257,
+          "food": 254104,
+          "living": 5000,
+          "livingSegments": 483816,
+          "physicsTickMs": 7.0,
+          "prey": 16,
+          "spawned": 5000,
+          "time": 636.9999999993876
+        }
+      },
+      "resolvedConfig": {
+        "radius": 47376.15433949869,
+        "dynamicRadius": true,
+        "sizeToPopulation": true,
+        "vision": 1500.0,
+        "foodCount": 548434,
+        "ambientRefillCountsAllFood": false,
+        "foodOnlyInsidePit": false,
+        "ambientReplenishPerSecond": 8022.817804495408,
+        "dt": 0.007,
+        "foodIndex": true,
+        "emitBoostFood": true,
+        "speedModel": "retained_progress",
+        "prey": {
+          "count": 705,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625,
+          "fleeHalfWidth": 320.0,
+          "size": 6.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0
+        },
+        "radiusUpdates": [],
+        "boundaryMode": "sliding",
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "stationaryRadius": 800.0,
+          "shrinkPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "recoveryPerSecond": 0.005519633948746724
+        },
+        "deathFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 22
+        },
+        "ambientFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 2
+        },
+        "boostFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 9
+        },
+        "pit": null,
+        "spawnRadius": null,
+        "spawnRadiusMax": null,
+        "killScoreSeconds": null,
+        "minScore": null
+      },
+      "savedCheckpointTick": 91000,
+      "finalCensus": {
+        "maxLength": 230,
+        "meanLength": 96.8968,
+        "memoryKiB": {
+          "RssAnon": 618652,
+          "RssFile": 2216,
+          "RssShmem": 1304,
+          "VmHWM": 689132,
+          "VmRSS": 622172,
+          "VmSize": 635460
+        },
+        "p50Length": 99,
+        "p90Length": 150,
+        "p99Length": 193,
+        "world": {
+          "ambientFood": 240975,
+          "arenaRadius": 47376.15433949869,
+          "boostFood": 6880,
+          "deathFood": 7681,
+          "deaths": 1277,
+          "food": 255536,
+          "living": 5000,
+          "livingSegments": 484484,
+          "physicsTickMs": 7.0,
+          "prey": 18,
+          "spawned": 5000,
+          "time": 640.583999999361
+        }
+      },
+      "parity": {
+        "serialParallelActionSha256": "f1c72eb2904cb3c9cb9334f54b2402893cd70dae262a296fc6f3f8bd64e83cdb",
+        "allFinalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+      },
+      "modes": {
+        "serial": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 2133335,
+          "observations": 2133335,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 11.079580584375,
+            "min": 9.034010000000148,
+            "p50": 10.9717300000014,
+            "p95": 11.817090000000974,
+            "p99": 13.539659999999287,
+            "max": 37.88389999999997
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 11.086371658203126,
+            "min": 9.03547,
+            "p50": 10.979030000000002,
+            "p95": 11.834919,
+            "p99": 13.540809,
+            "max": 37.887828
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 36.32316000000002,
+            "min": 34.7293099999999,
+            "p50": 36.42914000000008,
+            "p95": 37.88389999999997,
+            "p99": 37.88389999999997,
+            "max": 37.88389999999997
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 11.030180233268101,
+            "min": 9.034010000000148,
+            "p50": 10.970959999999863,
+            "p95": 11.807380000000478,
+            "p99": 13.334200000002738,
+            "max": 18.515190000002235
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 58.469142221484375,
+            "min": 51.332907,
+            "p50": 58.278667,
+            "p95": 62.60207700000001,
+            "p99": 64.880266,
+            "max": 84.418705
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.11703445664059112,
+            "min": 0.0024899999999661304,
+            "p50": 0.003350000000068576,
+            "p95": 0.007719999999267202,
+            "p99": 3.057990000000288,
+            "max": 6.237089999999057
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.11735872265625,
+            "min": 0.00275,
+            "p50": 0.00364,
+            "p95": 0.00813,
+            "p99": 3.0585,
+            "max": 6.240289000000001
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 36.24345386171875,
+            "min": 31.633308999999997,
+            "p50": 36.127178,
+            "p95": 39.506477999999994,
+            "p99": 41.130137999999995,
+            "max": 46.808197
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 11.00265263671875,
+            "min": 9.12897,
+            "p50": 11.103109,
+            "p95": 11.73282,
+            "p99": 12.006479,
+            "max": 12.934679
+          },
+          "observationProcessCpuUsPerBot": 43.46753966442215,
+          "observationWallUsPerBot": 43.49211065585104,
+          "policyLoopCpuUsPerBot": 13.194296293362282,
+          "decisionProcessCpuUsPerBot": 13.196729277399003,
+          "decisionWallUsPerBot": 13.203172849083712,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 17.104483817791,
+            "min": 16.861979835372196,
+            "p50": 17.095674787150088,
+            "p95": 17.388902591300734,
+            "p99": 17.388902591300734,
+            "max": 17.388902591300734
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 89.31503207761817,
+            "min": 88.81321620478097,
+            "p50": 89.30115392948788,
+            "p95": 90.12555187497156,
+            "p99": 90.12555187497156,
+            "max": 90.12555187497156
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 58.4408797453125,
+            "min": 57.48039019921875,
+            "p50": 58.46743586132813,
+            "p95": 59.275849593749996,
+            "p99": 59.275849593749996,
+            "max": 59.275849593749996
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 58.4408779171875,
+            "min": 57.48038646875,
+            "p50": 58.46743416210938,
+            "p95": 59.275848167968746,
+            "p99": 59.275848167968746,
+            "max": 59.275848167968746
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 100,
+          "refused": 0,
+          "poses": 1440,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 618560,
+              "RssFile": 2176,
+              "RssShmem": 1312,
+              "VmHWM": 688884,
+              "VmRSS": 622048,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618564,
+              "RssFile": 2140,
+              "RssShmem": 1328,
+              "VmHWM": 688956,
+              "VmRSS": 622032,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618560,
+              "RssFile": 2152,
+              "RssShmem": 1332,
+              "VmHWM": 688952,
+              "VmRSS": 622044,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618564,
+              "RssFile": 2080,
+              "RssShmem": 1300,
+              "VmHWM": 688996,
+              "VmRSS": 621944,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618568,
+              "RssFile": 2152,
+              "RssShmem": 1344,
+              "VmHWM": 688952,
+              "VmRSS": 622064,
+              "VmSize": 623548
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 618528,
+              "RssFile": 2048,
+              "RssShmem": 1312,
+              "VmHWM": 688884,
+              "VmRSS": 621888,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618528,
+              "RssFile": 2028,
+              "RssShmem": 1312,
+              "VmHWM": 688956,
+              "VmRSS": 621868,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618524,
+              "RssFile": 2088,
+              "RssShmem": 1312,
+              "VmHWM": 688952,
+              "VmRSS": 621924,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618532,
+              "RssFile": 2016,
+              "RssShmem": 1300,
+              "VmHWM": 688996,
+              "VmRSS": 621848,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618532,
+              "RssFile": 2088,
+              "RssShmem": 1280,
+              "VmHWM": 688952,
+              "VmRSS": 621900,
+              "VmSize": 623548
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 618648,
+              "RssFile": 2240,
+              "RssShmem": 1312,
+              "VmHWM": 688884,
+              "VmRSS": 622200,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618652,
+              "RssFile": 2204,
+              "RssShmem": 1328,
+              "VmHWM": 688956,
+              "VmRSS": 622184,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618648,
+              "RssFile": 2216,
+              "RssShmem": 1332,
+              "VmHWM": 688952,
+              "VmRSS": 622196,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618652,
+              "RssFile": 2144,
+              "RssShmem": 1300,
+              "VmHWM": 688996,
+              "VmRSS": 622096,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618656,
+              "RssFile": 2216,
+              "RssShmem": 1344,
+              "VmHWM": 688952,
+              "VmRSS": 622216,
+              "VmSize": 635460
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 29.949095685,
+              "processCpuSeconds": 29.935327161,
+              "mainCpuSeconds": 29.935326291000003,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 30.36416868,
+              "processCpuSeconds": 30.349234992,
+              "mainCpuSeconds": 30.349234262,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 30.041571469,
+              "processCpuSeconds": 30.024647372,
+              "mainCpuSeconds": 30.024646712,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 29.884177748,
+              "processCpuSeconds": 29.869482841,
+              "mainCpuSeconds": 29.869482331,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 29.444066255,
+              "processCpuSeconds": 29.429959782,
+              "mainCpuSeconds": 29.429957872,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            }
+          ]
+        },
+        "parallel": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 2133335,
+          "observations": 2133335,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 12.319259310546865,
+            "min": 9.062189999999859,
+            "p50": 12.418789999999902,
+            "p95": 14.029919999999807,
+            "p99": 14.773479999999672,
+            "max": 40.38057000000017
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 12.328694644921875,
+            "min": 9.063089,
+            "p50": 12.42305,
+            "p95": 14.040199,
+            "p99": 14.849239,
+            "max": 40.420167
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 38.66704800000003,
+            "min": 35.35194999999991,
+            "p50": 39.1046300000002,
+            "p95": 40.38057000000017,
+            "p99": 40.38057000000017,
+            "max": 40.38057000000017
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 12.267698080234824,
+            "min": 9.062189999999859,
+            "p50": 12.417399999999912,
+            "p95": 14.022459999999848,
+            "p99": 14.712689999999862,
+            "max": 16.488319999999668
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 33.18546566210937,
+            "min": 25.980158,
+            "p50": 33.115168,
+            "p95": 37.693408,
+            "p99": 39.894797000000004,
+            "max": 61.892776
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.10380254687500186,
+            "min": 0.0024999999999053557,
+            "p50": 0.0032199999999704687,
+            "p95": 0.007520000000482696,
+            "p99": 2.7195200000003084,
+            "max": 5.578059999999496
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.104133919140625,
+            "min": 0.0027,
+            "p50": 0.00348,
+            "p95": 0.00781,
+            "p99": 2.72039,
+            "max": 5.57889
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 16.814737398046876,
+            "min": 13.097769,
+            "p50": 16.446709000000002,
+            "p95": 20.453589,
+            "p99": 21.621617999999998,
+            "max": 24.043958
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 3.919313767578125,
+            "min": 3.20419,
+            "p50": 3.9285300000000003,
+            "p95": 4.242789999999999,
+            "p99": 4.425949999999999,
+            "max": 13.793889
+          },
+          "observationProcessCpuUsPerBot": 42.272615266706836,
+          "observationWallUsPerBot": 20.177669113852254,
+          "policyLoopCpuUsPerBot": 13.425087257275592,
+          "decisionProcessCpuUsPerBot": 13.551467450728552,
+          "decisionWallUsPerBot": 4.703172846739964,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 30.138309130105846,
+            "min": 29.444507490419404,
+            "p50": 30.233154656182542,
+            "p95": 30.68978153678317,
+            "p99": 30.68978153678317,
+            "max": 30.68978153678317
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 80.53563276828649,
+            "min": 77.63261007689498,
+            "p50": 80.47691259705424,
+            "p95": 83.27698162697205,
+            "p99": 83.27698162697205,
+            "max": 83.27698162697205
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 58.96757188632812,
+            "min": 58.51059666796875,
+            "p50": 58.86871145703125,
+            "p95": 59.85836187695312,
+            "p99": 59.85836187695312,
+            "max": 59.85836187695312
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 12.488436720703126,
+            "min": 12.0788986328125,
+            "p50": 12.48719943359375,
+            "p95": 12.94806941015625,
+            "p99": 12.94806941015625,
+            "max": 12.94806941015625
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 100,
+          "refused": 0,
+          "poses": 1440,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 767252,
+              "RssFile": 2104,
+              "RssShmem": 1300,
+              "VmHWM": 770656,
+              "VmRSS": 770656,
+              "VmSize": 891884
+            },
+            {
+              "RssAnon": 767244,
+              "RssFile": 2076,
+              "RssShmem": 1300,
+              "VmHWM": 770620,
+              "VmRSS": 770620,
+              "VmSize": 891884
+            },
+            {
+              "RssAnon": 767256,
+              "RssFile": 2012,
+              "RssShmem": 1348,
+              "VmHWM": 770616,
+              "VmRSS": 770616,
+              "VmSize": 826348
+            },
+            {
+              "RssAnon": 767252,
+              "RssFile": 2224,
+              "RssShmem": 1332,
+              "VmHWM": 770808,
+              "VmRSS": 770808,
+              "VmSize": 826348
+            },
+            {
+              "RssAnon": 767248,
+              "RssFile": 2108,
+              "RssShmem": 1320,
+              "VmHWM": 770676,
+              "VmRSS": 770676,
+              "VmSize": 826348
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 618576,
+              "RssFile": 1984,
+              "RssShmem": 1300,
+              "VmHWM": 688944,
+              "VmRSS": 621860,
+              "VmSize": 760800
+            },
+            {
+              "RssAnon": 618572,
+              "RssFile": 2012,
+              "RssShmem": 1300,
+              "VmHWM": 688836,
+              "VmRSS": 621884,
+              "VmSize": 760800
+            },
+            {
+              "RssAnon": 618580,
+              "RssFile": 1948,
+              "RssShmem": 1284,
+              "VmHWM": 688772,
+              "VmRSS": 621812,
+              "VmSize": 760800
+            },
+            {
+              "RssAnon": 618576,
+              "RssFile": 2096,
+              "RssShmem": 1332,
+              "VmHWM": 689140,
+              "VmRSS": 622004,
+              "VmSize": 760800
+            },
+            {
+              "RssAnon": 618572,
+              "RssFile": 1980,
+              "RssShmem": 1312,
+              "VmHWM": 688892,
+              "VmRSS": 621864,
+              "VmSize": 760800
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 862448,
+              "RssFile": 2168,
+              "RssShmem": 1300,
+              "VmHWM": 865916,
+              "VmRSS": 865916,
+              "VmSize": 1034868
+            },
+            {
+              "RssAnon": 861792,
+              "RssFile": 2140,
+              "RssShmem": 1300,
+              "VmHWM": 865232,
+              "VmRSS": 865232,
+              "VmSize": 1034868
+            },
+            {
+              "RssAnon": 861788,
+              "RssFile": 2076,
+              "RssShmem": 1348,
+              "VmHWM": 865212,
+              "VmRSS": 865212,
+              "VmSize": 1034868
+            },
+            {
+              "RssAnon": 861928,
+              "RssFile": 2288,
+              "RssShmem": 1332,
+              "VmHWM": 865548,
+              "VmRSS": 865548,
+              "VmSize": 1034868
+            },
+            {
+              "RssAnon": 861612,
+              "RssFile": 2172,
+              "RssShmem": 1320,
+              "VmHWM": 865104,
+              "VmRSS": 865104,
+              "VmSize": 1034868
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 17.388642013,
+              "processCpuSeconds": 30.647481280999997,
+              "mainCpuSeconds": 6.629411538,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 16.683077375,
+              "processCpuSeconds": 29.957425494,
+              "mainCpuSeconds": 6.1843961,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 16.929564241,
+              "processCpuSeconds": 30.218896533,
+              "mainCpuSeconds": 6.362957539,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 16.935050471,
+              "processCpuSeconds": 29.992400455000002,
+              "mainCpuSeconds": 6.39344611,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 17.020625935,
+              "processCpuSeconds": 30.140780266,
+              "mainCpuSeconds": 6.4001867180000005,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            }
+          ]
+        },
+        "simulation": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 0,
+          "observations": 0,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 8.974680439062505,
+            "min": 7.428300000000165,
+            "p50": 8.773370000000114,
+            "p95": 10.428969999999982,
+            "p99": 11.62724000000015,
+            "max": 42.37505000000019
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 8.9796153,
+            "min": 7.429919999999999,
+            "p50": 8.78,
+            "p95": 10.430689,
+            "p99": 11.629079,
+            "max": 42.377188000000004
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 36.058612000000025,
+            "min": 33.19185000000013,
+            "p50": 34.615689999999866,
+            "p95": 42.37505000000019,
+            "p99": 42.37505000000019,
+            "max": 42.37505000000019
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 8.92167861604697,
+            "min": 7.428300000000165,
+            "p50": 8.772830000000065,
+            "p95": 10.414380000000278,
+            "p99": 11.500579999999871,
+            "max": 14.650640000000159
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 9.0809609703125,
+            "min": 7.44167,
+            "p50": 8.823469000000001,
+            "p95": 10.8912,
+            "p99": 12.559159000000001,
+            "max": 42.397777
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.09322353124999695,
+            "min": 0.0024200000003915534,
+            "p50": 0.0028000000007466497,
+            "p95": 0.003850000000138465,
+            "p99": 2.4522400000002165,
+            "max": 5.301659999999764
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.09359728046875,
+            "min": 0.0026,
+            "p50": 0.00311,
+            "p95": 0.004189999999999999,
+            "p99": 2.45288,
+            "max": 5.32376
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "observationProcessCpuUsPerBot": null,
+          "observationWallUsPerBot": null,
+          "policyLoopCpuUsPerBot": null,
+          "decisionProcessCpuUsPerBot": null,
+          "decisionWallUsPerBot": null,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 110.21993825730767,
+            "min": 105.75048366992347,
+            "p50": 110.41059675156231,
+            "p95": 113.9720892486261,
+            "p99": 113.9720892486261,
+            "max": 113.9720892486261
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 110.38550247493119,
+            "min": 105.90588078431723,
+            "p50": 110.56874600131898,
+            "p95": 114.18341209093661,
+            "p99": 114.18341209093661,
+            "max": 114.18341209093661
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 9.07753833359375,
+            "min": 8.767669958984374,
+            "p50": 9.053044392578126,
+            "p95": 9.452262515625,
+            "p99": 9.452262515625,
+            "max": 9.452262515625
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 9.077536978125,
+            "min": 8.767669119140624,
+            "p50": 9.053043123046875,
+            "p95": 9.4522591171875,
+            "p99": 9.4522591171875,
+            "max": 9.4522591171875
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.00745045234375,
+            "min": 0.00556,
+            "p50": 0.00737,
+            "p95": 0.008450000000000001,
+            "p99": 0.01289,
+            "max": 0.04316
+          },
+          "admitted": 100,
+          "refused": 0,
+          "poses": 1440,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 618528,
+              "RssFile": 2012,
+              "RssShmem": 1312,
+              "VmHWM": 688956,
+              "VmRSS": 621852,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618524,
+              "RssFile": 2012,
+              "RssShmem": 1312,
+              "VmHWM": 689112,
+              "VmRSS": 621848,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618528,
+              "RssFile": 1984,
+              "RssShmem": 1312,
+              "VmHWM": 688952,
+              "VmRSS": 621824,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618524,
+              "RssFile": 2036,
+              "RssShmem": 1292,
+              "VmHWM": 688936,
+              "VmRSS": 621852,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618532,
+              "RssFile": 1992,
+              "RssShmem": 1312,
+              "VmHWM": 688980,
+              "VmRSS": 621836,
+              "VmSize": 623548
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 618528,
+              "RssFile": 2012,
+              "RssShmem": 1312,
+              "VmHWM": 688956,
+              "VmRSS": 621852,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618524,
+              "RssFile": 2012,
+              "RssShmem": 1312,
+              "VmHWM": 689112,
+              "VmRSS": 621848,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618528,
+              "RssFile": 1984,
+              "RssShmem": 1312,
+              "VmHWM": 688952,
+              "VmRSS": 621824,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618524,
+              "RssFile": 2036,
+              "RssShmem": 1292,
+              "VmHWM": 688936,
+              "VmRSS": 621852,
+              "VmSize": 623548
+            },
+            {
+              "RssAnon": 618532,
+              "RssFile": 1992,
+              "RssShmem": 1312,
+              "VmHWM": 688980,
+              "VmRSS": 621836,
+              "VmSize": 623548
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 618632,
+              "RssFile": 2192,
+              "RssShmem": 1312,
+              "VmHWM": 688956,
+              "VmRSS": 622136,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618628,
+              "RssFile": 2192,
+              "RssShmem": 1312,
+              "VmHWM": 689112,
+              "VmRSS": 622132,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618632,
+              "RssFile": 2168,
+              "RssShmem": 1312,
+              "VmHWM": 688952,
+              "VmRSS": 622112,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618628,
+              "RssFile": 2228,
+              "RssShmem": 1292,
+              "VmHWM": 688936,
+              "VmRSS": 622148,
+              "VmSize": 635460
+            },
+            {
+              "RssAnon": 618636,
+              "RssFile": 2120,
+              "RssShmem": 1312,
+              "VmHWM": 688980,
+              "VmRSS": 622068,
+              "VmSize": 635460
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 4.493439922,
+              "processCpuSeconds": 4.492181509,
+              "mainCpuSeconds": 4.492181319,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 4.492327932,
+              "processCpuSeconds": 4.489047019,
+              "mainCpuSeconds": 4.489046589,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 4.637236054,
+              "processCpuSeconds": 4.6351587290000005,
+              "mainCpuSeconds": 4.635158079,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 4.841585421,
+              "processCpuSeconds": 4.839558408,
+              "mainCpuSeconds": 4.839556668,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            },
+            {
+              "wallSeconds": 4.784034615,
+              "processCpuSeconds": 4.7825524690000005,
+              "mainCpuSeconds": 4.782552009,
+              "finalStateSha256": "02486e8d51ddb1ccd4dbb848a9a1293c4523ac2253038d8afa26944fd0765769"
+            }
+          ]
+        }
+      },
+      "phaseDiagnostics": {
+        "serial": {
+          "instrumentedWorldCpuMsPerTick": 11.019778140624997,
+          "instrumentedAdmissionCpuMsPerTick": 0.11481220703129764,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 11.134590347656294,
+          "worldWallMsPerTick": 11.023651261718749,
+          "offCpuFractionBound": 0.0003513464823767409,
+          "profileToOrdinaryCpuRatios": [
+            0.9889475857126924,
+            0.9958787359138956,
+            0.9904849899174933,
+            0.9943597786134242,
+            1.0034707466704205
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 1.63188687890625,
+              "cpuMsPerTickBounds": [
+                1.6280137578124974,
+                1.63188687890625
+              ],
+              "cpuShareBounds": [
+                0.14773562017648417,
+                0.14808709014659854
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 5.0620453671875,
+              "cpuMsPerTickBounds": [
+                5.058172246093747,
+                5.0620453671875
+              ],
+              "cpuShareBounds": [
+                0.45900853733584046,
+                0.4593600073059549
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.00451298828125,
+              "cpuMsPerTickBounds": [
+                0.003926328124987812,
+                0.00451298828125
+              ],
+              "cpuShareBounds": [
+                0.0003562982915702445,
+                0.0004095353122049372
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 4.01006977734375,
+              "cpuMsPerTickBounds": [
+                4.0061966562499975,
+                4.01006977734375
+              ],
+              "cpuShareBounds": [
+                0.36354603560310716,
+                0.36389750557322154
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.160991998046875,
+              "cpuMsPerTickBounds": [
+                0.15711887695312235,
+                0.160991998046875
+              ],
+              "cpuShareBounds": [
+                0.014257898384895362,
+                0.014609368355009748
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.079924216796875,
+              "cpuMsPerTickBounds": [
+                0.07605109570312234,
+                0.079924216796875
+              ],
+              "cpuShareBounds": [
+                0.006901327298301582,
+                0.00725279726841597
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.07422003515624928,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 13911419,
+            "segmentTests": 310847741,
+            "foodPairs": 4127675,
+            "pickupTests": 252122
+          }
+        },
+        "parallel": {
+          "instrumentedWorldCpuMsPerTick": 11.616022646484405,
+          "instrumentedAdmissionCpuMsPerTick": 0.10051056640627935,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 11.716533212890683,
+          "worldWallMsPerTick": 11.621599775390624,
+          "offCpuFractionBound": 0.00047989338937917214,
+          "profileToOrdinaryCpuRatios": [
+            0.909396777243566,
+            0.975976136447745,
+            0.9480505689600025,
+            0.9422801780848621,
+            0.941261188745397
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 1.34194656640625,
+              "cpuMsPerTickBounds": [
+                1.3363694375000283,
+                1.34194656640625
+              ],
+              "cpuShareBounds": [
+                0.1150453540054419,
+                0.11552547780305773
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 4.82308126953125,
+              "cpuMsPerTickBounds": [
+                4.8175041406250285,
+                4.82308126953125
+              ],
+              "cpuShareBounds": [
+                0.4147292311007201,
+                0.4152093548983359
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.0042931835937500004,
+              "cpuMsPerTickBounds": [
+                0.0036374726562525684,
+                0.0042931835937500004
+              ],
+              "cpuShareBounds": [
+                0.0003131426966831415,
+                0.0003695915309746176
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 5.164194341796875,
+              "cpuMsPerTickBounds": [
+                5.158617212890654,
+                5.164194341796875
+              ],
+              "cpuShareBounds": [
+                0.4440949686381605,
+                0.4445750924357763
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.1520535234375,
+              "cpuMsPerTickBounds": [
+                0.14715980859377903,
+                0.1520535234375
+              ],
+              "cpuShareBounds": [
+                0.01266869160575518,
+                0.013089981662830099
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.077222826171875,
+              "cpuMsPerTickBounds": [
+                0.07301431835940383,
+                0.077222826171875
+              ],
+              "cpuShareBounds": [
+                0.006285655648364431,
+                0.0066479576118290825
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.0588080644531256,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 13911419,
+            "segmentTests": 310847741,
+            "foodPairs": 4127675,
+            "pickupTests": 252122
+          }
+        }
+      }
+    },
+    {
+      "population": 10000,
+      "qualification": {
+        "population": 10000,
+        "stabilized": false,
+        "acceptance": null,
+        "elapsedSeconds": 7378.160639306996,
+        "fixtureSha256": "2d1d229ce54e842686e5b31d0426d639562ad4b432d463a28597caf0ea46332c",
+        "metaSha256": "dc8310c34663176494915fe9e53e45faad02c64e20ac5662e32fc7e07dfbcccf"
+      },
+      "census": {
+        "maxLength": 181,
+        "meanLength": 51.3174,
+        "memoryKiB": {
+          "RssAnon": 758340,
+          "RssFile": 2204,
+          "RssShmem": 1152,
+          "VmHWM": 858932,
+          "VmRSS": 761696,
+          "VmSize": 980040
+        },
+        "p50Length": 51,
+        "p90Length": 73,
+        "p99Length": 87,
+        "world": {
+          "ambientFood": 510711,
+          "arenaRadius": 67000.0,
+          "boostFood": 3154,
+          "deathFood": 1535,
+          "deaths": 398,
+          "food": 515400,
+          "living": 10000,
+          "livingSegments": 513174,
+          "physicsTickMs": 7.0,
+          "prey": 18,
+          "spawned": 10000,
+          "time": 238.0000000001175
+        }
+      },
+      "resolvedConfig": {
+        "radius": 67000.0,
+        "dynamicRadius": true,
+        "sizeToPopulation": true,
+        "vision": 1500.0,
+        "foodCount": 1096869,
+        "ambientRefillCountsAllFood": false,
+        "foodOnlyInsidePit": false,
+        "ambientReplenishPerSecond": 16045.635608990817,
+        "dt": 0.007,
+        "foodIndex": true,
+        "emitBoostFood": true,
+        "speedModel": "retained_progress",
+        "prey": {
+          "count": 1410,
+          "cruiseSpeed": 118.74999999999999,
+          "escapeSpeed": 192.28124999999997,
+          "sprintSpeed": 343.65625,
+          "turnRate": 3.625,
+          "fleeHalfWidth": 320.0,
+          "size": 6.0,
+          "maxSize": 9.2,
+          "nutritionFactor": 30.0,
+          "respawnSeconds": 1.0
+        },
+        "radiusUpdates": [],
+        "boundaryMode": "sliding",
+        "kiosk": {
+          "enabled": true,
+          "floorScore": 8500.0,
+          "graceSeconds": 1200.0,
+          "stationaryRadius": 800.0,
+          "shrinkPerSecond": 0.005519633948746724,
+          "scoreDecayPerSecond": 0.0002759816974373362,
+          "recoveryPerSecond": 0.005519633948746724
+        },
+        "deathFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 22
+        },
+        "ambientFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 2
+        },
+        "boostFood": {
+          "enabled": true,
+          "cellSize": 75.0,
+          "maxPerCell": 9
+        },
+        "pit": null,
+        "spawnRadius": null,
+        "spawnRadiusMax": null,
+        "killScoreSeconds": null,
+        "minScore": null
+      },
+      "savedCheckpointTick": 34000,
+      "guardedCounting": {
+        "scope": "final guarded checkpoint; ecology unsettled; no extra warmup",
+        "masterPinsSha256": "2fbd47bc43efeb12fede35948c05336fa5da599c2c22aeee04e863712c4f3261",
+        "amendmentSha256": "e4fc481bbb2776e73db2b4d7eddb15f1025079e3b70f36e2568b1240a91e2e28",
+        "controllerSha256": "fa6160e5901b9f56bbb6eb23580d41bec3f038d76baa31a79a8d1ca379748e9e",
+        "allFinalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+      },
+      "finalCensus": {
+        "maxLength": 185,
+        "meanLength": 51.8488,
+        "memoryKiB": {
+          "RssAnon": 897124,
+          "RssFile": 2116,
+          "RssShmem": 1312,
+          "VmHWM": 1014376,
+          "VmRSS": 900552,
+          "VmSize": 926264
+        },
+        "p50Length": 51,
+        "p90Length": 74,
+        "p99Length": 88,
+        "world": {
+          "ambientFood": 509884,
+          "arenaRadius": 67000.0,
+          "boostFood": 3189,
+          "deathFood": 1669,
+          "deaths": 407,
+          "food": 514742,
+          "living": 10000,
+          "livingSegments": 518488,
+          "physicsTickMs": 7.0,
+          "prey": 19,
+          "spawned": 10000,
+          "time": 241.58400000012006
+        }
+      },
+      "parity": {
+        "serialParallelActionSha256": "a4b48a6c88214ec6c6a8f1bedd2da6a23f919312237faf66edf52de733e8f249",
+        "allFinalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+      },
+      "modes": {
+        "serial": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 4266670,
+          "observations": 4266670,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 141.2805748238281,
+            "min": 133.32056000000136,
+            "p50": 139.1428000000019,
+            "p95": 153.70584000000065,
+            "p99": 157.73440999999622,
+            "max": 174.3641199999999
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 141.34630408359374,
+            "min": 133.354512,
+            "p50": 139.208631,
+            "p95": 153.800861,
+            "p99": 157.832731,
+            "max": 174.449739
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 173.15703200000013,
+            "min": 171.99498000000003,
+            "p50": 172.7867700000001,
+            "p95": 174.3641199999999,
+            "p99": 174.3641199999999,
+            "max": 174.3641199999999
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 141.21819428140896,
+            "min": 133.32056000000136,
+            "p50": 139.13456000000224,
+            "p95": 153.6559599999947,
+            "p99": 157.29198999999028,
+            "max": 161.40123000000983
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 285.742503546875,
+            "min": 266.776794,
+            "p50": 280.66349299999996,
+            "p95": 312.323491,
+            "p99": 317.433601,
+            "max": 327.353491
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.07252526562486795,
+            "min": 0.005779999998622998,
+            "p50": 0.009430000005750117,
+            "p95": 0.027119999998603816,
+            "p99": 3.311220000000503,
+            "max": 4.912720000021409
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.07290923515625,
+            "min": 0.00605,
+            "p50": 0.009779999999999999,
+            "p95": 0.027460000000000002,
+            "p99": 3.3124589999999996,
+            "max": 4.9138
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 126.87093596953125,
+            "min": 113.301024,
+            "p50": 124.635542,
+            "p95": 139.899572,
+            "p99": 144.48162200000002,
+            "max": 149.549641
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 17.402369596875,
+            "min": 13.937029,
+            "p50": 17.351729,
+            "p95": 19.437769,
+            "p99": 20.197788000000003,
+            "max": 21.847858000000002
+          },
+          "observationProcessCpuUsPerBot": 76.08692563919882,
+          "observationWallUsPerBot": 76.12250211101399,
+          "policyLoopCpuUsPerBot": 10.434855634487848,
+          "decisionProcessCpuUsPerBot": 10.436165285808267,
+          "decisionWallUsPerBot": 10.441413600770623,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 3.504829518447074,
+            "min": 3.24781130519155,
+            "p50": 3.585436086705507,
+            "p95": 3.5881789211080415,
+            "p99": 3.5881789211080415,
+            "max": 3.5881789211080415
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 7.08376303723081,
+            "min": 6.597407556414006,
+            "p50": 7.219971317054685,
+            "p95": 7.25707049475232,
+            "p99": 7.25707049475232,
+            "max": 7.25707049475232
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 285.61379080703125,
+            "min": 278.56535824218753,
+            "p50": 278.77264265625,
+            "p95": 307.75526491406254,
+            "p99": 307.75526491406254,
+            "max": 307.75526491406254
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 285.6137897289062,
+            "min": 278.5653575,
+            "p50": 278.77264166015624,
+            "p95": 307.75526383984374,
+            "p99": 307.75526383984374,
+            "max": 307.75526383984374
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 45,
+          "refused": 0,
+          "poses": 180,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 897120,
+              "RssFile": 2116,
+              "RssShmem": 1312,
+              "VmHWM": 1014452,
+              "VmRSS": 900548,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897116,
+              "RssFile": 2024,
+              "RssShmem": 1276,
+              "VmHWM": 1014204,
+              "VmRSS": 900416,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897120,
+              "RssFile": 2092,
+              "RssShmem": 1312,
+              "VmHWM": 1014412,
+              "VmRSS": 900524,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897116,
+              "RssFile": 2088,
+              "RssShmem": 1336,
+              "VmHWM": 1014220,
+              "VmRSS": 900540,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897116,
+              "RssFile": 2092,
+              "RssShmem": 1308,
+              "VmHWM": 1014408,
+              "VmRSS": 900516,
+              "VmSize": 902104
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 897104,
+              "RssFile": 1996,
+              "RssShmem": 1312,
+              "VmHWM": 1014452,
+              "VmRSS": 900412,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897104,
+              "RssFile": 1960,
+              "RssShmem": 1276,
+              "VmHWM": 1014204,
+              "VmRSS": 900340,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897104,
+              "RssFile": 2028,
+              "RssShmem": 1312,
+              "VmHWM": 1014412,
+              "VmRSS": 900444,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897100,
+              "RssFile": 2024,
+              "RssShmem": 1336,
+              "VmHWM": 1014220,
+              "VmRSS": 900460,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897100,
+              "RssFile": 2028,
+              "RssShmem": 1308,
+              "VmHWM": 1014408,
+              "VmRSS": 900436,
+              "VmSize": 902104
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 897128,
+              "RssFile": 2164,
+              "RssShmem": 1312,
+              "VmHWM": 1014452,
+              "VmRSS": 900604,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897124,
+              "RssFile": 2072,
+              "RssShmem": 1340,
+              "VmHWM": 1014204,
+              "VmRSS": 900536,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897128,
+              "RssFile": 2140,
+              "RssShmem": 1312,
+              "VmHWM": 1014412,
+              "VmRSS": 900580,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897124,
+              "RssFile": 2136,
+              "RssShmem": 1336,
+              "VmHWM": 1014220,
+              "VmRSS": 900596,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897124,
+              "RssFile": 2140,
+              "RssShmem": 1308,
+              "VmHWM": 1014408,
+              "VmRSS": 900572,
+              "VmSize": 926264
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 145.585182873,
+              "processCpuSeconds": 145.51466859,
+              "mainCpuSeconds": 145.51466785,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 142.782251179,
+              "processCpuSeconds": 142.72888378000002,
+              "mainCpuSeconds": 142.7288832,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 142.690766335,
+              "processCpuSeconds": 142.62546342000002,
+              "mainCpuSeconds": 142.62546304,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 142.799923808,
+              "processCpuSeconds": 142.73159304,
+              "mainCpuSeconds": 142.73159253,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 157.644626454,
+              "processCpuSeconds": 157.570695636,
+              "mainCpuSeconds": 157.570695086,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            }
+          ]
+        },
+        "parallel": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 4266670,
+          "observations": 4266670,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 141.74663983164055,
+            "min": 133.44258000000053,
+            "p50": 140.08197000000067,
+            "p95": 151.90926000000005,
+            "p99": 155.95740000000012,
+            "max": 193.64800999999997
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 141.81338842109375,
+            "min": 133.44335199999998,
+            "p50": 140.125141,
+            "p95": 152.110361,
+            "p99": 156.17524,
+            "max": 193.675588
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 179.523196,
+            "min": 174.11319999999986,
+            "p50": 176.10451999999998,
+            "p95": 193.64800999999997,
+            "p99": 193.64800999999997,
+            "max": 193.64800999999997
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 141.67271310724064,
+            "min": 133.44258000000053,
+            "p50": 140.0814799999992,
+            "p95": 151.79976999999667,
+            "p99": 155.23366000000038,
+            "max": 165.18847000000036
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 198.28946544296875,
+            "min": 184.190929,
+            "p50": 193.713358,
+            "p95": 215.355817,
+            "p99": 230.365526,
+            "max": 428.266364
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.05908676562500727,
+            "min": 0.005669999993074271,
+            "p50": 0.007390000000384589,
+            "p95": 0.028110000002357083,
+            "p99": 2.6471000000007905,
+            "max": 3.9877100000040855
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.0594523234375,
+            "min": 0.00596,
+            "p50": 0.007700000000000001,
+            "p95": 0.02844,
+            "p99": 2.65102,
+            "max": 3.988289
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 50.32828968398437,
+            "min": 42.800658,
+            "p50": 47.435427000000004,
+            "p95": 63.631566,
+            "p99": 71.831076,
+            "max": 283.066043
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 6.046795253515625,
+            "min": 4.80026,
+            "p50": 5.96921,
+            "p95": 6.87798,
+            "p99": 7.23017,
+            "max": 13.421129
+          },
+          "observationProcessCpuUsPerBot": 71.90567676150256,
+          "observationWallUsPerBot": 30.196950219023265,
+          "policyLoopCpuUsPerBot": 10.47765037863251,
+          "decisionProcessCpuUsPerBot": 10.549018508813628,
+          "decisionWallUsPerBot": 3.6280743176763144,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 5.048888937696179,
+            "min": 4.718377722934552,
+            "p50": 5.135730169491526,
+            "p95": 5.154466585109568,
+            "p99": 5.154466585109568,
+            "max": 5.154466585109568
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 7.057837973566844,
+            "min": 6.660260579322384,
+            "p50": 7.152357384284395,
+            "p95": 7.19583974326452,
+            "p99": 7.19583974326452,
+            "max": 7.19583974326452
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 279.2794326984375,
+            "min": 272.92137568359374,
+            "p50": 274.33679504687495,
+            "p95": 300.19887693359374,
+            "p99": 300.19887693359374,
+            "max": 300.19887693359374
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 141.91742733554688,
+            "min": 139.07399629296876,
+            "p50": 139.9138836328125,
+            "p95": 150.28352009374998,
+            "p99": 150.28352009374998,
+            "max": 150.28352009374998
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "admitted": 45,
+          "refused": 0,
+          "poses": 180,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 1120672,
+              "RssFile": 2156,
+              "RssShmem": 1304,
+              "VmHWM": 1124132,
+              "VmRSS": 1124132,
+              "VmSize": 1301512
+            },
+            {
+              "RssAnon": 1120672,
+              "RssFile": 2120,
+              "RssShmem": 1296,
+              "VmHWM": 1124088,
+              "VmRSS": 1124088,
+              "VmSize": 1170440
+            },
+            {
+              "RssAnon": 1120676,
+              "RssFile": 2152,
+              "RssShmem": 1308,
+              "VmHWM": 1124136,
+              "VmRSS": 1124136,
+              "VmSize": 1301512
+            },
+            {
+              "RssAnon": 1120676,
+              "RssFile": 2156,
+              "RssShmem": 1352,
+              "VmHWM": 1124184,
+              "VmRSS": 1124184,
+              "VmSize": 1170440
+            },
+            {
+              "RssAnon": 1120672,
+              "RssFile": 2144,
+              "RssShmem": 1352,
+              "VmHWM": 1124168,
+              "VmRSS": 1124168,
+              "VmSize": 1235976
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 897148,
+              "RssFile": 2028,
+              "RssShmem": 1304,
+              "VmHWM": 1014440,
+              "VmRSS": 900480,
+              "VmSize": 1039356
+            },
+            {
+              "RssAnon": 897144,
+              "RssFile": 1992,
+              "RssShmem": 1296,
+              "VmHWM": 1014292,
+              "VmRSS": 900432,
+              "VmSize": 1039356
+            },
+            {
+              "RssAnon": 897152,
+              "RssFile": 2044,
+              "RssShmem": 1308,
+              "VmHWM": 1014420,
+              "VmRSS": 900504,
+              "VmSize": 1039356
+            },
+            {
+              "RssAnon": 897152,
+              "RssFile": 2028,
+              "RssShmem": 1288,
+              "VmHWM": 1014384,
+              "VmRSS": 900468,
+              "VmSize": 1039356
+            },
+            {
+              "RssAnon": 897136,
+              "RssFile": 2032,
+              "RssShmem": 1288,
+              "VmHWM": 1014352,
+              "VmRSS": 900456,
+              "VmSize": 973808
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 1260912,
+              "RssFile": 2204,
+              "RssShmem": 1304,
+              "VmHWM": 1264420,
+              "VmRSS": 1264420,
+              "VmSize": 1391208
+            },
+            {
+              "RssAnon": 1262712,
+              "RssFile": 2184,
+              "RssShmem": 1296,
+              "VmHWM": 1266192,
+              "VmRSS": 1266192,
+              "VmSize": 1391208
+            },
+            {
+              "RssAnon": 1261272,
+              "RssFile": 2212,
+              "RssShmem": 1308,
+              "VmHWM": 1264792,
+              "VmRSS": 1264792,
+              "VmSize": 1391208
+            },
+            {
+              "RssAnon": 1262720,
+              "RssFile": 2204,
+              "RssShmem": 1352,
+              "VmHWM": 1266276,
+              "VmRSS": 1266276,
+              "VmSize": 1391208
+            },
+            {
+              "RssAnon": 1261952,
+              "RssFile": 2200,
+              "RssShmem": 1352,
+              "VmHWM": 1265504,
+              "VmRSS": 1265504,
+              "VmSize": 1391208
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 99.693711138,
+              "processCpuSeconds": 140.46043906399998,
+              "mainCpuSeconds": 71.50887876899999,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 100.596874354,
+              "processCpuSeconds": 141.23563679400002,
+              "mainCpuSeconds": 72.01277839999999,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 99.33132586,
+              "processCpuSeconds": 139.73574435,
+              "mainCpuSeconds": 71.20588610200001,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 99.48994197,
+              "processCpuSeconds": 139.82170251,
+              "mainCpuSeconds": 71.63590842,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 108.511872102,
+              "processCpuSeconds": 153.70182499,
+              "mainCpuSeconds": 76.94516228799999,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            }
+          ]
+        },
+        "simulation": {
+          "windows": 5,
+          "ticks": 2560,
+          "decisions": 0,
+          "observations": 0,
+          "worldCpuMs": {
+            "n": 2560,
+            "mean": 142.09426501484373,
+            "min": 133.12343999999854,
+            "p50": 140.18991999999741,
+            "p95": 152.08408000000162,
+            "p99": 155.46820900000034,
+            "max": 184.47059899999996
+          },
+          "worldWallMs": {
+            "n": 2560,
+            "mean": 142.1556699984375,
+            "min": 133.125802,
+            "p50": 140.254781,
+            "p95": 152.175751,
+            "p99": 155.624931,
+            "max": 184.604969
+          },
+          "firstRestoredTickWorldCpuMs": {
+            "n": 5,
+            "mean": 177.05179959999998,
+            "min": 172.16109899999998,
+            "p50": 176.58711000000005,
+            "p95": 184.47059899999996,
+            "p99": 184.47059899999996,
+            "max": 184.47059899999996
+          },
+          "worldCpuMsExcludingFirstTick": {
+            "n": 2555,
+            "mean": 142.02585496673186,
+            "min": 133.12343999999854,
+            "p50": 140.18502999999782,
+            "p95": 152.06564000000355,
+            "p99": 155.23095999999993,
+            "max": 158.81158000000005
+          },
+          "totalTickWallMs": {
+            "n": 2560,
+            "mean": 142.2292906746094,
+            "min": 134.460592,
+            "p50": 140.32630200000003,
+            "p95": 152.27036099999998,
+            "p99": 155.717351,
+            "max": 184.62684900000002
+          },
+          "totalTickWallFractionAbove7ms": 1.0,
+          "worldCpuFractionAbove7ms": 1.0,
+          "admissionCpuMs": {
+            "n": 2560,
+            "mean": 0.05592444531245019,
+            "min": 0.005760000000520904,
+            "p50": 0.006939999998678559,
+            "p95": 0.015259999997851992,
+            "p99": 2.599110000002014,
+            "max": 3.8818200000036995
+          },
+          "admissionWallMs": {
+            "n": 2560,
+            "mean": 0.0563971140625,
+            "min": 0.006039999999999999,
+            "p50": 0.0073,
+            "p95": 0.01561,
+            "p99": 2.608049,
+            "max": 3.8824490000000003
+          },
+          "observationWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "decisionWallMs": {
+            "n": 2560,
+            "mean": 0.0,
+            "min": 0.0,
+            "p50": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+            "max": 0.0
+          },
+          "observationProcessCpuUsPerBot": null,
+          "observationWallUsPerBot": null,
+          "policyLoopCpuUsPerBot": null,
+          "decisionProcessCpuUsPerBot": null,
+          "decisionWallUsPerBot": null,
+          "wholeWindowTicksPerSecond": {
+            "n": 5,
+            "mean": 7.037406559716655,
+            "min": 6.639730447037335,
+            "p50": 7.169781484381236,
+            "p95": 7.193845707452206,
+            "p99": 7.193845707452206,
+            "max": 7.193845707452206
+          },
+          "worldPlusAdmissionCostTicksPerSecond": {
+            "n": 5,
+            "mean": 7.041365413095212,
+            "min": 6.643377050844422,
+            "p50": 7.174193332741863,
+            "p95": 7.197539927299483,
+            "p99": 7.197539927299483,
+            "max": 7.197539927299483
+          },
+          "wholeWindowProcessCpuMsPerTick": {
+            "n": 5,
+            "mean": 142.17041844453126,
+            "min": 138.95661294921877,
+            "p50": 139.40852597656252,
+            "p95": 150.54720706640626,
+            "p99": 150.54720706640626,
+            "max": 150.54720706640626
+          },
+          "wholeWindowMainCpuMsPerTick": {
+            "n": 5,
+            "mean": 142.17041708125,
+            "min": 138.95661109375,
+            "p50": 139.4085248046875,
+            "p95": 150.54720669531252,
+            "p99": 150.54720669531252,
+            "max": 150.54720669531252
+          },
+          "replayWallMs": {
+            "n": 2560,
+            "mean": 0.016728827734375,
+            "min": 0.011229999999999999,
+            "p50": 0.016419999999999997,
+            "p95": 0.01849,
+            "p99": 0.02338,
+            "max": 0.03991
+          },
+          "admitted": 45,
+          "refused": 0,
+          "poses": 180,
+          "initialMemoryKiB": [
+            {
+              "RssAnon": 897104,
+              "RssFile": 1996,
+              "RssShmem": 1220,
+              "VmHWM": 1014324,
+              "VmRSS": 900320,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 2032,
+              "RssShmem": 1336,
+              "VmHWM": 1014352,
+              "VmRSS": 900476,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897104,
+              "RssFile": 2068,
+              "RssShmem": 1296,
+              "VmHWM": 1014320,
+              "VmRSS": 900468,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 1996,
+              "RssShmem": 1288,
+              "VmHWM": 1014324,
+              "VmRSS": 900392,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 1952,
+              "RssShmem": 1312,
+              "VmHWM": 1014324,
+              "VmRSS": 900372,
+              "VmSize": 902104
+            }
+          ],
+          "loadedFixtureMemoryKiB": [
+            {
+              "RssAnon": 897104,
+              "RssFile": 1996,
+              "RssShmem": 1220,
+              "VmHWM": 1014324,
+              "VmRSS": 900320,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 2032,
+              "RssShmem": 1336,
+              "VmHWM": 1014352,
+              "VmRSS": 900476,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897104,
+              "RssFile": 2068,
+              "RssShmem": 1296,
+              "VmHWM": 1014320,
+              "VmRSS": 900468,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 1996,
+              "RssShmem": 1288,
+              "VmHWM": 1014324,
+              "VmRSS": 900392,
+              "VmSize": 902104
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 1952,
+              "RssShmem": 1312,
+              "VmHWM": 1014324,
+              "VmRSS": 900372,
+              "VmSize": 902104
+            }
+          ],
+          "finalMemoryKiB": [
+            {
+              "RssAnon": 897108,
+              "RssFile": 2164,
+              "RssShmem": 1220,
+              "VmHWM": 1014324,
+              "VmRSS": 900492,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897112,
+              "RssFile": 2200,
+              "RssShmem": 1336,
+              "VmHWM": 1014352,
+              "VmRSS": 900648,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897108,
+              "RssFile": 2256,
+              "RssShmem": 1296,
+              "VmHWM": 1014320,
+              "VmRSS": 900660,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897112,
+              "RssFile": 2164,
+              "RssShmem": 1288,
+              "VmHWM": 1014324,
+              "VmRSS": 900564,
+              "VmSize": 926264
+            },
+            {
+              "RssAnon": 897112,
+              "RssFile": 2064,
+              "RssShmem": 1312,
+              "VmHWM": 1014324,
+              "VmRSS": 900488,
+              "VmSize": 926264
+            }
+          ],
+          "perWindow": [
+            {
+              "wallSeconds": 71.171946247,
+              "processCpuSeconds": 71.14578583000001,
+              "mainCpuSeconds": 71.14578488000001,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 71.287689651,
+              "processCpuSeconds": 71.25789208,
+              "mainCpuSeconds": 71.25789112000001,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 71.410823484,
+              "processCpuSeconds": 71.3771653,
+              "mainCpuSeconds": 71.3771647,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 73.127088311,
+              "processCpuSeconds": 73.09525799,
+              "mainCpuSeconds": 73.0952572,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            },
+            {
+              "wallSeconds": 77.111564104,
+              "processCpuSeconds": 77.080170018,
+              "mainCpuSeconds": 77.08016982800001,
+              "finalStateSha256": "bf2a4b85b86fc12757961ac004cd86060b805502bb7e60758e69c6ed4899c1a1"
+            }
+          ]
+        }
+      },
+      "phaseDiagnostics": {
+        "serial": {
+          "instrumentedWorldCpuMsPerTick": 170.28772962109383,
+          "instrumentedAdmissionCpuMsPerTick": 0.07790802734336436,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 170.3656376484372,
+          "worldWallMsPerTick": 170.34775891015624,
+          "offCpuFractionBound": 0.0003523925964536017,
+          "profileToOrdinaryCpuRatios": [
+            1.208410384221577,
+            1.236443128314058,
+            1.2355015395906666,
+            1.2301060156070067,
+            1.1240261735563402
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 3.4736225078125,
+              "cpuMsPerTickBounds": [
+                3.4135932187501017,
+                3.4736225078125
+              ],
+              "cpuShareBounds": [
+                0.0200460316568062,
+                0.020398548477577542
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 6.8165508632812495,
+              "cpuMsPerTickBounds": [
+                6.756521574218852,
+                6.8165508632812495
+              ],
+              "cpuShareBounds": [
+                0.039677090000863516,
+                0.04002960682163485
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.0016080078125,
+              "cpuMsPerTickBounds": [
+                0.000213923828166011,
+                0.0016080078125
+              ],
+              "cpuShareBounds": [
+                1.2562492238402119e-06,
+                9.442887142120975e-06
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 159.39782940429686,
+              "cpuMsPerTickBounds": [
+                159.3378001152345,
+                159.39782940429686
+              ],
+              "cpuShareBounds": [
+                0.9356974837222625,
+                0.9360500005430337
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.350720095703125,
+              "cpuMsPerTickBounds": [
+                0.29521091992193077,
+                0.350720095703125
+              ],
+              "cpuShareBounds": [
+                0.0017336006568341872,
+                0.002059573502351051
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.119970013671875,
+              "cpuMsPerTickBounds": [
+                0.07253630664048663,
+                0.119970013671875
+              ],
+              "cpuShareBounds": [
+                0.00042596320240974913,
+                0.0007045135544341305
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.1874580175781071,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 18056388,
+            "segmentTests": 121383209,
+            "foodPairs": 18739627696,
+            "pickupTests": 389179
+          }
+        },
+        "parallel": {
+          "instrumentedWorldCpuMsPerTick": 172.09538006445314,
+          "instrumentedAdmissionCpuMsPerTick": 0.0655111914062991,
+          "instrumentedWorldPlusAdmissionCpuMsPerTick": 172.16089125585944,
+          "worldWallMsPerTick": 172.22286027929687,
+          "offCpuFractionBound": 0.0007402049567461739,
+          "profileToOrdinaryCpuRatios": [
+            1.2336350846503794,
+            1.225019852447931,
+            1.2388673967568538,
+            1.2313816562981257,
+            1.1467264526158454
+          ],
+          "phases": {
+            "movementSeconds": {
+              "wallMsPerTick": 3.281574482421875,
+              "cpuMsPerTickBounds": [
+                3.15566018359375,
+                3.281574482421875
+              ],
+              "cpuShareBounds": [
+                0.018336693189624807,
+                0.01906834733850996
+              ]
+            },
+            "collisionSeconds": {
+              "wallMsPerTick": 6.649371826171875,
+              "cpuMsPerTickBounds": [
+                6.521891611328121,
+                6.649371826171875
+              ],
+              "cpuShareBounds": [
+                0.03789695928435466,
+                0.03863771255034013
+              ]
+            },
+            "deathSeconds": {
+              "wallMsPerTick": 0.00150138671875,
+              "cpuMsPerTickBounds": [
+                0.00022179492187322252,
+                0.00150138671875
+              ],
+              "cpuShareBounds": [
+                1.2887906798552985e-06,
+                8.724154699491068e-06
+              ]
+            },
+            "foodSeconds": {
+              "wallMsPerTick": 161.60759446484374,
+              "cpuMsPerTickBounds": [
+                161.48011425,
+                161.60759446484374
+              ],
+              "cpuShareBounds": [
+                0.9383175433850839,
+                0.9390582966510693
+              ]
+            },
+            "preySeconds": {
+              "wallMsPerTick": 0.377525681640625,
+              "cpuMsPerTickBounds": [
+                0.2901165449218816,
+                0.377525681640625
+              ],
+              "cpuShareBounds": [
+                0.0016857892687951715,
+                0.002193700269578615
+              ]
+            },
+            "ambientSeconds": {
+              "wallMsPerTick": 0.119945728515625,
+              "cpuMsPerTickBounds": [
+                0.0602464941405709,
+                0.119945728515625
+              ],
+              "cpuShareBounds": [
+                0.000350076185182934,
+                0.000696972390953801
+              ]
+            }
+          },
+          "unbracketedWallMsPerTick": 0.1853467089843741,
+          "counts": {
+            "ticks": 512,
+            "bodyPairs": 18056388,
+            "segmentTests": 121383209,
+            "foodPairs": 18739627696,
+            "pickupTests": 389179
+          }
+        }
+      }
+    }
+  ]
+}
