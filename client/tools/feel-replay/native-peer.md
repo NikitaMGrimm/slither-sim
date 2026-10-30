@@ -46,7 +46,8 @@ same bit-preserving codec. No decimal JSON serialization precedes bit capture.
 
 Each native run replays the same executable twice, preserving both observation
 documents and final traces. `repeat-comparison.json` requires A1 exact parity and
-identical document bytes. `comparison.json` uses unmodified A1 `cross-target`;
+identical document bytes. `comparison.json` uses A1 `cross-target`, while
+`exact-comparison.json` disables numerical allowances on those same traces;
 `summary.json` reports exact/numerical/failing channels and `differences.json`
 retains all differences even when a provenance/completeness gate fails. An exact
 channel is a local observation result, not a pass through a failed global gate.
@@ -55,9 +56,19 @@ The native runner adopts only the Wasm manifest's **predeclared** numerical poli
 it cannot add or relax one after observing differences. Default A2 runs declare
 `null`, so every native/Wasm numeric difference fails. A numerical match requires
 the same identified platform-math cause on both peers and the unchanged
-[A1 caps and accumulation guard](README.md#match-criteria). Commands, discrete
-state, correction rings, pixels and times remain exact. A math-related difference
-in such a channel still fails. Gameplay fixes belong in separate PRs.
+[A1 caps and accumulation guard](README.md#match-criteria). Cross-target ring
+floats use the existing f32/world caps and a separate accumulation history for
+each stored element. Commands, discrete state (including ring indices/pending
+counts), pixels and times stay exact; same-core remains fully exact.
+
+To predeclare a policy, pass `--numerical-policy <feel-f64-v1-policy-file>` to the
+**browser** runner before execution. It validates the unchanged caps and freezes
+the declaration as `numerical-policy.json` in the fresh Wasm run directory before
+either peer starts. Its manifest supplies the same policy to the native runner.
+Use cause `host-transcendental` with independent function/runtime evidence;
+never rewrite an existing trace's declaration after observing its errors. The
+comparison report records policy version `feel-cross-target-v2`; trace/manifest
+schema versions are unchanged. Gameplay fixes belong in separate PRs.
 
 Focused checks:
 

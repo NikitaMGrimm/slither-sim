@@ -12,11 +12,12 @@ import { launchBrowser } from './feel-replay/browser.mjs';
 import { replayServer } from './feel-replay/server.mjs';
 import { inputNormalization, startupPointer } from './feel-replay/input.mjs';
 import { floatBits } from './feel-replay/io.mjs';
+import { validateNumericalPolicy } from './feel-replay/schema.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 process.chdir(root);
 const args = process.argv.slice(2), options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt');
+  if (!['--record', '--out', '--browser', '--commands', '--appearance-at', '--width', '--height', '--dpr', '--receipt', '--numerical-policy'].includes(args[i]) || options[args[i]] !== undefined || args[i + 1] === undefined) throw new Error('Expected --record --out --browser --commands --appearance-at; optional --width --height --dpr --receipt --numerical-policy');
   options[args[i]] = args[i + 1];
 }
 for (const key of ['--record', '--out', '--browser', '--commands', '--appearance-at']) if (!options[key]) throw new Error(`Required ${key}`);
@@ -26,6 +27,14 @@ if (out.toLowerCase() === repository.toLowerCase() || out.toLowerCase().startsWi
 await mkdir(out); // No recursive/exist-ok: preserve every prior attempt.
 let server, browser;
 try {
+  // Freeze the declaration before either peer executes. The native runner adopts
+  // this same manifest policy; neither runner learns caps from observed errors.
+  let numericalPolicy = null;
+  if (options['--numerical-policy']) {
+    const bytes = await readFile(options['--numerical-policy']);
+    numericalPolicy = validateNumericalPolicy(parse(bytes.toString('utf8')));
+    await writeFile(path.join(out, 'numerical-policy.json'), bytes, { flag: 'wx' });
+  }
   const inputFile = path.resolve(options['--record']), input = await readFile(inputFile);
   const receipts = options['--receipt'] ? [{ path: path.resolve(options['--receipt']), sha256: sha256(await readFile(options['--receipt'])) }] : [];
   await writeFile(path.join(out, 'input-receipt.json'), stringify({ inputFile, sha256: sha256(input), receipts }));
@@ -70,7 +79,7 @@ try {
       startup: ['clock-zero', 'empty-timers-and-raf', 'high-quality', 'play',
         `startup-pointer:${pointer.source}:${floatBits(pointer.x)}:${floatBits(pointer.y)}`,
         `input-normalization:${inputNormalization}`, 'scheduled-startup-raf'],
-      geometry: peer.acks[0].geometry, qualityRequest: 'high', presentation: { gpu: null, mode: 'cpu-boundary-sink', maxFrameLatency: null }, numericalPolicy: null });
+      geometry: peer.acks[0].geometry, qualityRequest: 'high', presentation: { gpu: null, mode: 'cpu-boundary-sink', maxFrameLatency: null }, numericalPolicy });
     const assembly = traceAssembly(schedule, manifest);
     for (const ack of peer.acks) assembly.append(ack);
     const trace = assembly.finish({ atMs: finish.atMs, completed: finish.completed,

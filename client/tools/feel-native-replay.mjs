@@ -69,10 +69,12 @@ try {
   await writeFile(path.join(out, 'native-repeat.json'), second);
   const native = parse(first), repeat = compareTraces(native, parse(second), schedule);
   const comparison = compareTraces(wasm, native, schedule, { mode: 'cross-target' });
+  const exactComparison = compareTraces(wasm, native, schedule, { mode: 'cross-target', exactOnly: true });
   const { channels, rows } = channelResults(wasm, native, comparison);
   await writeFile(path.join(out, 'native-manifest.json'), stringify(manifest));
   await writeFile(path.join(out, 'repeat-comparison.json'), stringify({ ...repeat, byteExact: first === second, observationsByteExact: raw === repeatedRaw }));
   await writeFile(path.join(out, 'comparison.json'), stringify(comparison));
+  await writeFile(path.join(out, 'exact-comparison.json'), stringify(exactComparison));
   await writeFile(path.join(out, 'differences.json'), stringify(rows));
   const summary = { status: comparison.status, errors: comparison.errors, repeat: repeat.status, byteExact: first === second,
     observationErrors: observed.errors, mismatches: comparison.mismatches.length, nonExactFloats: comparison.nonExactFloats.length,
