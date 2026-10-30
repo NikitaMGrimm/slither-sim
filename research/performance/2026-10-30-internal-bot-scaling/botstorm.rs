@@ -141,7 +141,7 @@ fn main() {
             "pickupGridSnapshot":{"circles":circles,"cellSize":128,"rectangleCells":cells,
                 "totalCoverCells":area,"fixedCellLimit":1048576,"foodRelativeCellLimit":food_limit,
                 "regularGeometry":regular,
-                "fitsDenseGridGuards":regular && cells<=1048576.min(food_limit) && area<=1048576,
+                "fitsDenseGridGuards":regular && cells<=(1048576usize).min(food_limit) && area<=1048576,
                 "scope":"read-only checkpoint pickup circles; actual step builds after movement and deaths"},
             "scope":if args[1]=="views" { "read-only checkpoint census, all six selected masks; no policy decisions or physics" }
                 else { "read-only checkpoint pickup-grid guards; no observations, decisions or physics" }})).unwrap()).unwrap();

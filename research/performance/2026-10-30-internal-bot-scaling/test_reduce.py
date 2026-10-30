@@ -12,7 +12,7 @@ class CpuAttribution(unittest.TestCase):
         fields=['movementSeconds','collisionSeconds','deathSeconds','foodSeconds','preySeconds','ambientSeconds']
         profile={key:phase if key=='foodSeconds' else 0 for key in fields}
         profile.update(ticks=1,bodyPairs=2,segmentTests=3,foodPairs=4,pickupTests=5)
-        return {'samples':[{'worldCpu':cpu,'worldWall':wall,'profile':profile}]}
+        return {'samples':[{'worldCpu':cpu,'worldWall':wall,'admissionCpu':0,'profile':profile}]}
 
     def test_on_cpu_phase_has_point_bound(self):
         row=self.row(1,1,.4)

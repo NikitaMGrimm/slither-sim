@@ -83,6 +83,7 @@ def phase_summary(row,ordinary):
     samples=row['samples']
     phases=['movementSeconds','collisionSeconds','deathSeconds','foodSeconds','preySeconds','ambientSeconds']
     total_cpu=sum(s['worldCpu'] for s in samples)
+    admission_cpu=sum(s['admissionCpu'] for s in samples)
     total_wall=sum(s['worldWall'] for s in samples)
     result={}
     for phase in phases:
@@ -99,6 +100,8 @@ def phase_summary(row,ordinary):
     ordinary_means=[statistics.mean(s['worldCpu'] for s in r['samples']) for r in ordinary]
     profiled_mean=total_cpu/len(samples)
     return {'instrumentedWorldCpuMsPerTick':profiled_mean*1000,
+            'instrumentedAdmissionCpuMsPerTick':admission_cpu*1000/len(samples),
+            'instrumentedWorldPlusAdmissionCpuMsPerTick':(total_cpu+admission_cpu)*1000/len(samples),
             'worldWallMsPerTick':total_wall*1000/len(samples),
             'offCpuFractionBound':max(0,total_wall-total_cpu)/total_wall,
             'profileToOrdinaryCpuRatios':[profiled_mean/v for v in ordinary_means],

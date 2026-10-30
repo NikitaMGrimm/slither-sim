@@ -21,7 +21,10 @@ def summarize(root):
         directory=root/'botstorm-results'/str(n)
         receipt=directory/'qualification.json'
         if not receipt.exists():
-            result['populations'].append({'population':n,'status':'not measured','reason':'optional cost gate or incomplete attempt; see attempts'})
+            primary=root/'botstorm-results/12000/qualification.json'
+            skipped=n!=12000 and primary.exists() and not json.loads(primary.read_text())['missedRealTime']
+            result['populations'].append({'population':n,'status':'not measured',
+                'reason':'12k meets the frozen throughput trigger' if skipped else 'required row incomplete; see attempts'})
             continue
         qualification=json.loads(receipt.read_text())
         verify_fixture(directory,qualification)
