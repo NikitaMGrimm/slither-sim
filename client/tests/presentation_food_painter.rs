@@ -623,6 +623,101 @@ fn all_retained_sources_revalidate_readiness_revision_intrinsics_and_alias_befor
 }
 
 #[test]
+fn indexed_validation_matches_scans_across_catalog_changes_and_paint_paths() {
+    let palette = Palette::new();
+    let assets = palette.assets();
+    let mut world = FoodWorld::new();
+    palette.spawn(&mut world, 1, Point { x: 12., y: 13. });
+    palette.spawn(&mut world, 2, Point { x: 1e6, y: 0. });
+    mature(&mut world);
+    let sources = world.foods()[0].snapshot().sources;
+    let mut catalogs = vec![assets.clone(), assets.iter().rev().copied().collect()];
+    for source in [sources.body, sources.outline, sources.inner, sources.outer] {
+        let selected = source.asset();
+        let mut duplicate = assets.clone();
+        duplicate.push(selected);
+        catalogs.push(duplicate);
+        catalogs.push(
+            assets
+                .iter()
+                .copied()
+                .filter(|a| a.handle != selected.handle)
+                .collect(),
+        );
+        for mutation in 0..5 {
+            let mut changed = selected;
+            match mutation {
+                0 => changed.revision += 1,
+                1 => changed.width += 1,
+                2 => changed.height = 0,
+                3 => changed.status = BodyAssetStatus::Pending,
+                _ => changed.status = BodyAssetStatus::Unsupported,
+            }
+            let mut replaced = assets.clone();
+            *replaced
+                .iter_mut()
+                .find(|a| a.handle == selected.handle)
+                .unwrap() = changed;
+            catalogs.push(replaced);
+            let mut conflicting = assets.clone();
+            conflicting.push(changed);
+            catalogs.push(conflicting.clone());
+            conflicting.reverse();
+            catalogs.push(conflicting);
+        }
+    }
+    // Conflicts in unused handles must not reject a plan. Sparse full-width
+    // handles must cost table-sized storage rather than handle-sized storage.
+    let mut unrelated = assets.clone();
+    unrelated.extend([
+        BodyAsset {
+            handle: u64::MAX,
+            ..assets[0]
+        },
+        BodyAsset {
+            handle: u64::MAX,
+            revision: 999,
+            ..assets[0]
+        },
+    ]);
+    catalogs.extend([unrelated, Vec::new(), assets.clone()]);
+    let mut index = FoodAssetIndex::default();
+    for catalog in &catalogs {
+        for high_quality in [false, true] {
+            for blend in [0., 0.375, 1.] {
+                for bounds in [None, Some(FoodCullBounds::from_view(view()).unwrap())] {
+                    for target_handle in [None, Some(sources.body.asset().handle)] {
+                        let mut input = input(&world, catalog);
+                        input.quality = BodyPaintQuality {
+                            high_quality,
+                            blend,
+                        };
+                        input.bounds = bounds;
+                        input.target_handle = target_handle;
+                        assert_eq!(
+                            plan_food_with_index(input, &mut index, Vec::new(), Vec::new()),
+                            plan_food(input),
+                        );
+                    }
+                }
+            }
+        }
+    }
+    // A failed budget still leaves the reusable index coherent for recovery.
+    let mut input = input(&world, &assets);
+    input.command_limit = 0;
+    assert_eq!(
+        plan_food_with_index(input, &mut index, Vec::new(), Vec::new()),
+        plan_food(input)
+    );
+    input.command_limit = MAX_FOOD_PAINT_COMMANDS;
+    assert_eq!(
+        plan_food_with_index(input, &mut index, Vec::new(), Vec::new()),
+        plan_food(input)
+    );
+}
+
+#[test]
 fn invalid_view_quality_entry_alpha_and_bounds_fail_without_a_plan() {
     let p = Palette::new();
     let assets = p.assets();

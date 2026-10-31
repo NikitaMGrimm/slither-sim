@@ -1,6 +1,6 @@
 //! Read-only pixel-space food commands with early and late insertion barriers.
 
-use std::{error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt};
 
 use crate::state::Point;
 
@@ -199,6 +199,57 @@ impl fmt::Display for FoodPaintError {
 }
 impl Error for FoodPaintError {}
 
+/// Reusable current-catalog lookup for hosts retaining their asset tables.
+/// Storage is bounded by catalog size, independent of food count or handle values.
+#[derive(Debug, Default)]
+pub struct FoodAssetIndex {
+    assets: Vec<BodyAsset>,
+    by_handle: HashMap<u64, Option<usize>>,
+}
+
+impl FoodAssetIndex {
+    fn refresh(&mut self, assets: &[BodyAsset]) -> Result<(), FoodPaintError> {
+        if self.assets == assets {
+            return Ok(());
+        }
+        // Public caller-owned tables may change in place. Compare once per plan,
+        // then rebuild only on change: four full scans per retained food otherwise
+        // dominate dense native pictures (docs/frame-performance.md CPU workload).
+        let mut next = Self::default();
+        next.assets
+            .try_reserve_exact(assets.len())
+            .map_err(|_| FoodPaintError::Allocation)?;
+        next.by_handle
+            .try_reserve(assets.len())
+            .map_err(|_| FoodPaintError::Allocation)?;
+        next.assets.extend_from_slice(assets);
+        for (i, asset) in assets.iter().enumerate() {
+            next.by_handle
+                .entry(asset.handle)
+                .and_modify(|entry| {
+                    // Identical duplicates are valid; any conflicting duplicate
+                    // invalidates this handle, but must not reject unused handles.
+                    if entry.is_some_and(|first| assets[first] != *asset) {
+                        *entry = None;
+                    }
+                })
+                .or_insert(Some(i));
+        }
+        // Replacing rather than retaining old capacities also bounds a shrinking
+        // catalog; unchanged frames allocate nothing for validation.
+        *self = next;
+        Ok(())
+    }
+
+    fn matches(&self, frozen: BodyAsset) -> bool {
+        self.by_handle
+            .get(&frozen.handle)
+            .copied()
+            .flatten()
+            .is_some_and(|i| self.assets[i] == frozen)
+    }
+}
+
 fn validate_view(view: BodyPaintView) -> Result<(), FoodPaintError> {
     if !all_finite(&[
         view.camera.x,
@@ -215,13 +266,19 @@ fn validate_view(view: BodyPaintView) -> Result<(), FoodPaintError> {
     Ok(())
 }
 
-fn validate(input: FoodPaintInput<'_>) -> Result<(), FoodPaintError> {
+fn validate(
+    input: FoodPaintInput<'_>,
+    mut index: Option<&mut FoodAssetIndex>,
+) -> Result<(), FoodPaintError> {
     validate_view(input.view)?;
     if !(0. ..=1.).contains(&input.quality.blend) || !(0. ..=1.).contains(&input.entry_alpha) {
         return Err(FoodPaintError::InvalidVisual);
     }
     if input.foods.len() > MAX_RETAINED_FOODS {
         return Err(FoodPaintError::FoodLimit);
+    }
+    if let Some(index) = &mut index {
+        index.refresh(input.assets)?;
     }
     for food in input.foods {
         let sources = food.snapshot().sources;
@@ -232,6 +289,12 @@ fn validate(input: FoodPaintInput<'_>) -> Result<(), FoodPaintError> {
             let frozen = source.asset();
             if input.target_handle == Some(frozen.handle) {
                 return Err(FoodPaintError::TargetAlias);
+            }
+            if let Some(index) = &index {
+                if !index.matches(frozen) {
+                    return Err(FoodPaintError::InvalidSource);
+                }
+                continue;
             }
             let mut found = false;
             for actual in input.assets.iter().filter(|a| a.handle == frozen.handle) {
@@ -468,10 +531,30 @@ pub fn plan_food(input: FoodPaintInput<'_>) -> Result<FoodPaintPlan, FoodPaintEr
 /// Reuse retired early/late commands without changing validation or paint barriers.
 pub fn plan_food_with_storage(
     input: FoodPaintInput<'_>,
+    early: Vec<FoodImageCommand>,
+    late: Vec<FoodImageCommand>,
+) -> Result<FoodPaintPlan, FoodPaintError> {
+    plan_food_impl(input, early, late, None)
+}
+
+/// Reuse command storage and a catalog-sized index. Every call checks for table
+/// changes before validating all retained sources, including culled food.
+pub fn plan_food_with_index(
+    input: FoodPaintInput<'_>,
+    index: &mut FoodAssetIndex,
+    early: Vec<FoodImageCommand>,
+    late: Vec<FoodImageCommand>,
+) -> Result<FoodPaintPlan, FoodPaintError> {
+    plan_food_impl(input, early, late, Some(index))
+}
+
+fn plan_food_impl(
+    input: FoodPaintInput<'_>,
     mut early: Vec<FoodImageCommand>,
     mut late: Vec<FoodImageCommand>,
+    index: Option<&mut FoodAssetIndex>,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    validate(input)?;
+    validate(input, index)?;
     let counts = generate(input, |_| {})?;
     early.clear();
     late.clear();
@@ -498,6 +581,43 @@ pub fn plan_food_with_storage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn index_storage_tracks_catalog_size_and_is_reused_without_changes() {
+        let assets: Vec<_> = (0..1024)
+            .map(|i| BodyAsset {
+                handle: u64::MAX - i,
+                revision: 1,
+                width: 1,
+                height: 1,
+                status: super::super::BodyAssetStatus::Ready,
+            })
+            .collect();
+        let mut index = FoodAssetIndex::default();
+        index.refresh(&assets).unwrap();
+        assert_eq!(index.assets.len(), assets.len());
+        assert!(index.by_handle.len() <= assets.len());
+        let pointer = index.assets.as_ptr();
+        let capacities = (index.assets.capacity(), index.by_handle.capacity());
+        for _ in 0..100 {
+            index.refresh(&assets.clone()).unwrap();
+            assert_eq!(index.assets.as_ptr(), pointer);
+            assert_eq!(
+                (index.assets.capacity(), index.by_handle.capacity()),
+                capacities
+            );
+            assert!(index.matches(assets[0]));
+        }
+        index.refresh(&assets[..1]).unwrap();
+        assert_eq!(index.assets.len(), 1);
+        assert_eq!(index.by_handle.len(), 1);
+        assert!(index.assets.capacity() < capacities.0);
+        assert!(index.by_handle.capacity() < capacities.1);
+        assert!(!index.matches(assets[1]));
+        index.refresh(&[]).unwrap();
+        assert_eq!(index.assets.capacity(), 0);
+        assert_eq!(index.by_handle.capacity(), 0);
+    }
 
     #[test]
     fn canvas_ignores_invalid_alpha_assignments_and_accepts_signed_zero() {

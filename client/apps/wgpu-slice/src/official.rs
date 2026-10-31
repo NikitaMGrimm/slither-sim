@@ -1033,6 +1033,7 @@ mod tests {
             ))
         };
         let mut picker = ServerPicker::default();
+        picker.start_directory(true);
         picker.open();
         assert!(picker.take_directory_request());
         for _ in 0..3 {
@@ -1091,6 +1092,7 @@ mod tests {
     }
     fn explicit_play_keeps_picker_acquisition(directory_succeeds: bool) {
         let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.start_directory(true);
         picker.open();
         assert!(picker.take_directory_request());
         picker.close();
@@ -1192,6 +1194,7 @@ mod tests {
     #[test]
     fn cancelled_play_does_not_strand_picker() {
         let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.start_directory(true);
         picker.open();
         assert!(picker.take_directory_request());
         picker.status = "Measuring server latency...".into();
@@ -1240,6 +1243,7 @@ mod tests {
     #[test]
     fn failed_directory_fetch_retries_once_on_reopen_without_a_loop() {
         let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.start_directory(true);
         let cancel = Arc::new(AtomicBool::new(false));
         let mut fetches = 0;
         picker.open();
@@ -1271,6 +1275,7 @@ mod tests {
             let sweeps = Cell::new(0);
             let cancel = Arc::new(AtomicBool::new(false));
             let mut picker = slither_client::server_picker::ServerPicker::default();
+            picker.start_directory(true);
             picker.open();
             assert!(picker.take_directory_request());
             picker.close();
@@ -1372,6 +1377,7 @@ mod tests {
         );
         assert_eq!(fetches, 3);
         let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.start_directory(true);
         let mut cached = None;
         complete_picker_preparation(&mut picker, &mut cached, &completion, false, false).unwrap();
         picker.open();
@@ -1382,6 +1388,7 @@ mod tests {
     fn play_completion_keeps_acquisition_on_selection_error_or_late_cancel() {
         for (id, cancelled) in [(Some(77), false), (Some(42), false), (Some(42), true)] {
             let mut picker = slither_client::server_picker::ServerPicker::default();
+            picker.start_directory(true);
             picker.open();
             assert!(picker.take_directory_request());
             picker.close();

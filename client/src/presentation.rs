@@ -96,9 +96,9 @@ pub use food::{
     MAX_RETAINED_FOODS, SnakeObjectToken, food_palette,
 };
 pub use food_painter::{
-    FoodCullBounds, FoodImageCommand, FoodImageDraw, FoodPaintCounts, FoodPaintError,
-    FoodPaintInput, FoodPaintPass, FoodPaintPlan, MAX_FOOD_PAINT_COMMANDS, plan_food,
-    plan_food_with_storage,
+    FoodAssetIndex, FoodCullBounds, FoodImageCommand, FoodImageDraw, FoodPaintCounts,
+    FoodPaintError, FoodPaintInput, FoodPaintPass, FoodPaintPlan, MAX_FOOD_PAINT_COMMANDS,
+    plan_food, plan_food_with_index, plan_food_with_storage,
 };
 pub(crate) use hud::HudLeaderboardRowsBudget;
 pub use hud::{

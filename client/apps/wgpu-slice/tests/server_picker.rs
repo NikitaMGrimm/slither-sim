@@ -49,8 +49,8 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         let effects = login.pointer(point, Some(false), true);
         assert!(effects.contains(&HostEditEffect::ReleasePointerBoost));
         assert!(login.picker.policy.is_open());
-        assert!(login.picker.policy.take_directory_request());
-        assert_eq!(login.picker.controls.focus(), Some(SEARCH));
+        assert!(!login.picker.policy.take_directory_request());
+        assert_eq!(login.picker.controls.focus(), Some(ADDRESS));
         login
             .picker
             .policy
@@ -76,7 +76,7 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         assert!(!row.hit([row.rect.x + row.rect.width, row.rect.y]));
         login.pointer(point, Some(true), true);
         login.pointer(point, Some(false), true);
-        assert_eq!(login.picker.policy.selection.0, Some(5));
+        assert_eq!(login.picker.policy.selection.official_id(), Some(5));
         for now in (656..=1200).step_by(16) {
             login.step(now as f64, true, false).unwrap();
         }
@@ -134,7 +134,8 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     );
     assert_eq!(login.controls.focus(), Some(SERVER));
     let focused = login.prepare([960, 720], false, None).unwrap();
-    assert_eq!(focused.frame.draws.len(), unfocused.frame.draws.len() + 4);
+    assert_eq!(login.controls.visible_focus(), Some(SERVER));
+    assert!(focused.frame.draws.len() > unfocused.frame.draws.len());
     for id in [PLAY, SETTINGS] {
         assert!(
             !login
@@ -289,6 +290,8 @@ fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
     let resolved = picker.panel.resolve(picker.viewport).unwrap();
     let search = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
     let point = [search.rect.x + 20., search.rect.y + search.rect.height / 2.];
+    picker.pointer(&mut text, point, Some(true)).unwrap();
+    picker.pointer(&mut text, point, Some(false)).unwrap();
     for query in ["909", "808"] {
         let effects = picker.input.state.apply(EditIntent::KeyText(query.into()));
         picker.commit_effects(effects);
@@ -301,7 +304,7 @@ fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
         assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), "");
         assert_eq!(picker.policy.search, "");
         assert!(picker.policy.is_open());
-        assert_eq!(picker.policy.selection, ServerPreference(None));
+        assert_eq!(picker.policy.selection, ServerPreference::Automatic);
     }
 }
 #[test]
@@ -309,6 +312,8 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     let mut p = NativeServerPicker::default();
     p.policy.replace(&servers(), &BTreeMap::new()).unwrap();
     p.open();
+    p.controls.focus_control(&p.panel, SEARCH);
+    p.controls.sync_focus(&p.panel, &mut p.input.state);
     let effects = key(&mut p, NamedKey::ArrowDown, KeyCode::ArrowDown);
     p.commit_effects(effects);
     assert_eq!(p.controls.focus(), Some(ControlId(16)));
@@ -320,22 +325,27 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     assert_eq!(p.controls.focus(), Some(CLOSE));
     let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
     p.commit_effects(effects);
+    assert_eq!(p.controls.focus(), Some(ADDRESS));
+    for _ in 0..3 {
+        let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
+        p.commit_effects(effects);
+    }
     assert_eq!(p.controls.focus(), Some(SEARCH));
     let effects = p.input.state.apply(EditIntent::KeyText("19x99".into()));
     p.commit_effects(effects);
-    assert_eq!(p.policy.selection.0, Some(1999));
+    assert_eq!(p.policy.selection.official_id(), Some(1999));
     assert!(!p.policy.is_open());
     let directory =
         std::env::temp_dir().join(format!("slither-server-pref-{}", std::process::id()));
     std::fs::create_dir(&directory).unwrap();
     let path = directory.join("choice");
-    assert_eq!(read_preference(&path), ServerPreference(None));
+    assert_eq!(read_preference(&path), ServerPreference::Automatic);
     write_preference(&path, &p.policy.take_preference().unwrap()).unwrap();
-    assert_eq!(read_preference(&path), ServerPreference(Some(1999)));
+    assert_eq!(read_preference(&path), ServerPreference::Official(1999));
     assert!(write_preference(&directory, "1:auto").is_err());
-    assert_eq!(p.policy.selection.0, Some(1999));
+    assert_eq!(p.policy.selection.official_id(), Some(1999));
     std::fs::write(&path, "1:77".repeat(1000)).unwrap();
-    assert_eq!(read_preference(&path), ServerPreference(None));
+    assert_eq!(read_preference(&path), ServerPreference::Automatic);
     std::fs::remove_file(path).unwrap();
     std::fs::remove_dir(directory).unwrap();
 }
@@ -421,4 +431,84 @@ fn open_picker_with_stroke_logo_never_drops_at_dpr_five_to_eight() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn picker_reopening_inherits_the_current_opener_modality() {
+    use slither_client::login_controls::SERVER;
+    let mut login = NativeLogin::new("Focus").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, false, false).unwrap();
+    }
+    login.prepare([960, 720], false, None).unwrap();
+    login.controls.keyboard_navigation();
+    login.focus(SERVER);
+    login.activate(false);
+    login.step(9616., false, false).unwrap();
+    assert!(login.picker.controls.focus().is_some());
+    assert_eq!(
+        login.picker.controls.visible_focus(),
+        login.picker.controls.focus()
+    );
+    login.picker.policy.close();
+    for now in (9632..=10000).step_by(16) {
+        login.step(now as f64, false, false).unwrap();
+    }
+    assert!(!login.picker.policy.visible());
+    login.prepare([960, 720], false, None).unwrap();
+    let controls = login.panel.resolve([960., 720.]).unwrap();
+    let r = controls.iter().find(|r| r.control.id == SERVER).unwrap();
+    let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+    login.pointer(point, Some(true), false);
+    login.pointer(point, Some(false), false);
+    assert!(login.picker.policy.is_open());
+    assert!(login.picker.controls.focus().is_some());
+    assert!(login.picker.controls.visible_focus().is_none());
+    login.picker.controls.tab(&login.picker.panel, false);
+    assert_eq!(
+        login.picker.controls.visible_focus(),
+        login.picker.controls.focus()
+    );
+}
+
+#[test]
+fn text_navigation_reveals_pointer_focused_fields_without_activating() {
+    for (field, editor, value, official) in [
+        (SEARCH, SEARCH_EDITOR, "123", true),
+        (ADDRESS, ADDRESS_EDITOR, "192.0.2.9:445", false),
+    ] {
+        for (navigation, code) in [
+            (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
+            (NamedKey::ArrowRight, KeyCode::ArrowRight),
+            (NamedKey::Home, KeyCode::Home),
+            (NamedKey::End, KeyCode::End),
+        ] {
+            let mut p = NativeServerPicker::default();
+            p.policy.start_directory(official);
+            p.open();
+            p.policy.alpha = 1.;
+            p.sync();
+            let resolved = p.panel.resolve(p.viewport).unwrap();
+            let r = resolved.iter().find(|r| r.control.id == field).unwrap();
+            let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+            let mut text = slither_wgpu_slice::text::TextCache::menu();
+            p.pointer(&mut text, point, Some(true)).unwrap();
+            p.pointer(&mut text, point, Some(false)).unwrap();
+            p.input.state.apply(EditIntent::KeyText(value.into()));
+            assert_eq!(p.controls.focus(), Some(field));
+            assert_eq!(p.controls.visible_focus(), None);
+            let effects = key(&mut p, navigation, code);
+            assert!(
+                effects
+                    .iter()
+                    .all(|e| !matches!(e, HostEditEffect::Activate(_)))
+            );
+            assert_eq!(p.controls.visible_focus(), Some(field));
+            assert_eq!(p.input.state.editor(editor).text(), value);
+            assert!(p.policy.is_open());
+            assert_eq!(p.policy.selection, ServerPreference::Automatic);
+            assert!(p.policy.custom.is_empty());
+            assert_eq!(p.policy.take_directory_request(), official);
+        }
+    }
 }

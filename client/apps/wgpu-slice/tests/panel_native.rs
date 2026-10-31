@@ -493,3 +493,40 @@ fn champion_field_uses_shared_placement_for_value_placeholder_selection_and_ime(
         }
     }
 }
+
+#[test]
+fn text_navigation_reveals_pointer_focused_message_without_submitting() {
+    use slither_wgpu_slice::menu_input_native::KeyInput;
+    use winit::{
+        event::ElementState,
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+    };
+    for (navigation, code) in [
+        (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
+        (NamedKey::ArrowRight, KeyCode::ArrowRight),
+        (NamedKey::Home, KeyCode::Home),
+        (NamedKey::End, KeyCode::End),
+    ] {
+        let mut p = panel();
+        let resolved = p.panel.resolve(p.viewport).unwrap();
+        let r = resolved.iter().find(|r| r.control.id == MESSAGE).unwrap();
+        let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+        let mut text = TextCache::menu();
+        p.pointer(&mut text, point, Some(true)).unwrap();
+        p.pointer(&mut text, point, Some(false)).unwrap();
+        assert_eq!(p.controls.focus(), Some(MESSAGE));
+        assert_eq!(p.controls.visible_focus(), None);
+        let before = p.input.state.editor(EditorId::Champion).text().to_owned();
+        let logical = Key::Named(navigation);
+        p.key(KeyInput {
+            logical: &logical,
+            physical: PhysicalKey::Code(code),
+            text: None,
+            state: ElementState::Pressed,
+            repeat: false,
+        });
+        assert_eq!(p.controls.visible_focus(), Some(MESSAGE));
+        assert_eq!(p.input.state.editor(EditorId::Champion).text(), before);
+        assert!(p.take_submission().is_none());
+    }
+}

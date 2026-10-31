@@ -58,7 +58,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     let mut login = settled();
     login.prepare([960, 540], true, None).unwrap();
     let appearance = login.studio.state.committed().clone();
-    login.picker.policy.selection = slither_client::server_picker::ServerPreference(Some(7));
+    login.picker.policy.selection = slither_client::server_picker::ServerPreference::Official(7);
     login.focus(NICKNAME);
     for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
         assert!(key(&mut login, NamedKey::Tab));
@@ -114,7 +114,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert_eq!(login.state.view(true).nickname, "Player");
     assert_eq!(login.studio.state.committed().nickname, "Player");
     assert_eq!(login.studio.state.committed(), &appearance);
-    assert_eq!(login.picker.policy.selection.0, Some(7));
+    assert_eq!(login.picker.policy.selection.official_id(), Some(7));
     login.focus(PLAY);
     key(&mut login, NamedKey::Enter);
     login.open_settings(true);
