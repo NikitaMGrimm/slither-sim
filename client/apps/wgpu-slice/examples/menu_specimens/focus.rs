@@ -39,7 +39,14 @@ impl Sweep<'_> {
             login.studio.state.reveal_control(id, self.logical);
         }
         login.studio.sync_art(self.logical, Some(art))?;
-        login.prepare_host(extent, self.dpr, true, Some(art))?;
+        login
+            .prepare_host(extent, self.dpr, true, Some(art))
+            .map_err(|e| {
+                format!(
+                    "{name} {:?} DPR{} ready{} initial: {e}",
+                    self.logical, self.dpr, self.ready
+                )
+            })?;
         if let Some(id) = focus {
             login.focus(id);
         }
@@ -50,7 +57,14 @@ impl Sweep<'_> {
                     .set_progress(control.id, if hover { [1., 1.] } else { [0.; 2] });
             }
         }
-        let mut menu = login.prepare_host(extent, self.dpr, true, Some(art))?;
+        let mut menu = login
+            .prepare_host(extent, self.dpr, true, Some(art))
+            .map_err(|e| {
+                format!(
+                    "{name} {:?} DPR{} ready{} focused: {e}",
+                    self.logical, self.dpr, self.ready
+                )
+            })?;
         if let Some(id) = focus
             && login.controls.focus() != Some(id)
         {

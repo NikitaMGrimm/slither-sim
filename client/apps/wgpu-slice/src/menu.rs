@@ -1721,7 +1721,8 @@ impl Composition<'_> {
             if clip.is_none_or(|clip| clip_scaled_draw(&mut draw, clip, scale)) {
                 if mirrored {
                     let source = draw.source.as_mut().expect("capsule crop");
-                    source.x = 2. * source_x + source_width - source.x - source.width;
+                    // Fractional clipping can leave the reflected origin a few ulps below zero.
+                    source.x = (2. * source_x + source_width - source.x - source.width).max(0.);
                     let d = draw.destination;
                     draw.corners = Some([
                         [d.x + d.width, d.y],
