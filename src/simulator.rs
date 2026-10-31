@@ -1532,12 +1532,30 @@ impl Simulator {
         self.advance_validated(actions)
             .map_err(CoreStepError::Stopped)
     }
-    /// Set the next tick duration, validating the same limits as construction.
+    /// Set the next tick duration, validating construction and live travel limits.
     /// Rejection leaves the world and its configuration unchanged.
     pub fn set_dt(&mut self, dt: f64) -> Result<(), SimError> {
         let mut config = self.config.clone();
         config.dt = dt;
         config.validate()?;
+        // Imported states can carry speeds beyond the host's normal range.
+        // Increasing dt must preserve checkpoint's next-step travel bound;
+        // decreasing dt cannot violate it. Historical phases validate against
+        // elapsed time, so adaptive decreases never reject retained clocks.
+        if dt > self.config.dt
+            && self
+                .snakes
+                .iter()
+                .map(|s| s.speed)
+                .chain(self.speeds.iter().map(|s| s.speed))
+                .any(|speed| speed * dt > checkpoint::MAGNITUDE)
+        {
+            return Err(SimError::state(
+                Constraint::OutOfRange,
+                "dt",
+                "Tick duration exceeds the current state's one-step travel limit",
+            ));
+        }
         self.config.dt = dt;
         Ok(())
     }
