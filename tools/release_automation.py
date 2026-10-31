@@ -191,6 +191,11 @@ def manual_release_merge(commit):
     if len(parents) < 2:
         return None
     parent = parents[1]
+    # The owner-published bootstrap introduced this manifest. Its parent cannot
+    # authorize a metadata-only version bump; use the ordinary registry cooldown.
+    if release.selected_name() == release.PROTOCOL and not git(
+            "ls-tree", "--name-only", parent, "--", release.MANIFESTS[release.PROTOCOL]):
+        return None
     before = release.package_at(parent)
     package = release.package_at(commit)
     if package["version"] == before["version"]:

@@ -134,6 +134,30 @@ class ProtocolReleaseTests(unittest.TestCase):
             automation.main()
             output.assert_any_call("package=slither-protocol")
 
+    def test_first_protocol_import_uses_cooldown_without_reading_an_absent_parent_manifest(self):
+        with fixture_repository() as directory, automation.selected_package(release.PROTOCOL):
+            root = Path(directory)
+
+            def git(*args):
+                return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+
+            git("config", "user.name", "Fixture")
+            git("config", "user.email", "fixture@example.invalid")
+            (root / "Cargo.toml").write_text('[package]\nname="slither-sim"\nversion="0.8.2"\n')
+            git("add", ".")
+            git("commit", "-qm", "before bootstrap")
+            path = root / release.MANIFESTS[release.PROTOCOL]
+            path.parent.mkdir(parents=True)
+            path.write_text('[package]\nname="slither-protocol"\nversion="0.1.0"\npublish=["crates-io"]\n')
+            git("add", ".")
+            git("commit", "-qm", "bootstrap")
+            bootstrap = git("rev-parse", "HEAD")
+            self.assertIsNone(automation.manual_release_merge(bootstrap))
+            with patch.object(automation, "version_commit", return_value=bootstrap), \
+                    patch.object(release, "cooldown_ready", return_value=False) as cooldown:
+                self.assertFalse(automation.automatic_ready(self.package))
+                cooldown.assert_called_once_with("slither-protocol", manual_release=None)
+
 
 if __name__ == "__main__":
     unittest.main()
