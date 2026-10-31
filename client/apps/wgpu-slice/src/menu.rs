@@ -26,7 +26,7 @@ const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
     Legacy(u32, u32, u8, u64, u64),
-    Control([u32; 2], u64, SurfaceTokens),
+    Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
@@ -590,6 +590,14 @@ impl Composition<'_> {
                 image,
             }
         };
+        preflight_menu_totals(
+            self.materials.len() + 1,
+            self.materials
+                .values()
+                .map(|r| r.image.pixels.len())
+                .sum::<usize>()
+                + resource.image.pixels.len(),
+        )?;
         self.materials.insert(key, resource.clone());
         Ok(resource)
     }
@@ -603,6 +611,9 @@ impl Composition<'_> {
         clip: MenuRect,
         control_scale: f64,
     ) -> Result<()> {
+        if alpha == 0. {
+            return Ok(());
+        }
         let scale = self.scale;
         let raster_scale = scale * control_scale;
         if !raster_scale.is_finite() || !(0. ..=16.).contains(&raster_scale) || raster_scale == 0. {
@@ -612,6 +623,7 @@ impl Composition<'_> {
             SurfaceRecipe::Button => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
             SurfaceRecipe::Field => materials::MenuSurface::Nickname,
+            SurfaceRecipe::Compact => materials::MenuSurface::Compact,
         };
         let pad = (surface.padding() * raster_scale).ceil() as u32;
         let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;
@@ -621,52 +633,85 @@ impl Composition<'_> {
         ];
         let middle = 32;
         let atlas = size.map(|n| n.min(2 * radius + middle));
-        if atlas.iter().any(|n| n + 2 * pad > 512) {
-            return Err("Sliced menu atlas axis budget".into());
+        let padded = atlas.map(|n| n + 2 * pad);
+        if padded.iter().any(|n| *n > 2048) {
+            return Err("Sliced menu raster axis budget".into());
         }
-        let resource = self.cached_material(
-            MaterialKey::Control(atlas, raster_scale.to_bits(), tokens),
-            || {
-                materials::menu_control(
-                    atlas,
-                    f64::from(radius),
-                    tokens.colors,
-                    raster_scale,
-                    surface,
-                )
-            },
-        )?;
+        let mut raster = None;
+        let mut tiles = Vec::new();
+        for y in (0..padded[1]).step_by(512) {
+            for x in (0..padded[0]).step_by(512) {
+                let w = 512.min(padded[0] - x);
+                let h = 512.min(padded[1] - y);
+                let resource = self.cached_material(
+                    MaterialKey::Control(atlas, raster_scale.to_bits(), tokens, [x, y]),
+                    || {
+                        if raster.is_none() {
+                            raster = Some(materials::menu_control(
+                                atlas,
+                                f64::from(radius),
+                                tokens.colors,
+                                raster_scale,
+                                surface,
+                            )?);
+                        }
+                        let raster = raster.as_ref().expect("rasterized atlas");
+                        let mut pixels = Vec::with_capacity(w as usize * h as usize * 4);
+                        for row in y..y + h {
+                            let start = ((row * padded[0] + x) * 4) as usize;
+                            pixels.extend_from_slice(&raster.pixels[start..start + w as usize * 4]);
+                        }
+                        Ok(materials::RgbaImage {
+                            width: w,
+                            height: h,
+                            pixels,
+                        })
+                    },
+                )?;
+                tiles.push((x, y, resource));
+            }
+        }
         let xs = slice_axis(size[0], atlas[0], pad)?;
         let ys = slice_axis(size[1], atlas[1], pad)?;
         check_menu_draws(xs.len() * ys.len())?;
         for &(dy, sy, h) in &ys {
             for &(dx, sx, w) in &xs {
-                let mut draw = image(
-                    &resource,
-                    MenuRect {
-                        x: r.x + (f64::from(dx) - f64::from(pad)) / scale,
-                        y: r.y + (f64::from(dy) - f64::from(pad)) / scale,
-                        width: f64::from(w) / scale,
-                        height: f64::from(h) / scale,
-                    },
-                    alpha,
-                );
-                draw.source = Some(BodyRect {
-                    x: f64::from(sx),
-                    y: f64::from(sy),
-                    width: f64::from(w),
-                    height: f64::from(h),
-                });
-                draw.snap_overlay(scale);
-                if clip_draw(&mut draw, clip, scale) {
-                    self.push(draw)?;
+                for (tx, ty, resource) in &tiles {
+                    let left = sx.max(*tx);
+                    let top = sy.max(*ty);
+                    let right = (sx + w).min(tx + resource.asset.width);
+                    let bottom = (sy + h).min(ty + resource.asset.height);
+                    if right <= left || bottom <= top {
+                        continue;
+                    }
+                    let mut draw = image(
+                        resource,
+                        MenuRect {
+                            x: r.x + (f64::from(dx + left - sx) - f64::from(pad)) / scale,
+                            y: r.y + (f64::from(dy + top - sy) - f64::from(pad)) / scale,
+                            width: f64::from(right - left) / scale,
+                            height: f64::from(bottom - top) / scale,
+                        },
+                        alpha,
+                    );
+                    draw.source = Some(BodyRect {
+                        x: f64::from(left - tx),
+                        y: f64::from(top - ty),
+                        width: f64::from(right - left),
+                        height: f64::from(bottom - top),
+                    });
+                    draw.snap_overlay(scale);
+                    if clip_draw(&mut draw, clip, scale) {
+                        self.push(draw)?;
+                    }
                 }
             }
         }
         Ok(())
     }
     fn ink(&mut self, r: MenuRect, rgb: [u8; 3], alpha: f64, clip: MenuRect) -> Result<()> {
-        if r.width <= 0. || r.height <= 0. {
+        let r = intersection(r, clip);
+        if alpha == 0. || r.width <= 0. || r.height <= 0. {
             return Ok(());
         }
         let scale = self.scale;
@@ -676,6 +721,19 @@ impl Composition<'_> {
         ];
         if size.iter().any(|n| *n > 2048) {
             return Err("Menu ink axis budget".into());
+        }
+        if size.iter().any(|n| *n > 512) {
+            return self.sliced(
+                r,
+                SurfaceTokens {
+                    colors: [rgb; 2],
+                    radius: 0,
+                    recipe: SurfaceRecipe::Overlay,
+                },
+                alpha,
+                clip,
+                1.,
+            );
         }
         let resource = self.cached_material(MaterialKey::Solid(size, rgb), || {
             Ok(materials::RgbaImage {
@@ -762,60 +820,40 @@ impl Composition<'_> {
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
     }
+    // Login keeps its policy/input path; its existing recipes share the bounded
+    // material implementation so exact high-DPI rasters need no larger quota.
     fn control(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        let surface = match kind {
-            0 => materials::MenuSurface::Play,
-            1..=2 => materials::MenuSurface::Overlay,
-            5 => materials::MenuSurface::Nickname,
-            _ => materials::MenuSurface::Compact,
+        let recipe = match kind {
+            0 => SurfaceRecipe::Button,
+            1..=2 => SurfaceRecipe::Overlay,
+            5 => SurfaceRecipe::Field,
+            _ => SurfaceRecipe::Compact,
         };
-        let scale = self.scale;
-        let size = [
-            (r.width * scale).ceil() as u32,
-            (r.height * scale).ceil() as u32,
-        ];
-        let key = MaterialKey::Legacy(size[0], size[1], kind, scale.to_bits(), 0);
-        if !self.materials.contains_key(&key) {
-            let resource = if let Some(r) = self.old.get(&key) {
-                r.clone()
-            } else {
-                let colors = match kind {
-                    0 => [[86, 172, 129], [54, 108, 81]],
-                    1 => [[117, 240, 202], [72, 171, 132]],
-                    2 => [[12, 20, 18], [40, 59, 54]],
-                    4 | 5 => [[76, 68, 124], [76, 68, 124]],
-                    6 => [[108, 215, 128], [80, 160, 100]],
-                    _ => [[150, 108, 213], [100, 70, 150]],
-                };
-                let image =
-                    materials::menu_control(size, f64::from(size[1]) / 2., colors, scale, surface)?;
-                self.next_handle = self
-                    .next_handle
-                    .checked_add(1)
-                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
-                    .ok_or("Menu material handle overflow")?;
-                Resource {
-                    asset: BodyAsset {
-                        handle: self.next_handle,
-                        revision: 1,
-                        width: image.width,
-                        height: image.height,
-                        status: BodyAssetStatus::Ready,
-                    },
-                    image: image.into(),
-                }
-            };
-            self.materials.insert(key, resource);
-        }
-        let pad = (surface.padding() * scale).ceil() / scale;
-        let resource = &self.materials[&key];
+        let colors = match kind {
+            0 => [[86, 172, 129], [54, 108, 81]],
+            1 => [[117, 240, 202], [72, 171, 132]],
+            2 => [[12, 20, 18], [40, 59, 54]],
+            4 | 5 => [[76, 68, 124]; 2],
+            6 => [[108, 215, 128], [80, 160, 100]],
+            _ => [[150, 108, 213], [100, 70, 150]],
+        };
+        let tokens = SurfaceTokens {
+            colors,
+            radius: (r.height / 2.).ceil() as u16,
+            recipe,
+        };
         let r = MenuRect {
-            x: r.x - pad,
-            y: r.y - pad,
-            width: f64::from(resource.image.width) / scale,
-            height: f64::from(resource.image.height) / scale,
+            width: (r.width * self.scale).ceil() / self.scale,
+            height: (r.height * self.scale).ceil() / self.scale,
+            ..r
         };
-        self.push(image(resource, r, alpha))
+        let clip = MenuRect {
+            x: r.x - 2048. / self.scale,
+            y: r.y - 2048. / self.scale,
+            width: r.width + 4096. / self.scale,
+            height: r.height + 4096. / self.scale,
+        };
+        self.sliced(r, tokens, alpha, clip, 1.)
     }
     fn label(&mut self, text: &str, r: MenuRect, size: f64, bold: bool, alpha: f64) {
         self.labels.push(Label {
@@ -1446,7 +1484,10 @@ fn slice_axis(size: u32, atlas: u32, pad: u32) -> Result<Vec<(u32, u32, u32)>> {
     let middle = atlas - 2 * edge;
     let mut out = vec![(0, 0, edge + pad)];
     let mut offset = edge + pad;
-    let end = size - edge + pad;
+    let end = size
+        .checked_sub(edge)
+        .and_then(|n| n.checked_add(pad))
+        .ok_or("Menu slice extent budget")?;
     while offset < end {
         check_menu_draws(out.len() + 2)?;
         let length = middle.min(end - offset);
@@ -1563,7 +1604,7 @@ impl Composition<'_> {
                     extent,
                     viewport_scale: dpr,
                     tick: 0,
-                    draws:std::mem::take(&mut self.draws),
+                    draws: std::mem::take(&mut self.draws),
                     snakes: Vec::new(),
                 };
                 frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;

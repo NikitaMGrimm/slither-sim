@@ -27,7 +27,6 @@ pub struct NativePanel {
     pub effects: Vec<HostEditEffect>,
     submission: Option<(u32, Vec<u16>, Activation)>,
     drag_anchor: usize,
-    shift: bool,
 }
 impl NativePanel {
     pub fn new(session: &slither_client::session_policy::View) -> Self {
@@ -42,7 +41,6 @@ impl NativePanel {
             effects: Vec::new(),
             submission: None,
             drag_anchor: 0,
-            shift: false,
         }
     }
     pub fn observe(&mut self, game: &crate::game::LocalGame) {
@@ -102,12 +100,8 @@ impl NativePanel {
         self.submission.take()
     }
     pub fn event(&mut self, event: &WindowEvent) -> NativeInputResult {
-        if let WindowEvent::ModifiersChanged(m) = event {
-            self.shift = m.state().shift_key();
-        }
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
-            self.shift = false;
         }
         if let WindowEvent::KeyboardInput { event, .. } = event
             && event.state == ElementState::Pressed
@@ -118,7 +112,7 @@ impl NativePanel {
                 .focus()
                 .is_some_and(|id| self.input.state.editor(id).composing());
             if event.logical_key == Key::Named(NamedKey::Tab) && !composing {
-                self.controls.tab(&self.panel, self.shift);
+                self.controls.tab(&self.panel, self.input.shift_key());
                 return NativeInputResult {
                     consumed: true,
                     effects: self.controls.sync_focus(&self.panel, &mut self.input.state),

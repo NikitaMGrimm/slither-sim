@@ -8,7 +8,7 @@ mod scheduling;
 #[cfg(not(target_arch = "wasm32"))]
 mod desktop {
     use crate::scheduling::Schedule;
-    use slither_client::{menu_input::EditIntent, session_policy::Phase};
+    use slither_client::session_policy::Phase;
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
@@ -664,7 +664,7 @@ mod desktop {
                         &mut r.login.champion.input
                     };
                     // Retain window ownership across a committed panel handoff.
-                    inactive.state.apply(EditIntent::WindowFocused(*focused));
+                    inactive.window_event(&event);
                 }
                 let mapped = if champion {
                     r.login.champion.event(&event)

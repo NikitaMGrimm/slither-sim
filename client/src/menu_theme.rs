@@ -28,6 +28,8 @@ pub enum SurfaceRecipe {
     Overlay,
     /// Purple bordered field with its existing shadow.
     Field,
+    /// Existing compact link/focus capsule.
+    Compact,
 }
 /// Sampled control layer whose raster content is cached independently of opacity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,6 +66,8 @@ pub struct MenuTheme {
     pub hover_rate: f64,
     /// Per-core-step press damping.
     pub press_rate: f64,
+    /// Per-callback hover/press release, shared with existing login damping.
+    pub release_rate: f64,
     /// Disabled control opacity.
     pub disabled_alpha: f64,
 }
@@ -74,8 +78,9 @@ impl Default for MenuTheme {
             placeholder: [112, 112, 176],
             selection: [150, 108, 213],
             field: [76, 68, 124],
-            hover_rate: 0.1,
-            press_rate: 0.2,
+            hover_rate: 0.33,
+            press_rate: 0.33,
+            release_rate: 0.2,
             disabled_alpha: 0.38,
         }
     }

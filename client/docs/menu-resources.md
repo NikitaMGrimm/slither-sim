@@ -54,18 +54,17 @@ use solid materials without capsule shadows.
 
 ## Bounds and publication
 
-- Menu has **64 replacing slots / 13 MiB**, shared by text and authored materials,
+- Menu has **64 replacing slots / 4 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
-  are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
-  allowance includes exact 5x control/shadow rasters and the two-run wordmark
-  through 1.1x outgoing growth; the active-picture 64 MiB limit is unchanged.
+  are **386 slots / 22 MiB**; these are ceilings, not eager allocations. The Menu
+  allowance includes exact 5x control/shadow rasters through bounded sliced tiles.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
 - Menu/HUD text uses exact DPR within the 2048px texture bound and its byte
   budgets; world nicknames retain the 128px font guard and backing-space
-  diagnostics retain their 3x raster bound. Controls and
-  decoded menu art allow up to 2048px per axis. Menu decoding alone admits that
+  diagnostics retain their 3x raster bound. Control atlas tiles stay within 512px;
+  decoded menu art allows up to 2048px per axis. Menu decoding alone admits that
   density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
   pixel budgets and the two-resident-logo-frame limit still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored

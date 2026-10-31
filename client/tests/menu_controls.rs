@@ -125,7 +125,7 @@ fn tab_order_visibility_alpha_damping_and_editor_sync() {
     input.step(&p, 0., MenuTheme::default()).unwrap();
     input.pointer(&p, &r, point, Some(true));
     input.step(&p, 8., MenuTheme::default()).unwrap();
-    assert_eq!(input.progress(MESSAGE), [0.1, 0.2]);
+    assert_eq!(input.progress(MESSAGE), [0.33, 0.33]);
     assert!(input.step(&p, 7., MenuTheme::default()).is_err());
     p.visible = false;
     input.sync(&p, &mut edit);

@@ -52,7 +52,7 @@ champion handoff; it cannot claim that a message was saved.
 controls in one material/text transaction. `prepare_panel` also supports isolated
 headless specimens. Typed theme content enters material/text keys; sampled
 position, alpha and scrolling do not. The holder uses tiled three-slice strips;
-tall uniform surfaces use nine-slice tiles. The corner atlas stays at most
+tall uniform surfaces use nine-slice tiles. Published atlas tiles stay at most
 512 pixels per axis, and each tile charges the menu draw cap. Sources and
 destinations land on whole physical pixels through the existing snapped overlay
 path, with one source pixel per physical destination pixel.

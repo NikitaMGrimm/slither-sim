@@ -32,10 +32,8 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
-// Exact 5x controls, last-life/Play Again and the two-run wordmark through
-// 1.1x outgoing growth: tests/menu.rs::wordmark_runs_abut_and_override_only_logo_art.
-// The aggregate 13 MiB admission and 64 MiB whole-picture guard both apply.
-pub const MENU_CACHE_BYTES: usize = 13 * 1024 * 1024;
+// Sliced controls preserve exact high-DPI rasters within the original allowance.
+pub const MENU_CACHE_BYTES: usize = 4 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
 pub const CACHE_RUNS: usize = 258;

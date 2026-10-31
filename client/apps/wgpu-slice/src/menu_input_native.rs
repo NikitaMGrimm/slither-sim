@@ -52,6 +52,10 @@ impl NativeMenuInput {
     pub fn modifiers(&mut self, modifiers: ModifiersState) {
         self.modifiers = modifiers;
     }
+    /// Shared modifier snapshot, retained while this panel is inactive.
+    pub fn shift_key(&self) -> bool {
+        self.modifiers.shift_key()
+    }
 
     /// Map the fields of a winit KeyEvent. Logical keys own editing shortcuts;
     /// physical keys own gameplay. Ctrl+Alt text is retained for Windows AltGr.

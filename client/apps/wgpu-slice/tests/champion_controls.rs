@@ -90,6 +90,30 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
             .map(|r| (r.asset, r.image.pixels.clone()))
             .collect::<Vec<_>>()
     };
+    edit.apply(EditIntent::SelectAll);
+    let selected = menu
+        .prepare_panel(
+            &mut text,
+            &p,
+            &input,
+            &edit,
+            &mut scroll,
+            theme,
+            [1440, 1080],
+            1.5,
+        )
+        .unwrap();
+    assert!(
+        selected
+            .resources
+            .iter()
+            .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+    );
+    assert!(selected.frame.draws.len() <= 512);
+    edit.apply(EditIntent::Move {
+        movement: Movement::End,
+        extend: false,
+    });
     p.alpha = 0.5;
     p.placement.offset[0] += 1.;
     let moved = menu

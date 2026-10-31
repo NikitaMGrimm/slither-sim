@@ -418,13 +418,33 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
             let material_scale = dpr;
             let pad = (40. * material_scale).ceil() / material_scale;
-            let shape = p
+            // The union of the holder's physical tiles retains its full shadow box.
+            let tiles: Vec<_> = p
                 .frame
                 .draws
                 .iter()
-                .find(|draw| draw.asset.width > 1 && draw.source.is_none())
-                .unwrap()
-                .destination;
+                .filter(|d| {
+                    d.asset.handle >> 60 == 7 && (d.destination.y - (nick.y - pad)).abs() <= 2.
+                })
+                .map(|d| d.destination)
+                .collect();
+            assert!(!tiles.is_empty());
+            let left = tiles.iter().map(|r| r.x).fold(f64::INFINITY, f64::min);
+            let top = tiles.iter().map(|r| r.y).fold(f64::INFINITY, f64::min);
+            let right = tiles
+                .iter()
+                .map(|r| r.x + r.width)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let bottom = tiles
+                .iter()
+                .map(|r| r.y + r.height)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let shape = slither_client::menu_layout::MenuRect {
+                x: left,
+                y: top,
+                width: right - left,
+                height: bottom - top,
+            };
             assert!((shape.x + pad - nick.x).abs() <= 2.);
             assert!((shape.y + pad - nick.y).abs() <= 2.);
             assert!((shape.x + shape.width - pad - nick.x - nick.width).abs() <= 2.);
@@ -589,9 +609,20 @@ fn connecting_play_dims_the_whole_button_but_return_uses_its_own_alpha() {
         )
         .filter(|(a, b)| a.effective_alpha != b.effective_alpha)
         .collect();
-    // The base capsule and white Play label share the same 0.38 multiplier.
-    assert_eq!(changed.len(), 2);
+    // Every base-capsule tile and the one white Play label share the multiplier.
+    assert!(changed.iter().any(|(a, _)| a.asset.handle >> 60 == 7));
+    assert_eq!(
+        changed
+            .iter()
+            .filter(|(a, _)| a.asset.handle >> 60 == 8)
+            .count(),
+        1
+    );
+    let play = layout().viewport_rect(slither_client::menu_layout::MenuElement::Play);
     for (a, b) in changed {
+        let r = a.destination;
+        assert!(r.x >= play.x - 21. && r.x + r.width <= play.x + play.width + 21.);
+        assert!(r.y >= play.y - 21. && r.y + r.height <= play.y + play.height + 21.);
         assert_eq!(a.asset, b.asset);
         assert_eq!(a.destination, b.destination);
         assert!((b.effective_alpha / a.effective_alpha - 0.38).abs() < 1e-12);

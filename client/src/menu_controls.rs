@@ -519,7 +519,7 @@ impl PanelInputState {
                 activation,
             })
     }
-    /// Damping shares the menu's elapsed/8, clamped core-step seam.
+    /// Sample the existing login's per-callback linear overlay damping.
     pub fn step(
         &mut self,
         panel: &PanelView,
@@ -529,7 +529,6 @@ impl PanelInputState {
         if !now.is_finite() || self.previous.is_some_and(|p| now < p) {
             return Err("Invalid panel clock");
         }
-        let delta = self.previous.map_or(0., |p| ((now - p) / 8.).clamp(0., 5.));
         self.previous = Some(now);
         for c in &panel.controls {
             let p = self.progress.entry(c.id).or_insert([0.; 2]);
@@ -541,8 +540,11 @@ impl PanelInputState {
                     theme.press_rate,
                 ),
             ] {
-                let target = f64::from(target && Self::available(panel, c));
-                p[i] += (target - p[i]) * (rate * delta).min(1.);
+                p[i] = if target && Self::available(panel, c) {
+                    (p[i] + rate).min(1.)
+                } else {
+                    (p[i] - theme.release_rate).max(0.)
+                };
             }
         }
         Ok(())
