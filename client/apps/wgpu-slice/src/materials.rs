@@ -1,6 +1,7 @@
 //! Selected recipe adapter, not a general Canvas implementation. Unsupported tapes fail closed.
 use crate::Result;
 use slither_client::authored_sources::{CanvasRecipe, PaintCommand};
+pub(crate) const MENU_TEXTURE_QUOTA: &str = "Menu control texture budget";
 
 #[derive(Clone, Debug)]
 pub struct RgbaImage {
@@ -151,7 +152,7 @@ pub fn menu_control(
     let pad = (surface.padding() * scale).ceil() as u32;
     let (width, height) = (w + 2 * pad, h + 2 * pad);
     if width > 2048 || height > 2048 {
-        return Err("Menu control texture budget".into());
+        return Err(MENU_TEXTURE_QUOTA.into());
     }
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
     let r = radius.min(f64::from(w.min(h)) / 2.);

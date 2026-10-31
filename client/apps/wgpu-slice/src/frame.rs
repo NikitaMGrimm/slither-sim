@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 
 /// Per-picture CPU draw records, independent of GPU buffer size. See docs/draw-chunks.md.
 pub const DRAW_RECORD_BUDGET: usize = 64 * 1024 * 1024;
+pub(crate) const DRAW_ALLOCATION_FAILED: &str = "frame draw allocation failed";
+
 pub const MAX_DRAWS: usize = DRAW_RECORD_BUDGET / std::mem::size_of::<Draw>();
 pub const DRAW_MEMORY_LIMIT: &str = "frame draw-record memory budget exceeded; picture skipped";
 pub const VERTEX_CHUNK_QUADS: usize = 8192;
@@ -35,7 +37,7 @@ pub(crate) fn reserve_draws(draws: &mut Vec<Draw>, additional: usize) -> Result<
             .min(MAX_DRAWS);
         draws
             .try_reserve_exact(capacity - draws.len())
-            .map_err(|_| "frame draw allocation failed")?;
+            .map_err(|_| DRAW_ALLOCATION_FAILED)?;
     }
     Ok(())
 }

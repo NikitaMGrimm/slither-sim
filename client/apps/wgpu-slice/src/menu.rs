@@ -19,6 +19,13 @@ use slither_client::{
 use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
+pub(crate) const MENU_DRAW_QUOTA: &str = "Menu producer draw budget";
+pub(crate) const MENU_PICTURE_QUOTA: &str = "Menu whole-picture pixel budget";
+pub(crate) const MENU_RASTER_AXIS_QUOTA: &str = "Sliced menu raster axis budget";
+pub(crate) const MENU_SOLID_TEXTURE_QUOTA: &str = "Menu solid texture budget";
+pub(crate) const MENU_ART_AXIS_QUOTA: &str = "Menu art destination budget";
+pub(crate) const MENU_ART_PIXEL_QUOTA: &str = "Menu art pixel budget";
+
 use crate::bank::MENU_MATERIAL_HANDLE_BASE;
 // Reserved menu-material handles; the generic allocator starts above them.
 const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
@@ -37,7 +44,7 @@ pub const FIELD_CONTENT_INSET: [f64; 2] = [2., 0.];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
-        return Err("Menu producer draw budget".into());
+        return Err(MENU_DRAW_QUOTA.into());
     }
     Ok(())
 }
@@ -57,9 +64,27 @@ impl MenuFrame {
         match menu.and_then(|menu| menu.append_to(picture)) {
             Ok(()) => Ok(true),
             Err(error)
-                if error.contains("budget")
-                    || error == frame::DRAW_MEMORY_LIMIT
-                    || error == "frame draw allocation failed" =>
+                if matches!(
+                    error.as_str(),
+                    MENU_DRAW_QUOTA
+                        | MENU_PICTURE_QUOTA
+                        | MENU_RASTER_AXIS_QUOTA
+                        | MENU_SOLID_TEXTURE_QUOTA
+                        | MENU_ART_AXIS_QUOTA
+                        | MENU_ART_PIXEL_QUOTA
+                        | MENU_CACHE_QUOTA
+                        | PANEL_TOTALS_QUOTA
+                        | PANEL_SLOT_QUOTA
+                        | PANEL_DRAW_QUOTA
+                        | HUD_SLOT_QUOTA
+                        | TEXT_CACHE_RUN_QUOTA
+                        | TEXT_CACHE_PIXEL_QUOTA
+                        | TEXT_CACHE_QUOTA
+                        | TEXT_RASTER_QUOTA
+                        | materials::MENU_TEXTURE_QUOTA
+                        | frame::DRAW_MEMORY_LIMIT
+                        | frame::DRAW_ALLOCATION_FAILED
+                ) =>
             {
                 Ok(false)
             }
@@ -220,7 +245,7 @@ impl MenuFrame {
                 .sum::<usize>()
                 > crate::bank::PIXEL_BUDGET
         {
-            return Err("Menu whole-picture pixel budget".into());
+            return Err(MENU_PICTURE_QUOTA.into());
         }
         frame::check_draw_count(picture.draw_count() + count)?;
         if let Some(overlay) = &mut picture.overlay {
@@ -654,7 +679,7 @@ impl Composition<'_> {
         let atlas = size.map(|n| n.min(2 * radius + middle));
         let padded = atlas.map(|n| n + 2 * pad);
         if padded.iter().any(|n| *n > 2048) {
-            return Err("Sliced menu raster axis budget".into());
+            return Err(MENU_RASTER_AXIS_QUOTA.into());
         }
         // Every current surface is symmetric in X. Retain one half of the
         // padded atlas and mirror its quads; high-DPR shadows keep full padding
@@ -826,7 +851,7 @@ impl Composition<'_> {
             ]
         };
         if size.into_iter().any(|n| n > 2048) {
-            return Err("Menu solid texture budget".into());
+            return Err(MENU_SOLID_TEXTURE_QUOTA.into());
         }
         let key = MaterialKey::Legacy(size[0], size[1], kind, 0, 0);
         if !self.materials.contains_key(&key) {
@@ -938,7 +963,7 @@ impl Composition<'_> {
             (r.height * self.scale).round().max(1.) as u32,
         ];
         if size.into_iter().any(|n| n > 2048) {
-            return Err("Menu art destination budget".into());
+            return Err(MENU_ART_AXIS_QUOTA.into());
         }
         let key = (resource.asset.into(), size);
         if !self.art.contains_key(&key) {
@@ -990,7 +1015,7 @@ impl Composition<'_> {
             };
             let bytes: usize = self.art.values().map(|r| r.image.pixels.len()).sum();
             if bytes + resized.image.pixels.len() > crate::cosmetics::COSMETIC_PIXEL_BUDGET {
-                return Err("Menu art pixel budget".into());
+                return Err(MENU_ART_PIXEL_QUOTA.into());
             }
             self.art.insert(key, resized);
         }
@@ -1793,4 +1818,44 @@ fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
         height: height_px / scale,
     };
     true
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod quota_tests {
+    use super::*;
+    use slither_client::menu_input::EditIntent;
+
+    #[test]
+    fn solid_texture_axis_exhaustion_still_degrades() {
+        let mut text = TextCache::menu();
+        let mut view = crate::menu_specimen::view(0).unwrap();
+        view.nickname = "W".repeat(24);
+        // Isolate selection ink from the decorative field allocation.
+        view.nickname_alpha = 0.;
+        let extent = [7200, 6000];
+        let layout = crate::menu_specimen::layout(&mut text, &view, extent, 12.).unwrap();
+        let mut edit = MenuInputState::default();
+        edit.reset_editor(EditorId::Nickname, &view.nickname);
+        edit.apply(EditIntent::Focus(Some(EditorId::Nickname)));
+        edit.apply(EditIntent::SelectAll);
+        let mut menu = Menu {
+            focus: Some(E::Nickname),
+            ..Menu::default()
+        };
+        let prepared =
+            menu.prepare_with_input(&mut text, &view, &layout, extent, 12., None, 0, Some(&edit));
+        assert_eq!(
+            prepared.as_ref().err().map(String::as_str),
+            Some(MENU_SOLID_TEXTURE_QUOTA)
+        );
+        let base = MenuFrame::world_crossfade(extent, 12., 0.).unwrap();
+        let mut picture = PreparedFrame {
+            frame: base.frame.clone(),
+            overlay: None,
+            resources: vec![],
+        };
+        assert!(!MenuFrame::append_optional(prepared, &mut picture).unwrap());
+        assert_eq!(picture.frame, base.frame);
+        assert!(picture.resources.is_empty());
+    }
 }

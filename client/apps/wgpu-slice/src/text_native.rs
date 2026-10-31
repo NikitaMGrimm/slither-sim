@@ -280,7 +280,7 @@ impl Rasterizer {
         let height =
             ((f64::from(bounds[3]) / SAMPLE as f64).ceil() as i32 - top + 1).max(1) as usize;
         if width > 8192 || height > super::MAX_OVERLAY_TEXT_EXTENT as usize {
-            return Err("text raster extent budget".into());
+            return Err(super::TEXT_RASTER_QUOTA.into());
         }
         let mut mask = vec![0_u8; width * height * SAMPLE * SAMPLE];
         let stride = width * SAMPLE;

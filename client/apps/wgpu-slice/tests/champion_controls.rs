@@ -593,3 +593,45 @@ fn menu_budget_failures_skip_overlay_and_preserve_picture() {
     let invalid = MenuFrame::world_crossfade([800, 600], 1., 0.).unwrap();
     assert!(MenuFrame::append_optional(Ok(invalid), &mut picture).is_err());
 }
+
+#[test]
+fn optional_menu_propagates_non_quota_preparation_errors() {
+    use slither_wgpu_slice::{menu::MenuFrame, render::PreparedFrame};
+    let mut p = panel();
+    let label = p.controls[0].clone();
+    let field = p.controls[2].clone();
+    p.initial_focus = None;
+    for (scale, control, expected) in [
+        (0.01, label, "invalid text run/style/budget"),
+        (20., field, "Sliced menu scale budget"),
+    ] {
+        p.placement.scale = scale;
+        p.controls = vec![control];
+        let mut input = PanelInputState::default();
+        let mut edit = MenuInputState::default();
+        input.sync(&p, &mut edit);
+        let base = MenuFrame::world_crossfade([960, 720], 1., 0.).unwrap();
+        let mut picture = PreparedFrame {
+            frame: base.frame.clone(),
+            overlay: None,
+            resources: vec![],
+        };
+        let prepared = Menu::default().prepare_panel(
+            &mut TextCache::menu(),
+            &p,
+            &input,
+            &edit,
+            &mut BTreeMap::new(),
+            MenuTheme::default(),
+            [960, 720],
+            1.,
+        );
+        assert_eq!(prepared.as_ref().err().map(String::as_str), Some(expected));
+        assert_eq!(
+            MenuFrame::append_optional(prepared, &mut picture),
+            Err(expected.into())
+        );
+        assert_eq!(picture.frame, base.frame);
+        assert!(picture.resources.is_empty());
+    }
+}

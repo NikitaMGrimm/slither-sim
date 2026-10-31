@@ -72,8 +72,10 @@ physical pixel at either edge). Symmetric material atlases retain one half and
 mirror their quads. Large selection rectangles reuse 128-pixel uniform tiles.
 If menu preparation or whole-picture admission still exceeds a quota, native and
 WebGPU game hosts skip that frame's menu overlay and retry on the next frame;
-the world picture and editor/session state remain intact. Invalid geometry and
-handle collisions still surface as errors. No GPU feature, shader,
+the world picture and editor/session state remain intact. This always-on path
+matches exact producer-owned quota errors. Validation failures, including ones
+whose wording contains "budget", and handle collisions still surface as errors.
+No GPU feature, shader,
 texture-storage or compute requirement is added.
 
 ## Offline checks

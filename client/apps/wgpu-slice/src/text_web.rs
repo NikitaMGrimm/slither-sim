@@ -123,10 +123,11 @@ impl Rasterizer {
         if ![width, height, left, top, advance, middle]
             .into_iter()
             .all(f64::is_finite)
-            || width > 8192.
-            || height > f64::from(super::MAX_OVERLAY_TEXT_EXTENT)
         {
-            return Err("text raster extent budget".into());
+            return Err("invalid text raster metrics".into());
+        }
+        if width > 8192. || height > f64::from(super::MAX_OVERLAY_TEXT_EXTENT) {
+            return Err(super::TEXT_RASTER_QUOTA.into());
         }
         canvas.set_width(width as u32);
         canvas.set_height(height as u32);

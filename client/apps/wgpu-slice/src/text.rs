@@ -26,7 +26,18 @@ fn display_text(text: &str) -> String {
     text.chars().map(display_character).collect()
 }
 
+pub(crate) const TEXT_RASTER_QUOTA: &str = "text raster extent budget";
+
 pub const MINIMAP_CACHE_BYTES: usize = 1024 * 1024;
+pub(crate) const PANEL_TOTALS_QUOTA: &str = "Aggregate panel byte/draw budget";
+pub(crate) const MENU_CACHE_QUOTA: &str = "Menu cache slot/pixel budget";
+pub(crate) const PANEL_SLOT_QUOTA: &str = "Panel namespace/slot budget";
+pub(crate) const PANEL_DRAW_QUOTA: &str = "Panel draw budget";
+pub(crate) const HUD_SLOT_QUOTA: &str = "HUD text slot budget";
+pub(crate) const TEXT_CACHE_RUN_QUOTA: &str = "text cache run budget";
+pub(crate) const TEXT_CACHE_PIXEL_QUOTA: &str = "HUD text pixel budget";
+pub(crate) const TEXT_CACHE_QUOTA: &str = "text cache budget";
+
 pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // Allocation rationale: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/panel-text.md#aggregate-resource-proof;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
@@ -96,7 +107,7 @@ pub fn preflight_panel_totals(bytes: usize, text_draws: [usize; 2]) -> Result<()
             .into_iter()
             .any(|n| n > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS)
     {
-        return Err("Aggregate panel byte/draw budget".into());
+        return Err(PANEL_TOTALS_QUOTA.into());
     }
     Ok(())
 }
@@ -163,7 +174,7 @@ impl Content {
 }
 pub fn preflight_menu_totals(slots: usize, bytes: usize) -> Result<()> {
     if slots > MENU_CACHE_RUNS || bytes > MENU_CACHE_BYTES {
-        return Err("Menu cache slot/pixel budget".into());
+        return Err(MENU_CACHE_QUOTA.into());
     }
     Ok(())
 }
@@ -358,8 +369,11 @@ impl TextCache {
         for p in panels {
             let (base, limit) = p.group.slots();
             let i = usize::from(base != 0);
-            if active[i] || p.plan.runs.len() > limit || !(0. ..=1.).contains(&p.alpha) {
-                return Err("Panel namespace/slot budget".into());
+            if active[i] || !(0. ..=1.).contains(&p.alpha) {
+                return Err("Invalid panel namespace/opacity".into());
+            }
+            if p.plan.runs.len() > limit {
+                return Err(PANEL_SLOT_QUOTA.into());
             }
             active[i] = true;
             for run in &p.plan.runs {
@@ -446,7 +460,7 @@ impl TextCache {
                                 == crate::render::PANEL_PRODUCER_DRAWS
                                     - crate::render::PANEL_CONTROL_DRAWS
                             {
-                                return Err("Panel draw budget".into());
+                                return Err(PANEL_DRAW_QUOTA.into());
                             }
                             draws.push((draw, resource));
                         }
@@ -495,7 +509,7 @@ impl TextCache {
         max_width: Option<f64>,
     ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         if usize::from(slot) >= slither_client::presentation::MAX_HUD_TEXT_SPANS {
-            return Err("HUD text slot budget".into());
+            return Err(HUD_SLOT_QUOTA.into());
         }
         self.try_draw(
             run,
@@ -697,7 +711,7 @@ impl TextCache {
                 ),
             };
             if bytes > byte_limit {
-                return Err("text cache run budget".into());
+                return Err(TEXT_CACHE_RUN_QUOTA.into());
             }
             if let Some(old) = self.entries.remove(&key) {
                 self.bytes -= old.bytes;
@@ -714,13 +728,13 @@ impl TextCache {
                     break;
                 }
                 if key.group() != 0 {
-                    return Err("HUD text pixel budget".into());
+                    return Err(TEXT_CACHE_PIXEL_QUOTA.into());
                 }
                 let oldest = group
                     .into_iter()
                     .min_by_key(|(_, e)| e.used)
                     .map(|(k, _)| k.clone())
-                    .ok_or("text cache budget")?;
+                    .ok_or(TEXT_CACHE_QUOTA)?;
                 self.bytes -= self.entries.remove(&oldest).unwrap().bytes;
             }
             self.bytes += bytes;
