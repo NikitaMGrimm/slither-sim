@@ -2,7 +2,7 @@
 use crate::{
     Result,
     editor_geometry::EditorGeometry,
-    menu_input_native::{NativeInputResult, NativeMenuInput},
+    menu_input_native::{KeyInput, NativeInputResult, NativeMenuInput},
     text::TextCache,
 };
 use slither_client::{
@@ -102,15 +102,32 @@ impl NativePanel {
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
         }
-        if let WindowEvent::KeyboardInput { event, .. } = event
-            && event.state == ElementState::Pressed
-        {
+        if let WindowEvent::KeyboardInput { event, .. } = event {
+            return self.key(event.into());
+        }
+        self.input.window_event(event)
+    }
+    pub fn key(&mut self, event: KeyInput<'_>) -> NativeInputResult {
+        if event.state == ElementState::Pressed {
+            if matches!(
+                event.logical,
+                Key::Named(
+                    NamedKey::Enter
+                        | NamedKey::Space
+                        | NamedKey::ArrowLeft
+                        | NamedKey::ArrowRight
+                        | NamedKey::Home
+                        | NamedKey::End
+                )
+            ) {
+                self.controls.keyboard_navigation();
+            }
             let composing = self
                 .input
                 .state
                 .focus()
                 .is_some_and(|id| self.input.state.editor(id).composing());
-            if event.logical_key == Key::Named(NamedKey::Tab) && !composing {
+            if *event.logical == Key::Named(NamedKey::Tab) && !composing {
                 self.controls.tab(&self.panel, self.input.shift_key());
                 return NativeInputResult {
                     consumed: true,
@@ -119,14 +136,11 @@ impl NativePanel {
             }
             if self.controls.focus() != Some(MESSAGE)
                 && !event.repeat
-                && matches!(
-                    event.logical_key,
-                    Key::Named(NamedKey::Enter | NamedKey::Space)
-                )
+                && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
             {
                 self.activate(self.controls.activate(
                     &self.panel,
-                    if event.logical_key == Key::Named(NamedKey::Space) {
+                    if *event.logical == Key::Named(NamedKey::Space) {
                         Activation::Space
                     } else {
                         Activation::Enter
@@ -138,7 +152,7 @@ impl NativePanel {
                 };
             }
         }
-        self.input.window_event(event)
+        self.input.key(event)
     }
     pub fn geometry(&mut self, text: &mut TextCache) -> Result<Option<EditorGeometry>> {
         let resolved = self.panel.resolve(self.viewport).map_err(str::to_owned)?;
