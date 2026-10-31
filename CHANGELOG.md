@@ -10,6 +10,9 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
+- With `--stats`, the host also counts refused connections by stage and
+  reason, so the log shows why players can't join. No client addresses or
+  request data are recorded.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind
@@ -33,9 +36,6 @@
   overloaded and the results are mixed. Spawn search still takes about 60% of
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
-
-- Host `--stats` reports cumulative admission rejection counts by phase and
-  close reason, without client addresses or request data.
 
 ### Changed
 
