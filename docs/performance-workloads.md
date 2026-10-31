@@ -40,7 +40,7 @@ cargo run --release --locked --example perf_baseline -- --list
 
 ## Families
 
-The Windows product's separate [native frame workload](https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/frame-performance.md)
+The Windows product's separate native frame workload (`client/docs/frame-performance.md`)
 measures synthetic offscreen preparation, resource synchronization, render
 submission and calling-thread heap bytes on each exposed hardware adapter.
 It is outside the simulator timing/trace suites below.
