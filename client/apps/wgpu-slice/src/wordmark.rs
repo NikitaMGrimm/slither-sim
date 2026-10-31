@@ -444,7 +444,7 @@ pub fn raster(layout: &Layout, dpr: f64, progress: f64) -> Result<RgbaImage> {
             if bucket == 0 {
                 continue;
             }
-            let quantized = center.map(|n| (n * grid).round() as i32 * multiplier as i32);
+            let quantized = center.map(|n| (n * grid).round() as i32 * multiplier);
             let phase = quantized.map(|n| n.rem_euclid(8) as u8);
             let key = (bucket, phase);
             let side = (f64::from(bucket) / 8.).ceil() as usize * 2 + 4;
