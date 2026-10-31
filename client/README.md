@@ -43,6 +43,8 @@ npm run dev:desktop
 ```
 
 Press Enter to Play, Escape to Stop; use pointer/arrows and Space or mouse boost.
+During play, the mouse wheel [zooms](docs/zoom.md) from 1.25 times the stock
+scale out to the whole map. Zoom lasts until the app closes.
 
 Official servers (Windows desktop):
 

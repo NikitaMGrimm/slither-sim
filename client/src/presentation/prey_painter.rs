@@ -268,8 +268,10 @@ fn draw(
     center: Point,
     scale: f64,
     force_scaled: bool,
+    zoom_factor: f64,
 ) -> Result<FoodImageDraw, PreyPaintError> {
-    if scale == 1. && !force_scaled {
+    let stock_whole = scale == 1. && !force_scaled;
+    if stock_whole && zoom_factor == 1. {
         let x = center.x - source.half_width();
         let y = center.y - source.half_height();
         if !finite(&[x, y]) {
@@ -277,11 +279,20 @@ fn draw(
         }
         Ok(FoodImageDraw::Whole { x, y })
     } else {
+        // Preserve the stock natural-source versus declared-crop overload.
+        let [width, height] = if stock_whole {
+            [
+                f64::from(source.asset().width),
+                f64::from(source.asset().height),
+            ]
+        } else {
+            [source.width(), source.height()]
+        };
         let destination = BodyRect {
-            x: center.x - source.half_width() * scale,
-            y: center.y - source.half_height() * scale,
-            width: source.width() * scale,
-            height: source.height() * scale,
+            x: center.x - source.half_width() * scale * zoom_factor,
+            y: center.y - source.half_height() * scale * zoom_factor,
+            width: width * scale * zoom_factor,
+            height: height * scale * zoom_factor,
         };
         if !finite(&[
             destination.x,
@@ -295,8 +306,8 @@ fn draw(
             source: BodyRect {
                 x: 0.,
                 y: 0.,
-                width: source.width(),
-                height: source.height(),
+                width,
+                height,
             },
             destination,
         })
@@ -308,6 +319,7 @@ struct Recorder<F> {
     counts: PreyPaintCounts,
     limit: usize,
     alpha: f64,
+    zoom_factor: f64,
 }
 impl<F: FnMut(PreyImageCommand)> Recorder<F> {
     fn pair(
@@ -324,7 +336,13 @@ impl<F: FnMut(PreyImageCommand)> Recorder<F> {
         } else {
             p.sources.glow
         };
-        let draw = draw(source, center, scale, pass == PreyPaintPass::OuterGlow)?;
+        let draw = draw(
+            source,
+            center,
+            scale,
+            pass == PreyPaintPass::OuterGlow,
+            self.zoom_factor,
+        )?;
         let pulse = 0.5 + 0.5 * (p.glow_phase / 13.).cos();
         let alphas = [base * p.fade, base * pulse * p.fade];
         if !finite(&alphas) {
@@ -375,6 +393,7 @@ impl<F: FnMut(PreyImageCommand)> Recorder<F> {
 
 fn traverse<F: FnMut(PreyImageCommand)>(
     input: PreyPaintInput<'_>,
+    zoom_factor: f64,
     emit: F,
 ) -> Result<(PreyPaintCounts, f64, f64), PreyPaintError> {
     let mut r = Recorder {
@@ -382,6 +401,7 @@ fn traverse<F: FnMut(PreyImageCommand)>(
         counts: PreyPaintCounts::default(),
         limit: input.command_limit,
         alpha: input.early_entry_alpha,
+        zoom_factor,
     };
     for (index, prey) in input.preys.iter().enumerate().rev() {
         let p = prey.state();
@@ -448,8 +468,19 @@ fn traverse<F: FnMut(PreyImageCommand)>(
 /// Validate and count every call before allocating either command vector.
 /// Direct prey visibility and alpha are independent of rendering quality.
 pub fn plan_prey(input: PreyPaintInput<'_>) -> Result<PreyPaintPlan, PreyPaintError> {
+    plan_prey_with_zoom(input, 1.)
+}
+
+/// Apply a user scale to stock sprite extents without changing glow/alpha policy.
+pub fn plan_prey_with_zoom(
+    input: PreyPaintInput<'_>,
+    zoom_factor: f64,
+) -> Result<PreyPaintPlan, PreyPaintError> {
+    if !zoom_factor.is_finite() || zoom_factor <= 0. {
+        return Err(PreyPaintError::InvalidView);
+    }
     validate(input)?;
-    let (counts, final_early_alpha, final_late_alpha) = traverse(input, |_| {})?;
+    let (counts, final_early_alpha, final_late_alpha) = traverse(input, zoom_factor, |_| {})?;
     let mut early = Vec::new();
     let mut late = Vec::new();
     early
@@ -457,7 +488,7 @@ pub fn plan_prey(input: PreyPaintInput<'_>) -> Result<PreyPaintPlan, PreyPaintEr
         .map_err(|_| PreyPaintError::Allocation)?;
     late.try_reserve_exact(counts.late)
         .map_err(|_| PreyPaintError::Allocation)?;
-    traverse(input, |c| {
+    traverse(input, zoom_factor, |c| {
         if c.pass == PreyPaintPass::Body {
             early.push(c);
         } else {
@@ -494,7 +525,7 @@ mod tests {
         )
         .unwrap();
         // Controlled numeric boundary: scale .5 gives outer destination scale one.
-        let result = draw(source, Point { x: -0., y: -0. }, 0.5 * 2., true).unwrap();
+        let result = draw(source, Point { x: -0., y: -0. }, 0.5 * 2., true, 1.).unwrap();
         assert_eq!(
             result,
             FoodImageDraw::Scaled {
@@ -513,7 +544,7 @@ mod tests {
             }
         );
         assert!(matches!(
-            draw(source, Point { x: 0., y: 0. }, 1., false).unwrap(),
+            draw(source, Point { x: 0., y: 0. }, 1., false, 1.).unwrap(),
             FoodImageDraw::Whole { .. }
         ));
     }

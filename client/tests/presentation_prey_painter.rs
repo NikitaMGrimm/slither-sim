@@ -81,6 +81,86 @@ fn input<'a>(w: &'a PreyWorld, a: &'a [BodyAsset]) -> PreyPaintInput<'a> {
         command_limit: MAX_PREY_PAINT_COMMANDS,
     }
 }
+
+#[test]
+fn user_zoom_scales_prey_and_glow_extents_without_changing_alpha_or_order() {
+    let mut world = PreyWorld::new();
+    add(&mut world, 1, 0., 0.);
+    mature(&mut world);
+    let assets = assets();
+    let stock = plan_prey(input(&world, &assets)).unwrap();
+    assert_eq!(
+        stock,
+        plan_prey_with_zoom(input(&world, &assets), 1.).unwrap()
+    );
+    for factor in [0.02, 0.5, 1.25] {
+        let zoomed = plan_prey_with_zoom(input(&world, &assets), factor).unwrap();
+        assert_eq!(stock.counts, zoomed.counts);
+        for (a, b) in stock
+            .early
+            .iter()
+            .chain(&stock.late)
+            .zip(zoomed.early.iter().chain(&zoomed.late))
+        {
+            assert_eq!(a.alpha, b.alpha);
+            assert_eq!(a.pass, b.pass);
+            let extent = |c: &PreyImageCommand| match c.draw {
+                FoodImageDraw::Whole { .. } => [
+                    f64::from(c.source.asset().width),
+                    f64::from(c.source.asset().height),
+                ],
+                FoodImageDraw::Scaled { destination, .. } => {
+                    [destination.width, destination.height]
+                }
+            };
+            for (x, y) in extent(a).into_iter().zip(extent(b)) {
+                assert!((x * factor - y).abs() < 1e-12);
+            }
+        }
+    }
+}
+
+#[test]
+fn reciprocal_zoom_preserves_a_growing_preys_declared_crop() {
+    let mut world = PreyWorld::new();
+    add(&mut world, 1, 0., 0.);
+    let assets = assets();
+    for _ in 0..1000 {
+        world
+            .advance(step(0.25), 0., |_| panic!("uneaten"))
+            .unwrap();
+        let scale = world.preys()[0].snapshot().scale;
+        if scale > 0.8 && scale < 1. && scale * scale.recip() == 1. {
+            let stock = plan_prey(input(&world, &assets)).unwrap();
+            let zoomed = plan_prey_with_zoom(input(&world, &assets), scale.recip()).unwrap();
+            for (a, b) in stock
+                .early
+                .iter()
+                .chain(&stock.late)
+                .zip(zoomed.early.iter().chain(&zoomed.late))
+            {
+                let (
+                    FoodImageDraw::Scaled {
+                        source: sa,
+                        destination: da,
+                    },
+                    FoodImageDraw::Scaled {
+                        source: sb,
+                        destination: db,
+                    },
+                ) = (a.draw, b.draw)
+                else {
+                    panic!("stock crop must survive combined unit scale")
+                };
+                assert_eq!(sa, sb);
+                assert_eq!(db.width, da.width * scale.recip());
+                assert_eq!(a.alpha, b.alpha);
+            }
+            return;
+        }
+    }
+    panic!("no near-mature scale witness");
+}
 fn pose(x: f64, y: f64) -> PreyEaterPose {
     PreyEaterPose {
         head: Point { x, y },

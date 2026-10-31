@@ -2394,7 +2394,7 @@ impl AnimatedClient {
                         }
                     }
                     PresentationEvent::FoodSpawn(spawn) => {
-                        if let Some(factory) = resolve_food(&spawn, next.camera.zoom())? {
+                        if let Some(factory) = resolve_food(&spawn, next.camera.automatic_zoom())? {
                             next.foods
                                 .spawn(
                                     FoodSpawn {
@@ -2405,7 +2405,7 @@ impl AnimatedClient {
                                         raw_color: spawn.raw_color,
                                         rapid: spawn.rapid,
                                     },
-                                    factory.input(next.camera.zoom()),
+                                    factory.input(next.camera.automatic_zoom()),
                                 )
                                 .map_err(ClientPresentationError::from)?;
                         } else if next.food_enabled {
@@ -2429,9 +2429,9 @@ impl AnimatedClient {
                         next.retire_entries();
                     }
                     PresentationEvent::PreySpawn(spawn) => {
-                        if let Some(factory) = resolve_prey(&spawn, next.camera.zoom())? {
+                        if let Some(factory) = resolve_prey(&spawn, next.camera.automatic_zoom())? {
                             next.preys
-                                .spawn(spawn, factory.input(next.camera.zoom()))
+                                .spawn(spawn, factory.input(next.camera.automatic_zoom()))
                                 .map_err(ClientPresentationError::from)?;
                         } else if next.prey_enabled {
                             return Err(ClientPresentationError::PreyFactoryRequired.into());
@@ -3031,6 +3031,18 @@ impl AnimatedClient {
                     .prepare_draw(metrics.corrected_head, metrics.logical_segments as u32)
                     .map_err(ClientPresentationError::from)?;
             }
+            if let Some(setup) = self.received.setup.as_ref() {
+                camera.prepare_zoom(
+                    [width, height],
+                    setup
+                        .radius
+                        .max(self.boundary.as_ref().map_or(0., BoundaryRadius::displayed)),
+                    Point {
+                        x: setup.grid_center,
+                        y: setup.grid_center,
+                    },
+                );
+            }
             let position = camera.position();
             let half_width = f64::from(width) / 2. / camera.zoom() + 84.;
             let half_height = f64::from(height) / 2. / camera.zoom() + 84.;
@@ -3073,6 +3085,18 @@ impl AnimatedClient {
             next.camera
                 .prepare_draw(metrics.corrected_head, metrics.logical_segments as u32)
                 .map_err(ClientPresentationError::from)?;
+            if let Some(setup) = next.received.setup.as_ref() {
+                next.camera.prepare_zoom(
+                    [width, height],
+                    setup
+                        .radius
+                        .max(next.boundary.as_ref().map_or(0., BoundaryRadius::displayed)),
+                    Point {
+                        x: setup.grid_center,
+                        y: setup.grid_center,
+                    },
+                );
+            }
             next.arena_edge_view
                 .prepare_draw(next.camera.position())
                 .map_err(ClientPresentationError::from)?;
@@ -3347,6 +3371,11 @@ impl AnimatedClient {
     pub fn set_zoom(&mut self, zoom: f64) -> Result<(), ClientPresentationError> {
         self.camera.set_zoom(zoom)?;
         Ok(())
+    }
+
+    /// Adjust the session-only presentation preference; adapters admit play input.
+    pub fn wheel_zoom(&mut self, notches: f64) {
+        self.camera.wheel_zoom(notches);
     }
 
     /// Latest committed received state, including food and protocol caches/counters.

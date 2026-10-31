@@ -15,6 +15,9 @@ mod food;
 #[cfg(windows)]
 #[path = "../tests/support/announcement_tape.rs"]
 mod tape;
+#[cfg(windows)]
+#[path = "frame_perf/zoom.rs"]
+mod zoom;
 
 #[cfg(windows)]
 struct Counting;
@@ -283,17 +286,18 @@ fn run(output: &Path) -> Result<()> {
 }
 #[cfg(windows)]
 fn main() {
-    if std::env::args().nth(1).as_deref() == Some("--cpu-food") {
-        if let Err(e) = food::run() {
-            eprintln!("FRAME_PERF_FAILED: {e}");
-            std::process::exit(1);
-        }
-        return;
-    }
-    let output = std::env::args_os()
-        .nth(1)
-        .expect("new external output directory");
-    if let Err(e) = run(Path::new(&output)) {
+    let mut args = std::env::args_os().skip(1);
+    let first = args.next().expect("[--cpu-food|--zoom] new external output directory");
+    let result = if first == "--cpu-food" {
+        food::run()
+    } else if first == "--zoom" {
+        zoom::run(Path::new(
+            &args.next().expect("new external output directory"),
+        ))
+    } else {
+        run(Path::new(&first))
+    };
+    if let Err(e) = result {
         eprintln!("FRAME_PERF_FAILED: {e}");
         std::process::exit(1);
     }

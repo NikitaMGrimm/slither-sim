@@ -25,7 +25,7 @@ mod desktop {
     };
     use winit::{
         application::ApplicationHandler,
-        event::{ElementState, MouseButton, WindowEvent},
+        event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
         event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
         keyboard::{KeyCode, PhysicalKey},
         window::{Window, WindowId},
@@ -953,6 +953,17 @@ mod desktop {
                         )?;
                     }
                     WindowEvent::ScaleFactorChanged { .. } => r.schedule.invalidate(),
+                    WindowEvent::MouseWheel { delta, .. } => {
+                        let notches = match delta {
+                            MouseScrollDelta::LineDelta(_, y) => f64::from(y),
+                            // Forty logical pixels is one notch; preserve fractional
+                            // precision and device scale rather than rounding to lines.
+                            MouseScrollDelta::PixelDelta(p) => p.y / r.window.scale_factor() / 40.,
+                        };
+                        if r.login.wheel_zoom(&mut r.game, notches) {
+                            r.schedule.invalidate();
+                        }
+                    }
                     WindowEvent::CursorMoved { position, .. } => {
                         let d = r.window.scale_factor();
                         r.cursor = slither_client::desktop_input::mouse_client_position(

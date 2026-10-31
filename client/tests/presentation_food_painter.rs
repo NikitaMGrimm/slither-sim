@@ -112,6 +112,82 @@ fn calls(plan: &FoodPaintPlan) -> impl Iterator<Item = &FoodImageCommand> {
 }
 
 #[test]
+fn user_zoom_scales_all_food_passes_and_omits_subpixel_food_only_when_zoomed_out() {
+    let palette = Palette::new();
+    let assets = palette.assets();
+    let mut world = FoodWorld::new();
+    palette.spawn(&mut world, 1, Point { x: 12., y: 13. });
+    mature(&mut world);
+    let stock = plan_food(input(&world, &assets)).unwrap();
+    assert_eq!(
+        stock,
+        plan_food_with_zoom(input(&world, &assets), vec![], vec![], 1.).unwrap()
+    );
+    for factor in [0.25, 0.5, 1.25] {
+        let zoomed = plan_food_with_zoom(input(&world, &assets), vec![], vec![], factor).unwrap();
+        assert_eq!(stock.counts, zoomed.counts);
+        for (a, b) in calls(&stock).zip(calls(&zoomed)) {
+            assert_eq!(a.alpha, b.alpha);
+            assert_eq!(a.pass, b.pass);
+            let FoodImageDraw::Scaled { destination, .. } = b.draw else {
+                panic!("expected scaled sprite")
+            };
+            let [width, height] = match a.draw {
+                FoodImageDraw::Whole { .. } => [
+                    f64::from(a.source.asset().width),
+                    f64::from(a.source.asset().height),
+                ],
+                FoodImageDraw::Scaled { destination, .. } => {
+                    [destination.width, destination.height]
+                }
+            };
+            assert_eq!(destination.width, width * factor);
+            assert_eq!(destination.height, height * factor);
+        }
+    }
+    let tiny = plan_food_with_zoom(input(&world, &assets), vec![], vec![], 0.001).unwrap();
+    assert_eq!(tiny.counts.total(), 0);
+    assert_eq!(tiny.early.capacity() + tiny.late.capacity(), 0);
+}
+
+#[test]
+fn reciprocal_zoom_preserves_a_growing_foods_declared_crop() {
+    let palette = Palette::new();
+    let assets = palette.assets();
+    let mut world = FoodWorld::new();
+    palette.spawn(&mut world, 1, Point { x: 12., y: 13. });
+    for _ in 0..1000 {
+        world.advance(step(0.25), |_| panic!("uneaten")).unwrap();
+        let scale = world.foods()[0].snapshot().scale;
+        if scale > 0.8 && scale < 1. && scale * scale.recip() == 1. {
+            let stock = plan_food(input(&world, &assets)).unwrap();
+            let zoomed =
+                plan_food_with_zoom(input(&world, &assets), vec![], vec![], scale.recip()).unwrap();
+            for (a, b) in calls(&stock).zip(calls(&zoomed)) {
+                let (
+                    FoodImageDraw::Scaled {
+                        source: sa,
+                        destination: da,
+                    },
+                    FoodImageDraw::Scaled {
+                        source: sb,
+                        destination: db,
+                    },
+                ) = (a.draw, b.draw)
+                else {
+                    panic!("stock crop must survive combined unit scale")
+                };
+                assert_eq!(sa, sb);
+                assert_eq!(db.width, da.width * scale.recip());
+                assert_eq!(a.alpha, b.alpha);
+            }
+            return;
+        }
+    }
+    panic!("no near-mature scale witness");
+}
+
+#[test]
 fn retired_food_storage_preserves_barriers_and_reuses_both_lanes() {
     let palette = Palette::new();
     let assets = palette.assets();

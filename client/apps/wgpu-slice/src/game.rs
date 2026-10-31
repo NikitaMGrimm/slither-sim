@@ -1413,10 +1413,30 @@ impl LocalGame {
     pub fn blur(&mut self) {
         self.input.blur();
     }
+    /// Returns whether play consumed the wheel. Menus route their input first.
+    pub fn wheel_zoom(&mut self, notches: f64) -> bool {
+        if self.phase() != Phase::Playing
+            || !notches.is_finite()
+            || notches == 0.
+            || self.client.control_view().own.is_none_or(|own| own.dead)
+        {
+            return false;
+        }
+        self.client.wheel_zoom(notches);
+        // A prepared candidate can be waiting for presentation acknowledgement.
+        // Keep its preference current without changing its immutable picture.
+        if let Some(world) = self.work.as_mut().and_then(|w| w.world.as_mut()) {
+            world.wheel_zoom(notches);
+        }
+        true
+    }
     pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
         latency::generation(self.generation);
         let v = self.client.control_view();
         let head = v.own.map(|o| o.raw_head).unwrap_or_default();
+        // Uniform zoom cancels from following-camera heading. Preserve stock
+        // CSS coordinates/dead zone; the non-following projection below receives
+        // the displayed (zoomed) scale through control_view, not the stock scale.
         let args = [
             x,
             y,

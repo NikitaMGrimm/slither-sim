@@ -1,6 +1,6 @@
 //! Camera following and automatic zoom have an explicit draw clock.
 
-use super::{CameraCorrections, PresentationError, finite};
+use super::{CameraCorrections, PresentationError, UserZoom, finite};
 use crate::state::Point;
 
 /// Initial desktop zoom before draw-driven length adjustment.
@@ -10,7 +10,9 @@ pub const INITIAL_ZOOM: f64 = 0.9 * 18. / 14.;
 #[derive(Clone, Debug, PartialEq)]
 pub struct FollowCamera {
     position: Point,
-    zoom: f64,
+    automatic_zoom: f64,
+    displayed_zoom: f64,
+    user_zoom: UserZoom,
     follows: bool,
     corrections: CameraCorrections,
 }
@@ -19,7 +21,9 @@ impl Default for FollowCamera {
     fn default() -> Self {
         Self {
             position: Point::default(),
-            zoom: INITIAL_ZOOM,
+            automatic_zoom: INITIAL_ZOOM,
+            displayed_zoom: INITIAL_ZOOM,
+            user_zoom: UserZoom::default(),
             follows: true,
             corrections: CameraCorrections::default(),
         }
@@ -29,7 +33,8 @@ impl Default for FollowCamera {
 impl FollowCamera {
     /// Clear offsets and restore initial zoom, retaining position, preference and ring phase.
     pub(crate) fn reset_world(&mut self) {
-        self.zoom = INITIAL_ZOOM;
+        self.automatic_zoom = INITIAL_ZOOM;
+        self.displayed_zoom = INITIAL_ZOOM;
         self.corrections.clear();
     }
 
@@ -41,7 +46,8 @@ impl FollowCamera {
         }
         Ok(Self {
             position,
-            zoom,
+            automatic_zoom: zoom,
+            displayed_zoom: zoom,
             ..Self::default()
         })
     }
@@ -64,7 +70,8 @@ impl FollowCamera {
         if zoom <= 0. {
             return Err(PresentationError);
         }
-        self.zoom = zoom;
+        self.automatic_zoom = zoom;
+        self.displayed_zoom = zoom;
         Ok(())
     }
 
@@ -107,12 +114,12 @@ impl FollowCamera {
     ) -> Result<(), PresentationError> {
         finite(&[corrected_head.x, corrected_head.y])?;
         let target = 0.64285 + 0.514285714 / ((f64::from(logical_segments) + 16.) / 36.).max(1.);
-        let zoom = if self.zoom < target {
-            (self.zoom + 0.0002).min(target)
-        } else if self.zoom > target {
-            (self.zoom - 0.0002).max(target)
+        let zoom = if self.automatic_zoom < target {
+            (self.automatic_zoom + 0.0002).min(target)
+        } else if self.automatic_zoom > target {
+            (self.automatic_zoom - 0.0002).max(target)
         } else {
-            self.zoom
+            self.automatic_zoom
         };
         let mut corrections = self.corrections.clone();
         corrections.advance_draw();
@@ -127,7 +134,8 @@ impl FollowCamera {
         };
         finite(&[position.x, position.y, zoom])?;
         self.position = position;
-        self.zoom = zoom;
+        self.automatic_zoom = zoom;
+        self.displayed_zoom = zoom;
         self.corrections = corrections;
         Ok(())
     }
@@ -139,7 +147,34 @@ impl FollowCamera {
 
     /// Current desktop zoom.
     pub fn zoom(&self) -> f64 {
-        self.zoom
+        self.displayed_zoom
+    }
+
+    /// Stock scale for creation-time sprite selection, independent of the wheel.
+    pub fn automatic_zoom(&self) -> f64 {
+        self.automatic_zoom
+    }
+
+    /// Session preference, retained by world resets.
+    pub fn wheel_zoom(&mut self, notches: f64) {
+        self.user_zoom.wheel(notches);
+    }
+
+    /// Apply presentation-only zoom after stock following, before any culling.
+    pub(crate) fn prepare_zoom(&mut self, viewport: [u32; 2], radius: f64, center: Point) {
+        self.displayed_zoom =
+            self.user_zoom
+                .prepare(self.automatic_zoom, viewport, radius, center, self.position);
+    }
+
+    /// Scale names relative to their stock sizing, leaving the default exact.
+    pub fn user_zoom_factor(&self) -> f64 {
+        self.displayed_zoom / self.automatic_zoom
+    }
+
+    /// Whether the user has adjusted the view in this session.
+    pub fn user_zoom_active(&self) -> bool {
+        self.user_zoom.active()
     }
 
     /// Whether the next anchor/draw follows the own head.

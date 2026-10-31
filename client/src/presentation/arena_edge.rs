@@ -97,13 +97,22 @@ pub struct ArenaEdgePlan {
 /// Plan both complete paths before submission, or omit them at the strict distance gate.
 /// This has no quality, visibility, connection, lifecycle or update-clock input.
 pub fn plan_arena_edge(input: ArenaEdgeInput) -> Result<Option<ArenaEdgePlan>, PresentationError> {
+    plan_arena_edge_with_zoom(input, false)
+}
+
+/// At user zoom-out the entire circle can be visible, beyond the stock local
+/// arc/distance gate. Use the same bounded 40 steps for its complete perimeter.
+pub fn plan_arena_edge_with_zoom(
+    input: ArenaEdgeInput,
+    whole_circle: bool,
+) -> Result<Option<ArenaEdgePlan>, PresentationError> {
     finite(&[input.camera.x, input.camera.y, input.zoom, input.radius])?;
     if input.width == 0 || input.height == 0 || input.zoom <= 0. || input.radius < 0. {
         return Err(PresentationError);
     }
     let line_width = 23. * input.zoom;
     finite(&[line_width])?;
-    if (input.radius - input.view.distance).abs() >= 4000. {
+    if !whole_circle && (input.radius - input.view.distance).abs() >= 4000. {
         return Ok(None);
     }
     let mut plan = ArenaEdgePlan {
@@ -130,15 +139,28 @@ pub fn plan_arena_edge(input: ArenaEdgeInput) -> Result<Option<ArenaEdgePlan>, P
         } else {
             &mut plan.stroke[..]
         };
-        points[0] = project(input.view.angle - 2000. / k, input.radius)?;
+        let angle = |j: f64| {
+            if whole_circle {
+                j / 2000. * PI
+            } else {
+                input.view.angle + j / k
+            }
+        };
+        points[0] = project(
+            if whole_circle {
+                angle(-2000.)
+            } else {
+                input.view.angle - 2000. / k
+            },
+            input.radius,
+        )?;
         for (index, j) in (-2000..=2000).step_by(100).enumerate() {
-            points[index + 1] = project(input.view.angle + f64::from(j) / k, input.radius)?;
+            points[index + 1] = project(angle(f64::from(j)), input.radius)?;
         }
         if pass == 0 {
             for index in 0..=40 {
                 let j = 2000 - index as i32 * 100;
-                points[index + 42] =
-                    project(input.view.angle + f64::from(j) / k, input.radius + 4000.)?;
+                points[index + 42] = project(angle(f64::from(j)), input.radius + 4000.)?;
             }
         }
     }
