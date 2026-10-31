@@ -10,7 +10,7 @@ use super::{
     food::{FoodChanges, food_identity, food_updates},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
-    snakes::{BodyBounds, SnakeReports},
+    snakes::{BodyBounds, ReportObservation, SnakeReports},
     snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
 };
 use crate::{Simulator, client::encode, model::Snake, physics, simulator::PickupItem};
@@ -51,19 +51,6 @@ struct BroadcastView<'a> {
     food_eaters: &'a BTreeMap<(u64, u64), u16>,
     prey_eaters: &'a BTreeMap<u64, u16>,
     minimap_side: usize,
-}
-
-/// Only next-broadcast feedback may change while report opportunities are borrowed.
-#[derive(Clone, Debug, Default)]
-pub(super) struct ReportObservation {
-    motion_stale: bool,
-    fam_stale: bool,
-}
-impl ReportObservation {
-    fn observe(&mut self, report: &SnakeReports, known: &KnownSnake) {
-        self.motion_stale |= [known.heading, known.wanted, known.speed] != report.motion;
-        self.fam_stale |= known.fam != report.fam;
-    }
 }
 
 /// Rows the stock leaderboard shows.
@@ -165,16 +152,11 @@ fn wire_score(snake: &Snake) -> f64 {
 
 impl SimulatorBackend {
     #[cfg(test)]
-    pub(super) fn reports_for_trace(&self) -> Vec<SnakeReports> {
+    pub(super) fn reports_for_trace(&self) -> Vec<String> {
         self.reports
             .iter()
             .zip(&self.presenter.observations)
-            .map(|(report, observed)| {
-                let mut report = report.clone();
-                report.motion_stale |= observed.motion_stale;
-                report.fam_stale |= observed.fam_stale;
-                report
-            })
+            .map(|(report, observed)| report.trace(observed))
             .collect()
     }
 
@@ -565,9 +547,6 @@ impl SimulatorBackend {
         let now = self.time() + self.wall_offset;
         for (slot, snake) in self.world.snakes().iter().enumerate() {
             let reports = &mut self.reports[slot];
-            let observed = std::mem::take(&mut self.presenter.observations[slot]);
-            reports.motion_stale |= observed.motion_stale;
-            reports.fam_stale |= observed.fam_stale;
             if !snake.alive {
                 reports.motion_due = false;
                 reports.fam_due = false;
@@ -587,6 +566,7 @@ impl SimulatorBackend {
                     fam,
                     now,
                     self.config.delivery,
+                    &mut self.presenter.observations[slot],
                 );
                 continue;
             }
@@ -596,6 +576,7 @@ impl SimulatorBackend {
                 fam,
                 self.tick,
                 self.config.delivery,
+                &mut self.presenter.observations[slot],
             );
         }
         Ok(())

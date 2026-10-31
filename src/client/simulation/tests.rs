@@ -2445,24 +2445,25 @@ fn a_viewer_holding_a_newer_value_is_corrected_when_the_snake_returns() {
     };
     let (a, b) = ([10, 20, 30], [10, 21, 30]);
     let mut reports = SnakeReports::default();
-    reports.update(1, [0; 3], 100, 0, DeliveryProfile::Official);
-    reports.update(1, a, 150, 10, DeliveryProfile::Official);
+    let mut observed = snakes::ReportObservation::default();
+    reports.update(1, [0; 3], 100, 0, DeliveryProfile::Official, &mut observed);
+    reports.update(1, a, 150, 10, DeliveryProfile::Official, &mut observed);
     assert!(reports.motion_due && reports.fam_due);
     // A viewer appearing at tick 11 holds B; a growth anchor told every
     // viewer mass 200 while the mass gate was closed.
-    reports.update(1, b, 200, 11, DeliveryProfile::Official);
-    reports.observe(&known(b, 200));
+    reports.update(1, b, 200, 11, DeliveryProfile::Official, &mut observed);
+    observed.observe(&reports, &known(b, 200));
     // The snake returns to the reported A and mass 150 before the gates
     // open: six ticks for motion, 15 for mass.
     for tick in 12..25 {
-        reports.update(1, a, 150, tick, DeliveryProfile::Official);
+        reports.update(1, a, 150, tick, DeliveryProfile::Official, &mut observed);
         assert_eq!(reports.motion_due, tick == 16, "{tick}");
         assert!(!reports.fam_due, "{tick}");
     }
     assert_eq!(reports.motion, a);
-    reports.update(1, a, 150, 25, DeliveryProfile::Official);
+    reports.update(1, a, 150, 25, DeliveryProfile::Official, &mut observed);
     assert!(reports.fam_due && reports.fam == 150);
-    reports.update(1, a, 150, 40, DeliveryProfile::Official);
+    reports.update(1, a, 150, 40, DeliveryProfile::Official, &mut observed);
     assert!(!reports.motion_due && !reports.fam_due);
 }
 
@@ -2737,19 +2738,27 @@ fn responsive_inputs_reach_self_and_opponents_in_the_next_tick() {
 #[test]
 fn responsive_held_target_keeps_six_tick_motion_spacing_and_prompt_mass() {
     let mut reports = SnakeReports::default();
+    let mut observed = snakes::ReportObservation::default();
     let delivery = DeliveryProfile::Responsive;
-    reports.update(1, [0, 120, 80], 0, 0, delivery);
+    reports.update(1, [0, 120, 80], 0, 0, delivery, &mut observed);
     let mut sent = Vec::new();
     for tick in 1..=60 {
-        reports.update(1, [tick as u8, 120, 80], tick as u32, tick, delivery);
+        reports.update(
+            1,
+            [tick as u8, 120, 80],
+            tick as u32,
+            tick,
+            delivery,
+            &mut observed,
+        );
         if reports.motion_due {
             sent.push(tick);
         }
         assert!(reports.fam_due, "changed mass at {tick}");
     }
     assert_eq!(sent, (1..=60).step_by(6).collect::<Vec<_>>());
-    reports.update(1, [60, 120, 80], 60, 100, delivery);
-    reports.update(1, [60, 120, 80], 60, 106, delivery);
+    reports.update(1, [60, 120, 80], 60, 100, delivery, &mut observed);
+    reports.update(1, [60, 120, 80], 60, 106, delivery, &mut observed);
     assert!(!reports.motion_due && !reports.fam_due);
 }
 const ANCHORS: &[u8] = b"gn=+";
@@ -4346,7 +4355,15 @@ fn variable_ticks_deliver_growth_boost_anchors_and_peer_turns() {
 #[test]
 fn adaptive_report_gates_follow_elapsed_time_and_reset_on_new_life() {
     let mut reports = SnakeReports::default();
-    reports.update_timed(1, [0, 0, 80], 0, 0., DeliveryProfile::Official);
+    let mut observed = snakes::ReportObservation::default();
+    reports.update_timed(
+        1,
+        [0, 0, 80],
+        0,
+        0.,
+        DeliveryProfile::Official,
+        &mut observed,
+    );
     let mut motion = Vec::new();
     let mut mass = Vec::new();
     for (i, now) in [0.040, 0.097, 0.177, 0.220, 0.260, 0.317]
@@ -4359,6 +4376,7 @@ fn adaptive_report_gates_follow_elapsed_time_and_reset_on_new_life() {
             i as u32 + 1,
             now,
             DeliveryProfile::Official,
+            &mut observed,
         );
         if reports.motion_due {
             motion.push(i);
@@ -4369,9 +4387,23 @@ fn adaptive_report_gates_follow_elapsed_time_and_reset_on_new_life() {
     }
     assert_eq!(motion, [0, 1, 2, 3, 5]);
     assert_eq!(mass, [0, 2, 5]);
-    reports.update_timed(2, [0, 0, 80], 0, 0.320, DeliveryProfile::Official);
+    reports.update_timed(
+        2,
+        [0, 0, 80],
+        0,
+        0.320,
+        DeliveryProfile::Official,
+        &mut observed,
+    );
     assert!(!reports.motion_due && !reports.fam_due);
-    reports.update_timed(2, [1, 0, 80], 1, 0.321, DeliveryProfile::Official);
+    reports.update_timed(
+        2,
+        [1, 0, 80],
+        1,
+        0.321,
+        DeliveryProfile::Official,
+        &mut observed,
+    );
     assert!(reports.motion_due && reports.fam_due);
 }
 

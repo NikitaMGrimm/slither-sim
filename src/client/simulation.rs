@@ -216,7 +216,7 @@ impl SimulatorBackend {
                 legacy_maps: crate::client::encode13::FullMapCache::default(),
                 next_leaderboard: 1,
                 prey_clocks: BTreeMap::new(),
-                observations: vec![broadcast::ReportObservation::default(); config.agents],
+                observations: vec![snakes::ReportObservation::default(); config.agents],
                 coverage_grid: None,
                 coverage_bounds: BodyBounds::default(),
             },
