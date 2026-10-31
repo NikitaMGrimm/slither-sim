@@ -1,5 +1,5 @@
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-//! Authored glyph-half regressions through the production native pointer seam.
+//! Authored synthetic glyph-half regressions through the production native pointer seam.
 use slither_client::{
     champion::{ChampionState, MESSAGE},
     login_controls::{self, NICKNAME},
