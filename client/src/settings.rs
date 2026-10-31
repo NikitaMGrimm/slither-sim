@@ -5,42 +5,63 @@ use crate::{menu_controls::*, menu_preferences::MenuQuality, menu_theme::Control
 pub const MAX_SETTINGS_BYTES: usize = 64;
 /// Quality toggle within the settings panel.
 pub const QUALITY: ControlId = ControlId(2);
+/// Requested world attachment resolution, independent of Quality.
+pub const RESOLUTION: ControlId = ControlId(5);
 /// Close without reverting the immediately applied preference.
 pub const DONE: ControlId = ControlId(3);
 /// Stable panel identity, separate from login, champion and directory.
 pub const PANEL: u16 = 4;
+
+/// World raster policy; projection and input are identical in both modes.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum WorldResolution {
+    /// Existing capped world raster and linear presentation blit.
+    #[default]
+    Original,
+    /// Physical-size attachment, resolving directly into the presentation image.
+    Native,
+}
 
 /// Requested settings, never the renderer's adaptive runtime state.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SettingsPreferences {
     /// Existing next-Play quality mode.
     pub quality: MenuQuality,
+    /// Requested attachment policy. Unsupported sizes keep this preference.
+    pub resolution: WorldResolution,
 }
 impl SettingsPreferences {
-    /// Strict v1 record. Future versions remain untouched in host storage.
+    /// Strict v2 record, or v1 migrated with Original; no startup repair writes.
     pub fn parse(record: &str) -> Option<Self> {
         if record.len() > MAX_SETTINGS_BYTES {
             return None;
         }
+        let (quality, resolution) = match record {
+            "1:0" | "2:0:original" => (MenuQuality::Low, WorldResolution::Original),
+            "1:1" | "2:1:original" => (MenuQuality::High, WorldResolution::Original),
+            "2:0:native" => (MenuQuality::Low, WorldResolution::Native),
+            "2:1:native" => (MenuQuality::High, WorldResolution::Native),
+            _ => return None,
+        };
         Some(Self {
-            quality: match record {
-                "1:0" => MenuQuality::Low,
-                "1:1" => MenuQuality::High,
-                _ => return None,
-            },
+            quality,
+            resolution,
         })
     }
     /// No startup writes; invalid/missing records use the exact legacy mapping.
     pub fn restore(record: Option<&str>, legacy: Option<&str>) -> Self {
         record.and_then(Self::parse).unwrap_or(Self {
             quality: MenuQuality::restore(legacy),
+            resolution: WorldResolution::Original,
         })
     }
     /// Canonical ASCII record, independent of the appearance schema.
     pub fn serialize(self) -> &'static str {
-        match self.quality {
-            MenuQuality::High => "1:1",
-            MenuQuality::Low => "1:0",
+        match (self.quality, self.resolution) {
+            (MenuQuality::High, WorldResolution::Original) => "2:1:original",
+            (MenuQuality::Low, WorldResolution::Original) => "2:0:original",
+            (MenuQuality::High, WorldResolution::Native) => "2:1:native",
+            (MenuQuality::Low, WorldResolution::Native) => "2:0:native",
         }
     }
 }
@@ -53,6 +74,7 @@ pub struct SettingsState {
     generation: u64,
     pending: Option<&'static str>,
     not_saved: bool,
+    native_available: bool,
 }
 impl SettingsState {
     /// Restore preferences without scheduling storage work.
@@ -63,6 +85,7 @@ impl SettingsState {
             generation: 0,
             pending: None,
             not_saved: false,
+            native_available: true,
         }
     }
     /// Copied requested preferences, also used to freeze Play.
@@ -106,6 +129,19 @@ impl SettingsState {
                 }
             }
             DONE => self.close(),
+            RESOLUTION => {
+                if let Some(native) = intent.checked {
+                    let resolution = if native {
+                        WorldResolution::Native
+                    } else {
+                        WorldResolution::Original
+                    };
+                    if resolution != self.preferences.resolution {
+                        self.preferences.resolution = resolution;
+                        self.pending = Some(self.preferences.serialize());
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -121,11 +157,15 @@ impl SettingsState {
     pub fn storage_result(&mut self, saved: bool) {
         self.not_saved = !saved;
     }
-    /// Build a Quality-only panel. Narrow windows wrap help without shrinking type.
+    /// Host preflight reports capability without changing the requested preference.
+    pub fn native_available(&mut self, available: bool) {
+        self.native_available = available;
+    }
+    /// Both independent settings, with readable wrapped help on narrow windows.
     pub fn panel(&self, viewport: [f64; 2]) -> PanelView {
         let width = 560_f64.min((viewport[0] - 32.).max(1.));
         let narrow = width < 480.;
-        let height = if narrow { 352. } else { 320. };
+        let height = if narrow { 512. } else { 400. };
         let x = (viewport[0] - width) / 2.;
         let y = ((viewport[1] - height) / 2.).max(8.);
         let mut controls = Vec::new();
@@ -146,14 +186,14 @@ impl SettingsState {
         add(
             ControlId(0),
             [0., 0., width, height],
-            S::StudioSurface,
+            S::SettingsSurface,
             "Settings",
             None,
             ControlKind::Surface,
         );
         add(
             ControlId(1),
-            [24., 20., width - 48., 36.],
+            [24., 16., width - 48., 32.],
             S::Heading,
             "Settings",
             None,
@@ -161,84 +201,122 @@ impl SettingsState {
                 text: "Settings".into(),
             },
         );
-        add(
-            ControlId(4),
-            if narrow {
-                [24., 60., width - 48., 24.]
+        for (row, id, name, caption, checked) in [
+            (
+                0,
+                QUALITY,
+                "Quality",
+                "High quality",
+                self.preferences.quality == MenuQuality::High,
+            ),
+            (
+                1,
+                RESOLUTION,
+                "World resolution",
+                "Native/sharp",
+                self.preferences.resolution == WorldResolution::Native,
+            ),
+        ] {
+            let top = if narrow {
+                56. + f64::from(row) * 136.
             } else {
-                [24., 80., 120., 48.]
-            },
-            S::HelpText,
-            "Quality",
-            None,
-            ControlKind::Label {
-                text: "Quality".into(),
-            },
-        );
-        add(
-            QUALITY,
-            if narrow {
-                [24., 92., width - 48., 48.]
-            } else {
-                [168., 80., width - 192., 48.]
-            },
-            S::SecondaryButton,
-            "High quality",
-            Some(0),
-            ControlKind::Toggle {
-                label: "High quality".into(),
-                checked: self.preferences.quality == MenuQuality::High,
-            },
-        );
-        let lines: &[&str] = if width < 480. {
-            &[
-                "Off: Low. High adapts",
-                "effects to load.",
-                "Quality applies next game.",
-            ]
-        } else {
-            &[
-                "Off: Low. High adapts effects to load.",
-                "Quality applies next game.",
-            ]
-        };
-        for (index, line) in lines.iter().enumerate() {
+                60. + f64::from(row) * 104.
+            };
             add(
-                ControlId(10 + index as u16),
+                ControlId(6 + row),
                 [
                     24.,
-                    (if narrow { 148. } else { 140. }) + index as f64 * 24.,
-                    width - 48.,
-                    24.,
+                    top,
+                    if narrow { width - 48. } else { 168. },
+                    if narrow { 24. } else { 40. },
                 ],
                 S::HelpText,
-                line,
+                name,
                 None,
-                ControlKind::Label {
-                    text: (*line).into(),
+                ControlKind::Label { text: name.into() },
+            );
+            add(
+                id,
+                if narrow {
+                    [24., top + 28., width - 48., 40.]
+                } else {
+                    [196., top, width - 220., 40.]
+                },
+                S::SecondaryButton,
+                caption,
+                Some(row),
+                ControlKind::Toggle {
+                    label: caption.into(),
+                    checked,
                 },
             );
+            let lines = if row == 0 {
+                ["Off: Low. High adapts.", "Quality applies next game"]
+            } else {
+                ["Sharper world; higher GPU use.", "Same view area."]
+            };
+            for (line, text) in lines.iter().enumerate() {
+                add(
+                    ControlId(10 + row * 2 + line as u16),
+                    [
+                        24.,
+                        top + if narrow { 72. } else { 44. } + line as f64 * 24.,
+                        width - 48.,
+                        24.,
+                    ],
+                    S::SettingsHelp,
+                    text,
+                    None,
+                    ControlKind::Label {
+                        text: (*text).into(),
+                    },
+                );
+            }
+        }
+        if self.preferences.resolution == WorldResolution::Native && !self.native_available {
+            let lines: &[&str] = if narrow {
+                &["Native unavailable", "at this size"]
+            } else {
+                &["Native unavailable at this size"]
+            };
+            for (i, text) in lines.iter().enumerate() {
+                add(
+                    ControlId(20 + i as u16),
+                    [
+                        24.,
+                        if narrow { 320. } else { 272. } + i as f64 * 24.,
+                        width - 48.,
+                        24.,
+                    ],
+                    S::SettingsHelp,
+                    text,
+                    None,
+                    ControlKind::Label {
+                        text: (*text).into(),
+                    },
+                );
+            }
         }
         if self.not_saved {
-            let lines: &[&str] = if width < 480. {
+            let lines: &[&str] = if narrow {
                 &["Not saved;", "applies this session"]
             } else {
                 &["Not saved; applies this session"]
             };
-            for (index, line) in lines.iter().enumerate() {
+            for (i, text) in lines.iter().enumerate() {
                 add(
-                    ControlId(20 + index as u16),
+                    ControlId(24 + i as u16),
                     [
                         24.,
-                        (if narrow { 228. } else { 216. }) + index as f64 * 24.,
+                        if narrow { 376. } else { 304. } + i as f64 * 24.,
                         width - 48.,
                         24.,
                     ],
-                    S::HelpText,
-                    line,
+                    S::SettingsHelp,
+                    text,
                     None,
                     ControlKind::Label {
-                        text: (*line).into(),
+                        text: (*text).into(),
                     },
                 );
             }
@@ -248,7 +326,7 @@ impl SettingsState {
             [(width - 112.) / 2., height - 56., 112., 40.],
             S::PrimaryButton,
             "Done",
-            Some(1),
+            Some(2),
             ControlKind::Button {
                 label: "Done".into(),
             },
@@ -258,7 +336,7 @@ impl SettingsState {
         backdrop.placement = Placement::rect(0., 0., viewport[0], viewport[1]);
         backdrop.kind = ControlKind::Backdrop;
         backdrop.name = "Settings backdrop".into();
-        backdrop.alpha = 0.88; // Same modal backdrop as the server picker.
+        backdrop.alpha = 0.88;
         controls.insert(0, backdrop);
         PanelView {
             id: PANEL,

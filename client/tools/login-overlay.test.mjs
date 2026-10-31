@@ -16,7 +16,8 @@ function fixture(extra = {}, adapter = {}, storage) {
   const actions=[],calls=[];let alive=true, composingValue='';
   class Policy {
     restore_settings(...args){calls.push(['restore_settings',...args]);}
-    settings_record(){return '1:0';}
+    settings_record(){return '2:0:original';}
+    world_resolution(){return 'original';}
     edit(value){composingValue=value;return value;}
     action(...args){actions.push(args);return args[0]==='quality'?'0':undefined;}
     play_label(){return 'Play';}
@@ -57,7 +58,7 @@ test('settings storage migration reads without repair and writes only on explici
   assert.deepEqual(f.calls.find(x=>x[0]==='restore_settings'),['restore_settings','1:0','1']);
   f.ui.frame(0); assert.deepEqual(writes,[]);
   f.emit(f.ui.quality,'click');
-  assert.deepEqual(writes,[['slither-client-settings-v1','1:0'],['slither-client-quality-v1','0']]);
+  assert.deepEqual(writes,[['slither-client-settings-v1','2:0:original'],['slither-client-quality-v1','0']]);
   f.ui.dispose();
   const failed=fixture({}, {}, {getItem(){throw Error('unreadable');},setItem(){throw Error('unwritable');}});
   assert.deepEqual(failed.calls.find(x=>x[0]==='restore_settings'),['restore_settings',undefined,'1']);

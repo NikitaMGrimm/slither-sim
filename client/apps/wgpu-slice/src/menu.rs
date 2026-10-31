@@ -1177,6 +1177,127 @@ impl Composition<'_> {
         self.materials.insert(key, resource.clone());
         Ok(resource)
     }
+    // This uniform-colour panel can stretch its centre and straight edges. Keep
+    // corners/shadow at native raster density, retaining only the symmetric half.
+    fn settings_panel(
+        &mut self,
+        r: MenuRect,
+        tokens: SurfaceTokens,
+        alpha: f64,
+        clip: Option<MenuRect>,
+        raster_scale: f64,
+    ) -> Result<()> {
+        let scale = self.scale;
+        let pad = (12. * raster_scale).ceil() as u32;
+        let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;
+        let middle = (8. * raster_scale).ceil() as u32;
+        let atlas = [radius * 2 + middle; 2];
+        let padded = atlas.map(|n| n + 2 * pad);
+        let half = padded[0].div_ceil(2);
+        let resource = self.cached_material(
+            MaterialKey::Control(atlas, raster_scale.to_bits(), tokens, [0, 0]),
+            || {
+                let raster = materials::menu_control(
+                    atlas,
+                    f64::from(radius),
+                    tokens.colors,
+                    raster_scale,
+                    materials::MenuSurface::Compact,
+                )?;
+                let mut pixels = Vec::with_capacity((half * padded[1] * 4) as usize);
+                for row in raster.pixels.chunks_exact(padded[0] as usize * 4) {
+                    pixels.extend_from_slice(&row[..half as usize * 4]);
+                }
+                Ok(materials::RgbaImage {
+                    width: half,
+                    height: padded[1],
+                    pixels,
+                })
+            },
+        )?;
+        let edge = f64::from(radius + pad);
+        let width = r.width * scale + f64::from(2 * pad);
+        let height = r.height * scale + f64::from(2 * pad);
+        let xs = [
+            (0., edge, 0., edge),
+            (edge, width / 2. - edge, edge, f64::from(half) - edge),
+        ];
+        let ys = [
+            (0., edge, 0., edge),
+            (edge, height - 2. * edge, edge, f64::from(middle)),
+            (height - edge, edge, f64::from(padded[1]) - edge, edge),
+        ];
+        for mirrored in [false, true] {
+            for (dx, dw, sx, sw) in xs {
+                for (dy, dh, sy, sh) in ys {
+                    let mut draw = image(
+                        &resource,
+                        MenuRect {
+                            x: r.x
+                                + (if mirrored { width - dx - dw } else { dx } - f64::from(pad))
+                                    / scale,
+                            y: r.y + (dy - f64::from(pad)) / scale,
+                            width: dw / scale,
+                            height: dh / scale,
+                        },
+                        alpha,
+                    );
+                    draw.source = Some(BodyRect {
+                        x: sx,
+                        y: sy,
+                        width: sw,
+                        height: sh,
+                    });
+                    let source = draw.source.unwrap();
+                    let destination = draw.destination;
+                    let visible = clip.is_none_or(|clip| {
+                        let clipped = intersection(
+                            MenuRect {
+                                x: destination.x,
+                                y: destination.y,
+                                width: destination.width,
+                                height: destination.height,
+                            },
+                            clip,
+                        );
+                        if clipped.width <= 0. || clipped.height <= 0. {
+                            return false;
+                        }
+                        draw.source = Some(BodyRect {
+                            x: source.x
+                                + (clipped.x - destination.x) / destination.width * source.width,
+                            y: source.y
+                                + (clipped.y - destination.y) / destination.height * source.height,
+                            width: clipped.width / destination.width * source.width,
+                            height: clipped.height / destination.height * source.height,
+                        });
+                        draw.destination = BodyRect {
+                            x: clipped.x,
+                            y: clipped.y,
+                            width: clipped.width,
+                            height: clipped.height,
+                        };
+                        true
+                    });
+                    if visible {
+                        if mirrored {
+                            let crop = draw.source.as_mut().unwrap();
+                            crop.x = 2. * source.x + source.width - crop.x - crop.width;
+                            let d = draw.destination;
+                            draw.corners = Some([
+                                [d.x + d.width, d.y],
+                                [d.x, d.y],
+                                [d.x, d.y + d.height],
+                                [d.x + d.width, d.y + d.height],
+                            ]);
+                        }
+                        self.push(draw)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
     // Tile uniform middle strips in physical pixels. Only the bounded corner
     // atlas is rasterized; no wide field or tall surface becomes one texture.
     fn sliced(
@@ -1198,11 +1319,16 @@ impl Composition<'_> {
         if tokens.recipe == SurfaceRecipe::StudioButton {
             return self.studio_capsule(r, tokens, alpha, clip, control_scale);
         }
+        if tokens.recipe == SurfaceRecipe::SettingsPanel {
+            return self.settings_panel(r, tokens, alpha, clip, raster_scale);
+        }
         let surface = match tokens.recipe {
             SurfaceRecipe::Button | SurfaceRecipe::StudioButton => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
             SurfaceRecipe::Field | SurfaceRecipe::Panel => materials::MenuSurface::Nickname,
-            SurfaceRecipe::Compact | SurfaceRecipe::StudioPanel => materials::MenuSurface::Compact,
+            SurfaceRecipe::Compact | SurfaceRecipe::StudioPanel | SurfaceRecipe::SettingsPanel => {
+                materials::MenuSurface::Compact
+            }
         };
         let pad = (surface.padding() * raster_scale).ceil() as u32;
         let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;

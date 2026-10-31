@@ -930,7 +930,7 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
         login_controls::{NICKNAME, SETTINGS},
         menu_controls::ControlKind,
         menu_preferences::MenuQuality,
-        settings::{DONE, QUALITY},
+        settings::{DONE, QUALITY, RESOLUTION, WorldResolution},
     };
     use slither_wgpu_slice::login_native::NativeLogin;
     let validation = renderer
@@ -949,6 +949,9 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
         ([960., 540.], 3.),
         ([960., 540.], 4.),
         ([960., 540.], 5.),
+        ([960., 540.], 6.),
+        ([960., 540.], 7.),
+        ([960., 540.], 8.),
         ([360., 640.], 1.),
         ([360., 640.], 2.),
         ([360., 640.], 5.),
@@ -973,10 +976,13 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
             "not-saved",
             "done-focus",
             "disabled",
+            "native-focus",
+            "native-unavailable-not-saved",
         ] {
-            let high = matches!(state, "high-focus" | "high-pressed");
-            login.focus(QUALITY);
-            if (login.state.view(true).quality == MenuQuality::High) != high {
+            login.focus(RESOLUTION);
+            if (login.state.settings.preferences().resolution == WorldResolution::Native)
+                != state.starts_with("native")
+            {
                 login.activate(true);
                 now += 16.;
                 login.step(now, true, false)?;
@@ -984,7 +990,18 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
             login
                 .state
                 .settings
-                .storage_result(!matches!(state, "not-saved" | "not-saved-pressed"));
+                .native_available(state != "native-unavailable-not-saved");
+            let high = matches!(state, "high-focus" | "high-pressed");
+            login.focus(QUALITY);
+            if (login.state.view(true).quality == MenuQuality::High) != high {
+                login.activate(true);
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            login.state.settings.storage_result(!matches!(
+                state,
+                "not-saved" | "not-saved-pressed" | "native-unavailable-not-saved"
+            ));
             login.controls.set_progress(
                 QUALITY,
                 if matches!(state, "high-pressed" | "not-saved-pressed") {
@@ -995,6 +1012,17 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
             );
             if matches!(state, "done-focus" | "not-saved-pressed") {
                 login.focus(DONE);
+            }
+            login.controls.set_progress(
+                RESOLUTION,
+                if state == "native-unavailable-not-saved" {
+                    [1., 1.]
+                } else {
+                    [0., 0.]
+                },
+            );
+            if state.starts_with("native") {
+                login.focus(RESOLUTION);
             }
             let mut picture = login.prepare_host(extent, dpr, true, None)?;
             if state == "disabled" {
@@ -1069,7 +1097,7 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
         .output()
         .map_err(|e| e.to_string())?;
     let fonts = [slither_client::menu_theme::ControlStyle::Heading, slither_client::menu_theme::ControlStyle::HelpText, slither_client::menu_theme::ControlStyle::PrimaryButton].map(|role| serde_json::json!({"role":format!("{role:?}"),"face":TextCache::native_face(slither_client::menu_theme::MenuTheme::default().text_style(role))}));
-    let manifest = serde_json::json!({"revision":String::from_utf8_lossy(&revision.stdout).trim(),"fixture":"authored synthetic; no game servers or external art","fonts":fonts,"panel_at_960x540":[200,110,560,320],"settings_record":"1:<0|1>","measurements":measurements,"limits":{"slots":32,"bytes":4*1024*1024,"producer_quads":160,"producer_quads_dpr_1_to_2":64},"unverified":"physical input, visible-window behavior, owner appearance/feel and live servers"});
+    let manifest = serde_json::json!({"revision":String::from_utf8_lossy(&revision.stdout).trim(),"fixture":"authored synthetic; no game servers or external art","fonts":fonts,"panel_at_960x540":[200,70,560,400],"settings_record":"2:<0|1>:<original|native>","measurements":measurements,"limits":{"slots":32,"bytes":4*1024*1024,"producer_quads":160,"producer_quads_dpr_1_to_2":64,"menu_raster_density_cap":5},"unverified":"physical input, visible-window behavior, owner appearance/feel and live servers"});
     std::fs::write(
         output.join("settings.json"),
         serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,

@@ -423,6 +423,10 @@ mod desktop {
             let physical = [size.width, size.height];
             let dpr = self.window.scale_factor();
             self.host.resize(physical)?;
+            self.login
+                .state
+                .settings
+                .native_available(self.host.renderer.supports_native(physical));
             let extent = self.game.window_viewport(physical, dpr)?;
             if !self.host.prepare_present()? {
                 if self.host.is_occluded() {
@@ -552,10 +556,11 @@ mod desktop {
                 };
             }
             self.window.pre_present_notify();
-            match self
-                .host
-                .present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
-            {
+            match self.host.present_world_with_overlay(
+                &picture.frame,
+                picture.overlay.as_ref(),
+                self.login.state.settings.preferences().resolution,
+            ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {
                         self.login.studio.presented();

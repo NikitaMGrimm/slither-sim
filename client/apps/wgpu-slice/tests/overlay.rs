@@ -4,6 +4,85 @@
 mod tape;
 use slither_wgpu_slice::{game::LocalGame, render};
 
+#[test]
+fn resolution_policy_preserves_projection_camera_vertices_and_control_bytes() {
+    use slither_client::settings::WorldResolution::{Native, Original};
+    use slither_wgpu_slice::world_resolution::WorldTargetPlan;
+    for dpr in [1., 1.25, 1.5, 2.] {
+        let physical = [1920, 1080];
+        let mut games = [tape::playing(), tape::playing()];
+        for game in &mut games {
+            game.window_viewport(physical, dpr).unwrap();
+            game.pointer(830., 410., 960., 540., false).unwrap();
+            game.key("Space", true);
+            game.key("ArrowLeft", true);
+        }
+        let mut packets = [Vec::new(), Vec::new()];
+        for (i, game) in games.iter_mut().enumerate() {
+            let backing = game.window_viewport(physical, dpr).unwrap();
+            game.begin_redraw(300., backing, 1.).unwrap();
+            packets[i] = tape::effects(game);
+        }
+        assert_eq!(packets[0], packets[1]);
+        assert!(packets[0].iter().any(|p| p == &[253]));
+        let a = games[0].take_frame().unwrap();
+        let b = games[1].take_frame().unwrap();
+        let size = slither_client::desktop_layout::desktop_backing_size(
+            f64::from(physical[0]) / dpr,
+            f64::from(physical[1]) / dpr,
+        )
+        .unwrap();
+        let expected = [size.width, size.height];
+        assert_eq!(a.frame.extent, expected);
+        assert_eq!(a.frame, b.frame); // camera, sampling, order, UVs and destinations
+        assert_eq!(a.overlay, b.overlay);
+        let resident = a
+            .resources
+            .iter()
+            .map(|r| (r.asset.into(), r.asset))
+            .collect();
+        let before = a.frame.quads(&resident).unwrap();
+        for mode in [Original, Native] {
+            let plan = WorldTargetPlan::new(mode, a.frame.extent, physical, 4, 8192).unwrap();
+            assert_eq!(
+                plan.attachment,
+                if mode == Native { physical } else { expected }
+            );
+            let after = a.frame.quads(&resident).unwrap();
+            for (x, y) in before.iter().zip(after) {
+                assert_eq!(x.key, y.key);
+                assert_eq!(
+                    x.vertices.map(|v| v.map(f32::to_bits)),
+                    y.vertices.map(|v| v.map(f32::to_bits))
+                );
+            }
+        }
+        games[0].retry_frame(a.clone()).unwrap();
+
+        let retry = games[0].take_frame().unwrap();
+        assert_eq!(retry.frame, a.frame);
+        assert_eq!(retry.overlay, a.overlay);
+        assert_eq!(
+            games[0].client().control_view().own.unwrap().raw_head,
+            games[1].client().control_view().own.unwrap().raw_head
+        );
+        games[0].presented(true).unwrap();
+        games[1].presented(true).unwrap();
+        for game in &mut games {
+            game.key("Space", false);
+        }
+        // Next picture/input uses the same viewport, independent of the prior mode.
+        games[0].window_viewport(physical, dpr).unwrap();
+        for (i, game) in games.iter_mut().enumerate() {
+            let backing = game.window_viewport(physical, dpr).unwrap();
+            game.begin_redraw(360., backing, 1.).unwrap();
+            packets[i] = tape::effects(game);
+        }
+        assert_eq!(packets[0], packets[1]);
+        assert!(packets[0].contains(&vec![254]));
+    }
+}
+
 fn snapshot(game: &mut LocalGame, identity: u64) -> render::PreparedFrame {
     let mut world = game.client().clone();
     let quality = game.quality();

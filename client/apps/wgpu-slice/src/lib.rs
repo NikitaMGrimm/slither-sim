@@ -36,6 +36,8 @@ pub mod scene;
 pub mod server_picker_native;
 pub mod text;
 pub mod wordmark;
+pub mod world_presenter;
+pub mod world_resolution;
 
 #[cfg(target_arch = "wasm32")]
 mod web;
