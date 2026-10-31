@@ -30,11 +30,13 @@
 
 ### Changed
 
-- Food rows no longer stay in birth order after pickups or wall cleanup.
-  The geometric controller is now `slither-sim-json-v6`, the C ABI is v4,
-  and checkpoints use v3/rules v6 to retain food birth identity. Older
-  checkpoints are rejected. Explicit `remove_food` still preserves row order.
-
+- Food lists no longer keep the order in which food appeared. When food is
+  eaten or removed by a shrinking wall, the last item in the list takes its
+  place, so code that relied on that order, such as a bot breaking ties by
+  list position, can behave differently. The `serve` protocol is now
+  `slither-sim-json-v6`, the C ABI is `slither-sim-abi-v4`, and checkpoints
+  are `slither-sim-checkpoint-v3` with rules v6; older checkpoints are
+  rejected. `remove_food` still keeps the order of the remaining food.
 - The fidelity collectors no longer find servers. They connect to the address
   you give them with the standard protocol-19 login. The tools that found
   outside servers and prepared pilots on them are removed; earlier studies keep
@@ -42,11 +44,10 @@
 
 ### Performance
 
-- Remove food by filling gaps from the tail, with dense food lookups instead
-  of survivor copies and rank upkeep. The frozen 10,000-snake replay saves
-  4.01 ms of world CPU per tick (median paired saving,
-  all ten pairs faster); all 26 catalog rows pass their regression limits.
-
+- Removing eaten food no longer shifts the rest of the food list. In a frozen
+  10,000-snake world, world CPU per tick falls from about 11.7 to 7.7 ms, with
+  all ten timing pairs faster, and the 500-player catalog step gets about 28%
+  faster. Pellets, snake growth and event order are unchanged.
 - Bot observations in large worlds find nearby snakes through a bounds tree
   instead of checking every snake, and skip empty stretches of the food list
   when restoring food order. In a fresh 10,000-snake official-density world,
