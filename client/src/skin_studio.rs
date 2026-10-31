@@ -449,12 +449,15 @@ impl StudioState {
         self.section_started = Some(now);
         self.section_alpha = 0.;
         self.generation += 1;
+        let draft = self.draft.as_mut().expect("mounted draft");
         if section == StudioSection::Builder {
-            let draft = self.draft.as_mut().expect("mounted draft");
             if draft.record.custom_bytes.is_empty() && draft.builder.pattern().colours() == 0 {
                 draft.builder_base = draft.record.builtin;
             }
             draft.builder_active = true;
+        } else if draft.builder.pattern().colours() == 0 {
+            // An empty Builder owns the committed fallback only while mounted.
+            draft.builder_active = false;
         }
     }
     /// Mutate only the bounded builder; record bytes remain untouched until Save.

@@ -35,7 +35,8 @@ All hit targets remain at least 28 logical pixels.
 Opening Builder selects its custom draft for preview/Save. Switching sections
 retains edits; explicitly choosing a built-in with Previous/Next turns custom
 use off, while Save still retains any edited custom pattern as inactive data.
-Reset clears only the builder colours. Empty builder Save restores the
+Reset clears only the builder colours. Leaving an empty Builder keeps the
+draft's prior selection active. Save while still on an empty Builder restores the
 previously committed custom bytes if any (including inactive retained custom),
 otherwise the committed built-in. It never emits an empty custom override.
 

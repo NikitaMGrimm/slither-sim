@@ -270,14 +270,20 @@ fn every_retained_prefix_and_raw_tail_survives_unchanged_builder_save() {
 #[test]
 fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
     use slither_client::menu_controls::{ControlId, ControlKind};
-    for (retained_custom, cycle_first) in
-        [(false, false), (false, true), (true, false), (true, true)]
-    {
+    for (retained_custom, active_custom, cycle_first) in [
+        (false, false, false),
+        (false, false, true),
+        (true, false, false),
+        (true, false, true),
+        (true, true, false),
+        (true, true, true),
+    ] {
         for empty in [false, true] {
             for choose_builtin in [false, true] {
                 let record = AppearanceRecord {
                     builtin: 7,
                     custom_base: 7,
+                    active_custom,
                     custom_bytes: if retained_custom {
                         vec![1, 2, 3, 4, 5, 6, 7, 8, 2, 41]
                     } else {
@@ -292,6 +298,7 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                     // Exercise both the original skin 7 and a draft built-in 8.
                     s.cycle(true, UnlockSnapshot::default());
                 }
+                let before_builder = s.preview_selection().unwrap();
                 s.set_section(StudioSection::Builder, 230.);
                 if empty {
                     s.edit_builder(|b| b.reset());
@@ -307,9 +314,8 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                 let preview = s.preview_selection().unwrap();
                 if choose_builtin {
                     assert!(preview.custom_bytes.is_empty());
-                } else if empty && !retained_custom {
-                    assert_eq!(preview.skin, 7);
-                    assert!(preview.custom_bytes.is_empty());
+                } else if empty {
+                    assert_eq!(preview, before_builder);
                 } else {
                     assert!(!preview.custom_bytes.is_empty());
                 }
@@ -333,5 +339,54 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                 assert_eq!(committed.selection(), preview);
             }
         }
+    }
+}
+
+#[test]
+fn visiting_empty_builder_preserves_builtin_pick_and_both_cycle_directions() {
+    use slither_client::menu_controls::{ControlId, ControlKind};
+    for next in [true, false] {
+        let mut s = StudioState::new(AppearanceRecord {
+            builtin: 7,
+            ..Default::default()
+        })
+        .unwrap();
+        s.open(0., true);
+        s.step(230.);
+        s.cycle(next, UnlockSnapshot::default());
+        s.set_section(StudioSection::Builder, 230.);
+        s.set_section(StudioSection::BuiltIn, 410.);
+        let picked = if next { 8 } else { 6 };
+        for (direction, expected) in [
+            (None, picked),
+            (Some(next), if next { 9 } else { 5 }),
+            (Some(!next), picked),
+        ] {
+            if let Some(next) = direction {
+                s.cycle(next, UnlockSnapshot::default());
+            }
+            let preview = s.preview_selection().unwrap();
+            assert_eq!(preview.skin, expected);
+            assert!(preview.custom_bytes.is_empty());
+            let panel = s.panel([960., 540.], "");
+            assert_eq!(
+                panel
+                    .controls
+                    .iter()
+                    .find(|c| c.id == ControlId(3))
+                    .unwrap()
+                    .kind,
+                ControlKind::Label {
+                    text: format!("Skin {expected} / 64")
+                }
+            );
+        }
+        assert_eq!(
+            saved(&mut s).selection(),
+            AppearanceSelection {
+                skin: picked,
+                custom_bytes: vec![]
+            }
+        );
     }
 }

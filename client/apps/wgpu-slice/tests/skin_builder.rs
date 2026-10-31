@@ -330,6 +330,51 @@ fn expected(skin: u8, custom: &[u8]) -> Vec<u8> {
     .concat()
 }
 #[test]
+fn empty_builder_exit_and_empty_builder_save_send_their_own_selection() {
+    for next in [false, true] {
+        for retained_custom in [false, true] {
+            for leave_builder in [false, true] {
+                let custom = if retained_custom {
+                    vec![1, 2, 3, 4, 5, 6, 7, 8, 2, 41]
+                } else {
+                    vec![]
+                };
+                let mut state = StudioState::new(AppearanceRecord {
+                    builtin: 7,
+                    custom_base: 7,
+                    custom_bytes: custom.clone(),
+                    ..Default::default()
+                })
+                .unwrap();
+                state.open(0., true);
+                state.step(230.);
+                state.cycle(next, UnlockSnapshot::default());
+                state.set_section(StudioSection::Builder, 230.);
+                if retained_custom {
+                    state.edit_builder(|b| b.reset());
+                }
+                if leave_builder {
+                    state.set_section(StudioSection::BuiltIn, 410.);
+                }
+                let saved = state
+                    .save("Bytes", 410., UnlockSnapshot::default(), &mut || {
+                        panic!("empty builder sampled entropy")
+                    })
+                    .unwrap()
+                    .unwrap();
+                let skin = if leave_builder {
+                    if next { 8 } else { 6 }
+                } else {
+                    7
+                };
+                let wire_custom = if leave_builder { &[][..] } else { &custom[..] };
+                assert_eq!(saved.custom_bytes, custom);
+                assert_eq!(sent(&saved.selection()), expected(skin, wire_custom));
+            }
+        }
+    }
+}
+#[test]
 fn authored_and_retained_patterns_reach_actual_login_with_exact_bytes_and_base() {
     for colours in [
         PALETTES.to_vec(),
