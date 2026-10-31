@@ -118,6 +118,7 @@ mod native {
         Ok(pixels)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn capture(
         renderer: &mut Renderer,
         menu: &MenuFrame,

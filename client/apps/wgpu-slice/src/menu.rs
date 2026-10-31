@@ -2930,6 +2930,8 @@ mod quota_tests {
                 [100., 35.],
             ] {
                 let mut c = Composition {
+                    component: Default::default(),
+                    attribution: Default::default(),
                     old: &BTreeMap::new(),
                     old_art: &BTreeMap::new(),
                     materials: BTreeMap::new(),
@@ -2959,6 +2961,7 @@ mod quota_tests {
                 .unwrap();
                 let base = MenuFrame::world_crossfade([960, 540], scale, 0.).unwrap();
                 let menu = MenuFrame {
+                    attribution: c.attribution,
                     frame: Frame {
                         draws: c.draws,
                         ..base.frame.clone()
