@@ -13,6 +13,7 @@ fn shared_field_placement_keeps_placeholder_value_preedit_and_ime_together() {
         for value in ["", "Player", "WWWWWWWWWWWWWWWWWWWWWWWW"] {
             let mut login = NativeLogin::new(value).unwrap();
             login.step(0., true, false).unwrap();
+            login.step(16., true, false).unwrap();
             for preedit in [false, true] {
                 if preedit {
                     login
@@ -122,7 +123,11 @@ fn native_login_commit_focus_pointer_and_deferred_play() {
 fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
     let mut login = NativeLogin::new("").unwrap();
     login.step(0., true, false).unwrap();
-    for focus in [1, 2, 0] {
+    for focus in [
+        slither_client::login_controls::PLAY,
+        slither_client::login_controls::QUALITY,
+        slither_client::login_controls::NICKNAME,
+    ] {
         let effects = login.focus(focus);
         assert!(effects.contains(&HostEditEffect::ReleasePointerBoost));
         assert_eq!(
@@ -130,15 +135,15 @@ fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
                 .iter()
                 .filter(|e| matches!(e, HostEditEffect::Gameplay { pressed: false, .. }))
                 .count(),
-            if focus == 0 { 8 } else { 4 }
+            4
         );
     }
-    login.focus(2);
+    login.focus(slither_client::login_controls::QUALITY);
     login.activate(true);
     assert_eq!(login.state.view(true).quality, MenuQuality::Low);
     assert!(login.step(16., true, false).unwrap().0.is_empty());
     assert_eq!(login.input.state.focus(), None);
-    login.focus(0);
+    login.focus(slither_client::login_controls::NICKNAME);
     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
 }
 
@@ -327,6 +332,7 @@ fn acquisition_cancel_and_pre_game_socket_outcomes_release_native_admission() {
 fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
     let mut login = NativeLogin::new("").unwrap();
     login.step(0., true, false).unwrap();
+    login.step(16., true, false).unwrap();
     let picture = login.prepare([960, 540], true, None).unwrap();
     let nick = login.layout.viewport_rect(E::Nickname);
     let caret = picture
@@ -811,4 +817,166 @@ fn login_menu_composes_over_the_world_picture() {
     menu.resources[0].asset = picture.resources[0].asset;
     menu.resources[0].asset.revision += 1;
     assert!(menu.append_to(&mut picture).is_err());
+}
+
+#[test]
+fn shared_login_hits_fitted_text_and_drags_clamp_at_hidpi() {
+    use slither_client::{
+        login_controls::NICKNAME, menu_controls::ControlKind, menu_theme::MenuTheme,
+    };
+    use slither_wgpu_slice::{editor_geometry::field_geometry, text::TextCache};
+    for dpr in [1.5, 2.] {
+        for value in ["abcdef", "WWWWWWWWWWWWWWWWWWWWWWWW"] {
+            let mut login = NativeLogin::new(value).unwrap();
+            login.step(0., true, false).unwrap();
+            let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            let resolved = login.panel.resolve([960., 540.]).unwrap();
+            let r = resolved.iter().find(|r| r.control.id == NICKNAME).unwrap();
+            let ControlKind::TextField { fit, .. } = r.control.kind else {
+                unreachable!()
+            };
+            assert!(fit);
+            let mut text = TextCache::menu();
+            let (_, g) = field_geometry(&mut text, r, &login.input.state, &mut Default::default())
+                .unwrap()
+                .unwrap();
+            let base = MenuTheme::default().text_style(r.control.style).size * r.scale;
+            if value.starts_with('W') {
+                assert!(g.style.size < base);
+            }
+            let advance = |text: &mut TextCache, count| {
+                text.measure_panel(&value[..count], g.style)
+                    .unwrap()
+                    .advance
+            };
+            let point = |text: &mut TextCache, count| {
+                [
+                    g.placement.origin[0] + advance(text, count),
+                    g.rect.y + g.rect.height / 2.,
+                ]
+            };
+            // Native coordinates arrive as snapped physical pixels divided by DPR.
+            let start = point(&mut text, 2).map(|v| (v * dpr).round() / dpr);
+            login.pointer(start, Some(true), true);
+            assert_eq!(
+                login.input.state.editor(TextField::Nickname).selection(),
+                (2, 2)
+            );
+            let end = point(&mut text, 5).map(|v| (v * dpr).round() / dpr);
+            login.pointer(end, None, true);
+            assert_eq!(
+                login.input.state.editor(TextField::Nickname).selection(),
+                (2, 5)
+            );
+            let outside = [g.rect.x - 20., start[1]];
+            assert!(login.intercepts_pointer(outside));
+            login.pointer(outside, None, true);
+            assert_eq!(
+                login.input.state.editor(TextField::Nickname).selection(),
+                (2, 0)
+            );
+            let outside = [g.rect.x + g.rect.width + 20., start[1]];
+            login.pointer(outside, None, true);
+            assert_eq!(
+                login.input.state.editor(TextField::Nickname).selection(),
+                (2, value.len())
+            );
+            login.pointer(outside, Some(false), true);
+            assert_eq!(login.controls.capture(), None);
+            login.pointer(start, None, true);
+            assert_eq!(
+                login.input.state.editor(TextField::Nickname).selection(),
+                (2, value.len())
+            );
+            login.input.state.apply(EditIntent::KeyText("X".into()));
+            assert_eq!(login.displayed_nickname(), format!("{}X", &value[..2]));
+        }
+    }
+}
+#[test]
+fn login_preedit_suppresses_pointer_selection_and_activation_but_releases_capture() {
+    use slither_client::login_controls::NICKNAME;
+    let mut login = NativeLogin::new("abcdef").unwrap();
+    login.step(0., true, false).unwrap();
+    login.prepare([960, 540], true, None).unwrap();
+    let r = login.layout.viewport_rect(E::Nickname);
+    let p = [r.x + 30., r.y + 12.];
+    login.pointer(p, Some(true), true);
+    assert_eq!(login.controls.capture(), Some(NICKNAME));
+    let selected = login.input.state.editor(TextField::Nickname).selection();
+    login
+        .input
+        .state
+        .apply(EditIntent::Preedit("é".into(), None));
+    let play = login.layout.viewport_rect(E::Play);
+    login.pointer([play.x + 10., play.y + 10.], Some(false), true);
+    assert_eq!(login.controls.capture(), None);
+    assert_eq!(
+        login.input.state.editor(TextField::Nickname).selection(),
+        selected
+    );
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    login.input.state.apply(EditIntent::ImeCommit("X".into()));
+    let after = login.input.state.editor(TextField::Nickname).selection();
+    login.pointer([r.x, r.y], None, true);
+    assert_eq!(
+        login.input.state.editor(TextField::Nickname).selection(),
+        after
+    );
+}
+#[cfg(windows)]
+#[test]
+fn windows_click_preferences_are_converted_to_logical_half_extents() {
+    use slither_wgpu_slice::menu_input_native::click_settings;
+    for dpr in [1., 1.5, 2.] {
+        let settings = click_settings(dpr);
+        assert_eq!(settings.time_ms, f64::from(winsafe::GetDoubleClickTime()));
+        assert_eq!(
+            settings.distance,
+            [winsafe::co::SM::CXDOUBLECLK, winsafe::co::SM::CYDOUBLECLK]
+                .map(|m| f64::from(winsafe::GetSystemMetrics(m).max(1)) / (2. * dpr))
+        );
+    }
+}
+
+#[test]
+fn quality_focus_keeps_the_existing_full_height_capsule() {
+    use slither_client::{login_controls::QUALITY, menu_theme::MenuTheme};
+    use slither_wgpu_slice::materials::{self, MenuSurface};
+    for dpr in [1., 1.5, 2.] {
+        let mut login = NativeLogin::new("").unwrap();
+        login.step(0., true, false).unwrap();
+        login.step(16., true, false).unwrap();
+        login.focus(QUALITY);
+        let picture = login
+            .prepare_host([(960. * dpr) as u32, (540. * dpr) as u32], dpr, true, None)
+            .unwrap();
+        let rect = login.layout.viewport_rect(E::Quality);
+        let expected = materials::menu_control(
+            [
+                (rect.width * dpr).ceil() as u32,
+                (rect.height * dpr).ceil() as u32,
+            ],
+            ((rect.height / 2.).ceil() * dpr).ceil(),
+            [MenuTheme::default().field; 2],
+            dpr,
+            MenuSurface::Compact,
+        )
+        .unwrap();
+        let half = expected.width.div_ceil(2);
+        let tile = picture
+            .resources
+            .iter()
+            .find(|r| r.image.width == half && r.image.height == expected.height)
+            .expect("full-height focus end cap");
+        for (got, want) in tile
+            .image
+            .pixels
+            .chunks_exact(half as usize * 4)
+            .zip(expected.pixels.chunks_exact(expected.width as usize * 4))
+        {
+            assert_eq!(got, &want[..half as usize * 4]);
+        }
+    }
 }

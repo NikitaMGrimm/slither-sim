@@ -276,9 +276,10 @@ fn long_os_preedit_is_bounded_before_geometry_and_rasterization() {
         &mut text,
         editor,
         field,
-        [0.; 2],
+        [0.; 4],
         MenuTheme::default().text_style(slither_client::menu_theme::ControlStyle::Field),
         0.,
+        false,
     )
     .unwrap();
     assert!(geometry.display.len() <= 3 * MAX_PREEDIT_UNITS + 140);
@@ -353,8 +354,11 @@ fn champion_field_uses_shared_placement_for_value_placeholder_selection_and_ime(
             style.size *= field.scale;
             let metrics = text.measure_panel("", style).unwrap();
             let rule = single_line_field_placement(
-                field.rect,
-                inset.map(|v| v * field.scale),
+                slither_client::menu_layout::field_content_rect(
+                    field.rect,
+                    inset.map(|v| v * field.scale),
+                ),
+                [0.; 2],
                 style.size,
                 metrics.font_ascent,
                 metrics.font_descent,

@@ -32,6 +32,17 @@ pub struct FieldTextPlacement {
     pub caret_height: f64,
 }
 
+/// Content rectangle after left/top/right/bottom field padding.
+/// The caller validates finite dimensions and padding before resolving controls.
+pub fn field_content_rect(field: MenuRect, inset: [f64; 4]) -> MenuRect {
+    MenuRect {
+        x: field.x + inset[0],
+        y: field.y + inset[1],
+        width: (field.width - inset[0] - inset[2]).max(0.),
+        height: (field.height - inset[1] - inset[3]).max(0.),
+    }
+}
+
 /// Place any single-line field's value or placeholder using the selected font.
 /// `inset` is symmetric horizontal/vertical content padding in the same logical
 /// units as `field`; include borders here if the rect still includes them.

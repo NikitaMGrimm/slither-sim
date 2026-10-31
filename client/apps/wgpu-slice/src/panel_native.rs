@@ -26,7 +26,6 @@ pub struct NativePanel {
     pub viewport: [f64; 2],
     pub effects: Vec<HostEditEffect>,
     submission: Option<(u32, Vec<u16>, Activation)>,
-    drag_anchor: usize,
 }
 impl NativePanel {
     pub fn new(session: &slither_client::session_policy::View) -> Self {
@@ -40,7 +39,6 @@ impl NativePanel {
             viewport: [960., 540.],
             effects: Vec::new(),
             submission: None,
-            drag_anchor: 0,
         }
     }
     pub fn observe(&mut self, game: &crate::game::LocalGame) {
@@ -147,21 +145,10 @@ impl NativePanel {
         let Some(r) = resolved.iter().find(|r| r.control.id == MESSAGE) else {
             return Ok(None);
         };
-        let ControlKind::TextField { editor, inset, .. } = r.control.kind else {
-            return Ok(None);
-        };
-        let mut style = MenuTheme::default().text_style(r.control.style);
-        style.size *= r.scale;
-        let g = EditorGeometry::new(
-            text,
-            self.input.state.editor(editor),
-            r.rect,
-            inset.map(|n| n * r.scale),
-            style,
-            self.scroll.get(&editor).copied().unwrap_or(0.),
-        )?;
-        self.scroll.insert(editor, g.scroll);
-        Ok(Some(g))
+        Ok(
+            crate::editor_geometry::field_geometry(text, r, &self.input.state, &mut self.scroll)?
+                .map(|(_, g)| g),
+        )
     }
     pub fn pointer(
         &mut self,
@@ -169,28 +156,25 @@ impl NativePanel {
         point: [f64; 2],
         down: Option<bool>,
     ) -> Result<Vec<HostEditEffect>> {
-        if self.input.state.editor(EditorId::Champion).composing() {
-            if down == Some(false) {
-                self.controls.blur();
-            }
-            return Ok(Vec::new());
-        }
-        let resolved = self.panel.resolve(self.viewport).map_err(str::to_owned)?;
-        let intent = self.controls.pointer(&self.panel, &resolved, point, down);
-        let mut effects = self.controls.sync_focus(&self.panel, &mut self.input.state);
-        if self.controls.capture() == Some(MESSAGE)
-            && let Some(g) = self.geometry(text)?
-        {
-            let editor = self.input.state.editor(EditorId::Champion);
-            let caret = g.hit(text, editor.text(), point[0])?;
-            if down == Some(true) {
-                self.drag_anchor = caret;
-            }
-            effects.extend(self.input.state.apply(EditIntent::Select {
-                anchor: self.drag_anchor,
-                caret,
-            }));
-        }
+        self.pointer_scaled(text, point, down, 1.)
+    }
+    pub fn pointer_scaled(
+        &mut self,
+        text: &mut TextCache,
+        point: [f64; 2],
+        down: Option<bool>,
+        dpr: f64,
+    ) -> Result<Vec<HostEditEffect>> {
+        let (effects, intent) = self.input.panel_pointer(
+            &mut self.controls,
+            &self.panel,
+            &mut self.scroll,
+            text,
+            self.viewport,
+            point,
+            down,
+            dpr,
+        )?;
         self.activate(intent);
         Ok(effects)
     }

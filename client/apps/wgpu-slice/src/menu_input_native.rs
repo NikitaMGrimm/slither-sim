@@ -39,6 +39,7 @@ impl<'a> From<&'a KeyEvent> for KeyInput<'a> {
 pub struct NativeMenuInput {
     pub state: MenuInputState,
     modifiers: ModifiersState,
+    pointer_epoch: Option<std::time::Instant>,
 }
 /// Copied result. Consumed keyboard events must not reach Play/Stop/gameplay again.
 #[derive(Default)]
@@ -48,6 +49,61 @@ pub struct NativeInputResult {
 }
 
 impl NativeMenuInput {
+    /// Shared field routing: hosts supply measured geometry, core owns gestures.
+    #[allow(clippy::too_many_arguments)]
+    pub fn panel_pointer(
+        &mut self,
+        controls: &mut slither_client::menu_controls::PanelInputState,
+        panel: &slither_client::menu_controls::PanelView,
+        scroll: &mut std::collections::BTreeMap<slither_client::menu_input::EditorId, f64>,
+        text: &mut crate::text::TextCache,
+        viewport: [f64; 2],
+        point: [f64; 2],
+        down: Option<bool>,
+        dpr: f64,
+    ) -> crate::Result<(
+        Vec<HostEditEffect>,
+        Option<slither_client::menu_controls::ControlIntent>,
+    )> {
+        if self
+            .state
+            .focus()
+            .is_some_and(|id| self.state.editor(id).composing())
+        {
+            if down == Some(false) {
+                controls.blur();
+            }
+            return Ok((Vec::new(), None));
+        }
+        let resolved = panel.resolve(viewport).map_err(str::to_owned)?;
+        let intent = controls.pointer(panel, &resolved, point, down);
+        let mut effects = controls.sync_focus(panel, &mut self.state);
+        if let Some(r) = resolved
+            .iter()
+            .find(|r| Some(r.control.id) == controls.capture())
+            && let Some((editor, geometry)) =
+                crate::editor_geometry::field_geometry(text, r, &self.state, scroll)?
+        {
+            let caret = geometry.hit(text, self.state.editor(editor).text(), point[0])?;
+            let now = self
+                .pointer_epoch
+                .get_or_insert_with(std::time::Instant::now)
+                .elapsed()
+                .as_secs_f64()
+                * 1000.;
+            effects.extend(controls.select_text(
+                &mut self.state,
+                editor,
+                caret,
+                point,
+                down == Some(true),
+                self.modifiers.shift_key(),
+                now,
+                click_settings(dpr),
+            ));
+        }
+        Ok((effects, intent))
+    }
     /// Update modifiers explicitly (also used by the synthetic event tests).
     pub fn modifiers(&mut self, modifiers: ModifiersState) {
         self.modifiers = modifiers;
@@ -299,5 +355,25 @@ impl EditHost for WindowEditHost<'_> {
             let _ = text;
             Err("Clipboard unavailable on this platform".into())
         }
+    }
+}
+
+/// Windows reports a physical double-click rectangle around the first press.
+/// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsystemmetrics
+/// Safe wrappers keep platform FFI outside this crate's forbid(unsafe_code).
+pub fn click_settings(dpr: f64) -> slither_client::menu_controls::ClickSettings {
+    #[cfg(windows)]
+    {
+        use winsafe::{GetDoubleClickTime, GetSystemMetrics, co::SM};
+        slither_client::menu_controls::ClickSettings {
+            time_ms: f64::from(GetDoubleClickTime()),
+            distance: [SM::CXDOUBLECLK, SM::CYDOUBLECLK]
+                .map(|metric| f64::from(GetSystemMetrics(metric).max(1)) / (2. * dpr)),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = dpr;
+        slither_client::menu_controls::ClickSettings::default()
     }
 }

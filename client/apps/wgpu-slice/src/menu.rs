@@ -32,15 +32,13 @@ const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
-    Legacy(u32, u32, u8, u64, u64),
+    Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 pub const WORDMARK_GREEN: [u8; 3] = [86, 172, 129];
 pub const WORDMARK_PURPLE: [u8; 3] = [150, 76, 224];
-// Content padding inside the already border-free native input rect.
-pub const FIELD_CONTENT_INSET: [f64; 2] = [2., 0.];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -312,7 +310,6 @@ struct Label {
     reveal: f64,
     reveal_span: Option<[f64; 2]>,
     line_box: bool,
-    field_inset: Option<[f64; 2]>,
     clip: Option<MenuRect>,
     fit: bool,
 }
@@ -421,6 +418,7 @@ struct Composition<'a> {
     draws: Vec<Draw>,
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
+    quality_art: bool,
 }
 fn body(r: MenuRect) -> BodyRect {
     BodyRect {
@@ -472,7 +470,7 @@ impl Composition<'_> {
                     * if enabled || matches!(control.kind, ControlKind::Label { .. }) {
                         1.
                     } else {
-                        theme.disabled_alpha
+                        theme.disabled_opacity(control.style)
                     };
                 let mut style = theme.text_style(control.style);
                 style.size *= r.scale;
@@ -494,7 +492,6 @@ impl Composition<'_> {
                         reveal: 1.,
                         reveal_span: None,
                         line_box: false,
-                        field_inset: None,
                         clip: Some(clip),
                         fit: false,
                     });
@@ -504,15 +501,19 @@ impl Composition<'_> {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
                     ControlKind::Button { label } => {
-                        self.sliced(
-                            r.rect,
-                            theme.surface(control.style, ControlState::Idle),
-                            alpha,
-                            surface_clip,
-                            r.scale,
-                        )?;
+                        let quality = control.style == ControlStyle::QualityButton;
+                        let focused = input.focus() == Some(control.id);
+                        if !quality || focused {
+                            self.sliced(
+                                r.rect,
+                                theme.surface(control.style, ControlState::Idle),
+                                alpha * if quality { 0.35 } else { 1. },
+                                surface_clip,
+                                r.scale,
+                            )?;
+                        }
                         let [hover, press] = input.progress(control.id);
-                        if enabled {
+                        if enabled && !quality {
                             self.sliced(
                                 r.rect,
                                 theme.surface(control.style, ControlState::Hovered),
@@ -533,12 +534,18 @@ impl Composition<'_> {
                                 r.scale,
                             )?;
                         }
-                        add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
+                        if !quality || !self.quality_art {
+                            add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
+                            let l = self.labels.last_mut().unwrap();
+                            l.line_box = control.style == ControlStyle::LoginPlay;
+                            l.fit = true;
+                        }
                     }
                     ControlKind::TextField {
                         editor,
                         placeholder,
                         inset,
+                        fit,
                         ..
                     } => {
                         self.sliced(
@@ -559,7 +566,9 @@ impl Composition<'_> {
                             inset,
                             style,
                             scroll.get(editor).copied().unwrap_or(0.),
+                            *fit,
                         )?;
+                        style = g.style;
                         let clip = intersection(r.clip, g.rect);
                         scroll.insert(*editor, g.scroll);
                         if input.focus() == Some(control.id) && enabled {
@@ -586,14 +595,14 @@ impl Composition<'_> {
                             self,
                             value,
                             MenuRect {
-                                x: r.rect.x - g.scroll,
-                                ..r.rect
+                                x: g.rect.x - g.scroll,
+                                ..g.rect
                             },
                             style,
                             Align::Left,
                             clip,
                         );
-                        self.labels.last_mut().unwrap().field_inset = Some(inset);
+                        self.labels.last_mut().unwrap().line_box = true;
                     }
                 }
             }
@@ -814,6 +823,31 @@ impl Composition<'_> {
             }
             return Ok(());
         }
+        let mut draw = self.solid_draw(
+            MenuRect {
+                width: f64::from(size[0]) / scale,
+                height: f64::from(size[1]) / scale,
+                ..r
+            },
+            rgb,
+            alpha,
+            size,
+        )?;
+        if clip_draw(&mut draw, clip, scale) {
+            self.push(draw)?;
+        }
+        Ok(())
+    }
+    fn solid_draw(
+        &mut self,
+        r: MenuRect,
+        rgb: [u8; 3],
+        alpha: f64,
+        size: [u32; 2],
+    ) -> Result<Draw> {
+        if size.into_iter().any(|n| n > 2048) {
+            return Err(MENU_SOLID_TEXTURE_QUOTA.into());
+        }
         let resource = self.cached_material(MaterialKey::Solid(size, rgb), || {
             Ok(materials::RgbaImage {
                 width: size[0],
@@ -821,99 +855,16 @@ impl Composition<'_> {
                 pixels: [rgb[0], rgb[1], rgb[2], 255].repeat(size[0] as usize * size[1] as usize),
             })
         })?;
-        let mut draw = image(
-            &resource,
-            MenuRect {
-                width: f64::from(size[0]) / scale,
-                height: f64::from(size[1]) / scale,
-                ..r
-            },
-            alpha,
-        );
-        draw.snap_overlay(scale);
-        if clip_draw(&mut draw, clip, scale) {
-            self.push(draw)?;
-        }
-        Ok(())
-    }
-    fn solid_draw(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<Draw> {
-        let size = if kind == 10 {
-            [1, 1]
-        } else {
-            [
-                (r.width * self.scale).round().max(1.) as u32,
-                (r.height * self.scale).round().max(1.) as u32,
-            ]
-        };
-        if size.into_iter().any(|n| n > 2048) {
-            return Err(MENU_SOLID_TEXTURE_QUOTA.into());
-        }
-        let key = MaterialKey::Legacy(size[0], size[1], kind, 0, 0);
-        if !self.materials.contains_key(&key) {
-            let resource = if let Some(resource) = self.old.get(&key) {
-                resource.clone()
-            } else {
-                self.next_handle = self
-                    .next_handle
-                    .checked_add(1)
-                    .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
-                    .ok_or("Menu material handle overflow")?;
-                let rgb = match kind {
-                    8 => [224, 224, 255],
-                    10 => PAGE_COLOR,
-                    _ => [150, 108, 213],
-                };
-                Resource {
-                    asset: BodyAsset {
-                        handle: self.next_handle,
-                        revision: 1,
-                        width: size[0],
-                        height: size[1],
-                        status: BodyAssetStatus::Ready,
-                    },
-                    image: materials::RgbaImage {
-                        width: size[0],
-                        height: size[1],
-                        pixels: [rgb[0], rgb[1], rgb[2], 255]
-                            .repeat(size[0] as usize * size[1] as usize),
-                    }
-                    .into(),
-                }
-            };
-            self.materials.insert(key, resource);
-        }
-        let mut draw = image(&self.materials[&key], r, alpha);
-        if kind != 10 {
-            draw.destination.width = f64::from(size[0]) / self.scale;
-            draw.destination.height = f64::from(size[1]) / self.scale;
-            draw.snap_overlay(self.scale);
-        }
+        let mut draw = image(&resource, r, alpha);
+        draw.snap_overlay(self.scale);
         Ok(draw)
-    }
-    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        let draw = self.solid_draw(r, kind, alpha)?;
-        self.push(draw)
     }
     fn push(&mut self, mut draw: Draw) -> Result<()> {
         draw.snap_overlay(self.scale);
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
     }
-    // Login keeps its policy/input path; its existing recipes share the bounded
-    // material implementation so exact high-DPI rasters need no larger quota.
-    fn control(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        let theme = MenuTheme::default();
-        let mut tokens = match kind {
-            0 => theme.surface(ControlStyle::PrimaryButton, ControlState::Idle),
-            1 => theme.surface(ControlStyle::PrimaryButton, ControlState::Hovered),
-            2 => theme.surface(ControlStyle::PrimaryButton, ControlState::Pressed),
-            4 => theme.surface(ControlStyle::Surface, ControlState::Idle),
-            5 => theme.surface(ControlStyle::Field, ControlState::Idle),
-            _ => return Err("Unknown login surface".into()),
-        };
-        if kind == 4 {
-            tokens.recipe = SurfaceRecipe::Compact;
-        }
+    fn control(&mut self, r: MenuRect, mut tokens: SurfaceTokens, alpha: f64) -> Result<()> {
         tokens.radius = (r.height / 2.).ceil() as u16;
         let r = MenuRect {
             width: (r.width * self.scale).ceil() / self.scale,
@@ -938,7 +889,6 @@ impl Composition<'_> {
             reveal: 1.,
             reveal_span: None,
             line_box: false,
-            field_inset: None,
             clip: None,
             fit: true,
         });
@@ -1030,7 +980,7 @@ impl Composition<'_> {
         }
         let scale = self.scale * view.spinner_scale;
         let side = (128. * scale).ceil().max(1.) as u32;
-        let key = MaterialKey::Legacy(side, side, 6, scale.to_bits(), view.spinner_time.to_bits());
+        let key = MaterialKey::Spinner(side, scale.to_bits(), view.spinner_time.to_bits());
         let resource = if let Some(old) = self.old.get(&key) {
             old.clone()
         } else {
@@ -1094,6 +1044,7 @@ impl Menu {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
+            quality_art: false,
         };
         c.panel(
             text,
@@ -1169,6 +1120,7 @@ impl Menu {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
+            quality_art: false,
         };
         let a = view.login_alpha;
         let backdrop = if view.visible {
@@ -1179,8 +1131,9 @@ impl Menu {
                     width: f64::from(extent[0]) / dpr,
                     height: f64::from(extent[1]) / dpr,
                 },
-                10,
+                PAGE_COLOR,
                 1.,
+                [1, 1],
             )?)
         } else {
             None
@@ -1191,30 +1144,15 @@ impl Menu {
             draw.effective_alpha = a;
             draw
         });
-        let busy = view.phase == slither_client::start_page::MenuPhase::Connecting;
         if view.visible {
             let qr = layout.viewport_rect(E::Quality);
-            if self.focus == Some(E::Quality) {
-                c.control(qr, 4, a * 0.35)?;
-            }
             let role = match view.quality {
                 slither_client::menu_preferences::MenuQuality::High => MenuArt::QualityHigh,
                 slither_client::menu_preferences::MenuQuality::Low => MenuArt::QualityLow,
             };
             if let Some(art) = cosmetics.and_then(|p| p.menu_art(role)) {
+                c.quality_art = true;
                 c.art(art, qr, a)?;
-            } else {
-                c.label(
-                    if role == MenuArt::QualityHigh {
-                        "High quality"
-                    } else {
-                        "Low quality"
-                    },
-                    qr,
-                    14.,
-                    false,
-                    a,
-                );
             }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha;
@@ -1337,132 +1275,6 @@ impl Menu {
                 );
             }
             if view.ordinary_controls_visible {
-                let nick = layout.viewport_rect(E::NicknameHolder);
-                c.control(nick, 5, a * view.nickname_alpha)?;
-                c.label(
-                    if view.nickname.is_empty() {
-                        view.wording.nickname
-                    } else {
-                        &view.nickname
-                    },
-                    layout.viewport_rect(E::Nickname),
-                    15. * layout.scale,
-                    false,
-                    a * view.nickname_alpha,
-                );
-                c.labels.last_mut().unwrap().field_inset =
-                    Some(FIELD_CONTENT_INSET.map(|v| v * layout.scale));
-                c.labels.last_mut().unwrap().align = Align::Left;
-                c.labels.last_mut().unwrap().style.family = Family::Lucida;
-                if view.nickname.is_empty() {
-                    c.labels.last_mut().unwrap().style.color = [112, 112, 176];
-                }
-                if let Some(input) = input
-                    .filter(|i| i.focus() == Some(slither_client::menu_input::TextField::Nickname))
-                {
-                    let editor = input.editor(slither_client::menu_input::TextField::Nickname);
-                    let (anchor, caret) = editor.selection();
-                    let r = layout.viewport_rect(E::Nickname);
-                    let inset = FIELD_CONTENT_INSET.map(|v| v * layout.scale);
-                    let content_width = r.width - 2. * inset[0];
-                    let style = c.labels.last().unwrap().style;
-                    let full = text.measure_panel(&view.nickname, style)?.advance;
-                    let fit = if full > content_width {
-                        content_width / full
-                    } else {
-                        1.
-                    };
-                    let fitted = TextStyle {
-                        size: style.size * fit,
-                        ..style
-                    };
-                    let m = text.measure_panel("", fitted)?;
-                    let placement = single_line_field_placement(
-                        r,
-                        inset,
-                        fitted.size,
-                        m.font_ascent,
-                        m.font_descent,
-                    );
-                    let advance = |prefix: &str, text: &mut TextCache| -> Result<f64> {
-                        Ok(text.measure_panel(prefix, style)?.advance * fit)
-                    };
-                    let left = advance(&editor.text()[..anchor.min(caret)], text)?;
-                    let right = advance(&editor.text()[..anchor.max(caret)], text)?;
-                    if anchor != caret && editor.preedit().is_none() {
-                        c.solid(
-                            MenuRect {
-                                x: placement.origin[0] + left,
-                                y: r.y,
-                                width: (right - left).max(1.),
-                                height: r.height,
-                            },
-                            9,
-                            0.45 * a * view.nickname_alpha,
-                        )?;
-                    }
-                    let cursor = if let Some(preedit) = editor.preedit() {
-                        let end = preedit.selection.map_or(preedit.text.len(), |(_, end)| end);
-                        advance(&editor.text()[..anchor.min(caret)], text)?
-                            + advance(&preedit.text[..end], text)?
-                    } else {
-                        advance(&editor.text()[..caret], text)?
-                    };
-                    if input.caret_visible() {
-                        c.solid(
-                            MenuRect {
-                                x: placement.origin[0] + cursor.min(content_width - 1.),
-                                y: placement.caret_top,
-                                width: 1.,
-                                height: placement.caret_height,
-                            },
-                            8,
-                            a * view.nickname_alpha,
-                        )?;
-                    }
-                    if let Some(preedit) = editor.preedit() {
-                        let start = advance(&editor.text()[..anchor.min(caret)], text)?;
-                        let width =
-                            advance(&preedit.text, text)?.min((content_width - start).max(0.));
-                        if width > 0. {
-                            c.solid(
-                                MenuRect {
-                                    x: placement.origin[0] + start,
-                                    y: r.y + r.height - 2.,
-                                    width,
-                                    height: 1.,
-                                },
-                                8,
-                                a * view.nickname_alpha,
-                            )?;
-                        }
-                    }
-                }
-                let play = layout.viewport_rect(E::Play);
-                let pa =
-                    a * view.play_alpha * view.play_return_alpha * if busy { 0.38 } else { 1. };
-                c.control(play, 0, pa)?;
-                if !view.play_disabled {
-                    c.control(
-                        play,
-                        1,
-                        pa * view.hover_alpha.max(if self.focus == Some(E::Play) {
-                            0.33
-                        } else {
-                            0.
-                        }),
-                    )?;
-                    c.control(play, 2, pa * view.press_alpha)?;
-                }
-                c.label(
-                    &format!("\u{a0}{}\u{a0}", view.play_label),
-                    play,
-                    20. * layout.scale,
-                    true,
-                    pa,
-                );
-                c.labels.last_mut().unwrap().line_box = true;
-                c.labels.last_mut().unwrap().style.color = [255; 3];
                 let r = layout.viewport_rect(E::Skin);
                 let skin_alpha = a
                     * view.skin_alpha
@@ -1483,7 +1295,8 @@ impl Menu {
                             width: 48.,
                             height: 25.,
                         },
-                        0,
+                        MenuTheme::default()
+                            .surface(ControlStyle::PrimaryButton, ControlState::Idle),
                         skin_alpha,
                     )?;
                     c.label(
@@ -1499,6 +1312,36 @@ impl Menu {
                     );
                 }
             }
+        }
+        if !panel.as_ref().is_some_and(|p| p.panel.id == 0) {
+            let viewport = extent.map(|n| f64::from(n) / dpr);
+            let description = slither_client::login_controls::panel(view, layout, viewport);
+            let mut controls = PanelInputState::default();
+            if let Some(id) = match self.focus {
+                Some(E::Play) => Some(slither_client::login_controls::PLAY),
+                Some(E::Quality) => Some(slither_client::login_controls::QUALITY),
+                _ => input
+                    .filter(|i| i.focus() == Some(EditorId::Nickname))
+                    .map(|_| slither_client::login_controls::NICKNAME),
+            } {
+                controls.set_focus(id);
+            }
+            controls.set_progress(
+                slither_client::login_controls::PLAY,
+                [view.hover_alpha, view.press_alpha],
+            );
+            let mut fallback = MenuInputState::default();
+            fallback.reset_editor(EditorId::Nickname, &view.nickname);
+            let resolved = description.resolve(viewport).map_err(str::to_owned)?;
+            c.panel(
+                text,
+                &description,
+                &controls,
+                input.unwrap_or(&fallback),
+                &mut BTreeMap::new(),
+                MenuTheme::default(),
+                &resolved,
+            )?;
         }
         let mut staged_scroll = panel.as_ref().map(|p| p.scroll.clone());
         if let Some(p) = &panel {
@@ -1585,7 +1428,7 @@ impl Composition<'_> {
         // boxes, without synthetic bold or browser-specific metric machinery.
         for l in &mut self.labels {
             let width = text.measure_panel(&l.text, l.style)?.advance;
-            let available = l.rect.width - 2. * l.field_inset.map_or(0., |i| i[0]);
+            let available = l.rect.width;
             if l.fit && width > available && l.reveal_span.is_none() {
                 l.style.size *= available / width;
             }
@@ -1601,26 +1444,22 @@ impl Composition<'_> {
             .map(|(l, m)| {
                 let placement = single_line_field_placement(
                     l.rect,
-                    l.field_inset.unwrap_or([0.; 2]),
+                    [0.; 2],
                     l.style.size,
                     m.font_ascent,
                     m.font_descent,
                 );
-                let alphabetic = l.line_box || l.field_inset.is_some();
+                let alphabetic = l.line_box;
                 TextRun {
                     text: &l.text,
                     style: l.style,
                     position: [
-                        if l.field_inset.is_some() {
-                            placement.origin[0]
-                        } else {
-                            l.rect.x
-                                + if l.align == Align::Left {
-                                    0.
-                                } else {
-                                    l.rect.width / 2.
-                                }
-                        },
+                        l.rect.x
+                            + if l.align == Align::Left {
+                                0.
+                            } else {
+                                l.rect.width / 2.
+                            },
                         if alphabetic {
                             placement.origin[1]
                         } else {
@@ -1822,32 +1661,39 @@ fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod quota_tests {
     use super::*;
-    use slither_client::menu_input::EditIntent;
 
     #[test]
     fn solid_texture_axis_exhaustion_still_degrades() {
-        let mut text = TextCache::menu();
-        let mut view = crate::menu_specimen::view(0).unwrap();
-        view.nickname = "W".repeat(24);
-        // Isolate selection ink from the decorative field allocation.
-        view.nickname_alpha = 0.;
-        let extent = [7200, 6000];
-        let layout = crate::menu_specimen::layout(&mut text, &view, extent, 12.).unwrap();
-        let mut edit = MenuInputState::default();
-        edit.reset_editor(EditorId::Nickname, &view.nickname);
-        edit.apply(EditIntent::Focus(Some(EditorId::Nickname)));
-        edit.apply(EditIntent::SelectAll);
-        let mut menu = Menu {
-            focus: Some(E::Nickname),
-            ..Menu::default()
+        let mut c = Composition {
+            old: &BTreeMap::new(),
+            old_art: &BTreeMap::new(),
+            materials: BTreeMap::new(),
+            next_handle: PAGE_HANDLE,
+            spinner_revision: 0,
+            scale: 1.,
+            draws: Vec::new(),
+            art: BTreeMap::new(),
+            labels: Vec::new(),
+            quality_art: false,
         };
-        let prepared =
-            menu.prepare_with_input(&mut text, &view, &layout, extent, 12., None, 0, Some(&edit));
+        let prepared = c
+            .solid_draw(
+                MenuRect {
+                    x: 0.,
+                    y: 0.,
+                    width: 2049.,
+                    height: 1.,
+                },
+                [255; 3],
+                1.,
+                [2049, 1],
+            )
+            .map(|_| unreachable!("axis quota precedes allocation"));
         assert_eq!(
             prepared.as_ref().err().map(String::as_str),
             Some(MENU_SOLID_TEXTURE_QUOTA)
         );
-        let base = MenuFrame::world_crossfade(extent, 12., 0.).unwrap();
+        let base = MenuFrame::world_crossfade([960, 540], 1., 0.).unwrap();
         let mut picture = PreparedFrame {
             frame: base.frame.clone(),
             overlay: None,

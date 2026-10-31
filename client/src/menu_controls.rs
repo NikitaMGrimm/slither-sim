@@ -91,8 +91,10 @@ pub enum ControlKind {
         placeholder: String,
         /// Committed normalization.
         rule: TextRule,
-        /// Logical content insets.
-        inset: [f64; 2],
+        /// Logical left/top/right/bottom content padding.
+        inset: [f64; 4],
+        /// Fit the complete value into the content width; otherwise scroll.
+        fit: bool,
     },
 }
 /// One copied control in paint/reading order.
@@ -293,8 +295,8 @@ impl PanelView {
                 }
                 if let ControlKind::TextField { inset, .. } = control.kind
                     && (inset.iter().any(|n| !n.is_finite() || *n < 0.)
-                        || control.placement.size[0] <= 2. * inset[0]
-                        || control.placement.size[1] <= 2. * inset[1])
+                        || control.placement.size[0] <= inset[0] + inset[2]
+                        || control.placement.size[1] <= inset[1] + inset[3])
                 {
                     return Err("Invalid field content box");
                 }
@@ -354,6 +356,7 @@ pub struct PanelInputState {
     parent_focus: Option<(u16, u64, ControlId)>,
     modal: bool,
     synced_focus: Option<(u16, u64, ControlId)>,
+    selection: MouseSelection,
 }
 impl PanelInputState {
     /// Current logical focus.
@@ -363,6 +366,10 @@ impl PanelInputState {
     /// Current pointer capture, also used by host drag-selection.
     pub fn capture(&self) -> Option<ControlId> {
         self.capture
+    }
+    /// Restore an already sampled overlay (used by copied visual specimens).
+    pub fn set_progress(&mut self, id: ControlId, progress: [f64; 2]) {
+        self.progress.insert(id, progress.map(|v| v.clamp(0., 1.)));
     }
     /// Sampled hover/press opacity.
     pub fn progress(&self, id: ControlId) -> [f64; 2] {
@@ -398,7 +405,6 @@ impl PanelInputState {
                 self.focus = panel.restore_focus.or(Some(focus));
             }
         }
-        self.modal = panel.modal && panel.visible;
         for c in &panel.controls {
             if let ControlKind::TextField { editor, rule, .. } = c.kind {
                 edit.register(editor, rule, "");
@@ -410,12 +416,16 @@ impl PanelInputState {
                 .iter()
                 .any(|c| c.id == id && Self::available(panel, c))
         };
-        self.focus = self.focus.filter(|id| valid(*id));
+        self.focus = self.focus.or(panel.initial_focus).filter(|id| valid(*id));
         self.capture = self.capture.filter(|id| valid(*id));
         self.hovered = self.hovered.filter(|id| valid(*id));
         self.progress
             .retain(|id, _| panel.controls.iter().any(|c| c.id == *id));
-        effects.extend(edit.apply(EditIntent::Modal(panel.visible && panel.modal)));
+        let modal = panel.visible && panel.modal;
+        if modal != self.modal {
+            effects.extend(edit.apply(EditIntent::Modal(modal)));
+            self.modal = modal;
+        }
         effects.extend(self.sync_focus(panel, edit));
         effects
     }
@@ -436,13 +446,14 @@ impl PanelInputState {
                     None
                 }
             });
-        let mut effects = if edit.focus() != editor {
+        let editor_changed = edit.focus() != editor;
+        let mut effects = if editor_changed {
             edit.apply(EditIntent::Focus(editor))
         } else {
             Vec::new()
         };
         let focus = self.focus.map(|id| (panel.id, panel.generation, id));
-        if focus != self.synced_focus && focus.is_some() {
+        if focus != self.synced_focus && focus.is_some() && !(editor_changed && editor.is_some()) {
             MenuInputState::releases(&mut effects);
         }
         self.synced_focus = focus;
@@ -452,6 +463,35 @@ impl PanelInputState {
     pub fn blur(&mut self) {
         self.capture = None;
         self.hovered = None;
+        self.selection = MouseSelection::default();
+    }
+    /// Set a semantic focus target, revalidated by `sync`.
+    pub fn set_focus(&mut self, id: ControlId) {
+        self.focus = Some(id);
+    }
+    /// Apply a measured field hit through the shared mouse-selection policy.
+    #[allow(clippy::too_many_arguments)]
+    pub fn select_text(
+        &mut self,
+        edit: &mut MenuInputState,
+        editor: EditorId,
+        caret: usize,
+        point: [f64; 2],
+        pressed: bool,
+        shift: bool,
+        now: f64,
+        settings: ClickSettings,
+    ) -> Vec<HostEditEffect> {
+        let Some(control) = self.capture else {
+            return Vec::new();
+        };
+        let Some(state) = edit.registered_editor(editor) else {
+            return Vec::new();
+        };
+        let intent = self
+            .selection
+            .select(control, state, caret, point, pressed, shift, now, settings);
+        intent.map_or_else(Vec::new, |intent| edit.apply(intent))
     }
     /// Explicit Tab order wraps within the mounted panel and skips unavailable controls.
     pub fn tab(&mut self, panel: &PanelView, reverse: bool) {
@@ -491,12 +531,16 @@ impl PanelInputState {
             .map(|r| r.control.id);
         self.hovered = hit;
         if down == Some(true) {
+            if self.selection.last.is_some_and(|(id, ..)| Some(id) != hit) {
+                self.selection = MouseSelection::default();
+            }
             self.capture = hit;
             if hit.is_some() {
                 self.focus = hit;
             }
         }
         if down == Some(false) {
+            self.selection.release();
             let captured = self.capture.take();
             if let Some(control) = captured.filter(|id| Some(*id) == hit) {
                 return Some(ControlIntent {
@@ -553,4 +597,131 @@ impl PanelInputState {
         }
         Ok(())
     }
+}
+
+/// Copied platform multi-click settings. Distances are half the double-click
+/// rectangle, expressed in the same logical coordinates as the pointer.
+#[derive(Clone, Copy, Debug)]
+pub struct ClickSettings {
+    /// Maximum milliseconds between presses.
+    pub time_ms: f64,
+    /// Maximum displacement on each axis.
+    pub distance: [f64; 2],
+}
+impl Default for ClickSettings {
+    fn default() -> Self {
+        Self {
+            time_ms: 500.,
+            distance: [2.; 2],
+        }
+    }
+}
+#[derive(Clone, Debug, Default)]
+struct MouseSelection {
+    last: Option<(ControlId, f64, [f64; 2], u8)>,
+    drag: Option<(usize, usize)>,
+}
+impl MouseSelection {
+    fn release(&mut self) {
+        self.drag = None;
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn select(
+        &mut self,
+        control: ControlId,
+        editor: &crate::menu_input::TextEditState,
+        caret: usize,
+        point: [f64; 2],
+        pressed: bool,
+        shift: bool,
+        now: f64,
+        settings: ClickSettings,
+    ) -> Option<EditIntent> {
+        if editor.composing() {
+            self.drag = None;
+            return None;
+        }
+        let text = editor.text();
+        let mut caret = caret.min(text.len());
+        while !text.is_char_boundary(caret) {
+            caret -= 1;
+        }
+        if pressed {
+            let count = self
+                .last
+                .filter(|(id, time, p, _)| {
+                    *id == control
+                        && now >= *time
+                        && now - time <= settings.time_ms
+                        && (0..2).all(|i| (point[i] - p[i]).abs() <= settings.distance[i])
+                })
+                .map_or(1, |(_, _, _, count)| count % 3 + 1);
+            self.last = if shift {
+                None
+            } else {
+                Some((control, now, point, count))
+            };
+            let range = if shift {
+                (editor.selection().0, caret)
+            } else if count == 3 {
+                (0, text.len())
+            } else if count == 2 {
+                word_at(text, caret)
+            } else {
+                (caret, caret)
+            };
+            self.drag = Some(if shift { (range.0, range.0) } else { range });
+            Some(EditIntent::Select {
+                anchor: range.0,
+                caret: range.1,
+            })
+        } else {
+            let (left, right) = self.drag?;
+            if self.last.is_some_and(|(_, _, p, _)| {
+                (0..2).any(|i| (point[i] - p[i]).abs() > settings.distance[i])
+            }) {
+                self.last = None;
+            }
+            let (anchor, caret) = if left == right {
+                (left, caret)
+            } else if caret < left {
+                (right, word_at(text, caret).0)
+            } else if caret > right {
+                (left, word_at(text, caret).1)
+            } else {
+                (left, right)
+            };
+            Some(EditIntent::Select { anchor, caret })
+        }
+    }
+}
+fn word_at(text: &str, caret: usize) -> (usize, usize) {
+    let start = if caret == text.len() {
+        text.char_indices().next_back().map_or(0, |(i, _)| i)
+    } else {
+        caret
+    };
+    let class = |c: char| {
+        if c.is_alphanumeric() || c == '_' {
+            0
+        } else if c.is_whitespace() {
+            1
+        } else {
+            2
+        }
+    };
+    let Some(ch) = text[start..].chars().next() else {
+        return (0, 0);
+    };
+    let kind = class(ch);
+    let left = text[..start]
+        .char_indices()
+        .rev()
+        .find(|(_, c)| class(*c) != kind)
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    let right = text[start..]
+        .char_indices()
+        .find(|(_, c)| class(*c) != kind)
+        .map_or(text.len(), |(i, _)| start + i);
+    (left, right)
 }
