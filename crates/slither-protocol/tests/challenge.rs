@@ -2,6 +2,23 @@ mod common;
 use slither_protocol::challenge::*;
 const SOURCE: &[u8] = b"var a = \"_k/T)\";a+=\"dr'Ay(^|``J9l@Bs'L{]JX\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}";
 #[test]
+fn exact_literal_errors_point_to_the_offending_encoded_byte() {
+    // First/last positions in both literals, including the second-literal start
+    // that previously reported the first literal's unscaled source offset.
+    for at in [9, 13, 20, 41] {
+        for invalid in [b'"', b'\\', 0, 127, 255] {
+            let mut source = SOURCE.to_vec();
+            source[at] = invalid;
+            let error =
+                literal_27(&common::encode_source(&source), Grammar::ExactTemplate).unwrap_err();
+            assert_eq!(
+                (error.kind, error.opcode, error.offset),
+                (slither_protocol::ErrorKind::Literal, Some(b'6'), at * 2)
+            );
+        }
+    }
+}
+#[test]
 fn algorithms_have_separate_independent_golden_replies() {
     let encoded = common::encode_source(SOURCE);
     for grammar in [Grammar::ExactTemplate, Grammar::TokenWhitespace] {

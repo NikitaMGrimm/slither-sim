@@ -6,6 +6,7 @@ use core::iter::FusedIterator;
 pub const MAX_MINIMAP_DIMENSION: u16 = 512;
 pub type MinimapDecodeError = DecodeError;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum MinimapFormat {
     UpperU,
     LayeredL,
@@ -205,7 +206,11 @@ pub fn parse_minimap(
         require(
             command,
             size != 0 && (format != MinimapFormat::SnapshotM || size <= 512),
-            1,
+            if format == MinimapFormat::LayeredL {
+                2
+            } else {
+                1
+            },
             ErrorKind::InvalidScalar,
         )?;
     }

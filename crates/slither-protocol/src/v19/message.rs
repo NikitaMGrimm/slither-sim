@@ -6,11 +6,13 @@ use core::{iter::FusedIterator, slice};
 pub const PROTOCOL_VERSION: u8 = 19;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Target {
     Own,
     Id(u16),
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Direction {
     None,
     Decreasing,
@@ -159,6 +161,7 @@ impl<'a> BodyRef<'a> {
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum BodyDelta {
     HalfUnits([u8; 2]),
     FinalDirection(u16),
@@ -256,6 +259,7 @@ pub struct FoodSpawn {
     pub rapid: bool,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Eater {
     Absent,
     Cached,
@@ -324,7 +328,10 @@ impl Iterator for TeamScores<'_> {
 impl ExactSizeIterator for TeamScores<'_> {}
 impl FusedIterator for TeamScores<'_> {}
 
+/// An extensible output family. Match selected variants and handle future
+/// variants with a wildcard; `Unknown` only represents unknown wire opcodes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Message<'a> {
     Setup(SetupRef<'a>),
     SnakeAppearance(SnakeAppearanceRef<'a>),

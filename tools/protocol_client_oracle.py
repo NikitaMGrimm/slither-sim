@@ -3,12 +3,21 @@
 Offline, Linux only for A0. The temporary package is outside the workspace and
 does not edit client sources. No production dependency on either consumer is
 introduced. Keep generated expected bits fixed in the protocol package tests.
+
+After PR B delegates client numerics to slither-protocol, regeneration MUST use
+--client-root pointing to an independent pre-adoption client checkout at
+8b36a91cafe6878ccedf0d7da70a4008ae7ef108 (merged #391). Using B's delegating
+client would make the comparison circular. Never refresh old expected bits to
+accept a shared-reader change.
 """
+import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+PRE_ADOPTION_COMMIT = "8b36a91cafe6878ccedf0d7da70a4008ae7ef108"
 SOURCE = r'''
 use slither_client::{protocol::ElapsedHeader, state::{ClientState, PresentationEvent}};
 use slither_protocol::{scalar as s, v19::{self, Message}, DecodeAdmission};
@@ -57,6 +66,20 @@ fn main() {
         pin("full_speed_per_32ms", u32::from(raw), a.speed_per_32ms, s::full_speed_per_32ms(raw));
         pin("full_speed", u32::from(raw), state.snakes[&17].speed, s::full_speed(raw));
     }
+    for raw in [0_u16, 1, 127, 128, 255, 16384, 32767, 32768, 65534, 65535] {
+        let mut p = common::appearance(); let end = p.len();
+        p[end-2..].copy_from_slice(&raw.to_be_bytes());
+        let event = apply(&mut state, &p);
+        let PresentationEvent::SnakeAppearance(a) = &event[0] else { panic!() };
+        pin("body_angle16", u32::from(raw), a.heading, s::body_angle16(raw));
+        // The private advance helper does not expose its angle. Run its exact
+        // source with a cos seam that returns the argument, before any trig.
+        pin("anchor_angle16", u32::from(raw), anchor_reference::angle(raw), s::anchor_angle16(raw));
+        let [hi, lo] = raw.to_be_bytes();
+        let event = apply(&mut state, &[b'j', 0, 1, hi, lo, hi, lo]);
+        let PresentationEvent::PreyMotion(a) = &event[0] else { panic!() };
+        pin("prey_position", u32::from(raw), a.absolute_position.x, s::prey_position(raw));
+    }
     // Run the eleven historical solver witnesses through both actual solvers.
     for (_, _, encoded, hex) in CAPTURED {
         let current = slither_client::challenge::solve_challenge(encoded.as_bytes()).unwrap();
@@ -79,6 +102,33 @@ fn main() {
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--client-root", type=Path, default=ROOT / "client",
+                        help=f"independent client source; after B use {PRE_ADOPTION_COMMIT}")
+    args = parser.parse_args()
+    client = args.client_root.resolve()
+    manifest = tomllib.loads((client / "Cargo.toml").read_text(encoding="utf-8"))
+    if "slither-protocol" in manifest.get("dependencies", {}):
+        parser.error(f"circular oracle: use --client-root from pre-adoption {PRE_ADOPTION_COMMIT}")
+    # Copy these two actual private functions without rewriting their arithmetic.
+    # Only math::cos/sin are replaced in the temporary module: cos returns its
+    # argument and spacing=1, origin=0 makes advance().x that exact angle. This
+    # observes the client's intermediate value instead of duplicating its formula
+    # or recovering an angle through platform-dependent inverse trigonometry.
+    state_source = (client / "src/state.rs").read_text(encoding="utf-8")
+    def function(name):
+        start = state_source.index(f"fn {name}(")
+        return state_source[start:state_source.index("\n}", start) + 2]
+    anchor_reference = '''
+mod anchor_reference {
+    use slither_client::state::{Point, StateError, MAX_COORDINATE};
+    use std::f64::consts::TAU;
+    mod math {
+        pub fn cos(angle: f64) -> f64 { angle }
+        pub fn sin(_: f64) -> f64 { 0. }
+    }
+    pub fn angle(raw: u16) -> f64 { advance(Point::default(), raw, 1.).unwrap().x }
+'''+function("checked_point")+"\n"+function("advance")+"\n}\n"
     # Read only the existing literal witness array, preserving historical paths.
     witnesses = (ROOT / "tests/client_challenge.rs").read_text(encoding="utf-8")
     witnesses = witnesses[witnesses.index("const CAPTURED:"):witnesses.index("fn encode_source")]
@@ -88,11 +138,11 @@ def main():
         (path / "Cargo.toml").write_text(
             '[package]\nname="protocol-client-oracle"\nversion="0.0.0"\nedition="2024"\n'
             '[dependencies]\n'
-            f'slither-client={{path="{(ROOT / "client").as_posix()}"}}\n'
+            f'slither-client={{path="{client.as_posix()}"}}\n'
             f'slither-protocol={{path="{(ROOT / "crates/slither-protocol").as_posix()}"}}\n',
             encoding="utf-8")
         source = SOURCE.replace("COMMON", (ROOT / "crates/slither-protocol/tests/common/mod.rs").as_posix())
-        (path / "src/main.rs").write_text(source + witnesses, encoding="utf-8")
+        (path / "src/main.rs").write_text(source + witnesses + anchor_reference, encoding="utf-8")
         return subprocess.run(["rustup", "run", "1.99.0", "cargo", "run", "--offline", "--manifest-path", str(path / "Cargo.toml")], check=False).returncode
 
 

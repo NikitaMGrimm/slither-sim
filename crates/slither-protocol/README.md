@@ -40,6 +40,13 @@ Errors are small `Copy` kind/opcode/offset records, without formatted strings.
 Challenge error offsets refer to encoded payload bytes (decoded syntax offsets
 are multiplied by two), excluding the `6` opcode.
 
+Output enums (`Message`, `ErrorKind`, `Target`, `Direction`, `BodyDelta`,
+`Eater` and `MinimapFormat`) are `#[non_exhaustive]`. Downstream matches must
+include a wildcard arm: preserve the input/diagnostic and report or ignore an
+unhandled output according to the consumer's policy. `Message::Unknown` is a
+wire value, not a substitute for that Rust wildcard. Caller-selected `Header`,
+`FrameAdmission`, `DecodeAdmission` and challenge `Grammar` remain closed.
+
 Raw integers, optional fields, names/custom bytes, direction/color/eater
 metadata and opaque setup extensions are retained. Body, food, HUD, team-score
 and minimap traversals are concrete iterators. `BodyDelta::FinalDirection` is
@@ -87,6 +94,12 @@ The allocator test first verifies its counter detects allocations.
 inputs through the actual client and shared scalar functions, compares
 `to_bits()` and prints fixed expectations. `tests/numerics.rs` records the
 client pin and generation method; do not regenerate its bits to accept drift.
+After B adopts the shared numerics, run the oracle with `--client-root` pointing
+to an independent client checkout at `8b36a91cafe6878ccedf0d7da70a4008ae7ef108`.
+Using the delegating client would make regeneration circular. Body direction
+and prey coordinates come from actual client events; the private anchor helper
+is copied unchanged into a temporary module whose math seam exposes its angle
+before trigonometry. Neither consumer's source is edited for this measurement.
 The oracle also checks the eleven retained historical stock challenges without
 copying their captures into this package. Only authored synthetic data ships here.
 

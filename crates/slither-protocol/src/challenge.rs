@@ -67,11 +67,16 @@ fn exact_literals(source: &[u8]) -> Result<[u8; 27], ChallengeError> {
     let mut reply = [0; 27];
     reply[..5].copy_from_slice(&source[PREFIX.len()..PREFIX.len() + 5]);
     reply[5..].copy_from_slice(&source[second..second + 22]);
-    if reply
+    if let Some(index) = reply
         .iter()
-        .any(|c| !(b' '..=b'~').contains(c) || matches!(c, b'"' | b'\\'))
+        .position(|c| !(b' '..=b'~').contains(c) || matches!(c, b'"' | b'\\'))
     {
-        return Err(error(PREFIX.len(), ErrorKind::Literal));
+        let source_offset = if index < 5 {
+            PREFIX.len() + index
+        } else {
+            second + index - 5
+        };
+        return Err(error(source_offset * 2, ErrorKind::Literal));
     }
     Ok(reply)
 }

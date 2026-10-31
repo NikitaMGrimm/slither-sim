@@ -571,3 +571,31 @@ fn exact_client_byte_limit_and_unbounded_hud_are_distinct() {
         [[-1, 1], [i32::MIN, i32::MAX]]
     );
 }
+
+#[test]
+fn rejected_minimap_sizes_identify_the_size_field_and_frame_offset() {
+    for (p, offset) in [
+        (&b"L\x01\0\0"[..], 2),
+        (&b"U\0\0"[..], 1),
+        (&b"M\x02\x01"[..], 1),
+    ] {
+        let error = minimap::parse_minimap(p, Sim).unwrap_err();
+        assert_eq!(
+            (error.kind, error.opcode, error.offset),
+            (ErrorKind::InvalidScalar, Some(p[0]), offset)
+        );
+        let mut frame = vec![0, 0, 0, p.len() as u8];
+        frame.extend(p);
+        let command = decode_frame(
+            &frame,
+            Header::TwoBytes,
+            Limits::CLIENT,
+            FrameAdmission::Bounded,
+        )
+        .unwrap()
+        .commands()
+        .next()
+        .unwrap();
+        assert_eq!(decode_command(command, Sim).unwrap_err().offset, 4 + offset);
+    }
+}

@@ -9,7 +9,9 @@ pub mod scalar;
 pub mod v19;
 
 /// Structural and scalar failures; unknown opcodes are returned as values.
+/// Callers must include a wildcard arm for future error kinds.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorKind {
     Empty,
     TooLarge,
