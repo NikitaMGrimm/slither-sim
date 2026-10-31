@@ -48,6 +48,12 @@ release = false
 name = "slither-wgpu-slice"
 release = false
 
+# With two released packages, release-plz would name tags (and changelog links)
+# slither-sim-vX.Y.Z; release.yml tags the simulator vX.Y.Z.
+[[package]]
+name = "slither-sim"
+git_tag_name = "v{{ version }}"
+
 # Independently versioned; publication is ordered and guarded by release.yml.
 [[package]]
 name = "slither-protocol"
