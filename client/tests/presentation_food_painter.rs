@@ -774,6 +774,19 @@ fn indexed_validation_matches_scans_across_catalog_changes_and_paint_paths() {
                             plan_food_with_index(input, &mut index, Vec::new(), Vec::new()),
                             plan_food(input),
                         );
+                        for factor in [1., 0.25, 0.001, 1.25] {
+                            assert_eq!(
+                                plan_food_with_zoom_and_index(
+                                    input,
+                                    &mut index,
+                                    Vec::new(),
+                                    Vec::new(),
+                                    factor,
+                                ),
+                                plan_food_with_zoom(input, Vec::new(), Vec::new(), factor),
+                                "indexed zoom differs at factor {factor}",
+                            );
+                        }
                     }
                 }
             }

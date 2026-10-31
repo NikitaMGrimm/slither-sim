@@ -62,6 +62,10 @@ pixels use the existing low-quality passes: omit outline/shadow/inner shimmer,
 retaining the body, outer boost and death passes. These rules are opt-in to
 zoom-out; default output remains exact.
 The background already uses one repeating-texture quad regardless of tile count.
+Native food planning combines this zoom policy with the retained catalog index
+from [frame performance](frame-performance.md#retained-food-cpu-preparation).
+Factor one keeps stock retained-source validation and draw ordering; catalog
+changes refresh the index once per plan, without per-food asset-table rescans.
 Other geometry retains existing complete-or-reject picture budgeting; there is
 no unbounded allocation or geometry trimming at the renderer boundary.
 
