@@ -154,6 +154,13 @@ impl ServerPicker {
     /// A successful empty directory is still a completed, reusable result.
     pub fn directory_failed(&mut self, status: &str) {
         if !self.directory_ready {
+            // Provisional samples belong to the failed attempt, not the next retry.
+            if !self.rows.is_empty() {
+                self.generation = self.generation.wrapping_add(1);
+            }
+            self.rows.clear();
+            self.pending_rows = None;
+            self.list = ScrollList::new(VISIBLE_ROWS);
             self.directory_requested = false;
             self.request = false;
             self.status = status.to_owned();

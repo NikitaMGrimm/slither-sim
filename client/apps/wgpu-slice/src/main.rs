@@ -508,7 +508,12 @@ mod desktop {
                             self.directory_snapshot.clone(),
                             pending,
                         ) {
-                            Ok(preparation) => self.preparation = Some(preparation),
+                            Ok(preparation) => {
+                                if let Some(progress) = &preparation.progress {
+                                    self.directory_progress = Some(progress.clone());
+                                }
+                                self.preparation = Some(preparation);
+                            }
                             Err(error) => {
                                 if self.directory.is_none() {
                                     self.directory_progress = None;

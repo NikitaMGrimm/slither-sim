@@ -68,6 +68,7 @@ pub struct Preparation {
     receiver: mpsc::Receiver<PreparationOutcome>,
     cancel: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
+    pub progress: Option<DirectoryProgress>,
 }
 impl Preparation {
     pub fn start(server: Option<String>) -> Result<Self> {
@@ -82,6 +83,30 @@ impl Preparation {
         cached: Option<Arc<DirectorySnapshot>>,
         pending: Option<DirectoryPreparation>,
     ) -> Result<Self> {
+        Self::start_with(
+            server,
+            id,
+            cached,
+            pending,
+            DirectoryPreparation::start,
+            fetch,
+        )
+    }
+    fn start_with(
+        server: Option<String>,
+        id: Option<u16>,
+        cached: Option<Arc<DirectorySnapshot>>,
+        pending: Option<DirectoryPreparation>,
+        start_directory: impl FnOnce() -> Result<DirectoryPreparation>,
+        get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)> + Send + 'static,
+    ) -> Result<Self> {
+        // Cold Play after a failed startup uses the same streaming acquisition.
+        let pending = if server.is_none() && cached.is_none() && pending.is_none() {
+            Some(start_directory()?)
+        } else {
+            pending
+        };
+        let progress = pending.as_ref().map(|work| work.progress.clone());
         let (sender, receiver) = mpsc::sync_channel(1);
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
@@ -94,8 +119,8 @@ impl Preparation {
                     &flag,
                     pending,
                     cached,
-                    fetch,
-                    probe_clusters,
+                    get,
+                    |_, _| unreachable!("automatic Play has a directory worker or completed cache"),
                 );
                 let _ = sender.send(completion);
             })
@@ -104,6 +129,7 @@ impl Preparation {
             receiver,
             cancel,
             worker: Some(worker),
+            progress,
         })
     }
     pub fn poll(&mut self) -> Option<PreparationOutcome> {
@@ -749,6 +775,131 @@ mod tests {
         b"var client_version=4242; var cpw=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19];";
     fn synthetic_directory() -> Vec<u8> {
         synthetic_ids([24, 42])
+    }
+    #[test]
+    fn cold_play_after_failed_startup_streams_and_cancellation_clears_provisional_rows() {
+        for startup_cancelled in [false, true] {
+            let mut picker = slither_client::server_picker::ServerPicker::default();
+            picker.start_directory(true);
+            assert!(picker.take_directory_request());
+            let startup = DirectoryPreparation::start_with(
+                move |url, _, _| {
+                    if !startup_cancelled {
+                        return Err("Injected startup fetch failure".into());
+                    }
+                    synthetic_fetch(url, [24])
+                },
+                |_, flag, publish| {
+                    publish(BTreeMap::from([(1, 80)]));
+                    flag.store(true, Ordering::SeqCst);
+                    BTreeMap::from([(1, 80)])
+                },
+            )
+            .unwrap();
+            let startup_progress = startup.progress.clone();
+            let error = startup.finish(&AtomicBool::new(false)).err().unwrap();
+            if let Some(snapshot) = startup_progress.take() {
+                picker
+                    .update_directory(&snapshot.servers, &snapshot.pings, false)
+                    .unwrap();
+                assert_eq!(picker.rows[0].server.id, 24);
+            }
+            picker.directory_failed(&error);
+            assert!(picker.rows.is_empty());
+            assert!(!picker.take_directory_request());
+
+            // Play retries without a picker reopen, pending worker or completed cache.
+            let (phase_tx, phase_rx) = mpsc::sync_channel(1);
+            let (continue_tx, continue_rx) = mpsc::sync_channel(1);
+            let starts = std::cell::Cell::new(0);
+            let play = Preparation::start_with(
+                None,
+                None,
+                None,
+                None,
+                || {
+                    starts.set(starts.get() + 1);
+                    DirectoryPreparation::start_with(
+                        |url, _, _| synthetic_fetch(url, [42]),
+                        move |_, flag, publish| {
+                            phase_tx.send(()).unwrap();
+                            continue_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                            publish(BTreeMap::from([(1, 12)]));
+                            phase_tx.send(()).unwrap();
+                            continue_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                            let deadline = Instant::now() + Duration::from_secs(5);
+                            while !flag.load(Ordering::SeqCst) {
+                                assert!(
+                                    Instant::now() < deadline,
+                                    "retry cancellation must propagate"
+                                );
+                                thread::sleep(Duration::from_millis(1));
+                            }
+                            // A last reply can race cancellation; it must not restore rows.
+                            publish(BTreeMap::from([(1, 2)]));
+                            BTreeMap::from([(1, 2)])
+                        },
+                    )
+                },
+                |_, _, _| panic!("cancelled retry must not acquire a profile"),
+            )
+            .unwrap();
+            let progress = play.progress.as_ref().unwrap().clone();
+            phase_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            let decoded = progress.take().expect("cold directory must stream");
+            picker
+                .update_directory(&decoded.servers, &decoded.pings, false)
+                .unwrap();
+            picker.open();
+            assert!(!picker.take_directory_request());
+            assert_eq!(picker.rows[0].server.id, 42);
+            assert_eq!(picker.rows[0].ping, None);
+            continue_tx.send(()).unwrap();
+            phase_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            let pinged = progress.take().expect("cold pings must stream");
+            picker
+                .update_directory(&pinged.servers, &pinged.pings, false)
+                .unwrap();
+            assert_eq!(picker.rows[0].ping, Some(12));
+            play.cancel();
+            continue_tx.send(()).unwrap();
+            let completion = play.receiver.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert!(completion.result.is_err());
+            assert!(completion.directory.is_none());
+            drop(play);
+            // Match host ordering: drain progress, then handle terminal cancellation.
+            if let Some(snapshot) = progress.take() {
+                picker
+                    .update_directory(&snapshot.servers, &snapshot.pings, false)
+                    .unwrap();
+            }
+            let mut cached = None;
+            complete_picker_preparation(&mut picker, &mut cached, &completion, true, false)
+                .unwrap();
+            assert!(cached.is_none());
+            assert!(picker.rows.is_empty());
+            assert!(progress.take().is_none());
+            picker.open();
+            assert!(!picker.take_directory_request());
+            picker.close();
+            picker.open();
+            assert!(picker.take_directory_request());
+            assert!(picker.rows.is_empty());
+            picker.open();
+            assert!(!picker.take_directory_request());
+            assert_eq!(starts.get(), 1);
+        }
+    }
+    fn synthetic_fetch(url: &Url, ids: impl IntoIterator<Item = u16>) -> Result<(Url, Inert)> {
+        Ok((
+            url.clone(),
+            Inert(match url.path() {
+                "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                "/s/game999.js" => b"getData('https://slither.io/i999.txt',handler);".to_vec(),
+                "/i999.txt" => synthetic_ids(ids),
+                _ => panic!("unexpected fetch"),
+            }),
+        ))
     }
     #[test]
     fn startup_worker_streams_before_completion_and_play_joins_it() {

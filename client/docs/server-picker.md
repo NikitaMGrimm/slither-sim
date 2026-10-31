@@ -26,6 +26,10 @@ takes the worker. Partial results are for display only: automatic Play still
 waits for the unchanged ping sweep and selects from its completed samples.
 Partial results never become the completed cache or suppress a retry after
 cancellation/failure. Fetch limits, cancellation and probe deadlines are unchanged.
+Cold Play after a failed or cancelled startup starts that same streaming worker,
+even without reopening the picker. Failure/cancellation clears provisional rows
+and their captures; completed samples remain reusable. Retries still require an
+explicit Play or a new picker open, with no automatic retry loop.
 
 While the picker is visible (including its exit fade), progress and completion
 update latency text in place and retain row order and visible membership. They

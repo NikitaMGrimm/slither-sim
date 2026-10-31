@@ -145,7 +145,7 @@ fn provisional_rows_do_not_suppress_retry_after_failure() {
     p.update_directory(&[server(1, 1, true)], &BTreeMap::new(), false)
         .unwrap();
     p.directory_failed("Cancelled sweep");
-    assert_eq!(p.rows.len(), 1);
+    assert!(p.rows.is_empty());
     p.open();
     assert!(!p.take_directory_request());
     p.close();
