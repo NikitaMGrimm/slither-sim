@@ -207,6 +207,10 @@ async fn run(output: &Path) -> Result<()> {
             .await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--settings-fade") {
+        return settings_fade::specimens(&mut renderer, output).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--settings") {
         return settings_specimens(output, &mut renderer).await;
     }
@@ -1199,3 +1203,7 @@ mod focus;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/picker_panel.rs"]
 mod picker_panel;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/settings_fade.rs"]
+mod settings_fade;
