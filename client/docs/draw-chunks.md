@@ -8,12 +8,13 @@ texture's repeat/clamp states. A run crossing a chunk boundary splits without
 changing primitive order. MSAA is cleared and resolved once for the whole frame.
 Canvas output and core painter traversal/quality semantics are unchanged.
 
-Each call to `Renderer::render(&self)` owns its GPU buffers. Concurrent calls and
-retained retries cannot overwrite each other's vertices. `create_buffer_init`
-remains per chunk; cross-frame buffer reuse would require synchronization across
-write and submit. There is no persistent shared vertex buffer. Conversion and
-serialization happen in one traversal with no per-quad heap allocation and no
-full-frame `Quad` vector. All geometry is validated before any draw submission.
+`Renderer::render(&mut self)` retains growable vertex chunks and writes them with
+`queue.write_buffer`. Exclusive calls finish submission before the next call's
+writes, so queue order protects earlier in-flight vertices, including the world
+and overlay sharing buffers. The MSAA view is retained until extent/sample count
+changes. Conversion and serialization happen in one traversal with no per-quad
+heap allocation or full-frame `Quad` vector. All geometry is validated before
+GPU writes or draw submission. CPU byte/state storage is reused across frames.
 Preparation validates the final composed picture without allocating quads;
 resource materialization no longer repeats that geometry traversal. The public
 renderer validates again because its public `Frame` input remains mutable.
@@ -32,7 +33,7 @@ At the absolute bound, per-picture storage is:
 | --- | ---: |
 | Logical CPU Draw records | 67,108,864 (64 MiB) |
 | CPU resolved states, 24 bytes per quad | 6,291,456 (6 MiB) |
-| Reused CPU vertex scratch, at most one chunk | 983,040 (0.9375 MiB) |
+| Retained CPU vertex bytes, at most 32 chunks | 31,457,280 (30 MiB) |
 | GPU vertex data across at most 32 chunks | 31,457,280 (30 MiB) |
 
 Chunk/state-vector headers, allocator and driver overhead are additional.
@@ -64,34 +65,25 @@ reserve. The opt-in menu's 512-draw bound is likewise a producer quota,
 with its own [64-slot / 4 MiB cache](menu-resources.md); append it in paint order and apply the final
 picture memory/pixel checks without subtracting 512 from the world allowance.
 
-## Recoverable oversized pictures
+## Recoverable bad pictures
 
-Exceeding the logical or queued-Draw allowance returns the explicit
-`DRAW_MEMORY_LIMIT` error. Production `LocalGame` handles this error at Setup,
-ordinary preparation and resize: **skip the whole picture, leave the previous
-image on screen, and keep the session**. It commits packet/model/HUD/quality
-bookkeeping once, without counting a successful present. No oversized picture
-is issued for retry; later packets and smaller frames continue normally.
-The native host discards its acquired surface image and uses its existing
-100 ms no-picture retry; the browser continues its existing RAF schedule.
-`LocalGame::draw_diagnostics` records `skipped_frames` and
-`last_skipped_identity`, separately from session failure and bot observations.
-The counter saturates; it stores no unbounded diagnostic history.
+Native release builds skip pictures that fail preparation, composition, resource
+or geometry validation, retaining the session and the previous presented image.
+`LocalGame::draw_diagnostics` records a saturating skip count and last identity,
+and logs the error text at most once every five seconds. Debug/test builds return
+the errors; `strict_validation` lets tests exercise both policies explicitly.
+The browser keeps its existing draw-memory skip policy.
 
-Native and browser feel replays retain the core draw observation of a skipped picture
-with v2 status `prepared: true, submitted: false, committed: false`. Submission,
-picture commit, `quality.successfulDraws` and `final.draws` require an actual
-picture acknowledgement. Recorder-local identities match even equal-valued
-observations to issued pictures. Browser peers carry these identities outside
-the unchanged numeric cells and drain actual picture acknowledgements from
-both Canvas and WebGPU. Every sample's `quality.successfulDraws` is the cumulative
-committed draw count at that boundary; skipped and update rows retain it.
+Skipping an issued picture retires model/HUD/control bookkeeping once without
+counting a successful present. No invalid picture is retained for retry, and
+later ingress and smaller frames continue. The native host discards any acquired
+surface image and uses its existing 100 ms retry. Device loss and surface failures
+remain host errors and keep their existing recovery/shutdown handling.
 
-Other errors, including invalid geometry, missing resources and pixel-budget
-failures, retain their existing failure behavior. Direct renderer callers get
-the explicit error before draw submission. This PR does not trim geometry or
-claim that arbitrarily large frames fit; farthest-first degradation remains a
-separate safety-net change.
+Direct renderer callers receive typed `RenderError::Frame` validation errors and
+`RenderError::Host` device failures. Geometry is never trimmed to fit a budget.
+The [offscreen workload](frame-performance.md) measures this submission path;
+passing it does not establish Canvas/official parity or gameplay FPS.
 
 The regression suite uses authored packets through `prepare_gameplay`, including
 former-overflow frames, immutable retries, resize, memory skips and later ingress

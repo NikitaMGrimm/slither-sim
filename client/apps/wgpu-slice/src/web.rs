@@ -65,7 +65,7 @@ impl MenuSpecimen {
         self.host
             .renderer
             .sync_resources(&p.resources)
-            .map_err(js_error)?;
+            .map_err(|e| js_error(e.into()))?;
         if !self.host.present(&p.frame).map_err(js_error)? {
             return Err(js_error("Menu specimen not presented".into()));
         }
@@ -510,7 +510,9 @@ impl GameplaySlice {
             .map_err(|e| JsValue::from_str(&e))?;
         let scene = Scene::new().map_err(|e| JsValue::from_str(&e))?;
         for r in &scene.resources {
-            host.renderer.upload(r).map_err(|e| JsValue::from_str(&e))?;
+            host.renderer
+                .upload(r)
+                .map_err(|e| JsValue::from_str(&e.to_string()))?;
         }
         Ok(Self {
             host,

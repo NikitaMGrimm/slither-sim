@@ -1498,6 +1498,56 @@ fn former_overflow_survives_production_preparation_retry_and_resize() {
 }
 
 #[test]
+fn rejected_issued_picture_keeps_controls_and_later_frames_running() {
+    let mut game = playing();
+    let mut control = playing();
+    game.draw_diagnostics.strict_validation = false;
+    for g in [&mut game, &mut control] {
+        g.key("ArrowLeft", true);
+        g.begin_frame(40., [960, 540], 1.).unwrap();
+    }
+    assert_eq!(effects(&mut game), effects(&mut control));
+    let mut bad = game.take_frame().unwrap();
+    let valid = control.take_frame().unwrap();
+    bad.frame.draws[0].asset.revision += 1;
+    let resident = bad
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    let rejected = bad.frame.validate(&resident);
+    assert_eq!(
+        rejected.as_ref().unwrap_err(),
+        "missing, stale or unready resource"
+    );
+    assert_eq!(
+        game.draw_diagnostics.admit(bad.frame.identity, rejected),
+        Ok(None)
+    );
+    game.skip_frame().unwrap();
+    control.presented(true).unwrap();
+    assert!(game.skip_frame().is_err());
+    assert_eq!(game.phase(), Phase::Playing);
+    assert!(game.failure.is_none());
+    assert_eq!(game.hud_text(), control.hud_text());
+    assert_eq!(
+        game.client().control_view().own.unwrap().raw_head,
+        control.client().control_view().own.unwrap().raw_head
+    );
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[board()]), 41.).unwrap();
+        g.begin_frame(60., [960, 540], 1.).unwrap();
+    }
+    assert_eq!(effects(&mut game), effects(&mut control));
+    let recovered = game.take_frame().unwrap();
+    let expected = control.take_frame().unwrap();
+    assert!(recovered.frame.identity > valid.frame.identity);
+    assert_eq!(recovered.frame, expected.frame);
+    game.presented(true).unwrap();
+    control.presented(true).unwrap();
+}
+
+#[test]
 fn draw_memory_overflow_skips_pictures_without_stalling_ingress_or_the_session() {
     let mut g = playing();
     g.draw_diagnostics.strict_validation = false;
