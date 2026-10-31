@@ -9,7 +9,8 @@ const usage = 'node tools/e2e-local-host.mjs --host-bin PATH [--client-bin PATH]
 const fail = (stage, message) => Object.assign(new Error(message), { stage });
 
 export function argumentsFor(args) {
-  const options = { seconds: 8, clientBin: path.join(clientRoot, 'target/wgpu-slice-check/debug',
+  const options = { seconds: 8, clientBin: path.join(process.env.CARGO_TARGET_DIR
+    ? path.resolve(process.env.CARGO_TARGET_DIR) : path.join(clientRoot, 'target/wgpu-slice-check'), 'debug',
     `slither-client-e2e${process.platform === 'win32' ? '.exe' : ''}`) };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
