@@ -1,5 +1,5 @@
 {
-  "description": "Synthetic numeric-overflow lifecycle regression, not server evidence. Error text is descriptive; terminalReply shows its shape with example text. The literal protocol and sessionEnded fields define the v5 structured error contract; snapshots separate initial config radius from live radius.",
+  "description": "Synthetic numeric-overflow lifecycle regression, not server evidence. Error text is descriptive; terminalReply shows its shape with example text. The literal protocol and sessionEnded fields define the v6 structured error contract; snapshots separate initial config radius from live radius.",
   "reset": {
     "op": "reset",
     "worlds": 2,

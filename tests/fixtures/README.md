@@ -25,10 +25,11 @@ protocol and `sessionEnded` independently of runtime defaults.
 
 The corresponding `serve-errors-v6.json`, `serve-rules-v6.json` and
 `serve-radius-v6.json` keep those mechanics and error/radius expectations,
-changing only the current geometric protocol label. The v5 files remain
-historical. Version 6 permits unordered food rows after pickup; stable birth
-identity preserves nutrition and host lifetime selection. No captured wire,
-recorded nutrition or frozen Forager expectation is changed by these copies.
+changing only the geometric protocol label and the version each description
+names. The v5 files remain historical. Version 6 permits unordered food rows
+after pickup; stable birth identity preserves nutrition and host lifetime
+selection. No captured wire, recorded nutrition or frozen Forager expectation
+is changed by these copies.
 
 `dataOrigin: captured` labels retained packet bytes;
 `expectedOrigin: reference-decoder` labels decoded expectations. Each fixture

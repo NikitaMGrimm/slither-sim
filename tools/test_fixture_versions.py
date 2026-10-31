@@ -189,7 +189,11 @@ class FixtureVersionsTest(unittest.TestCase):
                 if isinstance(value, list):
                     return [migrate(v) for v in value]
                 return "slither-sim-json-v6" if value == "slither-sim-json-v5" else value
-            self.assertEqual(new, migrate(old), name)
+            # Descriptions name their own contract version; compare the data.
+            self.assertTrue(new.pop("description"))
+            migrated = migrate(old)
+            migrated.pop("description")
+            self.assertEqual(new, migrated, name)
 
     def test_protocol19_food_interest_receipts(self):
         entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")

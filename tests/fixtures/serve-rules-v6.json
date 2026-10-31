@@ -1,5 +1,5 @@
 {
-  "description": "Synthetic geometric rules/ABI v3 fixture, not server evidence. Rules are world metadata, never per-entity observations.",
+  "description": "Synthetic geometric rules/ABI v4 fixture, not server evidence. Rules are world metadata, never per-entity observations.",
   "protocol": "slither-sim-json-v6",
   "reset": {
     "op": "reset",

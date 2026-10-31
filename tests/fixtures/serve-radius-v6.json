@@ -1,5 +1,5 @@
 {
-  "description": "Synthetic geometric v5 radius split regression, not server evidence. Config radius stays initial; snapshot and frame radius stay live.",
+  "description": "Synthetic geometric v6 radius split regression, not server evidence. Config radius stays initial; snapshot and frame radius stay live.",
   "protocol": "slither-sim-json-v6",
   "reset": {
     "op": "reset",
