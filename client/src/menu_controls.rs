@@ -503,11 +503,12 @@ pub struct TextHit {
 pub struct PanelInputState {
     identity: Option<(u16, u64)>,
     focus: Option<ControlId>,
+    keyboard_focus: bool,
     capture: Option<ControlId>,
     hovered: Option<ControlId>,
     progress: std::collections::BTreeMap<ControlId, [f64; 2]>,
     previous: Option<f64>,
-    parent_focus: Option<(u16, u64, ControlId)>,
+    parent_focus: Option<(u16, u64, ControlId, bool)>,
     modal: bool,
     synced_focus: Option<(u16, u64, ControlId)>,
     selection: MouseSelection,
@@ -521,11 +522,24 @@ impl PanelInputState {
             .any(|c| c.id == id && Self::available(panel, c))
         {
             self.focus = Some(id);
+            self.keyboard_navigation();
         }
     }
     /// Current logical focus.
     pub fn focus(&self) -> Option<ControlId> {
         self.focus
+    }
+    /// Decoration follows input modality; logical focus still owns text and activation.
+    pub fn visible_focus(&self) -> Option<ControlId> {
+        self.focus.filter(|_| self.keyboard_focus)
+    }
+    /// A modal with its own input owner inherits the opener's input modality.
+    pub fn inherit_modality(&mut self, opener: &Self) {
+        self.keyboard_focus = opener.keyboard_focus;
+    }
+    /// Tab, directional navigation and keyboard activation expose the current target.
+    pub fn keyboard_navigation(&mut self) {
+        self.keyboard_focus = true;
     }
     /// Current pointer capture, also used by host drag-selection.
     pub fn capture(&self) -> Option<ControlId> {
@@ -554,7 +568,7 @@ impl PanelInputState {
                 && !self.modal
                 && let (Some((id, generation)), Some(focus)) = (self.identity, self.focus)
             {
-                self.parent_focus = Some((id, generation, focus));
+                self.parent_focus = Some((id, generation, focus, self.keyboard_focus));
             }
             self.blur();
             self.focus = None;
@@ -563,10 +577,11 @@ impl PanelInputState {
             self.identity = Some((panel.id, panel.generation));
             self.focus = panel.initial_focus;
             if !panel.modal
-                && let Some((id, generation, focus)) = self.parent_focus.take()
+                && let Some((id, generation, focus, keyboard)) = self.parent_focus.take()
                 && (id, generation) == (panel.id, panel.generation)
             {
                 self.focus = panel.restore_focus.or(Some(focus));
+                self.keyboard_focus = keyboard;
             }
         }
         for c in &panel.controls {
@@ -659,6 +674,7 @@ impl PanelInputState {
     }
     /// Explicit Tab order wraps within the mounted panel and skips unavailable controls.
     pub fn tab(&mut self, panel: &PanelView, reverse: bool) {
+        self.keyboard_navigation();
         let mut order: Vec<_> = panel
             .controls
             .iter()
@@ -695,6 +711,7 @@ impl PanelInputState {
             .map(|r| r.control.id);
         self.hovered = hit;
         if down == Some(true) {
+            self.keyboard_focus = false;
             if self.selection.last.is_some_and(|(id, ..)| Some(id) != hit) {
                 self.selection = MouseSelection::default();
             }

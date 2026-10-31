@@ -388,3 +388,47 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
         }
     }
 }
+
+#[test]
+fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
+    for keyboard in [false, true] {
+        let mut login = NativeLogin::new("Focus").unwrap();
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, false, false).unwrap();
+        }
+        login.prepare([960, 540], false, None).unwrap();
+        if keyboard {
+            while login.controls.focus() != Some(CHANGE_SKIN) {
+                key(&mut login, NamedKey::Tab);
+            }
+            key(&mut login, NamedKey::Enter);
+        } else {
+            click(&mut login, CHANGE_SKIN, true);
+            login.step(9616., false, false).unwrap();
+            click(&mut login, CHANGE_SKIN, false);
+        }
+        login.step(9900., false, false).unwrap();
+        assert!(login.studio.state.visible());
+        click(&mut login, CANCEL, true);
+        login.step(9916., false, false).unwrap();
+        click(&mut login, CANCEL, false);
+        login.step(10200., false, false).unwrap();
+        login.sync_return_focus(false);
+        assert!(!login.studio.state.visible());
+        assert_eq!(login.controls.focus(), Some(CHANGE_SKIN));
+        assert_eq!(login.controls.visible_focus().is_some(), keyboard);
+        assert!(login.controls.capture().is_none());
+        assert!(
+            login.panel.controls.iter().all(|c| login
+                .controls
+                .progress(c.id)
+                .into_iter()
+                .all(|p| p == 0.))
+        );
+        let returned = login.prepare([960, 540], false, None).unwrap();
+        // Moving the pointer away cannot remove any additional stale ring/press paint.
+        login.pointer([-1., -1.], None, false);
+        let away = login.prepare([960, 540], false, None).unwrap();
+        assert_eq!(returned.frame.draws.len(), away.frame.draws.len());
+    }
+}

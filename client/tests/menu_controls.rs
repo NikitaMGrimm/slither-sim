@@ -529,3 +529,23 @@ fn word_selection_uses_character_while_single_click_uses_nearest_caret() {
     );
     assert_eq!(e.editor(EditorId::Champion).selection(), (0, 6));
 }
+
+#[test]
+fn pointer_focus_is_silent_and_keyboard_navigation_exposes_the_target() {
+    let panel = panel();
+    let resolved = panel.resolve([960., 720.]).unwrap();
+    let target = resolved.iter().find(|r| r.control.id == SAVE).unwrap();
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&panel, &mut edit);
+    input.tab(&panel, false);
+    assert_eq!(input.visible_focus(), input.focus());
+    input.pointer(&panel, &resolved, center(target.rect), Some(true));
+    input.pointer(&panel, &resolved, center(target.rect), Some(false));
+    assert_eq!(input.focus(), Some(SAVE));
+    assert!(input.visible_focus().is_none());
+    input.pointer(&panel, &resolved, center(target.rect), None);
+    assert!(input.visible_focus().is_none());
+    input.tab(&panel, false);
+    assert_eq!(input.visible_focus(), input.focus());
+}

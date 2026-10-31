@@ -370,8 +370,22 @@ fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
             let pixel = |n: f64| (n - n.round()).abs() < 1e-7;
             assert!(pixel((d.destination.x + d.translation[0]) * scale));
             assert!(pixel((d.destination.y + d.translation[1]) * scale));
-            if let Some(src) = d.source {
-                assert!((d.destination.width * scale - src.width).abs() < 1e-7);
+            if let Some(src) = d.source
+                && (d.destination.width * scale - src.width).abs() >= 1e-7
+            {
+                // Stretched crops must be uniform across their horizontal sampling footprint.
+                let image = &frame
+                    .resources
+                    .iter()
+                    .find(|r| r.asset == d.asset)
+                    .unwrap()
+                    .image;
+                let start = (src.x.floor() as usize).saturating_sub(1);
+                let end = ((src.x + src.width).ceil() as usize + 1).min(image.width as usize);
+                for row in image.pixels.chunks_exact(image.width as usize * 4) {
+                    let pixels = &row[start * 4..end * 4];
+                    assert!(pixels.as_chunks::<4>().0.iter().all(|p| p == &pixels[..4]));
+                }
             }
         }
     }

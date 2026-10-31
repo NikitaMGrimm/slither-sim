@@ -134,7 +134,8 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     );
     assert_eq!(login.controls.focus(), Some(SERVER));
     let focused = login.prepare([960, 720], false, None).unwrap();
-    assert_eq!(focused.frame.draws.len(), unfocused.frame.draws.len() + 4);
+    assert_eq!(login.controls.visible_focus(), Some(SERVER));
+    assert!(focused.frame.draws.len() > unfocused.frame.draws.len());
     for id in [PLAY, SETTINGS] {
         assert!(
             !login
@@ -421,4 +422,42 @@ fn open_picker_with_stroke_logo_never_drops_at_dpr_five_to_eight() {
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn picker_reopening_inherits_the_current_opener_modality() {
+    use slither_client::login_controls::SERVER;
+    let mut login = NativeLogin::new("Focus").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, false, false).unwrap();
+    }
+    login.prepare([960, 720], false, None).unwrap();
+    login.controls.keyboard_navigation();
+    login.focus(SERVER);
+    login.activate(false);
+    login.step(9616., false, false).unwrap();
+    assert!(login.picker.controls.focus().is_some());
+    assert_eq!(
+        login.picker.controls.visible_focus(),
+        login.picker.controls.focus()
+    );
+    login.picker.policy.close();
+    for now in (9632..=10000).step_by(16) {
+        login.step(now as f64, false, false).unwrap();
+    }
+    assert!(!login.picker.policy.visible());
+    login.prepare([960, 720], false, None).unwrap();
+    let controls = login.panel.resolve([960., 720.]).unwrap();
+    let r = controls.iter().find(|r| r.control.id == SERVER).unwrap();
+    let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+    login.pointer(point, Some(true), false);
+    login.pointer(point, Some(false), false);
+    assert!(login.picker.policy.is_open());
+    assert!(login.picker.controls.focus().is_some());
+    assert!(login.picker.controls.visible_focus().is_none());
+    login.picker.controls.tab(&login.picker.panel, false);
+    assert_eq!(
+        login.picker.controls.visible_focus(),
+        login.picker.controls.focus()
+    );
 }

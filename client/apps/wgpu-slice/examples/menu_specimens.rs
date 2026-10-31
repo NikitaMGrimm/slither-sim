@@ -186,6 +186,10 @@ async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--focus") {
+        return focus::specimens(&mut renderer, output).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--cosmetics") {
         let directory = std::env::args_os()
             .nth(3)
@@ -1183,3 +1187,7 @@ mod studio_panel;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/cosmetics.rs"]
 mod cosmetics_studio;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/focus.rs"]
+mod focus;
