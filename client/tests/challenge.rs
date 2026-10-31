@@ -173,10 +173,14 @@ fn single_literal_copy_loops_use_the_same_transform() {
             expected
         );
     }
+    // A double quote is an ordinary byte inside single quotes; its negative
+    // value takes JavaScript's signed remainder, as in the 27-byte shape.
     let quoted = r#"var a='A"B';for(var i=0;i<3;i++)idba[i]=a.charCodeAt(i);"#;
+    assert_eq!(solve_challenge(&encode(quoted.as_bytes())).unwrap(), b"D).");
+    let appended = r#"var a='AA';a+="AAA";a += 'A';for(var i=0;i<6;i++){idba[i]=a.charCodeAt(i);}"#;
     assert_eq!(
-        solve_challenge(&encode(quoted.as_bytes())).unwrap().len(),
-        3
+        solve_challenge(&encode(appended.as_bytes())).unwrap(),
+        b"DHLPTX"
     );
 }
 

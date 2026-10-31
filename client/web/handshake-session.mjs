@@ -42,7 +42,8 @@ export class HandshakeSession {
         if (command[0] === 54) {
           if (state !== 'challenge') throw new Error('Repeated or out-of-order challenge');
           const reply = this.#solve(command.subarray(1));
-          if (!(reply instanceof Uint8Array) || reply.length !== 27) throw new Error('Invalid challenge reply');
+          // Official challenges copy 27 bytes; some community servers copy 24.
+          if (!(reply instanceof Uint8Array) || reply.length === 0 || reply.length > 256) throw new Error('Invalid challenge reply');
           outbound.push(reply, this.#login.slice()); state = 'setup';
         } else if (command[0] === 97) {
           if (state !== 'setup') throw new Error('Setup arrived before challenge');
