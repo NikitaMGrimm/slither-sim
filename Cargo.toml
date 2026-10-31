@@ -35,6 +35,7 @@ include = [
     "/tests/fixtures/client-reporting-cadence-near-server.json",
     "/tests/fixtures/protocol-catalog-13.json",
     "/tests/fixtures/protocol-catalog-19.json",
+    "/tests/protocol13_roundtrip/mod.rs",
     "/docs/*.md",
     # CHANGELOG.md links this guide.
     "/docs/maintainers/releasing.md",
