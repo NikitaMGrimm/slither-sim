@@ -1,6 +1,79 @@
 use super::*;
 use serde_json::Value;
 
+#[test]
+fn many_eaters_keep_dense_pickup_after_food_is_depleted() {
+    const SIDE: usize = 48;
+    let mut world = Simulator::new(WorldOptions {
+        seed: 7,
+        config: Config {
+            radius: 10000.,
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            prey: crate::PreyConfig {
+                count: 0,
+                ..Default::default()
+            },
+            ..Config::sandbox()
+        },
+        population: InitialPopulation::Dormant {
+            ids: (0..SIDE * SIDE).map(|i| i.to_string()).collect(),
+        },
+    })
+    .unwrap();
+    // Spread non-colliding lives over more than the old 4,096-cell minimum.
+    // Only a small fraction have food, as in a depleted, crowded world.
+    for slot in 0..SIDE * SIDE {
+        let head = Point {
+            x: (slot % SIDE) as f64 * 192. - 4608.,
+            y: (slot / SIDE) as f64 * 192. - 4608.,
+        };
+        let (body, heading) = world.spawn_body(head, 0.).unwrap();
+        world.respawn_body(slot, body, heading).unwrap();
+    }
+    let food = world.snakes[..128]
+        .iter()
+        .flat_map(|snake| {
+            [(48., 0.), (96., 96.)].map(|(x, y)| Food {
+                x: snake.head.x + x,
+                y: snake.head.y + y,
+                value: 0.125,
+                size: None,
+                origin: None,
+            })
+        })
+        .collect();
+    world.replace_food(food).unwrap();
+    world.record_events(checkpoint::EventRecording {
+        pickups: true,
+        food_births: true,
+    });
+    let mut reference = world.clone();
+    reference.config.food_index = false;
+    let actions = vec![
+        Some(Action {
+            heading: 0.,
+            boost: false,
+        });
+        SIDE * SIDE
+    ];
+    for tick in 0..4 {
+        world.step(&actions).unwrap();
+        reference.step(&actions).unwrap();
+        assert!(world.eater_grid.occupied().next().is_some());
+        assert_eq!(world.pickup_events(), reference.pickup_events());
+        assert_eq!(world.food_spawn_events(), reference.food_spawn_events());
+        if tick == 0 {
+            assert_eq!(world.pickup_events().unwrap().len(), 128);
+            assert_eq!(world.food.len(), 128);
+        }
+        let actual = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
+        let mut expected = serde_json::to_value(reference.checkpoint().unwrap()).unwrap();
+        expected["config"]["foodIndex"] = Value::Bool(true);
+        assert_eq!(actual, expected, "tick {tick}");
+    }
+}
+
 fn normalized(world: &Simulator) -> Vec<u8> {
     let mut value = serde_json::to_value(world.checkpoint().unwrap()).unwrap();
     let state = value["state"].as_object_mut().unwrap();

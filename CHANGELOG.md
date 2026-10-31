@@ -94,6 +94,9 @@
   results, since that is about 1.5% of a 7 ms tick
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
 
+- Keep dense food pickup after depletion; a live 64,000-bot replay improves
+  from 227.4 to 55.6 ms per world step (p50).
+
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 
 ### Added
