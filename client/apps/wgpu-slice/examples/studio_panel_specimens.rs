@@ -106,10 +106,13 @@ mod native {
             .slice(..)
             .get_mapped_range()
             .map_err(|e| e.to_string())?;
-        let pixels = data
-            .chunks_exact(row as usize)
-            .flat_map(|r| r[..w as usize * 4].iter().copied())
-            .collect();
+        let mut pixels = vec![0; w as usize * h as usize * 4];
+        for (destination, source) in pixels
+            .chunks_exact_mut(w as usize * 4)
+            .zip(data.chunks_exact(row as usize))
+        {
+            destination.copy_from_slice(&source[..w as usize * 4]);
+        }
         drop(data);
         buffer.unmap();
         Ok(pixels)
@@ -156,14 +159,16 @@ mod native {
             let mut delta = 0;
             let mut at = 0;
             let mut changed = 0u64;
-            for (i, (a, b)) in before.as_raw().iter().zip(&rgba).enumerate() {
-                let d = a.abs_diff(*b);
-                if d > delta {
-                    delta = d;
-                    at = i;
-                }
-                if d != 0 {
-                    changed += 1;
+            if before.as_raw() != &rgba {
+                for (i, (a, b)) in before.as_raw().iter().zip(&rgba).enumerate() {
+                    let d = a.abs_diff(*b);
+                    if d > delta {
+                        delta = d;
+                        at = i;
+                    }
+                    if d != 0 {
+                        changed += 1;
+                    }
                 }
             }
             differences.push_str(&format!(
