@@ -9,7 +9,10 @@ there is no open-count or timed refresh. An in-flight request is shared.
 If acquisition fails or Play cancels it before completion, the next open retries
 once. Failure never starts an automatic retry loop or discards completed samples,
 including a successfully empty directory.
-Custom endpoint mode keeps its explicit endpoint and performs no discovery.
+Direct `--server host:port` keeps its explicit server and performs no discovery
+or website fetch. It uses the fixed login and builds `ws://host:port/slither`
+internally; IPv6 authorities use brackets. `--official --server host:port` keeps
+the explicit server but fetches fresh login values on Play.
 
 `server_directory` owns bounded decoding and the existing automatic selection
 policy. IPv4/IPv6 alternatives remain separate in the decoded directory.

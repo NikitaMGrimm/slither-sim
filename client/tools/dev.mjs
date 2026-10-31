@@ -81,7 +81,7 @@ export async function develop({ mode, simulator }) {
     if (stopping) return;
     console.log(`Local simulator: ws://127.0.0.1:${port}/slither`);
     if (mode === 'desktop') {
-      launch(executable, ['--endpoint', `ws://127.0.0.1:${port}/slither`]);
+      launch(executable, ['--server', `127.0.0.1:${port}`]);
       console.log('Enter: Play. Escape: Stop. Close the window or press Ctrl+C to exit.');
     } else {
       server = createSceneServer({ simulatorPort: port });

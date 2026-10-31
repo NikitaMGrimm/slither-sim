@@ -73,6 +73,9 @@ On Windows append `.exe` to the host path. `--client-bin PATH` overrides the
 prebuilt debug probe path; `--seconds N` selects 5–60 seconds of gameplay
 (default 8). The runner does not build binaries. Its pure argument, port,
 readiness and assertion tests run in `npm test` without either binary.
+The probe takes `--server 127.0.0.1:<port> --seconds 5..60`; it builds the
+WebSocket URL internally and retains its loopback-only admission. The ordinary
+desktop headless path also needs `--server`, and rejects `--official`.
 
 The runner writes a temporary host config: one player, no bots/food/prey,
 fixed radius, a 400-point starting floor so boost is available, and leaderboard
