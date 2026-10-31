@@ -261,8 +261,9 @@ impl Sweep<'_> {
                 true,
                 None,
             )?;
+            let logical = self.logical;
             let click = |login: &mut NativeLogin, id| -> Result<()> {
-                let resolved = login.panel.resolve(self.logical).map_err(str::to_owned)?;
+                let resolved = login.panel.resolve(logical).map_err(str::to_owned)?;
                 let r = resolved
                     .iter()
                     .find(|r| r.control.id == id)
