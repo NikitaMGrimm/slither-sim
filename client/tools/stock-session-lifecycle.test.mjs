@@ -139,16 +139,19 @@ function paired() {
   return { all, verify, each, call, step, tick, connect, message, setTime: ms => each(h => h.setTime(ms)) };
 }
 
-test('a 24-byte challenge reply is sent before login and an empty one closes the session', () => {
-  const short = Uint8Array.from({ length: 24 }, (_, i) => 65 + i);
-  const h = harness({ reply: short });
-  h.connect();
-  assert.deepEqual(h.sockets[0].sent.slice(-2), [[...short], [115, 1, 2]]);
-  assert.deepEqual(h.errors, []);
-  const empty = harness({ reply: new Uint8Array(0) });
-  empty.connect();
-  assert.equal(empty.sockets[0].sent.some(bytes => bytes[0] === 115), false);
-  assert.equal(empty.errors.length, 1);
+test('challenge reply length bounds gate login', () => {
+  for (const reply of [Uint8Array.from({ length: 24 }, (_, i) => 65 + i), new Uint8Array(256).fill(65)]) {
+    const h = harness({ reply });
+    h.connect();
+    assert.deepEqual(h.sockets[0].sent.slice(-2), [[...reply], [115, 1, 2]]);
+    assert.deepEqual(h.errors, []);
+  }
+  for (const length of [0, 257]) {
+    const h = harness({ reply: new Uint8Array(length).fill(65) });
+    h.connect();
+    assert.equal(h.sockets[0].sent.some(bytes => bytes[0] === 115), false);
+    assert.equal(h.errors.length, 1);
+  }
 });
 
 test('HUD facade rejects unselected and legacy modes before request reads or staged Play consumption', () => {
