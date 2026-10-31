@@ -48,6 +48,12 @@ release = false
 name = "slither-wgpu-slice"
 release = false
 
+# The owner manually publishes 0.1.0 after A0 merges. Keep version bumps and
+# publication disabled here; the simulator-switch PR will wire release.yml.
+[[package]]
+name = "slither-protocol"
+release = false
+
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"
 protect_breaking_commits = true

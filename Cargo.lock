@@ -2159,6 +2159,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "slither-protocol"
+version = "0.1.0"
+
+[[package]]
 name = "slither-sim"
 version = "0.8.2"
 dependencies = [

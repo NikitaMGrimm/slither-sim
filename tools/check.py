@@ -25,10 +25,11 @@ def clippy(*features):
     return ["cargo", "clippy", "--all-targets", *features, "--locked", "--", "-D", "warnings"]
 
 
-# The simulator's packages by name. The client crates share the workspace but
+# Simulator and shared protocol packages by name. The client crates share the workspace but
 # have their own toolchain and checks (client.yml), and their desktop binaries
 # don't build on Linux, so no command here selects the whole workspace.
-SIM_PACKAGES = ("-p", "slither-sim", "-p", "slither-sim-ffi", "-p", "slither-sim-py")
+SIM_PACKAGES = ("-p", "slither-sim", "-p", "slither-sim-ffi", "-p", "slither-sim-py",
+                "-p", "slither-protocol")
 
 
 def commands(group):
@@ -48,6 +49,8 @@ def commands(group):
         ]
     if group == "test":
         return [
+            ["cargo", "test", "-p", "slither-protocol", "--all-targets", "--locked"],
+            ["cargo", "test", "-p", "slither-protocol", "--doc", "--locked"],
             ["cargo", "test", "--all-targets", "--locked"],
             ["cargo", "test", "--all-targets", "--no-default-features", "--locked"],
             ["cargo", "test", "--all-targets", "--no-default-features", "--features", "bot", "--locked"],
@@ -95,9 +98,11 @@ def commands(group):
             [sys.executable, "python/tests/run.py", wheels],
         ]
     if group == "package":
-        return [["cargo", "package", "--locked"]]
+        return [["cargo", "package", "--locked", "-p", "slither-protocol", "-p", "slither-sim",
+                 "--registry", "crates-io"]]
     if group == "wasm":
         return [
+            ["cargo", "check", "-p", "slither-protocol", "--lib", "--locked", "--target", "wasm32-unknown-unknown"],
             ["cargo", "check", "--lib", "--locked", "--no-default-features", "--target", "wasm32-unknown-unknown"],
             ["cargo", "check", "--lib", "--locked", "--no-default-features", "--features", "bot", "--target", "wasm32-unknown-unknown"],
         ]
