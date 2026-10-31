@@ -46,9 +46,9 @@ One quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-The native logo always uses the [authored swelling stroke alphabet](wordmark.md),
-settles to a cached
-raster, and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
+Supported native logo glyphs use the [authored swelling stroke alphabet](wordmark.md);
+unsupported configurable text uses the installed bold-font fallback. Either path
+settles to a cached raster and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Both browser art loaders share reserved cosmetic-path rejection with the bounded
