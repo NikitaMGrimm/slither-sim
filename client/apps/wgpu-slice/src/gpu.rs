@@ -74,7 +74,11 @@ impl Renderer {
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("synthetic-gameplay-slice"),
                 required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
+                // Every backend validates against WebGL2 so native runs reject what
+                // the planned WebGL2 extension cannot create. Surfaces and offscreen
+                // targets keep the adapter's resolution; uploads have their own cap.
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
                 ..Default::default()
             })
             .await
@@ -748,8 +752,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chunk_and_record_storage_fit_default_device_limits() {
-        let limits = wgpu::Limits::default();
+    fn chunk_and_record_storage_fit_webgl2_device_limits() {
+        let limits = wgpu::Limits::downlevel_webgl2_defaults();
         assert_eq!(std::mem::size_of::<crate::frame::Draw>(), 256);
         assert_eq!(std::mem::size_of::<DrawState>(), 24);
         assert_eq!(crate::frame::MAX_DRAWS, 262_144);
