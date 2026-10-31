@@ -251,6 +251,7 @@ impl Sweep<'_> {
             )?;
         }
         for keyboard in [false, true] {
+            self.renderer.sync_resources(&[])?;
             let mut roundtrip = NativeLogin::new("Focus")?;
             for now in (0..=9600).step_by(16) {
                 roundtrip.step(now as f64, true, false)?;
