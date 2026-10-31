@@ -1,0 +1,33 @@
+{
+  "format": "Frame/overlay Debug, Rust 1.99.0, FNV-1a64",
+  "input": "announcement_tape::playing; pointer(850,130,960,540,false); begin_frame(times,960x540,1); effect acknowledgements and successful presents",
+  "platform": "x86_64-pc-windows-msvc",
+  "rows": [
+    {
+      "draws": 272,
+      "frameFnv1a64": "7affb854c74250c9",
+      "packets": [
+        [
+          236
+        ]
+      ],
+      "timeMs": 60.0
+    },
+    {
+      "draws": 272,
+      "frameFnv1a64": "39f0d67c9e4c6bf4",
+      "packets": [],
+      "timeMs": 100.0
+    },
+    {
+      "draws": 272,
+      "frameFnv1a64": "30f4b4d32a820a6e",
+      "packets": [],
+      "timeMs": 140.0
+    }
+  ],
+  "source": "5ed5b3e67c96d18f46434171caf782abc1968761",
+  "dataOrigin": "AUTHORED SYNTHETIC; independent pristine-main capture; no game server or official art",
+  "wireProtocol": 19,
+  "toolchain": "Rust 1.99.0"
+}

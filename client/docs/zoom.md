@@ -31,11 +31,17 @@ wheel steps leave no floating-point residue in paint policy.
 Culling, body/face geometry, arena, world labels and repeating background use the
 resulting scale.
 Food/prey keep stock creation-time source selection, with user zoom applied to
-their sprite extents. The arena uses a full circle with the existing bounded 40
-angular steps when zoomed out, rather than the stock nearby arc. HUD, minimap and
-leaderboard stay in screen space. Following-camera heading is invariant under
-uniform zoom, preserving stock CSS input and its dead zone at every zoom level.
-The shared non-following projection reads the displayed scale. No wheel event
+their sprite extents. At nondefault zoom, the arena keeps the stock nearby arc
+while it covers the visible boundary band. Circle/viewport intersections select
+a whole circle only when visible coverage extends beyond that arc or its
+4,000-unit distance gate. Full-circle tessellation uses the projected outer band
+radius to keep chord sagitta at most **0.5 logical pixels**, with 40 to 4,096
+segments; a request beyond that hard bound rejects the picture rather than
+allocating without a limit. Default zoom retains the exact stock path. HUD, minimap and
+leaderboard stay in screen space. At nondefault zoom, steering starts at the
+corrected displayed head, including camera smoothing offsets and the backing to
+CSS transform. Factor one preserves the stock centre/raw-head policy exactly.
+The CSS dead zone and command cadence are unchanged. No wheel event
 emits a command.
 
 Zoom changes neither protocol nor subscriptions: only already-received objects
@@ -67,7 +73,7 @@ From the repository root, in PowerShell (one Cargo process at a time):
 
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'
-$env:CARGO_BUILD_JOBS = '2'
+$env:CARGO_BUILD_JOBS = '1'
 cargo build --release --locked -p slither-wgpu-slice --example frame_perf
 & "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --zoom C:/new/external/output
 ```
@@ -85,3 +91,15 @@ separate checks.
 Use 16.7 ms p95 as a diagnostic CPU picture-build target for maximum zoom-out on
 this workload. It is not a frame-rate promise or an iGPU measurement. Preserve
 slow trials and report their scope separately from the final measurements.
+
+## Default-view regression
+
+`tests/fixtures/zoom-stock-main.json` pins command bytes and complete frame/overlay
+draw-list hashes captured from main at the fixture's source commit, using the
+authored `announcement_tape` session and the three listed pointer/frame times.
+The exact hash test runs on its pinned Windows/Rust target because native trig
+and Debug float text can differ by platform. It does not compare two instances
+of the zoom implementation. Cross-revision native CPU replay separately uses
+the unchanged `feel-perceptual-v1` comparator and authored
+`tools/feel-replay/browser-synthetic.json` schedule; neither check is a pixel or
+physical-input acceptance claim.

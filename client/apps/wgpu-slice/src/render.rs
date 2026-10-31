@@ -1104,28 +1104,30 @@ fn prepare_composed(
                 height: logical[1],
                 radius: boundary.displayed(),
             },
-            user_zoom < 1.,
+            user_zoom != 1.,
         )
         .map_err(|e| e.to_string())?
     {
         let fill = bank.solid([48, 0, 0]);
-        for i in 0..40 {
+        let edge_fill = edge.fill();
+        let segments = edge.stroke().len() - 2;
+        for i in 0..segments {
             push_draw(
                 &mut draws,
                 polygon(
                     fill,
                     [
-                        edge.fill[i + 1],
-                        edge.fill[i + 2],
-                        edge.fill[81 - i],
-                        edge.fill[82 - i],
+                        edge_fill[i + 1],
+                        edge_fill[i + 2],
+                        edge_fill[2 * segments + 1 - i],
+                        edge_fill[2 * segments + 2 - i],
                     ],
                     0.8,
                 ),
             )?;
         }
         let stroke = bank.solid([128, 0, 0]);
-        let points = &edge.stroke[1..];
+        let points = &edge.stroke()[1..];
         for i in 0..points.len() - 1 {
             let a = points[i];
             let b = points[i + 1];
@@ -1136,8 +1138,8 @@ fn prepare_composed(
                 continue;
             }
             let n = Point {
-                x: -dy / length * edge.line_width / 2.,
-                y: dx / length * edge.line_width / 2.,
+                x: -dy / length * edge.line_width() / 2.,
+                y: dx / length * edge.line_width() / 2.,
             };
             push_draw(
                 &mut draws,

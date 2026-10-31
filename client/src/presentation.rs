@@ -60,7 +60,8 @@ pub use antenna::{
     AntennaStroke, MAX_ANTENNA_NODES, OrdinaryAntennaGeometry, PreparedAntenna,
 };
 pub use arena_edge::{
-    ArenaEdgeInput, ArenaEdgePlan, ArenaEdgeView, plan_arena_edge, plan_arena_edge_with_zoom,
+    ArenaEdgeInput, ArenaEdgePlan, ArenaEdgeView, MAX_ARENA_EDGE_SEGMENTS, ZoomArenaEdgePlan,
+    plan_arena_edge, plan_arena_edge_with_zoom,
 };
 pub use background::{
     BackgroundImageLayer, BackgroundInput, BackgroundPatternLayer, BackgroundPlan,

@@ -1434,10 +1434,7 @@ impl LocalGame {
         latency::generation(self.generation);
         let v = self.client.control_view();
         let head = v.own.map(|o| o.raw_head).unwrap_or_default();
-        // Uniform zoom cancels from following-camera heading. Preserve stock
-        // CSS coordinates/dead zone; the non-following projection below receives
-        // the displayed (zoomed) scale through control_view, not the stock scale.
-        let args = [
+        let mut args = [
             x,
             y,
             width,
@@ -1450,6 +1447,19 @@ impl LocalGame {
             head.y,
             v.zoom,
         ];
+        if self.client.camera().user_zoom_factor() != 1.
+            && let Some(own) = self.client.own_snake()
+        {
+            // Camera correction can leave the displayed head off centre. Map
+            // that offset through the world backing into pointer CSS space.
+            // Keep the original centre/raw-head policy exactly at factor one;
+            // only the displacement changes, never the send/dead-zone cadence.
+            let head = own.metrics().corrected_head;
+            let logical = render::dimensions(self.extent, self.scale)?;
+            args[0] -= (head.x - v.camera.x) * v.zoom * width / f64::from(logical[0]);
+            args[1] -= (head.y - v.camera.y) * v.zoom * height / f64::from(logical[1]);
+            args[4] = 1.; // Offset already projected, including non-following views.
+        }
         if down {
             self.input.mouse_down(&args).map_err(|e| e.to_string())?;
         } else {
