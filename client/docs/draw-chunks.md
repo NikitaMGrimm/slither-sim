@@ -53,7 +53,8 @@ allow a 268,435,456-byte `maxBufferSize`, a 2,048-byte
 `maxVertexBufferArrayStride`, 8 vertex buffers and 16 attributes. Each chunk uses
 983,040 bytes at most, a 20-byte stride, one active vertex-buffer slot and three
 attributes. Its draw indices cover at most 49,152 vertices. Native and browser
-request default limits; no raised device limit is required. Chunks are all
+request WebGL2 downlevel validation limits with the adapter's resolution;
+no raised buffer limit is required. Chunks are all
 retained through one submission: total vertex storage scales at 120 bytes per
 quad, rather than being a constant-size streaming ring.
 
