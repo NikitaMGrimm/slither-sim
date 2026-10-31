@@ -12,10 +12,13 @@ use crate::{
     presentation::{HudIngressError, HudIngressPlan, HudLeaderboardRows, HudLeaderboardRowsBudget},
     protocol::{self, ElapsedHeader, ProtocolError},
 };
-use std::{
-    collections::BTreeMap,
-    f64::consts::{PI, TAU},
-    fmt,
+use std::{collections::BTreeMap, fmt};
+
+use slither_protocol::{
+    DecodeAdmission, ErrorKind,
+    frame::CommandRef,
+    scalar,
+    v19::{self, Message},
 };
 
 /// Maximum simultaneously retained snakes.
@@ -604,20 +607,22 @@ impl ClientState {
         if let Some(collector) = hud.as_ref() {
             collector
                 .plan
-                .validate(&decoded.commands)
+                .validate(decoded.commands())
                 .map_err(StateError::Hud)?;
         }
         if let Some(collector) = hud.as_deref_mut() {
             collector
                 .boundaries
-                .try_reserve_exact(decoded.commands.len())
+                .try_reserve_exact(decoded.command_count())
                 .map_err(|_| StateError::Hud(HudIngressError::LeaderboardRowsResource))?;
         }
         let mut staged = self.clone();
         let mut ignored = 0;
         let mut captures = 0;
         let mut row_budget = HudLeaderboardRowsBudget::default();
-        for (index, command) in decoded.commands.iter().enumerate() {
+        for command_ref in decoded.commands() {
+            let index = command_ref.index;
+            let command = command_ref.bytes;
             let mut marker = HudCommandMarker::Other;
             let hud_leaderboard = hud.is_some() && command[0] == b'l';
             if let Some(collector) = hud.as_ref() {
@@ -663,7 +668,7 @@ impl ClientState {
                     events.push(PresentationEvent::Minimap(command.to_vec()));
                 }
             } else if !hud_leaderboard
-                && !staged.apply_command(command, events.as_deref_mut(), score_enabled)?
+                && !staged.apply_command(command_ref, events.as_deref_mut(), score_enabled)?
             {
                 ignored += 1;
             }
@@ -685,11 +690,11 @@ impl ClientState {
         staged.frames_applied = staged.frames_applied.saturating_add(1);
         staged.commands_applied = staged
             .commands_applied
-            .saturating_add(decoded.commands.len() as u64);
+            .saturating_add(decoded.command_count() as u64);
         staged.ignored_commands = staged.ignored_commands.saturating_add(ignored as u64);
-        staged.last_elapsed_ms = decoded.elapsed_ms;
+        staged.last_elapsed_ms = decoded.prefix();
         let report = FrameReport {
-            commands: decoded.commands.len(),
+            commands: decoded.command_count(),
             ignored,
         };
         *self = staged;
@@ -698,20 +703,72 @@ impl ClientState {
 
     fn apply_command(
         &mut self,
-        p: &[u8],
+        command: CommandRef<'_>,
         events: Option<&mut Vec<PresentationEvent>>,
         score_enabled: bool,
     ) -> Result<bool, StateError> {
+        let p = command.bytes;
         let code = p[0];
-        if score_enabled && code == b'R' {
-            require(p, p.len() == 2)?;
+        // Disabled lanes remain opaque, including malformed bodies.
+        if !(score_enabled && code == b'R')
+            && !matches!(
+                code,
+                b'a' | b's'
+                    | b'g'
+                    | b'n'
+                    | b'G'
+                    | b'N'
+                    | b'='
+                    | b'+'
+                    | b'e'
+                    | b'E'
+                    | b'3'
+                    | b'4'
+                    | b'5'
+                    | b'd'
+                    | b'7'
+                    | b'h'
+                    | b'r'
+                    | b'F'
+                    | b'f'
+                    | b'b'
+                    | b'c'
+                    | b'C'
+                    | b'<'
+                    | b'w'
+                    | b'j'
+                    | b'y'
+                    | b'z'
+            )
+        {
+            return Ok(false);
+        }
+        if code != b'a' && code != b'R' && self.setup.is_none() {
+            return Err(StateError::MissingSetup);
+        }
+        let admission = if events.is_some() {
+            DecodeAdmission::ClientPresentation
+        } else {
+            DecodeAdmission::ClientReceived
+        };
+        let message = v19::decode_command(command, admission).map_err(|error| {
+            if error.kind == ErrorKind::UnsupportedVersion {
+                StateError::UnsupportedProtocol(
+                    v19::setup_protocol_version(p, admission)
+                        .expect("decoder validated setup boundaries"),
+                )
+            } else {
+                StateError::InvalidPacket(code)
+            }
+        })?;
+        if let Message::ScoreAdjustment(value) = message {
             if let Some(events) = events {
-                events.push(PresentationEvent::OwnScoreAdjustment(p[1]));
+                events.push(PresentationEvent::OwnScoreAdjustment(value));
             }
             return Ok(true);
         }
-        if code == b'a' {
-            let setup = parse_setup(p)?;
+        if let Message::Setup(raw) = message {
+            let setup = setup_from_wire(raw);
             if let Some(previous) = &self.setup
                 && previous.grid_center != setup.grid_center
             {
@@ -738,97 +795,76 @@ impl ClientState {
             self.setup = Some(setup);
             return Ok(true);
         }
-        if !matches!(
-            code,
-            b's' | b'g'
-                | b'n'
-                | b'G'
-                | b'N'
-                | b'='
-                | b'+'
-                | b'e'
-                | b'E'
-                | b'3'
-                | b'4'
-                | b'5'
-                | b'd'
-                | b'7'
-                | b'h'
-                | b'r'
-                | b'F'
-                | b'f'
-                | b'b'
-                | b'c'
-                | b'C'
-                | b'<'
-                | b'w'
-                | b'j'
-                | b'y'
-                | b'z'
-        ) {
-            return Ok(false);
-        }
         let setup = self.setup.as_ref().ok_or(StateError::MissingSetup)?.clone();
-        match code {
-            b's' => self.appearance(p, &setup, events)?,
-            b'g' | b'n' | b'G' | b'N' | b'=' | b'+' => self.anchor(p, &setup, events)?,
-            b'e' | b'E' | b'3' | b'4' | b'5' | b'd' | b'7' => self.motion(p, events)?,
-            b'j' | b'y' => {
-                let event = if code == b'j' {
-                    PresentationEvent::PreyMotion(parse_prey_motion(p)?)
-                } else {
-                    parse_prey_lifecycle(p)?
-                };
+        match message {
+            Message::SnakeAppearance(raw) => self.appearance(raw, &setup, events)?,
+            Message::SnakeRemoval(raw) => {
+                self.snakes.remove(&raw.id);
                 if let Some(events) = events {
-                    events.push(event);
+                    events.push(PresentationEvent::SnakeRemoved {
+                        id: raw.id,
+                        died: raw.raw_status == Some(1),
+                    });
                 }
             }
-            b'h' | b'r' => {
-                require(
-                    p,
-                    if code == b'h' {
-                        p.len() == 6
-                    } else {
-                        matches!(p.len(), 3 | 6)
-                    },
-                )?;
-                let id = word(p, 1)?;
-                let fam = if p.len() == 6 {
-                    Some(fraction(p, 3)?)
-                } else {
-                    None
-                };
+            Message::Anchor(raw) => self.anchor(raw, &setup, events)?,
+            Message::Motion(raw) => self.motion(raw, events)?,
+            Message::PreyAppearance(raw) => {
+                if let Some(events) = events {
+                    events.push(PresentationEvent::PreySpawn(prey_from_wire(raw)));
+                }
+            }
+            Message::PreyRemoval { id, eater } => {
+                if let Some(events) = events {
+                    events.push(match eater {
+                        Some(eater_id) => PresentationEvent::PreyEaten { id, eater_id },
+                        None => PresentationEvent::PreyRemoved { id },
+                    });
+                }
+            }
+            Message::PreyMotion(raw) => {
+                if let Some(events) = events {
+                    events.push(PresentationEvent::PreyMotion(prey_motion_from_wire(raw)));
+                }
+            }
+            Message::Mass { id, fraction }
+            | Message::Tail {
+                id,
+                fraction: Some(fraction),
+            } => {
+                let fam = scalar::fraction24(fraction);
                 if let Some(snake) = self.snakes.get_mut(&id) {
                     if code == b'r' {
                         snake.body.pop();
                     }
-                    if let Some(fam) = fam {
-                        snake.fam = fam;
-                    }
+                    snake.fam = fam;
                     if let Some(events) = events {
                         events.push(if code == b'r' {
-                            PresentationEvent::SnakeTailRemoved { id, fam }
+                            PresentationEvent::SnakeTailRemoved { id, fam: Some(fam) }
                         } else {
-                            PresentationEvent::SnakeMass {
-                                id,
-                                fam: fam.expect("mass packet requires fractional mass"),
-                            }
+                            PresentationEvent::SnakeMass { id, fam }
                         });
                     }
                 }
             }
-            b'F' => {
-                require(p, p.len() >= 3 && (p.len() - 3).is_multiple_of(4))?;
-                let sector = (p[1], p[2]);
-                // F is a possibly split listing, not a replacement of the sector.
+            Message::Tail { id, fraction: None } => {
+                if let Some(snake) = self.snakes.get_mut(&id) {
+                    snake.body.pop();
+                    if let Some(events) = events {
+                        events.push(PresentationEvent::SnakeTailRemoved { id, fam: None });
+                    }
+                }
+            }
+            Message::FoodSector(raw) => {
+                // F is a possibly split listing, not a sector replacement.
                 let mut events = events;
-                for food in p[3..].as_chunks::<4>().0 {
+                for food in raw.foods() {
                     let input = self.insert_food(
                         &setup,
-                        sector,
-                        (food[1], food[2]),
-                        food[3],
-                        food[0],
+                        (raw.sector[0], raw.sector[1]),
+                        (food.offset[0], food.offset[1]),
+                        food.size,
+                        food.color,
                         true,
                     )?;
                     if let Some(events) = &mut events {
@@ -836,153 +872,118 @@ impl ClientState {
                     }
                 }
             }
-            b'f' | b'b' => {
-                require(p, (4..=7).contains(&p.len()))?;
-                let explicit = p.len() >= 6;
-                let sector = if explicit {
-                    (p[1], p[2])
-                } else {
-                    self.added_sector.ok_or(StateError::MissingSector)?
-                };
-                let at = if explicit { 3 } else { 1 };
-                if p.len() == at + 4 {
-                    self.added_color = p[at + 2];
+            Message::FoodSpawn(raw) => {
+                let sector = raw
+                    .sector
+                    .map(|s| (s[0], s[1]))
+                    .or(self.added_sector)
+                    .ok_or(StateError::MissingSector)?;
+                if let Some(color) = raw.color {
+                    self.added_color = color;
                 }
                 let input = self.insert_food(
                     &setup,
                     sector,
-                    (p[at], p[at + 1]),
-                    p[p.len() - 1],
+                    (raw.offset[0], raw.offset[1]),
+                    raw.size,
                     self.added_color,
-                    code == b'b',
+                    raw.rapid,
                 )?;
                 self.added_sector = Some(sector);
                 if let Some(events) = events {
                     events.push(PresentationEvent::FoodSpawn(input));
                 }
             }
-            b'c' | b'C' | b'<' => {
-                let extra = if code == b'<' { 2 } else { 0 };
-                require(p, p.len() == 3 + extra || p.len() == 5 + extra)?;
-                let explicit = p.len() == 5 + extra;
-                let sector = if explicit {
-                    (p[1], p[2])
-                } else {
-                    self.eaten_sector.ok_or(StateError::MissingSector)?
-                };
-                let at = if explicit { 3 } else { 1 };
-                let eater_id = match code {
-                    b'<' => {
-                        self.eater_id = Some(word(p, at + 2)?);
+            Message::FoodEaten(raw) => {
+                let sector = raw
+                    .sector
+                    .map(|s| (s[0], s[1]))
+                    .or(self.eaten_sector)
+                    .ok_or(StateError::MissingSector)?;
+                let eater_id = match raw.eater {
+                    v19::Eater::Id(id) => {
+                        self.eater_id = Some(id);
                         self.eater_id
                     }
-                    b'C' => self.eater_id,
+                    v19::Eater::Cached => self.eater_id,
                     _ => None,
                 };
-                let key = food_key(sector, p[at], p[at + 1]);
+                let key = food_key(sector, raw.offset[0], raw.offset[1]);
                 self.foods.remove(&key);
                 self.eaten_sector = Some(sector);
                 if let Some(events) = events {
                     events.push(PresentationEvent::FoodConsume { key, eater_id });
                 }
             }
-            b'w' => {
-                require(p, p.len() == 3)?;
-                self.foods.retain(|_, food| food.sector != (p[1], p[2]));
+            Message::SectorClear([x, y]) => {
+                self.foods.retain(|_, food| food.sector != (x, y));
                 if let Some(events) = events {
-                    events.push(PresentationEvent::FoodSectorClear {
-                        sector: (p[1], p[2]),
-                    });
+                    events.push(PresentationEvent::FoodSectorClear { sector: (x, y) });
                 }
             }
-            b'z' => {
-                require(p, p.len() == 4)?;
-                let radius = f64::from(triple(p, 1)?);
-                require(p, radius > 0.)?;
+            Message::Radius(raw) => {
+                let radius = f64::from(raw);
                 self.setup.as_mut().ok_or(StateError::MissingSetup)?.radius = radius;
                 if let Some(events) = events {
                     events.push(PresentationEvent::RadiusTarget(radius));
                 }
             }
-            _ => unreachable!(),
+            _ => return Ok(false),
         }
         Ok(true)
     }
 
     fn appearance(
         &mut self,
-        p: &[u8],
+        raw: v19::SnakeAppearanceRef<'_>,
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
-        let id = word(p, 1)?;
-        if p.len() <= 7 {
-            require(p, matches!(p.len(), 3 | 4))?;
-            self.snakes.remove(&id);
-            if let Some(events) = events {
-                events.push(PresentationEvent::SnakeRemoved {
-                    id,
-                    died: p.get(3) == Some(&1),
-                });
-            }
-            return Ok(());
-        }
-        // Received-only state has never consumed this presentation metadata.
+        let id = raw.id;
         let direction = if events.is_some() {
-            match byte(p, 6)? {
-                b'0' => Direction::None,
-                b'1' => Direction::Decreasing,
-                b'2' => Direction::Increasing,
-                _ => return Err(StateError::InvalidPacket(p[0])),
-            }
+            direction_from_wire(raw.raw_direction)
         } else {
             Direction::None
         };
-        let speed_per_32ms = f64::from(word(p, 10)?) / 1000.;
-        let name_len = usize::from(byte(p, 22)?);
-        let name_end = 23 + name_len;
-        let name = p.get(23..name_end).ok_or(StateError::InvalidPacket(p[0]))?;
-        let custom_len = usize::from(byte(p, name_end)?);
-        let custom_end = name_end + 1 + custom_len;
-        let custom_skin = p
-            .get(name_end + 1..custom_end)
-            .ok_or(StateError::InvalidPacket(p[0]))?;
-        let cosmetic = byte(p, custom_end)?;
-        let at = custom_end + 1;
+        let speed_per_32ms = scalar::full_speed_per_32ms(raw.speed);
+        let name = raw.name;
+        let custom_skin = raw.custom_skin;
+        let cosmetic = raw.cosmetic;
         let mut body = Vec::new();
         let mut absolute_body = events.as_ref().map(|_| Vec::new());
         let mut anchor_direction = None;
-        let mut effective_heading = f64::from(triple(p, 3)?) * TAU / 16_777_215.;
-        if at < p.len() {
-            require(p, p.len() >= at + 6 && (p.len() - at - 6).is_multiple_of(2))?;
+        let mut effective_heading = scalar::angle24(raw.heading);
+        if let Some([x, y]) = raw.body.first {
             let mut absolute_point = Point {
-                x: f64::from(triple(p, at)?) / 5.,
-                y: f64::from(triple(p, at + 3)?) / 5.,
+                x: scalar::position5(x),
+                y: scalar::position5(y),
             };
             let mut point = centered(setup, absolute_point.x, absolute_point.y)?;
             body.push(point);
             if let Some(body) = &mut absolute_body {
                 body.push(absolute_point);
             }
-            let rest = &p[at + 6..];
-            for (index, pair) in rest.as_chunks::<2>().0.iter().enumerate() {
-                if index * 2 + 2 == rest.len() {
-                    let direction = u16::from_be_bytes([pair[0], pair[1]]);
-                    point = advance(point, direction, setup.body_spacing)?;
-                    anchor_direction = Some(direction);
-                    effective_heading = f64::from(direction) * (TAU / 65_536.);
-                    if absolute_body.is_some() {
-                        absolute_point.x += math::cos(effective_heading) * setup.body_spacing;
-                        absolute_point.y += math::sin(effective_heading) * setup.body_spacing;
+            for delta in raw.body.deltas() {
+                match delta {
+                    v19::BodyDelta::FinalDirection(direction) => {
+                        point = advance(point, direction, setup.body_spacing)?;
+                        anchor_direction = Some(direction);
+                        effective_heading = scalar::body_angle16(direction);
+                        if absolute_body.is_some() {
+                            absolute_point.x += math::cos(effective_heading) * setup.body_spacing;
+                            absolute_point.y += math::sin(effective_heading) * setup.body_spacing;
+                        }
                     }
-                } else {
-                    let dx = (f64::from(pair[0]) - 127.) / 2.;
-                    let dy = (f64::from(pair[1]) - 127.) / 2.;
-                    point = checked_point(point.x + dx, point.y + dy)?;
-                    if absolute_body.is_some() {
-                        absolute_point.x += dx;
-                        absolute_point.y += dy;
+                    v19::BodyDelta::HalfUnits([x, y]) => {
+                        let dx = scalar::delta_half(x);
+                        let dy = scalar::delta_half(y);
+                        point = checked_point(point.x + dx, point.y + dy)?;
+                        if absolute_body.is_some() {
+                            absolute_point.x += dx;
+                            absolute_point.y += dy;
+                        }
                     }
+                    _ => return Err(StateError::InvalidPacket(b's')),
                 }
                 body.push(point);
                 if let Some(body) = &mut absolute_body {
@@ -1003,21 +1004,21 @@ impl ClientState {
             return Err(StateError::Limit);
         }
         let absolute_head = Point {
-            x: f64::from(triple(p, 16)?) / 5.,
-            y: f64::from(triple(p, 19)?) / 5.,
+            x: scalar::position5(raw.head[0]),
+            y: scalar::position5(raw.head[1]),
         };
         let snake = Snake {
             id,
-            skin: byte(p, 15)?,
+            skin: raw.skin,
             name: name.iter().map(|&b| char::from(b)).collect(),
             custom_skin: custom_skin.to_vec(),
             cosmetic,
             head: centered(setup, absolute_head.x, absolute_head.y)?,
             body,
-            heading: f64::from(triple(p, 3)?) * TAU / 16_777_215.,
-            wanted_heading: f64::from(triple(p, 7)?) * TAU / 16_777_215.,
+            heading: scalar::angle24(raw.heading),
+            wanted_heading: scalar::angle24(raw.wanted_heading),
             speed: speed_per_32ms / 0.032,
-            fam: fraction(p, 12)?,
+            fam: scalar::fraction24(raw.fraction),
             radius: 6.,
             anchor_direction,
             segment_length: setup.body_spacing,
@@ -1054,55 +1055,25 @@ impl ClientState {
 
     fn anchor(
         &mut self,
-        p: &[u8],
+        raw: v19::AnchorRef,
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
-        let code = p[0];
-        let absolute = matches!(code, b'=' | b'+');
-        let grow = matches!(code, b'n' | b'N' | b'+');
-        let own = matches!(code, b'G' | b'N')
-            || (code == b'=' && p.len() == 7)
-            || (code == b'+' && p.len() == 10);
-        let at = if own { 1 } else { 3 };
-        let mass_bytes = if grow { 3 } else { 0 };
-        let payload = p
-            .len()
-            .checked_sub(at)
-            .ok_or(StateError::InvalidPacket(code))?;
-        require(
-            p,
-            if absolute {
-                payload == 6 + mass_bytes
-            } else {
-                payload == mass_bytes || payload == 2 + mass_bytes
-            },
-        )?;
-        let direction = if absolute || payload == 2 + mass_bytes {
-            Some(word(p, at)?)
-        } else {
-            None
-        };
-        let absolute_position = if absolute {
-            Some(Point {
-                x: f64::from(word(p, at + 2)?),
-                y: f64::from(word(p, at + 4)?),
-            })
-        } else {
-            None
-        };
+        let own = raw.target == v19::Target::Own;
+        let grow = raw.grew;
+        let direction = raw.direction;
+        let absolute_position = raw.absolute.map(|[x, y]| Point {
+            x: f64::from(x),
+            y: f64::from(y),
+        });
         let position = absolute_position
             .map(|point| centered(setup, point.x, point.y))
             .transpose()?;
-        let fam = if grow {
-            Some(fraction(p, p.len() - 3)?)
-        } else {
-            None
-        };
-        let id = if own {
-            self.own_snake_id
-        } else {
-            Some(word(p, 1)?)
+        let fam = raw.fraction.map(scalar::fraction24);
+        let id = match raw.target {
+            v19::Target::Own => self.own_snake_id,
+            v19::Target::Id(id) => Some(id),
+            _ => return Err(StateError::InvalidPacket(b'g')),
         };
         if let Some(id) = id
             && (own || self.snakes.contains_key(&id))
@@ -1154,46 +1125,26 @@ impl ClientState {
 
     fn motion(
         &mut self,
-        p: &[u8],
+        raw: v19::MotionRef<'_>,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
-        let code = p[0];
-        let own = matches!(code, b'd' | b'7') || p.len() <= 3;
-        let at = if own { 1 } else { 3 };
-        let count = p
-            .len()
-            .checked_sub(at)
-            .ok_or(StateError::InvalidPacket(code))?;
-        let (heading, wanted, speed) = match (code, count) {
-            (b'd' | b'7', 3) | (b'e' | b'E' | b'3' | b'4' | b'5', 3)
-                if !own || matches!(code, b'd' | b'7') =>
-            {
-                (Some(p[at]), Some(p[at + 1]), Some(p[at + 2]))
-            }
-            (b'e', 2) => (Some(p[at]), None, Some(p[at + 1])),
-            (b'E' | b'4', 2) => (None, Some(p[at]), Some(p[at + 1])),
-            (b'3' | b'5', 2) => (Some(p[at]), Some(p[at + 1]), None),
-            (b'e', 1) => (Some(p[at]), None, None),
-            (b'E' | b'4', 1) => (None, Some(p[at]), None),
-            (b'3', 1) => (None, None, Some(p[at])),
-            // The single-field 5 shape is valid but changes no motion fields.
-            (b'5', 1) => return Ok(()),
-            _ => return Err(StateError::InvalidPacket(code)),
-        };
-        let direction = match (code, count) {
-            (b'e', 3) | (b'd', 3) | (b'E' | b'3', 2) | (b'E', 1) => Some(Direction::Decreasing),
-            (b'E' | b'3' | b'4' | b'5' | b'7', 3) | (b'4' | b'5', 2) | (b'4', 1) => {
-                Some(Direction::Increasing)
-            }
-            _ => None,
-        };
-        let heading = heading.map(|value| f64::from(value) * TAU / 256.);
-        let wanted_heading = wanted.map(|value| f64::from(value) * TAU / 256.);
-        let speed_per_32ms = speed.map(|value| f64::from(value) / 18.);
-        let id = if own {
-            self.own_snake_id
-        } else {
-            Some(word(p, 1)?)
+        // The admitted single-field 5 command changes no fields or events.
+        if raw.heading.is_none()
+            && raw.wanted_heading.is_none()
+            && raw.speed.is_none()
+            && raw.direction.is_none()
+        {
+            return Ok(());
+        }
+        let own = raw.target == v19::Target::Own;
+        let heading = raw.heading.map(scalar::angle8);
+        let wanted_heading = raw.wanted_heading.map(scalar::angle8);
+        let speed_per_32ms = raw.speed.map(scalar::compact_speed_per_32ms);
+        let direction = raw.direction.map(direction_from_shared);
+        let id = match raw.target {
+            v19::Target::Own => self.own_snake_id,
+            v19::Target::Id(id) => Some(id),
+            _ => return Err(StateError::InvalidPacket(raw.command[0])),
         };
         if let Some(id) = id
             && (own || self.snakes.contains_key(&id))
@@ -1283,149 +1234,68 @@ impl ClientState {
     }
 }
 
-fn parse_prey_lifecycle(p: &[u8]) -> Result<PresentationEvent, StateError> {
-    require(p, matches!(p.len(), 3 | 5 | 20))?;
-    let id = word(p, 1)?;
-    Ok(match p.len() {
-        3 => PresentationEvent::PreyRemoved { id },
-        5 => PresentationEvent::PreyEaten {
-            id,
-            eater_id: word(p, 3)?,
-        },
-        20 => PresentationEvent::PreySpawn(PreySpawnInput {
-            id,
-            absolute_position: Point {
-                x: f64::from(triple(p, 4)?) / 5.,
-                y: f64::from(triple(p, 7)?) / 5.,
-            },
-            size_byte: p[10],
-            base_size: f64::from(p[10]) / 5.,
-            raw_color: p[3],
-            direction: prey_direction(p, 11)?,
-            heading: prey_angle(p, 15)?,
-            wanted_heading: prey_angle(p, 12)?,
-            speed_per_32ms: f64::from(word(p, 18)?) / 1000.,
-        }),
-        _ => unreachable!(),
-    })
+fn direction_from_shared(direction: v19::Direction) -> Direction {
+    match direction {
+        v19::Direction::Decreasing => Direction::Decreasing,
+        v19::Direction::Increasing => Direction::Increasing,
+        _ => Direction::None,
+    }
 }
-
-fn parse_prey_motion(p: &[u8]) -> Result<PreyMotionInput, StateError> {
-    let (direction_at, heading_at, wanted_at, speed_at) = match p.len() {
-        7 => (None, None, None, None),
-        9 => (None, None, None, Some(7)),
-        10 => (None, Some(7), None, None),
-        11 => (Some(7), None, Some(8), None),
-        12 => (None, Some(7), None, Some(10)),
-        13 => (Some(7), None, Some(8), Some(11)),
-        14 => (Some(7), Some(8), Some(11), None),
-        16 => (Some(7), Some(8), Some(11), Some(14)),
-        _ => return Err(StateError::InvalidPacket(p[0])),
-    };
-    Ok(PreyMotionInput {
-        id: word(p, 1)?,
+fn direction_from_wire(raw: u8) -> Direction {
+    direction_from_shared(
+        v19::Direction::from_wire(raw).expect("client admission checked direction"),
+    )
+}
+fn prey_from_wire(raw: v19::PreyRef) -> PreySpawnInput {
+    PreySpawnInput {
+        id: raw.id,
         absolute_position: Point {
-            x: 1. + f64::from(word(p, 3)?) * 3.,
-            y: 1. + f64::from(word(p, 5)?) * 3.,
+            x: scalar::position5(raw.position[0]),
+            y: scalar::position5(raw.position[1]),
         },
-        direction: direction_at.map(|at| prey_direction(p, at)).transpose()?,
-        heading: heading_at.map(|at| prey_angle(p, at)).transpose()?,
-        wanted_heading: wanted_at.map(|at| prey_angle(p, at)).transpose()?,
-        speed_per_32ms: speed_at
-            .map(|at| word(p, at).map(|speed| f64::from(speed) / 1000.))
-            .transpose()?,
-    })
-}
-
-fn prey_direction(p: &[u8], at: usize) -> Result<Direction, StateError> {
-    match p[at] {
-        b'0' => Ok(Direction::None),
-        b'1' => Ok(Direction::Decreasing),
-        b'2' => Ok(Direction::Increasing),
-        _ => Err(StateError::InvalidPacket(p[0])),
+        size_byte: raw.size,
+        base_size: scalar::position5(u32::from(raw.size)),
+        raw_color: raw.color,
+        direction: direction_from_wire(raw.raw_direction),
+        heading: scalar::prey_angle24(raw.heading),
+        wanted_heading: scalar::prey_angle24(raw.wanted_heading),
+        speed_per_32ms: scalar::full_speed_per_32ms(raw.speed),
     }
 }
-
-fn prey_angle(p: &[u8], at: usize) -> Result<f64, StateError> {
-    // Keep the wire operation order and the inclusive full-turn endpoint.
-    Ok(f64::from(triple(p, at)?) * 2. * PI / 16_777_215.)
-}
-
-fn parse_setup(p: &[u8]) -> Result<Setup, StateError> {
-    protocol::setup_protocol_version(p)?;
-    if p[23] != 19 {
-        return Err(StateError::UnsupportedProtocol(p[23]));
+fn prey_motion_from_wire(raw: v19::PreyMotion) -> PreyMotionInput {
+    PreyMotionInput {
+        id: raw.id,
+        absolute_position: Point {
+            x: scalar::prey_position(raw.position[0]),
+            y: scalar::prey_position(raw.position[1]),
+        },
+        direction: raw.raw_direction.map(direction_from_wire),
+        heading: raw.heading.map(scalar::prey_angle24),
+        wanted_heading: raw.wanted_heading.map(scalar::prey_angle24),
+        speed_per_32ms: raw.speed.map(scalar::full_speed_per_32ms),
     }
-    let grid_center = f64::from(triple(p, 1)?);
-    let max_segments = word(p, 4)?;
-    let sector_size = word(p, 6)?;
-    let contraction = f64::from(word(p, 21)?) / 1000.;
-    let radius = if p.len() >= 30 {
-        f64::from(triple(p, 27)?)
-    } else {
-        grid_center * 0.98
-    };
-    require(
-        p,
-        grid_center > 0.
-            && max_segments > 0
-            && sector_size > 0
-            && word(p, 8)? > 0
-            && p[24] > 0
-            && contraction <= 1.
-            && radius > 0.,
-    )?;
-    Ok(Setup {
-        protocol: 19,
+}
+fn setup_from_wire(raw: v19::SetupRef<'_>) -> Setup {
+    let grid_center = f64::from(raw.grid_center);
+    Setup {
+        protocol: raw.protocol,
         grid_center,
-        radius,
-        sector_size,
-        sector_count: word(p, 8)?,
-        max_segments,
-        body_spacing: f64::from(p[24]),
-        body_contraction: contraction,
-        spangdv: f64::from(p[10]) / 10.,
-        nsp1: f64::from(word(p, 11)?) / 100.,
-        nsp2: f64::from(word(p, 13)?) / 100.,
-        nsp3: f64::from(word(p, 15)?) / 100.,
-        mamu: f64::from(word(p, 17)?) / 1000.,
-        mamu2: f64::from(word(p, 19)?) / 1000.,
-        server_number: if p.len() >= 27 {
-            Some(word(p, 25)?)
-        } else {
-            None
-        },
-        game_mode: p.get(30).copied(),
-        team: if p.get(30) == Some(&2) {
-            Some(byte(p, 31)?)
-        } else {
-            None
-        },
-    })
-}
-fn require(p: &[u8], valid: bool) -> Result<(), StateError> {
-    if valid {
-        Ok(())
-    } else {
-        Err(StateError::InvalidPacket(p[0]))
+        radius: raw.radius.map(f64::from).unwrap_or(grid_center * 0.98),
+        sector_size: raw.sector_size,
+        sector_count: raw.sector_count,
+        max_segments: raw.max_segments,
+        body_spacing: f64::from(raw.body_spacing),
+        body_contraction: f64::from(raw.contraction) / 1000.,
+        spangdv: f64::from(raw.spangdv) / 10.,
+        nsp1: f64::from(raw.nsp1) / 100.,
+        nsp2: f64::from(raw.nsp2) / 100.,
+        nsp3: f64::from(raw.nsp3) / 100.,
+        mamu: f64::from(raw.mamu) / 1000.,
+        mamu2: f64::from(raw.mamu2) / 1000.,
+        server_number: raw.server_number,
+        game_mode: raw.game_mode,
+        team: raw.team,
     }
-}
-fn byte(p: &[u8], at: usize) -> Result<u8, StateError> {
-    p.get(at).copied().ok_or(StateError::InvalidPacket(p[0]))
-}
-fn word(p: &[u8], at: usize) -> Result<u16, StateError> {
-    Ok(u16::from_be_bytes([byte(p, at)?, byte(p, at + 1)?]))
-}
-fn triple(p: &[u8], at: usize) -> Result<u32, StateError> {
-    Ok(u32::from_be_bytes([
-        0,
-        byte(p, at)?,
-        byte(p, at + 1)?,
-        byte(p, at + 2)?,
-    ]))
-}
-fn fraction(p: &[u8], at: usize) -> Result<f64, StateError> {
-    Ok(f64::from(triple(p, at)?) / 16_777_215.)
 }
 fn checked_point(x: f64, y: f64) -> Result<Point, StateError> {
     if x.is_finite() && y.is_finite() && x.abs() <= MAX_COORDINATE && y.abs() <= MAX_COORDINATE {
@@ -1438,7 +1308,7 @@ fn centered(setup: &Setup, x: f64, y: f64) -> Result<Point, StateError> {
     checked_point(x - setup.grid_center, y - setup.grid_center)
 }
 fn advance(point: Point, direction: u16, spacing: f64) -> Result<Point, StateError> {
-    let angle = f64::from(direction) * TAU / 65_536.;
+    let angle = scalar::anchor_angle16(direction);
     checked_point(
         point.x + math::cos(angle) * spacing,
         point.y + math::sin(angle) * spacing,

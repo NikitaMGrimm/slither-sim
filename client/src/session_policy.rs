@@ -384,8 +384,8 @@ impl SessionPolicy {
     /// Copy a selected negotiation packet without changing phase.
     pub fn negotiation_packet(index: u8) -> Result<Vec<u8>> {
         match index {
-            0 => Ok(vec![1]),
-            1 => Ok(vec![99, 0]),
+            0 => Ok(slither_protocol::v19::client::REQUEST_BARE.to_vec()),
+            1 => Ok(slither_protocol::v19::client::STOCK_HELLO.to_vec()),
             _ => Err(SessionError("Invalid negotiation packet")),
         }
     }
@@ -427,6 +427,27 @@ impl SessionPolicy {
             112 if length != 1 => Err(SessionError("Invalid pong")),
             118 if length != 2 => Err(SessionError("Invalid life control")),
             _ => Ok(opcode == 97),
+        }
+    }
+    /// Extract the selected control argument; other message bodies stay opaque.
+    pub fn command_argument(command: &[u8]) -> Result<u8> {
+        use slither_protocol::{DecodeAdmission, v19};
+        match command.first() {
+            Some(b'v' | b'p') => {
+                let message =
+                    v19::decode(command, DecodeAdmission::ClientReceived).map_err(|_| {
+                        SessionError(if command[0] == b'v' {
+                            "Invalid life control"
+                        } else {
+                            "Invalid pong"
+                        })
+                    })?;
+                Ok(match message {
+                    v19::Message::LifeControl { status, .. } => status.unwrap_or(0),
+                    _ => 0,
+                })
+            }
+            _ => Ok(0),
         }
     }
     /// Admit advertised production protocol without changing the control state.
@@ -722,14 +743,14 @@ impl SessionPolicy {
         self.last_ping_ms = now;
         self.ping_external = false;
         self.control.ping_pending = true;
-        vec![251]
+        slither_protocol::v19::client::PING.to_vec()
     }
     /// Commit host-value ownership without evaluating or retaining JS objects here.
     pub fn commit_opaque_ping(&mut self) -> Vec<u8> {
         self.last_ping_ms = f64::NAN;
         self.ping_external = true;
         self.control.ping_pending = true;
-        vec![251]
+        slither_protocol::v19::client::PING.to_vec()
     }
     /// Production protocol selection for launch and ping admission.
     pub fn protocol_allowed(version: f64) -> bool {

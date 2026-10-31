@@ -14,6 +14,7 @@ include = ["/src", "/README.md", "/LICENSE"]
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+slither-protocol = { path = "../crates/slither-protocol" }
 unicode-segmentation = "=1.13.3"
 
 [features]

@@ -117,6 +117,19 @@ console.log('Synthetic Rust skin policy ABI passed:', skinPolicySmoke(wasm));
 leaderboardScoreSmoke(wasm);
 console.log('Synthetic native minimap view ABI passed:', minimapRenderSmoke(wasm));
 const profile = { clientVersion: 1, pageEcho: Uint8Array.from({ length: 20 }, (_, index) => index), protocolVersion: 19 };
+// Same fixed direct-login contract as apps/wgpu-slice/tests/endpoint_login.rs (#391).
+const directEcho = Uint8Array.of(54,206,204,169,97,178,74,136,124,117,14,210,106,236,8,208,136,213,140,111);
+assert.deepEqual(wasm.encode_login(291, directEcho, 'Fixed', 9, new Uint8Array()),
+  Uint8Array.from([115,30,1,35,...directEcho,9,5,70,105,120,101,100,0,255]));
+// Same byte/UTF-16 contract as tests/menu_controls.rs; no JS text conversion.
+assert.deepEqual(wasm.encode_champion(Uint16Array.of(0,31,32,126,127,128,0xd800,0xdc00,65)),
+  Uint8Array.of(255,118,32,32,32,126,127,32,32,32,65));
+for (const length of [139,140,141]) {
+  assert.deepEqual(wasm.encode_champion(new Uint16Array(length).fill(65)),
+    Uint8Array.from([255,118,...new Array(Math.min(length,140)).fill(65)]));
+}
+assert.deepEqual(wasm.encode_champion(Uint16Array.from([...new Array(139).fill(65),0xd83d,0xde00,66])),
+  Uint8Array.from([255,118,...new Array(139).fill(65),32]));
 const session = new HandshakeSession(wasm, profile, 'Synthetic');
 const challenge = Uint8Array.from([54, ...syntheticChallenge('A'.repeat(27))]);
 const reply = session.receive(challenge);

@@ -726,12 +726,17 @@ impl LocalGame {
         let mut session = self.session.clone();
         session.receive_bytes(bytes.len()).map_err(|e| e.0)?;
         let decoded =
-            protocol::decode_frame(bytes, ElapsedHeader::Absent).map_err(|e| e.to_string())?;
+            protocol::read_frame(bytes, ElapsedHeader::Absent).map_err(|e| e.to_string())?;
         if session
-            .receive_header(decoded.commands.len(), decoded.commands[0][0])
+            .receive_header(
+                decoded.command_count(),
+                decoded.commands().next().expect("nonempty frame").bytes[0],
+            )
             .map_err(|e| e.0)?
         {
-            let reply = solve_challenge(&decoded.commands[0][1..]).map_err(|e| e.to_string())?;
+            let reply =
+                solve_challenge(&decoded.commands().next().expect("one challenge").bytes[1..])
+                    .map_err(|e| e.to_string())?;
             self.session = session;
             self.enqueue(EffectKind::Send(reply), After::None)?;
             self.enqueue(EffectKind::Send(self.login.clone()), After::Challenged)?;
@@ -741,7 +746,8 @@ impl LocalGame {
             }
             return Ok(());
         }
-        for c in &decoded.commands {
+        for c in decoded.commands() {
+            let c = c.bytes;
             if session
                 .command_requires_version(c[0], c.len())
                 .map_err(|e| e.0)?
@@ -754,13 +760,15 @@ impl LocalGame {
             }
         }
         let commands: Vec<_> = decoded
-            .commands
-            .iter()
-            .map(|c| Command {
-                opcode: c[0],
-                argument: *c.get(1).unwrap_or(&0),
+            .commands()
+            .map(|c| c.bytes)
+            .map(|c| {
+                Ok(Command {
+                    opcode: c[0],
+                    argument: SessionPolicy::command_argument(c).map_err(|e| e.0)?,
+                })
             })
-            .collect();
+            .collect::<Result<_>>()?;
         let plan = session.prepare_controls(&commands, now).map_err(|e| e.0)?;
         let guards: Vec<_> = plan
             .guards
@@ -882,11 +890,22 @@ impl LocalGame {
             events.push(h);
         }
         // Raw row history is admitted independently of the playing-gated HUD journal.
+        let mut row_headers = report.events().iter().filter_map(|event| {
+            if let HudIngressEventKind::Leaderboard { local_row, .. } = event.kind {
+                Some((event.command_index, local_row))
+            } else {
+                None
+            }
+        });
         for rows in report.leaderboard_rows() {
+            let local_row = row_headers
+                .find(|(index, _)| *index == rows.command_index())
+                .ok_or("Missing leaderboard header")?
+                .1;
             row_events.push(LeaderboardEvent {
                 command_index: rows.command_index(),
                 kind: LeaderboardEventKind::Board {
-                    local_row: commands[rows.command_index()].argument,
+                    local_row,
                     rows: rows
                         .rows()
                         .iter()

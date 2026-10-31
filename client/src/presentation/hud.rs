@@ -81,7 +81,10 @@ impl Error for HudIngressError {
 }
 
 impl HudIngressPlan<'_> {
-    pub(crate) fn validate(self, commands: &[&[u8]]) -> Result<(), HudIngressError> {
+    pub(crate) fn validate(
+        self,
+        commands: slither_protocol::frame::Commands<'_>,
+    ) -> Result<(), HudIngressError> {
         if !matches!(self.schema, 1 | 2)
             || !(1..=MAX_FRAME_COMMANDS).contains(&self.command_count)
             || self.guards.len() != self.command_count
@@ -104,7 +107,9 @@ impl HudIngressPlan<'_> {
             return Err(HudIngressError::InvalidCaptureIndices);
         }
         let mut captures = self.final_capture_indices.iter().copied().peekable();
-        for (index, (&command, guard)) in commands.iter().zip(self.guards).enumerate() {
+        for (command, guard) in commands.zip(self.guards) {
+            let index = command.index;
+            let command = command.bytes;
             match command[0] {
                 b'p' if command.len() != 1 => return Err(HudIngressError::InvalidControl(b'p')),
                 b'v' if command.len() != 2 => return Err(HudIngressError::InvalidControl(b'v')),

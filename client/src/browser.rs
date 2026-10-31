@@ -29,6 +29,12 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, JsValue> {
     challenge::solve_challenge(encoded).map_err(error)
 }
 
+/// Preserve per-UTF-16-unit menu normalization before shared serialization.
+#[wasm_bindgen]
+pub fn encode_champion(units: &[u16]) -> Vec<u8> {
+    protocol::encode_champion(units)
+}
+
 /// Pack complete commands as repeated u32 big-endian lengths and command bytes.
 #[wasm_bindgen]
 pub fn decode_frame(bytes: &[u8], elapsed_header: bool) -> Result<Vec<u8>, JsValue> {
@@ -37,9 +43,10 @@ pub fn decode_frame(bytes: &[u8], elapsed_header: bool) -> Result<Vec<u8>, JsVal
     } else {
         protocol::ElapsedHeader::Absent
     };
-    let frame = protocol::decode_frame(bytes, mode).map_err(error)?;
+    let frame = protocol::read_frame(bytes, mode).map_err(error)?;
     let mut packed = Vec::new();
-    for command in frame.commands {
+    for command in frame.commands() {
+        let command = command.bytes;
         packed.extend((command.len() as u32).to_be_bytes());
         packed.extend(command);
     }

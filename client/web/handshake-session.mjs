@@ -27,7 +27,7 @@ export class HandshakeSession {
     this.#login = wasm.encode_login(profile.clientVersion, profile.pageEcho, nickname, 0, new Uint8Array());
   }
   get state() { return this.#state; }
-  start() { return [Uint8Array.of(1), Uint8Array.of(99, 0)]; }
+  start() { return [0, 1].map(index => this.#wasm.SessionPolicy.negotiation_packet(index)); }
   receive(frame) {
     if (this.#state === 'done' || this.#state === 'failed') throw new Error('Handshake is terminal');
     try {

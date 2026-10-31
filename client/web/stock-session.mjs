@@ -81,9 +81,10 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
   if (typeof createSocket !== 'function' || typeof now !== 'function') throw new TypeError('Session capabilities required');
   integer(maxBufferedBytes, 1048576, 'send budget');
   if (typeof SessionPolicy !== 'function' || typeof SessionPolicy.prototype?.free !== 'function'
-    || typeof SessionPolicy.valid_input !== 'function' || typeof SessionPolicy.protocol_allowed !== 'function' || typeof SessionPolicy.negotiation_packet !== 'function' || typeof SessionPolicy.death_elapsed !== 'function') throw new TypeError('Wasm SessionPolicy required');
+    || typeof SessionPolicy.valid_input !== 'function' || typeof SessionPolicy.protocol_allowed !== 'function' || typeof SessionPolicy.negotiation_packet !== 'function' || typeof SessionPolicy.command_argument !== 'function' || typeof SessionPolicy.death_elapsed !== 'function') throw new TypeError('Wasm SessionPolicy required');
   const free = SessionPolicy.prototype.free, validInput = SessionPolicy.valid_input;
   const protocolAllowed = SessionPolicy.protocol_allowed, negotiationPacket = SessionPolicy.negotiation_packet;
+  const commandArgument = SessionPolicy.command_argument;
   const deathElapsed = SessionPolicy.death_elapsed;
   let policy = new SessionPolicy();
   try {
@@ -194,7 +195,10 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     }
     const receivedMs = time();
     const schema = owner().schema();
-    const pairs = Uint8Array.from(commands.flatMap(command => [command[0], command[1] ?? 0]));
+    // Only life control carries a session argument; avoid copying gameplay
+    // bodies back through Wasm just to obtain their unused zero argument.
+    const pairs = Uint8Array.from(commands.flatMap(command => [command[0], command[0] === 118
+      ? Reflect.apply(commandArgument, SessionPolicy, [command]) : 0]));
     const copiedPlan = owner().prepare_controls(pairs, receivedMs);
     const plan = schema ? copyHudIngressPlan({ schema: copiedPlan.schema, commandCount: copiedPlan.commandCount,
       guards: Array.from(copiedPlan.guards, guard => ({ playing: guard.playing,

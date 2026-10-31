@@ -2153,6 +2153,7 @@ name = "slither-client"
 version = "0.1.0-alpha.0"
 dependencies = [
  "js-sys",
+ "slither-protocol",
  "unicode-segmentation",
  "wasm-bindgen",
  "web-sys",

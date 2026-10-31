@@ -2,6 +2,7 @@
 import {stageControls,matchHudReport} from './session-policy-oracle.mjs';
 const fail=message=>{throw new Error(message);};
 export class TestSessionPolicy {
+  static command_argument(command){return command[0]===118?command[1]:0;}
   constructor(){Object.assign(this,{phase:'ready',connected:false,playing:false,lifeEnded:false,outcome:null,lagging:false,pingPending:false,lastPingMs:0,pingExternal:false,closeRequested:false,reason:null,constructorAttempts:0,startedMs:undefined,launch:false,launchCommitted:false,subscribed:false,hudSchema:0,actions:{},actionRevision:0,stepRevision:undefined,deathMs:null,returnFraction:0,uiPhase:'idle',previousUiMs:0,handshakeFrames:0,handshakeBytes:0});}
   free(){if(this.freed)fail('Test session released twice');this.freed=true;}
   snapshot(){const{phase,connected,playing,lifeEnded,outcome,lagging,pingPending,lastPingMs,closeRequested,returnFraction,reason,constructorAttempts}=this;return{phase,connected,playing,lifeEnded,outcome,deathPending:this.deathMs!==null,returnActive:this.uiPhase==='out',lagging,pingPending,lastPingMs,closeRequested,returnFraction,uiTimerNeeded:this.uiPhase==='in',reason,constructorAttempts};}
