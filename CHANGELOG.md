@@ -30,7 +30,6 @@
 
 ### Changed
 
-- World ticks reuse steering calculations when their inputs are unchanged.
 - Food lists no longer keep the order in which food appeared. When food is
   eaten or removed by a shrinking wall, the last item in the list takes its
   place, so code that relied on that order, such as a bot breaking ties by
@@ -45,12 +44,18 @@
 
 ### Performance
 
-- Dense-world collision indexing saves 26% per tick in the 64,000-bot storm.
-- Large food indexes use compact cell heads sooner.
-- Large food worlds use compact cell heads for pickup lookups. The frozen
-  10,000-snake replay saves 0.56 ms of world CPU per tick in ten timing pairs
-  (eight faster), with unchanged food, snake state and ordered events.
-
+- Dense worlds find collision candidates through a grid of snake bodies built
+  once per tick, instead of the bounds index. In a frozen world of 64,000 bots
+  steering toward the center of a radius-32,000 arena, world CPU per tick
+  falls from about 81 to 60 ms, with all ten timing pairs faster. Collision
+  tests, death order and killer attribution are unchanged.
+- Snakes that hold their heading reuse the previous tick's steering result.
+  In the same 64,000-bot world, world CPU per tick falls by about 1.7% (nine
+  of ten pairs faster). Motion is bit-identical.
+- Food pickup switches to compact cell heads once a world holds 65,536
+  pellets. The frozen 10,000-snake replay saves 0.56 ms of world CPU per tick
+  (eight of ten pairs faster), and the 64,000-bot world about 1.2% (all ten
+  pairs). Food, snake state and event order are unchanged.
 - Removing eaten food no longer shifts the rest of the food list. In a frozen
   10,000-snake world, world CPU per tick falls from about 11.7 to 7.7 ms, with
   all ten timing pairs faster, and the 500-player catalog step gets about 28%
