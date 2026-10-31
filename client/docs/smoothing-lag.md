@@ -140,3 +140,95 @@ node --test tools/smoothing-lag.test.mjs
 cargo test --locked -p slither-client --features feel-trace --lib feel_trace
 cargo test --locked -p slither-wgpu-slice --features feel-trace --example feel-replay
 ```
+
+## Baseline snapshot (2026-10-31)
+
+Windows release CPU capture at `f9e8b743a311fe707ed87711e6ec4053fa76a543`, source tree
+`5337fae22f4701106c341a885bc5a328f8dd7946`, binary SHA-256
+`fe92c799a3d725d04ceb6737cfcd99f92d0e1ac3a9ed595d3be99c6732b59d81`. Analysis at
+`f1693ca25a48783466ba7440143ce74b8d155b82` adds sustained crossings without changing
+the retained raw captures or baseline metrics. All 48 baseline/impulse pairs and
+three production controls completed: **112,632 retained frames**, two selected
+snakes per picture, zero coverage failures. The complete earlier matrix at
+`21af2859` is also retained; all case results and controls matched exactly
+after the partial-failure export fix. This is deterministic reproducibility, not
+independent trials.
+
+Stationary zero-correction control: zero head error/correction, undefined lag.
+Moving 0/40 ms controls measured a **41.1765 ms** shift in median lag-equivalent,
+within a **5.8824 ms** frame-phase bound. Absolute zero-delay median was
+**−3.8080 ms** and was not subtracted. Ten boost strata exceeded the proposed
+p95 ≤0.25R engineering target: 170 Hz with jitter ±4/±12 ms, and 240 Hz at all
+three jitter amplitudes, for both straight and turn. No stratum exceeded the
+p99 ≤0.5R target. These are baseline outcomes, not safety acceptance.
+
+All table values are milliseconds. Lag is signed p50/p95 against truth at
+preparation. Position t50 is a paired step-response estimate after admission.
+Heading cells show **first→sustained t50**, separately for own/enemy: ten strata
+have a transient first t50 earlier than the sustained response. For example,
+170 Hz normal/straight/no-jitter briefly reached 100% at +1.57 ms, dropped near
+0% at +7.45 ms, then eased toward the changed heading. First-crossing estimates
+clipped to zero are bounded by the retained receipt-to-next-frame interval;
+they do not establish zero physical latency or immediate settling.
+
+Own/enemy match at the shown precision because they follow translated copies
+of the same scripted trajectory. Normal/boost, turning and jitter remain
+separate. At 60 Hz and irregular cadence p99 uses fewer than 1,000 measured
+frames and is descriptive only.
+
+| Rate | Speed / motion | Jitter ±ms | Own lag p50/p95 ms | Enemy lag p50/p95 ms | Position t50 own/enemy ms | Heading first→sustained t50 own/enemy ms | Status |
+|---|---|---:|---:|---:|---:|---:|---|
+| 60 | normal/straight | 0 | 16.67 / 16.67 | 16.67 / 16.67 | 213.33 / 213.33 | 109.15→109.15 / 109.15→109.15 | complete |
+| 60 | normal/straight | 4 | 9.84 / 16.65 | 9.84 / 16.65 | 200.67 / 200.67 | 105.15→105.15 / 105.15→105.15 | complete |
+| 60 | normal/straight | 12 | 9.84 / 16.65 | 9.84 / 16.65 | 208.67 / 208.67 | 97.15→97.15 / 97.15→97.15 | complete |
+| 60 | normal/turn | 0 | 16.67 / 16.67 | 16.67 / 16.67 | 213.42 / 213.42 | 109.15→109.15 / 109.15→109.15 | complete |
+| 60 | normal/turn | 4 | 9.84 / 16.65 | 9.84 / 16.65 | 200.75 / 200.75 | 105.15→105.15 / 105.15→105.15 | complete |
+| 60 | normal/turn | 12 | 9.84 / 16.65 | 9.84 / 16.65 | 208.75 / 208.75 | 97.15→97.15 / 97.15→97.15 | complete |
+| 60 | boost/straight | 0 | 10.81 / 13.68 | 10.81 / 13.68 | 208.00 / 208.00 | 99.82→99.82 / 99.82→99.82 | complete |
+| 60 | boost/straight | 4 | 11.34 / 16.03 | 11.34 / 16.03 | 212.00 / 212.00 | 103.82→103.82 / 103.82→103.82 | complete |
+| 60 | boost/straight | 12 | 9.05 / 13.20 | 9.05 / 13.20 | 203.33 / 203.33 | 111.82→111.82 / 111.82→111.82 | complete |
+| 60 | boost/turn | 0 | 10.68 / 13.36 | 10.68 / 13.36 | 207.12 / 207.12 | 99.82→99.82 / 99.82→99.82 | complete |
+| 60 | boost/turn | 4 | 11.14 / 15.59 | 11.14 / 15.59 | 211.12 / 211.12 | 103.82→103.82 / 103.82→103.82 | complete |
+| 60 | boost/turn | 12 | 8.73 / 12.66 | 8.73 / 12.66 | 202.46 / 202.46 | 111.82→111.82 / 111.82→111.82 | complete |
+| 170 | normal/straight | 0 | 17.57 / 18.99 | 17.57 / 18.99 | 211.37 / 211.37 | 0.00→104.51 / 0.00→104.51 | complete |
+| 170 | normal/straight | 4 | 17.18 / 21.86 | 17.18 / 21.86 | 215.37 / 215.37 | 100.51→100.51 / 100.51→100.51 | complete |
+| 170 | normal/straight | 12 | 14.83 / 28.54 | 14.83 / 28.54 | 217.49 / 217.49 | 104.27→104.27 / 104.27→104.27 | complete |
+| 170 | normal/turn | 0 | 17.56 / 18.97 | 17.56 / 18.97 | 211.43 / 211.43 | 0.00→104.51 / 0.00→104.51 | complete |
+| 170 | normal/turn | 4 | 17.15 / 21.65 | 17.15 / 21.65 | 215.43 / 215.43 | 100.51→100.51 / 100.51→100.51 | complete |
+| 170 | normal/turn | 12 | 14.84 / 27.87 | 14.84 / 27.87 | 217.55 / 217.55 | 104.27→104.27 / 104.27→104.27 | complete |
+| 170 | boost/straight | 0 | 17.15 / 17.77 | 17.15 / 17.77 | 213.88 / 213.88 | 106.94→106.94 / 106.94→106.94 | complete |
+| 170 | boost/straight | 4 | 16.80 / 19.39 | 16.80 / 19.39 | 212.00 / 212.00 | 99.18→99.18 / 99.18→99.18 | complete |
+| 170 | boost/straight | 12 | 15.57 / 19.69 | 15.57 / 19.69 | 208.24 / 208.24 | 1.29→107.18 / 1.29→107.18 | complete |
+| 170 | boost/turn | 0 | 17.09 / 17.82 | 17.09 / 17.82 | 213.27 / 213.27 | 106.94→106.94 / 106.94→106.94 | complete |
+| 170 | boost/turn | 4 | 16.67 / 19.12 | 16.67 / 19.12 | 205.50 / 205.50 | 99.18→99.18 / 99.18→99.18 | complete |
+| 170 | boost/turn | 12 | 15.45 / 18.75 | 15.45 / 18.75 | 207.62 / 207.62 | 1.29→107.18 / 1.29→107.18 | complete |
+| 240 | normal/straight | 0 | 16.67 / 16.67 | 16.67 / 16.67 | 209.17 / 209.17 | 0.00→107.08 / 0.00→107.08 | complete |
+| 240 | normal/straight | 4 | 15.67 / 20.71 | 15.67 / 20.71 | 204.83 / 204.83 | 103.08→103.08 / 103.08→103.08 | complete |
+| 240 | normal/straight | 12 | 13.37 / 28.60 | 13.37 / 28.60 | 208.67 / 208.67 | 103.42→103.42 / 103.42→103.42 | complete |
+| 240 | normal/turn | 0 | 16.67 / 16.67 | 16.67 / 16.67 | 213.38 / 213.38 | 0.00→107.08 / 0.00→107.08 | complete |
+| 240 | normal/turn | 4 | 15.66 / 20.20 | 15.66 / 20.20 | 209.04 / 209.04 | 103.08→103.08 / 103.08→103.08 | complete |
+| 240 | normal/turn | 12 | 13.40 / 27.26 | 13.40 / 27.26 | 208.71 / 208.71 | 103.42→103.42 / 103.42→103.42 | complete |
+| 240 | boost/straight | 0 | 17.51 / 19.42 | 17.51 / 19.42 | 216.33 / 216.33 | 106.08→106.08 / 106.08→106.08 | complete |
+| 240 | boost/straight | 4 | 17.62 / 19.53 | 17.62 / 19.53 | 216.17 / 216.17 | 1.75→110.08 / 1.75→110.08 | complete |
+| 240 | boost/straight | 12 | 16.24 / 20.30 | 16.24 / 20.30 | 215.83 / 215.83 | 1.42→109.75 / 1.42→109.75 | complete |
+| 240 | boost/turn | 0 | 17.51 / 19.37 | 17.51 / 19.37 | 211.73 / 211.73 | 106.08→106.08 / 106.08→106.08 | complete |
+| 240 | boost/turn | 4 | 17.48 / 19.33 | 17.48 / 19.33 | 215.73 / 215.73 | 1.75→110.08 / 1.75→110.08 | complete |
+| 240 | boost/turn | 12 | 16.10 / 19.25 | 16.10 / 19.25 | 215.40 / 215.40 | 1.42→109.75 / 1.42→109.75 | complete |
+| irregular | normal/straight | 0 | 12.50 / 16.61 | 12.50 / 16.61 | 196.17 / 196.17 | 98.56→98.56 / 98.56→98.56 | complete |
+| irregular | normal/straight | 4 | 12.60 / 19.63 | 12.60 / 19.63 | 200.17 / 200.17 | 101.83→101.83 / 101.83→101.83 | complete |
+| irregular | normal/straight | 12 | 11.20 / 23.14 | 11.20 / 23.14 | 208.17 / 208.17 | 93.83→93.83 / 93.83→93.83 | complete |
+| irregular | normal/turn | 0 | 12.56 / 16.26 | 12.56 / 16.26 | 196.28 / 196.28 | 98.56→98.56 / 98.56→98.56 | complete |
+| irregular | normal/turn | 4 | 12.76 / 19.21 | 12.76 / 19.21 | 200.28 / 200.28 | 101.83→101.83 / 101.83→101.83 | complete |
+| irregular | normal/turn | 12 | 11.00 / 22.83 | 11.00 / 22.83 | 208.28 / 208.28 | 93.83→93.83 / 93.83→93.83 | complete |
+| irregular | boost/straight | 0 | 11.57 / 14.24 | 11.57 / 14.24 | 195.00 / 195.00 | 96.50→96.50 / 96.50→96.50 | complete |
+| irregular | boost/straight | 4 | 13.56 / 16.91 | 13.56 / 16.91 | 199.00 / 199.00 | 100.50→100.50 / 100.50→100.50 | complete |
+| irregular | boost/straight | 12 | 9.43 / 16.08 | 9.43 / 16.08 | 207.00 / 207.00 | 101.23→101.23 / 101.23→101.23 | complete |
+| irregular | boost/turn | 0 | 11.43 / 14.26 | 11.43 / 14.26 | 194.27 / 194.27 | 96.50→96.50 / 96.50→96.50 | complete |
+| irregular | boost/turn | 4 | 13.30 / 16.58 | 13.30 / 16.58 | 198.27 / 198.27 | 100.50→100.50 / 100.50→100.50 | complete |
+| irregular | boost/turn | 12 | 9.16 / 15.21 | 9.16 / 15.21 | 206.27 / 206.27 | 101.23→101.23 / 101.23→101.23 | complete |
+
+Full per-stratum spatial/body/age/smoothness distributions, t10/t50/t90 brackets,
+recrossings, raw frames, failed pilots and both complete matrices remain outside
+Git. This analysis summary SHA-256 is
+`f3a1c66f0474b1731acbc5fde65f7879237d5f7172bb6890ee6cbf10bb52d113`; its manifest hashes all 99 raw case/control
+files. No baseline frame was trimmed or aligned.
