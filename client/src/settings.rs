@@ -11,6 +11,7 @@ pub const RESOLUTION: ControlId = ControlId(5);
 pub const DONE: ControlId = ControlId(3);
 /// Stable panel identity, separate from login, champion and directory.
 pub const PANEL: u16 = 4;
+const BACKDROP: ControlId = ControlId(30);
 
 /// World raster policy; projection and input are identical in both modes.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -71,6 +72,8 @@ impl SettingsPreferences {
 pub struct SettingsState {
     preferences: SettingsPreferences,
     open: bool,
+    alpha: f64,
+    previous: Option<f64>,
     generation: u64,
     pending: Option<&'static str>,
     not_saved: bool,
@@ -82,6 +85,8 @@ impl SettingsState {
         Self {
             preferences,
             open: false,
+            alpha: 0.,
+            previous: None,
             generation: 0,
             pending: None,
             not_saved: false,
@@ -94,11 +99,24 @@ impl SettingsState {
     }
     /// Whether this panel owns menu input and content.
     pub fn visible(&self) -> bool {
+        self.open || self.alpha > 0.
+    }
+    /// Whether preference changes are still admitted, including during entry.
+    pub fn is_open(&self) -> bool {
         self.open
+    }
+    /// Sampled opacity, shared with the directory picker's transition.
+    pub fn alpha(&self) -> f64 {
+        self.alpha
+    }
+    /// Advance on the host's existing clock; closing never schedules a write.
+    pub fn step(&mut self, now: f64) -> Result<(), &'static str> {
+        crate::menu_transition::step(&mut self.alpha, &mut self.previous, self.open, now)
+            .map_err(|_| "Invalid settings clock")
     }
     /// Mount only after the login's existing admission gates settle.
     pub fn open(&mut self, view: &crate::start_page::StartMenuView) -> bool {
-        if !available(view) || self.open {
+        if !available(view) || self.visible() {
             return false;
         }
         self.open = true;
@@ -128,7 +146,7 @@ impl SettingsState {
                     }
                 }
             }
-            DONE => self.close(),
+            DONE | BACKDROP => self.close(),
             RESOLUTION => {
                 if let Some(native) = intent.checked {
                     let resolution = if native {
@@ -166,13 +184,17 @@ impl SettingsState {
         let width = 560_f64.min((viewport[0] - 32.).max(1.));
         let narrow = width < 480.;
         let height = if narrow { 512. } else { 400. };
-        let x = (viewport[0] - width) / 2.;
-        let y = ((viewport[1] - height) / 2.).max(8.);
+        let scale = crate::menu_transition::scale(self.alpha);
+        let x = (viewport[0] - width * scale) / 2.;
+        let y = ((viewport[1] - height) / 2.).max(8.) + height * (1. - scale) / 2.;
         let mut controls = Vec::new();
         let mut add = |id, rect: [f64; 4], style, text: &str, tab, kind| {
+            let mut placement =
+                Placement::rect(x + rect[0] * scale, y + rect[1] * scale, rect[2], rect[3]);
+            placement.scale = scale;
             controls.push(Control {
                 id,
-                placement: Placement::rect(x + rect[0], y + rect[1], rect[2], rect[3]),
+                placement,
                 clip: None,
                 visible: true,
                 enabled: true,
@@ -332,7 +354,7 @@ impl SettingsState {
             },
         );
         let mut backdrop = controls[0].clone();
-        backdrop.id = ControlId(30);
+        backdrop.id = BACKDROP;
         backdrop.placement = Placement::rect(0., 0., viewport[0], viewport[1]);
         backdrop.kind = ControlKind::Backdrop;
         backdrop.name = "Settings backdrop".into();
@@ -342,10 +364,11 @@ impl SettingsState {
             id: PANEL,
             generation: self.generation,
             placement: Placement::rect(0., 0., viewport[0], viewport[1]),
-            visible: self.open,
-            enabled: self.open,
-            alpha: 1.,
-            modal: self.open,
+            visible: self.visible(),
+            // Keep feedback through exit; activation independently rechecks `open`.
+            enabled: self.visible(),
+            alpha: self.alpha,
+            modal: self.visible(),
             initial_focus: Some(QUALITY),
             restore_focus: Some(crate::login_controls::SETTINGS),
             controls,

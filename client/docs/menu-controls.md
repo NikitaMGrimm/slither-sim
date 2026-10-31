@@ -9,7 +9,8 @@ login and pending-champion flow. This is not the extension input or GL port.
 
 The login-only [Settings](settings.md) screen moves Quality out of the product
 login. It shares the toggle, input and painter semantics and replaces inactive
-login content while mounted. Done/Escape restore the Settings entry focus.
+login content when settled. Done, Escape and backdrop dismissal return focus
+to the Settings entry after the shared modal exit fade completes.
 
 The core resolves logical placements and clips with `MenuRect`, including
 half-open hits and inverse mapping. `PanelInputState` owns reverse-order hits,

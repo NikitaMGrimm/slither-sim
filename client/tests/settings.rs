@@ -251,3 +251,83 @@ fn storage_failure_and_done_preserve_quality_next_play_and_generation() {
             })
     );
 }
+#[test]
+fn fade_is_monotonic_visible_through_exit_and_never_replays_a_write() {
+    let mut m = menu(Q::High);
+    m.settings.step(0.).unwrap();
+    assert!(m.settings.open(&m.view(true)));
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    let panel = m.settings.panel([960., 540.]);
+    input.sync(&panel, &mut edit);
+    m.settings
+        .activate(input.activate(&panel, Activation::Space).unwrap());
+    let prefs = m.settings.preferences();
+    assert_eq!(m.settings.take_write(), Some(prefs.serialize()));
+    let mut now = 0.;
+    let mut previous = m.settings.alpha();
+    let mut previous_width = 0.;
+    let mut centre: Option<[f64; 2]> = None;
+    for _ in 0..256 {
+        now += 16.;
+        m.settings.step(now).unwrap();
+        let alpha = m.settings.alpha();
+        assert!((previous..=1.).contains(&alpha));
+        assert!(m.settings.visible());
+        let panel = m.settings.panel([960., 540.]);
+        let resolved = panel.resolve([960., 540.]).unwrap();
+        let surface = resolved
+            .iter()
+            .find(|r| matches!(r.control.kind, ControlKind::Surface))
+            .unwrap()
+            .rect;
+        assert!(surface.width >= previous_width);
+        let current = [
+            surface.x + surface.width / 2.,
+            surface.y + surface.height / 2.,
+        ];
+        if let Some(old) = centre {
+            assert!(
+                current
+                    .into_iter()
+                    .zip(old)
+                    .all(|(a, b)| (a - b).abs() < 1e-7)
+            );
+        }
+        centre = Some(current);
+        previous_width = surface.width;
+        previous = alpha;
+        assert!(m.settings.take_write().is_none());
+        if alpha == 1. {
+            break;
+        }
+    }
+    assert_eq!(m.settings.alpha(), 1.);
+    let old_panel = m.settings.panel([960., 540.]);
+    input.sync(&old_panel, &mut edit);
+    let toggle = input.activate(&old_panel, Activation::Space).unwrap();
+    m.settings.close();
+    assert!(m.settings.visible());
+    assert!(!m.settings.is_open());
+    for _ in 0..256 {
+        m.settings.activate(toggle);
+        now += 16.;
+        m.settings.step(now).unwrap();
+        let alpha = m.settings.alpha();
+        assert!((0. ..=previous).contains(&alpha));
+        assert_eq!(m.settings.visible(), alpha > 0.);
+        let panel = m.settings.panel([960., 540.]);
+        assert_eq!(panel.visible, m.settings.visible());
+        assert_eq!(panel.enabled, panel.visible);
+        assert_eq!(m.settings.preferences(), prefs);
+        assert!(m.settings.take_write().is_none());
+        previous = alpha;
+        if !m.settings.visible() {
+            break;
+        }
+    }
+    assert!(!m.settings.visible());
+    let closed = m.settings.clone();
+    assert!(m.settings.step(f64::NAN).is_err());
+    assert_eq!(m.settings, closed);
+}

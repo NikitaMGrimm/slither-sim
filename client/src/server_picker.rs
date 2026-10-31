@@ -307,19 +307,8 @@ impl ServerPicker {
             }
     }
     pub fn step(&mut self, now: f64) -> Result<(), &'static str> {
-        if !now.is_finite() || self.previous.is_some_and(|p| now < p) {
-            return Err("Invalid picker clock");
-        }
-        let delta = self.previous.map_or(0., |p| ((now - p) / 8.).min(5.));
-        self.previous = Some(now);
-        self.alpha = (self.alpha
-            + if self.open {
-                0.02 * delta
-            } else {
-                -0.025 * delta
-            })
-        .clamp(0., 1.);
-        Ok(())
+        crate::menu_transition::step(&mut self.alpha, &mut self.previous, self.open, now)
+            .map_err(|_| "Invalid picker clock")
     }
     pub fn replace(
         &mut self,
@@ -512,7 +501,7 @@ impl ServerPicker {
     }
     pub fn panel(&mut self, viewport: [f64; 2]) -> PanelView {
         let scale = (viewport[0] / 620.).min(viewport[1] / 680.).min(1.)
-            * (0.9 + 0.1 * self.alpha.powf(0.4));
+            * crate::menu_transition::scale(self.alpha);
         let origin = [
             (viewport[0] - 560. * scale) / 2.,
             (viewport[1] - 620. * scale) / 2.,

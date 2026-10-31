@@ -3,10 +3,13 @@
 The native login's secondary row is Change Skin, Choose Server, Settings, after
 Nickname and Play in keyboard order. Settings opens only in admitted, settled
 Login, with no pending Play, champion editor, skin studio or picker. Its shared
-modal backdrop replaces login content and the wordmark. Tab wraps Quality →
-World resolution → Done;
-Enter/Space activates the focused control. Done and Escape close and restore
-Settings focus. Outside clicks do not dismiss it. In-game Escape remains Stop/cancel.
+modal uses the server picker's shared fade and scale ramp. Login content fades
+behind it, and the settled panel replaces inactive login/wordmark resources.
+Tab wraps Quality → World resolution → Done; Enter/Space activates the focused
+control. Done, Escape and a backdrop click start the exit fade. The panel keeps
+visual feedback and input ownership until opacity reaches zero, while closed
+controls reject activation. Focus then returns to Settings. In-game Escape
+remains Stop/cancel.
 
 Quality is the existing requested High/Low mode, independent of adaptive runtime
 quality and resolution. Changes apply immediately to preferences; Play freezes
@@ -46,7 +49,7 @@ bridging remains separate.
 
 Offline tests cover record precedence, write failures, entry/return focus,
 modality, capture cancellation and Play snapshots. Settings retains the existing
-global menu/picture quotas and adds a compactness regression of 32 resources,
+global menu/picture quotas. The settled-state compactness regression keeps 32 resources,
 4 MiB and 160 producer quads through DPR 1–5, with ≤64 quads through DPR 2.
 Menus retain the DPR-5 raster cap and physical-resolution placement through DPR 8.
 The rounded settings panel stretches only uniform centre/edge strips; its corners
@@ -62,3 +65,9 @@ focused, pressed, disabled, Native-unavailable and combined storage-failure stat
 `CARGO_BUILD_JOBS=2`. Full verification is `npm run check`, which skips native
 wgpu checks on Linux; neither proves physical input, owner appearance/feel or
 server acceptance. These checks open no windows and contact no game servers.
+
+`menu_specimens <new-output-directory> --settings-fade` captures fixed-clock
+entry/exit frames at 1×/1.5×/2× and a DPR 1–8 ledger, including fractional DPR,
+narrow/short-wide windows, keyboard/mouse entry, storage/capability messages and
+sampled control feedback. It uses procedural geometry only. Partial transitions
+share the unchanged global 512-record, 64-resource, 13 MiB menu allowance.

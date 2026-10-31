@@ -1000,6 +1000,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
     ] {
         let extent = logical.map(|v| (v * dpr) as u32);
         login.close_settings(true);
+        while login.state.settings.visible() {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         login.focus(NICKNAME);
         assert_eq!(login.controls.focus(), Some(NICKNAME));
         let outgoing = login.prepare_host(extent, dpr, true, None)?;
@@ -1010,6 +1014,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
         )?;
         login.focus(SETTINGS);
         login.open_settings(true);
+        while login.state.settings.alpha() < 1. {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         for state in [
             "high-focus",
             "high-pressed",
@@ -1134,6 +1142,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
                 .collect(),
         )?;
         login.close_settings(true);
+        while login.state.settings.visible() {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         assert_eq!(login.controls.focus(), Some(SETTINGS));
         let returned = login.prepare_host(extent, dpr, true, None)?;
         capture(

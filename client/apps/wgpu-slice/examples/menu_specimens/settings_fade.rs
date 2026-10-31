@@ -15,7 +15,11 @@ fn key(login: &mut NativeLogin, named: NamedKey) {
     login.key(
         KeyInput {
             logical: &Key::Named(named),
-            physical: PhysicalKey::Code(KeyCode::Enter),
+            physical: PhysicalKey::Code(if named == NamedKey::Escape {
+                KeyCode::Escape
+            } else {
+                KeyCode::Enter
+            }),
             text: None,
             state: ElementState::Pressed,
             repeat: false,

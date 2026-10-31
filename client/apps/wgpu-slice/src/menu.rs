@@ -967,7 +967,14 @@ impl Composition<'_> {
                             },
                         )?;
                         let mut draw = image(&resource, indicator, alpha);
-                        if clip_draw(&mut draw, r.clip, self.scale) {
+                        draw.source = Some(BodyRect {
+                            x: 0.,
+                            y: 0.,
+                            width: f64::from(resource.asset.width),
+                            height: f64::from(resource.asset.height),
+                        });
+                        // Modal scaling need not map the rounded raster to 1:1 pixels.
+                        if clip_scaled_draw(&mut draw, r.clip, self.scale) {
                             self.push(draw)?;
                         }
                         add_label(

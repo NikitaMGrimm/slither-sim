@@ -102,6 +102,8 @@ impl NativeLogin {
         playing: bool,
     ) -> Result<(Vec<StartMenuIntent>, Vec<HostEditEffect>)> {
         self.studio.step(now);
+        let settings_visible = self.state.settings.visible();
+        self.state.settings.step(now).map_err(str::to_owned)?;
         if let Some(record) = self.state.settings.take_write() {
             self.state
                 .settings
@@ -126,6 +128,9 @@ impl NativeLogin {
             .state
             .sync_menu(&self.state.view(admission), &intents);
         effects.extend(self.sync_controls(admission));
+        if settings_visible && !self.state.settings.visible() {
+            effects.extend(self.focus(SETTINGS));
+        }
         self.controls
             .step(
                 &self.panel,
@@ -275,7 +280,9 @@ impl NativeLogin {
     pub fn close_settings(&mut self, admission: bool) -> Vec<HostEditEffect> {
         self.state.settings.close();
         let mut effects = self.sync_controls(admission);
-        effects.extend(self.focus(SETTINGS));
+        if !self.state.settings.visible() {
+            effects.extend(self.focus(SETTINGS));
+        }
         effects
     }
     fn settings_activation(
@@ -692,20 +699,45 @@ impl NativeLogin {
         self.area = area;
         if self.state.settings.visible() {
             self.sync_controls(admission);
-            // Replace login/wordmark resources; retained pictures keep their own handles.
-            let mut picture = self.menu.prepare_panel(
-                &mut self.text,
-                &self.panel,
-                &self.controls,
-                &self.input.state,
-                &mut self.scroll,
-                Default::default(),
-                extent,
-                dpr,
-            )?;
-            let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
-            picture.backdrop = page.backdrop;
-            picture.resources.extend(page.resources);
+            let alpha = self.state.settings.alpha();
+            let mut picture = if alpha == 1. {
+                // The settled panel keeps its compact resource envelope.
+                self.menu.prepare_panel(
+                    &mut self.text,
+                    &self.panel,
+                    &self.controls,
+                    &self.input.state,
+                    &mut self.scroll,
+                    Default::default(),
+                    extent,
+                    dpr,
+                )?
+            } else {
+                view.login_alpha *= 1. - alpha;
+                view.visible = view.login_alpha > 0.;
+                self.menu.prepare_with_panel(
+                    &mut self.text,
+                    &view,
+                    &self.layout,
+                    extent,
+                    dpr,
+                    cosmetics,
+                    Some(&self.input.state),
+                    Some(crate::menu::PanelPaint {
+                        thumbnails: None,
+                        panel: &self.panel,
+                        input: &self.controls,
+                        edit: &self.input.state,
+                        scroll: &mut self.scroll,
+                        theme: Default::default(),
+                    }),
+                )?
+            };
+            if picture.backdrop.is_none() {
+                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
+                picture.backdrop = page.backdrop;
+                picture.resources.extend(page.resources);
+            }
             return Ok(picture);
         }
         if self.studio.state.visible() {
