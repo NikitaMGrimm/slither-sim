@@ -33,7 +33,7 @@ use super::{
 use crate::Action;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     io,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
@@ -264,12 +264,40 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
+    admission_rejections: Mutex<BTreeMap<(&'static str, String), u64>>,
     /// Commands per socket slot sent to the simulation and not yet consumed.
     pending: Vec<AtomicUsize>,
     failure: Mutex<Option<String>>,
 }
 
 impl Shared {
+    fn reject_admission(&self, phase: &'static str, reason: &str) {
+        let mut counts = self
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let count = counts.entry((phase, reason.to_owned())).or_default();
+        *count = count.saturating_add(1);
+    }
+
+    fn reject_handshake(&self, error: &tungstenite::Error) {
+        // Handshake errors can contain peer input. Retain only host-owned labels,
+        // including the existing HTTP path rejection, never request data.
+        let reason = match error {
+            tungstenite::Error::Io(_)
+            | tungstenite::Error::ConnectionClosed
+            | tungstenite::Error::AlreadyClosed
+            | tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::HandshakeIncomplete,
+            ) => return,
+            tungstenite::Error::Http(response) if response.status() == StatusCode::NOT_FOUND => {
+                "Not found"
+            }
+            _ => "Invalid WebSocket handshake",
+        };
+        self.reject_admission("http", reason);
+    }
+
     fn wake_socket(&self) -> Result<(), String> {
         #[cfg(windows)]
         self.socket_wake.notify().map_err(|e| e.to_string())?;
@@ -425,6 +453,7 @@ impl Host {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..self.max_clients).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         });
@@ -529,6 +558,16 @@ impl RunningHost {
     /// Connected socket players in the shared world.
     pub fn players(&self) -> usize {
         self.shared.players.load(Ordering::Relaxed)
+    }
+
+    /// Cumulative server-initiated admission rejections by phase and reason.
+    /// Contains no peer addresses, names or raw handshake errors.
+    pub fn admission_rejections(&self) -> BTreeMap<(&'static str, String), u64> {
+        self.shared
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Whether a host thread has stopped. Call [`Self::wait`] for its result.
@@ -1308,7 +1347,10 @@ impl Gateway {
                     physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    self.gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             };
             self.sessions.push(Session {
                 accepted: now,
@@ -1341,14 +1383,20 @@ impl Session {
     ) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
-            Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
+            Stage::Http(_) if age >= HTTP_TIMEOUT => {
+                gate.shared.reject_admission("http", "HTTP timeout");
+                Stage::Closed
+            }
             Stage::Http(mid) => match mid.handshake() {
                 Ok(socket) => Stage::Open(Box::new(Open::new(
                     socket,
                     self.physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             },
             Stage::Open(mut open) => {
                 if open.service(gate, now, wall, age, readable)? {
@@ -1630,11 +1678,20 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     fn reject(&mut self, gate: &mut Gate, now: Instant, reason: &str) {
+        let phase = match self.phase {
+            Phase::Hello { .. } => Some("hello"),
+            Phase::Reply => Some("reply"),
+            Phase::Login => Some("login"),
+            Phase::Playing(_) | Phase::Closing(_) => None,
+        };
         self.release(gate);
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
         let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
             end -= 1;
+        }
+        if let Some(phase) = phase {
+            gate.shared.reject_admission(phase, &reason[..end]);
         }
         let _ = self.socket.close(Some(CloseFrame {
             code: CloseCode::Policy,
@@ -2656,6 +2713,7 @@ mod tests {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..sockets).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         })

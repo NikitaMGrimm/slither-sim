@@ -28,6 +28,9 @@
   the slowest ticks
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-battledome-post-spawn/REPORT.md)).
 
+- Host `--stats` reports cumulative admission rejection counts by phase and
+  close reason, without client addresses or request data.
+
 ### Changed
 
 - Food lists no longer keep the order in which food appeared. When food is
