@@ -374,11 +374,27 @@ mod tests {
     #[test]
     fn separate_geometry_keeps_the_issued_picture_identity_through_retry() {
         let mut d = playing();
+        let mut off = playing();
         let id = d.game.client().own_snake().unwrap().metrics().id;
         d.recorder.record_geometry([id, id.wrapping_add(1)]);
         d.game.begin_redraw(40., d.extent, 1.).unwrap();
         d.drain_effects(40.).unwrap();
         let picture = d.game.take_frame().unwrap();
+        off.game.begin_redraw(40., off.extent, 1.).unwrap();
+        off.drain_effects(40.).unwrap();
+        let plain = off.game.take_frame().unwrap();
+        assert_eq!(picture.frame, plain.frame);
+        assert_eq!(picture.overlay, plain.overlay);
+        assert_eq!(picture.resources.len(), plain.resources.len());
+        for (on, off) in picture.resources.iter().zip(&plain.resources) {
+            assert_eq!(on.asset, off.asset);
+            assert_eq!(on.image.pixels, off.image.pixels);
+        }
+        assert_eq!(d.commands, off.commands);
+        assert_eq!(
+            d.game.issued_feel_observation(),
+            off.game.issued_feel_observation()
+        );
         let observation = d.game.issued_feel_observation().unwrap();
         let geometry = d.recorder.take_geometry();
         assert_eq!(geometry.len(), 1);
