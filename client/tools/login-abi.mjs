@@ -41,4 +41,31 @@ for(const base of ['dist/web/slither_client','dist/wgpu-slice/pkg/slither_wgpu_s
   assert.equal(menu.step(80,960,540,36,true,true).alpha,1);
   assert.ok(menu.step(96,960,540,36,true,true).alpha<1);
   menu.free();console.log(`${base}: login ABI passed`);
+  for (const outcome of ['dead','victory']) {
+    const returning=new wasm.LoginMenu('en','1');
+    returning.step(0,960,540,36,true,false);returning.action('play',false,true);
+    returning.step(16,960,540,36,false,false);
+    returning.observe_life('playing','',true,false,false,1,undefined,undefined);
+    returning.observe_life(outcome,outcome,true,true,false,1,1001,1n);
+    let view=returning.step(1616,960,540,80,false,false);
+    assert.equal(view.last_number,'1001');assert.equal(view.last_suffix,'!');assert.equal(view.last_label_alpha,.45);
+    assert.equal(view.alpha,0);assert.equal(view.disabled,true);
+    assert.equal(view.ordinary_controls_visible,outcome==='dead');
+    returning.action('play',false,true);returning.action('enter',false,true);
+    returning.observe_life(outcome,outcome,true,true,true,.5,1001,1n);
+    view=returning.step(2600,960,540,80,false,false);
+    assert.equal(view.alpha,.5);assert.equal(view.world_alpha,.5);assert.equal(view.play_alpha,.25);
+    assert.equal(Object.hasOwn(view,'request'),false);
+    returning.observe_life('disconnected',outcome,false,false,false,0,1001,1n);
+    view=returning.step(3600,960,540,80,false,false);
+    assert.equal(view.focus,false);
+    view=returning.step(3616,960,540,80,true,false);
+    assert.equal(view.focus,outcome==='dead');assert.equal(view.disabled,outcome==='victory');
+    assert.equal(view.champion_pending,outcome==='victory');
+    if(outcome==='dead') {
+      returning.action('play',false,true);view=returning.step(3632,960,540,80,true,false);
+      assert.ok(Object.hasOwn(view,'request'));assert.equal(view.last_number,'1001');
+    }
+    returning.free();
+  }
 }

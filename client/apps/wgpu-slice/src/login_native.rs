@@ -64,7 +64,10 @@ impl NativeLogin {
         admission: bool,
         playing: bool,
     ) -> Result<(Vec<StartMenuIntent>, Vec<HostEditEffect>)> {
-        let intents = self.state.step(now, false).map_err(str::to_owned)?;
+        let intents = self
+            .state
+            .step_with_admission(now, false, admission)
+            .map_err(str::to_owned)?;
         if playing {
             self.state.begin_outgoing();
         }
@@ -79,6 +82,24 @@ impl NativeLogin {
     }
     pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
         self.state.attempt_ended(phase)
+    }
+    pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        self.state
+            .observe_session(game.login_session(), game.login_final())
+            .map_err(str::to_owned)?;
+        Ok(())
+    }
+    pub fn sync_return_focus(&mut self, admission: bool) -> Vec<HostEditEffect> {
+        if self.state.view(admission).disabled {
+            return Vec::new();
+        }
+        let intents: Vec<_> = self.state.take_focus_intent().into_iter().collect();
+        if !intents.is_empty() {
+            self.focus = 0;
+        }
+        self.input
+            .state
+            .sync_menu(&self.state.view(admission), &intents)
     }
     pub fn focus(&mut self, focus: u8) -> Vec<HostEditEffect> {
         self.focus = focus;

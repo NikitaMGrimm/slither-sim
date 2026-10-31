@@ -190,24 +190,23 @@ fn zero_window_suspends_and_restoring_the_same_size_resumes_frames() {
 }
 
 #[test]
-fn menu_backdrop_stays_below_the_fading_world_at_unequal_sizes() {
+fn login_crossfade_covers_complete_world_and_hud_on_the_physical_overlay() {
     use slither_wgpu_slice::login_native::NativeLogin;
     let mut game = tape::playing();
     let physical = [3840, 2160];
     game.window_viewport(physical, 1.5).unwrap();
     let mut picture = snapshot(&mut game, 100);
-    for draw in &mut picture.frame.draws {
-        draw.effective_alpha *= 0.25;
-    }
-    for draw in &mut picture.overlay.as_mut().unwrap().draws {
-        draw.effective_alpha *= 0.25;
-    }
-    let faded_world = picture.frame.draws.clone();
-    let faded_hud = picture.overlay.as_ref().unwrap().draws.clone();
-    let menu = NativeLogin::new("Player")
-        .unwrap()
-        .prepare_host(physical, 1.5, true, None)
-        .unwrap();
+    let world = picture.frame.draws.clone();
+    let hud = picture.overlay.as_ref().unwrap().draws.clone();
+    let mut login = NativeLogin::new("Player").unwrap();
+    login
+        .state
+        .action(slither_client::start_page::MenuAction::Play, true);
+    login.state.step(0., false).unwrap();
+    login.state.begin_outgoing();
+    login.state.step(125., false).unwrap();
+    let menu = login.prepare_host(physical, 1.5, false, None).unwrap();
+    assert_eq!(login.state.view(false).world_alpha, 0.25);
     let page_asset = menu.backdrop.as_ref().unwrap().asset;
     menu.append_to(&mut picture).unwrap();
 
@@ -219,10 +218,17 @@ fn menu_backdrop_stays_below_the_fading_world_at_unequal_sizes() {
         (page.destination.width, page.destination.height),
         (1500., 845.)
     );
-    assert_eq!(picture.frame.draws[1..], faded_world);
+    assert_eq!(picture.frame.draws[1..], world);
     let overlay = picture.overlay.as_ref().unwrap();
-    assert_eq!(overlay.draws[..faded_hud.len()], faded_hud);
-    assert!(!overlay.draws.iter().any(|draw| draw.asset == page_asset));
+    assert_eq!(overlay.draws[1..=hud.len()], hud);
+    let cover = &overlay.draws[0];
+    assert_eq!(cover.asset, page_asset);
+    assert_eq!(cover.effective_alpha, 0.75);
+    assert_eq!((cover.destination.x, cover.destination.y), (0., 0.));
+    assert_eq!(
+        (cover.destination.width, cover.destination.height),
+        (2560., 1440.)
+    );
     assert_eq!(
         picture
             .resources
@@ -233,6 +239,37 @@ fn menu_backdrop_stays_below_the_fading_world_at_unequal_sizes() {
             .pixels,
         [22, 28, 34, 255]
     );
+    let resident = picture
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    picture.frame.validate(&resident).unwrap();
+    overlay.validate(&resident).unwrap();
+}
+
+#[test]
+fn webgpu_midpoint_cover_precedes_the_independently_faded_hud() {
+    let mut game = tape::playing();
+    game.bank.overlay_viewport = Some(([960, 540], 1.));
+    let mut picture = snapshot(&mut game, 100);
+    let world = picture.frame.draws.clone();
+    let overlay = picture.overlay.as_mut().unwrap();
+    for draw in &mut overlay.draws {
+        draw.effective_alpha = 0.5;
+    }
+    let hud = overlay.draws.clone();
+    assert!(!hud.is_empty());
+    slither_wgpu_slice::menu::MenuFrame::world_crossfade([960, 540], 1., 0.5)
+        .unwrap()
+        .append_to(&mut picture)
+        .unwrap();
+    assert_eq!(picture.frame.draws[1..], world);
+    assert_eq!(picture.frame.draws[0].effective_alpha, 1.);
+    let overlay = picture.overlay.as_ref().unwrap();
+    assert_eq!(overlay.draws[0].effective_alpha, 0.5);
+    assert_eq!(overlay.draws[1..], hud);
+    assert!(overlay.draws[1..].iter().all(|d| d.effective_alpha == 0.5));
     let resident = picture
         .resources
         .iter()

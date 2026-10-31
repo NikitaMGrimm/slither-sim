@@ -283,7 +283,7 @@ mod desktop {
             self.effects()?;
             // Do not return while a cancelled acquisition still owns its worker.
             if self.preparation.is_none() {
-                self.login.observe_session(self.game.phase());
+                self.login.observe_game(&self.game)?;
             }
             let active = !matches!(
                 self.game.phase(),
@@ -384,6 +384,10 @@ mod desktop {
             self.game
                 .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
             self.effects()?;
+            // A fresh official acquisition still refers to the previous session.
+            if self.preparation.is_none() {
+                self.login.observe_game(&self.game)?;
+            }
             let Some(p) = self.game.take_frame() else {
                 self.host.discard_acquired();
                 self.schedule.retry(Instant::now());
@@ -392,14 +396,6 @@ mod desktop {
             let view = self.login.state.view(admission);
             let composed = if view.visible || view.spinner_visible {
                 let mut picture = p.clone();
-                for draw in &mut picture.frame.draws {
-                    draw.effective_alpha *= view.world_alpha;
-                }
-                if let Some(overlay) = &mut picture.overlay {
-                    for draw in &mut overlay.draws {
-                        draw.effective_alpha *= view.world_alpha;
-                    }
-                }
                 self.login
                     .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
                     .append_to(&mut picture)?;
@@ -421,6 +417,8 @@ mod desktop {
             {
                 Ok(true) => {
                     self.game.presented(true)?;
+                    let effects = self.login.sync_return_focus(self.game.can_play());
+                    self.edit_effects(effects);
                     self.schedule.presented();
                     self.log_present();
                 }

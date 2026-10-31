@@ -326,6 +326,193 @@ fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
 mod endpoint_tape;
 
 #[test]
+fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
+    use endpoint_tape::{bundle, effects, pump};
+    use slither_client::{presentation::ScoreTables, start_page::MenuAction};
+    use slither_wgpu_slice::endpoint_login;
+    let mut game = endpoint_tape::playing();
+    game.window_viewport([1920, 1080], 2.).unwrap();
+    let mut login = NativeLogin::new("Again").unwrap();
+    login.step(0., true, false).unwrap();
+    login.activate(true);
+    login.step(16., true, false).unwrap();
+    pump(&mut game, 600.);
+    login.observe_game(&game).unwrap();
+    login.step(600., false, false).unwrap();
+    let own = game.client().score_view().own.unwrap();
+    // Received credit before v belongs to the final capture; the later R in
+    // the same envelope must not change the last-length line.
+    let expected = ScoreTables::new(game.client().score_view().table_max.unwrap())
+        .unwrap()
+        .score(own.logical_segments + 3, own.fractional_mass)
+        .unwrap();
+    game.receive(
+        game.generation(),
+        &bundle(&[vec![b'R', 3], vec![b'v', 0], vec![b'R', 7]]),
+        700.,
+    )
+    .unwrap();
+    login.observe_game(&game).unwrap();
+    let captured = login.state.view(false).last_life;
+    assert_eq!(captured.number, format!("{expected:.0}"));
+    assert!(!login.state.view(false).visible);
+    game.receive(game.generation(), &bundle(&[vec![b'p']]), 2300.)
+        .unwrap();
+    pump(&mut game, 2300.);
+    login.observe_game(&game).unwrap();
+    assert_eq!(login.state.view(true).phase, MenuPhase::DeathHold);
+    for _ in 0..2 {
+        login.state.action(MenuAction::Play, true);
+    }
+    game.begin_frame(2301., [960, 540], 1.).unwrap();
+    effects(&mut game);
+    login.observe_game(&game).unwrap();
+    let midpoint = login.state.view(true);
+    assert!((midpoint.transition - 0.9995).abs() < 1e-10);
+    assert!(midpoint.disabled);
+    // An unacknowledged picture retries without advancing return or focus.
+    let picture = game.take_frame().unwrap();
+    let identity = picture.frame.identity;
+    let mut composed = picture.clone();
+    let menu = login.prepare_host([1920, 1080], 2., false, None).unwrap();
+    let menu_draws = menu.frame.draws.clone();
+    menu.append_to(&mut composed).unwrap();
+    let overlay = composed.overlay.as_ref().unwrap();
+    assert_eq!(overlay.extent, [1920, 1080]);
+    assert_eq!(overlay.viewport_scale, 2.);
+    assert!(overlay.draws.ends_with(&menu_draws));
+    let world_draws = composed.frame.draws.len();
+    assert_eq!(
+        world_draws,
+        picture.frame.draws.len() + 1,
+        "only the backdrop enters the world"
+    );
+    game.retry_frame(picture).unwrap();
+    game.begin_frame(2310., [960, 540], 1.).unwrap();
+    login.observe_game(&game).unwrap();
+    assert_eq!(login.state.view(true), midpoint);
+    assert_eq!(game.take_frame().unwrap().frame.identity, identity);
+    game.presented(true).unwrap();
+    let mut focus = 0;
+    let mut completion_retried = false;
+    for frame in 1..=130 {
+        let now = 2301. + f64::from(frame) * 16.;
+        if game.login_session().outcome.is_some() && game.login_session().death_pending {
+            game.receive(game.generation(), &bundle(&[vec![b'p']]), now)
+                .unwrap();
+        }
+        game.begin_frame(now, [960, 540], 1.).unwrap();
+        effects(&mut game);
+        login.observe_game(&game).unwrap();
+        if !game.login_session().death_pending && !completion_retried {
+            assert!(!game.can_play());
+            let picture = game.take_frame().unwrap();
+            let identity = picture.frame.identity;
+            game.retry_frame(picture).unwrap();
+            assert!(
+                !login
+                    .step(now, false, false)
+                    .unwrap()
+                    .0
+                    .contains(&StartMenuIntent::FocusNickname)
+            );
+            game.begin_frame(now + 1., [960, 540], 1.).unwrap();
+            login.observe_game(&game).unwrap();
+            assert!(
+                !login
+                    .step(now + 1., false, false)
+                    .unwrap()
+                    .0
+                    .contains(&StartMenuIntent::FocusNickname)
+            );
+            assert_eq!(game.take_frame().unwrap().frame.identity, identity);
+            game.presented(true).unwrap();
+            login.sync_return_focus(game.can_play());
+            assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
+            completion_retried = true;
+            focus += 1;
+        } else {
+            while game.take_frame().is_some() {
+                game.presented(true).unwrap();
+            }
+            let (intents, _) = login.step(now, game.can_play(), false).unwrap();
+            focus += intents
+                .iter()
+                .filter(|i| **i == StartMenuIntent::FocusNickname)
+                .count();
+        }
+    }
+    assert!(completion_retried);
+    assert_eq!(focus, 1);
+    assert!(game.can_play());
+    assert_eq!(login.state.view(true).last_life, captured);
+    let generation = game.generation();
+    login.activate(true);
+    login.activate(true);
+    let (intents, _) = login.step(4500., true, false).unwrap();
+    assert!(matches!(intents.as_slice(), [StartMenuIntent::Play { .. }]));
+    // A failed fresh official acquisition has not replaced the old session.
+    game.fail("Synthetic replay acquisition failure");
+    login.observe_game(&game).unwrap();
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    assert!(!login.state.view(true).spinner_visible);
+    assert_eq!(login.state.view(true).last_life, captured);
+    login.activate(true);
+    assert!(matches!(
+        login.step(4516., true, false).unwrap().0.as_slice(),
+        [StartMenuIntent::Play { .. }]
+    ));
+    endpoint_login::play(&mut game, "ws://127.0.0.1:19491/slither", "Again", 0).unwrap();
+    assert_eq!(game.generation(), generation + 1);
+    assert_eq!(game.login_session().outcome, None);
+    assert_eq!(login.state.view(false).last_life, captured);
+}
+
+#[test]
+fn champion_is_only_accepted_v1_and_survives_close_without_ordinary_focus() {
+    use endpoint_tape::{bundle, effects, pump};
+    for flag in [None, Some(0), Some(1), Some(2)] {
+        let mut game = endpoint_tape::playing();
+        let mut login = NativeLogin::new("Player").unwrap();
+        login.step(0., true, false).unwrap();
+        login.activate(true);
+        login.step(16., true, false).unwrap();
+        pump(&mut game, 600.);
+        login.observe_game(&game).unwrap();
+        let mut first = endpoint_tape::board();
+        first[2..4].copy_from_slice(&1u16.to_be_bytes());
+        game.receive(game.generation(), &bundle(&[first]), 650.)
+            .unwrap();
+        if let Some(flag) = flag {
+            game.receive(game.generation(), &bundle(&[vec![b'v', flag]]), 700.)
+                .unwrap();
+        }
+        // Observe only after close: accepted outcome must survive the terminal
+        // phase, while close-only and flag 2 have no score/champion authority.
+        game.closed(game.generation());
+        effects(&mut game);
+        login.observe_game(&game).unwrap();
+        for frame in 0..=240 {
+            let now = 700. + f64::from(frame) * 16.;
+            pump(&mut game, now);
+            login.observe_game(&game).unwrap();
+            let (intents, _) = login.step(now, game.can_play(), false).unwrap();
+            if flag == Some(1) {
+                assert!(!intents.contains(&StartMenuIntent::FocusNickname));
+            }
+        }
+        let view = login.state.view(true);
+        assert_eq!(view.champion_pending, flag == Some(1));
+        assert_eq!(view.ordinary_controls_visible, flag != Some(1));
+        assert_eq!(
+            view.last_life.label.is_empty(),
+            !matches!(flag, Some(0 | 1))
+        );
+        assert_eq!(view.disabled, flag == Some(1));
+    }
+}
+
+#[test]
 fn native_login_endpoint_enter_pointer_and_terminal_retry_send_fixed_profile() {
     use endpoint_tape::{bundle, challenge, effects, pump};
     use slither_wgpu_slice::{endpoint_login, game::LocalGame};

@@ -3,7 +3,8 @@
 mod menu;
 mod wording;
 pub use menu::{
-    LastLifeView, MenuAction, MenuPhase, StartMenuIntent, StartMenuState, StartMenuView,
+    LastLifeView, MenuAction, MenuPhase, MenuSession, StartMenuIntent, StartMenuState,
+    StartMenuView,
 };
 pub use wording::{MenuLocale, MenuWording, normalize_nickname, normalize_nickname_units};
 

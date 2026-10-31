@@ -59,6 +59,7 @@ function stageControls(commands, receivedMs, initial, hudSchema) {
         if (next.playing && !next.closeRequested) {
           if (command[1] === 1) next.phase = 'victory';
           else { next.closeRequested = true; next.phase = 'dead'; }
+          next.outcome ??= next.phase;
         }
       }
     }
@@ -139,6 +140,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
   let connected = false;
   let playing = false;
   let lifeEnded = false;
+  let outcome = null;
   let lagging = false;
   let pingPending = false;
   let lastPingMs = 0;
@@ -167,7 +169,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
   const outsideIngress = () => { if (busy || notifying) throw new Error('Session reentry'); };
   const time = () => finite(now(), 'clock');
   function snapshot() {
-    return freeze({ phase, connected, playing, lifeEnded, lagging, pingPending,
+    return freeze({ phase, connected, playing, lifeEnded, outcome, deathPending: deathMs !== null, returnActive: uiPhase === 'out', lagging, pingPending,
       lastPingMs, closeRequested, returnFraction, uiTimerNeeded: uiPhase === 'in',
       reason, constructorAttempts });
   }
@@ -243,7 +245,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     const receivedMs = time();
     const { next, plan } = stageControls(commands, receivedMs, {
       phase, connected, playing, lifeEnded, lagging, pingPending, closeRequested, deathMs,
-      previousUiMs, uiPhase, actions, actionRevision,
+      previousUiMs, uiPhase, actions, actionRevision, outcome,
     }, hudSchema);
     const packetGeneration = generation;
     const applied = hudSchema ? sink.packet(bytes, false, plan) : sink.packet(bytes, false);
@@ -259,7 +261,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     // Reflection can run Proxy traps too; terminal state must win even then.
     if (terminal() || generation !== packetGeneration) throw new Error('Session stopped during packet');
     ({ phase, connected, playing, lifeEnded, lagging, pingPending, closeRequested, deathMs,
-      previousUiMs, uiPhase, actions, actionRevision } = next);
+      previousUiMs, uiPhase, actions, actionRevision, outcome } = next);
     if (hudSchema) {
       notifying = true;
       try {

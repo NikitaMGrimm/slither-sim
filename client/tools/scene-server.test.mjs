@@ -38,7 +38,7 @@ test('scene server is local, allowlisted and requires no reference or socket', a
   for (const resource of ['/game/bootstrap.mjs', '/game/runtime.mjs', '/game/host.css', '/assets/logo.svg',
     '/game/start-page-layout.mjs', '/game/appearance-preview.mjs', '/game/local-game-host.mjs',
     '/game/client-asset-map.mjs', '/game/stock-accessory-selection.mjs', '/game/owned-minimap-ui.mjs',
-    '/game/owned-end-screen-ui.mjs', '/game/owned-announcement-ui.mjs', '/game/stock-gameplay.mjs',
+    '/game/owned-announcement-ui.mjs', '/game/stock-gameplay.mjs',
     '/game/stock-leaderboard-state.mjs', '/apps/wgpu-slice/web/input-targeting.mjs']) {
     assert.equal((await request(resource)).status, 200);
   }
