@@ -323,6 +323,7 @@ impl SnakeReports {
     }
 
     /// Note a recipient's view of this snake after its packets this tick.
+    #[cfg(test)]
     pub(super) fn observe(&mut self, known: &KnownSnake) {
         self.motion_stale |= [known.heading, known.wanted, known.speed] != self.motion;
         self.fam_stale |= known.fam != self.fam;

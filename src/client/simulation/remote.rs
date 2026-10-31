@@ -124,13 +124,13 @@ impl RawSimulator {
             Err(reason) if reason == crate::spawn::WAITING => return Ok(false),
             Err(reason) => return Err(reason),
         };
-        b.slots[slot].living = None;
+        b.seats[slot].living = None;
         b.world.retire(slot).map_err(|error| error.to_string())?;
         b.world
             .respawn_body(slot, body, heading)
             .map_err(|error| error.to_string())?;
         b.profiles[slot] = appearance;
-        let s = &mut b.slots[slot];
+        let s = &mut b.seats[slot];
         s.life += 1;
         s.control = Action {
             heading,
@@ -254,7 +254,7 @@ impl RawSimulator {
     pub(crate) fn disconnect(&mut self, slot: usize) -> Result<(), String> {
         self.remote(slot)?;
         let b = &mut self.backend;
-        b.slots[slot].living = None;
+        b.seats[slot].living = None;
         b.world.retire(slot).map_err(|error| error.to_string())?;
         b.slots[slot].connection = Connection::default();
         Ok(())

@@ -19,7 +19,7 @@ impl RawWorld {
             .sync(&raw.backend.world.food_in_birth_order())?;
         for slot in 0..count {
             if raw.backend.world.snakes()[slot].alive {
-                raw.backend.slots[slot].control = Action {
+                raw.backend.seats[slot].control = Action {
                     heading: raw.backend.world.snakes()[slot].heading,
                     boost: false,
                 };
@@ -42,7 +42,7 @@ impl RawWorld {
         {
             return Err("Invalid raw fixture controls".into());
         }
-        for (slot, action) in self.0.backend.slots.iter_mut().zip(actions) {
+        for (slot, action) in self.0.backend.seats.iter_mut().zip(actions) {
             if let Some(action) = action {
                 slot.control = *action;
             }
@@ -52,6 +52,11 @@ impl RawWorld {
 
     pub fn tick(&mut self) -> Result<(), String> {
         self.0.advance_tick_with(0, &mut |_| Ok(()))
+    }
+
+    /// Repeat presentation of the stopped world for allocation diagnostics.
+    pub fn broadcast(&mut self) -> Result<(), String> {
+        self.0.backend.broadcast_with(0, &mut |_| Ok(()), true)
     }
 
     pub fn search(&mut self, seed: u64) -> Result<(Vec<Point>, f64), String> {

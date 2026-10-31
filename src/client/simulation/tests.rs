@@ -100,7 +100,7 @@ fn population_sized_backends_hold_across_death_and_respawn() {
                 2,
             )
             .unwrap();
-        backend.slots[0].control = Action::default();
+        backend.seats[0].control = Action::default();
         backend.advance_ticks(1).unwrap();
         assert!(!backend.world.snakes()[0].alive);
         assert_eq!(backend.world.radius(), radius);
@@ -227,7 +227,7 @@ fn hosted_disconnects_shrink_the_arena_but_bot_deaths_and_respawns_do_not() {
         .world
         .correct_pose(2, rim, vec![rim; 2], 0.)
         .unwrap();
-    host.backend.slots[2].control = Action::default();
+    host.backend.seats[2].control = Action::default();
     host.advance_ticks(1).unwrap();
     assert!(!host.backend.world.snakes()[2].alive);
     assert_eq!(host.backend.world.occupied(), 4);
@@ -313,7 +313,7 @@ fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_picku
             .world
             .respawn(slot, Point { x: 0., y }, 0., 2)
             .unwrap();
-        sim.backend.slots[slot].control = Action::default();
+        sim.backend.seats[slot].control = Action::default();
     }
     // All prey remain in range and far from either mouth. Only the reduced
     // population target removes them; the sample isolates shrink from navigation.
@@ -375,7 +375,7 @@ fn shrinking_food_and_surplus_prey_leave_both_decoded_client_views_without_picku
     }
     let removed: Vec<_> = sim.backend.world.prey()[2..]
         .iter()
-        .map(|p| sim.backend.prey_wire[&p.id])
+        .map(|p| sim.backend.presenter.prey_wire[&p.id])
         .collect();
     a.packets.clear();
     b.packets.clear();
@@ -446,7 +446,7 @@ fn shrinking_food_cull(pit_only: bool) {
             .world
             .respawn(slot, Point { x: 0., y }, 0., 2)
             .unwrap();
-        sim.backend.slots[slot].control = Action::default();
+        sim.backend.seats[slot].control = Action::default();
     }
     let pellet = |x, y, origin| Food {
         x,
@@ -894,11 +894,11 @@ fn failed_ring_admission_preserves_the_existing_life() {
     // Failed admission must preserve the existing life.
     crate::client::fixtures::set_live_radius(&mut backend.world, 100.0);
     let before = format!("{:?}", backend.world);
-    let life = backend.slots[0].life;
+    let life = backend.seats[0].life;
     let connections = backend.connections;
     assert_eq!(backend.reconnect_slot(0).unwrap_err(), spawn::WAITING);
     assert_eq!(format!("{:?}", backend.world), before);
-    assert_eq!(backend.slots[0].life, life);
+    assert_eq!(backend.seats[0].life, life);
     assert_eq!(backend.connections, connections);
     backend.world.retire(0).unwrap();
     assert!(backend.spawn_pose(0).is_err());
@@ -940,14 +940,14 @@ fn a_full_arena_refuses_a_join_inside_contact_range() {
         .correct_pose(1, neighbor.head, neighbor.body.clone(), neighbor.heading)
         .unwrap();
     let neighbor = backend.world.snakes()[1].clone();
-    let life = backend.slots[0].life;
+    let life = backend.seats[0].life;
 
     assert_eq!(
         backend.reconnect_slot(0).unwrap_err(),
         "Spawn candidate search exhausted: no sampled position is clear of other snakes"
     );
     assert_eq!(backend.world.snakes()[1], neighbor);
-    assert_eq!(backend.slots[0].life, life);
+    assert_eq!(backend.seats[0].life, life);
 }
 
 /// Diff against freshly allocated listings, as after a changed broadcast.
@@ -1126,13 +1126,13 @@ fn presentation_telemetry_preserves_physics_and_source_colors() {
     });
     let mut births = 0;
     for _ in 0..160 {
-        sim.backend.slots[0].control.boost = true;
+        sim.backend.seats[0].control.boost = true;
         let actions: Vec<_> = sim
             .backend
             .world
             .snakes()
             .iter()
-            .zip(&sim.backend.slots)
+            .zip(&sim.backend.seats)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
         reference.step(&actions).unwrap();
@@ -1372,7 +1372,7 @@ fn hosted_and_native_snakes_use_finite_whole_body_coverage() {
             .world
             .respawn(slot, Point { x, y: 0. }, 0., 2)
             .unwrap();
-        sim.backend.slots[slot].control.heading = 0.;
+        sim.backend.seats[slot].control.heading = 0.;
     }
     run(&mut sim, &mut [(0, &mut remote)], 12);
     assert!(sim.backend.slots[0].connection.snakes.contains_key(1));
@@ -1539,7 +1539,7 @@ fn minimaps_follow_the_server_clock_and_reset_after_death_and_reconnect() {
         .world
         .respawn(0, Point::default(), 0., 2)
         .unwrap();
-    sim.backend.slots[0].control = Action {
+    sim.backend.seats[0].control = Action {
         heading: 0.,
         boost: false,
     };
@@ -1690,7 +1690,7 @@ fn retained_food_keeps_updating_after_leaving_the_entry_region() {
         .world
         .respawn(0, Point::default(), 0., 2)
         .unwrap();
-    sim.backend.slots[0].control = Action {
+    sim.backend.seats[0].control = Action {
         heading: 0.,
         boost: false,
     };
@@ -1754,7 +1754,7 @@ fn unchanged_prey_positions_still_correct_client_prediction() {
         .world
         .respawn(0, Point::default(), PI, 2)
         .unwrap();
-    sim.backend.slots[0].control.heading = PI;
+    sim.backend.seats[0].control.heading = PI;
     run(&mut sim, &mut [(0, &mut remote)], 7);
     let position = Point { x: 700., y: 700. };
     sim.backend
@@ -2156,7 +2156,7 @@ fn boosting_within_the_window_never_resends_the_body() {
             .world
             .respawn(slot, Point { x: -1500., y }, 0., segments)
             .unwrap();
-        sim.backend.slots[slot].control = Action {
+        sim.backend.seats[slot].control = Action {
             heading: 0.,
             boost: slot == 1,
         };
@@ -2326,14 +2326,14 @@ fn raw_controls_travel_the_uplink_and_reject_without_mutation() {
     ] {
         sim.receive(0, &[message]).unwrap();
         sim.advance_ticks(1).unwrap();
-        let control = sim.backend.slots[0].control;
+        let control = sim.backend.seats[0].control;
         assert_eq!(control.heading, heading * TAU / 251.);
         assert_eq!(control.boost, boost);
     }
     sim.receive(0, &[251]).unwrap();
     sim.advance_ticks(1).unwrap();
     assert!(remote.pump(&mut sim, 0).contains(&encode::pong()));
-    let control = sim.backend.slots[0].control;
+    let control = sim.backend.seats[0].control;
     for message in [&[252][..], &[255], &[], &[1, 2], &[252, 1, 2]] {
         let error = sim.receive(0, message).unwrap_err();
         assert_eq!(error, "Unsupported client message");
@@ -2341,7 +2341,7 @@ fn raw_controls_travel_the_uplink_and_reject_without_mutation() {
     }
     assert!(sim.receive(1, &[1]).is_err());
     sim.advance_ticks(1).unwrap();
-    assert_eq!(sim.backend.slots[0].control, control);
+    assert_eq!(sim.backend.seats[0].control, control);
 
     // The steered snake reports the requested heading to its own decoder.
     sim.receive(0, &[100]).unwrap();
@@ -2359,13 +2359,13 @@ fn keyboard_turns_move_the_wanted_heading_both_ways() {
     run(&mut sim, &mut [(0, &mut remote)], 7);
     sim.receive(0, &[0]).unwrap();
     sim.advance_ticks(1).unwrap();
-    let start = sim.backend.slots[0].control.heading;
+    let start = sim.backend.seats[0].control.heading;
     let step = 0.033 * physics::scang(sim.backend.world.snakes()[0].segments);
     for (amount, turns) in [(0, 0.), (128, 0.), (10, -10.), (138, 10.), (255, 127.)] {
-        let before = sim.backend.slots[0].control;
+        let before = sim.backend.seats[0].control;
         sim.receive(0, &[252, amount]).unwrap();
         sim.advance_ticks(1).unwrap();
-        let after = sim.backend.slots[0].control;
+        let after = sim.backend.seats[0].control;
         assert!(angle_close(
             after.heading,
             before.heading + turns * step,
@@ -2374,7 +2374,7 @@ fn keyboard_turns_move_the_wanted_heading_both_ways() {
         assert!((0. ..TAU).contains(&after.heading) && !after.boost);
     }
     assert!(angle_close(
-        sim.backend.slots[0].control.heading,
+        sim.backend.seats[0].control.heading,
         start + 127. * step,
         1e-12
     ));
@@ -2382,7 +2382,7 @@ fn keyboard_turns_move_the_wanted_heading_both_ways() {
     sim.receive(0, &[252, 127]).unwrap();
     sim.receive(0, &[252, 127]).unwrap();
     sim.advance_ticks(1).unwrap();
-    let heading = sim.backend.slots[0].control.heading;
+    let heading = sim.backend.seats[0].control.heading;
     assert!(angle_close(heading, start - 127. * step, 1e-12));
     assert!((0. ..TAU).contains(&heading));
 }
@@ -2475,7 +2475,7 @@ fn input_arriving_during_a_tick_shapes_that_ticks_frame() {
     sim.receive_at(0, &[251], sent).unwrap();
     sim.receive_at(0, &[253], sent).unwrap();
     sim.advance_ticks(1).unwrap();
-    assert!(sim.backend.slots[0].control.boost);
+    assert!(sim.backend.seats[0].control.boost);
     let packets = remote.pump(&mut sim, 0);
     assert_eq!(packets[0], encode::pong());
     assert_eq!(packets.iter().filter(|p| **p == encode::pong()).count(), 1);
@@ -2678,7 +2678,7 @@ fn responsive_inputs_reach_self_and_opponents_in_the_next_tick() {
                 .world
                 .respawn(slot, Point { x: 0., y: x }, 0., 30)
                 .unwrap();
-            sim.backend.slots[slot].control.heading = 0.;
+            sim.backend.seats[slot].control.heading = 0.;
         }
         run(&mut sim, &mut [(0, &mut viewer), (1, &mut mover)], 60);
         assert!(sim.backend.world.snakes().iter().all(|snake| snake.alive));
@@ -2773,7 +2773,7 @@ fn motion_reports_share_one_gate_per_snake_and_lead_its_anchors() {
     let mut steer = |sim: &mut RawSimulator, turn: f64, ticks: usize| {
         let mut seen = [Vec::new(), Vec::new()];
         for _ in 0..ticks {
-            sim.backend.slots[2].control.heading += turn;
+            sim.backend.seats[2].control.heading += turn;
             sim.advance_ticks(1).unwrap();
             seen[0].push(a.pump(sim, 0));
             seen[1].push(b.pump(sim, 1));
@@ -2868,9 +2868,9 @@ fn ordinary_food_waits_for_maintenance_while_snake_food_is_prompt() {
     ] {
         sim.backend.world.retire(slot).unwrap();
         sim.backend.world.respawn(slot, head, 0., segments).unwrap();
-        sim.backend.slots[slot].control.heading = 0.;
+        sim.backend.seats[slot].control.heading = 0.;
     }
-    sim.backend.slots[1].control = Action {
+    sim.backend.seats[1].control = Action {
         heading: 0.,
         boost: true,
     };
@@ -2940,7 +2940,7 @@ fn post_death_opponents_keep_the_live_broadcast_cadence() {
         for _ in 0..120 {
             // Synthetic steering keeps the opponent's wanted angle changing
             // on every broadcast, so packet gaps expose a stopped stream.
-            sim.backend.slots[1].control.heading += 0.02;
+            sim.backend.seats[1].control.heading += 0.02;
             sim.advance_ticks(1).unwrap();
             b.pump(&mut sim, 1);
             for packet in a.pump(&mut sim, 0) {
@@ -3017,7 +3017,7 @@ fn sole_dead_session_still_receives_food_and_prey() {
             mode: crate::PreyMode::Roaming,
         })
         .unwrap();
-    sim.backend.next_minimap = 0;
+    sim.backend.presenter.next_minimap = 0;
     sim.backend.broadcast().unwrap();
     let packets = a.pump(&mut sim, 0);
     assert!(
@@ -3071,7 +3071,7 @@ fn remote_death_sends_mass_game_over_then_removal_and_stays_dead() {
     assert!(seen.iter().all(|p| p[0] != b'm'));
     // A dead session must still answer pings during the stock client's
     // death fade, without accepting controls or reviving the snake.
-    let control = sim.backend.slots[0].control;
+    let control = sim.backend.seats[0].control;
     for bytes in [&[0][..], &[252, 100], &[253], &[251]] {
         sim.receive(0, bytes).unwrap();
     }
@@ -3104,7 +3104,7 @@ fn remote_death_sends_mass_game_over_then_removal_and_stays_dead() {
     }
     assert!(boards > 0);
     assert_eq!(pongs, 1);
-    assert_eq!(sim.backend.slots[0].control, control);
+    assert_eq!(sim.backend.seats[0].control, control);
     assert!(!sim.backend.world.snakes()[0].alive);
 }
 
@@ -3182,7 +3182,7 @@ fn leaderboard_ranks_living_snakes_with_slot_ties() {
 
     // Each connection's packet shares the rows, with its own position.
     zero.pump(&mut sim, 0);
-    sim.backend.next_leaderboard = 0;
+    sim.backend.presenter.next_leaderboard = 0;
     sim.advance_ticks(1).unwrap();
     let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
     let index = board.order.iter().position(|&(_, i)| i == 0).unwrap();
@@ -3270,7 +3270,7 @@ fn credit_and_hud_carry_the_represented_score() {
             },
         )
         .unwrap();
-    sim.backend.next_leaderboard = 0;
+    sim.backend.presenter.next_leaderboard = 0;
     sim.backend.broadcast().unwrap();
     let packets = remote.pump(&mut sim, 0);
     assert!(packets.contains(&encode::credit(5)));
@@ -3516,11 +3516,11 @@ fn disconnect_removes_the_snake_and_a_reused_slot_is_a_new_life() {
     // Replace a life before any broadcast: observers drop the stale one.
     Remote::connect(&mut sim, 0, "Old");
     run(&mut sim, &mut [(1, &mut b)], 6);
-    let life = sim.backend.slots[0].life;
+    let life = sim.backend.seats[0].life;
     sim.disconnect(0).unwrap();
     b.packets.clear();
     let mut c = Remote::connect(&mut sim, 0, "New");
-    assert_eq!(sim.backend.slots[0].life, life + 1);
+    assert_eq!(sim.backend.seats[0].life, life + 1);
     run(&mut sim, &mut [(0, &mut c), (1, &mut b)], 7);
     let removed = b
         .packets
@@ -3633,13 +3633,13 @@ fn recording_exhaustion_preserves_reconnect_state_and_allows_retry() {
                 (
                     (&s.state, &s.connection),
                     (
-                        s.life,
+                        backend.seats[0].life,
                         s.outbox,
                         s.processing_override,
                         s.previous_boost,
-                        s.control,
+                        backend.seats[0].control,
                         s.pinged_at,
-                        s.living,
+                        backend.seats[0].living,
                     ),
                     (&s.records, s.record_bytes),
                     (
@@ -3692,11 +3692,11 @@ fn recording_exhaustion_preserves_reconnect_state_and_allows_retry() {
         );
         assert_eq!(snapshot(&backend), before);
 
-        let life = backend.slots[0].life;
+        let life = backend.seats[0].life;
         let connections = backend.connections;
         let mut records = backend.drain_records(0).unwrap();
         backend.reconnect_slot(0).unwrap();
-        assert_eq!(backend.slots[0].life, life + 1);
+        assert_eq!(backend.seats[0].life, life + 1);
         assert_eq!(backend.connections, connections + 1);
         while backend.frame().unwrap().status != ClientStatus::Playing {
             backend.advance_ticks(1).unwrap();
@@ -3734,7 +3734,7 @@ fn reconnect_rechecks_record_room_after_queued_delivery() {
     s.record_bytes = MAX_RECORD_BYTES - 2 * RECORD_OVERHEAD;
     let mut connection = s.connection.clone();
     connection.downlink.pop_front();
-    let life = s.life;
+    let life = backend.seats[0].life;
     let connections = backend.connections;
     let world = serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap();
     let random = format!("{:?}", (&backend.random, &backend.spawn_random));
@@ -3745,7 +3745,7 @@ fn reconnect_rechecks_record_room_after_queued_delivery() {
         "Wire record buffer is full; drain records first"
     );
     assert_eq!(backend.frame().unwrap().status, ClientStatus::Playing);
-    assert_eq!(backend.slots[0].life, life);
+    assert_eq!(backend.seats[0].life, life);
     assert_eq!(backend.connections, connections);
     assert_eq!(
         serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap(),
@@ -3789,7 +3789,7 @@ fn rejected_departure_leaves_every_side_unchanged() {
     // Room for the heading record alone, not heading plus boost.
     backend.slots[0].record_bytes = MAX_RECORD_BYTES - 2 * RECORD_OVERHEAD - 1;
     let uplink = backend.slots[0].connection.uplink.len();
-    let control = backend.slots[0].control;
+    let control = backend.seats[0].control;
     let action = Action {
         heading: 1.,
         boost: true,
@@ -3799,7 +3799,7 @@ fn rejected_departure_leaves_every_side_unchanged() {
     assert!(s.outbox.is_some_and(|(_, queued, _)| queued == action));
     assert_eq!(s.previous_boost, None);
     assert_eq!(s.connection.uplink.len(), uplink);
-    assert_eq!(s.control, control);
+    assert_eq!(backend.seats[0].control, control);
     assert!(s.records.as_ref().unwrap().is_empty());
     assert!(backend.frame().unwrap().timing.sent_commands.is_empty());
     assert!(backend.decision_pending(0).unwrap());
@@ -3839,7 +3839,7 @@ fn rejected_departure_clock_check_leaves_every_side_unchanged() {
     // Reproduce the future client clock left by a partial pre-tick failure.
     s.state.record_sent(&[253], at + 0.001).unwrap();
     s.previous_boost = Some(true);
-    s.control.boost = true;
+    backend.seats[0].control.boost = true;
     s.outbox = Some((
         at,
         Action {
@@ -3857,7 +3857,7 @@ fn rejected_departure_clock_check_leaves_every_side_unchanged() {
                 &s.connection,
                 s.outbox,
                 s.previous_boost,
-                s.control,
+                backend.seats[0].control,
                 &s.records,
                 s.record_bytes,
                 &backend.random,
@@ -3902,7 +3902,7 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
                 sim.send_to(
                     slot,
                     Action {
-                        heading: sim.slots[slot].control.heading,
+                        heading: sim.seats[slot].control.heading,
                         boost: true,
                     },
                 )
@@ -3950,7 +3950,7 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
                                     &s.connection,
                                     s.outbox,
                                     s.previous_boost,
-                                    s.control,
+                                    sim.seats[slot].control,
                                     &s.records,
                                     s.record_bytes,
                                 )
@@ -3988,19 +3988,19 @@ fn native_capacity_failure_keeps_all_slots_retryable() {
             sim.advance_ticks(1).unwrap();
             for slot in 0..2 {
                 assert!(!sim.decision_pending(slot).unwrap());
-                assert!(sim.slots[slot].control.boost);
+                assert!(sim.seats[slot].control.boost);
             }
             sim.set_slot_processing_seconds(0, 0.).unwrap();
             sim.send_to(
                 0,
                 Action {
-                    heading: sim.slots[0].control.heading,
+                    heading: sim.seats[0].control.heading,
                     boost: false,
                 },
             )
             .unwrap();
             sim.advance_ticks(1).unwrap();
-            assert!(!sim.slots[0].control.boost);
+            assert!(!sim.seats[0].control.boost);
             assert_eq!(sim.slots[0].previous_boost, Some(false));
         }
         // Recovery preserves bytes, receipt/departure times and future RNG draws.
@@ -4038,7 +4038,7 @@ fn pending_native_commands_apply_in_their_arrival_tick() {
         while backend.frame().unwrap().status != ClientStatus::Playing {
             backend.advance_ticks(1).unwrap();
         }
-        let before = backend.slots[0].control.heading;
+        let before = backend.seats[0].control.heading;
         let action = Action {
             heading: (before + 1.).rem_euclid(TAU),
             boost: true,
@@ -4048,13 +4048,13 @@ fn pending_native_commands_apply_in_their_arrival_tick() {
         backend.advance_ticks(1).unwrap();
         let arrived = processing + uplink <= backend.world.config().dt;
         assert_eq!(
-            backend.slots[0].control.boost, arrived,
+            backend.seats[0].control.boost, arrived,
             "processing {processing}, uplink {uplink}"
         );
-        assert_eq!(backend.slots[0].control.heading != before, arrived);
+        assert_eq!(backend.seats[0].control.heading != before, arrived);
         if !arrived {
             backend.advance_ticks(1).unwrap();
-            assert!(backend.slots[0].control.boost);
+            assert!(backend.seats[0].control.boost);
         }
         let records = backend.drain_records(0).unwrap();
         assert!(records.windows(2).all(|w| w[0].time <= w[1].time));
@@ -4100,10 +4100,10 @@ fn pending_departure_keeps_earlier_receipts_before_measured_processing() {
             },
         )
         .unwrap();
-    let life = backend.slots[0].life;
+    let life = backend.seats[0].life;
     backend.advance_ticks(1).unwrap();
-    assert!(backend.slots[0].control.boost);
-    assert_eq!(backend.slots[0].life, life);
+    assert!(backend.seats[0].control.boost);
+    assert_eq!(backend.seats[0].life, life);
     assert!(backend.slots[0].outbox.is_none());
     let records = backend.drain_records(0).unwrap();
     assert!(records.windows(2).all(|w| w[0].time <= w[1].time));
@@ -4182,7 +4182,7 @@ fn variable_ticks_deliver_growth_boost_anchors_and_peer_turns() {
                 .world
                 .correct_pose(slot, body[0], body, 0.)
                 .unwrap();
-            sim.backend.slots[slot].control.heading = 0.;
+            sim.backend.seats[slot].control.heading = 0.;
         }
         sim.backend
             .world

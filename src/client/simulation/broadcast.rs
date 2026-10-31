@@ -3,15 +3,68 @@
 #[doc(hidden)]
 pub mod perf;
 use super::{
-    EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, SimulatorBackend,
+    EarlyFrames, MAX_PREY, NATIVE_PROFILE, PlayerAppearance, Seat, SimulatorBackend,
+    connection::Connection,
     connection::KnownPrey,
+    food::SectorFood,
     food::{FoodChanges, food_identity, food_updates},
     minimap::MinimapBroadcast,
     prey_visibility::PreyBounds,
+    snakes::{BodyBounds, SnakeReports},
     snakes::{CoverageGrid, KnownSnake, SnakeBroadcast, covered, full},
 };
 use crate::{Simulator, client::encode, model::Snake, physics, simulator::PickupItem};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
+
+/// Retained presentation history and geometry scratch; never authoritative input.
+pub(super) struct Presenter {
+    /// Wire ID of each living prey. Simulator IDs are 64-bit; see `assign_prey_wire`.
+    pub(super) prey_wire: BTreeMap<u64, u16>,
+    /// Next minimap and leaderboard periods; see `broadcast::clock_due`.
+    pub(super) next_minimap: u64,
+    pub(super) pit_projection: crate::client::minimap::PitProjectionCache,
+    /// Full U conversions live for one broadcast; recipients retain immutable
+    /// decoded baselines independently of the broadcast-local packet cache.
+    pub(super) legacy_maps: crate::client::encode13::FullMapCache,
+    pub(super) next_leaderboard: u64,
+    pub(super) prey_clocks: BTreeMap<u64, PreyClock>,
+    pub(super) observations: Vec<ReportObservation>,
+    /// Reused broad-phase cells; an interrupted broadcast may drop this scratch
+    /// and the next one rebuilds it without changing recipient state.
+    pub(super) coverage_grid: Option<CoverageGrid>,
+    pub(super) coverage_bounds: BodyBounds,
+}
+
+/// Borrowed, stopped-world inputs. No geometry, controls or connections are copied.
+struct BroadcastView<'a> {
+    world: &'a Simulator,
+    seats: &'a [Seat],
+    profiles: &'a [PlayerAppearance],
+    reports: &'a [SnakeReports],
+    record: Option<&'a Record>,
+    food_sectors: &'a [Option<Arc<SectorFood>>],
+    decorated_food_sectors: &'a [Option<Arc<SectorFood>>],
+    decorated: bool,
+    food_eaters: &'a BTreeMap<(u64, u64), u16>,
+    prey_eaters: &'a BTreeMap<u64, u16>,
+    minimap_side: usize,
+}
+
+/// Only next-broadcast feedback may change while report opportunities are borrowed.
+#[derive(Clone, Debug, Default)]
+pub(super) struct ReportObservation {
+    motion_stale: bool,
+    fam_stale: bool,
+}
+impl ReportObservation {
+    fn observe(&mut self, report: &SnakeReports, known: &KnownSnake) {
+        self.motion_stale |= [known.heading, known.wanted, known.speed] != report.motion;
+        self.fam_stale |= known.fam != report.fam;
+    }
+}
 
 /// Rows the stock leaderboard shows.
 pub(super) const LEADERBOARD_ROWS: usize = 10;
@@ -111,11 +164,25 @@ fn wire_score(snake: &Snake) -> f64 {
 }
 
 impl SimulatorBackend {
+    #[cfg(test)]
+    pub(super) fn reports_for_trace(&self) -> Vec<SnakeReports> {
+        self.reports
+            .iter()
+            .zip(&self.presenter.observations)
+            .map(|(report, observed)| {
+                let mut report = report.clone();
+                report.motion_stale |= observed.motion_stale;
+                report.fam_stale |= observed.fam_stale;
+                report
+            })
+            .collect()
+    }
+
     /// Text from the client whose dead life holds the record, accepted once.
     /// Anything else is ignored: this is a local session rule, not an official
     /// qualification check.
     pub(super) fn victory(&mut self, slot: usize, text: Vec<u8>, now: f64) -> Result<(), String> {
-        let life = self.slots[slot].life;
+        let life = self.seats[slot].life;
         let dead = !self.world.snakes()[slot].alive;
         if self.record.as_ref().is_some_and(|record| {
             record.slot == slot && record.life == life && dead && !record.message_set
@@ -139,7 +206,7 @@ impl SimulatorBackend {
         }
         for slot in 0..self.slots.len() {
             let snake = &self.world.snakes()[slot];
-            let s = &mut self.slots[slot];
+            let s = &mut self.seats[slot];
             if snake.alive {
                 s.living = Some(s.life);
                 continue;
@@ -222,7 +289,7 @@ impl SimulatorBackend {
             .world
             .snakes()
             .iter()
-            .zip(&self.slots)
+            .zip(&self.seats)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
         let radius = self.world.radius();
@@ -322,7 +389,7 @@ impl SimulatorBackend {
         hand_over: &mut EarlyFrames,
         advance_interest: bool,
     ) -> Result<(), String> {
-        self.legacy_maps.clear();
+        self.presenter.legacy_maps.clear();
         let now = self.time();
         // Ambient births reach the wire at the shared food maintenance, with
         // sector cleanup; see `FoodIndex`.
@@ -340,12 +407,12 @@ impl SimulatorBackend {
         self.update_reports()?;
         // HUD clocks run even without recipients, so a join meets their phase.
         let minimap_due = clock_due(
-            &mut self.next_minimap,
+            &mut self.presenter.next_minimap,
             now,
             self.config.minimap_interval_seconds,
         );
         let leaderboard_due = clock_due(
-            &mut self.next_leaderboard,
+            &mut self.presenter.next_leaderboard,
             now,
             self.config.leaderboard_interval_seconds,
         );
@@ -371,7 +438,7 @@ impl SimulatorBackend {
         self.assign_prey_wire()?;
         self.update_prey_clocks()?;
         let bounds = self.world.presentation_bounds();
-        let grid = if let Some(mut grid) = self.coverage_grid.take() {
+        let grid = if let Some(mut grid) = self.presenter.coverage_grid.take() {
             grid.update(self.world.snakes(), &bounds, self.world.config().vision);
             grid
         } else {
@@ -383,7 +450,7 @@ impl SimulatorBackend {
         // they are consumed by the next broadcast's update_reports.
         let mut snakes = SnakeBroadcast::new(
             self.world.snakes(),
-            std::mem::take(&mut self.coverage_bounds),
+            std::mem::take(&mut self.presenter.coverage_bounds),
         );
         let mut board = None;
         let mut map = None;
@@ -395,65 +462,33 @@ impl SimulatorBackend {
             if !connection.setup {
                 continue;
             }
-            let alive = self.world.snakes()[slot].alive;
-            let was_over = connection.over;
-            // The board is needed when a leaderboard is due or to freeze the
-            // rank at death.
-            if board.is_none() && (leaderboard_due || !alive && !connection.over) {
-                board = Some(Board::new(&self.world, &self.profiles)?);
-            }
-            if !alive && !was_over {
-                let snake = &self.world.snakes()[slot];
-                let score = if self.world.config().kill_score_seconds.is_some() {
-                    self.world.kill_score(slot).unwrap_or(0) as f64
-                } else {
-                    wire_score(snake)
-                };
-                let rank = board.as_ref().unwrap().rank(score, slot);
-                self.slots[slot].connection.final_rank = Some(rank);
-            }
-            // Official frames lead with pongs (81,830 of 81,843 pong frames),
-            // and put the map before gameplay updates.
-            let pongs = std::mem::take(&mut self.slots[slot].connection.pongs);
-            let mut prefix = if pongs == 0 {
-                Vec::new()
-            } else {
-                vec![encode::pong(); pongs]
+            let view = BroadcastView {
+                world: &self.world,
+                seats: &self.seats,
+                profiles: &self.profiles,
+                reports: &self.reports,
+                record: self.record.as_ref(),
+                food_sectors: &self.food_sectors,
+                decorated_food_sectors: &self.decorated_food_sectors,
+                decorated: self.pit_markers.is_some(),
+                food_eaters: &self.food_eaters,
+                prey_eaters: &self.prey_eaters,
+                minimap_side: self.config.minimap_side(),
             };
-            let (updates, presented_updates) = self.updates(
+            let (packets, presented) = self.presenter.prepare(
+                &view,
                 slot,
+                &mut self.slots[slot].connection,
                 &food_changes,
                 &bounds,
                 &grid,
                 &prey_bounds,
                 &mut snakes,
+                &mut board,
+                &mut map,
+                minimap_due,
+                leaderboard_due,
             )?;
-            if minimap_due && let Some(packet) = self.minimap(slot, &mut map)? {
-                prefix.push(packet);
-            }
-            // Most broadcasts have neither pongs nor a map. Keep updates' own
-            // allocation instead of moving every packet through another Vec.
-            let (mut packets, mut presented) = if prefix.is_empty() {
-                (updates, presented_updates)
-            } else {
-                let presented = presented_updates.map(|updates| {
-                    let mut presented = prefix.clone();
-                    presented.extend(updates);
-                    presented
-                });
-                prefix.extend(updates);
-                (prefix, presented)
-            };
-            // The stock client ignores a leaderboard after game over, so the
-            // death broadcast omits it; a record may follow.
-            let live_board = board
-                .as_ref()
-                .filter(|_| leaderboard_due && (alive || was_over));
-            let hud = self.hud(slot, live_board)?;
-            if let Some(presented) = &mut presented {
-                presented.extend(hud.iter().cloned());
-            }
-            packets.extend(hud);
             if let Some(presented) = presented {
                 self.emit_presented(slot, now, &presented, Some(&packets))?;
             } else if !packets.is_empty() {
@@ -463,11 +498,34 @@ impl SimulatorBackend {
         if early >= self.slots.len() {
             self.hand_over_early(early, hand_over)?;
         }
-        self.coverage_grid = Some(grid);
-        self.coverage_bounds = snakes.body_bounds;
+        self.presenter.coverage_grid = Some(grid);
+        self.presenter.coverage_bounds = snakes.body_bounds;
         self.food_eaters.clear();
         self.prey_eaters.clear();
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(super) fn minimap(
+        &mut self,
+        slot: usize,
+        map: &mut Option<MinimapBroadcast>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let view = BroadcastView {
+            world: &self.world,
+            seats: &self.seats,
+            profiles: &self.profiles,
+            reports: &self.reports,
+            record: self.record.as_ref(),
+            food_sectors: &self.food_sectors,
+            decorated_food_sectors: &self.decorated_food_sectors,
+            decorated: self.pit_markers.is_some(),
+            food_eaters: &self.food_eaters,
+            prey_eaters: &self.prey_eaters,
+            minimap_side: self.config.minimap_side(),
+        };
+        self.presenter
+            .minimap(&view, &mut self.slots[slot].connection, slot, map)
     }
 
     /// Give every living prey a 16-bit wire ID. Truncating 64-bit simulator IDs
@@ -480,13 +538,14 @@ impl SimulatorBackend {
     /// before its reuse. All 65,536 IDs can therefore be live.
     fn assign_prey_wire(&mut self) -> Result<(), String> {
         let live: BTreeSet<u64> = self.world.prey().iter().map(|prey| prey.id).collect();
-        self.prey_wire.retain(|id, _| live.contains(id));
+        self.presenter.prey_wire.retain(|id, _| live.contains(id));
         let mut taken: Option<BTreeSet<u16>> = None;
         for &id in &live {
-            if self.prey_wire.contains_key(&id) {
+            if self.presenter.prey_wire.contains_key(&id) {
                 continue;
             }
-            let taken = taken.get_or_insert_with(|| self.prey_wire.values().copied().collect());
+            let taken =
+                taken.get_or_insert_with(|| self.presenter.prey_wire.values().copied().collect());
             let wire = (0..=u16::MAX)
                 .map(|offset| (id as u16).wrapping_add(offset))
                 .find(|wire| !taken.contains(wire))
@@ -494,7 +553,7 @@ impl SimulatorBackend {
                     "Protocol-19 prey IDs are 16-bit: more than {MAX_PREY} prey are live"
                 ))?;
             taken.insert(wire);
-            self.prey_wire.insert(id, wire);
+            self.presenter.prey_wire.insert(id, wire);
         }
         Ok(())
     }
@@ -506,12 +565,15 @@ impl SimulatorBackend {
         let now = self.time() + self.wall_offset;
         for (slot, snake) in self.world.snakes().iter().enumerate() {
             let reports = &mut self.reports[slot];
+            let observed = std::mem::take(&mut self.presenter.observations[slot]);
+            reports.motion_stale |= observed.motion_stale;
+            reports.fam_stale |= observed.fam_stale;
             if !snake.alive {
                 reports.motion_due = false;
                 reports.fam_due = false;
                 continue;
             }
-            let wanted = physics::quantize_heading(self.slots[slot].control.heading);
+            let wanted = physics::quantize_heading(self.seats[slot].control.heading);
             let motion = [
                 encode::angle_byte(snake.heading),
                 encode::angle_byte(wanted),
@@ -520,7 +582,7 @@ impl SimulatorBackend {
             let fam = encode::fam_u24(snake.fam);
             if self.variable_dt {
                 reports.update_timed(
-                    self.slots[slot].life,
+                    self.seats[slot].life,
                     motion,
                     fam,
                     now,
@@ -529,7 +591,7 @@ impl SimulatorBackend {
                 continue;
             }
             reports.update(
-                self.slots[slot].life,
+                self.seats[slot].life,
                 motion,
                 fam,
                 self.tick,
@@ -550,15 +612,16 @@ impl SimulatorBackend {
         let mut clocks = BTreeMap::new();
         for prey in self.world.prey() {
             let speed = u32::from(encode::speed_u16(prey.speed)?);
-            let mut clock = self
-                .prey_clocks
-                .get(&prey.id)
-                .copied()
-                .unwrap_or(PreyClock {
-                    reported_at: now,
-                    speed,
-                    due: false,
-                });
+            let mut clock =
+                self.presenter
+                    .prey_clocks
+                    .get(&prey.id)
+                    .copied()
+                    .unwrap_or(PreyClock {
+                        reported_at: now,
+                        speed,
+                        due: false,
+                    });
             let pulse = clock.speed == 11000 || speed == 11000;
             let interval = if pulse { 0.210 } else { 1. / 3. };
             clock.due = now + 1e-9 >= clock.reported_at + interval;
@@ -568,36 +631,130 @@ impl SimulatorBackend {
             }
             clocks.insert(prey.id, clock);
         }
-        self.prey_clocks = clocks;
+        self.presenter.prey_clocks = clocks;
         Ok(())
     }
+}
 
+impl Presenter {
+    // Preparation mutates only this recipient and presenter history. Emission
+    // immediately follows it in slot order; a failed preparation keeps the same
+    // partial mutations and never observes later recipients.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Explicit borrowed broadcast boundary"
+    )]
+    fn prepare(
+        &mut self,
+        view: &BroadcastView<'_>,
+        slot: usize,
+        connection: &mut Connection,
+        food_changes: &FoodChanges,
+        bounds: &[[f64; 4]],
+        grid: &CoverageGrid,
+        prey_bounds: &PreyBounds,
+        snakes: &mut SnakeBroadcast,
+        board: &mut Option<Board>,
+        map: &mut Option<MinimapBroadcast>,
+        minimap_due: bool,
+        leaderboard_due: bool,
+    ) -> Result<PacketViews, String> {
+        let alive = view.world.snakes()[slot].alive;
+        let was_over = connection.over;
+        // The board is needed when a leaderboard is due or to freeze the
+        // rank at death.
+        if board.is_none() && (leaderboard_due || !alive && !connection.over) {
+            *board = Some(Board::new(view.world, view.profiles)?);
+        }
+        if !alive && !was_over {
+            let snake = &view.world.snakes()[slot];
+            let score = if view.world.config().kill_score_seconds.is_some() {
+                view.world.kill_score(slot).unwrap_or(0) as f64
+            } else {
+                wire_score(snake)
+            };
+            let rank = board.as_ref().unwrap().rank(score, slot);
+            connection.final_rank = Some(rank);
+        }
+        // Official frames lead with pongs (81,830 of 81,843 pong frames),
+        // and put the map before gameplay updates.
+        let pongs = std::mem::take(&mut connection.pongs);
+        let mut prefix = if pongs == 0 {
+            Vec::new()
+        } else {
+            vec![encode::pong(); pongs]
+        };
+        let (updates, presented_updates) = self.updates(
+            view,
+            connection,
+            slot,
+            food_changes,
+            bounds,
+            grid,
+            prey_bounds,
+            snakes,
+        )?;
+        if minimap_due && let Some(packet) = self.minimap(view, connection, slot, map)? {
+            prefix.push(packet);
+        }
+        // Most broadcasts have neither pongs nor a map. Keep updates' own
+        // allocation instead of moving every packet through another Vec.
+        let (mut packets, mut presented) = if prefix.is_empty() {
+            (updates, presented_updates)
+        } else {
+            let presented = presented_updates.map(|updates| {
+                let mut presented = prefix.clone();
+                presented.extend(updates);
+                presented
+            });
+            prefix.extend(updates);
+            (prefix, presented)
+        };
+        // The stock client ignores a leaderboard after game over, so the
+        // death broadcast omits it; a record may follow.
+        let live_board = board
+            .as_ref()
+            .filter(|_| leaderboard_due && (alive || was_over));
+        let hud = self.hud(view, connection, slot, live_board)?;
+        if let Some(presented) = &mut presented {
+            presented.extend(hud.iter().cloned());
+        }
+        packets.extend(hud);
+        Ok((packets, presented))
+    }
     /// A due minimap for a living connection that knows its own snake, as a
     /// delta when shorter. Raster and encodings are shared within this broadcast.
-    pub(super) fn minimap(
+    fn minimap(
         &mut self,
+        view: &BroadcastView<'_>,
+        connection: &mut Connection,
         slot: usize,
         map: &mut Option<MinimapBroadcast>,
     ) -> Result<Option<Vec<u8>>, String> {
-        let connection = &self.slots[slot].connection;
-        if !self.world.snakes()[slot].alive || !connection.snakes.contains_key(slot) {
+        if !view.world.snakes()[slot].alive || !connection.snakes.contains_key(slot) {
             return Ok(None);
         }
         if map.is_none() {
             *map = Some(MinimapBroadcast::new(
                 self.pit_projection
-                    .render_world(&self.world, self.config.minimap_side())?,
+                    .render_world(view.world, view.minimap_side)?,
             ));
         }
         let map = map.as_mut().expect("minimap was just constructed");
         let packet = map.packet19(connection.minimap_sent.as_ref())?;
-        self.slots[slot].connection.minimap_sent = Some(map.map.clone());
+        connection.minimap_sent = Some(map.map.clone());
         Ok(Some(packet))
     }
 
     /// Changes since this connection's last frame, own snake first.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Explicit borrowed presentation inputs"
+    )]
     fn updates(
         &mut self,
+        view: &BroadcastView<'_>,
+        connection: &mut Connection,
         slot: usize,
         food_changes: &FoodChanges,
         bounds: &[[f64; 4]],
@@ -605,14 +762,12 @@ impl SimulatorBackend {
         prey_bounds: &PreyBounds,
         snakes: &mut SnakeBroadcast,
     ) -> Result<PacketViews, String> {
-        let world = &self.world;
+        let world = view.world;
         let me = &world.snakes()[slot];
-        let record = self
+        let record = view
             .record
-            .as_ref()
-            .is_some_and(|record| record.slot == slot && record.life == self.slots[slot].life);
+            .is_some_and(|record| record.slot == slot && record.life == view.seats[slot].life);
         let mut packets = Vec::new();
-        let connection = &mut self.slots[slot].connection;
         if !me.alive && !connection.over {
             // Game over alone leaves the stock client predicting its snake: send
             // the final mass, then game over, then the death removal.
@@ -650,7 +805,7 @@ impl SimulatorBackend {
         let head = me.head;
         // Snakes that may cover the head, or that this connection shows and may
         // need removing; every other snake is neither shown nor eligible.
-        let known = &self.slots[slot].connection.snakes;
+        let known = &connection.snakes;
         let SnakeBroadcast {
             deltas,
             candidates,
@@ -660,18 +815,17 @@ impl SimulatorBackend {
         let order = std::iter::once(slot).chain(candidates.iter().copied().filter(|&i| i != slot));
         for i in order {
             let snake = &world.snakes()[i];
-            let life = self.slots[i].life;
-            let control = self.slots[i].control.heading;
+            let life = view.seats[i].life;
+            let control = view.seats[i].control.heading;
             let eligible = snake.alive
                 && (i == slot || covered(head, snake, bounds[i], vision, body_bounds.for_snake(i)));
             let own = i == slot;
             let id = i as u16;
-            let profile = self.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
-            let connection = &mut self.slots[slot].connection;
+            let profile = view.profiles.get(i).unwrap_or(&NATIVE_PROFILE);
             let known = connection.snakes.get_mut(i);
             match (known, eligible) {
                 (Some(known), true) if known.life == life => {
-                    let reports = &self.reports[i];
+                    let reports = &view.reports[i];
                     deltas[i].changes(
                         &mut packets,
                         own,
@@ -682,7 +836,7 @@ impl SimulatorBackend {
                         profile,
                         reports,
                     )?;
-                    self.reports[i].observe(known);
+                    self.observations[i].observe(&view.reports[i], known);
                 }
                 (Some(known), false) => {
                     let died = !snake.alive || known.life != life;
@@ -697,11 +851,10 @@ impl SimulatorBackend {
                     }
                     full(&mut packets, own, id, snake, wanted, profile)?;
                     let known = KnownSnake::new(life, snake, wanted)?;
-                    self.reports[i].observe(&known);
+                    self.observations[i].observe(&view.reports[i], &known);
                     connection.snakes.insert(i, known);
                 }
             }
-            let connection = &mut self.slots[slot].connection;
             if own && connection.snakes.contains_key(slot) {
                 // HUD packets wait for the client's own appearance; a
                 // requested session ID follows it so the client knows itself.
@@ -717,26 +870,25 @@ impl SimulatorBackend {
                 }
             }
         }
-        let connection = &mut self.slots[slot].connection;
         let food_start = packets.len();
         food_updates(
             &mut packets,
             &mut connection.food,
             &connection.food_interest,
-            &self.food_sectors,
+            view.food_sectors,
             food_changes,
-            &self.food_eaters,
+            view.food_eaters,
         );
         let food_end = packets.len();
-        let mut presented = if connection.decorations && self.pit_markers.is_some() {
+        let mut presented = if connection.decorations && view.decorated {
             let mut presented = packets[..food_start].to_vec();
             food_updates(
                 &mut presented,
                 &mut connection.decorated_food,
                 &connection.food_interest,
-                &self.decorated_food_sectors,
+                view.decorated_food_sectors,
                 food_changes,
-                &self.food_eaters,
+                view.food_eaters,
             );
             Some(presented)
         } else {
@@ -759,7 +911,7 @@ impl SimulatorBackend {
             let known = connection.prey.remove(&id).expect("known prey");
             packets.push(encode::prey_removal(
                 known.wire,
-                self.prey_eaters.get(&id).copied(),
+                view.prey_eaters.get(&id).copied(),
             ));
         }
         for (id, prey) in visible {
@@ -791,9 +943,14 @@ impl SimulatorBackend {
 
     /// Leaderboard when `board` is given, then an unsent record. Both wait for
     /// the connection's own appearance.
-    fn hud(&mut self, slot: usize, board: Option<&Board>) -> Result<Vec<Vec<u8>>, String> {
+    fn hud(
+        &mut self,
+        view: &BroadcastView<'_>,
+        connection: &mut Connection,
+        slot: usize,
+        board: Option<&Board>,
+    ) -> Result<Vec<Vec<u8>>, String> {
         let mut packets = Vec::new();
-        let connection = &mut self.slots[slot].connection;
         if !connection.appeared {
             return Ok(packets);
         }
@@ -801,7 +958,7 @@ impl SimulatorBackend {
             let (row, rank) = match board.order.iter().position(|&(_, i)| i == slot) {
                 Some(index) if index < LEADERBOARD_ROWS => (index as u8 + 1, index + 1),
                 Some(index) => (0, index + 1),
-                None if self.world.config().kill_score_seconds.is_some() => (0, 0),
+                None if view.world.config().kill_score_seconds.is_some() => (0, 0),
                 None => (0, connection.final_rank.unwrap_or(0)),
             };
             packets.push(encode::leaderboard(
@@ -811,9 +968,8 @@ impl SimulatorBackend {
                 &board.rows,
             ));
         }
-        if let Some(record) = self
+        if let Some(record) = view
             .record
-            .as_ref()
             .filter(|record| record.version != connection.record_version)
         {
             packets.push(encode::record(

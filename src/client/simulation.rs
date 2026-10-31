@@ -79,10 +79,10 @@ mod spawn_prefilter_tests;
 pub use config::{DeliveryProfile, SimulationConfig};
 pub(crate) use remote::RawSimulator;
 
-use broadcast::{PreyClock, Record};
+use broadcast::Record;
 use connection::{Connection, Slot};
 use food::{FoodIndex, FoodSubscriptions, SectorFood};
-use snakes::{BodyBounds, CoverageGrid, SnakeReports};
+use snakes::{BodyBounds, SnakeReports};
 
 /// Simulator backend whose clients reconstruct frames from protocol-19 bytes.
 ///
@@ -94,6 +94,7 @@ pub struct SimulatorBackend {
     player_latency: PlayerLatency,
     world: Simulator,
     slots: Vec<Slot>,
+    seats: Vec<Seat>,
     /// Stateless scratch shared by sequential background decisions, never per slot.
     background_policy: Option<ForagerBot>,
     random: Random,
@@ -103,8 +104,6 @@ pub struct SimulatorBackend {
     food_eaters: BTreeMap<(u64, u64), u16>,
     /// Eater slot by simulator prey ID since the last broadcast.
     prey_eaters: BTreeMap<u64, u16>,
-    /// Wire ID of each living prey. Simulator IDs are 64-bit; see `assign_prey_wire`.
-    prey_wire: BTreeMap<u64, u16>,
     /// Listings of the subscribed sectors at the last broadcast, indexed by
     /// `u16::from_be_bytes(sector)`. An unchanged listing keeps its allocation,
     /// so a connection already holding it can skip the comparison.
@@ -117,19 +116,8 @@ pub struct SimulatorBackend {
     food_index: FoodIndex,
     /// Food maintenance periods begun since virtual zero.
     food_epoch: u64,
-    /// Next minimap and leaderboard periods; see `broadcast::clock_due`.
-    next_minimap: u64,
-    pit_projection: super::minimap::PitProjectionCache,
-    /// Full U conversions live for one broadcast; recipients retain immutable
-    /// decoded baselines independently of the broadcast-local packet cache.
-    legacy_maps: crate::client::encode13::FullMapCache,
-    next_leaderboard: u64,
-    prey_clocks: BTreeMap<u64, PreyClock>,
     reports: Vec<SnakeReports>,
-    /// Reused broad-phase cells; an interrupted broadcast may drop this scratch
-    /// and the next one rebuilds it without changing recipient state.
-    coverage_grid: Option<CoverageGrid>,
-    coverage_bounds: BodyBounds,
+    presenter: broadcast::Presenter,
     food_subscriptions: FoodSubscriptions,
     tick: u64,
     variable_dt: bool,
@@ -142,6 +130,15 @@ pub struct SimulatorBackend {
     /// Connections opened so far; numbers session IDs.
     connections: u32,
     session_key: u32,
+}
+
+/// Authoritative lifecycle and held command, independent of recipient history.
+#[derive(Debug)]
+struct Seat {
+    life: u64,
+    control: Action,
+    /// A disconnect or respawn clears this before settling completed lives.
+    living: Option<u64>,
 }
 
 /// Only hosted socket slots override the simulation's link model. Native
@@ -200,7 +197,6 @@ impl SimulatorBackend {
             food_presentation: FoodPresentation::new(seed, config.agents),
             food_eaters: BTreeMap::new(),
             prey_eaters: BTreeMap::new(),
-            prey_wire: BTreeMap::new(),
             food_sectors: Vec::new(),
             food_revision: Arc::default(),
             decorated_food_sectors: Vec::new(),
@@ -212,16 +208,21 @@ impl SimulatorBackend {
                 .transpose()?,
             food_index: FoodIndex::default(),
             food_epoch: 0,
-            next_minimap: 1,
-            pit_projection: super::minimap::PitProjectionCache::default(),
-            legacy_maps: crate::client::encode13::FullMapCache::default(),
-            next_leaderboard: 1,
-            prey_clocks: BTreeMap::new(),
             reports: vec![SnakeReports::default(); config.agents],
-            coverage_grid: None,
-            coverage_bounds: BodyBounds::default(),
+            presenter: broadcast::Presenter {
+                prey_wire: BTreeMap::new(),
+                next_minimap: 1,
+                pit_projection: super::minimap::PitProjectionCache::default(),
+                legacy_maps: crate::client::encode13::FullMapCache::default(),
+                next_leaderboard: 1,
+                prey_clocks: BTreeMap::new(),
+                observations: vec![broadcast::ReportObservation::default(); config.agents],
+                coverage_grid: None,
+                coverage_bounds: BodyBounds::default(),
+            },
             food_subscriptions: FoodSubscriptions::default(),
             slots: Vec::with_capacity(config.agents),
+            seats: Vec::with_capacity(config.agents),
             background_policy: None,
             player_latency: PlayerLatency::default(),
             world,
@@ -241,22 +242,24 @@ impl SimulatorBackend {
         for slot in 0..backend.config.agents {
             let heading = backend.world.snakes()[slot].heading;
             let remote = slot < remote;
-            backend.slots.push(Slot {
-                state: ClientState::new(),
-                connection: Connection::default(),
+            backend.seats.push(Seat {
                 life: 0,
-                outbox: None,
-                processing_override: None,
-                previous_boost: None,
                 control: Action {
                     heading,
                     boost: false,
                 },
+                living: None,
+            });
+            backend.slots.push(Slot {
+                state: ClientState::new(),
+                connection: Connection::default(),
+                outbox: None,
+                processing_override: None,
+                previous_boost: None,
                 pinged_at: None,
                 records: (backend.config.record_wire && !remote).then(Vec::new),
                 record_bytes: 0,
                 remote,
-                living: None,
             });
             if remote {
                 continue;
@@ -270,7 +273,7 @@ impl SimulatorBackend {
                     .world
                     .respawn_body(slot, body, heading)
                     .map_err(|error| error.to_string())?;
-                backend.slots[slot].control.heading = heading;
+                backend.seats[slot].control.heading = heading;
             }
             backend.connect(slot)?;
             backend.client_until(slot, 0.)?;
@@ -439,14 +442,14 @@ impl SimulatorBackend {
         let s = &mut self.slots[slot];
         s.state.disconnect();
         s.record(now, WireEvent::Disconnect, &[])?;
-        s.living = None;
+        self.seats[slot].living = None;
         self.world.retire(slot).map_err(|error| error.to_string())?;
         self.world
             .respawn_body(slot, body, heading)
             .map_err(|error| error.to_string())?;
         let s = &mut self.slots[slot];
-        s.life += 1;
-        s.control = Action {
+        self.seats[slot].life += 1;
+        self.seats[slot].control = Action {
             heading,
             boost: false,
         };
