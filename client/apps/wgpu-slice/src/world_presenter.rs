@@ -111,7 +111,9 @@ impl WorldPresenter {
             let mut encoder = renderer.device.create_command_encoder(&Default::default());
             self.blitter
                 .copy(&renderer.device, &mut encoder, &backing, target);
+            let submission = crate::latency::submit_begin();
             renderer.queue.submit([encoder.finish()]);
+            crate::latency::submit_end(submission);
         } else {
             renderer.render_world_at(frame, target, plan.attachment, plan.samples)?;
             world_draws = renderer.draw_call_count();

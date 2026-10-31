@@ -13,6 +13,7 @@ mod desktop {
         Result,
         game::LocalGame,
         gpu::{RenderError, SurfaceHost, instance},
+        latency,
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
@@ -347,10 +348,13 @@ mod desktop {
                         }
                     }
                     Event::Binary(g, b) => {
-                        if let Err(e) =
-                            self.game
-                                .receive(g, &b, self.started.elapsed().as_secs_f64() * 1000.)
-                        {
+                        let message = self.transport.message_id();
+                        if let Err(e) = self.game.receive_message(
+                            g,
+                            &b,
+                            self.started.elapsed().as_secs_f64() * 1000.,
+                            message,
+                        ) {
                             self.game.fail(&e)
                         }
                     }
@@ -419,6 +423,7 @@ mod desktop {
             );
         }
         fn frame(&mut self) -> Result<()> {
+            latency::generation(self.game.generation());
             let size = self.window.inner_size();
             let physical = [size.width, size.height];
             let dpr = self.window.scale_factor();
@@ -551,7 +556,11 @@ mod desktop {
                 return self.skip_bad_frame(p.frame.identity, error);
             }
             let picture = composed.as_ref().unwrap_or(&p);
-            if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
+            let synced = {
+                let _sync = latency::PictureSpan::new("sync_begin", "sync_end");
+                self.host.renderer.sync_resources(&picture.resources)
+            };
+            if let Err(e) = synced {
                 return match e {
                     RenderError::Frame(e) => self.skip_bad_frame(p.frame.identity, e),
                     RenderError::Host(e) => {
@@ -560,6 +569,7 @@ mod desktop {
                     }
                 };
             }
+            latency::picture("pre_present_notify");
             self.window.pre_present_notify();
             match self.host.present_world_with_overlay(
                 &picture.frame,
@@ -756,6 +766,15 @@ mod desktop {
             if r.window.id() != id {
                 return;
             }
+            latency::generation(r.game.generation());
+            let _input = matches!(
+                &event,
+                WindowEvent::CursorMoved { .. }
+                    | WindowEvent::MouseInput { .. }
+                    | WindowEvent::KeyboardInput { .. }
+                    | WindowEvent::Focused(_)
+            )
+            .then(latency::callback);
             let result = (|| -> Result<()> {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
@@ -803,6 +822,13 @@ mod desktop {
                         }
                         r.game.stop();
                         r.transport.close();
+                        // Exit performs the queued Close directly, without changing the game's
+                        // existing acknowledgement path. Retain that distinct host completion.
+                        if let Some(e) = r.game.effect()
+                            && matches!(e.kind, slither_wgpu_slice::game::EffectKind::Close)
+                        {
+                            latency::event("host_close", e.id, 0, 0);
+                        }
                         l.exit();
                     }
                     WindowEvent::RedrawRequested => {
@@ -960,6 +986,7 @@ mod desktop {
                 "No connection mode configured; Play stays disabled. Use --official or --endpoint."
             );
         }
+        let trace = latency::Run::from_env()?;
         let event_loop = EventLoop::<TransportWake>::with_user_event()
             .build()
             .map_err(|e| e.to_string())?;
@@ -971,6 +998,9 @@ mod desktop {
         };
         event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
         app.running.take();
+        if let Some(trace) = trace {
+            trace.finish(app.failure.is_none())?;
+        }
         app.failure.map_or(Ok(()), Err)
     }
     #[cfg(test)]

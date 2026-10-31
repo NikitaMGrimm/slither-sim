@@ -659,7 +659,9 @@ impl Renderer {
                 }
             }
         }
+        let submission = crate::latency::submit_begin();
         self.queue.submit([encoder.finish()]);
+        crate::latency::submit_end(submission);
         self.draw_calls = draw_calls;
         // Allocation precedes publication; wgpu retains submitted attachment references
         // after the old host handles are dropped, without a CPU/GPU idle wait.
@@ -853,7 +855,10 @@ impl SurfaceHost {
             return Ok(true);
         }
         self.occluded = false;
-        self.acquired = Some(match self.surface.get_current_texture() {
+        let acquire = crate::latency::acquire_begin();
+        let texture = self.surface.get_current_texture();
+        crate::latency::event("acquire_end", acquire, 0, 0);
+        self.acquired = Some(match texture {
             wgpu::CurrentSurfaceTexture::Success(t)
             | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             failure => {
@@ -906,7 +911,9 @@ impl SurfaceHost {
             self.extent,
             requested,
         )?;
+        crate::latency::picture("present_begin");
         self.renderer.queue.present(texture);
+        crate::latency::picture("present_end");
         Ok(true)
     }
 }

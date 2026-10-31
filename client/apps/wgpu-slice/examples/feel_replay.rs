@@ -1,9 +1,10 @@
 //! Offline A3 CPU peer. See tools/feel-replay/native-peer.md for the bound runner.
 #[path = "feel_replay/driver.rs"]
 mod driver;
+#[path = "feel_replay/latency.rs"]
+mod latency;
 #[path = "feel_replay/observation.rs"]
 mod observation;
-#[cfg(test)]
 #[path = "../tests/support/announcement_tape.rs"]
 mod synthetic_tape;
 use serde_json::{Value, json};
@@ -303,6 +304,9 @@ mod desktop_tests {
 
 fn run() -> Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args == ["--latency-overhead"] {
+        return latency::run();
+    }
     let mut input = String::new();
     io::stdin()
         .read_to_string(&mut input)
@@ -311,7 +315,11 @@ fn run() -> Result<()> {
         return Err("Expected no arguments".into());
     }
     let request = serde_json::from_str(&input).map_err(|e| e.to_string())?;
+    let trace = slither_wgpu_slice::latency::Run::from_env()?;
     let result = replay(request)?;
+    if let Some(trace) = trace {
+        trace.finish(result["body"]["final"]["completed"] == true)?;
+    }
     println!(
         "{}",
         serde_json::to_string(&result).map_err(|e| e.to_string())?
