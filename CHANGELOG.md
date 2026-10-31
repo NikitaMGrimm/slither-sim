@@ -53,8 +53,12 @@
 
 ### Performance
 
-- Bound collision-grid insertion for grown snakes while preserving exact
-  collision tests and killer order; add a synthetic 4,096-snake catalog row.
+- In worlds with 4,096 or more snakes, one long snake no longer widens the
+  collision-grid area of every other body. Long snakes search a wider area
+  themselves instead. On a synthetic
+  4,096-snake world, collision CPU per tick falls from about 444 to 352 µs, with
+  all ten timing pairs faster, and on a live 64,000-bot world from about 77.4 to
+  73.6 ms. Collision results are unchanged.
 - Keep collision join order between ticks instead of sorting every living snake.
   The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
   timing pairs, with identical events and final state.
