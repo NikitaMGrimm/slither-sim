@@ -1,6 +1,7 @@
 //! Selected recipe adapter, not a general Canvas implementation. Unsupported tapes fail closed.
 use crate::Result;
 use slither_client::authored_sources::{CanvasRecipe, PaintCommand};
+pub(crate) const MENU_TEXTURE_QUOTA: &str = "Menu control texture budget";
 
 #[derive(Clone, Debug)]
 pub struct RgbaImage {
@@ -151,7 +152,7 @@ pub fn menu_control(
     let pad = (surface.padding() * scale).ceil() as u32;
     let (width, height) = (w + 2 * pad, h + 2 * pad);
     if width > 2048 || height > 2048 {
-        return Err("Menu control texture budget".into());
+        return Err(MENU_TEXTURE_QUOTA.into());
     }
     let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
     let r = radius.min(f64::from(w.min(h)) / 2.);
@@ -176,6 +177,11 @@ pub fn menu_control(
             } else {
                 0.5 * (1. - (distance(px, py - offset * scale) / (sigma * scale)).tanh()) * opacity
             };
+            // Analytic shadows have infinite tails. Fade the last quarter of
+            // their padding to zero so a sliced atlas never ends in visible ink.
+            let edge = x.min(width - 1 - x).min(y).min(height - 1 - y);
+            let t = (f64::from(edge) / (f64::from(pad) / 4.).max(1.)).min(1.);
+            let shadow = shadow * t * t * (3. - 2. * t);
             let t = (py / f64::from(h)).clamp(0., 1.);
             let t = if matches!(surface, MenuSurface::Play | MenuSurface::Overlay) {
                 (1. - (std::f64::consts::PI * t).cos()) / 2.

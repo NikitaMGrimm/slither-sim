@@ -156,6 +156,127 @@ fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+    if std::env::args().nth(2).as_deref() == Some("--champion") {
+        use slither_client::{
+            champion::ChampionState,
+            menu_controls::PanelInputState,
+            menu_input::{EditIntent, MenuInputState},
+            menu_theme::MenuTheme,
+            session_policy::{Command, SessionPolicy},
+        };
+        let mut session = SessionPolicy::new();
+        session
+            .prepare_controls(
+                &[
+                    Command {
+                        opcode: b'a',
+                        argument: 0,
+                    },
+                    Command {
+                        opcode: b'v',
+                        argument: 1,
+                    },
+                ],
+                0.,
+            )
+            .map_err(|e| e.0)?;
+        session.commit_controls().map_err(|e| e.0)?;
+        let mut champion = ChampionState::default();
+        champion.observe(1, &session.view());
+        champion.step(0., 1.).map_err(str::to_owned)?;
+        let validation = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut measurements = Vec::new();
+        let mut menu = Menu::default();
+        let mut text = TextCache::menu();
+        for scale in [1., 1.5, 2.] {
+            let extent = [(960. * scale) as u32, (720. * scale) as u32];
+            let panel = champion.panel(&session.view(), [960., 720.]);
+            let mut input = PanelInputState::default();
+            let mut edit = MenuInputState::default();
+            input.sync(&panel, &mut edit);
+            edit.apply(EditIntent::KeyText("Thanks for a great game!".into()));
+
+            let mut scroll = std::collections::BTreeMap::new();
+            let mut view = menu_specimen::view(0)?;
+            // Authored returned-score data; the fresh-login specimen has none.
+            view.last_life = slither_client::start_page::LastLifeView {
+                label: view.wording.final_length,
+                number: "1234".into(),
+                suffix: "!",
+                label_alpha: 0.45,
+            };
+            view.ordinary_controls_visible = false;
+            view.champion_pending = false;
+            view.tips_visible = false;
+            let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
+            let picture = menu.prepare_with_panel(
+                &mut text,
+                &view,
+                &layout,
+                extent,
+                scale,
+                None,
+                0,
+                None,
+                Some(slither_wgpu_slice::menu::PanelPaint {
+                    panel: &panel,
+                    input: &input,
+                    edit: &edit,
+                    scroll: &mut scroll,
+                    theme: MenuTheme::default(),
+                }),
+            )?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!("champion-scale-{scale}.png")),
+            )?;
+            measurements.push(serde_json::json!({"scale":scale,"draws":picture.frame.draws.len(),"resources":picture.resources.len(),"bytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+            edit.apply(EditIntent::SelectAll);
+            edit.apply(EditIntent::KeyText("Wide message ".repeat(12)));
+            let long = menu.prepare_with_panel(
+                &mut text,
+                &view,
+                &layout,
+                extent,
+                scale,
+                None,
+                0,
+                None,
+                Some(slither_wgpu_slice::menu::PanelPaint {
+                    panel: &panel,
+                    input: &input,
+                    edit: &edit,
+                    scroll: &mut scroll,
+                    theme: MenuTheme::default(),
+                }),
+            )?;
+            capture(
+                &mut renderer,
+                &long,
+                &output.join(format!("champion-scroll-scale-{scale}.png")),
+            )?;
+            view.ordinary_controls_visible = true;
+            let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
+            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None, 0)?;
+            capture(
+                &mut renderer,
+                &login,
+                &output.join(format!("login-scale-{scale}.png")),
+            )?;
+        }
+        std::fs::write(
+            output.join("champion.json"),
+            serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        if let Some(e) = validation.pop().await {
+            return Err(e.to_string());
+        }
+        return Ok(());
+    }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--login") {
         use slither_client::menu_layout::MenuElement as E;

@@ -83,7 +83,10 @@ with the command-time `HudFinal` capture. It never reads the current displayed
 score. Duplicate outcomes and close-only phases cannot rewrite it. Missing
 captures stay blank; no disconnect supplies a score. Last-life content survives
 the next Play and disconnect; `EndScreenState` remains independent. Champion
-outcomes expose an explicitly incomplete handoff with ordinary controls disabled.
+outcomes hand off to the native [shared champion controls](menu-controls.md), with
+ordinary controls disabled until acknowledgement or terminal transport ends the
+editor, followed by its exit fade and the session's existing return.
+Browser development pages retain the labelled pending handoff.
 The menu follows the committed SessionPolicy hold/return fraction and retained
 accepted outcome, including after a transport close. It owns no death timer.
 The session closes/resets ordinary lives at return completion; each replay uses
@@ -98,13 +101,14 @@ storage failure cannot undo a toggle. It has an independent key and does not
 modify adaptive `QualityState` or migrate the existing appearance record.
 
 Logo assets/curve settling, renderer styles, chooser/builder/server modal policy,
-champion editing/acknowledgement remain later work.
+and browser champion editing remain later work.
 Incoming/API skin 65 and the existing chooser are untouched; the later official
 chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
 
 ## Opt-in text editing and native input
 
-`menu_input::MenuInputState` owns two `TextEditState` values, directional UTF-8
+`menu_input::MenuInputState` owns a bounded `EditorId`/`TextRule` registry of
+`TextEditState` values (including nickname and champion), directional UTF-8
 byte selections, focus, modality, composition and bounded undo/redo (64 edits).
 `EditIntent` and `HostEditEffect` contain copied data only. No DOM, window,
 clipboard, transport or accessibility-library handle enters the shared core.
@@ -123,10 +127,13 @@ ASCII substitution with a 140-unit cap: each surrogate becomes a space, includin
 limit splits a pair. This follows the private
 `source/20b-skins-and-cosmetics.js:528-537` input handler; Save repeats substitution
 and truncation at `source/06-login-and-hud.js:321-323`. The plan's earlier Unicode
-inference was incorrect. This PR adds no champion submission or wire encoding.
+inference was incorrect. Native Save uses the shared
+[champion protocol boundary](menu-controls.md#victory-authority-and-send).
 
 Raw Unicode preedit and its optional UTF-8 byte selection stay separate from
-the committed value, field limit and undo history. Retaining raw preedit until
+the committed value, field limit and undo history. The preview keeps at most
+256 UTF-16 units on scalar boundaries, before copying/measuring/rasterizing;
+its byte selection clamps to that prefix. Retaining this raw Unicode prefix until
 commit approximates Chromium's input-event timing during composition, rather
 than establishing timing parity. Empty preedit immediately clears the raw
 preview, including winit's mandatory pre-Commit clear.

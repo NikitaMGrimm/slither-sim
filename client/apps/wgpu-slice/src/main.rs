@@ -171,11 +171,27 @@ mod desktop {
     impl Running {
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            for effect in self
-                .login
-                .input
-                .execute(effects, &mut WindowEditHost(&self.window))
-            {
+            let effects = if self.login.champion.policy.visible() {
+                let effects = self
+                    .login
+                    .champion
+                    .input
+                    .execute(effects, &mut WindowEditHost(&self.window));
+                self.login.champion.commit_effects(effects)
+            } else {
+                let effects = self
+                    .login
+                    .input
+                    .execute(effects, &mut WindowEditHost(&self.window));
+                let admission = self.game.can_play()
+                    && self.preparation.is_none()
+                    && (self.official || self.endpoint.is_some());
+                self.login
+                    .input
+                    .state
+                    .commit_menu(effects, &mut self.login.state, admission)
+            };
+            for effect in effects {
                 match effect {
                     HostEditEffect::Gameplay { key, pressed } => {
                         if !pressed || !self.login.blocks_gameplay() {
@@ -187,6 +203,16 @@ mod desktop {
                     _ => {}
                 }
             }
+        }
+        fn champion_submission(&mut self) -> Result<()> {
+            if let Some((generation, units, activation)) = self.login.champion.take_submission() {
+                self.game.save_champion(generation, &units, activation)?;
+                self.login.observe_game(&self.game)?;
+                self.effects()?;
+            }
+            let effects = std::mem::take(&mut self.login.champion.effects);
+            self.edit_effects(effects);
+            Ok(())
         }
         fn effects(&mut self) -> Result<()> {
             for _ in 0..64 {
@@ -287,12 +313,12 @@ mod desktop {
             if self.preparation.is_none() {
                 self.login.observe_game(&self.game)?;
             }
+            self.champion_submission()?;
             let active = !matches!(
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
             );
-            self.schedule
-                .activity(active || self.login.state.view(true).visible);
+            self.schedule.activity(active || self.login.needs_redraw());
             if !matches!(
                 self.game.phase(),
                 Phase::Opening | Phase::Challenge | Phase::Setup
@@ -352,6 +378,7 @@ mod desktop {
                 self.game.phase() == Phase::Playing,
             )?;
             self.edit_effects(effects);
+            self.champion_submission()?;
             for intent in intents {
                 if let slither_client::start_page::StartMenuIntent::Play { nickname, quality } =
                     intent
@@ -398,13 +425,18 @@ mod desktop {
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
-                    let picture = self
-                        .login
-                        .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                        .compose_over(&p)?;
+                    let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(
+                        self.login.prepare_host(
+                            physical,
+                            dpr,
+                            admission,
+                            self.game.menu_cosmetics(),
+                        ),
+                        &p,
+                    )?;
                     let effects = self.login.cursor_area()?;
                     self.edit_effects(effects);
-                    Some(picture)
+                    picture
                 } else {
                     None
                 })
@@ -603,12 +635,15 @@ mod desktop {
             let result = (|| -> Result<()> {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.shift = modifiers.state().shift_key();
+                    r.login.input.modifiers(modifiers.state());
+                    r.login.champion.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play()
                     && r.preparation.is_none()
                     && (r.official || r.endpoint.is_some());
                 if let WindowEvent::KeyboardInput { event, .. } = &event
                     && event.state == ElementState::Pressed
+                    && !r.login.champion.policy.visible()
                     && !r.login.state.view(admission).disabled
                 {
                     if event.logical_key == Key::Named(NamedKey::Tab) {
@@ -630,17 +665,26 @@ mod desktop {
                         return Ok(());
                     }
                 }
-                let mapped = r.login.input.window_event(&event);
-                let effects = r
-                    .login
-                    .input
-                    .execute(mapped.effects, &mut WindowEditHost(&r.window));
-                let effects =
-                    r.login
-                        .input
-                        .state
-                        .commit_menu(effects, &mut r.login.state, admission);
-                r.edit_effects(effects);
+                let champion = r.login.champion.policy.visible();
+                if let WindowEvent::Focused(focused) = &event {
+                    if !focused {
+                        r.shift = false;
+                    }
+                    let inactive = if champion {
+                        &mut r.login.input
+                    } else {
+                        &mut r.login.champion.input
+                    };
+                    // Retain window ownership across a committed panel handoff.
+                    inactive.window_event(&event);
+                }
+                let mapped = if champion {
+                    r.login.champion.event(&event)
+                } else {
+                    r.login.input.window_event(&event)
+                };
+                r.edit_effects(mapped.effects);
+                r.champion_submission()?;
                 if mapped.consumed {
                     r.schedule.invalidate();
                     return Ok(());
@@ -713,6 +757,7 @@ mod desktop {
                             );
                             r.edit_effects(effects);
                             r.game.mouse_up();
+                            r.champion_submission()?;
                         } else if state == ElementState::Pressed {
                             r.pointer(true)?;
                         } else {

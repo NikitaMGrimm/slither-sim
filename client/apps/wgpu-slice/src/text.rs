@@ -26,15 +26,25 @@ fn display_text(text: &str) -> String {
     text.chars().map(display_character).collect()
 }
 
+pub(crate) const TEXT_RASTER_QUOTA: &str = "text raster extent budget";
+
 pub const MINIMAP_CACHE_BYTES: usize = 1024 * 1024;
+pub(crate) const PANEL_TOTALS_QUOTA: &str = "Aggregate panel byte/draw budget";
+pub(crate) const MENU_CACHE_QUOTA: &str = "Menu cache slot/pixel budget";
+pub(crate) const PANEL_SLOT_QUOTA: &str = "Panel namespace/slot budget";
+pub(crate) const PANEL_DRAW_QUOTA: &str = "Panel draw budget";
+pub(crate) const HUD_SLOT_QUOTA: &str = "HUD text slot budget";
+pub(crate) const TEXT_CACHE_RUN_QUOTA: &str = "text cache run budget";
+pub(crate) const TEXT_CACHE_PIXEL_QUOTA: &str = "HUD text pixel budget";
+pub(crate) const TEXT_CACHE_QUOTA: &str = "text cache budget";
+
 pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // Allocation rationale: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/panel-text.md#aggregate-resource-proof;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
-// Exact 5x controls, last-life/Play Again and the two-run wordmark through
-// 1.1x outgoing growth: tests/menu.rs::wordmark_runs_abut_and_override_only_logo_art.
-// The aggregate 13 MiB admission and 64 MiB whole-picture guard both apply.
+// Shared ceiling inherited from #358: exact 5x controls and full-growth wordmark.
+// Champion controls retain their own compactness regression below this ceiling.
 pub const MENU_CACHE_BYTES: usize = 13 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
@@ -98,7 +108,7 @@ pub fn preflight_panel_totals(bytes: usize, text_draws: [usize; 2]) -> Result<()
             .into_iter()
             .any(|n| n > crate::render::PANEL_PRODUCER_DRAWS - crate::render::PANEL_CONTROL_DRAWS)
     {
-        return Err("Aggregate panel byte/draw budget".into());
+        return Err(PANEL_TOTALS_QUOTA.into());
     }
     Ok(())
 }
@@ -126,7 +136,7 @@ struct Content {
     line_height: Option<u64>,
 }
 impl Content {
-    fn menu(run: &TextRun<'_>, scale: f64) -> Self {
+    fn menu(run: &TextRun<'_>, scale: f64, clip: Option<BodyRect>) -> Self {
         Self {
             text: run.text.into(),
             max_width: None,
@@ -134,7 +144,7 @@ impl Content {
             weight: run.style.weight,
             family: run.style.family,
             slant: run.style.slant,
-            clip: None,
+            clip: clip.map(|c| [c.x, c.y, c.width, c.height].map(f64::to_bits)),
             color: run.style.color,
             shadow: None,
             line_height: None,
@@ -165,7 +175,7 @@ impl Content {
 }
 pub fn preflight_menu_totals(slots: usize, bytes: usize) -> Result<()> {
     if slots > MENU_CACHE_RUNS || bytes > MENU_CACHE_BYTES {
-        return Err("Menu cache slot/pixel budget".into());
+        return Err(MENU_CACHE_QUOTA.into());
     }
     Ok(())
 }
@@ -248,6 +258,7 @@ impl TextCache {
     pub(crate) fn compose_menu<T>(
         &mut self,
         runs: &[TextRun<'_>],
+        clips: &[Option<BodyRect>],
         scale: f64,
         materials: (usize, usize),
         finish: impl FnOnce(Vec<Vec<(Draw, Resource)>>) -> Result<T>,
@@ -264,7 +275,7 @@ impl TextCache {
         for (i, run) in runs.iter().enumerate() {
             let key = Key::Menu(i as u8);
             if let Some(entry) = self.entries.get(&key)
-                && entry.content == Content::menu(run, scale)
+                && entry.content == Content::menu(run, scale, clips.get(i).copied().flatten())
             {
                 staged.entries.insert(key, entry.clone());
                 staged.bytes += entry.bytes;
@@ -281,7 +292,7 @@ impl TextCache {
                             Some(Key::Menu(i as u8)),
                             None,
                             None,
-                            None,
+                            clips.get(i).copied().flatten(),
                         )?
                         .1,
                 );
@@ -359,8 +370,11 @@ impl TextCache {
         for p in panels {
             let (base, limit) = p.group.slots();
             let i = usize::from(base != 0);
-            if active[i] || p.plan.runs.len() > limit || !(0. ..=1.).contains(&p.alpha) {
-                return Err("Panel namespace/slot budget".into());
+            if active[i] || !(0. ..=1.).contains(&p.alpha) {
+                return Err("Invalid panel namespace/opacity".into());
+            }
+            if p.plan.runs.len() > limit {
+                return Err(PANEL_SLOT_QUOTA.into());
             }
             active[i] = true;
             for run in &p.plan.runs {
@@ -447,7 +461,7 @@ impl TextCache {
                                 == crate::render::PANEL_PRODUCER_DRAWS
                                     - crate::render::PANEL_CONTROL_DRAWS
                             {
-                                return Err("Panel draw budget".into());
+                                return Err(PANEL_DRAW_QUOTA.into());
                             }
                             draws.push((draw, resource));
                         }
@@ -496,7 +510,7 @@ impl TextCache {
         max_width: Option<f64>,
     ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         if usize::from(slot) >= slither_client::presentation::MAX_HUD_TEXT_SPANS {
-            return Err("HUD text slot budget".into());
+            return Err(HUD_SLOT_QUOTA.into());
         }
         self.try_draw(
             run,
@@ -605,11 +619,23 @@ impl TextCache {
                     });
                 }
                 compose_shadow(glyphs, &self.minimap_shadow.as_ref().unwrap().raster)?
+            } else if matches!(key, Key::Menu(_))
+                && let Some(c) = clip
+            {
+                self.rasterizer.rasterize_window(
+                    run.text,
+                    px,
+                    run.style,
+                    max_width,
+                    Some([c.x * backing_scale, (c.x + c.width) * backing_scale]),
+                )?
             } else {
                 self.rasterizer
                     .rasterize_styled(run.text, px, run.style, max_width)?
             };
-            if let Some(clip) = clip {
+            if let Some(clip) = clip
+                && !matches!(key, Key::Menu(_))
+            {
                 raster = crop_panel(raster, clip, backing_scale)?;
             }
             let [w, h] = [raster.image.width, raster.image.height];
@@ -686,7 +712,7 @@ impl TextCache {
                 ),
             };
             if bytes > byte_limit {
-                return Err("text cache run budget".into());
+                return Err(TEXT_CACHE_RUN_QUOTA.into());
             }
             if let Some(old) = self.entries.remove(&key) {
                 self.bytes -= old.bytes;
@@ -703,13 +729,13 @@ impl TextCache {
                     break;
                 }
                 if key.group() != 0 {
-                    return Err("HUD text pixel budget".into());
+                    return Err(TEXT_CACHE_PIXEL_QUOTA.into());
                 }
                 let oldest = group
                     .into_iter()
                     .min_by_key(|(_, e)| e.used)
                     .map(|(k, _)| k.clone())
-                    .ok_or("text cache budget")?;
+                    .ok_or(TEXT_CACHE_QUOTA)?;
                 self.bytes -= self.entries.remove(&oldest).unwrap().bytes;
             }
             self.bytes += bytes;
@@ -1095,20 +1121,54 @@ mod menu_budget_tests {
         }
     }
     #[test]
+    fn visible_window_preserves_full_raster_pixels_and_metrics() {
+        let mut rasterizer = platform::Rasterizer::new();
+        let value = "AV Wfi ".repeat(12);
+        let style = run(&value, 20.).style;
+        for px in [20., 30., 100.] {
+            let full = rasterizer
+                .rasterize_styled(&value, px, style, None)
+                .unwrap();
+            for start in [0.25, full.advance * 0.7] {
+                let part = rasterizer
+                    .rasterize_window(&value, px, style, None, Some([start, start + 100.]))
+                    .unwrap();
+                assert!(part.image.width <= 104);
+                assert_eq!(
+                    (part.advance, part.middle, part.offset[1]),
+                    (full.advance, full.middle, full.offset[1])
+                );
+                let x = (part.offset[0] - full.offset[0]) as usize * 4;
+                for (a, b) in part
+                    .image
+                    .pixels
+                    .chunks_exact(part.image.width as usize * 4)
+                    .zip(
+                        full.image
+                            .pixels
+                            .chunks_exact(full.image.width as usize * 4),
+                    )
+                {
+                    assert_eq!(a, &b[x..x + a.len()]);
+                }
+            }
+        }
+    }
+    #[test]
     fn menu_composition_admits_exact_byte_boundary_and_rolls_back_one_more() {
         let mut cache = TextCache::default();
         let runs = [run("Play", 20.)];
-        let first = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let first = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         let text_bytes = cache.cached_bytes();
         let material_bytes = MENU_CACHE_BYTES - text_bytes;
         cache
-            .compose_menu(&runs, 1., (0, material_bytes), Ok)
+            .compose_menu(&runs, &[], 1., (0, material_bytes), Ok)
             .unwrap();
         let next_handle = cache.next_handle;
         let mut published = false;
         assert!(
             cache
-                .compose_menu(&runs, 1., (0, material_bytes + 1), |_| {
+                .compose_menu(&runs, &[], 1., (0, material_bytes + 1), |_| {
                     published = true;
                     Ok(())
                 })
@@ -1117,7 +1177,7 @@ mod menu_budget_tests {
         assert!(!published);
         assert_eq!(cache.next_handle, next_handle);
         assert_eq!(cache.cached_bytes(), text_bytes);
-        let retained = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let retained = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         assert_eq!(first[0][0].0.asset, retained[0][0].0.asset);
     }
     #[test]
@@ -1131,7 +1191,7 @@ mod menu_budget_tests {
             .0
             .asset;
         let runs: Vec<_> = (0..64).map(|_| run("Play", 20.)).collect();
-        let old = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let old = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         let bytes = cache.cached_bytes();
         let handles: Vec<_> = old.iter().flatten().map(|(d, _)| d.asset).collect();
         assert_eq!(
@@ -1142,19 +1202,23 @@ mod menu_budget_tests {
                 .count(),
             64
         );
-        assert!(cache.compose_menu(&runs, 1., (1, 0), Ok).is_err());
+        assert!(cache.compose_menu(&runs, &[], 1., (1, 0), Ok).is_err());
         assert!(
             cache
-                .compose_menu(&[run("replacement", 20.)], 1., (0, 0), |_| -> Result<()> {
-                    Err("frame rejected".into())
-                })
+                .compose_menu(
+                    &[run("replacement", 20.)],
+                    &[],
+                    1.,
+                    (0, 0),
+                    |_| -> Result<()> { Err("frame rejected".into()) }
+                )
                 .is_err()
         );
         let large = "M".repeat(100);
         let big: Vec<_> = (0..16).map(|_| run(&large, 64.)).collect();
-        assert!(cache.compose_menu(&big, 1., (0, 0), Ok).is_err());
+        assert!(cache.compose_menu(&big, &[], 1., (0, 0), Ok).is_err());
         assert_eq!(cache.cached_bytes(), bytes);
-        let after = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let after = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         assert_eq!(
             handles,
             after
@@ -1163,7 +1227,7 @@ mod menu_budget_tests {
                 .map(|(d, _)| d.asset)
                 .collect::<Vec<_>>()
         );
-        cache.compose_menu(&[], 1., (0, 0), Ok).unwrap();
+        cache.compose_menu(&[], &[], 1., (0, 0), Ok).unwrap();
         let assets: Vec<_> = cache
             .entries
             .values()

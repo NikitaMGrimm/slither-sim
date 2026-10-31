@@ -4,6 +4,7 @@
 pub mod announcement;
 pub mod bank;
 pub mod cosmetics;
+pub mod editor_geometry;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod endpoint_login;
 pub mod frame;
@@ -23,6 +24,8 @@ pub mod minimap;
 pub mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod official;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod panel_native;
 pub mod render;
 pub mod scene;
 pub mod text;

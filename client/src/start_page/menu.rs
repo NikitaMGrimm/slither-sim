@@ -402,6 +402,16 @@ impl StartMenuState {
         }
     }
 
+    /// The champion owner calls this after acknowledgement or terminal transport
+    /// has ended the editor and its sampled exit fade has completed.
+    pub fn champion_finished(&mut self) {
+        if self.champion {
+            self.champion = false;
+            if self.phase == MenuPhase::Login {
+                self.focus_pending = true;
+            }
+        }
+    }
     /// Consume focus at the host's post-session seam, including return completion.
     pub fn take_focus_intent(&mut self) -> Option<StartMenuIntent> {
         std::mem::take(&mut self.focus_pending).then_some(StartMenuIntent::FocusNickname)
@@ -437,7 +447,7 @@ impl StartMenuState {
     }
 
     /// Explicit transport-failure return; retains prior last-life content and never
-    /// invents an outcome. A champion still needs the later editor/ack handoff.
+    /// invents an outcome. The champion owner completes its editor exit separately.
     pub fn disconnected(&mut self) {
         if matches!(self.phase, MenuPhase::DeathHold | MenuPhase::Returning) {
             return;

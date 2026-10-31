@@ -15,6 +15,7 @@ use slither_client::{
 
 pub struct NativeLogin {
     pub input: NativeMenuInput,
+    pub champion: crate::panel_native::NativePanel,
     pub state: StartMenuState,
     pub layout: MenuLayout,
     pub focus: u8,
@@ -24,17 +25,23 @@ pub struct NativeLogin {
     pixel_scale: f64,
     pressed: bool,
     pressed_quality: bool,
+    champion_session: slither_client::session_policy::View,
 }
 impl NativeLogin {
     pub fn set_wordmark(&mut self, enabled: bool) {
         self.menu.wordmark = enabled;
     }
+    pub fn needs_redraw(&self) -> bool {
+        // A terminal socket must not idle the host during the hidden death hold.
+        self.state.view(true).visible || self.champion_session.death_pending
+    }
     pub fn blocks_gameplay(&self) -> bool {
-        matches!(
-            self.state.view(true).phase,
-            slither_client::start_page::MenuPhase::Login
-                | slither_client::start_page::MenuPhase::Connecting
-        )
+        self.champion.policy.visible()
+            || matches!(
+                self.state.view(true).phase,
+                slither_client::start_page::MenuPhase::Login
+                    | slither_client::start_page::MenuPhase::Connecting
+            )
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
         self.blocks_gameplay()
@@ -52,6 +59,9 @@ impl NativeLogin {
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         Ok(Self {
             input,
+            champion: crate::panel_native::NativePanel::new(
+                &slither_client::session_policy::SessionPolicy::new().view(),
+            ),
             state,
             layout,
             focus: 0,
@@ -61,6 +71,7 @@ impl NativeLogin {
             pixel_scale: 1.,
             pressed: false,
             pressed_quality: false,
+            champion_session: slither_client::session_policy::SessionPolicy::new().view(),
         })
     }
     pub fn step(
@@ -80,16 +91,35 @@ impl NativeLogin {
         if intents.contains(&StartMenuIntent::FocusNickname) {
             self.focus = 0;
         }
-        let effects = self
+        let mut effects = self
             .input
             .state
             .sync_menu(&self.state.view(admission), &intents);
+        if self.champion.policy.visible() || self.champion.policy.finished() {
+            self.champion.step(
+                now,
+                self.state.view(admission).login_alpha,
+                &self.champion_session,
+            )?;
+            // Champion host executes these against its own clipboard/IME owner.
+        }
+        if self.champion.policy.finished() {
+            self.state.champion_finished();
+        }
+        if !self.champion.policy.visible() {
+            effects.extend(std::mem::take(&mut self.champion.effects));
+        }
         Ok((intents, effects))
     }
     pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
         self.state.attempt_ended(phase)
     }
     pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        self.champion_session = game.champion_session();
+        self.champion.observe(game);
+        if self.champion.policy.finished() {
+            self.state.champion_finished();
+        }
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
@@ -147,6 +177,12 @@ impl NativeLogin {
         down: Option<bool>,
         admission: bool,
     ) -> Vec<HostEditEffect> {
+        if self.champion.policy.visible() {
+            return self
+                .champion
+                .pointer(&mut self.text, point, down)
+                .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
+        }
         let view = self.state.view(admission);
         self.menu.skin_hovered = view.visible && self.layout.hit_test(E::Skin, point[0], point[1]);
         if let Some(down) = down {
@@ -270,6 +306,12 @@ impl NativeLogin {
         cosmetics: Option<&Cosmetics>,
     ) -> Result<MenuFrame> {
         let mut view = self.state.view(admission);
+        if self.champion.policy.finished() {
+            let alpha = self.champion.policy.ordinary_alpha();
+            view.nickname_alpha *= alpha;
+            view.play_alpha *= alpha;
+            view.skin_alpha *= alpha;
+        }
         self.menu.focus = if view.disabled {
             None
         } else {
@@ -289,7 +331,25 @@ impl NativeLogin {
         self.layout = fresh;
         self.area = area;
         view.nickname = self.displayed_nickname();
-        self.menu.prepare_with_input(
+        let panel = if self.champion.policy.visible() {
+            self.champion.viewport = extent.map(|n| f64::from(n) / dpr);
+            self.champion.panel = self
+                .champion
+                .policy
+                .panel(&self.champion_session, self.champion.viewport);
+            // Keep specialized logo/result producers, suppress the old pending label.
+            view.champion_pending = false;
+            Some(crate::menu::PanelPaint {
+                panel: &self.champion.panel,
+                input: &self.champion.controls,
+                edit: &self.champion.input.state,
+                scroll: &mut self.champion.scroll,
+                theme: slither_client::menu_theme::MenuTheme::default(),
+            })
+        } else {
+            None
+        };
+        self.menu.prepare_with_panel(
             &mut self.text,
             &view,
             &self.layout,
@@ -298,6 +358,7 @@ impl NativeLogin {
             cosmetics,
             0,
             Some(&self.input.state),
+            panel,
         )
     }
     pub fn displayed_nickname(&self) -> String {
@@ -310,6 +371,9 @@ impl NativeLogin {
         text
     }
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
+        if self.champion.policy.visible() {
+            return self.champion.cursor_area(&mut self.text, self.pixel_scale);
+        }
         let r = self.layout.viewport_rect(E::Nickname);
         let editor = self.input.state.editor(TextField::Nickname);
         let (anchor, caret) = editor.selection();

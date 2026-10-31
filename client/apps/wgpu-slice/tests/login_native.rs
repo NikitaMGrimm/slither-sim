@@ -153,42 +153,30 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
         for element in [E::Play, E::NicknameHolder, E::Quality] {
             let mut login = NativeLogin::new("Test").unwrap();
             login.step(0., true, false).unwrap();
-            let logical = login
+            login.step(16., true, false).unwrap();
+            login
                 .prepare(physical.map(|n| (f64::from(n) / dpr) as u32), true, None)
                 .unwrap();
             let rect = login.layout.viewport_rect(element);
             let center = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
-            // Select a real painted quad, then project its centre exactly as the
-            // host projects CSS quads to physical pixels and routes logical input.
-            let index = logical
-                .frame
-                .draws
-                .iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| {
-                    let distance = |d: &slither_wgpu_slice::frame::Draw| {
-                        (d.destination.x + d.destination.width / 2. + d.translation[0] - center[0])
-                            .powi(2)
-                            + (d.destination.y + d.destination.height / 2. + d.translation[1]
-                                - center[1])
-                                .powi(2)
-                    };
-                    distance(a).total_cmp(&distance(b))
-                })
-                .unwrap()
-                .0;
             let host = login.prepare_host(physical, dpr, true, None).unwrap();
             assert_eq!(host.frame.extent, physical);
             assert_eq!(host.frame.viewport_scale, dpr);
-            let draw = &host.frame.draws[index];
-            let point = [
-                (draw.destination.x + draw.destination.width / 2. + draw.translation[0])
-                    * host.frame.viewport_scale
-                    / dpr,
-                (draw.destination.y + draw.destination.height / 2. + draw.translation[1])
-                    * host.frame.viewport_scale
-                    / dpr,
-            ];
+            // Slicing changes quad topology with DPR. Verify the physical target
+            // lies in an actual painted tile, then route its logical inverse.
+            let physical_point = center.map(|n| (n * dpr).round());
+            let point = physical_point.map(|n| n / host.frame.viewport_scale);
+            assert!(
+                host.frame.draws.iter().any(|d| {
+                    let x = d.destination.x + d.translation[0];
+                    let y = d.destination.y + d.translation[1];
+                    point[0] >= x
+                        && point[0] < x + d.destination.width
+                        && point[1] >= y
+                        && point[1] < y + d.destination.height
+                }),
+                "{element:?} at DPR {dpr}: {point:?}"
+            );
             assert!(
                 (point[0] - center[0]).abs() < 2.,
                 "{element:?}: {point:?} {center:?}"
@@ -385,6 +373,7 @@ fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
     for dpr in [1., 1.5, 2.] {
         let mut login = NativeLogin::new("Player").unwrap();
         login.step(0., true, false).unwrap();
+        login.step(16., true, false).unwrap();
         let first = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
         let second = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
         let resized = login.prepare_host([3600, 2025], dpr, true, None).unwrap();
@@ -408,13 +397,11 @@ fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
                 < slither_wgpu_slice::text::MENU_CACHE_BYTES
         );
         if dpr == 2. {
-            // Nickname control/shadow now uses more than the old 1.5x raster.
-            assert!(
-                first
-                    .resources
-                    .iter()
-                    .any(|r| r.asset.handle >> 60 == 7 && r.asset.width > 500)
-            );
+            // A 2x field/shadow still exceeds the old 1.5x density, while
+            // bounded tiles replace the former full-width material.
+            assert!(first.resources.iter().any(|r| r.asset.handle >> 60 == 7
+                && r.asset.height > 200
+                && r.asset.width <= 512));
         }
     }
 }
@@ -566,7 +553,7 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
 }
 
 #[test]
-fn champion_is_only_accepted_v1_and_survives_close_without_ordinary_focus() {
+fn champion_requires_v1_and_close_restores_ordinary_login() {
     use endpoint_tape::{bundle, effects, pump};
     for flag in [None, Some(0), Some(1), Some(2)] {
         let mut game = endpoint_tape::playing();
@@ -594,18 +581,22 @@ fn champion_is_only_accepted_v1_and_survives_close_without_ordinary_focus() {
             pump(&mut game, now);
             login.observe_game(&game).unwrap();
             let (intents, _) = login.step(now, game.can_play(), false).unwrap();
-            if flag == Some(1) {
+            if flag == Some(1)
+                && login.state.view(true).phase != slither_client::start_page::MenuPhase::Login
+            {
                 assert!(!intents.contains(&StartMenuIntent::FocusNickname));
             }
         }
         let view = login.state.view(true);
-        assert_eq!(view.champion_pending, flag == Some(1));
-        assert_eq!(view.ordinary_controls_visible, flag != Some(1));
+        assert!(!view.champion_pending);
+        assert!(view.ordinary_controls_visible);
         assert_eq!(
             view.last_life.label.is_empty(),
             !matches!(flag, Some(0 | 1))
         );
-        assert_eq!(view.disabled, flag == Some(1));
+        assert!(!view.disabled);
+        assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
+        assert!(!game.champion_session().champion_acknowledged);
     }
 }
 
