@@ -60,14 +60,22 @@ fn presentation_bounds_fixed_tape_512_ticks() {
             sim.backend.world.retire(0).unwrap();
             sim.backend
                 .world
-                .respawn(0, Point { x: 4000., y: -2500. }, 0., 16)
+                .respawn(
+                    0,
+                    Point {
+                        x: 4000.,
+                        y: -2500.,
+                    },
+                    0.,
+                    16,
+                )
                 .unwrap();
             respawns += 1;
         }
         if tick == 192 {
             let snake = &sim.backend.world.snakes()[3];
             let mut body = snake.body.clone();
-            body[128].y -= 2000.;
+            body[128].y -= 20.;
             sim.backend
                 .world
                 .correct_pose(3, snake.head, body, snake.heading)
@@ -77,13 +85,12 @@ fn presentation_bounds_fixed_tape_512_ticks() {
         }
         let commands: Vec<_> = (0..4)
             .map(|slot| {
-                let heading = if slot == 0 && (96..112).contains(&tick)
-                    || slot == 0 && (288..304).contains(&tick)
-                {
-                    0
-                } else {
-                    ((tick / 24 + slot * 17) % 251) as u8
-                };
+                let heading =
+                    if slot == 0 && ((96..112).contains(&tick) || (288..304).contains(&tick)) {
+                        0
+                    } else {
+                        ((tick / 24 + slot * 17) % 251) as u8
+                    };
                 sim.receive(slot, &[heading]).unwrap();
                 if tick % 64 == 0 {
                     sim.receive(slot, &[251]).unwrap();
@@ -114,12 +121,36 @@ fn presentation_bounds_fixed_tape_512_ticks() {
             })
             .collect();
         if let Some(trace) = &mut trace {
+            let pickups: Vec<_> = sim
+                .backend
+                .world
+                .pickup_events()
+                .unwrap()
+                .iter()
+                .map(|event| {
+                    let item = match &event.item {
+                        crate::PickupItem::Food(food) => serde_json::json!({"food": food}),
+                        crate::PickupItem::Prey(prey) => serde_json::json!({"prey": prey}),
+                    };
+                    serde_json::json!({"eater": event.eater, "item": item})
+                })
+                .collect();
+            let births: Vec<_> = sim
+                .backend
+                .world
+                .food_spawn_events()
+                .unwrap()
+                .iter()
+                .map(|event| serde_json::json!({"source": event.source, "food": event.food}))
+                .collect();
             serde_json::to_writer(
                 &mut *trace,
                 &serde_json::json!({
                     "tick": tick, "commands": commands,
                     "world": sim.backend.world.checkpoint().unwrap(),
-                    "events": sim.backend.world.events(),
+                    "pickups": pickups,
+                    "foodBirths": births,
+                    "deaths": sim.backend.world.deaths(),
                     "queued": queued, "delivered": delivered,
                 }),
             )
