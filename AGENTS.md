@@ -21,9 +21,6 @@ below apply everywhere.
   behavior from inferred rules. Hashes verify consistency, not scientific claims.
 - Use Conventional Commits and LF; avoid unrelated formatting. Start with focused
   checks, then the relevant [check group](CONTRIBUTING.md#setup-and-checks).
-  In other checkouts or on build hosts, reuse the owner's existing Git name/email
-  from the source checkout; never invent a fallback author email or add the primary
-  author as a co-author. Keep genuine third-party authorship intact.
   Rust/docs need no research stack. Python tooling uses locked uv;
   simulator examples use only the standard library. PR CI runs automatically.
 - Use one task, branch and worktree. Discuss large/API changes first; small fixes

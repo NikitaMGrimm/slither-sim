@@ -336,7 +336,9 @@ fn target(value: v19::Target) -> Target {
     }
 }
 
-#[inline]
+// Project directly into the frame's packet buffer instead of returning a second
+// large enum through a separate call after the shared borrowed decoder.
+#[inline(always)]
 fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
     // Minimap syntax is deliberately deferred to validation after setup/budgets,
     // as before extraction. Eager decoding would change error precedence.
@@ -494,6 +496,35 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
             _ => Packet::Ignored,
         },
     )
+}
+
+struct ParsedPackets<'a> {
+    packets: Vec<Packet<'a>>,
+    setup: bool,
+    retention: bool,
+}
+
+fn parse_packets<'a>(
+    commands: impl ExactSizeIterator<Item = &'a [u8]>,
+) -> Result<ParsedPackets<'a>, String> {
+    let mut parsed = ParsedPackets {
+        packets: Vec::with_capacity(commands.len()),
+        setup: false,
+        retention: false,
+    };
+    for command in commands {
+        let packet = parse(command)?;
+        parsed.setup |= matches!(packet, Packet::Setup(_));
+        parsed.retention |= matches!(
+            packet,
+            Packet::Appear(_)
+                | Packet::Anchor { fam: Some(_), .. }
+                | Packet::Sector(..)
+                | Packet::Pellet(..)
+        );
+        parsed.packets.push(packet);
+    }
+    Ok(parsed)
 }
 
 /// Per-snake bookkeeping beside the receipt tracker, keyed by wire id.
@@ -659,7 +690,9 @@ impl ClientState {
             }
             decode_payload(&bytes[2..])?
         };
-        let setup = frame.commands().any(|command| command.bytes[0] == b'a');
+        let commands = frame.commands().map(|command| command.bytes);
+        let parsed = parse_packets(commands.clone())?;
+        let setup = parsed.setup;
         let (server, header_ms) = if raw {
             let start = if setup {
                 Some(receipt_seconds)
@@ -677,11 +710,7 @@ impl ClientState {
             };
             (ms as f64 / 1000., Some(ms))
         };
-        self.apply(
-            frame.commands().map(|command| command.bytes),
-            server,
-            receipt_seconds,
-        )?;
+        self.apply(commands, parsed, server, receipt_seconds)?;
         self.session.frames += 1;
         self.session.raw_framing = raw;
         if raw && setup {
@@ -702,20 +731,21 @@ impl ClientState {
     ) -> Result<(), String> {
         self.require_connection()?;
         self.local_clock(receipt_seconds)?;
-        self.apply(std::iter::once(packet), server_seconds, receipt_seconds)
+        let commands = std::iter::once(packet);
+        let parsed = parse_packets(commands.clone())?;
+        self.apply(commands, parsed, server_seconds, receipt_seconds)
     }
 
     fn apply<'a>(
         &mut self,
         packets: impl Iterator<Item = &'a [u8]> + Clone,
+        parsed: ParsedPackets<'a>,
         server: f64,
         receipt: f64,
     ) -> Result<(), String> {
-        let parsed = packets.clone().map(parse).collect::<Result<Vec<_>, _>>()?;
-        let setup = parsed.iter().any(|p| matches!(p, Packet::Setup(_)));
         if !server.is_finite()
             || server < 0.
-            || (!setup && self.session.server_time.is_some_and(|last| server < last))
+            || (!parsed.setup && self.session.server_time.is_some_and(|last| server < last))
         {
             return Err("Invalid server clock".into());
         }
@@ -724,7 +754,7 @@ impl ClientState {
         // Cloned only for frames carrying a minimap packet, then committed whole.
         let mut minimap: Option<MinimapDecoder> = None;
         let mut minimap_cells = MAX_FRAME_MINIMAP_CELLS;
-        for (index, packet) in parsed.iter().enumerate() {
+        for (index, packet) in parsed.packets.iter().enumerate() {
             match packet {
                 Packet::Setup(_) if has_setup => {
                     return Err("Repeated setup on one connection".into());
@@ -742,8 +772,10 @@ impl ClientState {
                 _ => {}
             }
         }
-        self.validate_retention(&parsed)?;
-        for packet in parsed {
+        if parsed.retention {
+            self.validate_retention(&parsed.packets)?;
+        }
+        for packet in parsed.packets {
             self.apply_packet(packet, server, receipt)?;
         }
         if let Some(decoder) = minimap {
@@ -757,17 +789,6 @@ impl ClientState {
     /// Simulate retained sizes before committing any packet in a frame. The
     /// food overlay touches only updated IDs, rather than copying all pellets.
     fn validate_retention(&self, packets: &[Packet<'_>]) -> Result<(), String> {
-        if !packets.iter().any(|p| {
-            matches!(
-                p,
-                Packet::Appear(_)
-                    | Packet::Anchor { fam: Some(_), .. }
-                    | Packet::Sector(..)
-                    | Packet::Pellet(..)
-            )
-        }) {
-            return Ok(());
-        }
         let mut lengths: Vec<_> = (0..self.session.slot_count)
             .map(|slot| self.tracker.snake(slot).map_or(0, |snake| snake.body.len()))
             .collect();
