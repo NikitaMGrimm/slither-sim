@@ -13,7 +13,7 @@ mod pit_food_tests;
 mod spawn_bounds;
 #[cfg(test)]
 mod spawn_bounds_tests;
-use crate::bounds_index::{BoundsIndex, CollisionGrid, collision_grid_margin};
+use crate::bounds_index::{BoundsIndex, CollisionGrid};
 use crate::food_grid::{EaterGrid, FoodCache, PelletIndex};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
@@ -1936,18 +1936,15 @@ impl Simulator {
                     .chain(other.body.iter().copied());
                 strikes_scaled(last_tips[i], tip, direction, head_scale, body_scale, line)
             };
-            let grid_candidates = if let Some((grid, max_reach)) = grid.as_ref() {
-                if s.segments <= GRID_HEAD_SEGMENTS {
-                    grid.candidates(tip)
-                } else {
-                    let reach =
-                        collision_grid_margin(head_scale, scale(GRID_HEAD_SEGMENTS), *max_reach);
-                    grid.candidates_near(tip, reach, candidates)
-                        .then_some(candidates.as_slice())
-                }
-            } else {
-                None
-            };
+            let grid_candidates = grid.as_ref().and_then(|(grid, max_reach)| {
+                grid.candidates_for_head(
+                    tip,
+                    head_scale,
+                    scale(GRID_HEAD_SEGMENTS),
+                    *max_reach,
+                    candidates,
+                )
+            });
             // Both visit positions newest first; the index omits only snakes
             // whose bounds fail the test above.
             let killer = if let Some(candidates) = grid_candidates {

@@ -155,6 +155,26 @@ impl CollisionGrid {
         true
     }
 
+    // Keep multi-cell collection and its rounding arithmetic outside advance's
+    // scalar path: small worlds never query this grid.
+    #[inline(never)]
+    pub(crate) fn candidates_for_head<'a>(
+        &'a self,
+        point: Point,
+        head_scale: f64,
+        cap_scale: f64,
+        max_reach: f64,
+        out: &'a mut Vec<u32>,
+    ) -> Option<&'a [u32]> {
+        if head_scale <= cap_scale {
+            self.candidates(point)
+        } else {
+            let reach = collision_grid_margin(head_scale, cap_scale, max_reach);
+            self.candidates_near(point, reach, out)
+                .then_some(out.as_slice())
+        }
+    }
+
     /// None requests the original broad phase for unusual query coordinates.
     pub(crate) fn candidates(&self, point: Point) -> Option<&[u32]> {
         if !point.finite() {
