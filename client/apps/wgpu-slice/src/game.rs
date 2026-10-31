@@ -1,4 +1,5 @@
 //! Shared actual local session. Host effects are acknowledged outside every Rust borrow.
+use crate::latency;
 use crate::{
     Result,
     bank::Bank,
@@ -169,7 +170,7 @@ pub struct LocalGame {
     work: Option<Work>,
     packet_frames: VecDeque<Picture<PreparedFrame>>,
     inflight: u8,
-    deferred: VecDeque<(u32, Vec<u8>, f64)>,
+    deferred: VecDeque<(u32, Vec<u8>, f64, u64)>,
     deferred_bytes: usize,
     own: Option<SnakeObjectToken>,
     extent: [u32; 2],
@@ -383,6 +384,7 @@ impl LocalGame {
             .generation
             .checked_add(1)
             .ok_or("Generation exhausted")?;
+        latency::connection(self.generation);
         self.login = login;
         self.nickname = nickname.into();
         self.endpoint = endpoint.into();
@@ -400,6 +402,20 @@ impl LocalGame {
             .next_effect
             .checked_add(1)
             .ok_or("Effect identity exhausted")?;
+        latency::generation(self.generation);
+        latency::event(
+            "effect",
+            id,
+            0,
+            match kind {
+                EffectKind::Connect(_) => 0,
+                EffectKind::Send(_) => 1,
+                EffectKind::Close => 2,
+            },
+        );
+        if matches!(after, After::Control) {
+            latency::decision(id, self.work.as_ref().map_or(0, |w| u64::from(w.phase - 1)));
+        }
         self.effects.push_back(Pending {
             effect: Effect {
                 id,
@@ -456,6 +472,7 @@ impl LocalGame {
         {
             return Err("Connect must begin before acknowledgement".into());
         }
+        latency::event(if ok { "ack_effect" } else { "failed_effect" }, id, 0, 0);
         let p = self.effects.pop_front().expect("checked");
         if !ok {
             self.fail("Transport effect failed");
@@ -503,6 +520,8 @@ impl LocalGame {
         self.stop_as(false, "Stopped");
     }
     pub fn fail(&mut self, message: &str) {
+        latency::generation(self.generation);
+        latency::event("game_failed", 0, 0, 0);
         if self.failure.is_none() {
             self.failure = Some(message.into());
         }
@@ -539,6 +558,19 @@ impl LocalGame {
         }
     }
     pub fn receive(&mut self, generation: u32, bytes: &[u8], now: f64) -> Result<()> {
+        latency::generation(generation);
+        let message = latency::message();
+        self.receive_message(generation, bytes, now, message)
+    }
+    /// Transport receipt identity survives the existing deferral fences unchanged.
+    pub fn receive_message(
+        &mut self,
+        generation: u32,
+        bytes: &[u8],
+        now: f64,
+        message: u64,
+    ) -> Result<()> {
+        latency::generation(generation);
         if !self.active(generation) {
             return Ok(());
         }
@@ -565,11 +597,13 @@ impl LocalGame {
             {
                 return Err("Deferred receive budget".into());
             }
-            self.deferred.push_back((generation, bytes.to_vec(), now));
+            latency::event("deferred", message, 0, 0);
+            self.deferred
+                .push_back((generation, bytes.to_vec(), now, message));
             self.deferred_bytes += bytes.len();
             return Ok(());
         }
-        self.ingest(bytes, now)
+        self.apply_message(bytes, now, message)
     }
     fn release_stalled_presentation(&mut self) -> Result<()> {
         // Only a fully prepared connected frame may be superseded. Never bypass
@@ -586,10 +620,10 @@ impl LocalGame {
             self.commit_work()?;
         }
         self.supersede_setup_frames()?;
-        while let Some((generation, bytes, now)) = self.deferred.pop_front() {
+        while let Some((generation, bytes, now, message)) = self.deferred.pop_front() {
             self.deferred_bytes -= bytes.len();
             if self.active(generation) {
-                self.ingest(&bytes, now)?;
+                self.apply_message(&bytes, now, message)?;
             }
             // Setup pictures are superseded, not their admitted world/HUD state.
             self.supersede_setup_frames()?;
@@ -607,11 +641,11 @@ impl LocalGame {
         if self.work.is_some() || self.inflight != 0 || !self.effects.is_empty() {
             return Ok(());
         }
-        while let Some((generation, bytes, now)) = self.deferred.pop_front() {
+        while let Some((generation, bytes, now, message)) = self.deferred.pop_front() {
             self.deferred_bytes -= bytes.len();
             if self.active(generation) {
                 self.supersede_setup_frames()?;
-                self.ingest(&bytes, now)?;
+                self.apply_message(&bytes, now, message)?;
             }
             if !self.effects.is_empty() {
                 break;
@@ -624,9 +658,11 @@ impl LocalGame {
     /// have already happened at ingress; never prepare them again. See the
     /// desktop-ordering lane in tools/feel-replay/native-peer.md.
     pub fn begin_redraw(&mut self, now: f64, extent: [u32; 2], scale: f64) -> Result<()> {
+        latency::generation(self.generation);
         self.observe_time(now)?;
         self.viewport(extent, scale)?;
         self.service_ingress()?;
+        latency::last_ingress();
         if self.work.is_none() && self.inflight == 0 && self.effects.is_empty() {
             self.supersede_setup_frames()?;
         }
@@ -642,8 +678,26 @@ impl LocalGame {
             .draws_since_statistics
             .checked_add(draws)
             .ok_or("Quality draw counter exhausted")?;
+        for frame in &self.packet_frames {
+            latency::build("superseded", frame.value.frame.identity);
+        }
         self.packet_frames.clear();
         Ok(())
+    }
+    fn apply_message(&mut self, bytes: &[u8], now: f64, message: u64) -> Result<()> {
+        latency::applying(message);
+        let result = self.ingest(bytes, now);
+        latency::event(
+            if result.is_ok() {
+                "apply_end"
+            } else {
+                "apply_failed"
+            },
+            message,
+            0,
+            0,
+        );
+        result
     }
     fn ingest(&mut self, bytes: &[u8], now: f64) -> Result<()> {
         let mut session = self.session.clone();
@@ -909,6 +963,7 @@ impl LocalGame {
     /// Probe only the existing transactional clock callback; intentionally abort before entity update.
     /// The same owner commits it exactly once after all staged input send acknowledgements.
     pub fn begin_frame(&mut self, now: f64, extent: [u32; 2], scale: f64) -> Result<()> {
+        latency::generation(self.generation);
         self.observe_time(now)?;
         self.viewport(extent, scale)?;
         if self.suspended {
@@ -924,10 +979,10 @@ impl LocalGame {
         {
             return Ok(());
         }
-        while let Some((g, b, t)) = self.deferred.pop_front() {
+        while let Some((g, b, t, message)) = self.deferred.pop_front() {
             self.deferred_bytes -= b.len();
             if self.active(g) {
-                self.ingest(&b, t)?;
+                self.apply_message(&b, t, message)?;
             }
             if !self.packet_frames.is_empty() || !self.effects.is_empty() {
                 return Ok(());
@@ -1157,11 +1212,13 @@ impl LocalGame {
         Ok(())
     }
     pub fn take_frame(&mut self) -> Option<PreparedFrame> {
+        latency::generation(self.generation);
         if self.suspended || self.inflight != 0 {
             return None;
         }
         if let Some(frame) = self.packet_frames.pop_front() {
             self.inflight = 1;
+            latency::issue(frame.value.frame.identity);
             #[cfg(feature = "feel-trace")]
             {
                 self.issued_observation = frame.observation;
@@ -1170,6 +1227,7 @@ impl LocalGame {
         }
         let prepared = self.work.as_mut()?.prepared.take()?;
         self.inflight = 2;
+        latency::issue(prepared.value.frame.identity);
         #[cfg(feature = "feel-trace")]
         {
             self.issued_observation = prepared.observation;
@@ -1189,6 +1247,7 @@ impl LocalGame {
             return Err("No issued frame".into());
         }
         if !success {
+            latency::picture("picture_failed");
             self.fail("GPU presentation failed");
             return Ok(());
         }
@@ -1199,10 +1258,12 @@ impl LocalGame {
             .draws_since_statistics
             .checked_add(1)
             .ok_or("Quality draw counter exhausted")?;
+        latency::picture("presented");
         Ok(())
     }
     /// Retire rejected pixels without losing the issued model/control transaction.
     pub fn skip_frame(&mut self) -> Result<()> {
+        latency::picture("skipped");
         let kind = std::mem::replace(&mut self.inflight, 0);
         if kind == 0 {
             return Err("No issued frame".into());
@@ -1218,6 +1279,9 @@ impl LocalGame {
     }
     fn commit_work(&mut self) -> Result<()> {
         let w = self.work.take().ok_or("Missing frame work")?;
+        if let Some(p) = &w.prepared {
+            latency::build("superseded", p.value.frame.identity);
+        }
         self.client = w.world.ok_or("Missing world candidate")?;
         self.hud = w.hud;
         self.quality = w.quality;
@@ -1255,6 +1319,7 @@ impl LocalGame {
     }
     /// Resize supersedes queued intermediate Setup pictures, never their admitted packet state.
     pub fn viewport(&mut self, extent: [u32; 2], scale: f64) -> Result<()> {
+        latency::generation(self.generation);
         if extent.contains(&0) {
             self.suspended = true;
             self.supersede_setup_frames()?;
@@ -1276,6 +1341,9 @@ impl LocalGame {
                 w.extent = extent;
                 w.scale = scale;
                 if let Some(world) = &mut w.world {
+                    if let Some(p) = &w.prepared {
+                        latency::build("superseded", p.value.frame.identity);
+                    }
                     self.identity += 1;
                     let frame = render::prepare_gameplay(
                         world,
@@ -1304,6 +1372,7 @@ impl LocalGame {
         Ok(())
     }
     pub fn retry_frame(&mut self, frame: PreparedFrame) -> Result<()> {
+        latency::build("retried", frame.frame.identity);
         let frame = Picture {
             value: frame,
             #[cfg(feature = "feel-trace")]
@@ -1317,12 +1386,22 @@ impl LocalGame {
         Ok(())
     }
     pub fn key(&mut self, code: &str, down: bool) -> bool {
-        self.input.key(code, down)
+        latency::generation(self.generation);
+        let admitted = self.input.key(code, down);
+        if admitted {
+            latency::admitted(if matches!(code, "ArrowLeft" | "ArrowRight") {
+                1
+            } else {
+                2
+            });
+        }
+        admitted
     }
     pub fn blur(&mut self) {
         self.input.blur();
     }
     pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
+        latency::generation(self.generation);
         let v = self.client.control_view();
         let head = v.own.map(|o| o.raw_head).unwrap_or_default();
         let args = [
@@ -1343,10 +1422,20 @@ impl LocalGame {
         } else {
             self.input.pointer(&args).map_err(|e| e.to_string())?;
         }
+        if !down || self.input.view().own.is_some() {
+            latency::admitted(0);
+        }
+        if down && self.input.view().own.is_some() {
+            latency::admitted(2);
+        }
         Ok(())
     }
     pub fn mouse_up(&mut self) {
+        latency::generation(self.generation);
         self.input.mouse_up();
+        if self.input.view().own.is_some() {
+            latency::admitted(2);
+        }
     }
     pub fn hud_text(&self) -> String {
         self.hud_view().compact_text()

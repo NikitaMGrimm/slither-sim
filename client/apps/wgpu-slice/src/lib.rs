@@ -11,6 +11,7 @@ pub mod frame;
 pub mod game;
 pub mod gpu;
 pub mod hud;
+pub mod latency;
 pub mod materials;
 pub mod menu;
 pub mod menu_specimen;

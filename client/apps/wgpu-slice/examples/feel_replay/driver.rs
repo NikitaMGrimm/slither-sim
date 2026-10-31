@@ -92,6 +92,11 @@ impl Driver {
                     "close"
                 }
             };
+            if kind == "send" {
+                // Synchronous fake-socket receipts for CPU sidecars, never network evidence.
+                slither_wgpu_slice::latency::accepted(e.id);
+                slither_wgpu_slice::latency::flushed();
+            }
             self.game.acknowledge(g, e.id, true)?;
             self.receipts
                 .push(json!({"generation":g, "id":e.id.to_string(), "kind":kind, "ackMs":now}));

@@ -1,4 +1,5 @@
 //! Native-only platform transport. No socket exists until an explicit Connect effect.
+use crate::latency;
 use crate::{
     Result,
     game::{Effect, EffectKind, server_endpoint},
@@ -9,7 +10,7 @@ use std::{
     net::{Shutdown, SocketAddr, TcpStream, ToSocketAddrs},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc,
     },
     thread,
@@ -39,6 +40,8 @@ pub(crate) struct Wire {
     ready: Option<mio::net::TcpStream>,
     write_blocked: bool,
     deadline: Option<Instant>,
+    read_first: u64,
+    read_last: u64,
     cancel: Arc<AtomicBool>,
     #[cfg(test)]
     test_io: TestIo,
@@ -60,6 +63,8 @@ impl Wire {
     fn ready(&mut self) -> io::Result<()> {
         self.budget()?;
         self.deadline = None;
+        // Only the final handshake read can contain bytes after the HTTP header.
+        self.read_first = self.read_last;
         self.stream.set_read_timeout(None)?;
         self.stream.set_write_timeout(None)?;
         self.stream.set_nonblocking(true)?;
@@ -79,6 +84,15 @@ impl Read for Wire {
             Some(stream) => stream.read(b),
             None => self.stream.read(b),
         };
+        if let Ok(count) = &result
+            && *count > 0
+        {
+            let read = latency::raw_read(*count, self.deadline.is_some());
+            if self.read_first == 0 {
+                self.read_first = read;
+            }
+            self.read_last = read;
+        }
         #[cfg(test)]
         if let Ok(count) = &result {
             self.test_io.read_bytes += *count;
@@ -93,23 +107,32 @@ impl Write for Wire {
         #[cfg(test)]
         if self.test_io.block_writes {
             self.write_blocked = true;
+            latency::write_blocked();
             return Err(ErrorKind::WouldBlock.into());
         }
         let result = match &mut self.ready {
             Some(stream) => stream.write(b),
             None => self.stream.write(b),
         };
+        if let Ok(count) = &result {
+            latency::write_completed(*count);
+        }
         if matches!(&result, Err(e) if e.kind() == ErrorKind::WouldBlock) {
             self.write_blocked = true;
+            latency::write_blocked();
         }
         result
     }
     fn flush(&mut self) -> io::Result<()> {
         self.budget()?;
-        match &mut self.ready {
+        let result = match &mut self.ready {
             Some(stream) => stream.flush(),
             None => self.stream.flush(),
+        };
+        if result.is_ok() {
+            latency::flushed();
         }
+        result
     }
 }
 struct Connector {
@@ -125,6 +148,7 @@ struct Readiness {
     worker: Option<thread::JoinHandle<()>>,
     notify: Arc<dyn Fn() + Send + Sync>,
     error: Arc<Mutex<Option<String>>>,
+    pending: Arc<AtomicU64>,
 }
 impl Readiness {
     fn new(notify: Arc<dyn Fn() + Send + Sync>) -> Result<Self> {
@@ -134,9 +158,15 @@ impl Readiness {
         let error = Arc::new(Mutex::new(None));
         let failure = error.clone();
         let wake = notify.clone();
+        let trace = latency::worker();
+        let generation = latency::current_generation();
+        let pending = Arc::new(AtomicU64::new(0));
+        let first_pending = pending.clone();
         let worker = thread::Builder::new()
             .name("ws-readiness".into())
             .spawn(move || {
+                let _trace = trace.as_ref().map(|r| r.attach());
+                latency::generation(generation);
                 let mut events = Events::with_capacity(8);
                 loop {
                     if let Err(e) = poll.poll(&mut events, None) {
@@ -151,6 +181,20 @@ impl Readiness {
                         break;
                     }
                     if !events.is_empty() {
+                        // Retain only the first unserviced readiness observation, not an arrival claim.
+                        let ns = latency::stamp();
+                        if ns != 0
+                            && first_pending
+                                .compare_exchange(0, ns, Ordering::AcqRel, Ordering::Relaxed)
+                                .is_ok()
+                        {
+                            let interest = events.iter().fold(0, |flags, event| {
+                                flags
+                                    | u64::from(event.is_readable())
+                                    | (u64::from(event.is_writable()) << 1)
+                            });
+                            latency::event("ready", ns, 0, interest);
+                        }
                         wake();
                     }
                 }
@@ -162,6 +206,7 @@ impl Readiness {
             worker: Some(worker),
             notify,
             error,
+            pending,
         })
     }
 }
@@ -182,6 +227,7 @@ pub struct Transport {
     readiness: Option<Readiness>,
     wake: Option<Arc<dyn Fn() + Send + Sync>>,
     writable: bool,
+    messages: std::collections::VecDeque<u64>,
 }
 fn would_block(e: &Error) -> bool {
     matches!(e,Error::Io(e)if e.kind()==ErrorKind::WouldBlock)
@@ -262,6 +308,8 @@ pub(crate) fn connect(url: &str, cancel: &Arc<AtomicBool>, deadline: Instant) ->
         ready: None,
         write_blocked: false,
         deadline: Some(deadline.min(Instant::now() + Duration::from_secs(2))),
+        read_first: 0,
+        read_last: 0,
         cancel: cancel.clone(),
         #[cfg(test)]
         test_io: TestIo::default(),
@@ -284,6 +332,11 @@ impl Transport {
             readiness: None,
             wake: Some(Arc::new(wake)),
             writable: false,
+            messages: std::collections::VecDeque::with_capacity(if latency::worker().is_some() {
+                64
+            } else {
+                0
+            }),
         }
     }
     fn interest(&mut self) -> Result<()> {
@@ -314,6 +367,8 @@ impl Transport {
         Ok(())
     }
     pub fn execute(&mut self, e: &Effect) -> Result<()> {
+        latency::generation(e.generation);
+        latency::writing(e.id);
         match &e.kind {
             EffectKind::Connect(url) => {
                 if self.socket.is_some() || self.connector.is_some() {
@@ -330,9 +385,13 @@ impl Transport {
                 let cancel = Arc::new(AtomicBool::new(false));
                 let flag = cancel.clone();
                 let notify = self.readiness.as_ref().map(|r| r.notify.clone());
+                let trace = latency::worker();
+                let generation = e.generation;
                 let worker = thread::Builder::new()
                     .name("ws-connect".into())
                     .spawn(move || {
+                        let _trace = trace.as_ref().map(|r| r.attach());
+                        latency::generation(generation);
                         let result = connect(&url, &flag, Instant::now() + Duration::from_secs(3));
                         let _ = tx.send(result);
                         if let Some(notify) = notify {
@@ -356,16 +415,21 @@ impl Transport {
                 // tungstenite retains a WouldBlock write; never enqueue the same message again.
                 match socket.write(Message::Binary(bytes.clone().into())) {
                     Ok(()) => {}
-                    Err(error) if would_block(&error) => {}
+                    Err(error) if would_block(&error) => {
+                        latency::event("backpressure", e.id, 0, 0);
+                    }
                     Err(error) => return Err(error.to_string()),
                 }
+                latency::accepted(e.id);
                 self.pending_bytes += bytes.len();
                 match socket.flush() {
                     Ok(()) => {
                         self.pending_bytes = 0;
                         socket.get_mut().write_blocked = false;
                     }
-                    Err(error) if would_block(&error) => {}
+                    Err(error) if would_block(&error) => {
+                        latency::event("backpressure", e.id, 0, 0);
+                    }
                     Err(error) => return Err(error.to_string()),
                 }
                 self.interest()
@@ -376,7 +440,22 @@ impl Transport {
             }
         }
     }
+    pub fn message_id(&mut self) -> u64 {
+        self.messages.pop_front().unwrap_or(0)
+    }
     pub fn poll(&mut self) -> Vec<Event> {
+        latency::generation(self.generation);
+        latency::writing(0);
+        let poll = latency::poll();
+        if poll != 0
+            && let Some(r) = &self.readiness
+        {
+            let ready = r.pending.swap(0, Ordering::AcqRel);
+            if ready != 0 {
+                latency::event("poll_ready", poll, ready, 0);
+            }
+        }
+        self.messages.clear();
         let mut events = Vec::new();
         let error = self
             .readiness
@@ -422,7 +501,9 @@ impl Transport {
                     self.pending_bytes = 0;
                     socket.get_mut().write_blocked = false;
                 }
-                Err(e) if would_block(&e) => {}
+                Err(e) if would_block(&e) => {
+                    latency::event("flush_blocked", 0, 0, 0);
+                }
                 Err(e) => {
                     let error = e.to_string();
                     self.drop_socket();
@@ -435,6 +516,13 @@ impl Transport {
             for index in 0..64 {
                 match socket.read() {
                     Ok(Message::Binary(bytes)) => {
+                        let wire = socket.get_mut();
+                        let message = latency::message_reads(wire.read_first, wire.read_last);
+                        // Buffered messages may share the last raw read. Keep that uncertainty.
+                        wire.read_first = wire.read_last;
+                        if message != 0 {
+                            self.messages.push_back(message);
+                        }
                         events.push(Event::Binary(self.generation, bytes.to_vec()))
                     }
                     Ok(Message::Close(_)) => {
@@ -493,6 +581,7 @@ impl Transport {
         self.interest()
     }
     pub fn close(&mut self) {
+        latency::generation(self.generation);
         if let Some(mut c) = self.connector.take() {
             c.cancel.store(true, Ordering::SeqCst);
             if let Some(t) = c.thread.take() {
@@ -509,6 +598,7 @@ impl Transport {
         self.pending_bytes = 0;
     }
     fn drop_socket(&mut self) {
+        latency::abandoned();
         if let Some(mut socket) = self.socket.take()
             && let (Some(readiness), Some(stream)) = (&self.readiness, &mut socket.get_mut().ready)
         {
@@ -625,6 +715,8 @@ mod tests {
         // ORIGINAL SYNTHETIC server frame. Exercise both a split header and a
         // split payload; the peer cannot send the rest until the first read.
         for split in [1, 4] {
+            let trace = latency::Recorder::new(4096);
+            let buffer = trace.attach();
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
             let (advance, steps) = mpsc::channel();
@@ -691,6 +783,23 @@ mod tests {
             transport.close();
             advance.send(()).unwrap();
             peer.join().unwrap();
+            drop(buffer);
+            let (rows, dropped) = trace.snapshot();
+            assert_eq!(dropped, 0);
+            let messages: Vec<_> = rows.iter().filter(|r| r.stage == "message").collect();
+            assert_eq!(messages.len(), 2);
+            assert_ne!(messages[0].id, messages[1].id);
+            assert_ne!(messages[0].related, messages[0].detail);
+            for message in messages {
+                for read in [message.related, message.detail] {
+                    assert!(
+                        rows.iter()
+                            .any(|r| matches!(r.stage, "read" | "handshake_read")
+                                && r.id == read
+                                && r.ns <= message.ns)
+                    );
+                }
+            }
         }
     }
 
@@ -698,6 +807,8 @@ mod tests {
     fn would_block_write_flushes_on_readiness_without_requeuing_the_message() {
         // ORIGINAL SYNTHETIC peer; injected WouldBlock avoids host-dependent
         // socket buffer saturation while exercising Transport's real send path.
+        let trace = latency::Recorder::new(4096);
+        let buffer = trace.attach();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
         let (received, packets) = mpsc::channel();
@@ -734,6 +845,8 @@ mod tests {
         assert!(transport.socket.as_ref().unwrap().get_ref().write_blocked);
         assert_eq!(transport.pending_bytes, 2);
         assert!(transport.writable);
+        // Accepted means tungstenite owns the bytes, even while Wire cannot write.
+        latency::event("test_blocked_boundary", 2, 0, 0);
         transport
             .socket
             .as_mut()
@@ -764,6 +877,34 @@ mod tests {
         transport.close();
         finish.send(()).unwrap();
         peer.join().unwrap();
+        drop(buffer);
+        let (rows, dropped) = trace.snapshot();
+        assert_eq!(dropped, 0);
+        let accepted = rows
+            .iter()
+            .position(|r| r.stage == "accepted" && r.id == 2)
+            .unwrap();
+        let blocked = rows
+            .iter()
+            .position(|r| r.stage == "test_blocked_boundary")
+            .unwrap();
+        let flushed = rows
+            .iter()
+            .position(|r| r.stage == "flushed" && r.id == 2)
+            .unwrap();
+        assert!(accepted < blocked && blocked < flushed);
+        assert_eq!(
+            rows.iter()
+                .filter(|r| r.stage == "accepted" && r.id == 2)
+                .count(),
+            1
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|r| r.stage == "flushed" && r.id == 2)
+                .count(),
+            1
+        );
     }
 
     #[test]

@@ -774,6 +774,7 @@ pub fn prepare_gameplay(
     identity: u64,
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
+    crate::latency::build("build_begin", identity);
     let announcement = client.announcement_view();
     prepare_composed(
         client,
@@ -1412,7 +1413,17 @@ pub fn finish_hud(
 ) -> Result<PreparedFrame> {
     let ui = prepared.ui_frame();
     let plan = crate::hud::plan(hud, ui.extent, ui.viewport_scale);
-    finish_plan(prepared, bank, plan.map_err(str::to_owned))
+    let identity = prepared.frame.identity;
+    let result = finish_plan(prepared, bank, plan.map_err(str::to_owned));
+    crate::latency::build(
+        if result.is_ok() {
+            "build_end"
+        } else {
+            "build_failed"
+        },
+        identity,
+    );
+    result
 }
 
 #[cfg(test)]
