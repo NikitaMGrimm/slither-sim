@@ -410,6 +410,120 @@ fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
 mod endpoint_tape;
 
 #[test]
+fn early_return_click_uses_animated_hit_rect_and_waits_for_close_ack() {
+    use endpoint_tape::{bundle, pump};
+    use slither_wgpu_slice::{endpoint_login, game::EffectKind};
+    let mut game = endpoint_tape::playing();
+    let mut login = NativeLogin::new("Stored").unwrap();
+    login.step(0., true, false).unwrap();
+    login.activate(true);
+    login.step(16., true, false).unwrap();
+    pump(&mut game, 600.);
+    login.observe_game(&game).unwrap();
+    login.step(600., false, false).unwrap();
+    game.receive(game.generation(), &bundle(&[vec![b'v', 0]]), 700.)
+        .unwrap();
+    login.observe_game(&game).unwrap();
+    login.prepare_host([1920, 1080], 1., false, None).unwrap();
+    let hold = login.layout.viewport_rect(E::Play);
+    let hold_point = [hold.x + hold.width / 2., hold.y + hold.height / 2.];
+    login.pointer(hold_point, Some(true), false);
+    login.pointer(hold_point, Some(false), false);
+    assert_eq!(login.state.view(false).phase, MenuPhase::DeathHold);
+    let generation = game.generation();
+    let mut clicked = false;
+    let mut close_checked = false;
+    let mut previous = 1.;
+    for frame in 0..=150 {
+        let now = 2301. + f64::from(frame) * 16.;
+        game.receive(generation, &bundle(&[vec![b'p']]), now)
+            .unwrap();
+        game.begin_frame(now, [960, 540], 1.).unwrap();
+        login.observe_game(&game).unwrap();
+        let view = login.state.view(game.can_play());
+        assert_eq!(view.transition, game.login_session().return_fraction);
+        assert!(view.transition <= previous);
+        previous = view.transition;
+        assert!(login.step(now, false, false).unwrap().0.is_empty());
+        if !clicked && view.phase == MenuPhase::Returning && view.transition < 0.8 {
+            assert!(view.disabled && !view.play_disabled);
+            assert_eq!(login.input.state.focus(), None);
+            login.input.state.apply_menu(
+                EditIntent::KeyText("Changed".into()),
+                &mut login.state,
+                false,
+            );
+            assert_eq!(login.state.view(false).nickname, "Stored");
+            login.prepare_host([1920, 1080], 1., false, None).unwrap();
+            let r = login.layout.viewport_rect(E::Play);
+            let point = [r.x + r.width - 0.1, r.y + r.height / 2.];
+            let mut settled = login.layout.clone();
+            settled.scale = settled.base_scale;
+            assert!(!settled.hit_test(E::Play, point[0], point[1]));
+            assert!(login.layout.hit_test(E::Play, point[0], point[1]));
+            for _ in 0..2 {
+                login.pointer(point, Some(true), false);
+                login.pointer(point, Some(false), false);
+            }
+            let queued = login.state.view(false);
+            assert_eq!(queued.phase, MenuPhase::Connecting);
+            assert!(queued.disabled && queued.play_disabled && queued.spinner_visible);
+            assert_eq!(queued.transition, view.transition);
+            clicked = true;
+        }
+        while let Some(effect) = game.effect() {
+            assert!(!matches!(effect.kind, EffectKind::Connect(_)));
+            if matches!(effect.kind, EffectKind::Close) {
+                assert!(clicked && !game.can_play());
+                assert!(
+                    login
+                        .step(now, game.can_play(), false)
+                        .unwrap()
+                        .0
+                        .is_empty()
+                );
+                close_checked = true;
+            }
+            game.acknowledge(effect.generation, effect.id, true)
+                .unwrap();
+        }
+        login.observe_game(&game).unwrap();
+        if let Some(_picture) = game.take_frame() {
+            assert!(!game.can_play());
+            assert!(
+                login
+                    .step(now, game.can_play(), false)
+                    .unwrap()
+                    .0
+                    .is_empty()
+            );
+            game.presented(true).unwrap();
+        }
+        if close_checked && game.can_play() {
+            assert_eq!(game.generation(), generation);
+            assert_eq!(login.state.view(false).transition, 0.);
+            let intents = login.step(now + 1., true, false).unwrap().0;
+            assert!(
+                matches!(intents.as_slice(), [StartMenuIntent::Play { nickname, .. }] if nickname == "Stored")
+            );
+            assert!(login.step(now + 2., true, false).unwrap().0.is_empty());
+            endpoint_login::play(&mut game, "ws://127.0.0.1:19491/slither", "Stored", 0).unwrap();
+            pump(&mut game, now + 3.);
+            let connect = game.effect().unwrap();
+            assert!(matches!(connect.kind, EffectKind::Connect(_)));
+            game.construct(connect.generation, connect.id, now + 3.)
+                .unwrap();
+            game.acknowledge(connect.generation, connect.id, true)
+                .unwrap();
+            assert!(game.effect().is_none());
+            assert_eq!(game.generation(), generation + 1);
+            return;
+        }
+    }
+    panic!("return must finish and dispatch exactly one admitted replay");
+}
+
+#[test]
 fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
     use endpoint_tape::{bundle, effects, pump};
     use slither_client::{presentation::ScoreTables, start_page::MenuAction};

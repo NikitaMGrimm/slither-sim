@@ -19,11 +19,12 @@ function fixture(extra = {}, adapter = {}) {
     play_label(){return 'Play';}
     observe_life(phase){calls.push(['terminal',phase]);return phase==='failed';}
     pointer(...args){calls.push(args);}
-    step(){return Object.fromEntries(['logo','last','tips','holder','input','play','skin','quality_rect','spinner'].map(k=>[k,[0,0,100,30]]).concat(Object.entries({visible:true,disabled:false,ordinary_controls_visible:true,last_label:'',last_number:'\u00a0',last_suffix:'',last_label_alpha:.45,alpha:1,logo_alpha:1,nickname_alpha:1,play_alpha:1,skin_alpha:1,tip_alpha:1,hover:0,press:0,scale:1,nickname:composingValue,placeholder:'Nickname',play_label:'Play',tip:'Eat',skin_label:'Change Skin',quality_label:'Graphics quality',quality:'high',spinner_visible:false,spinner_alpha:0,spinner_scale:0,spinner_time:0,...extra})));}
+    step(){return Object.fromEntries(['logo','last','tips','holder','input','play','skin','quality_rect','spinner'].map(k=>[k,[0,0,100,30]]).concat(Object.entries({visible:true,disabled:false,play_disabled:extra.disabled??false,ordinary_controls_visible:true,last_label:'',last_number:'\u00a0',last_suffix:'',last_label_alpha:.45,alpha:1,logo_alpha:1,nickname_alpha:1,play_alpha:1,skin_alpha:1,tip_alpha:1,hover:0,press:0,scale:1,nickname:composingValue,placeholder:'Nickname',play_label:'Play',tip:'Eat',skin_label:'Change Skin',quality_label:'Graphics quality',quality:'high',spinner_visible:false,spinner_alpha:0,spinner_scale:0,spinner_time:0,...extra})));}
+    cancel_pending_play(){calls.push('cancel_pending');}
     free(){calls.push('free');}
   }
   const ui=mountLogin({realm,LoginMenu:Policy,isCurrent:()=>alive,available:()=>true,playing:()=>false,play:()=>calls.push('play'),release:()=>calls.push('release'),...adapter});
-  const emit=(node,type,fields={})=>{const e=new Event(type,{cancelable:true});Object.assign(e,fields);node.dispatchEvent(e);};
+  const emit=(node,type,fields={})=>{const e=new Event(type,{cancelable:true});Object.assign(e,fields);node.dispatchEvent(e);return e;};
   return {ui,realm,emit,actions,calls,stale(){alive=false;}};
 }
 test('IME Enter belongs to composition through key release; pointer Play uses committed value',()=>{
@@ -81,4 +82,28 @@ test('WebGPU midpoint keeps canvas opacity at one and the independently faded HU
     if(!fadeWorld)assert.equal(hudAlpha*world.style.opacity,.5);
     f.ui.dispose();
   }
+});
+
+
+test('returning Play is enabled while nickname stays disabled and locks on click without admission',()=>{
+  const f=fixture({disabled:true,play_disabled:false,alpha:.4,scale:1.036},{available:()=>false});
+  f.ui.frame(16);
+  assert.equal(f.ui.input.disabled,true);
+  assert.equal(f.ui.button.disabled,false);
+  f.emit(f.ui.button,'click');f.emit(f.ui.button,'click');
+  assert.equal(f.actions.filter(a=>a[0]==='play').length,1);
+  assert.equal(f.ui.button.disabled,true);
+  f.emit(f.realm,'keydown',{code:'Escape'});
+  assert.ok(f.calls.includes('cancel_pending'));
+  f.ui.dispose();
+});
+
+
+test('return Enter delegates to policy and suppresses the native button default click',()=>{
+  const f=fixture({disabled:true,play_disabled:false});
+  f.ui.frame(16);
+  const event=f.emit(f.realm,'keydown',{key:'Enter',code:'Enter',repeat:false});
+  assert.equal(event.defaultPrevented,true);
+  assert.deepEqual(f.actions,[['enter',false,true]]);
+  f.ui.dispose();
 });

@@ -953,7 +953,11 @@ pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<
                     String::new()
                 },
                 false,
-                enabled,
+                if id == "play" {
+                    !view.play_disabled && !input.modal
+                } else {
+                    enabled
+                },
                 vec![AccessibleAction::Menu(action)],
             );
         }

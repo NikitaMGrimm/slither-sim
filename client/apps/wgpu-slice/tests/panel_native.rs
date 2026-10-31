@@ -93,6 +93,79 @@ fn victory_at(
 }
 
 #[test]
+fn early_play_waits_for_champion_ack_or_disconnect_and_editor_exit() {
+    use slither_client::{
+        menu_controls::Activation,
+        start_page::{MenuAction, MenuPhase, StartMenuIntent},
+    };
+    for disconnect in [false, true] {
+        let (mut game, mut login) = victory_at(2408);
+        let generation = game.generation();
+        let returning = login.state.view(false);
+        assert_eq!(returning.phase, MenuPhase::Returning);
+        assert!(returning.transition > 0. && returning.transition < 1.);
+        assert!(
+            game.save_champion(generation, &[65], Activation::Pointer)
+                .unwrap()
+        );
+        assert_eq!(tape::effects(&mut game), [vec![255, 118, 65]]);
+
+        // Even with admission supplied, neither an explicit Play nor native
+        // Enter can bypass the mounted editor or queue a replay behind it.
+        let reject_play = |login: &mut slither_wgpu_slice::login_native::NativeLogin, now| {
+            assert!(login.champion.policy.visible());
+            let view = login.state.view(true);
+            assert!(view.play_disabled && !view.ordinary_controls_visible);
+            login.state.action(MenuAction::Play, true);
+            login.activate(true);
+            let (intents, _) = login.step(now, true, false).unwrap();
+            assert!(
+                !intents
+                    .iter()
+                    .any(|i| matches!(i, StartMenuIntent::Play { .. }))
+            );
+            assert_ne!(login.state.view(true).phase, MenuPhase::Connecting);
+        };
+        reject_play(&mut login, 2408.);
+        for now in (2448..=6008).step_by(40) {
+            game.receive(generation, b"p", f64::from(now)).unwrap();
+            tape::pump(&mut game, f64::from(now));
+            login.observe_game(&game).unwrap();
+            reject_play(&mut login, f64::from(now));
+        }
+        assert_eq!(login.state.view(false).transition, 0.);
+        assert!(game.champion_session().champion_sent);
+        assert!(!game.champion_session().champion_acknowledged);
+        if disconnect {
+            game.closed(generation);
+        } else {
+            game.receive(generation, &[b'v', 2], 6048.).unwrap();
+        }
+        for now in (6048..=7208).step_by(40) {
+            tape::pump(&mut game, f64::from(now));
+            login.observe_game(&game).unwrap();
+            if login.champion.policy.visible() {
+                reject_play(&mut login, f64::from(now));
+            } else {
+                let (intents, _) = login.step(f64::from(now), game.can_play(), false).unwrap();
+                assert!(
+                    !intents
+                        .iter()
+                        .any(|i| matches!(i, StartMenuIntent::Play { .. }))
+                );
+            }
+        }
+        assert!(login.champion.policy.finished() && game.can_play());
+        assert_eq!(game.champion_session().champion_acknowledged, !disconnect);
+        assert_eq!(game.generation(), generation);
+        assert!(!login.state.view(true).play_disabled);
+        login.state.action(MenuAction::Play, game.can_play());
+        let (intents, _) = login.step(7248., game.can_play(), false).unwrap();
+        assert!(matches!(intents.as_slice(), [StartMenuIntent::Play { .. }]));
+    }
+}
+
+#[test]
 fn returned_champion_empty_full_and_selected_compose_at_high_dpr() {
     let (_, mut login) = victory_at(6008);
     assert_eq!(login.champion.panel.alpha, 1.);

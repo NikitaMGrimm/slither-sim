@@ -91,7 +91,8 @@ pub enum MenuAction {
 pub enum StartMenuIntent {
     /// Focus the nickname field.
     FocusNickname,
-    /// A once-only request on the update after the click. The caller must use its
+    /// A once-only request on the first admitted update after the click/return.
+    /// The caller must use its
     /// existing route/profile admission; this data alone grants no connection.
     Play {
         /// Normalized committed name frozen at the click.
@@ -114,8 +115,10 @@ pub struct StartMenuView {
     pub phase: MenuPhase,
     /// Whether the login is mounted, even at zero opacity during return.
     pub visible: bool,
-    /// Input/button disable state, including admission and champion suppression.
+    /// Nickname and other ordinary controls remain disabled through return.
     pub disabled: bool,
+    /// Play can accept one queued click during the visible ordinary return.
+    pub play_disabled: bool,
     /// Champion is deliberately incomplete until the editor lane is integrated.
     pub champion_pending: bool,
     /// Ordinary nickname/Play/skin controls are suppressed for a champion.
@@ -200,6 +203,8 @@ pub struct StartMenuState {
     spinner_progress: f64,
     pending_play: Option<(String, MenuQuality)>,
     focus_pending: bool,
+    return_play: bool,
+    return_enter_enabled: bool,
 }
 
 impl StartMenuState {
@@ -236,6 +241,8 @@ impl StartMenuState {
             spinner_progress: 0.,
             pending_play: None,
             focus_pending: true,
+            return_play: false,
+            return_enter_enabled: false,
         }
     }
 
@@ -260,27 +267,35 @@ impl StartMenuState {
     }
 
     fn play_enabled(&self, admission_available: bool) -> bool {
-        self.phase == MenuPhase::Login && !self.champion && admission_available
+        !self.champion
+            && (self.phase == MenuPhase::Returning
+                || (self.phase == MenuPhase::Login && admission_available))
     }
 
     /// Route an action. `admission_available` must come from the existing admission
-    /// owner. An admitted Play locks immediately and yields data on the next step.
+    /// owner. A visible return can queue Play before that admission is ready;
+    /// the request remains locked until return completion and an admitted step.
     pub fn action(
         &mut self,
         action: MenuAction,
         admission_available: bool,
     ) -> Option<StartMenuIntent> {
+        let returning = self.phase == MenuPhase::Returning;
+        let activation = action == MenuAction::Play
+            || (action == MenuAction::Enter { composing: false }
+                && (!returning || self.return_enter_enabled));
+        if activation && self.play_enabled(admission_available) {
+            self.return_play = returning;
+            self.phase = MenuPhase::Connecting;
+            self.focus_pending = false;
+            self.pending_play = Some((self.nickname.clone(), self.quality));
+            self.spinner_visible = true;
+            return None;
+        }
         if self.phase != MenuPhase::Login || self.champion {
             return None;
         }
         match action {
-            MenuAction::Play | MenuAction::Enter { composing: false } if admission_available => {
-                self.phase = MenuPhase::Connecting;
-                self.focus_pending = false;
-                self.pending_play = Some((self.nickname.clone(), self.quality));
-                self.spinner_visible = true;
-                None
-            }
             MenuAction::FocusNickname => Some(StartMenuIntent::FocusNickname),
             MenuAction::Skin => Some(StartMenuIntent::OpenSkinChooser),
             MenuAction::Server => Some(StartMenuIntent::OpenServerPicker),
@@ -320,6 +335,7 @@ impl StartMenuState {
         self.replay = true;
         self.champion = phase == Phase::Victory;
         self.phase = MenuPhase::DeathHold;
+        self.return_enter_enabled = false;
         self.lag = 1.;
         Ok(true)
     }
@@ -332,6 +348,20 @@ impl StartMenuState {
         session: MenuSession,
         capture: Option<HudFinal>,
     ) -> Result<bool, &'static str> {
+        let life = crate::session_policy::Lifecycle {
+            death_pending: session.death_pending,
+            return_active: session.return_active,
+            return_completed: !session.death_pending && session.return_fraction == 0.,
+            return_fraction: session.return_fraction,
+        };
+        // A click locks immediately, but the old session still owns its return
+        // clock. Never treat its playing/outcome flags as a fresh attempt.
+        if self.return_play {
+            self.observe_return(life);
+            // Browser admission owners still need the old return-completion
+            // notification, even though no nickname focus is requested.
+            return Ok(!self.return_play);
+        }
         // The previous generation can still be terminal while Play is queued.
         if self.pending_play.is_some() {
             return Ok(false);
@@ -354,6 +384,10 @@ impl StartMenuState {
         if let Some(outcome) = session.outcome {
             self.accepted_game_over(outcome, capture)?;
         }
+        self.return_enter_enabled = matches!(
+            session.phase,
+            Phase::Ready | Phase::Disconnected | Phase::Failed
+        );
         let mut returned = false;
         if matches!(
             self.phase,
@@ -372,12 +406,7 @@ impl StartMenuState {
             }
             if matches!(self.phase, MenuPhase::DeathHold | MenuPhase::Returning) {
                 returned = !session.death_pending && self.transition == 0. && !self.champion;
-                self.observe_return(crate::session_policy::Lifecycle {
-                    death_pending: session.death_pending,
-                    return_active: session.return_active,
-                    return_completed: !session.death_pending && self.transition == 0.,
-                    return_fraction: self.transition,
-                });
+                self.observe_return(life);
             } else if matches!(session.phase, Phase::Failed | Phase::Disconnected) {
                 self.disconnected();
                 return Ok(true);
@@ -389,6 +418,13 @@ impl StartMenuState {
     /// Same-step lifecycle projection, also useful to offline callers. No clock
     /// or delta is recomputed here; SessionPolicy owns the strict hold and fade.
     pub fn observe_return(&mut self, life: crate::session_policy::Lifecycle) {
+        if self.return_play {
+            self.transition = life.return_fraction;
+            if life.return_completed {
+                self.return_play = false;
+            }
+            return;
+        }
         if !matches!(self.phase, MenuPhase::DeathHold | MenuPhase::Returning) {
             return;
         }
@@ -418,15 +454,17 @@ impl StartMenuState {
     }
 
     /// A prepared return may still await picture/transport acknowledgement.
-    /// Retain its focus intent until the existing admission owner is ready.
+    /// Retain focus and a frozen Play until the existing admission owner is ready.
     pub fn step_with_admission(
         &mut self,
         now_ms: f64,
         lagging: bool,
         admission: bool,
     ) -> Result<Vec<StartMenuIntent>, &'static str> {
-        let mut intents = self.step(now_ms, lagging)?;
-        if !self.play_enabled(admission) && intents.contains(&StartMenuIntent::FocusNickname) {
+        let mut intents = self.advance(now_ms, lagging, admission)?;
+        if (self.phase != MenuPhase::Login || self.champion || !admission)
+            && intents.contains(&StartMenuIntent::FocusNickname)
+        {
             self.focus_pending = true;
             intents.retain(|intent| *intent != StartMenuIntent::FocusNickname);
         }
@@ -446,6 +484,20 @@ impl StartMenuState {
         true
     }
 
+    /// Cancel a queued click without restarting the old session's return.
+    pub fn cancel_pending_play(&mut self) {
+        if self.pending_play.is_none() {
+            return;
+        }
+        let returning = self.return_play.then_some(self.transition);
+        self.disconnected();
+        if let Some(fraction) = returning {
+            self.phase = MenuPhase::Returning;
+            self.transition = fraction;
+            self.focus_pending = false;
+        }
+    }
+
     /// Explicit transport-failure return; retains prior last-life content and never
     /// invents an outcome. The champion owner completes its editor exit separately.
     pub fn disconnected(&mut self) {
@@ -456,6 +508,7 @@ impl StartMenuState {
         self.transition = 0.;
         self.outgoing_active = false;
         self.pending_play = None;
+        self.return_play = false;
         self.focus_pending = !self.champion;
         self.spinner_visible = false;
         self.spinner_alpha = 0.;
@@ -468,10 +521,20 @@ impl StartMenuState {
     /// Advance one animation callback at a finite monotonic clock. Frame delta is
     /// elapsed/8 clamped before lag; logo/outgoing use their separate /25 clock.
     /// Death/return uses observe_session, never this animation clock.
+    /// Hosts must use `step_with_admission`; this convenience assumes admission.
     pub fn step(
         &mut self,
         now_ms: f64,
         lagging: bool,
+    ) -> Result<Vec<StartMenuIntent>, &'static str> {
+        self.step_with_admission(now_ms, lagging, true)
+    }
+
+    fn advance(
+        &mut self,
+        now_ms: f64,
+        lagging: bool,
+        admission: bool,
     ) -> Result<Vec<StartMenuIntent>, &'static str> {
         if !now_ms.is_finite() || now_ms < 0. {
             return Err("Invalid menu clock");
@@ -496,7 +559,10 @@ impl StartMenuState {
         if let Some(focus) = self.take_focus_intent() {
             intents.push(focus);
         }
-        if let Some((nickname, quality)) = self.pending_play.take() {
+        if admission
+            && !self.return_play
+            && let Some((nickname, quality)) = self.pending_play.take()
+        {
             intents.push(StartMenuIntent::Play { nickname, quality });
         }
         if self.spinner_visible {
@@ -558,12 +624,13 @@ impl StartMenuState {
                 label_alpha: 0.45,
             },
         );
-        let disabled = !self.play_enabled(admission_available);
+        let disabled = self.phase != MenuPhase::Login || self.champion || !admission_available;
         StartMenuView {
             phase: self.phase,
             visible: self.phase != MenuPhase::World
                 && (self.phase != MenuPhase::DeathHold || self.transition < 1.),
             disabled,
+            play_disabled: !self.play_enabled(admission_available),
             champion_pending: self.champion,
             ordinary_controls_visible: !self.champion,
             nickname: self.nickname.clone(),
@@ -577,7 +644,8 @@ impl StartMenuState {
             transition: self.transition,
             login_alpha: 1. - self.transition,
             world_alpha: self.transition,
-            play_return_alpha: if matches!(self.phase, MenuPhase::Returning | MenuPhase::DeathHold)
+            play_return_alpha: if self.return_play
+                || matches!(self.phase, MenuPhase::Returning | MenuPhase::DeathHold)
             {
                 1. - 0.5 * (6. * self.transition).clamp(0., 1.)
             } else {
@@ -591,8 +659,16 @@ impl StartMenuState {
             tip: self.tip_index.map_or("\u{a0}", |i| wording.tips[i]),
             tips_visible: self.tips_active,
             tip_alpha: if self.tips_active { self.tip_alpha } else { 0. },
-            hover_alpha: if disabled { 0. } else { self.hover_alpha },
-            press_alpha: if disabled { 0. } else { self.press_alpha },
+            hover_alpha: if self.play_enabled(admission_available) {
+                self.hover_alpha
+            } else {
+                0.
+            },
+            press_alpha: if self.play_enabled(admission_available) {
+                self.press_alpha
+            } else {
+                0.
+            },
             spinner_visible: self.spinner_visible,
             spinner_time: self.spinner_time,
             spinner_alpha: self.spinner_alpha,

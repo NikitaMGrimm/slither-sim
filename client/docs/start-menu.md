@@ -7,7 +7,7 @@ the copied core projection in both Wasm builds. Real input/button elements own
 browser editing, IME, clipboard and accessibility; Rust owns normalization,
 once-only Play, styles' state, transformed geometry and animation clocks.
 
-`StartMenuState` emits a frozen Play request on the next menu update. Each host
+`StartMenuState` emits a frozen Play request on the next admitted menu update. Each host
 then uses its existing explicit route/profile/session admission. Initial native
 CLI values seed the login; neither startup nor quality/skin interaction opens
 a game socket. The first accepted gameplay update starts the outgoing fade;
@@ -73,7 +73,7 @@ new hover/press activation while still accepting leave/release cleanup.
 Pass clock milliseconds relative to state creation. Logo/outgoing use elapsed/25;
 the frame clock clamps elapsed/8 to 0..5 before damping. Button layers advance
 once per callback. A Play action consumes the menu's click lock immediately;
-the next `step` returns one frozen nickname/quality request. It does not grant
+the next admitted `step` returns one frozen nickname/quality request. It does not grant
 route/profile authority. The existing admission owner must authorize execution.
 Call `begin_outgoing` only after that request has been emitted and gameplay
 accepted, at the same clock seam. Effects execute outside core borrows.
@@ -93,7 +93,18 @@ The session closes/resets ordinary lives at return completion; each replay uses
 the existing explicit admission and fresh native profile preparation. Final
 length is an unbordered line with a 0.45-alpha prefix, real bold ungrouped
 number and regular punctuation. Native restores nickname focus after the
-completed picture commits. Canvas and WebGPU remain working reference tools;
+completed picture commits.
+During ordinary return, `play_disabled` is independent of `disabled`: the Play
+button can accept one click while nickname editing/focus remain disabled. The
+click freezes the stored nickname/quality and shows the connecting spinner,
+but the old session continues to drive the return fraction, scale and opacity.
+The request waits for both return completion and the existing host admission
+(including terminal session, Close acknowledgement and committed picture).
+Enter during return is accepted only after the old session is no longer connected;
+a hidden death hold never accepts Play. Cancel clears a queued request without
+restarting the return. Champion controls and result ownership are unchanged.
+Authored regressions: `early_return_play_locks_but_waits_for_return_and_admission`
+and `early_return_click_uses_animated_hit_rect_and_waits_for_close_ack`. Canvas and WebGPU remain working reference tools;
 owner play and physical IME acceptance are separate.
 
 `MenuQuality` retains high/low in memory and emits best-effort storage writes;

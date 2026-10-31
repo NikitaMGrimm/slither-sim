@@ -74,6 +74,11 @@ impl LoginMenu {
         self.state.view(false).play_label.into()
     }
 
+    /// Cancel a queued explicit click while preserving any old return fade.
+    pub fn cancel_pending_play(&mut self) {
+        self.state.cancel_pending_play();
+    }
+
     /// Return after an explicitly observed transport failure.
     pub fn disconnected(&mut self) {
         self.state.disconnected();
@@ -199,6 +204,7 @@ impl LoginMenu {
         for (key, value) in [
             ("visible", view.visible),
             ("disabled", view.disabled),
+            ("play_disabled", view.play_disabled),
             (
                 "busy",
                 view.phase == crate::start_page::MenuPhase::Connecting,

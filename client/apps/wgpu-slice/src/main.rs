@@ -648,6 +648,19 @@ mod desktop {
                 if let WindowEvent::KeyboardInput { event, .. } = &event
                     && event.state == ElementState::Pressed
                     && !r.login.champion.policy.visible()
+                    && !event.repeat
+                    && event.logical_key == Key::Named(NamedKey::Enter)
+                    && r.login.state.view(admission).phase
+                        == slither_client::start_page::MenuPhase::Returning
+                    && !r.login.state.view(admission).play_disabled
+                {
+                    r.login.activate(admission);
+                    r.schedule.invalidate();
+                    return Ok(());
+                }
+                if let WindowEvent::KeyboardInput { event, .. } = &event
+                    && event.state == ElementState::Pressed
+                    && !r.login.champion.policy.visible()
                     && !r.login.state.view(admission).disabled
                 {
                     if event.logical_key == Key::Named(NamedKey::Tab) {
@@ -779,6 +792,7 @@ mod desktop {
                         match event.physical_key {
                             PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
                             PhysicalKey::Code(KeyCode::Escape) if down => {
+                                r.login.state.cancel_pending_play();
                                 if let Some(p) = &r.preparation {
                                     p.cancel();
                                 }

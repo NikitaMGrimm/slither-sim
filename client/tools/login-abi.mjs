@@ -9,7 +9,8 @@ for(const base of ['dist/web/slither_client','dist/wgpu-slice/pkg/slither_wgpu_s
   const wasm=await import(pathToFileURL(path.resolve(`${base}.js`)));
   wasm.initSync({module:await readFile(`${base}_bg.wasm`)});
   assert.equal(typeof wasm.LoginMenu,'function',base);
-  if(wasm.CosmeticImages) assert.deepEqual([...wasm.CosmeticImages.paths()].sort(),[...COSMETIC_PATHS].sort());
+  // The Wasm inventory also includes the two world backgrounds.
+  if(wasm.CosmeticImages) assert.deepEqual([...wasm.CosmeticImages.paths()].sort(),[...COSMETIC_PATHS,'s/bg54.jpg','s/gbg.jpg'].sort());
   const zero=new wasm.LoginMenu('en','1');
   assert.throws(()=>zero.step(0,0,0,36,true,false),error=>!(error instanceof WebAssembly.RuntimeError));
   assert.equal(zero.step(16,960,540,36,true,false).disabled,false);zero.free();
@@ -41,10 +42,32 @@ for(const base of ['dist/web/slither_client','dist/wgpu-slice/pkg/slither_wgpu_s
   assert.equal(menu.step(80,960,540,36,true,true).alpha,1);
   assert.ok(menu.step(96,960,540,36,true,true).alpha<1);
   menu.free();console.log(`${base}: login ABI passed`);
+  const early=new wasm.LoginMenu('en','1');
+  early.edit('Stored'); early.step(0,960,540,36,true,false);early.action('play',false,true);
+  early.step(16,960,540,36,true,false);
+  early.observe_life('playing','',true,false,false,1,undefined,undefined);
+  early.observe_life('dead','dead',true,true,false,1,1001,1n);
+  early.action('play',false,false); // hidden hold is ignored
+  early.observe_life('dead','dead',true,true,true,.6,1001,1n);
+  let mid=early.step(2000,960,540,80,false,false);
+  assert.equal(mid.disabled,true);assert.equal(mid.play_disabled,false);
+  early.action('enter',false,false);
+  assert.equal(early.step(2016,960,540,80,false,false).busy,false);
+  early.action('play',false,false);early.action('play',false,false);
+  assert.equal(early.edit('Changed'),'Stored');
+  mid=early.step(2032,960,540,80,false,false);
+  assert.equal(mid.busy,true);assert.equal(mid.spinner_visible,true);assert.equal(mid.alpha,.4);
+  assert.equal(Object.hasOwn(mid,'request'),false);
+  assert.equal(early.observe_life('disconnected','dead',false,false,false,0,1001,1n),true);
+  assert.equal(Object.hasOwn(early.step(3000,960,540,80,false,false),'request'),false);
+  assert.equal(early.step(3016,960,540,80,true,false).request,'Stored');
+  assert.equal(Object.hasOwn(early.step(3032,960,540,80,true,false),'request'),false);
+  early.free();
+
   for (const outcome of ['dead','victory']) {
     const returning=new wasm.LoginMenu('en','1');
     returning.step(0,960,540,36,true,false);returning.action('play',false,true);
-    returning.step(16,960,540,36,false,false);
+    returning.step(16,960,540,36,true,false);
     returning.observe_life('playing','',true,false,false,1,undefined,undefined);
     returning.observe_life(outcome,outcome,true,true,false,1,1001,1n);
     let view=returning.step(1616,960,540,80,false,false);

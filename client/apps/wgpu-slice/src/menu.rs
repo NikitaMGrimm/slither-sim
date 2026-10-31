@@ -1442,7 +1442,7 @@ impl Menu {
                 let pa =
                     a * view.play_alpha * view.play_return_alpha * if busy { 0.38 } else { 1. };
                 c.control(play, 0, pa)?;
-                if !view.disabled {
+                if !view.play_disabled {
                     c.control(
                         play,
                         1,

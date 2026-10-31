@@ -562,6 +562,114 @@ fn strict_return_boundary_lag_floor_recovery_and_focus() {
 }
 
 #[test]
+fn early_return_play_locks_but_waits_for_return_and_admission() {
+    let mut state = menu();
+    state.edit_nickname(&"Stored".encode_utf16().collect::<Vec<_>>());
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)))
+        .unwrap();
+    state.action(A::Play, false); // Hidden death hold cannot queue a request.
+    assert!(
+        state
+            .step_with_admission(2100., false, false)
+            .unwrap()
+            .is_empty()
+    );
+    let mut clock = ReturnClock::new(500., 500.);
+    clock.step(&mut state, 2101., false).unwrap();
+    let returning = state.view(false);
+    assert!(returning.visible && returning.disabled && !returning.play_disabled);
+    state.action(A::Enter { composing: false }, false); // Old connection is live.
+    assert_eq!(state.view(false).phase, P::Returning);
+    state.action(A::Play, false);
+    state.action(A::Play, false);
+    state.edit_nickname(&"Changed".encode_utf16().collect::<Vec<_>>());
+    let queued = state.view(false);
+    assert_eq!(queued.phase, P::Connecting);
+    assert!(queued.disabled && queued.play_disabled && queued.spinner_visible);
+    assert_eq!(queued.nickname, "Stored");
+    near(queued.transition, returning.transition);
+    near(queued.play_return_alpha, returning.play_return_alpha);
+    assert!(
+        state
+            .step_with_admission(2117., false, false)
+            .unwrap()
+            .is_empty()
+    );
+    let session = |fraction, pending| slither_client::start_page::MenuSession {
+        phase: Phase::Disconnected,
+        outcome: Some(Phase::Dead),
+        playing: false,
+        death_pending: pending,
+        return_active: pending,
+        return_fraction: fraction,
+    };
+    state.observe_session(session(0.4, true), None).unwrap();
+    near(state.view(false).transition, 0.4);
+    assert!(
+        state
+            .step_with_admission(2200., false, true)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(state.observe_session(session(0., false), None).unwrap());
+    assert!(!state.observe_session(session(0., false), None).unwrap());
+    assert!(
+        state
+            .step_with_admission(2300., false, false)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        state.step_with_admission(2316., false, true).unwrap(),
+        vec![I::Play {
+            nickname: "Stored".into(),
+            quality: MenuQuality::High
+        }]
+    );
+    assert!(
+        state
+            .step_with_admission(2332., false, true)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(state.begin_outgoing());
+    near(state.view(true).transition, 0.);
+    state.step(2348., false).unwrap();
+    near(state.view(true).transition, 0.032);
+}
+
+#[test]
+fn terminal_return_enter_can_queue_and_cancel_preserves_the_fade() {
+    let mut state = menu();
+    world(&mut state, 0.);
+    state.accepted_game_over(Phase::Dead, None).unwrap();
+    let session = slither_client::start_page::MenuSession {
+        phase: Phase::Disconnected,
+        outcome: Some(Phase::Dead),
+        playing: false,
+        death_pending: true,
+        return_active: true,
+        return_fraction: 0.6,
+    };
+    state.observe_session(session, None).unwrap();
+    state.action(A::Enter { composing: false }, false);
+    assert_eq!(state.view(false).phase, P::Connecting);
+    state.cancel_pending_play();
+    let view = state.view(false);
+    assert_eq!(view.phase, P::Returning);
+    near(view.transition, 0.6);
+    assert!(view.disabled && !view.play_disabled && !view.spinner_visible);
+    assert!(
+        state
+            .step_with_admission(2200., false, true)
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn persistent_last_life_second_life_and_disconnect_has_no_result_authority() {
     let mut state = menu();
     assert_eq!(state.view(true).last_life.number, "\u{a0}");
@@ -616,6 +724,10 @@ fn champion_suppresses_ordinary_controls_without_fake_editor() {
         clock
             .step(&mut state, 2101. + f64::from(step) * 40., false)
             .unwrap();
+        assert!(state.view(false).play_disabled);
+        state.action(A::Play, false);
+        state.action(A::Enter { composing: false }, false);
+        assert_ne!(state.view(false).phase, P::Connecting);
     }
     let v = state.view(true);
     assert!(v.champion_pending && v.disabled);

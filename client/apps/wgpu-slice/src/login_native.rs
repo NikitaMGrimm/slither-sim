@@ -159,10 +159,22 @@ impl NativeLogin {
         effects
     }
     pub fn activate(&mut self, admission: bool) {
+        if self.state.view(admission).phase == slither_client::start_page::MenuPhase::Returning
+            && !self.state.view(admission).play_disabled
+        {
+            self.state.action(
+                MenuAction::Enter {
+                    composing: self.input.state.editor(TextField::Nickname).composing(),
+                },
+                admission,
+            );
+            return;
+        }
         match self.focus {
             0 | 1 => {
                 if !self.input.state.editor(TextField::Nickname).composing() {
-                    self.state.action(MenuAction::Play, admission);
+                    self.state
+                        .action(MenuAction::Enter { composing: false }, admission);
                 }
             }
             2 => {
@@ -188,13 +200,15 @@ impl NativeLogin {
         if let Some(down) = down {
             self.menu.skin_pressed = down && self.menu.skin_hovered;
         }
-        if !view.visible || view.disabled {
+        if !view.visible || view.play_disabled {
             self.pressed = false;
             return Vec::new();
         }
         let hit = [E::Nickname, E::NicknameHolder, E::Play, E::Quality]
             .into_iter()
-            .find(|e| self.layout.hit_test(*e, point[0], point[1]));
+            .find(|e| {
+                (!view.disabled || *e == E::Play) && self.layout.hit_test(*e, point[0], point[1])
+            });
         let hover = hit == Some(E::Play);
         // Windows owns commit ordering. A pointer cannot cancel raw preedit and
         // then submit the older committed name in the same gesture.
