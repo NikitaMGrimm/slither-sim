@@ -908,7 +908,7 @@ impl Composition<'_> {
                             add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
                             let l = self.labels.last_mut().unwrap();
                             l.line_box = control.style == ControlStyle::LoginPlay;
-                            l.fit = true;
+                            l.fit = control.style != ControlStyle::StudioAction;
                         }
                         if matches!(control.kind, ControlKind::SectionTab { selected: true, .. }) {
                             self.studio_solid(

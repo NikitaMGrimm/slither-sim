@@ -40,6 +40,88 @@ fn login() -> NativeLogin {
     login.step(410., false, false).unwrap();
     login
 }
+
+#[test]
+fn action_labels_keep_theme_padding_at_nominal_size_in_every_layout() {
+    use slither_client::menu_theme::{MenuTheme, STUDIO_ACTION_PADDING_X};
+    use slither_wgpu_slice::text::{Align, Baseline, TextCache, TextRun};
+    let mut login = login();
+    login.studio.state.edit_builder(|b| {
+        b.append(1);
+    });
+    let mut text = TextCache::menu();
+    for dpr in [1., 1.25, 1.5, 1.75, 2., 3., 4., 5.] {
+        for logical in [
+            [960., 540.],
+            [360., 640.],
+            [960., 360.],
+            [280., 320.],
+            [240., 320.],
+        ] {
+            for id in [ADD, REMOVE, RECOLOUR, RESET] {
+                login.studio.state.reveal_control(id, logical);
+                let panel = login.studio.state.panel(logical, "");
+                let resolved = panel.resolve(logical).unwrap();
+                let action = resolved.iter().find(|r| r.control.id == id).unwrap();
+                let ControlKind::Button { label } = &action.control.kind else {
+                    panic!("action button");
+                };
+                let style = MenuTheme::default().text_style(action.control.style);
+                // No max width or fitting: scan the complete native raster's nonzero ink.
+                let raster = text
+                    .draw(
+                        TextRun {
+                            text: label,
+                            style,
+                            position: [0., 0.],
+                            align: Align::Left,
+                            baseline: Baseline::Alphabetic,
+                            alpha: 1.,
+                        },
+                        dpr,
+                    )
+                    .unwrap();
+                assert_eq!(raster.len(), 1);
+                let image = &raster[0].1.image;
+                let columns: Vec<_> = image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, p)| p[3] > 0)
+                    .map(|(index, _)| index % image.width as usize)
+                    .collect();
+                let ink = (columns.iter().max().unwrap() - columns.iter().min().unwrap() + 1)
+                    as f64
+                    / dpr;
+                assert!(
+                    ink <= action.rect.width - 2. * STUDIO_ACTION_PADDING_X,
+                    "DPR {dpr}, {logical:?}, {label}: {ink} ink in {} pill, padding {}",
+                    action.rect.width,
+                    2. * STUDIO_ACTION_PADDING_X
+                );
+                assert_eq!(
+                    intersection(action.rect, action.clip),
+                    action.rect,
+                    "focused action must be fully visible"
+                );
+                for other in [ControlId(4), CANCEL, SAVE] {
+                    let bounds = resolved
+                        .iter()
+                        .find(|r| r.control.id == other)
+                        .unwrap()
+                        .rect;
+                    let overlap = intersection(action.rect, bounds);
+                    assert!(
+                        overlap.width == 0. || overlap.height == 0.,
+                        "action overlaps status/footer"
+                    );
+                }
+            }
+        }
+    }
+}
 #[test]
 fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
     let mut login = login();

@@ -266,3 +266,72 @@ fn every_retained_prefix_and_raw_tail_survives_unchanged_builder_save() {
         .is_err()
     );
 }
+
+#[test]
+fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
+    use slither_client::menu_controls::{ControlId, ControlKind};
+    for (retained_custom, cycle_first) in
+        [(false, false), (false, true), (true, false), (true, true)]
+    {
+        for empty in [false, true] {
+            for choose_builtin in [false, true] {
+                let record = AppearanceRecord {
+                    builtin: 7,
+                    custom_base: 7,
+                    custom_bytes: if retained_custom {
+                        vec![1, 2, 3, 4, 5, 6, 7, 8, 2, 41]
+                    } else {
+                        vec![]
+                    },
+                    ..Default::default()
+                };
+                let mut s = StudioState::new(record).unwrap();
+                s.open(0., true);
+                s.step(230.);
+                if cycle_first {
+                    // Exercise both the original skin 7 and a draft built-in 8.
+                    s.cycle(true, UnlockSnapshot::default());
+                }
+                s.set_section(StudioSection::Builder, 230.);
+                if empty {
+                    s.edit_builder(|b| b.reset());
+                } else if !retained_custom {
+                    s.edit_builder(|b| {
+                        b.append(37);
+                    });
+                }
+                s.set_section(StudioSection::BuiltIn, 410.);
+                if choose_builtin {
+                    s.cycle(true, UnlockSnapshot::default());
+                }
+                let preview = s.preview_selection().unwrap();
+                if choose_builtin {
+                    assert!(preview.custom_bytes.is_empty());
+                } else if empty && !retained_custom {
+                    assert_eq!(preview.skin, 7);
+                    assert!(preview.custom_bytes.is_empty());
+                } else {
+                    assert!(!preview.custom_bytes.is_empty());
+                }
+                let panel = s.panel([960., 540.], "");
+                let title = &panel
+                    .controls
+                    .iter()
+                    .find(|c| c.id == ControlId(3))
+                    .unwrap()
+                    .kind;
+                let expected = if preview.custom_bytes.is_empty() {
+                    format!("Skin {} / 64", preview.skin)
+                } else {
+                    "Saved custom skin".into()
+                };
+                assert_eq!(*title, ControlKind::Label { text: expected });
+                let committed = s
+                    .save("Bytes", 410., UnlockSnapshot::default(), &mut || 0)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(committed.selection(), preview);
+            }
+        }
+    }
+}

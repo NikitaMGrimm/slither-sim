@@ -1,6 +1,7 @@
 //! Concrete section and windowed builder controls; no platform input policy.
 use super::*;
 use crate::skin_builder::{MAX_COLOURS, PALETTES};
+const BUILDER_ROWS: usize = 10;
 
 /// Grid/tab/strip navigation shared by native input and authored tests.
 #[derive(Clone, Copy)]
@@ -29,25 +30,32 @@ impl StudioState {
             (b.y + b.height - 224.)
                 .max(Self::preview_bounds(viewport).y + Self::preview_bounds(viewport).height + 12.)
         };
+        // Use the status band's right side only when all rows fit. Shorter
+        // windows keep their existing visible-row budget and scroll the actions.
+        let bottom = if wide && b.y + b.height - 84. - top >= BUILDER_ROWS as f64 * 28. {
+            84.
+        } else {
+            112.
+        };
         MenuRect {
             x: b.x + if wide { b.width - 280. } else { 24. },
             y: top,
             width: if wide { 256. } else { b.width - 48. },
-            height: (b.y + b.height - 112. - top).max(28.),
+            height: (b.y + b.height - bottom - top).max(28.),
         }
     }
     fn editor_window(&self, viewport: [f64; 2]) -> ScrollList {
         let mut window =
             ScrollList::new((Self::editor_bounds(viewport).height / 28.).floor() as usize);
-        let first = self.editor_scroll.clone().window(9).start;
-        window.scroll(first as isize, 9);
+        let first = self.editor_scroll.clone().window(BUILDER_ROWS).start;
+        window.scroll(first as isize, BUILDER_ROWS);
         window
     }
     /// Scroll only active builder content; capture is cancelled by the adapter.
     pub fn scroll_editor(&mut self, rows: isize, viewport: [f64; 2]) {
         if self.interactive() && self.section == StudioSection::Builder {
             self.editor_scroll = self.editor_window(viewport);
-            self.editor_scroll.scroll(rows, 9);
+            self.editor_scroll.scroll(rows, BUILDER_ROWS);
         }
     }
     /// Keep the roving item or a Tab destination visible without moving the preview/footer.
@@ -69,13 +77,15 @@ impl StudioState {
                 .position(|p| SWATCH_BASE + u16::from(*p) == id.0)
                 .unwrap_or(0)
                 / 6
-        } else if [ADD, REMOVE, RECOLOUR, RESET].contains(&id) {
+        } else if [ADD, REMOVE].contains(&id) {
             8
+        } else if [RECOLOUR, RESET].contains(&id) {
+            9
         } else {
             return;
         };
         self.editor_scroll = self.editor_window(viewport);
-        self.editor_scroll.reveal(row, 9);
+        self.editor_scroll.reveal(row, BUILDER_ROWS);
     }
     /// Roving focus never appends, saves or samples entropy.
     pub fn navigate(&mut self, focus: ControlId, direction: Navigation, now: f64) -> ControlId {
@@ -186,6 +196,13 @@ impl StudioState {
             return;
         };
         let builder = &draft.builder;
+        // Two action rows use the right side of the status band on wide screens.
+        // Status stays below the preview; narrow screens keep their scrolling editor.
+        if b.width >= 640.
+            && let Some(status) = panel.controls.iter_mut().find(|c| c.id == ControlId(4))
+        {
+            status.placement.size[0] = b.width - 328.;
+        }
         if let Some(control) = panel.controls.iter_mut().find(|c| c.id == ControlId(4))
             && let ControlKind::Label { text } = &mut control.kind
             && text.is_empty()
@@ -199,7 +216,7 @@ impl StudioState {
             control.name = text.clone();
         }
         let area = Self::editor_bounds(viewport);
-        let offset = self.editor_window(viewport).window(9).start as f64 * 28.;
+        let offset = self.editor_window(viewport).window(BUILDER_ROWS).start as f64 * 28.;
         let cell = |id, row: usize, column: usize, columns: usize, kind, name, order, enabled| {
             let inset = if matches!(kind, ControlKind::Button { .. }) {
                 2.
@@ -240,18 +257,12 @@ impl StudioState {
                 true,
             ));
         }
-        for index in self
+        let runs = self
             .run_window
             .clone()
-            .window(builder.pattern().runs().len())
-        {
+            .window(builder.pattern().runs().len());
+        for (column, index) in runs.enumerate() {
             let run = builder.pattern().runs()[index];
-            let column = index
-                - self
-                    .run_window
-                    .clone()
-                    .window(builder.pattern().runs().len())
-                    .start;
             panel.controls.push(cell(
                 ControlId(RUN_BASE + index as u16),
                 7,
@@ -298,7 +309,7 @@ impl StudioState {
                 enabled,
             ));
         }
-        for (column, (id, label, enabled)) in [
+        for (index, (id, label, enabled)) in [
             (ADD, "Add", builder.pattern().colours() < MAX_COLOURS),
             (REMOVE, "Remove", !builder.pattern().runs().is_empty()),
             (RECOLOUR, "Recolour", !builder.pattern().runs().is_empty()),
@@ -309,14 +320,14 @@ impl StudioState {
         {
             panel.controls.push(cell(
                 id,
-                8,
-                column,
-                4,
+                8 + index / 2,
+                index % 2,
+                2,
                 ControlKind::Button {
                     label: label.into(),
                 },
                 label.into(),
-                Some(3 + column as u16),
+                Some(3 + index as u16),
                 enabled,
             ));
         }

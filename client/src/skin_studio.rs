@@ -585,9 +585,8 @@ impl StudioState {
             b.height - 208.
         };
         let selection = self
-            .draft
-            .as_ref()
-            .map_or_else(|| self.committed.selection(), |d| d.record.selection());
+            .preview_selection()
+            .unwrap_or_else(|_| self.committed.selection());
         let title = if !selection.custom_bytes.is_empty() {
             "Saved custom skin".into()
         } else if selection.skin == 65 {

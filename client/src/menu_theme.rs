@@ -1,6 +1,9 @@
 //! Typed site-style roles. Motion and placement never enter raster keys.
 use crate::presentation::{TextFamily, TextSlant, TextStyle, TextWeight};
 
+/// Minimum logical padding on each side of a studio action label.
+pub const STUDIO_ACTION_PADDING_X: f64 = 12.;
+
 /// Roles shared by menu descriptions.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ControlStyle {
