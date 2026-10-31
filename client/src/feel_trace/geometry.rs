@@ -2,8 +2,33 @@
 use super::MAX_BODY_TRACE_POINTS;
 use crate::{
     presentation::{AnimatedClient, PreparedAccessorySnake, SnakeMetrics},
-    state::Point,
+    state::{ClientState, Point},
 };
+
+/// Only the selected packet heads, captured after each Setup command, before
+/// later bundle commands can change them. No presentation interpolation is copied.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PacketHeads(pub [(u16, Option<Point>); 2]);
+impl PacketHeads {
+    pub fn capture(state: &ClientState, ids: [u16; 2]) -> Self {
+        let center = state.setup.as_ref().map_or(0., |s| s.grid_center);
+        Self(ids.map(|id| {
+            (
+                id,
+                state.snakes.get(&id).map(|s| Point {
+                    x: s.head.x + center,
+                    y: s.head.y + center,
+                }),
+            )
+        }))
+    }
+    pub fn head(&self, id: u16) -> Option<Point> {
+        self.0
+            .iter()
+            .find(|(key, _)| *key == id)
+            .and_then(|(_, head)| *head)
+    }
+}
 
 /// Separate from the feel-trace v3 numeric ABI; coordinates are absolute world units.
 #[derive(Clone, Debug, PartialEq)]
@@ -33,7 +58,7 @@ pub struct GeometrySnake {
 }
 #[derive(Debug)]
 pub(super) struct Journal {
-    ids: [u16; 2],
+    pub ids: [u16; 2],
     count: usize,
     pub rows: Vec<GeometryObservation>,
 }
@@ -69,14 +94,9 @@ impl Journal {
             if body.len() > MAX_BODY_TRACE_POINTS || snakes.len() == 2 {
                 return false;
             }
-            let Some(packet) = client.received().snakes.get(&p.metrics.id) else {
+            let Some(packet_head) = client.geometry_packet_head(p.metrics.id) else {
                 return false;
             };
-            let center = client
-                .received()
-                .setup
-                .as_ref()
-                .map_or(0., |s| s.grid_center);
             snakes.push(GeometrySnake {
                 token: p.token.serial(),
                 own: p.own,
@@ -85,10 +105,7 @@ impl Journal {
                     .iter()
                     .map(|p| [f64::from(p.x), f64::from(p.y)])
                     .collect(),
-                packet_head: Point {
-                    x: packet.head.x + center,
-                    y: packet.head.y + center,
-                },
+                packet_head,
             });
         }
         self.rows.push(GeometryObservation {

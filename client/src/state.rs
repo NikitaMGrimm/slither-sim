@@ -545,10 +545,60 @@ impl ClientState {
         &mut self,
         bytes: &[u8],
         header: ElapsedHeader,
+        events: Option<&mut Vec<PresentationEvent>>,
+        score_enabled: bool,
+        minimap_enabled: bool,
+        hud: Option<&mut HudCommandCollector<'_>>,
+    ) -> Result<FrameReport, StateError> {
+        self.apply_transaction_inner(
+            bytes,
+            header,
+            events,
+            score_enabled,
+            minimap_enabled,
+            hud,
+            #[cfg(feature = "feel-trace")]
+            None,
+        )
+    }
+
+    #[cfg(feature = "feel-trace")]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn apply_frame_with_setup_packet_heads(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+        score_enabled: bool,
+        minimap_enabled: bool,
+        hud: Option<&mut HudCommandCollector<'_>>,
+        heads: &mut ([u16; 2], Vec<crate::feel_trace::PacketHeads>),
+    ) -> Result<AppliedFrame, StateError> {
+        let mut events = Vec::new();
+        let report = self.apply_transaction_inner(
+            bytes,
+            header,
+            Some(&mut events),
+            score_enabled,
+            minimap_enabled,
+            hud,
+            Some(heads),
+        )?;
+        Ok(AppliedFrame { report, events })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn apply_transaction_inner(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
         mut events: Option<&mut Vec<PresentationEvent>>,
         score_enabled: bool,
         minimap_enabled: bool,
         mut hud: Option<&mut HudCommandCollector<'_>>,
+        #[cfg(feature = "feel-trace")] mut setup_heads: Option<&mut (
+            [u16; 2],
+            Vec<crate::feel_trace::PacketHeads>,
+        )>,
     ) -> Result<FrameReport, StateError> {
         let decoded = protocol::decode_frame(bytes, header)?;
         if let Some(collector) = hud.as_ref() {
@@ -622,6 +672,14 @@ impl ClientState {
                     event_end: events.as_ref().map_or(0, |events| events.len()),
                     marker,
                 });
+            }
+            #[cfg(feature = "feel-trace")]
+            if command[0] == b'a'
+                && let Some(heads) = setup_heads.as_deref_mut()
+            {
+                heads
+                    .1
+                    .push(crate::feel_trace::PacketHeads::capture(&staged, heads.0));
             }
         }
         staged.frames_applied = staged.frames_applied.saturating_add(1);

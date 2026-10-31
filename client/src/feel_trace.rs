@@ -11,6 +11,7 @@ use crate::state::Point;
 use std::sync::{Arc, Mutex};
 
 mod geometry;
+pub(crate) use geometry::PacketHeads;
 pub use geometry::{GeometryObservation, GeometrySnake};
 
 /// Trace capacity for the complete prepared centerline, in original sample order.
@@ -54,6 +55,14 @@ impl PartialEq for Recorder {
     }
 }
 impl Recorder {
+    pub(crate) fn geometry_ids(&self) -> Option<[u16; 2]> {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .geometry
+            .as_ref()
+            .map(|g| g.ids)
+    }
     /// Enable a separate bounded own/enemy geometry journal; v3 cells are unchanged.
     /// A fresh recorder is required for another run; pending geometry is never replaced.
     pub fn record_geometry(&self, ids: [u16; 2]) {

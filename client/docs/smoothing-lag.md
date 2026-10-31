@@ -9,6 +9,9 @@ are unchanged; the opt-in geometry journal is separate and uses the existing
 immutable observation sequence through issue/retry/acknowledgement.
 Geometry is copied under the existing trace lock; disabling geometry adds no
 second mutex acquisition per preparation.
+Setup draws use selected packet heads captured at that command boundary,
+including earlier anchors/spawns in the bundle and excluding later commands;
+the callback's ordinary `received()` view still commits after the whole bundle.
 
 ## Method and frozen schedule
 

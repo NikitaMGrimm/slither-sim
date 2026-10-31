@@ -372,6 +372,80 @@ mod tests {
         assert!(d.game.presented(true).is_err());
     }
     #[test]
+    fn setup_geometry_uses_each_packet_prefix_without_changing_v3() {
+        use super::super::synthetic_tape::{bundle, setup, u24};
+        let mut d = playing();
+        let mut off = playing();
+        let id = d.game.client().own_snake().unwrap().metrics().id;
+        d.recorder.record_geometry([id, id.wrapping_add(1)]);
+        let anchor = |x: u16| {
+            let mut p = vec![b'='];
+            p.extend(id.to_be_bytes());
+            p.extend([0, 0]);
+            p.extend(x.to_be_bytes());
+            p.extend(1000u16.to_be_bytes());
+            p
+        };
+        let mut changed_setup = setup();
+        changed_setup[1..4].copy_from_slice(&u24(1400));
+        let packet = bundle(&[
+            anchor(1142),
+            changed_setup,
+            anchor(1184),
+            setup(),
+            anchor(1226),
+        ]);
+        for peer in [&mut d, &mut off] {
+            peer.recorder.take();
+            peer.packet(&packet, 30.).unwrap();
+        }
+        let rows = d.recorder.take_geometry();
+        assert_eq!(rows.len(), 2);
+        for (row, x) in rows.iter().zip([1142., 1184.]) {
+            assert_eq!(row.snakes.len(), 1);
+            assert_eq!(
+                row.snakes[0].packet_head,
+                slither_client::state::Point { x, y: 1000. }
+            );
+        }
+        assert_eq!(d.recorder.take(), off.recorder.take()); // v3 ABI and sequence
+        assert_eq!(d.acknowledged_pictures, off.acknowledged_pictures);
+        assert_eq!(d.commands, off.commands);
+        d.frame(40.).unwrap();
+        let rows = d.recorder.take_geometry();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].snakes[0].packet_head.x, 1226.);
+        assert!(!d.recorder.has_failed(), "{:?}", d.recorder.take_errors());
+    }
+
+    #[test]
+    fn selected_spawn_before_setup_keeps_geometry_recording_complete() {
+        use super::super::synthetic_tape::{bundle, setup, snake};
+        let mut d = playing();
+        let id = d.game.client().own_snake().unwrap().metrics().id;
+        let enemy = id.wrapping_add(1);
+        d.recorder.record_geometry([id, enemy]);
+        let mut spawn = snake(0);
+        spawn[1..3].copy_from_slice(&enemy.to_be_bytes());
+        assert!(!d.game.client().received().snakes.contains_key(&enemy));
+        d.packet(&bundle(&[spawn, setup()]), 30.).unwrap();
+        let rows = d.recorder.take_geometry();
+        assert_eq!(rows.len(), 1);
+        let spawned = rows[0]
+            .snakes
+            .iter()
+            .find(|s| s.metrics.id == enemy)
+            .unwrap();
+        assert_eq!(
+            spawned.packet_head,
+            slither_client::state::Point { x: 1100., y: 1000. }
+        );
+        d.frame(40.).unwrap();
+        assert_eq!(d.recorder.take_geometry().len(), 1);
+        assert!(!d.recorder.has_failed(), "{:?}", d.recorder.take_errors());
+    }
+
+    #[test]
     fn separate_geometry_keeps_the_issued_picture_identity_through_retry() {
         let mut d = playing();
         let mut off = playing();

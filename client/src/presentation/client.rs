@@ -659,6 +659,8 @@ impl Entry {
 pub struct AnimatedClient {
     #[cfg(feature = "feel-trace")]
     trace: Option<crate::feel_trace::Recorder>,
+    #[cfg(feature = "feel-trace")]
+    trace_setup_heads: Option<crate::feel_trace::PacketHeads>,
     received: ClientState,
     announcements_enabled: bool,
     announcements: AnnouncementState,
@@ -710,6 +712,8 @@ impl AnimatedClient {
         Ok(Self {
             #[cfg(feature = "feel-trace")]
             trace: None,
+            #[cfg(feature = "feel-trace")]
+            trace_setup_heads: None,
             received: ClientState::default(),
             announcements_enabled: false,
             announcements: AnnouncementState::default(),
@@ -1971,7 +1975,32 @@ impl AnimatedClient {
             boundaries: Vec::new(),
         });
         let mut received = self.received.clone();
-        let applied = if self.minimap_enabled {
+        #[cfg(feature = "feel-trace")]
+        let mut setup_heads = self
+            .trace
+            .as_ref()
+            .and_then(|r| r.geometry_ids())
+            .map(|ids| (ids, Vec::new()));
+        #[cfg(feature = "feel-trace")]
+        let traced = if let Some(heads) = &mut setup_heads {
+            Some(received.apply_frame_with_setup_packet_heads(
+                bytes,
+                header,
+                self.score_enabled,
+                self.minimap_enabled,
+                collector.as_mut(),
+                heads,
+            ))
+        } else {
+            None
+        };
+        // Geometry alone opts into command-boundary snapshots. Ordinary callbacks
+        // must continue seeing the pre-transaction received state.
+        #[cfg(not(feature = "feel-trace"))]
+        let traced: Option<Result<crate::state::AppliedFrame, StateError>> = None;
+        let applied = if let Some(traced) = traced {
+            traced
+        } else if self.minimap_enabled {
             received.apply_frame_with_minimap_events(
                 bytes,
                 header,
@@ -1986,6 +2015,8 @@ impl AnimatedClient {
             received.apply_frame_with_events(bytes, header)
         }
         .map_err(ClientPresentationError::from)?;
+        #[cfg(feature = "feel-trace")]
+        let mut setup_heads = setup_heads.into_iter().flat_map(|(_, heads)| heads);
         if self.minimap_enabled {
             validate_minimap_work(&applied.events, self.minimap.view().dimension)?;
         }
@@ -2122,7 +2153,15 @@ impl AnimatedClient {
                                 },
                             );
                         }
+                        #[cfg(feature = "feel-trace")]
+                        {
+                            next.trace_setup_heads = setup_heads.next();
+                        }
                         on_setup(&mut next, setup.insert(value))?;
+                        #[cfg(feature = "feel-trace")]
+                        {
+                            next.trace_setup_heads = None;
+                        }
                         if let Some(journal) = &mut journal {
                             journal.setup_draw(command_index, next.score_view());
                         }
@@ -3313,6 +3352,19 @@ impl AnimatedClient {
     /// Latest committed received state, including food and protocol caches/counters.
     pub fn received(&self) -> &ClientState {
         &self.received
+    }
+
+    #[cfg(feature = "feel-trace")]
+    pub(crate) fn geometry_packet_head(&self, id: u16) -> Option<Point> {
+        if let Some(heads) = &self.trace_setup_heads {
+            return heads.head(id);
+        }
+        let packet = self.received.snakes.get(&id)?;
+        let center = self.received.setup.as_ref().map_or(0., |s| s.grid_center);
+        Some(Point {
+            x: packet.head.x + center,
+            y: packet.head.y + center,
+        })
     }
 
     /// Retained food instances in dense insertion/swap order, including flights.
