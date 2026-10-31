@@ -950,14 +950,12 @@ fn stroke_cache_reuses_pixels_separates_fades_and_rolls_back_failed_text() {
     let first = menu
         .prepare(&mut text, &view, &layout, [1920, 1080], 1., None, 0)
         .unwrap();
+    let holder = layout.viewport_rect(slither_client::menu_layout::MenuElement::Logo);
     let logo = |p: &slither_wgpu_slice::menu::MenuFrame| {
         p.frame
             .draws
             .iter()
-            .filter(|d| {
-                d.source.is_some()
-                    && d.asset.handle < slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
-            })
+            .filter(|d| is_stroke_draw(d, holder))
             .cloned()
             .collect::<Vec<_>>()
     };
@@ -1030,7 +1028,10 @@ fn high_dpr_atlas_reassembles_the_exact_raster_without_seams_or_overlap() {
         .unwrap();
     let mut occupied = vec![false; expected.width as usize * expected.height as usize];
     for d in p.frame.draws.iter().filter(|d| {
-        d.source.is_some() && d.asset.handle < slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+        is_stroke_draw(
+            d,
+            layout.viewport_rect(slither_client::menu_layout::MenuElement::Logo),
+        )
     }) {
         let source = d.source.unwrap();
         assert_eq!(d.destination.width * dpr, source.width);
@@ -1069,7 +1070,10 @@ fn reveal_frames_inside_25ms_reuse_the_shared_raster() {
             .prepare(&mut text, &view, &layout, [1920, 1080], 1., None, 0)
             .unwrap();
         let logo = p.frame.draws.iter().find(|d| {
-            d.source.is_some() && d.asset.handle < slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+            is_stroke_draw(
+                d,
+                layout.viewport_rect(slither_client::menu_layout::MenuElement::Logo),
+            )
         });
         if let Some(draw) = logo {
             let image = p
@@ -1094,4 +1098,15 @@ fn reveal_frames_inside_25ms_reuse_the_shared_raster() {
         }
     }
     assert_eq!(changes, [25, 50, 75, 100]);
+}
+
+// Shared controls now have cropped sources too; identify the logo by its holder.
+fn is_stroke_draw(
+    d: &slither_wgpu_slice::frame::Draw,
+    holder: slither_client::menu_layout::MenuRect,
+) -> bool {
+    d.source.is_some()
+        && d.asset.handle < slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+        && d.destination.y >= holder.y - 1.
+        && d.destination.y + d.destination.height <= holder.y + holder.height + 1.
 }

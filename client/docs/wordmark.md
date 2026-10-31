@@ -53,7 +53,7 @@ fractional-DPR regressions retain the same boundary rule as the prior font logo.
 
 Above DPR 3, nonempty horizontal bands are packed in bounded atlases to avoid
 charging transparent areas around the letters against essential controls. This
-uses more quads within the same 512-draw cap; a pixel-exact reconstruction test
+retains within-band gaps to share the 512-draw cap with sliced controls; a pixel-exact reconstruction test
 checks that packing neither drops, overlaps nor changes the raster pixels.
 
 Offline authored tests: `cargo test -p slither-wgpu-slice --locked --test wordmark

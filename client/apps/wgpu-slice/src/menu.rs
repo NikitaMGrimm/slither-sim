@@ -1099,20 +1099,18 @@ impl Composition<'_> {
                         let band = (3. * self.scale).round() as u32;
                         for y in (bounds[1]..bounds[3]).step_by(band as usize) {
                             let height = (bounds[3] - y).min(band);
-                            let mut left = None;
-                            for x in bounds[0]..=bounds[2] {
-                                let painted = x < bounds[2]
-                                    && (y..y + height).any(|row| {
-                                        raster.pixels[((row * raster.width + x) * 4 + 3) as usize]
-                                            > 0
-                                    });
-                                if painted && left.is_none() {
-                                    left = Some(x);
-                                }
-                                if !painted && let Some(start) = left.take() {
-                                    for sx in (start..x).step_by(2048) {
-                                        regions.push([sx, y, (x - sx).min(2048), height]);
-                                    }
+                            let painted = |x: u32| {
+                                (y..y + height).any(|row| {
+                                    raster.pixels[((row * raster.width + x) * 4 + 3) as usize] > 0
+                                })
+                            };
+                            // Retain gaps within each band: sliced controls also
+                            // consume draws, so splitting every letter's holes
+                            // would exceed the shared 512-draw producer ceiling.
+                            if let Some(left) = (bounds[0]..bounds[2]).find(|x| painted(*x)) {
+                                let right = (left..bounds[2]).rfind(|x| painted(*x)).unwrap() + 1;
+                                for sx in (left..right).step_by(2048) {
+                                    regions.push([sx, y, (right - sx).min(2048), height]);
                                 }
                             }
                         }
@@ -1815,7 +1813,8 @@ impl Composition<'_> {
                     .map(|r| r.image.pixels.len())
                     .sum::<usize>()
             });
-        let material_slots = c.materials.len() + self.stroke.as_ref().map_or(0, |s| s.resources.len());
+        let material_slots =
+            self.materials.len() + self.stroke.as_ref().map_or(0, |s| s.resources.len());
         // Essential controls belong to the Menu allowance. Optional cosmetics
         // must not consume the capacity needed by Play, nickname or fallbacks.
         // Measure replacement faces normally. Fit full labels into their authored
@@ -2014,6 +2013,8 @@ mod quota_tests {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            old_stroke: None,
+            stroke: None,
         };
         let prepared = c
             .solid_draw(

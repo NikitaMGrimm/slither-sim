@@ -60,6 +60,7 @@ use solid materials without capsule shadows.
   are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
   allowance includes exact 5x control/shadow rasters and cropped wordmark tiles
   through 1.1x outgoing growth; the active-picture 64 MiB limit is unchanged.
+  Champion controls retain compact sliced tiles and a separate 4 MiB regression.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
