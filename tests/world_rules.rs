@@ -130,7 +130,7 @@ fn every_frame_has_custom_rules_and_absent_values_are_null() {
         json!({"boundaryMode":"sliding","pitRadius":null,"minScore":null,"killScoreSeconds":null,"freeBoostAtFloor":false})
     );
     let info: Value = serde_json::from_slice(&session.request(br#"{"op":"info"}"#)).unwrap();
-    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v7");
+    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v6");
 }
 
 #[test]
