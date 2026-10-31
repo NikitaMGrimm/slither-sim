@@ -2,6 +2,8 @@ pub mod checkpoint;
 #[cfg(test)]
 mod collision_bounds_tests;
 mod initialization;
+mod join_order;
+use join_order::JoinOrder;
 #[cfg(test)]
 mod initialization_tests;
 #[cfg(test)]
@@ -1854,9 +1856,7 @@ impl Simulator {
         // The offline Android client resolves collisions oldest first against
         // newer snakes first, skipping those already dead. We preserve that
         // resolution after moving all snakes; online move/test phasing is unverified.
-        order.clear();
-        order.extend_from_slice(alive);
-        order.sort_unstable_by_key(|&i| self.joins[i]);
+        let order = order.update(alive, &self.snakes, &self.joins, self.next_join);
         // Large dense worlds repay expanded body insertion by avoiding a merged,
         // sorted query for every head. The grid declines sparse or oversized
         // geometry, retaining the existing bounds index in those worlds.
@@ -2828,9 +2828,9 @@ impl Simulator {
 }
 
 /// Working memory kept between steps, so that small worlds do not pay for an
-/// allocation per buffer per tick. Scratch is reset or overwritten before use;
-/// anchor bounds alone persist until a body edit invalidates them. Cloned and
-/// restored worlds start empty.
+/// allocation per buffer per tick. Derived caches persist while their inputs
+/// remain valid; other scratch is reset or overwritten. Cloned and restored
+/// worlds start empty.
 #[derive(Default)]
 struct StepBuffers {
     alive: Vec<usize>,
@@ -2844,7 +2844,7 @@ struct StepBuffers {
     body_bounds: Vec<Option<Bounds>>,
     heads: Vec<(Point, (f64, f64), f64)>,
     steering: Vec<SteeringCache>,
-    order: Vec<usize>,
+    order: JoinOrder,
     candidates: Vec<u32>,
     dead: Vec<(usize, Option<usize>, DeathReason)>,
     fallen: Vec<bool>,
