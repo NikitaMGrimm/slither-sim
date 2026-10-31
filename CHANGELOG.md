@@ -10,9 +10,14 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
-- Linux hosting guidance for large bot worlds: aged-run sizing, one world per
-  machine, a PGO build recipe and glibc transparent hugepage advice, with links
-  to the scoped 64k-session measurements.
+- The hosting guide has a section on large bot worlds: size the tick from a
+  world that has run for 15 minutes, watch for a growing backlog, run one large
+  world per machine, and build with PGO and glibc's hugepage setting on Linux.
+  A dated report records what a public 64,000-bot session measured
+  ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-31-64k-session/REPORT.md)).
+- With `--stats`, the host also counts refused connections by stage and
+  reason, so the log shows why players can't join. No client addresses or
+  request data are recorded.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind
