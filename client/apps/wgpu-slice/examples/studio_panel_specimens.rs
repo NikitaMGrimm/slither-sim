@@ -258,7 +258,7 @@ mod native {
                         login.studio.presented();
                     }
                     // Explicit fractional clip cuts the surface/shadow; other controls stay intact.
-                renderer.sync_resources(&[])?;
+                    renderer.sync_resources(&[])?;
                     let mut state = StudioState::new(AppearanceRecord {
                         builtin: 7,
                         ..Default::default()
