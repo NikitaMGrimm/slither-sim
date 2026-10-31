@@ -1,11 +1,24 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const stages = new Set(`thread_end ready poll poll_ready read handshake_read message deferred apply_begin apply_end apply_failed
-build_begin build_end build_failed issued superseded retried skipped picture_failed
-sync_begin sync_end submit_begin submit_end pre_present_notify present_begin present_end presented
-callback admitted suppressed coalesced effect decision decision_input accepted write write_blocked backpressure
-flush_blocked flushed ack_effect failed_effect send_abandoned game_failed host_close acquire_begin acquire_end last_ingress`.split(/\s+/));
+// One place classifies stages for identity, lifecycle and reference validation.
+const groups = Object.fromEntries(Object.entries({
+  picture: `build_begin build_end issued superseded retried skipped sync_begin sync_end
+    submit_begin submit_end pre_present_notify present_begin present_end presented`,
+  repeated: `issued retried submit_begin submit_end sync_begin sync_end write write_blocked
+    backpressure flush_blocked last_ingress decision_input coalesced`,
+  boundary: 'retried superseded skipped presented',
+  dependency: 'decision_input coalesced',
+  failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed',
+  effect: 'accepted flushed ack_effect host_close decision backpressure',
+  send: 'accepted flushed decision backpressure',
+  optionalEffect: 'write write_blocked flush_blocked',
+  optionalPoll: 'write write_blocked flush_blocked backpressure handshake_read',
+  packet: 'apply_begin apply_end deferred',
+  watermark: 'build_begin build_end superseded retried last_ingress',
+  plain: 'thread_end ready poll poll_ready read handshake_read message callback admitted suppressed effect acquire_begin acquire_end',
+}).map(([name, names]) => [name, new Set(names.split(/\s+/))]));
+const stages = new Set(Object.values(groups).flatMap(group => [...group]));
 const integer = x => Number.isSafeInteger(x) && x >= 0;
 const decimal = x => typeof x === 'string' && /^(0|[1-9][0-9]*)$/.test(x) && BigInt(x) <= 0xffffffffffffffffn;
 const check = (ok, message) => { if (!ok) throw Error(message); };
@@ -45,18 +58,18 @@ export function analyze(text, { cpu = false } = {}) {
     check(!previous || r.t >= previous.t, 'thread clock reversed');
     threads.set(r.thread, r);
     // Repeated issue/retry/submit/write records have their own ordered event identity.
-    if (!['issued', 'retried', 'submit_begin', 'submit_end', 'sync_begin', 'sync_end', 'write',
-      'backpressure', 'write_blocked', 'flush_blocked', 'last_ingress', 'decision_input', 'coalesced'].includes(r.stage)) unique(r.stage, r);
+    if (!groups.repeated.has(r.stage)) unique(r.stage, r);
     if (r.stage === 'submit_begin') {
       const k = ref(r, r.related); check(r.related !== '0' && !submissions.has(k), 'duplicate/invalid submission ID'); submissions.add(k);
     }
-    if (['decision_input', 'coalesced'].includes(r.stage)) {
+    if (groups.dependency.has(r.stage)) {
       const k = `${r.stage}/${key(r)}/${r.related}/${r.detail}`; check(!dependencies.has(k), 'duplicate input dependency'); dependencies.add(k);
     }
-    if (r.stage.endsWith('_failed') || r.stage === 'failed_effect' || r.stage === 'send_abandoned') throw Error(`failed stage ${r.stage}`);
+    if (groups.failed.has(r.stage)) throw Error(`failed stage ${r.stage}`);
   }
   check(threads.size === header.threads && [...threads.values()].every(r => r.stage === 'thread_end'), 'missing thread completion');
   const each = stage => [...table(stage).values()];
+  const classified = name => lines.filter(r => groups[name].has(r.stage));
   // Ready IDs are the first-pending epoch offsets, so they can cross thread boundaries.
   const readiness = new Map();
   for (const r of each('ready')) {
@@ -89,9 +102,7 @@ export function analyze(text, { cpu = false } = {}) {
     check(begin.t >= r.t && finish.t >= begin.t, 'invalid packet apply');
     if (r.detail !== '0') add('readToApply', read(r, r.detail).t, begin.t);
   }
-  for (const stage of ['apply_begin', 'apply_end', 'deferred']) {
-    for (const r of each(stage)) one('message', r);
-  }
+  for (const r of classified('packet')) one('message', r);
   const inputs = new Map(each('admitted').map(r => [r.id, r]));
   check(inputs.size === each('admitted').length, 'duplicate process input ID');
   const input = id => { const r = inputs.get(id); check(r, `orphan input ${id}`); return r; };
@@ -116,8 +127,25 @@ export function analyze(text, { cpu = false } = {}) {
       add('acceptedToFlushed', accepted.t, flushed.t);
     }
   }
-  for (const stage of ['accepted', 'flushed', 'ack_effect', 'host_close', 'decision']) for (const r of each(stage)) one('effect', r);
-  for (const r of [...each('accepted'), ...each('flushed'), ...each('decision')]) check(one('effect', r).detail === '1', 'send stage on non-send effect');
+  for (const r of classified('effect')) one('effect', r);
+  for (const r of classified('send')) check(one('effect', r).detail === '1', 'send stage on non-send effect');
+  for (const r of classified('optionalEffect')) if (r.id !== '0') {
+    check(one('effect', r).t <= r.t, 'write precedes effect');
+  }
+  for (const r of classified('optionalPoll')) if (r.related !== '0') {
+    check(one('poll', r, r.related).t <= r.t, 'wire observation precedes poll');
+  }
+  const acquisition = (r, id) => {
+    const acquire = table('acquire_end').get(`${r.thread}/${r.detail}/${id}`);
+    check(acquire && acquire.t <= r.t, 'orphan/reversed picture acquisition');
+  };
+  for (const r of classified('watermark')) if (r.related !== '0') {
+    check(table('message').has(ref(r, r.related)), 'orphan packet watermark');
+  }
+  for (const r of lines.filter(r => r.stage === 'last_ingress')) {
+    if (r.id !== '0') acquisition(r, r.id);
+    if (r.related !== '0') check(one('apply_end', r, r.related).t <= r.t, 'ingress watermark precedes application');
+  }
   for (const r of [...each('decision'), ...lines.filter(r => r.stage === 'decision_input')]) {
     const decision = one('decision', r), accepted = one('accepted', r), flushed = one('flushed', r);
     if (r.stage === 'decision') add('decisionToAccepted', decision.t, accepted.t);
@@ -127,12 +155,13 @@ export function analyze(text, { cpu = false } = {}) {
       add('admissionToFlushed', admitted.t, flushed.t);
     }
   }
+  const closed = p => check(!p.submit && !p.sync && !p.present, 'unfinished picture span');
   const pictures = new Map();
   for (const r of each('build_begin')) pictures.set(key(r), { begin: r, state: 'building', submits: 0 });
   for (const r of lines) {
-    if (['build_begin', 'build_end', 'issued', 'retried', 'superseded', 'skipped', 'sync_begin', 'sync_end',
-      'submit_begin', 'submit_end', 'pre_present_notify', 'present_begin', 'present_end', 'presented'].includes(r.stage)) {
+    if (groups.picture.has(r.stage)) {
       const p = pictures.get(key(r)); check(p, `orphan picture ${key(r)}`);
+      if (groups.boundary.has(r.stage)) closed(p);
       switch (r.stage) {
         case 'build_begin': break;
         case 'build_end': {
@@ -149,8 +178,7 @@ export function analyze(text, { cpu = false } = {}) {
         case 'issued': {
           check(p.state === 'prepared', 'issue violates picture ownership');
           if (r.related !== '0') {
-            const acquire = table('acquire_end').get(`${r.thread}/${r.detail}/${r.related}`);
-            check(acquire && acquire.t <= r.t, 'orphan/reversed picture acquisition');
+            acquisition(r, r.related);
           } else check(cpu, 'native picture has no acquisition');
           p.state = 'issued'; break;
         }
@@ -163,16 +191,16 @@ export function analyze(text, { cpu = false } = {}) {
         case 'sync_end': check(p.sync && r.t >= p.sync.t, 'sync without begin'); p.sync = null; break;
         case 'pre_present_notify': check(p.state === 'issued', 'notify without issue'); p.notify = r; break;
         case 'present_begin': check(p.state === 'issued' && p.notify && p.submits > 0 && !p.present, 'invalid present'); p.present = r; break;
-        case 'present_end': check(p.present, 'present without begin'); add('presentCall', p.present.t, r.t); p.returned = r; break;
+        case 'present_end': check(p.present, 'present without begin'); add('presentCall', p.present.t, r.t); p.present = null; p.returned = r; break;
         case 'presented':
-          check(p.state === 'issued' && (cpu || p.returned) && !p.submit && !p.sync, 'ack without completed present');
+          check(p.state === 'issued' && (cpu || p.returned), 'ack without completed present');
           p.state = 'done';
           if (p.lastSubmit) add('buildToLastSubmit', p.end.t, p.lastSubmit.t);
           break;
       }
     }
   }
-  for (const p of pictures.values()) check(p.state === 'done', 'incomplete picture tail');
+  for (const p of pictures.values()) { closed(p); check(p.state === 'done', 'incomplete picture tail'); }
   for (const r of each('acquire_begin')) add('acquireWait', r.t, one('acquire_end', r).t);
   for (const r of each('acquire_end')) one('acquire_begin', r);
   const distributions = {};

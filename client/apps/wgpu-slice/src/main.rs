@@ -986,7 +986,7 @@ mod desktop {
                 "No connection mode configured; Play stays disabled. Use --official or --endpoint."
             );
         }
-        let trace = latency::Run::from_env()?;
+        let trace = latency::Run::from_env();
         let event_loop = EventLoop::<TransportWake>::with_user_event()
             .build()
             .map_err(|e| e.to_string())?;
@@ -999,7 +999,7 @@ mod desktop {
         event_loop.run_app(&mut app).map_err(|e| e.to_string())?;
         app.running.take();
         if let Some(trace) = trace {
-            trace.finish(app.failure.is_none())?;
+            trace.finish(app.failure.is_none());
         }
         app.failure.map_or(Ok(()), Err)
     }

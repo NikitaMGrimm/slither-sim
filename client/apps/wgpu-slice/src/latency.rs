@@ -128,7 +128,7 @@ impl Recorder {
                 .open(path)?,
         );
         // Revision is supplied by the opt-in launcher; reject strings requiring JSON escaping.
-        if revision.len() < 8 || !revision.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !(8..=64).contains(&revision.len()) || !revision.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(std::io::Error::other("expected source revision hex"));
         }
         writeln!(
@@ -440,17 +440,37 @@ pub struct Run {
     finished: bool,
 }
 impl Run {
-    pub fn from_env() -> Result<Option<Self>, String> {
+    /// Invalid diagnostics configuration must never prevent the app from playing.
+    pub fn from_env() -> Option<Self> {
+        Self::try_from_env().unwrap_or_else(|error| {
+            eprintln!("Latency tracing disabled: {error}");
+            None
+        })
+    }
+    fn try_from_env() -> Result<Option<Self>, String> {
         let Some(path) = std::env::var_os("SLITHER_LATENCY_TRACE") else {
             return Ok(None);
         };
         let revision = std::env::var("SLITHER_LATENCY_REVISION")
             .map_err(|_| "SLITHER_LATENCY_REVISION is required")?;
-        if revision.len() < 8 || !revision.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !(8..=64).contains(&revision.len()) || !revision.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("Invalid latency source revision".into());
         }
-        if Path::new(&path).exists() {
+        if path.is_empty() {
+            return Err("Latency output path is empty".into());
+        }
+        if Path::new(&path)
+            .try_exists()
+            .map_err(|e| format!("Invalid latency output: {e}"))?
+        {
             return Err("Latency output already exists".into());
+        }
+        let parent = Path::new(&path)
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        if !parent.is_dir() {
+            return Err("Latency output parent is not a directory".into());
         }
         let recorder = Recorder::new(CAPACITY);
         let thread = Some(recorder.attach());
@@ -462,12 +482,12 @@ impl Run {
             finished: false,
         }))
     }
-    pub fn finish(mut self, complete: bool) -> Result<(), String> {
+    pub fn finish(mut self, complete: bool) {
         self.thread.take();
         self.finished = true;
-        self.recorder
-            .write(&self.path, &self.revision, complete)
-            .map_err(|e| e.to_string())
+        if let Err(error) = self.recorder.write(&self.path, &self.revision, complete) {
+            eprintln!("Latency trace finalization failed: {error}");
+        }
     }
 }
 
@@ -485,6 +505,86 @@ impl Drop for Run {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // Environment changes are confined to child processes; tests never mutate
+    // the multi-threaded test runner's process environment.
+    #[test]
+    fn invalid_configuration_is_reported_once_and_startup_continues() {
+        let path = std::env::temp_dir().join(format!(
+            "latency-config-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let existing = path.with_extension("existing");
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&existing)
+            .unwrap()
+            .write_all(b"preserve")
+            .unwrap();
+        let missing_parent = path.join("trace.jsonl");
+        let oversized_revision = "a".repeat(65);
+        for (output, revision, reports) in [
+            (None, Some("invalid"), 0),
+            (Some(path.as_os_str()), None, 1),
+            (Some(path.as_os_str()), Some("invalid"), 1),
+            (Some(path.as_os_str()), Some(oversized_revision.as_str()), 1),
+            (Some(path.as_os_str()), Some(""), 1),
+            (Some(std::ffi::OsStr::new("")), Some("2f34a000"), 1),
+            (Some(existing.as_os_str()), Some("2f34a000"), 1),
+            (Some(missing_parent.as_os_str()), Some("2f34a000"), 1),
+        ] {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command
+                .args([
+                    "--exact",
+                    "latency::tests::configuration_startup_child",
+                    "--nocapture",
+                ])
+                .env("SLITHER_LATENCY_CONFIG_TEST", "1")
+                .env_remove("SLITHER_LATENCY_TRACE")
+                .env_remove("SLITHER_LATENCY_REVISION");
+            if let Some(output) = output {
+                command.env("SLITHER_LATENCY_TRACE", output);
+            }
+            if let Some(revision) = revision {
+                command.env("SLITHER_LATENCY_REVISION", revision);
+            }
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW for the startup probe.
+            }
+            let result = command.output().unwrap();
+            assert!(
+                result.status.success(),
+                "{}",
+                String::from_utf8_lossy(&result.stderr)
+            );
+            assert!(String::from_utf8_lossy(&result.stdout).contains("startup continued"));
+            assert_eq!(
+                String::from_utf8_lossy(&result.stderr)
+                    .matches("Latency tracing disabled:")
+                    .count(),
+                reports
+            );
+        }
+        assert!(!path.exists());
+        assert_eq!(std::fs::read(&existing).unwrap(), b"preserve");
+        std::fs::remove_file(existing).unwrap();
+    }
+    #[test]
+    fn configuration_startup_child() {
+        if std::env::var_os("SLITHER_LATENCY_CONFIG_TEST").is_some() {
+            assert!(Run::from_env().is_none());
+            assert!(worker().is_none());
+            crate::game::LocalGame::new(0.).unwrap();
+            println!("startup continued");
+        }
+    }
     #[test]
     fn bounded_full_records_without_subsampling() {
         let r = Recorder::new(2);

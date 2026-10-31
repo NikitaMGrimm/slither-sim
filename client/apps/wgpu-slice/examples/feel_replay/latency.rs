@@ -69,9 +69,34 @@ fn schedule(
 fn percentile(v: &[f64], p: f64) -> f64 {
     v[(v.len() as f64 * p).ceil() as usize - 1]
 }
+// Quantiles of frame differences and differences of run quantiles answer different
+// questions. Keep both, including the individual run quantiles, outside timing.
+fn statistics(a: &[f64], b: &[f64]) -> Value {
+    let mut delta: Vec<_> = a.iter().zip(b).map(|(a, b)| b - a).collect();
+    let mut left = a.to_vec();
+    let mut right = b.to_vec();
+    delta.sort_by(f64::total_cmp);
+    left.sort_by(f64::total_cmp);
+    right.sort_by(f64::total_cmp);
+    json!({"pairedDeltaP50Ms":percentile(&delta,0.5), "pairedDeltaP95Ms":percentile(&delta,0.95),
+        "aP50Ms":percentile(&left,0.5), "aP95Ms":percentile(&left,0.95),
+        "bP50Ms":percentile(&right,0.5), "bP95Ms":percentile(&right,0.95),
+        "runQuantileDeltaP50Ms":percentile(&right,0.5)-percentile(&left,0.5),
+        "runQuantileDeltaP95Ms":percentile(&right,0.95)-percentile(&left,0.95),
+        "aMeanMs":a.iter().sum::<f64>()/a.len() as f64, "bMeanMs":b.iter().sum::<f64>()/b.len() as f64})
+}
 pub fn run() -> Result<()> {
     let mut rounds = Vec::new();
-    for round in 0..5 {
+    // Interleave the control and treatment pairs so host drift favors neither.
+    let experiments = (0..5).flat_map(|round| {
+        let order = if round % 2 == 0 {
+            [false, true]
+        } else {
+            [true, false]
+        };
+        order.map(|record| (round, record))
+    });
+    for (round, record) in experiments {
         // Adjacent frame pairs reduce host-load drift. Channels, waits, construction,
         // observation copying and export remain outside each timed driver operation.
         let (a, b) = std::thread::scope(|scope| -> Result<_> {
@@ -80,7 +105,7 @@ pub fn run() -> Result<()> {
             let (on_turn, on_rx) = mpsc::channel();
             let (on_done, on_ready) = mpsc::channel();
             let off = scope.spawn(|| schedule(false, off_rx, off_done));
-            let on = scope.spawn(|| schedule(true, on_rx, on_done));
+            let on = scope.spawn(|| schedule(record, on_rx, on_done));
             let result = (|| -> Result<()> {
                 off_ready.recv().map_err(|e| e.to_string())?;
                 on_ready.recv().map_err(|e| e.to_string())?;
@@ -105,21 +130,36 @@ pub fn run() -> Result<()> {
             Ok((a?, b?))
         })?;
         if a.commands != b.commands || a.pictures != b.pictures {
-            return Err("Trace off/on changed commands or pictures".into());
+            return Err("Calibration pair changed commands or pictures".into());
         }
         let (rows, dropped) = b.recorder.snapshot();
         if dropped != 0 {
             return Err("Latency calibration overflow".into());
         }
-        let mut delta: Vec<_> = a.times.iter().zip(&b.times).map(|(a, b)| b - a).collect();
-        delta.sort_by(f64::total_cmp);
-        rounds.push(json!({"round":round,"frames":FRAMES,"commands":a.commands.len(),"observations":a.pictures.len(),
-            "records":rows.len(),"dropped":dropped,"pairedRecorderDeltaP50Ms":percentile(&delta,0.5),
-            "pairedRecorderDeltaP95Ms":percentile(&delta,0.95), "offMeanMs":a.times.iter().sum::<f64>() / FRAMES as f64, "onMeanMs":b.times.iter().sum::<f64>() / FRAMES as f64}));
+        if rows.is_empty() == record {
+            return Err("Unexpected calibration recording state".into());
+        }
+        rounds.push(
+            json!({"comparison":if record { "A/B" } else { "A/A" }, "round":round,
+        "frames":FRAMES,"commands":a.commands.len(),"observations":a.pictures.len(),
+        "records":rows.len(),"dropped":dropped,"timing":statistics(&a.times, &b.times)}),
+        );
     }
     println!(
         "{}",
         json!({"scope":"release CPU driver; scalar recorder; no transport/GPU/present", "warmupFrames":100,"rounds":rounds})
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn run_quantiles_do_not_confuse_frame_alignment_noise_with_recorder_cost() {
+        let result = statistics(&[1., 2., 100.], &[100., 2., 1.]);
+        assert_eq!(result["pairedDeltaP95Ms"], 99.);
+        assert_eq!(result["runQuantileDeltaP50Ms"], 0.);
+        assert_eq!(result["runQuantileDeltaP95Ms"], 0.);
+    }
 }

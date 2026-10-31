@@ -15,6 +15,18 @@ hash and any source diff separately. Close the app to write once. Unset
 input is started by enabling it. The separate `--headless` renderer does not use
 this desktop recorder. Existing feel-trace v3 is unchanged.
 
+Missing/invalid revision metadata or an empty, existing or invalid output path
+reports one diagnostic and disables tracing; startup and play continue. Output
+failure at shutdown is also reported without failing the application. Existing
+output files are never overwritten.
+
+Trace-off is **not just one thread-local Option check per hook**. Helpers borrow
+thread-local `RefCell` state and check the optional buffer; metadata helpers can
+still store IDs/phase state, and compound hooks can access TLS more than once.
+Disabled recording does no clock reads, atomic ID allocation, readiness atomic
+exchange, record writes, recorder mutex work, formatting or file I/O. The native
+poll's readiness exchange is guarded by a nonzero trace poll ID.
+
 The UI, readiness worker and connector each preallocate and touch 262,144
 scalar records. Recording does no formatting, file I/O, buffer growth, or
 locking. The pending send join queue is separately bounded to 32 effects.
@@ -97,7 +109,10 @@ node --test tools/latency-trace.test.mjs
 
 The analyzer rejects duplicate IDs/events, orphan joins, changed picture
 watermarks, illegal ownership transitions, missing acknowledgements/flushes,
-overflow and incomplete tails. It prints counts, p50, p95 and maximum in ms for
+overflow and incomplete tails. Every begun submit/sync/present span must close
+before retry or retirement, including skipped pictures. Nonzero wire effect/poll
+and ingress acquisition/packet references must resolve; acquisition joins use the
+generation in `detail`, which can differ from the ingress event's generation. It prints counts, p50, p95 and maximum in ms for
 ready-to-read, read-to-apply-start, apply-to-build-end, build-end-to-last-submit,
 present-call duration, input admission/decision/acceptance/flush and acquire wait.
 Setup can build inside application: apply-start-to-build-end is always reported;
@@ -113,13 +128,15 @@ cargo build --release --locked -p slither-wgpu-slice --features feel-trace --exa
 target/release/examples/feel-replay --latency-overhead
 ```
 
-Run from the repository root, with `CARGO_BUILD_JOBS=2`. It runs five pairs of
-independent CPU drivers on two worker threads, stepping
-off/on frames adjacently with alternating order on the same authored schedule.
+Run from the repository root, with `CARGO_BUILD_JOBS=2`. It interleaves five A/A
+(off/off) and five A/B (off/on) pairs in one build/process. Independent CPU
+drivers on two worker threads step adjacent frames with alternating order on
+the same authored schedule.
 Each warms 100 frames, measures 1,200, and checks exact command bytes/order/clocks
 and complete feel observations.
-It reports p50/p95 of paired per-frame CPU differences, not a difference of
-pooled percentiles. Channel waits, initialization, observation copying and
+For each pair it reports both p50/p95 of paired per-frame differences and
+p50(B)-p50(A) / p95(B)-p95(A) of the per-run distributions, plus the individual
+run quantiles. These are different statistics, not an end-to-end interval sum. Channel waits, initialization, observation copying and
 export are outside the timed frames. Both sides enable the existing feel
 recorder. This is a CPU-driver overhead check;
 it does not measure the native surface, GPU, transport or display path.
@@ -149,9 +166,63 @@ with zero drops. The calibration process was constrained to one logical CPU
 | 5 | 0.0002 | 0.1297 |
 
 Median pair p50 is 0.0002 ms and p95 is 0.1297 ms (p95 range 0.1285-0.1369).
-The 0.1 ms p95 target was **not met** by this paired CPU-frame measurement.
+These raw paired p95 deltas exceed 0.1 ms, but without A/A they do not establish
+recorder cost or whether the target is met; the controlled follow-up below
+separates the measurement noise.
 Average frame CPU time stayed around 0.23 ms, with both positive and negative
 pair deltas; these high-quantile differences include workload/host variation
 and do not isolate a universal recorder cost. Earlier unpinned measurements
 also varied above the target (up to 0.1611 ms p95). They were not discarded in
 favor of a passing run. Native transport/surface overhead remains unmeasured.
+
+## A/A-controlled follow-up (2026-10-31)
+
+Five A/A (off/off) and five A/B (off/on) pairs were interleaved in one release
+executable/process, using the identical schedule, warmup, sample count and
+process affinity mask 1 above. Each pair retained exactly equal commands and
+complete feel observations. A/A retained zero latency records, A/B retained
+8,238 per on run, and all dropped counts were zero. Earlier runs and the
+historical table above are retained; this does not replace them.
+
+All values below are ms/frame. Paired columns are quantiles of B[i]-A[i]. Run
+columns are q(B)-q(A); they do not pool frames across runs. A and B both mean
+off in A/A; only B is on in A/B. Quantiles use the existing nearest-rank rule.
+
+| Pair | Paired p50 | Paired p95 | Run p50 difference | Run p95 difference |
+| --- | ---: | ---: | ---: | ---: |
+| A/A 1 | 0.0006 | 0.1222 | 0.0003 | -0.0042 |
+| A/A 2 | 0.0002 | 0.1897 | -0.0002 | 0.0199 |
+| A/A 3 | -0.0007 | 0.1390 | -0.0008 | -0.0634 |
+| A/A 4 | -0.0004 | 0.1344 | -0.0004 | -0.0123 |
+| A/A 5 | 0.0000 | 0.1288 | 0.0002 | -0.0086 |
+| A/B 1 | 0.0005 | 0.1255 | 0.0004 | -0.0064 |
+| A/B 2 | 0.0001 | 0.1220 | -0.0004 | -0.0494 |
+| A/B 3 | 0.0004 | 0.1304 | -0.0001 | -0.0032 |
+| A/B 4 | -0.0001 | 0.1356 | 0.0010 | 0.0052 |
+| A/B 5 | 0.0000 | 0.1387 | 0.0003 | 0.0035 |
+
+Medians of the five pair summaries:
+
+| Statistic | A/A | A/B | Observed A/A range |
+| --- | ---: | ---: | ---: |
+| Paired p50 | 0.0000 | 0.0001 | -0.0007 to 0.0006 |
+| Paired p95 | 0.1344 | 0.1304 | 0.1222 to 0.1897 |
+| Run p50 difference | -0.0002 | 0.0003 | -0.0008 to 0.0003 |
+| Run p95 difference | -0.0086 | -0.0032 | -0.0634 to 0.0199 |
+
+The paired p95 is about 0.13 ms even with both recorders off. Every A/B run-p95
+shift lies inside the observed A/A range. No positive p95 recorder cost is
+resolved: it is below this experiment's empirical **0.0634 ms/frame measurement
+floor**, defined as the maximum absolute A/A run-p95 shift over these five
+pairs. The corresponding p50 floor is 0.0008 ms. One A/B run-p50 shift of
+0.0010 ms exceeds that p50 envelope, without a consistent excess across the
+other summaries; a blanket claim that every statistic is below noise is not
+supported. These empirical floors are not confidence bounds or zero-cost claims.
+
+The 0.1 ms target is unchanged. The former 0.1297 ms paired p95 did not isolate
+recorder overhead and cannot establish a target failure. This control does not
+certify the native surface/transport path either. No frame-loop recorder
+allocation, mutex or string formatting was found in source; current evidence
+does not justify attributing the noisy tails to one or making a speculative
+performance change. Disabled hooks still have the TLS/metadata costs described
+above, with the per-poll readiness atomic now skipped.

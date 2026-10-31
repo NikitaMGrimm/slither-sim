@@ -73,7 +73,7 @@ test('readable first-pending wakes join across threads; writable-only wakes are 
 
 test('a handshake read can be retained into a UI-thread message', () => {
   const rows = fixture();
-  const read = rows.find(r => r.stage === 'read'); read.stage = 'handshake_read'; read.thread = 1;
+  const read = rows.find(r => r.stage === 'read'); read.stage = 'handshake_read'; read.thread = 1; read.related = '0';
   rows.push({ ...read, ns: '1001', stage: 'thread_end', id: '0', related: '0', detail: '0' });
   assert.equal(analyze(encode(rows, { threads: 2 })).distributions.readToApply.count, 1);
 });
@@ -91,4 +91,48 @@ test('retained input intent can contribute after a connection generation changes
   const rows = fixture();
   for (const r of rows) if (['effect', 'decision', 'accepted', 'ack_effect', 'flushed', 'backpressure'].includes(r.stage)) r.generation = 2;
   assert.equal(analyze(encode(rows)).distributions.admissionToFlushed.count, 1);
+});
+
+test('retry and retirement cannot hide open submit, sync or present spans', () => {
+  for (const end of ['submit_end', 'sync_end', 'present_end']) {
+    for (const boundary of ['skipped', 'retried', 'presented']) {
+      const rows = fixture();
+      rows.splice(rows.findLastIndex(r => r.stage === end), 1);
+      rows.find(r => r.stage === 'presented').stage = boundary;
+      assert.throws(() => analyze(encode(rows), { cpu: true }), /unfinished picture span/);
+    }
+  }
+});
+test('final completeness also rejects an open span without retirement', () => {
+  for (const begin of ['submit_begin', 'sync_begin', 'present_begin']) {
+    const rows = fixture(), end = rows.at(-1);
+    const prefix = rows.slice(0, rows.findIndex(r => r.stage === begin) + 1);
+    assert.throws(() => analyze(encode([...prefix, end]), { cpu: true }), /unfinished picture span/);
+  }
+});
+function tail(stage, id, related = '0', detail = '0') {
+  const rows = fixture();
+  rows.splice(-1, 0, { ...rows[0], stage, id, related, detail });
+  rows.forEach((r, i) => r.ns = String(i * 1000));
+  return rows;
+}
+test('every nonzero wire effect and poll reference must resolve', () => {
+  for (const stage of ['write', 'write_blocked', 'flush_blocked']) {
+    for (const [id, poll] of [['9999', '0'], ['0', '8888'], ['9999', '8888']]) {
+      assert.throws(() => analyze(encode(tail(stage, id, poll))), /orphan/);
+    }
+  }
+  assert.equal(analyze(encode(tail('write', '5', '1', '42'))).complete, true);
+  assert.equal(analyze(encode(tail('write', '0', '0', '42'))).complete, true);
+});
+test('ingress acquisition and packet references cannot be orphaned', () => {
+  for (const [id, packet, generation] of [['9999', '0', '1'], ['0', '9999', '0'], ['12', '3', '9999']]) {
+    assert.throws(() => analyze(encode(tail('last_ingress', id, packet, generation))), /orphan/);
+  }
+  const rows = tail('last_ingress', '12', '3', '0');
+  for (const r of rows) {
+    if (['acquire_begin', 'acquire_end'].includes(r.stage) && r.id === '12') r.generation = 0;
+    if (r.stage === 'issued') r.detail = '0';
+  }
+  assert.equal(analyze(encode(rows)).complete, true);
 });

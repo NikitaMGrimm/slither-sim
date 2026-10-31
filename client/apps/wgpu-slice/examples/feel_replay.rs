@@ -315,10 +315,10 @@ fn run() -> Result<()> {
         return Err("Expected no arguments".into());
     }
     let request = serde_json::from_str(&input).map_err(|e| e.to_string())?;
-    let trace = slither_wgpu_slice::latency::Run::from_env()?;
+    let trace = slither_wgpu_slice::latency::Run::from_env();
     let result = replay(request)?;
     if let Some(trace) = trace {
-        trace.finish(result["body"]["final"]["completed"] == true)?;
+        trace.finish(result["body"]["final"]["completed"] == true);
     }
     println!(
         "{}",

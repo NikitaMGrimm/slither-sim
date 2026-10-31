@@ -424,7 +424,6 @@ impl Transport {
                 self.pending_bytes += bytes.len();
                 match socket.flush() {
                     Ok(()) => {
-                        latency::flushed();
                         self.pending_bytes = 0;
                         socket.get_mut().write_blocked = false;
                     }
@@ -448,7 +447,9 @@ impl Transport {
         latency::generation(self.generation);
         latency::writing(0);
         let poll = latency::poll();
-        if let Some(r) = &self.readiness {
+        if poll != 0
+            && let Some(r) = &self.readiness
+        {
             let ready = r.pending.swap(0, Ordering::AcqRel);
             if ready != 0 {
                 latency::event("poll_ready", poll, ready, 0);
@@ -497,7 +498,6 @@ impl Transport {
         if let Some(socket) = &mut self.socket {
             match socket.flush() {
                 Ok(()) => {
-                    latency::flushed();
                     self.pending_bytes = 0;
                     socket.get_mut().write_blocked = false;
                 }
