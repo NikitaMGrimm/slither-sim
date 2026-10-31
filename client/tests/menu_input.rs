@@ -55,7 +55,12 @@ fn normalization_is_identical_for_typing_paste_and_ime_commit() {
         let mut ime = editor(field, "");
         ime.apply(EditIntent::Preedit(raw.clone(), None));
         assert_eq!(text(&ime, field), "");
-        assert_eq!(ime.editor(field).preedit().unwrap().text, raw);
+        let preview = &ime.editor(field).preedit().unwrap().text;
+        assert!(raw.starts_with(preview));
+        assert_eq!(
+            preview.encode_utf16().count(),
+            slither_client::menu_input::MAX_PREEDIT_UNITS
+        );
         ime.apply(EditIntent::ImeCommit(raw));
         assert_eq!(text(&typed, field), text(&pasted, field));
         assert_eq!(text(&typed, field), text(&ime, field));
@@ -914,4 +919,43 @@ fn caret_edit_after_idle_uses_the_next_menu_clock_seam() {
     assert!(input.caret_visible());
     input.step_caret(10_530.);
     assert!(!input.caret_visible());
+}
+
+#[test]
+fn preedit_is_bounded_before_display_and_clamps_selection_on_scalar_boundaries() {
+    use slither_client::menu_input::MAX_PREEDIT_UNITS;
+    let field = TextField::Champion;
+    let mut input = editor(field, "old");
+    input.apply(EditIntent::SelectAll);
+    input.apply(EditIntent::Preedit(
+        "界".repeat(100_000),
+        Some((usize::MAX, usize::MAX)),
+    ));
+    let preview = input.editor(field).preedit().unwrap();
+    assert_eq!(preview.text.len(), 3 * MAX_PREEDIT_UNITS);
+    assert_eq!(preview.text, "界".repeat(MAX_PREEDIT_UNITS));
+    assert!(preview.text.capacity() <= 3 * MAX_PREEDIT_UNITS);
+    assert_eq!(
+        preview.selection,
+        Some((preview.text.len(), preview.text.len()))
+    );
+    assert_eq!(text(&input, field), "old");
+    for prefix in [MAX_PREEDIT_UNITS - 2, MAX_PREEDIT_UNITS - 1] {
+        input.apply(EditIntent::Preedit(
+            "x".repeat(prefix) + "😀tail",
+            Some((prefix + 1, usize::MAX)),
+        ));
+        let preview = input.editor(field).preedit().unwrap();
+        assert!(preview.text.encode_utf16().count() <= MAX_PREEDIT_UNITS);
+        assert_eq!(
+            preview.text.ends_with('😀'),
+            prefix == MAX_PREEDIT_UNITS - 2
+        );
+        assert_eq!(preview.selection, Some((prefix, preview.text.len())));
+    }
+    input.apply(EditIntent::ImeCommit("done".into()));
+    assert_eq!(text(&input, field), "done");
+    assert!(!input.editor(field).composing());
+    input.apply(EditIntent::Undo);
+    assert_eq!(text(&input, field), "old");
 }

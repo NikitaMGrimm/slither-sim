@@ -87,6 +87,17 @@ pub fn encode_login(
     Ok(bytes)
 }
 
+/// Encode the protocol-19 victory message on the existing connection.
+/// The server accepts one bounded ASCII payload; see docs/raw-server.md, local records.
+/// Substitute per UTF-16 unit before truncation, including isolated surrogates.
+pub fn encode_champion(units: &[u16]) -> Vec<u8> {
+    let text = crate::menu_input::TextRule::Champion.normalize_units(units);
+    let mut bytes = Vec::with_capacity(2 + text.len());
+    bytes.extend([255, b'v']);
+    bytes.extend(text.bytes());
+    bytes
+}
+
 /// Explicit connection framing mode; this is never inferred from packet data.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ElapsedHeader {

@@ -21,15 +21,18 @@ mod authored_sources_browser;
 
 pub mod authored_sources;
 pub mod challenge;
+pub mod champion;
 pub mod desktop_input;
 pub mod desktop_layout;
 #[cfg(feature = "feel-trace")]
 pub mod feel_trace;
 pub mod gameplay_policy;
+pub mod menu_controls;
 pub mod menu_input;
 pub mod menu_layout;
 pub mod menu_loading;
 pub mod menu_preferences;
+pub mod menu_theme;
 pub mod play_admission;
 pub mod presentation;
 pub mod profile_literals;

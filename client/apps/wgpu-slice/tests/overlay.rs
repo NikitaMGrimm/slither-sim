@@ -206,6 +206,10 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
     }
     let mut login = NativeLogin::new("Player").unwrap();
     login.step(0., true, false).unwrap();
+    // Exercise the visible field, not the initial zero-alpha reveal sample.
+    for now in (16..=2400).step_by(16) {
+        login.step(f64::from(now), true, false).unwrap();
+    }
     let menu = login.prepare_host(physical, 5., true, None).unwrap();
     let resident = menu
         .resources
@@ -219,7 +223,8 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
         .filter(|r| r.asset.handle >> 60 == 7)
         .max_by_key(|r| r.asset.width)
         .unwrap();
-    assert_eq!(widest.asset.width, 1640);
+    // Material storage is sliced; exact physical source/destination sizes above remain unchanged.
+    assert!(widest.asset.width <= 512);
     assert!(
         menu.resources
             .iter()

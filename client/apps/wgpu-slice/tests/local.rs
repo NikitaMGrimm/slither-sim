@@ -262,6 +262,197 @@ fn playing() -> LocalGame {
 }
 
 #[test]
+fn champion_send_uses_current_victory_session_once_and_exact_bytes() {
+    use slither_client::menu_controls::Activation::{Enter, Pointer};
+    let mut game = playing();
+    let generation = game.generation();
+    assert!(!game.save_champion(generation, &[65], Pointer).unwrap());
+    game.receive(generation, &[b'v', 1], 30.).unwrap();
+    assert_eq!(game.champion_session().outcome, Some(Phase::Victory));
+    assert!(!game.save_champion(generation + 1, &[65], Pointer).unwrap());
+    assert!(!game.save_champion(generation, &[], Enter).unwrap());
+    assert!(!game.champion_session().champion_sent);
+    let units = [vec![65; 139], vec![0xd800, 0xdc00, 66]].concat();
+    assert!(game.save_champion(generation, &units, Enter).unwrap());
+    assert!(game.champion_session().champion_sent);
+    assert!(!game.save_champion(generation, &[66], Pointer).unwrap());
+    let e = game.effect().unwrap();
+    assert_eq!(e.generation, generation);
+    assert_eq!(
+        e.kind,
+        EffectKind::Send([vec![255, 118], vec![65; 139], vec![32]].concat())
+    );
+    game.receive(generation, &[b'v', 2], 31.).unwrap();
+    assert!(
+        !game.champion_session().champion_acknowledged,
+        "ingress waits for outstanding effect"
+    );
+    game.acknowledge(generation, e.id, true).unwrap();
+    game.service_ingress().unwrap();
+    assert!(game.champion_session().champion_acknowledged);
+    assert!(!game.save_champion(generation, &[66], Pointer).unwrap());
+    let mut empty = playing();
+    let g = empty.generation();
+    empty.receive(g, &[b'v', 1], 30.).unwrap();
+    assert!(empty.save_champion(g, &[], Pointer).unwrap());
+    assert_eq!(effects(&mut empty), [vec![255, 118]]);
+    let mut space = playing();
+    let g = space.generation();
+    space.receive(g, &[b'v', 1], 30.).unwrap();
+    assert!(
+        space
+            .save_champion(g, &[], slither_client::menu_controls::Activation::Space)
+            .unwrap()
+    );
+    assert_eq!(effects(&mut space), [vec![255, 118]]);
+    let mut failed = playing();
+    let g = failed.generation();
+    failed.receive(g, &[b'v', 1], 30.).unwrap();
+    failed.save_champion(g, &[65], Pointer).unwrap();
+    let e = failed.effect().unwrap();
+    failed.acknowledge(g, e.id, false).unwrap();
+    assert_eq!(failed.phase(), Phase::Failed);
+    assert!(!failed.save_champion(g, &[66], Pointer).unwrap());
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[test]
+fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
+    use slither_client::{
+        champion::{MESSAGE, SAVE},
+        menu_input::{EditIntent, EditorId},
+    };
+    use slither_wgpu_slice::{
+        login_native::NativeLogin,
+        menu_input_native::{EditHost, KeyInput},
+    };
+    use winit::{
+        event::{ElementState, Ime, WindowEvent},
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+    };
+    struct Host;
+    impl EditHost for Host {
+        fn ime_allowed(&mut self, _: bool) {}
+        fn ime_purpose_normal(&mut self) {}
+        fn ime_cursor_area(&mut self, _: [f64; 2], _: [f64; 2]) {}
+        fn read_clipboard(&mut self) -> Result<String, String> {
+            Ok("A😀".into())
+        }
+        fn write_clipboard(&mut self, _: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    let mut game = playing();
+    let mut login = NativeLogin::new("Player").unwrap();
+    login.step(0., true, false).unwrap();
+    login.activate(true);
+    login.step(8., true, false).unwrap();
+    login.observe_game(&game).unwrap();
+    let g = game.generation();
+    game.receive(g, &[b'v', 1], 30.).unwrap();
+    login.observe_game(&game).unwrap();
+    assert!(login.champion.policy.visible());
+    assert_eq!(login.champion.controls.focus(), Some(MESSAGE));
+    assert!(login.blocks_gameplay());
+    login.step(32., false, false).unwrap();
+    for scale in [1., 1.5, 2.] {
+        let extent = [(960. * scale) as u32, (720. * scale) as u32];
+        let frame = login.prepare_host(extent, scale, false, None).unwrap();
+        assert!(frame.frame.draws.len() <= 512);
+        assert!(frame.resources.len() <= 64);
+        assert!(
+            frame
+                .resources
+                .iter()
+                .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+        );
+        for d in &frame.frame.draws {
+            let pixel = |n: f64| (n - n.round()).abs() < 1e-7;
+            assert!(pixel((d.destination.x + d.translation[0]) * scale));
+            assert!(pixel((d.destination.y + d.translation[1]) * scale));
+            if let Some(src) = d.source {
+                assert!((d.destination.width * scale - src.width).abs() < 1e-7);
+            }
+        }
+    }
+    let e = login.champion.input.state.apply(EditIntent::Paste);
+    login.champion.input.execute(e, &mut Host);
+    assert_eq!(
+        login.champion.input.state.editor(EditorId::Champion).text(),
+        "A  "
+    );
+    login
+        .champion
+        .input
+        .window_event(&WindowEvent::Ime(Ime::Preedit("日".into(), None)));
+    let mapped = login.champion.input.key(KeyInput {
+        logical: &Key::Named(NamedKey::Process),
+        physical: PhysicalKey::Code(KeyCode::Enter),
+        text: None,
+        state: ElementState::Pressed,
+        repeat: false,
+    });
+    login.champion.commit_effects(mapped.effects);
+    login
+        .champion
+        .input
+        .window_event(&WindowEvent::Ime(Ime::Commit("B".into())));
+    let mapped = login.champion.input.key(KeyInput {
+        logical: &Key::Named(NamedKey::Enter),
+        physical: PhysicalKey::Code(KeyCode::Enter),
+        text: None,
+        state: ElementState::Pressed,
+        repeat: false,
+    });
+    login.champion.commit_effects(mapped.effects);
+    assert!(login.champion.take_submission().is_none());
+    login.champion.input.state.apply(EditIntent::Enter {
+        pressed: false,
+        repeat: false,
+    });
+    login.champion.controls.tab(&login.champion.panel, false);
+    assert_eq!(login.champion.controls.focus(), Some(SAVE));
+    let e = login
+        .champion
+        .controls
+        .sync_focus(&login.champion.panel, &mut login.champion.input.state);
+    login.champion.input.execute(e, &mut Host);
+    let resolved = login
+        .champion
+        .panel
+        .resolve(login.champion.viewport)
+        .unwrap();
+    let r = resolved[3].rect;
+    let point = [r.x + r.width / 2., r.y + r.height / 2.];
+    login.pointer(point, Some(true), false);
+    login.pointer(point, Some(false), false);
+    let (generation, units, source) = login.champion.take_submission().unwrap();
+    assert!(game.save_champion(generation, &units, source).unwrap());
+    assert_eq!(effects(&mut game), [vec![255, 118, 65, 32, 32, 66]]);
+    login.observe_game(&game).unwrap();
+    assert!(!login.champion.panel.enabled);
+    game.receive(g, &[b'v', 2], 40.).unwrap();
+    login.observe_game(&game).unwrap();
+    assert!(game.champion_session().champion_acknowledged);
+    for now in (48..=800).step_by(8) {
+        login.step(f64::from(now), false, false).unwrap();
+    }
+    assert!(login.champion.policy.finished());
+    for now in (800..=5000).step_by(40) {
+        if game.phase() == Phase::Victory {
+            game.receive(g, b"p", f64::from(now)).unwrap();
+        }
+        pump(&mut game, f64::from(now));
+        login.observe_game(&game).unwrap();
+    }
+    assert!(!login.state.view(true).champion_pending);
+    assert!(login.state.view(true).ordinary_controls_visible);
+    assert!(login.sync_return_focus(game.can_play()).contains(
+        &slither_client::menu_input::HostEditEffect::ImeAllowed(true)
+    ));
+}
+
+#[test]
 fn desktop_setup_pair_and_deferred_appearance_do_not_consume_redraws() {
     for delay in [0., 1000. / 60., 40.] {
         let mut game = negotiating();

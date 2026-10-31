@@ -166,6 +166,10 @@ pub struct View {
     pub last_ping_ms: f64,
     /// A close life control is pending.
     pub close_requested: bool,
+    /// Victory send has been queued on this session; never retry it automatically.
+    pub champion_sent: bool,
+    /// A victory v2 has committed through ingress.
+    pub champion_acknowledged: bool,
     /// Current fade/return fraction.
     pub return_fraction: f64,
     /// Fade-in caller timer remains needed.
@@ -185,6 +189,8 @@ struct Controls {
     lagging: bool,
     ping_pending: bool,
     close_requested: bool,
+    champion_sent: bool,
+    champion_acknowledged: bool,
     death_ms: Option<f64>,
     previous_ui_ms: f64,
     ui_phase: UiPhase,
@@ -234,6 +240,8 @@ impl SessionPolicy {
                 lagging: false,
                 ping_pending: false,
                 close_requested: false,
+                champion_sent: false,
+                champion_acknowledged: false,
                 death_ms: None,
                 previous_ui_ms: 0.0,
                 ui_phase: UiPhase::Idle,
@@ -271,11 +279,25 @@ impl SessionPolicy {
             ping_pending: c.ping_pending,
             last_ping_ms: self.last_ping_ms,
             close_requested: c.close_requested,
+            champion_sent: c.champion_sent,
+            champion_acknowledged: c.champion_acknowledged,
             return_fraction: self.return_fraction,
             ui_timer_needed: c.ui_phase == UiPhase::In,
             reason: self.reason.clone(),
             constructor_attempts: self.constructor_attempts,
         }
+    }
+    /// Existing-session authority for one victory message. No login/profile capability.
+    pub fn can_send_champion(&self) -> bool {
+        self.control.connected
+            && self.control.outcome == Some(Phase::Victory)
+            && !self.control.close_requested
+            && !self.control.champion_sent
+            && !self.terminal()
+    }
+    /// Lock only after the transport effect was successfully enqueued.
+    pub fn champion_enqueued(&mut self) {
+        self.control.champion_sent = true;
     }
     /// Whether stop has already committed.
     pub fn terminal(&self) -> bool {
@@ -454,6 +476,8 @@ impl SessionPolicy {
                 }
                 118 => {
                     if cmd.argument == 2 {
+                        // Only committed victory authority can acknowledge its editor.
+                        next.champion_acknowledged = next.outcome == Some(Phase::Victory);
                         next.close_requested = true
                     } else {
                         next.death_ms = Some(received);

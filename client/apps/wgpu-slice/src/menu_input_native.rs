@@ -2,7 +2,7 @@
 //! Other native platforms need their own IME rule before enabling this editor.
 
 use slither_client::menu_input::{
-    EditIntent, GameplayKey, HostEditEffect, MenuInputState, Movement,
+    EditIntent, GameplayKey, HostEditEffect, MenuInputState, Movement, bounded_preedit,
 };
 use winit::{
     dpi::{LogicalPosition, LogicalSize},
@@ -51,6 +51,10 @@ impl NativeMenuInput {
     /// Update modifiers explicitly (also used by the synthetic event tests).
     pub fn modifiers(&mut self, modifiers: ModifiersState) {
         self.modifiers = modifiers;
+    }
+    /// Shared modifier snapshot, retained while this panel is inactive.
+    pub fn shift_key(&self) -> bool {
+        self.modifiers.shift_key()
     }
 
     /// Map the fields of a winit KeyEvent. Logical keys own editing shortcuts;
@@ -192,7 +196,9 @@ impl NativeMenuInput {
             WindowEvent::Ime(ime) => Some(match ime {
                 Ime::Enabled => EditIntent::ImeEnabled(true),
                 Ime::Disabled => EditIntent::ImeEnabled(false),
-                Ime::Preedit(text, selection) => EditIntent::Preedit(text.clone(), *selection),
+                Ime::Preedit(text, selection) => {
+                    EditIntent::Preedit(bounded_preedit(text), *selection)
+                }
                 Ime::Commit(text) => EditIntent::ImeCommit(text.clone()),
             }),
             _ => None,

@@ -228,6 +228,16 @@ impl Rasterizer {
         style: TextStyle,
         max_width: Option<u32>,
     ) -> Result<Raster> {
+        self.rasterize_window(text, px, style, max_width, None)
+    }
+    pub fn rasterize_window(
+        &mut self,
+        text: &str,
+        px: f64,
+        style: TextStyle,
+        max_width: Option<u32>,
+        window: Option<[f64; 2]>,
+    ) -> Result<Raster> {
         let color = style.color;
         let arial = self.face(style)?;
         let font = &arial.font;
@@ -258,28 +268,32 @@ impl Rasterizer {
             pen += m.advance_width;
             previous = Some(c);
         }
-        let left = (f64::from(bounds[0]) / SAMPLE as f64).floor() as i32 - 1;
+        let mut left = (f64::from(bounds[0]) / SAMPLE as f64).floor() as i32 - 1;
+        let mut right = (f64::from(bounds[2]) / SAMPLE as f64).ceil() as i32 + 1;
+        if let Some([start, end]) = window {
+            left = left.max(start.floor() as i32 - 1);
+            right = right.min(end.ceil() as i32 + 1);
+        }
         let top = (f64::from(bounds[1]) / SAMPLE as f64).floor() as i32 - 1;
-        let width =
-            ((f64::from(bounds[2]) / SAMPLE as f64).ceil() as i32 - left + 1).max(1) as usize;
+        let width = (right - left).max(1) as usize;
         let width = max_width.map_or(width, |limit| width.min(limit as usize + 2));
         let height =
             ((f64::from(bounds[3]) / SAMPLE as f64).ceil() as i32 - top + 1).max(1) as usize;
         if width > 8192 || height > super::MAX_OVERLAY_TEXT_EXTENT as usize {
-            return Err("text raster extent budget".into());
+            return Err(super::TEXT_RASTER_QUOTA.into());
         }
         let mut mask = vec![0_u8; width * height * SAMPLE * SAMPLE];
         let stride = width * SAMPLE;
         for (x, y, w, h, c) in glyphs {
-            let x = (x - left * SAMPLE as i32) as usize;
+            let x = x - left * SAMPLE as i32;
             let y = (y - top * SAMPLE as i32) as usize;
-            if x >= stride {
+            if x >= stride as i32 || x + w as i32 <= 0 {
                 continue;
             }
             let (_, coverage) = font.rasterize(c, size);
             for row in 0..h {
-                for col in 0..w.min(stride - x) {
-                    let dst = &mut mask[(y + row) * stride + x + col];
+                for col in (-x).max(0) as usize..w.min((stride as i32 - x) as usize) {
+                    let dst = &mut mask[(y + row) * stride + (x + col as i32) as usize];
                     let a = u32::from(coverage[row * w + col]);
                     *dst = (a + u32::from(*dst) * (255 - a) / 255) as u8;
                 }
