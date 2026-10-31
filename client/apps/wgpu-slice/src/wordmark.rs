@@ -120,6 +120,37 @@ pub fn layout(
 }
 
 type Point = [f64; 2];
+// Shared analytic ellipse, flattened at five-degree intervals before the
+// existing distance-spaced round pen. Matching endpoints keep one pen stroke.
+fn ellipse_arc(paths: &mut Vec<Vec<Point>>, [x, y, w, h]: [f64; 4], start: f64, sweep: f64) {
+    let steps = (sweep.abs() / 5.).ceil() as u32;
+    let point = |t: f64| {
+        let angle = (start + sweep * t).to_radians();
+        [
+            x + w / 2. * (1. + angle.cos()),
+            y + h / 2. * (1. + angle.sin()),
+        ]
+    };
+    let first = point(0.);
+    if !paths
+        .last()
+        .and_then(|p| p.last())
+        .is_some_and(|p| (p[0] - first[0]).hypot(p[1] - first[1]) < 1e-8)
+    {
+        paths.push(vec![first]);
+    }
+    let path = paths.last_mut().unwrap();
+    for i in 1..=steps {
+        path.push(point(f64::from(i) / f64::from(steps)));
+    }
+}
+fn arch(paths: &mut Vec<Vec<Point>>, [x, y, w, h]: [f64; 4]) {
+    ellipse_arc(paths, [x, y, w, 2. * h], 180., 180.);
+}
+fn s_curve(paths: &mut Vec<Vec<Point>>, [x, y, w, h]: [f64; 4]) {
+    ellipse_arc(paths, [x, y, w, h / 2.], -30., -240.);
+    ellipse_arc(paths, [x, y + h / 2., w, h / 2.], -90., 240.);
+}
 fn paths(code: &str) -> Vec<Vec<Point>> {
     let mut tokens = code.split_whitespace();
     let mut paths: Vec<Vec<Point>> = Vec::new();
@@ -128,6 +159,16 @@ fn paths(code: &str) -> Vec<Vec<Point>> {
         match command {
             "M" => paths.push(vec![[number(), number()]]),
             "L" => paths.last_mut().unwrap().push([number(), number()]),
+            "A" | "B" | "H" | "S" => {
+                let bounds = [number(), number(), number(), number()];
+                match command {
+                    "A" => ellipse_arc(&mut paths, bounds, number(), number()),
+                    "B" => ellipse_arc(&mut paths, bounds, 0., -360.),
+                    "H" => arch(&mut paths, bounds),
+                    "S" => s_curve(&mut paths, bounds),
+                    _ => unreachable!(),
+                }
+            }
             "Q" => {
                 let control = [number(), number()];
                 let end = [number(), number()];
@@ -201,7 +242,7 @@ pub fn samples(layout: &Layout, progress: f64) -> Result<Vec<Sample>> {
                     continue;
                 }
                 let radius = PEN * growth * growth * (3. - 2. * growth);
-                let wave = 1.9
+                let wave = 1.25
                     * (1. - progress).powi(3)
                     * (0.55 + 0.45 * along)
                     * (progress * 34. - along * 8. + index as f64 * 0.7).sin();
@@ -724,5 +765,100 @@ mod raster_tests {
             height: size[1],
             pixels,
         })
+    }
+}
+
+#[cfg(test)]
+mod round_geometry_tests {
+    use super::*;
+
+    #[test]
+    fn bowls_and_shoulders_follow_ellipses_and_s_arcs_share_a_tangent() {
+        for (code, center, radii) in [
+            ("B 0 4 6 6", [3., 7.], [3., 3.]),
+            ("A 0 0 8 10 -40 -280", [4., 5.], [4., 5.]),
+            ("H 0 4 6 3", [3., 7.], [3., 3.]),
+            ("H 0 10 6 -3", [3., 7.], [3., 3.]),
+        ] {
+            let curves = paths(code);
+            assert_eq!(curves.len(), 1);
+            for p in &curves[0] {
+                let ellipse = ((p[0] - center[0]) / radii[0]).powi(2)
+                    + ((p[1] - center[1]) / radii[1]).powi(2);
+                assert!((ellipse - 1.).abs() < 1e-12);
+            }
+        }
+        // Pen-lift counts retain each family's reveal order/delays.
+        for (glyph, strokes) in [
+            ('C', 1),
+            ('G', 1),
+            ('O', 1),
+            ('Q', 2),
+            ('S', 1),
+            ('U', 1),
+            ('a', 1),
+            ('b', 2),
+            ('c', 1),
+            ('d', 2),
+            ('e', 1),
+            ('g', 1),
+            ('h', 2),
+            ('m', 3),
+            ('n', 2),
+            ('o', 1),
+            ('p', 2),
+            ('q', 2),
+            ('r', 2),
+            ('s', 1),
+            ('u', 2),
+        ] {
+            assert_eq!(
+                paths(super::glyph(glyph).unwrap().1).len(),
+                strokes,
+                "{glyph}"
+            );
+        }
+        let curves = paths("S 0 0 7 10");
+        assert_eq!(curves.len(), 1);
+        let curve = &curves[0];
+        let join = 48;
+        assert!((curve[join][0] - 3.5).abs() < 1e-12);
+        assert!((curve[join][1] - 5.).abs() < 1e-12);
+        let a = [
+            curve[join][0] - curve[join - 1][0],
+            curve[join][1] - curve[join - 1][1],
+        ];
+        let b = [
+            curve[join + 1][0] - curve[join][0],
+            curve[join + 1][1] - curve[join][1],
+        ];
+        assert!(a[0] > 0. && b[0] > 0.);
+        assert!((a[0] * b[1] - a[1] * b[0]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn wiggle_is_two_thirds_of_the_previous_wave_with_the_same_phase_and_decay() {
+        let geometry = layout(
+            "l",
+            MenuRect {
+                x: 0.,
+                y: 0.,
+                width: 450.,
+                height: 115.,
+            },
+            1920.,
+            |_| unreachable!(),
+        )
+        .unwrap();
+        let rest = samples(&geometry, 1.).unwrap()[0];
+        for progress in [0.5_f64, 0.75] {
+            let sample = samples(&geometry, progress).unwrap()[0];
+            let previous =
+                1.9 * (1. - progress).powi(3) * 0.55 * (progress * 34.).sin() * geometry.unit;
+            let ratio = (rest.center[0] - sample.center[0]) / previous;
+            assert!((ratio - 1.25 / 1.9).abs() < 1e-12);
+            assert_eq!(sample.center[1], rest.center[1]);
+            assert_eq!(sample.radius, rest.radius);
+        }
     }
 }

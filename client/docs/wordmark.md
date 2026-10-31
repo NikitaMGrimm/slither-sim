@@ -23,7 +23,10 @@ outgoing growth, still applies.
 
 The core's retained `logo_reveal` drives a chain of circle samples. Each sample
 swells from zero radius with delay along its stroke and across stroke order.
-A traveling perpendicular sine displacement grows along each stroke and decays
+Shared analytic ellipse arcs build the round bowls, semicircular shoulders and
+tangent-continuous S curves; straight segments retain their authored corners.
+A traveling perpendicular sine displacement (65.8% of the initial amplitude)
+grows along each stroke and decays
 smoothly to exactly zero at completion. Most stroke volume arrives in the first
 2.5 seconds; settling uses the full roughly 6.7-second clock. Opacity remains
 the independent `login_alpha * logo_alpha`. The soft shadow follows the current

@@ -1,8 +1,11 @@
 //! Original, authored monoline ASCII alphabet. Coordinates use a ten-unit cap
-//! height and a six-unit x-height; Q corners are quadratic curves. No imported
+//! height and a six-unit x-height. Shared arcs, bowls and shoulders keep round
+//! families consistent; Q retains authored quadratic corners. No imported
 //! font, official logo geometry or third-party glyph data. Repository MIT licence.
 
-/// Advance and pen paths. M lifts the pen, L draws, Q rounds a corner.
+/// Advance and pen paths. M/L/Q are move/line/quadratic; A is an ellipse arc
+/// (x, y, width, height, start/sweep degrees), B a closed bowl, H an arch
+/// (x, y, width, signed height; negative turns it down), and S two tangent arcs.
 pub fn glyph(c: char) -> Option<(f64, &'static str)> {
     Some(match c {
         ' ' => (4., ""),
@@ -11,14 +14,11 @@ pub fn glyph(c: char) -> Option<(f64, &'static str)> {
             8.,
             "M 0 10 L 0 0 L 3 0 Q 7 0 6 3 Q 5.5 5 1 5 L 3.5 5 Q 7 5 7 7.5 Q 7 10 3 10 L 0 10",
         ),
-        'C' => (8., "M 7 1 Q 5 0 3 0 Q 0 0 0 5 Q 0 10 3 10 Q 5 10 7 9"),
+        'C' => (8., "A 0 0 8 10 -40 -280"),
         'D' => (8., "M 0 10 L 0 0 L 2 0 Q 7 0 7 5 Q 7 10 2 10 L 0 10"),
         'E' => (7., "M 6 0 L 0 0 L 0 10 L 6 10 M 0 5 L 5 5"),
         'F' => (7., "M 0 10 L 0 0 L 6 0 M 0 5 L 5 5"),
-        'G' => (
-            8.,
-            "M 7 1 Q 5 0 3 0 Q 0 0 0 5 Q 0 10 4 10 Q 7 10 7 7 L 7 5.5 L 4.5 5.5",
-        ),
+        'G' => (8., "A 0 0 8 10 -40 -280 L 7 5.5 L 4.5 5.5"),
         'H' => (8., "M 0 0 L 0 10 M 7 0 L 7 10 M 0 5 L 7 5"),
         'I' => (4., "M 0 0 L 3 0 M 1.5 0 L 1.5 10 M 0 10 L 3 10"),
         'J' => (7., "M 6 0 L 6 7 Q 6 10 3 10 Q 0 10 0 8"),
@@ -26,78 +26,42 @@ pub fn glyph(c: char) -> Option<(f64, &'static str)> {
         'L' => (7., "M 0 0 L 0 9 Q 0 10 1 10 L 6 10"),
         'M' => (10., "M 0 10 L 0 0 L 4.5 6 L 9 0 L 9 10"),
         'N' => (8., "M 0 10 L 0 0 L 7 10 L 7 0"),
-        'O' => (9., "M 4 0 Q 0 0 0 5 Q 0 10 4 10 Q 8 10 8 5 Q 8 0 4 0"),
+        'O' => (9., "A 0 0 8 10 -90 -360"),
         'P' => (8., "M 0 10 L 0 0 L 3 0 Q 7 0 7 3 Q 7 6 3 6 L 0 6"),
-        'Q' => (
-            9.,
-            "M 4 0 Q 0 0 0 5 Q 0 10 4 10 Q 8 10 8 5 Q 8 0 4 0 M 5 7 L 8 11",
-        ),
+        'Q' => (9., "A 0 0 8 10 -90 -360 M 5 7 L 8 11"),
         'R' => (
             8.,
             "M 0 10 L 0 0 L 3 0 Q 7 0 7 3 Q 7 5.5 3 5.5 L 0 5.5 M 3 5.5 L 7 10",
         ),
-        'S' => (
-            8.,
-            "M 7 1 Q 5 -0.5 2 0.5 Q -1 2 1 4 Q 2 5 5 6 Q 8 7 6 9 Q 3 11 0 9",
-        ),
+        'S' => (8., "S 0 0 7 10"),
         'T' => (8., "M 0 0 L 7 0 M 3.5 0 L 3.5 10"),
-        'U' => (8., "M 0 0 L 0 6 Q 0 10 3.5 10 Q 7 10 7 6 L 7 0"),
+        'U' => (8., "M 0 0 L 0 6.5 H 0 10 7 -3.5 L 7 0"),
         'V' => (8., "M 0 0 L 3 9 Q 3.5 11 4 9 L 7 0"),
         'W' => (12., "M 0 0 L 2 10 L 5.5 3 L 9 10 L 11 0"),
         'X' => (8., "M 0 0 L 7 10 M 7 0 L 0 10"),
         'Y' => (8., "M 0 0 L 3.5 5 L 7 0 M 3.5 5 L 3.5 10"),
         'Z' => (8., "M 0 0 L 7 0 L 0 10 L 7 10"),
-        'a' => (
-            7.,
-            "M 5.5 5 Q 4 3.5 2 4 Q 0 4.5 0 7 Q 0 10 2.5 10 Q 5.5 10 5.5 7 L 5.5 4 L 5.5 10",
-        ),
-        'b' => (
-            7.,
-            "M 0 0 L 0 10 M 0 6 Q 2 3 4 4 Q 6 5 6 7 Q 6 10 3 10 Q 1 10 0 8",
-        ),
-        'c' => (
-            7.,
-            "M 5.5 4.5 Q 4 3.5 2 4 Q 0 4.5 0 7 Q 0 10 3 10 Q 4.5 10 5.5 9",
-        ),
-        'd' => (
-            7.,
-            "M 6 0 L 6 10 M 6 6 Q 4 3 2 4 Q 0 5 0 7 Q 0 10 3 10 Q 5 10 6 8",
-        ),
-        'e' => (
-            7.,
-            "M 0 7 L 6 7 Q 6 4 3 4 Q 0 4 0 7 Q 0 10 3 10 Q 4.5 10 5.5 9",
-        ),
+        'a' => (7., "B 0 4 5.5 6 L 5.5 4 L 5.5 10"),
+        'b' => (7., "M 0 0 L 0 10 B 0 4 6 6"),
+        'c' => (7., "A 0 4 6 6 -40 -280"),
+        'd' => (7., "M 6 0 L 6 10 B 0 4 6 6"),
+        'e' => (7., "M 0 7 L 6 7 A 0 4 6 6 0 -320"),
         'f' => (5., "M 1 10 L 1 2 Q 1 -0.5 4 0 M 0 4 L 4 4"),
-        'g' => (
-            7.,
-            "M 6 5 Q 4 3 2 4 Q 0 5 0 7 Q 0 10 3 10 Q 6 10 6 7 L 6 11 Q 6 14 1 12",
-        ),
-        'h' => (7., "M 0 0 L 0 10 M 0 6 Q 2 4 3.5 4 Q 6 4 6 7 L 6 10"),
+        'g' => (7., "B 0 4 6 6 L 6 11 Q 6 14 1 12"),
+        'h' => (7., "M 0 0 L 0 10 H 0 4 6 3 L 6 10"),
         'i' => (2., "M 0.5 4 L 0.5 10 M 0.5 1 L 0.5 1"),
         'j' => (4., "M 2.5 4 L 2.5 11 Q 2.5 13 0 12 M 2.5 1 L 2.5 1"),
         'k' => (7., "M 0 0 L 0 10 M 5.5 4 L 0 7 M 2.5 5.7 L 6 10"),
         'l' => (2., "M 0.5 0 L 0.5 10"),
-        'm' => (
-            11.,
-            "M 0 10 L 0 4 M 0 6 Q 2 3 4 4 Q 5 5 5 7 L 5 10 M 5 6 Q 7 3 9 4 Q 10 5 10 7 L 10 10",
-        ),
-        'n' => (7., "M 0 10 L 0 4 M 0 6 Q 2 3 4 4 Q 6 5 6 7 L 6 10"),
-        'o' => (7., "M 3 4 Q 0 4 0 7 Q 0 10 3 10 Q 6 10 6 7 Q 6 4 3 4"),
-        'p' => (
-            7.,
-            "M 0 13 L 0 4 M 0 6 Q 2 3 4 4 Q 6 5 6 7 Q 6 10 3 10 Q 1 10 0 8",
-        ),
-        'q' => (
-            7.,
-            "M 6 13 L 6 4 M 6 6 Q 4 3 2 4 Q 0 5 0 7 Q 0 10 3 10 Q 5 10 6 8",
-        ),
-        'r' => (5., "M 0 10 L 0 4 M 0 6 Q 1.5 3 4 4.5"),
-        's' => (
-            6.,
-            "M 5 4.5 Q 3 3 1 4.5 Q -1 6 2.5 7 Q 6 8 4 9.5 Q 2 11 0 9.5",
-        ),
+        'm' => (11., "M 0 10 L 0 4 H 0 4 5 2.5 L 5 10 H 5 4 5 2.5 L 10 10"),
+        'n' => (7., "M 0 10 L 0 4 H 0 4 6 3 L 6 10"),
+        'o' => (7., "B 0 4 6 6"),
+        'p' => (7., "M 0 13 L 0 4 B 0 4 6 6"),
+        'q' => (7., "M 6 13 L 6 4 B 0 4 6 6"),
+        'r' => (5., "M 0 10 L 0 4 H 0 4 4 2"),
+        's' => (6., "S 0 4 5 6"),
         't' => (5., "M 1.5 1.5 L 1.5 8 Q 1.5 11 4 9.5 M 0 4 L 4 4"),
-        'u' => (7., "M 0 4 L 0 7 Q 0 10 2.5 10 Q 6 10 6 7 M 6 4 L 6 10"),
+        'u' => (7., "M 0 4 L 0 7 H 0 10 6 -3 M 6 4 L 6 10"),
         'v' => (7., "M 0 4 L 2.5 9 Q 3 11 3.5 9 L 6 4"),
         'w' => (10., "M 0 4 L 1.8 10 L 4.5 5.5 L 7.2 10 L 9 4"),
         'x' => (7., "M 0 4 L 6 10 M 6 4 L 0 10"),
