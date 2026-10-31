@@ -197,6 +197,16 @@ pub struct Cosmetics {
     menu: menu_art::MenuArtCache,
 }
 impl Cosmetics {
+    /// Share ready face/bulb pixels with the isolated preview. No accessory selection/grant.
+    pub fn preview_sources(&self) -> Self {
+        Self {
+            roles: self.roles.clone(),
+            backgrounds: Default::default(),
+            accessories: Default::default(),
+            own_accessory: None,
+            menu: Default::default(),
+        }
+    }
     /// The only byte-source seam. Native and browser bind it to local development inputs.
     pub fn load(mut resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
         let mut images = Images::default();

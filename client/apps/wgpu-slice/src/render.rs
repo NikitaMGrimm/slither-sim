@@ -152,9 +152,31 @@ fn submit_face(
     accessory: Option<(StaticHeadAccessoryGeometry, BodyAsset)>,
     draws: &mut Vec<Draw>,
 ) -> Result<()> {
-    let heading = snake.face_heading;
-    let pupil = snake.pupil;
-    if let FaceGeometry::Paired(face) = snake.face_geometry {
+    submit_face_geometry(
+        bank,
+        skin,
+        snake.face_geometry,
+        snake.face_heading,
+        snake.pupil,
+        snake.metrics.spawn_progress,
+        view,
+        accessory,
+        draws,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn submit_face_geometry(
+    bank: &mut Bank,
+    skin: &SkinDescriptor,
+    face_geometry: FaceGeometry,
+    heading: f64,
+    pupil: Point,
+    spawn: f64,
+    view: EyeLayoutInput,
+    accessory: Option<(StaticHeadAccessoryGeometry, BodyAsset)>,
+    draws: &mut Vec<Draw>,
+) -> Result<()> {
+    if let FaceGeometry::Paired(face) = face_geometry {
         let e = face
             .eyes
             .layout(heading, pupil, view)
@@ -232,7 +254,7 @@ fn submit_face(
                     x: f64::from(asset.width),
                     y: f64::from(asset.height),
                 },
-                snake.metrics.spawn_progress,
+                spawn,
                 view,
             )
             .map_err(|e| e.to_string())?;
@@ -256,7 +278,7 @@ fn submit_face(
     let Some(cosmetics) = &bank.cosmetics else {
         return Ok(());
     };
-    match (snake.face_geometry, skin.face_sources) {
+    match (face_geometry, skin.face_sources) {
         (
             FaceGeometry::SingleImage(geometry),
             SkinFaceSources::SingleImage {
@@ -388,6 +410,140 @@ fn submit_antenna(
         )?;
     }
     Ok(())
+}
+
+/// Reuse gameplay body/face/antenna ordering for a bounded synthetic pose.
+pub fn prepare_studio_preview(
+    bank: &mut Bank,
+    pose: &slither_client::studio_preview::PreviewPose,
+    skin: &SkinDescriptor,
+    time: f64,
+    extent: [u32; 2],
+    dpr: f64,
+    alpha: f64,
+) -> Result<(Frame, Vec<Resource>)> {
+    let mut families = bank.bodies.clone();
+    for family in &mut families {
+        let len = family.variants.len();
+        if !skin.custom {
+            family.variants.rotate_left((time / 120.) as usize % len);
+        }
+    }
+    let palettes: Vec<_> = families
+        .iter()
+        .map(|p| BodyPalette {
+            variants: &p.variants,
+            boost_glow: Some(p.glow),
+        })
+        .collect();
+    let body = plan_standard_body_with_antenna(
+        BodyPaintInput {
+            geometry: BodyPaintGeometry {
+                samples: &pose.samples,
+                active_count: pose.samples.len(),
+                distance_cursor_seed: pose.head,
+                eligible: true,
+            },
+            recipe: BodyPaintRecipe {
+                base_palette: skin.base_palette,
+                palettes: &palettes,
+                runs: &skin.runs,
+                variant_mode: skin.variant_mode,
+                variant_period: skin.variant_period,
+                custom: skin.custom,
+                style: Some(skin.body_style),
+                outline: Some(bank.outline),
+                shadow: Some(bank.shadow),
+                death: Some(bank.death),
+            },
+            assets: &bank.assets,
+            view: pose.view,
+            quality: BodyPaintQuality {
+                high_quality: true,
+                blend: 1.,
+            },
+            visual: BodyPaintVisual {
+                scale: 1.,
+                spawn: 1.,
+                death: 0.,
+                dead: false,
+                smoothed_speed: 0.,
+                boost_threshold: 1.,
+                cruise_speed: 0.,
+                maximum_speed: 2.,
+                boost_phase: 0.,
+            },
+            entry_alpha: 1.,
+            command_limit: 1024,
+        },
+        pose.antenna
+            .as_ref()
+            .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
+    )
+    .map_err(|e| e.to_string())?;
+    let mut draws: Vec<_> = body.commands[..body.antenna_barrier]
+        .iter()
+        .map(Draw::from)
+        .collect();
+    if let Some(antenna) = &pose.antenna {
+        submit_antenna(bank, skin, antenna, 1024 - draws.len(), &mut draws)?;
+    }
+    draws.extend(body.commands[body.antenna_barrier..].iter().map(Draw::from));
+    submit_face_geometry(
+        bank,
+        skin,
+        skin.face,
+        pose.heading,
+        pose.pupil,
+        1.,
+        EyeLayoutInput {
+            corrected_head: pose.head,
+            camera: pose.view.camera,
+            viewport_half: Point {
+                x: pose.view.half_width,
+                y: pose.view.half_height,
+            },
+            scale: 1.,
+            zoom: pose.view.zoom,
+            death_progress: 0.,
+        },
+        None,
+        &mut draws,
+    )?;
+    if draws.len() > 1024 {
+        return Err(DRAW_MEMORY_LIMIT.into());
+    }
+    for draw in &mut draws {
+        draw.effective_alpha *= alpha;
+    }
+    let mut frame = Frame {
+        identity: 0,
+        tick: 0,
+        extent,
+        viewport_scale: dpr,
+        draws,
+        snakes: vec![],
+    };
+    let mut resources = bank.resources(&frame)?;
+    // Independent lazy disk allocation must never alias gameplay's body handles.
+    let remap = |a: &mut BodyAsset| {
+        if a.handle / crate::bank::HANDLE_NAMESPACE_SIZE == 1 {
+            a.handle = (a.handle % crate::bank::HANDLE_NAMESPACE_SIZE) | 0x9000_0000_0000_0000;
+        }
+    };
+    for draw in &mut frame.draws {
+        remap(&mut draw.asset);
+    }
+    for resource in &mut resources {
+        remap(&mut resource.asset);
+    }
+    frame.validate(
+        &resources
+            .iter()
+            .map(|r| (r.asset.into(), r.asset))
+            .collect(),
+    )?;
+    Ok((frame, resources))
 }
 
 struct StrokePath {

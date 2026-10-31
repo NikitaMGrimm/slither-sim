@@ -242,6 +242,10 @@ async fn run(output: &Path) -> Result<()> {
         }
         return Ok(());
     }
+    #[cfg(not(target_os = "linux"))]
+    if std::env::args().nth(2).as_deref() == Some("--studio") {
+        return studio_specimens(&mut renderer, output);
+    }
     if std::env::args().nth(2).as_deref() == Some("--champion") {
         use slither_client::{
             champion::ChampionState,
@@ -558,6 +562,180 @@ async fn run(output: &Path) -> Result<()> {
     if let Some(error) = validation.pop().await {
         return Err(error.to_string());
     }
+    Ok(())
+}
+#[cfg(not(target_os = "linux"))]
+fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
+    use slither_client::{
+        presentation::{FaceGeometry, resolve_skin},
+        skin_studio::*,
+    };
+    use slither_wgpu_slice::{
+        login_native::NativeLogin, menu_storage::MenuStorage, skin_studio_native::SkinStudioNative,
+    };
+    let png = synthetic_logo([180, 100, 210, 255])?;
+    let full = Cosmetics::load(
+        |path| {
+            if slither_wgpu_slice::cosmetics::BackgroundArt::ALL
+                .iter()
+                .any(|art| art.path() == path)
+                || path.ends_with(".json")
+            {
+                Err("skin-only authored fixture".into())
+            } else {
+                Ok(png.clone())
+            }
+        },
+        None,
+    )?;
+    let mut ledger = vec!["dpr,skin,art,clock_ms,control_draws,preview_draws,menu_slots,menu_bytes,text_slots,text_bytes,preview_slots,preview_bytes".to_owned()];
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut controls = slither_client::menu_controls::PanelInputState::default();
+    let mut edit = slither_client::menu_input::MenuInputState::default();
+    let mut scroll = Default::default();
+    let mut studio = SkinStudioNative::new(AppearanceRecord::default(), MenuStorage::at(None))?;
+    for scale in [1., 1.5, 2., 3., 4., 5.] {
+        let extent = [(960. * scale) as u32, (540. * scale) as u32];
+        for skin in 0..=65 {
+            for (art, sources) in [("fallback", None), ("synthetic-ready", Some(&full))] {
+                studio.state = StudioState::new(AppearanceRecord {
+                    builtin: skin,
+                    ..Default::default()
+                })
+                .map_err(str::to_owned)?;
+                studio.step(0.);
+                studio.open(true);
+                for time in [0., 230., 355., 730.] {
+                    studio.step(time);
+                    let (preview, resources) = studio.prepare_preview(extent, scale, sources)?;
+                    let panel = studio.state.panel([960., 540.], &studio.status);
+                    controls.sync(&panel, &mut edit);
+                    let mut picture = menu.prepare_panel(
+                        &mut text,
+                        &panel,
+                        &controls,
+                        &edit,
+                        &mut scroll,
+                        Default::default(),
+                        extent,
+                        scale,
+                    )?;
+                    let menu_slots = picture.resources.len();
+                    let menu_bytes: usize =
+                        picture.resources.iter().map(|r| r.image.pixels.len()).sum();
+                    let text_sources: Vec<_> = picture
+                        .resources
+                        .iter()
+                        .filter(|r| r.asset.handle >> 60 == 8)
+                        .collect();
+                    let text_bytes: usize = text_sources.iter().map(|r| r.image.pixels.len()).sum();
+                    ledger.push(format!("{scale},{skin},{art},{time},{},{},{menu_slots},{menu_bytes},{},{text_bytes},{},{}",
+                        picture.frame.draws.len(),preview.draws.len(),text_sources.len(),resources.len(),resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()));
+                    if picture.frame.draws.len() > 384
+                        || preview.draws.len() > 1024
+                        || menu_slots > 40
+                        || menu_bytes > 8 * 1024 * 1024
+                        || text_sources.len() > 20
+                        || text_bytes > 2 * 1024 * 1024
+                    {
+                        return Err("Studio working allocation exceeded".into());
+                    }
+                    let requested = resolve_skin(skin, &[], false).map_err(|e| e.to_string())?;
+                    let special =
+                        requested.antenna.is_some() || requested.face != FaceGeometry::default();
+                    if scale <= 2. && time == 730. && (skin == 0 || skin == 65 || special) {
+                        let page = MenuFrame::world_crossfade(extent, scale, 0.)?;
+                        picture.backdrop = page.backdrop;
+                        picture.resources.extend(page.resources);
+                        picture.frame.draws.extend(preview.draws);
+                        picture.resources.extend(resources);
+                        capture(
+                            renderer,
+                            &picture,
+                            &output.join(format!("studio-{skin:02}-{art}-{scale}x.png")),
+                        )?;
+                    }
+                    studio.presented();
+                }
+            }
+        }
+    }
+    std::fs::write(output.join("dpr-ledger.csv"), ledger.join("\n") + "\n")
+        .map_err(|e| e.to_string())?;
+    // New fixture owners restart their handle allocators. Retire the previous
+    // fixture before reusing that namespace, as a new host would.
+    renderer.sync_resources(&[])?;
+    let mut login = NativeLogin::new("Player")?;
+    for now in (0..=9600).step_by(16) {
+        login.step(f64::from(now), false, false)?;
+    }
+    login.prepare_host([960, 540], 1., false, None)?;
+    login.open_studio();
+    let mut strip = image::RgbaImage::new(960 * 4, 540 * 2);
+    for (index, time) in [0., 58., 115., 230., 288., 345., 459., 460.]
+        .into_iter()
+        .enumerate()
+    {
+        if index == 4 {
+            login.studio.state.cancel(9830.);
+        }
+        login.step(9600. + time, false, false)?;
+        let mut picture = login.prepare_host([960, 540], 1., false, None)?;
+        if login.studio.state.visible() {
+            let (preview, resources) = login.studio.prepare_preview([960, 540], 1., None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
+        }
+        let path = output.join(format!("transition-{time:03}ms.png"));
+        capture(renderer, &picture, &path)?;
+        login.studio.presented();
+        let frame = image::open(&path).map_err(|e| e.to_string())?.to_rgba8();
+        image::imageops::replace(
+            &mut strip,
+            &frame,
+            (index % 4 * 960) as i64,
+            (index / 4 * 540) as i64,
+        );
+    }
+    strip
+        .save(output.join("entry-return-strip.png"))
+        .map_err(|e| e.to_string())?;
+    renderer.sync_resources(&[])?;
+    let mut narrow = NativeLogin::new("")?;
+    narrow.step(0., false, false)?;
+    narrow.open_studio();
+    narrow.step(230., false, false)?;
+    let mut picture = narrow.prepare_host([360, 640], 1., false, None)?;
+    let (preview, resources) = narrow.studio.prepare_preview([360, 640], 1., None)?;
+    picture.frame.draws.extend(preview.draws);
+    picture.resources.extend(resources);
+    capture(
+        renderer,
+        &picture,
+        &output.join("studio-narrow-360x640.png"),
+    )?;
+    for (name, logical) in [("narrow", [360., 640.]), ("short-wide", [960., 360.])] {
+        for scale in [1., 1.5, 2.] {
+            renderer.sync_resources(&[])?;
+            let mut login = NativeLogin::new("")?;
+            login.step(0., false, false)?;
+            login.open_studio();
+            login.step(230., false, false)?;
+            login.studio.status = "Saved for this run".into();
+            let extent = logical.map(|n| (n * scale) as u32);
+            let mut picture = login.prepare_host(extent, scale, false, None)?;
+            let (preview, resources) = login.studio.prepare_preview(extent, scale, None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
+            capture(
+                renderer,
+                &picture,
+                &output.join(format!("studio-{name}-status-{scale}x.png")),
+            )?;
+        }
+    }
+    std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
     Ok(())
 }
 fn main() {

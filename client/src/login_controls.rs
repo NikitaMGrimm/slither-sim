@@ -14,6 +14,8 @@ pub const PLAY: ControlId = ControlId(1);
 pub const QUALITY: ControlId = ControlId(2);
 /// Server directory link identity.
 pub const SERVER: ControlId = ControlId(3);
+/// Offline appearance editor, independent of endpoint availability.
+pub const CHANGE_SKIN: ControlId = ControlId(4);
 /// Build controls without adding admission or return-phase policy.
 pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> PanelView {
     let holder = layout.logical_rect(E::NicknameHolder);
@@ -34,7 +36,9 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
             placement,
             clip: None,
             visible,
-            enabled: if id == PLAY {
+            enabled: if id == CHANGE_SKIN {
+                view.phase == MenuPhase::Login && !view.champion_pending
+            } else if id == PLAY {
                 !view.play_disabled
             } else if id == SERVER {
                 crate::server_picker::available(view)
@@ -43,7 +47,11 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
             },
             alpha,
             name,
-            tab_order: Some(id.0),
+            tab_order: Some(match id {
+                CHANGE_SKIN => 3,
+                SERVER => 4,
+                _ => id.0,
+            }),
             style,
             kind,
         }
@@ -59,6 +67,18 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
         initial_focus: Some(NICKNAME),
         restore_focus: Some(NICKNAME),
         controls: vec![
+            control(
+                CHANGE_SKIN,
+                E::Skin,
+                1.,
+                ControlStyle::ChangeSkin,
+                view.skin_alpha,
+                view.ordinary_controls_visible,
+                ControlKind::Button {
+                    label: view.wording.change_skin.into(),
+                },
+                view.wording.change_skin.into(),
+            ),
             control(
                 NICKNAME,
                 E::NicknameHolder,

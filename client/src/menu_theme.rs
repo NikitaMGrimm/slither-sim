@@ -12,6 +12,8 @@ pub enum ControlStyle {
     Nickname,
     /// Existing quality link, with only a keyboard focus surface.
     QualityButton,
+    /// Existing Change Skin artwork remains specialized; shared focus/hit ownership.
+    ChangeSkin,
     /// Purple action.
     SecondaryButton,
     /// Single-line purple editor.
@@ -22,6 +24,8 @@ pub enum ControlStyle {
     HelpText,
     /// Purple panel background.
     Surface,
+    /// Compact-shadow studio panel, with its own bounded physical repeat.
+    StudioSurface,
     /// Selection indication.
     SelectedCell,
     /// Server directory row with compact decoration.
@@ -38,6 +42,8 @@ pub enum SurfaceRecipe {
     Overlay,
     /// Purple bordered field with its existing shadow.
     Field,
+    /// Studio panel with a repeat kept within one physical tile.
+    StudioPanel,
     /// Existing compact link/focus capsule.
     Compact,
     /// Large modal surface with a wider uniform centre tile.
@@ -137,7 +143,10 @@ impl MenuTheme {
     pub fn disabled_opacity(self, role: ControlStyle) -> f64 {
         if matches!(
             role,
-            ControlStyle::Nickname | ControlStyle::LoginPlay | ControlStyle::QualityButton
+            ControlStyle::Nickname
+                | ControlStyle::LoginPlay
+                | ControlStyle::QualityButton
+                | ControlStyle::StudioSurface
         ) {
             1.
         } else {
@@ -173,11 +182,15 @@ impl MenuTheme {
                 44
             } else if matches!(role, ListRow | MenuLink | SelectedCell) {
                 4
+            } else if role == StudioSurface {
+                16
             } else {
                 24
             },
             recipe: if matches!(role, ListRow | MenuLink | SelectedCell) {
                 SurfaceRecipe::Compact
+            } else if role == StudioSurface {
+                SurfaceRecipe::StudioPanel
             } else if role == Surface {
                 SurfaceRecipe::Panel
             } else if matches!(role, Field | Nickname) {

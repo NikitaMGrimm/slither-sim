@@ -698,6 +698,18 @@ impl Composition<'_> {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
                     ControlKind::Button { label } => {
+                        if control.style == ControlStyle::ChangeSkin {
+                            if input.focus() == Some(control.id) {
+                                self.sliced(
+                                    r.rect,
+                                    theme.surface(ControlStyle::QualityButton, ControlState::Idle),
+                                    alpha * 0.35,
+                                    surface_clip,
+                                    r.scale,
+                                )?;
+                            }
+                            continue;
+                        }
                         let quality = control.style == ControlStyle::QualityButton;
                         let focused = input.focus() == Some(control.id);
                         if !quality || focused {
@@ -881,7 +893,7 @@ impl Composition<'_> {
             SurfaceRecipe::Button => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
             SurfaceRecipe::Field | SurfaceRecipe::Panel => materials::MenuSurface::Nickname,
-            SurfaceRecipe::Compact => materials::MenuSurface::Compact,
+            SurfaceRecipe::Compact | SurfaceRecipe::StudioPanel => materials::MenuSurface::Compact,
         };
         let pad = (surface.padding() * raster_scale).ceil() as u32;
         let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;
@@ -896,7 +908,14 @@ impl Composition<'_> {
             SurfaceRecipe::Compact => 128.,
             _ => 32.,
         };
-        let middle = (logical_middle * raster_scale).ceil().max(1.) as u32;
+        let middle = if tokens.recipe == SurfaceRecipe::StudioPanel {
+            // Keep the uniform panel repeat within the first physical tile. A
+            // repeat spanning two Y tiles doubles every interior row's draw cost.
+            // The server picker and existing controls retain their logical repeats.
+            512u32.saturating_sub(radius + pad).max(32)
+        } else {
+            (logical_middle * raster_scale).ceil().max(1.) as u32
+        };
         let atlas = size.map(|n| n.min(2 * radius + middle));
         let padded = atlas.map(|n| n + 2 * pad);
         if padded.iter().any(|n| *n > 2048) {

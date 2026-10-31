@@ -8,7 +8,6 @@ use slither_client::{
     challenge::solve_challenge,
     desktop_input::{DesktopInput, OwnInput},
     gameplay_policy::GameplayPolicy,
-    menu_preferences::MenuPreferences,
     presentation::*,
     protocol::{self, ElapsedHeader},
     session_policy::{Command, Phase, ReportEvent, SessionPolicy},
@@ -344,18 +343,35 @@ impl LocalGame {
         skin: u8,
         profile: &LoginProfile,
     ) -> Result<()> {
+        self.play_with_appearance(
+            endpoint,
+            nickname,
+            &slither_client::skin_studio::AppearanceSelection {
+                skin,
+                custom_bytes: vec![],
+            },
+            profile,
+        )
+    }
+    /// Explicit Play owns its appearance before any deferred acquisition or socket work.
+    pub fn play_with_appearance(
+        &mut self,
+        endpoint: &str,
+        nickname: &str,
+        appearance: &slither_client::skin_studio::AppearanceSelection,
+        profile: &LoginProfile,
+    ) -> Result<()> {
         if !self.can_play() {
             return Err("Explicit Play unavailable".into());
         }
         server_endpoint(endpoint)?;
-        let mut menu = MenuPreferences::new(true);
-        menu.select(skin, &[])?;
+        appearance.validate_wire()?;
         let login = protocol::encode_login(
             profile.client_version,
             &profile.page_echo,
             nickname,
-            skin,
-            None,
+            appearance.skin,
+            (!appearance.custom_bytes.is_empty()).then_some(appearance.custom_bytes.as_slice()),
         )
         .map_err(|e| e.to_string())?;
         if matches!(self.phase(), Phase::Disconnected | Phase::Failed) {
