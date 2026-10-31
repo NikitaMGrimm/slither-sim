@@ -317,16 +317,26 @@ mod tests {
         bounds[0].max.x = 100000.0;
         bounds[0].max.y = 100000.0;
         assert!(CollisionGrid::new(&bounds, &reaches).is_none());
-        bounds[0] = Bounds::between(
-            Point { x: 1e6, y: 1e6 },
+        let far = Bounds::between(
             Point {
-                x: 1e6 + 1.0,
-                y: 1e6,
+                x: 1048577.0,
+                y: 0.0,
+            },
+            Point {
+                x: 1048619.0,
+                y: 42.0,
             },
         );
-        assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+        assert!(CollisionGrid::new(&vec![far; 128], &reaches).is_none());
+        bounds.fill(small);
         bounds[0].min.x = f64::NAN;
         assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+        bounds.fill(small);
+        for bad in [-1.0, 1024.5, f64::NAN] {
+            let mut bad_reaches = reaches.clone();
+            bad_reaches[0] = bad;
+            assert!(CollisionGrid::new(&bounds, &bad_reaches).is_none());
+        }
     }
 
     #[test]

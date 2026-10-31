@@ -75,6 +75,8 @@ pub struct Renderer {
     layout: wgpu::BindGroupLayout,
     over: wgpu::RenderPipeline,
     overlay_over: wgpu::RenderPipeline,
+    overlay_black_over: wgpu::RenderPipeline,
+    overlay_lighter: wgpu::RenderPipeline,
     lighter: wgpu::RenderPipeline,
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
@@ -199,18 +201,16 @@ impl Renderer {
             sample_count,
         );
         let overlay_over = pipeline(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "fs", 1);
-        let black_over = pipeline(
-            wgpu::BlendState {
-                color: wgpu::BlendComponent {
-                    src_factor: wgpu::BlendFactor::One,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::ReverseSubtract,
-                },
-                alpha: wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING.alpha,
+        let black_blend = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::ReverseSubtract,
             },
-            "fs_black",
-            sample_count,
-        );
+            alpha: wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING.alpha,
+        };
+        let black_over = pipeline(black_blend, "fs_black", sample_count);
+        let overlay_black_over = pipeline(black_blend, "fs_black", 1);
         let add = wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::One,
             dst_factor: wgpu::BlendFactor::One,
@@ -224,6 +224,14 @@ impl Renderer {
             "fs",
             sample_count,
         );
+        let overlay_lighter = pipeline(
+            wgpu::BlendState {
+                color: add,
+                alpha: add,
+            },
+            "fs",
+            1,
+        );
         Ok(Self {
             sample_count,
             format,
@@ -233,6 +241,8 @@ impl Renderer {
             layout,
             over,
             overlay_over,
+            overlay_black_over,
+            overlay_lighter,
             lighter,
             black_over,
             textures: BTreeMap::new(),
@@ -398,6 +408,13 @@ impl Renderer {
     pub fn render(&mut self, frame: &Frame, target: &wgpu::TextureView) -> RenderResult<()> {
         self.render_inner(frame, target, false)
     }
+    /// Adjacent draw runs in prepared vertex chunks; read after a successful render.
+    pub fn draw_call_count(&self) -> usize {
+        self.vertices
+            .iter()
+            .map(|chunk| draw_runs(chunk.states.iter().copied()).count())
+            .sum()
+    }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
     pub fn render_overlay(
         &mut self,
@@ -441,12 +458,6 @@ impl Renderer {
         }
         for (index, quad) in quads.enumerate() {
             let quad = quad?;
-            if overlay
-                && (quad.blend != slither_client::presentation::BodyBlend::SourceOver
-                    || quad.black_effect)
-            {
-                return Err("Overlay requires source-over quads".into());
-            }
             let chunk = &mut self.vertices[index / VERTEX_CHUNK_QUADS];
             if chunk.states.is_empty() {
                 let count = (frame.draws.len() - index).min(VERTEX_CHUNK_QUADS);
@@ -546,8 +557,20 @@ impl Renderer {
                 for (state, vertices) in draw_runs(chunk.states.iter().copied()) {
                     if previous.is_none_or(|p| p.pipeline != state.pipeline) {
                         pass.set_pipeline(match state.pipeline {
-                            Pipeline::BlackOver => &self.black_over,
-                            Pipeline::Lighter => &self.lighter,
+                            Pipeline::BlackOver => {
+                                if overlay {
+                                    &self.overlay_black_over
+                                } else {
+                                    &self.black_over
+                                }
+                            }
+                            Pipeline::Lighter => {
+                                if overlay {
+                                    &self.overlay_lighter
+                                } else {
+                                    &self.lighter
+                                }
+                            }
                             Pipeline::Over => {
                                 if overlay {
                                     &self.overlay_over

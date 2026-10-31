@@ -394,9 +394,9 @@ struct PelletSlot {
 }
 impl PelletIndex {
     fn new(entries: &[Entry]) -> Self {
-        // Catalog worlds stay below 71k pellets; the frozen 10k world has
-        // 515k. Keep their original lists below this large-world threshold.
-        const DIRECT_PELLETS: usize = 1 << 18;
+        // Use compact cell heads once per-cell Vec headers become a substantial
+        // part of the index; bounded rectangles still limit their memory cost.
+        const DIRECT_PELLETS: usize = 1 << 16;
         Self {
             direct: (entries.len() >= DIRECT_PELLETS)
                 .then(|| DirectCells::new(entries).map(Box::new))
@@ -1010,7 +1010,12 @@ mod tests {
             origin: None,
         });
         assert!(PelletIndex::new(&[entry; 128]).direct.is_none());
-        assert!(PelletIndex::new(&vec![entry; 1 << 18]).direct.is_some());
+        assert!(
+            PelletIndex::new(&vec![entry; (1 << 16) - 1])
+                .direct
+                .is_none()
+        );
+        assert!(PelletIndex::new(&vec![entry; 1 << 16]).direct.is_some());
         let far = Entry {
             x: 1e6_f64.to_bits(),
             y: 1e6_f64.to_bits(),

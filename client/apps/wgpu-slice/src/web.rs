@@ -56,7 +56,7 @@ impl MenuSpecimen {
             crate::menu_specimen::layout(&mut self.text, &view, extent, dpr).map_err(js_error)?;
         let mut p = self
             .menu
-            .prepare(&mut self.text, &view, &layout, extent, dpr, None, 0)
+            .prepare(&mut self.text, &view, &layout, extent, dpr, None)
             .map_err(js_error)?;
         self.host.resize(extent).map_err(js_error)?;
         if let Some(backdrop) = p.backdrop.take() {

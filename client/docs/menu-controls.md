@@ -1,11 +1,15 @@
 # Shared menu controls
 
 Native login and champion editing share `PanelView`, `Control` and the
-Label/Button/TextField painter. `login_controls` copies nickname, Play and quality
+Label/Button/TextField/Toggle painter. `login_controls` copies nickname, Play and secondary-action
 rectangles from `MenuLayout`, retaining its resize-time `top` and the existing
 admission/return projection. Logo, last-life line, page and spinner remain
 specialized producers in the same transaction. Browser development pages still compile and retain their existing
 login and pending-champion flow. This is not the extension input or GL port.
+
+The login-only [Settings](settings.md) screen moves Quality out of the product
+login. It shares the toggle, input and painter semantics and replaces inactive
+login content while mounted. Done/Escape restore the Settings entry focus.
 
 The core resolves logical placements and clips with `MenuRect`, including
 half-open hits and inverse mapping. `PanelInputState` owns reverse-order hits,

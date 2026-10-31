@@ -30,6 +30,7 @@
 
 ### Changed
 
+- World ticks reuse steering calculations when their inputs are unchanged.
 - Food lists no longer keep the order in which food appeared. When food is
   eaten or removed by a shrinking wall, the last item in the list takes its
   place, so code that relied on that order, such as a bot breaking ties by
@@ -44,9 +45,8 @@
 
 ### Performance
 
-- Dense worlds select collision candidates more cheaply while preserving exact
-  collision tests, death order and killer attribution.
-
+- Dense-world collision indexing saves 26% per tick in the 64,000-bot storm.
+- Large food indexes use compact cell heads sooner.
 - Large food worlds use compact cell heads for pickup lookups. The frozen
   10,000-snake replay saves 0.56 ms of world CPU per tick in ten timing pairs
   (eight faster), with unchanged food, snake state and ordered events.

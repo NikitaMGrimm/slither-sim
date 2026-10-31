@@ -18,3 +18,13 @@ pub fn play(game: &mut LocalGame, endpoint: &str, nickname: &str, skin: u8) -> R
     game.play_with_profile(endpoint, nickname, skin, &PROFILE)?;
     Ok(PROFILE.client_version)
 }
+/// Native interactive custom preferences use the same fixed profile and exact trailing bytes.
+pub fn play_appearance(
+    game: &mut LocalGame,
+    endpoint: &str,
+    nickname: &str,
+    appearance: &slither_client::skin_studio::AppearanceSelection,
+) -> Result<u16> {
+    game.play_with_appearance(endpoint, nickname, appearance, &PROFILE)?;
+    Ok(PROFILE.client_version)
+}

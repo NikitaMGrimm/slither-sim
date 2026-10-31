@@ -151,19 +151,10 @@ impl Images {
         Ok(())
     }
     pub fn menu_paths(&self) -> Vec<String> {
-        let mut logos = 0;
         self.menu
             .manifest
             .0
             .iter()
-            .filter(|e| {
-                if matches!(e.art, MenuArt::Logo(_)) {
-                    logos += 1;
-                    logos <= 2
-                } else {
-                    true
-                }
-            })
             .map(|e| e.path.clone())
             .collect()
     }
@@ -197,6 +188,16 @@ pub struct Cosmetics {
     menu: menu_art::MenuArtCache,
 }
 impl Cosmetics {
+    /// Share ready face/bulb pixels with the isolated preview. No accessory selection/grant.
+    pub fn preview_sources(&self) -> Self {
+        Self {
+            roles: self.roles.clone(),
+            backgrounds: Default::default(),
+            accessories: Default::default(),
+            own_accessory: None,
+            menu: Default::default(),
+        }
+    }
     /// The only byte-source seam. Native and browser bind it to local development inputs.
     pub fn load(mut resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
         let mut images = Images::default();

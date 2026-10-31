@@ -317,10 +317,10 @@ impl MenuPreferences {
     }
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
-fn unhex(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn unhex(text: &str) -> Option<Vec<u8>> {
     let (pairs, tail) = text.as_bytes().as_chunks::<2>();
     if !tail.is_empty() {
         return None;

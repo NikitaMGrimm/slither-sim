@@ -8,6 +8,41 @@ use crate::{
 /// Stable control identity within a panel generation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ControlId(pub u16);
+/// Fixed-height list window. Only this range is copied, rasterised and drawn.
+#[derive(Clone, Debug)]
+pub struct ScrollList {
+    first: usize,
+    visible: usize,
+}
+impl ScrollList {
+    /// Bound a window to at most 32 rows, independent of directory length.
+    pub fn new(visible: usize) -> Self {
+        Self {
+            first: 0,
+            visible: visible.clamp(1, 32),
+        }
+    }
+    /// Clamp after refresh/resize and return only the visible row indices.
+    pub fn window(&mut self, total: usize) -> std::ops::Range<usize> {
+        self.first = self.first.min(total.saturating_sub(self.visible));
+        self.first..(self.first + self.visible).min(total)
+    }
+    /// Move a whole number of rows, saturating at both ends.
+    pub fn scroll(&mut self, rows: isize, total: usize) {
+        self.first = self.first.saturating_add_signed(rows);
+        self.window(total);
+    }
+    /// Keep a keyboard target visible.
+    pub fn reveal(&mut self, index: usize, total: usize) {
+        if index < self.first {
+            self.first = index;
+        }
+        if index >= self.first + self.visible {
+            self.first = index + 1 - self.visible;
+        }
+        self.window(total);
+    }
+}
 /// Logical placement relative to the containing panel (or viewport).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
@@ -70,9 +105,41 @@ impl Placement {
             .then_some((rect, s))
     }
 }
-/// The three kinds with real adopters in this slice.
+/// Concrete controls used by the mounted menu screens.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControlKind {
+    /// Settings icon above the same unboxed caption as the server link.
+    SettingsLink {
+        /// Visible caption.
+        label: String,
+    },
+    /// Binary preference with matching-release button interaction.
+    Toggle {
+        /// Visible caption and semantic name.
+        label: String,
+        /// Committed requested value.
+        checked: bool,
+    },
+    /// One login link: server icon above an unboxed caption.
+    IconLink {
+        /// Visible caption and accessible name.
+        label: String,
+    },
+    /// Full viewport modal hit shield.
+    Backdrop,
+    /// Passive themed panel surface.
+    Surface,
+    /// One visible row of a windowed list. Offscreen rows never enter the view.
+    ListRow {
+        /// Primary row text.
+        label: String,
+        /// Secondary status text.
+        detail: String,
+        /// Current committed selection.
+        selected: bool,
+        /// Measured latency, absent until supplied by the adapter.
+        ping: Option<u32>,
+    },
     /// Single-line label; long instructions are not result-panel text.
     Label {
         /// Label content.
@@ -192,6 +259,8 @@ pub fn intersection(a: MenuRect, b: MenuRect) -> MenuRect {
 /// Actions exposed by the copied semantic view; bridges use the same input path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PanelAction {
+    /// Set the checked state through the same generation-bound activation path.
+    SetChecked,
     /// Focus a control.
     Focus,
     /// Activate a button.
@@ -202,6 +271,8 @@ pub enum PanelAction {
 /// Copied semantic node. Publishing it does not install a native OS bridge.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PanelNode {
+    /// Committed checked state, present only for checkable controls.
+    pub checked: Option<bool>,
     /// Stable ID within the panel generation.
     pub id: ControlId,
     /// Shared existing role vocabulary.
@@ -237,9 +308,31 @@ impl PanelView {
             .filter(|r| r.control.visible)
             .map(|r| {
                 let enabled = self.enabled && r.control.enabled;
+                let checked = match r.control.kind {
+                    ControlKind::Toggle { checked, .. } => Some(checked),
+                    _ => None,
+                };
                 let (role, value, actions) = match r.control.kind {
+                    ControlKind::Toggle { checked, .. } => (
+                        AccessibleRole::Checkbox,
+                        checked.to_string(),
+                        vec![PanelAction::Focus, PanelAction::SetChecked],
+                    ),
+                    ControlKind::Backdrop => (
+                        AccessibleRole::Button,
+                        String::new(),
+                        vec![PanelAction::Activate],
+                    ),
+                    ControlKind::Surface => (AccessibleRole::Status, String::new(), vec![]),
+                    ControlKind::ListRow { label, detail, .. } => (
+                        AccessibleRole::Button,
+                        format!("{label}, {detail}"),
+                        vec![PanelAction::Focus, PanelAction::Activate],
+                    ),
                     ControlKind::Label { text } => (AccessibleRole::Status, text, vec![]),
-                    ControlKind::Button { .. } => (
+                    ControlKind::Button { .. }
+                    | ControlKind::IconLink { .. }
+                    | ControlKind::SettingsLink { .. } => (
                         AccessibleRole::Button,
                         String::new(),
                         vec![PanelAction::Focus, PanelAction::Activate],
@@ -252,6 +345,7 @@ impl PanelView {
                     ),
                 };
                 PanelNode {
+                    checked,
                     id: r.control.id,
                     role,
                     name: r.control.name,
@@ -335,6 +429,8 @@ pub enum Activation {
 /// Intent envelope; owners revalidate current generation and authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ControlIntent {
+    /// Explicit next checked value from the activated description, for toggles only.
+    pub checked: Option<bool>,
     /// Panel ID.
     pub panel: u16,
     /// Description generation.
@@ -367,6 +463,16 @@ pub struct PanelInputState {
     selection: MouseSelection,
 }
 impl PanelInputState {
+    /// Set an available keyboard target through the same admission gate as Tab.
+    pub fn focus_control(&mut self, panel: &PanelView, id: ControlId) {
+        if panel
+            .controls
+            .iter()
+            .any(|c| c.id == id && Self::available(panel, c))
+        {
+            self.focus = Some(id);
+        }
+    }
     /// Current logical focus.
     pub fn focus(&self) -> Option<ControlId> {
         self.focus
@@ -552,6 +658,17 @@ impl PanelInputState {
             let captured = self.capture.take();
             if let Some(control) = captured.filter(|id| Some(*id) == hit) {
                 return Some(ControlIntent {
+                    checked: panel
+                        .controls
+                        .iter()
+                        .find(|c| c.id == control)
+                        .and_then(|c| {
+                            if let ControlKind::Toggle { checked, .. } = c.kind {
+                                Some(!checked)
+                            } else {
+                                None
+                            }
+                        }),
                     panel: panel.id,
                     generation: panel.generation,
                     control,
@@ -569,6 +686,13 @@ impl PanelInputState {
             .iter()
             .any(|c| c.id == id && Self::available(panel, c))
             .then_some(ControlIntent {
+                checked: panel.controls.iter().find(|c| c.id == id).and_then(|c| {
+                    if let ControlKind::Toggle { checked, .. } = c.kind {
+                        Some(!checked)
+                    } else {
+                        None
+                    }
+                }),
                 panel: panel.id,
                 generation: panel.generation,
                 control: id,

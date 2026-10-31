@@ -861,6 +861,8 @@ impl MenuInputState {
 /// Minimal semantic roles for a later native accessibility bridge.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AccessibleRole {
+    /// Binary control exposing a committed checked state.
+    Checkbox,
     /// Editable field.
     TextInput,
     /// Activatable control.

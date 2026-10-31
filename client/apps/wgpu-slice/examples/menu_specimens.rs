@@ -141,7 +141,21 @@ fn capture_scaled(
     );
     Ok(())
 }
-fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
+/// PNG stores straight alpha; production textures retain premultiplied pixels.
+fn straight_alpha(premultiplied: &[u8]) -> Vec<u8> {
+    let mut pixels = premultiplied.to_vec();
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel[..3] {
+            *channel = (u32::from(*channel) * 255 + alpha / 2)
+                .checked_div(alpha)
+                .unwrap_or(0)
+                .min(255) as u8;
+        }
+    }
+    pixels
+}
+fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
     let mut bytes = Cursor::new(Vec::new());
     // Deliberately synthetic icon; no external reference/brand artwork.
     let image = image::RgbaImage::from_fn(320, 80, |x, y| {
@@ -156,6 +170,100 @@ fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--settings") {
+        return settings_specimens(output, &mut renderer).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--server-picker") {
+        use slither_client::{server_directory::Server, server_picker::ServerPreference};
+        use slither_wgpu_slice::login_native::NativeLogin;
+        use std::{collections::BTreeMap, net::SocketAddr};
+        let validation = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let servers = (1..=2000)
+            .map(|id| Server {
+                id,
+                cluster: id % 5,
+                address: SocketAddr::from(([192, 0, 2, 1], id)),
+                population: 40,
+                active: true,
+            })
+            .collect::<Vec<_>>();
+        let pings = BTreeMap::from([(0, 18), (1, 67), (2, 130), (3, 285)]);
+        let mut measurements = Vec::new();
+        // One resource owner across DPR changes, like the actual native host.
+        let mut login = NativeLogin::new("")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        let mut now = 9600.;
+        for dpr in [1., 1.5, 2.] {
+            let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+            login.picker.policy.close();
+            for _ in 0..40 {
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            let picture = login.prepare_host(extent, dpr, true, None)?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!("server-login-{dpr}x.png")),
+            )?;
+            login
+                .picker
+                .policy
+                .replace(&servers, &pings)
+                .map_err(str::to_owned)?;
+            login.picker.policy.selection = ServerPreference(Some(25));
+            login.picker.open();
+            for _ in 0..40 {
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            for (name, offset) in [("picker", 0), ("scrolled", 1994)] {
+                login.picker.policy.scroll(offset);
+                login.picker.sync();
+                let picture = login.prepare_host(extent, dpr, true, None)?;
+                capture(
+                    &mut renderer,
+                    &picture,
+                    &output.join(format!("server-{name}-{dpr}x.png")),
+                )?;
+                measurements.push(serde_json::json!({"dpr":dpr,"state":name,"directory_rows":2000,"draws":picture.frame.draws.len(),"resources":picture.resources.len(),"bytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+            }
+        }
+        // Retain the same native menu across the reported DPR-3 resize trigger.
+        for logical in [[960., 540.], [960., 720.]] {
+            let dpr = 3.;
+            let extent = logical.map(|v| (v * dpr) as u32);
+            let picture = login.prepare_host(extent, dpr, true, None)?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!(
+                    "server-resize-3x-{}x{}.png",
+                    logical[0], logical[1]
+                )),
+            )?;
+            measurements.push(serde_json::json!({"dpr":dpr,"logical":logical,"state":"resize","directory_rows":2000,"draws":picture.frame.draws.len(),"resources":picture.resources.len(),"bytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+        }
+        std::fs::write(
+            output.join("server-picker.json"),
+            serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        if let Some(error) = validation.pop().await {
+            return Err(error.to_string());
+        }
+        return Ok(());
+    }
+    #[cfg(not(target_os = "linux"))]
+    if std::env::args().nth(2).as_deref() == Some("--studio") {
+        return studio_specimens(&mut renderer, output);
+    }
     if std::env::args().nth(2).as_deref() == Some("--champion") {
         use slither_client::{
             champion::ChampionState,
@@ -218,7 +326,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -243,7 +350,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -260,7 +366,7 @@ async fn run(output: &Path) -> Result<()> {
             )?;
             view.ordinary_controls_visible = true;
             let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
-            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None, 0)?;
+            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None)?;
             capture(
                 &mut renderer,
                 &login,
@@ -277,6 +383,9 @@ async fn run(output: &Path) -> Result<()> {
         }
         return Ok(());
     }
+    if std::env::args().nth(2).as_deref() == Some("--stroke") {
+        return stroke_specimens(output, &mut renderer);
+    }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--login") {
         use slither_client::menu_layout::MenuElement as E;
@@ -285,9 +394,7 @@ async fn run(output: &Path) -> Result<()> {
             .nth(3)
             .map(|dir| Cosmetics::directory(Path::new(&dir), None))
             .transpose()?;
-        let wordmark = std::env::args().any(|a| a == "--wordmark");
         let mut login = NativeLogin::new("")?;
-        login.set_wordmark(wordmark);
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
         }
@@ -375,12 +482,11 @@ async fn run(output: &Path) -> Result<()> {
         }
         let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
         capture(&mut renderer, &picture, &output.join("native-spinner.png"))?;
-        for fallback in [false, true] {
+        for without_icons in [false, true] {
             // Each independent producer starts its own material revision sequence.
             let mut intro_renderer =
                 Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
             let mut intro = NativeLogin::new("")?;
-            intro.set_wordmark(wordmark);
             for now in (0..=768).step_by(16) {
                 intro.step(f64::from(now), true, false)?;
                 if [128, 256, 512, 768].contains(&now) {
@@ -388,12 +494,12 @@ async fn run(output: &Path) -> Result<()> {
                         [960, 540],
                         1.,
                         true,
-                        if fallback { None } else { art.as_ref() },
+                        if without_icons { None } else { art.as_ref() },
                     )?;
                     capture(
                         &mut intro_renderer,
                         &picture,
-                        &output.join(format!("reveal-{now}-fallback-{fallback}.png")),
+                        &output.join(format!("reveal-{now}-without-icons-{without_icons}.png")),
                     )?;
                 }
             }
@@ -422,7 +528,7 @@ async fn run(output: &Path) -> Result<()> {
             let extent = [(1280. * dpr) as u32, (720. * dpr) as u32];
             let view = menu_specimen::view(state as u8)?;
             let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
-            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)?;
+            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
             capture(
                 &mut renderer,
                 &p,
@@ -432,24 +538,24 @@ async fn run(output: &Path) -> Result<()> {
     }
     let view = menu_specimen::view(0)?;
     let mut images = Images::default();
-    images.add("menu/logo.png", &synthetic_logo([90, 180, 120, 255])?)?;
+    images.add("menu/skin.png", &synthetic_icon([90, 180, 120, 255])?)?;
     let mut art = Cosmetics::from_images(images, None)?;
     let layout = menu_specimen::layout(&mut text, &view, [1280, 720], 1.)?;
-    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &old,
         &output.join("native-synthetic-art.png"),
     )?;
-    art.replace_menu_art(MenuArt::Logo(0), &synthetic_logo([170, 90, 180, 255])?)?;
-    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    art.replace_menu_art(MenuArt::Skin, &synthetic_icon([170, 90, 180, 255])?)?;
+    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &replacement,
         &output.join("native-replacement.png"),
     )?;
     let layout = menu_specimen::layout(&mut text, &view, [960, 540], 1.)?;
-    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None, 0)?;
+    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None)?;
     capture(
         &mut renderer,
         &resized,
@@ -466,7 +572,7 @@ async fn run(output: &Path) -> Result<()> {
     let layout = menu_specimen::layout(&mut text, &view, [640, 360], 1.)?;
     capture(
         &mut renderer,
-        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None, 0)?,
+        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None)?,
         &output.join("native-short-640x360.png"),
     )?;
     if let Some(error) = validation.pop().await {
@@ -474,6 +580,503 @@ async fn run(output: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(not(target_os = "linux"))]
+fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
+    use slither_client::{
+        presentation::{FaceGeometry, resolve_skin},
+        skin_studio::*,
+    };
+    use slither_wgpu_slice::{
+        login_native::NativeLogin, menu_storage::MenuStorage, skin_studio_native::SkinStudioNative,
+    };
+    let png = synthetic_icon([180, 100, 210, 255])?;
+    let full = Cosmetics::load(
+        |path| {
+            if slither_wgpu_slice::cosmetics::BackgroundArt::ALL
+                .iter()
+                .any(|art| art.path() == path)
+                || path.ends_with(".json")
+            {
+                Err("skin-only authored fixture".into())
+            } else {
+                Ok(png.clone())
+            }
+        },
+        None,
+    )?;
+    let mut ledger = vec!["dpr,skin,art,clock_ms,control_draws,preview_draws,menu_slots,menu_bytes,text_slots,text_bytes,preview_slots,preview_bytes".to_owned()];
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut controls = slither_client::menu_controls::PanelInputState::default();
+    let mut edit = slither_client::menu_input::MenuInputState::default();
+    let mut scroll = Default::default();
+    let mut studio = SkinStudioNative::new(AppearanceRecord::default(), MenuStorage::at(None))?;
+    for scale in [1., 1.5, 2., 3., 4., 5.] {
+        let extent = [(960. * scale) as u32, (540. * scale) as u32];
+        for skin in 0..=65 {
+            for (art, sources) in [("fallback", None), ("synthetic-ready", Some(&full))] {
+                studio.state = StudioState::new(AppearanceRecord {
+                    builtin: skin,
+                    ..Default::default()
+                })
+                .map_err(str::to_owned)?;
+                studio.step(0.);
+                studio.open(true);
+                for time in [0., 230., 355., 730.] {
+                    studio.step(time);
+                    let (preview, resources) = studio.prepare_preview(extent, scale, sources)?;
+                    let panel = studio.state.panel([960., 540.], &studio.status);
+                    controls.sync(&panel, &mut edit);
+                    let mut picture = menu.prepare_panel(
+                        &mut text,
+                        &panel,
+                        &controls,
+                        &edit,
+                        &mut scroll,
+                        Default::default(),
+                        extent,
+                        scale,
+                    )?;
+                    let menu_slots = picture.resources.len();
+                    let menu_bytes: usize =
+                        picture.resources.iter().map(|r| r.image.pixels.len()).sum();
+                    let text_sources: Vec<_> = picture
+                        .resources
+                        .iter()
+                        .filter(|r| r.asset.handle >> 60 == 8)
+                        .collect();
+                    let text_bytes: usize = text_sources.iter().map(|r| r.image.pixels.len()).sum();
+                    ledger.push(format!("{scale},{skin},{art},{time},{},{},{menu_slots},{menu_bytes},{},{text_bytes},{},{}",
+                        picture.frame.draws.len(),preview.draws.len(),text_sources.len(),resources.len(),resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()));
+                    if picture.frame.draws.len() > 384
+                        || preview.draws.len() > 1024
+                        || menu_slots > 40
+                        || menu_bytes > 8 * 1024 * 1024
+                        || text_sources.len() > 20
+                        || text_bytes > 2 * 1024 * 1024
+                    {
+                        return Err("Studio working allocation exceeded".into());
+                    }
+                    let requested = resolve_skin(skin, &[], false).map_err(|e| e.to_string())?;
+                    let special =
+                        requested.antenna.is_some() || requested.face != FaceGeometry::default();
+                    if scale <= 2. && time == 730. && (skin == 0 || skin == 65 || special) {
+                        let page = MenuFrame::world_crossfade(extent, scale, 0.)?;
+                        picture.backdrop = page.backdrop;
+                        picture.resources.extend(page.resources);
+                        picture.frame.draws.extend(preview.draws);
+                        picture.resources.extend(resources);
+                        capture(
+                            renderer,
+                            &picture,
+                            &output.join(format!("studio-{skin:02}-{art}-{scale}x.png")),
+                        )?;
+                    }
+                    studio.presented();
+                }
+            }
+        }
+    }
+    std::fs::write(output.join("dpr-ledger.csv"), ledger.join("\n") + "\n")
+        .map_err(|e| e.to_string())?;
+    // New fixture owners restart their handle allocators. Retire the previous
+    // fixture before reusing that namespace, as a new host would.
+    renderer.sync_resources(&[])?;
+    let mut login = NativeLogin::new("Player")?;
+    for now in (0..=9600).step_by(16) {
+        login.step(f64::from(now), false, false)?;
+    }
+    login.prepare_host([960, 540], 1., false, None)?;
+    login.open_studio();
+    let mut strip = image::RgbaImage::new(960 * 4, 540 * 2);
+    for (index, time) in [0., 58., 115., 230., 288., 345., 459., 460.]
+        .into_iter()
+        .enumerate()
+    {
+        if index == 4 {
+            login.studio.state.cancel(9830.);
+        }
+        login.step(9600. + time, false, false)?;
+        let mut picture = login.prepare_host([960, 540], 1., false, None)?;
+        if login.studio.state.visible() {
+            let (preview, resources) = login.studio.prepare_preview([960, 540], 1., None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
+        }
+        let path = output.join(format!("transition-{time:03}ms.png"));
+        capture(renderer, &picture, &path)?;
+        login.studio.presented();
+        let frame = image::open(&path).map_err(|e| e.to_string())?.to_rgba8();
+        image::imageops::replace(
+            &mut strip,
+            &frame,
+            (index % 4 * 960) as i64,
+            (index / 4 * 540) as i64,
+        );
+    }
+    strip
+        .save(output.join("entry-return-strip.png"))
+        .map_err(|e| e.to_string())?;
+    renderer.sync_resources(&[])?;
+    let mut narrow = NativeLogin::new("")?;
+    narrow.step(0., false, false)?;
+    narrow.open_studio();
+    narrow.step(230., false, false)?;
+    let mut picture = narrow.prepare_host([360, 640], 1., false, None)?;
+    let (preview, resources) = narrow.studio.prepare_preview([360, 640], 1., None)?;
+    picture.frame.draws.extend(preview.draws);
+    picture.resources.extend(resources);
+    capture(
+        renderer,
+        &picture,
+        &output.join("studio-narrow-360x640.png"),
+    )?;
+    for (name, logical) in [("narrow", [360., 640.]), ("short-wide", [960., 360.])] {
+        for scale in [1., 1.5, 2.] {
+            renderer.sync_resources(&[])?;
+            let mut login = NativeLogin::new("")?;
+            login.step(0., false, false)?;
+            login.open_studio();
+            login.step(230., false, false)?;
+            login.studio.status = "Saved for this run".into();
+            let extent = logical.map(|n| (n * scale) as u32);
+            let mut picture = login.prepare_host(extent, scale, false, None)?;
+            let (preview, resources) = login.studio.prepare_preview(extent, scale, None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
+            capture(
+                renderer,
+                &picture,
+                &output.join(format!("studio-{name}-status-{scale}x.png")),
+            )?;
+        }
+    }
+    std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
+    Ok(())
+}
+/// Authored string/raster probes and the production menu at frozen core times.
+/// Output stays external; optional private reference composition is a separate
+/// local operation and never part of this example's inputs or repository data.
+fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_client::{
+        menu_layout::MenuRect,
+        menu_preferences::MenuQuality,
+        start_page::{MenuLocale, StartMenuState},
+    };
+    use slither_wgpu_slice::wordmark;
+    let holder = MenuRect {
+        x: 735.,
+        y: 50.,
+        width: 450.,
+        height: 115.,
+    };
+    let mut timings = Vec::new();
+    for dpr in [1., 2., 5.] {
+        let layout = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| {
+            Err("unexpected fallback".into())
+        })?;
+        for progress in [0.15, 0.5, 1.] {
+            let mut runs = Vec::new();
+            for index in 0..7 {
+                let now = std::time::Instant::now();
+                let raster = wordmark::raster(&layout, dpr, progress)?;
+                let ms = now.elapsed().as_secs_f64() * 1000.;
+                let nonzero = raster
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .filter(|p| p[3] > 0)
+                    .count();
+                if nonzero == 0 {
+                    return Err("empty timed raster".into());
+                }
+                if index > 0 {
+                    runs.push(ms);
+                }
+            }
+            timings.push(serde_json::json!({"dpr": dpr, "progress": progress,
+                "milliseconds": runs, "size": wordmark::raster_size(&layout, dpr)?,
+                "profile": if cfg!(debug_assertions) { "dev" } else { "release" }}));
+        }
+    }
+    for (index, value) in [
+        wordmark::DEFAULT_TEXT,
+        "Slither",
+        "Hello World 123",
+        "AnExtremelyLongSnakeClientName",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "abcdefghijklmnopqrstuvwxyz",
+        "0123456789 !?.,:;+-_()[]{}@#$%&*=<>/\\|~^`\"'",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let layout = wordmark::layout(value, holder, 1920., |_| Err("unexpected fallback".into()))?;
+        let raster = wordmark::raster(&layout, 1., 1.)?;
+        image::save_buffer(
+            output.join(format!("string-{index}.png")),
+            &straight_alpha(&raster.pixels),
+            raster.width,
+            raster.height,
+            image::ColorType::Rgba8,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
+    let mut last_ms = 0;
+    for ms in [0, 512, 1025, 2048, 2050, 3075, 4100, 5125, 6150, 7175] {
+        for now in ((last_ms + 16)..ms).step_by(16) {
+            state.step(f64::from(now), false).map_err(str::to_owned)?;
+        }
+        state.step(f64::from(ms), false).map_err(str::to_owned)?;
+        last_ms = ms;
+        let view = state.view(true);
+        let layout = menu_specimen::layout(&mut text, &view, [1920, 1080], 1.)?;
+        let p = menu.prepare(&mut text, &view, &layout, [1920, 1080], 1., None)?;
+        capture(renderer, &p, &output.join(format!("reveal-{ms:05}ms.png")))?;
+    }
+    for dpr in [1., 2.] {
+        let extent = [(1920. * dpr) as u32, (1080. * dpr) as u32];
+        let view = state.view(true);
+        let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
+        let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
+        capture(
+            renderer,
+            &p,
+            &output.join(format!("settled-1920x1080-dpr-{dpr}.png")),
+        )?;
+        let mut cached_ms = Vec::new();
+        for _ in 0..6 {
+            let now = std::time::Instant::now();
+            let cached = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
+            cached_ms.push(now.elapsed().as_secs_f64() * 1000.);
+            if cached
+                .frame
+                .draws
+                .iter()
+                .map(|d| d.asset)
+                .collect::<Vec<_>>()
+                != p.frame.draws.iter().map(|d| d.asset).collect::<Vec<_>>()
+            {
+                return Err("settled resources changed".into());
+            }
+            for resource in &p.resources {
+                let retained = cached
+                    .resources
+                    .iter()
+                    .find(|r| r.asset == resource.asset)
+                    .ok_or("settled resource missing")?;
+                if !std::sync::Arc::ptr_eq(&resource.image, &retained.image) {
+                    return Err("settled raster was copied".into());
+                }
+            }
+        }
+        timings.push(serde_json::json!({"dpr":dpr, "cachedMenuMilliseconds":cached_ms,
+            "draws":p.frame.draws.len(), "pixelBytes":p.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+    }
+    // A ten-fps CPU raster sequence preserves the shared clock's timing for an
+    // external motion strip/video. Full GPU menus above remain separate proof.
+    let motion = output.join("motion");
+    std::fs::create_dir(&motion).map_err(|e| e.to_string())?;
+    let geometry = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| unreachable!())?;
+    let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
+    for frame in 0..=72 {
+        let ms = frame * 100;
+        if ms > 0 {
+            for now in ((ms - 100 + 16)..ms).step_by(16) {
+                state.step(f64::from(now), false).map_err(str::to_owned)?;
+            }
+        }
+        state.step(f64::from(ms), false).map_err(str::to_owned)?;
+        let view = state.view(true);
+        let progress = view.logo_reveal;
+        let mut raster = wordmark::raster(&geometry, 1., progress)?;
+        let opacity = view.login_alpha * view.logo_alpha;
+        for p in raster.pixels.as_chunks_mut::<4>().0 {
+            let alpha = f64::from(p[3]) / 255. * opacity;
+            for (channel, background) in p[..3].iter_mut().zip([22., 28., 34.]) {
+                *channel =
+                    (f64::from(*channel) * opacity + background * (1. - alpha)).round() as u8;
+            }
+            p[3] = 255;
+        }
+        image::save_buffer(
+            motion.join(format!("{frame:03}.png")),
+            &raster.pixels,
+            raster.width,
+            raster.height,
+            image::ColorType::Rgba8,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    std::fs::write(
+        output.join("raster-timings.json"),
+        serde_json::to_vec_pretty(&timings).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_client::{
+        login_controls::{NICKNAME, SETTINGS},
+        menu_controls::ControlKind,
+        menu_preferences::MenuQuality,
+        settings::{DONE, QUALITY},
+    };
+    use slither_wgpu_slice::login_native::NativeLogin;
+    let validation = renderer
+        .device
+        .push_error_scope(wgpu::ErrorFilter::Validation);
+    let mut login = NativeLogin::new("Player")?;
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, true, false)?;
+    }
+    let mut measurements = Vec::new();
+    let mut now = 9600.;
+    for (logical, dpr) in [
+        ([960., 540.], 1.),
+        ([960., 540.], 1.5),
+        ([960., 540.], 2.),
+        ([960., 540.], 3.),
+        ([960., 540.], 4.),
+        ([960., 540.], 5.),
+        ([360., 640.], 1.),
+        ([360., 640.], 2.),
+        ([360., 640.], 5.),
+    ] {
+        let extent = logical.map(|v| (v * dpr) as u32);
+        login.close_settings(true);
+        login.focus(NICKNAME);
+        assert_eq!(login.controls.focus(), Some(NICKNAME));
+        let outgoing = login.prepare_host(extent, dpr, true, None)?;
+        capture(
+            renderer,
+            &outgoing,
+            &output.join(format!("login-{}x{}-{dpr}x.png", logical[0], logical[1])),
+        )?;
+        login.focus(SETTINGS);
+        login.open_settings(true);
+        for state in [
+            "high-focus",
+            "high-pressed",
+            "not-saved-pressed",
+            "low-focus",
+            "not-saved",
+            "done-focus",
+            "disabled",
+        ] {
+            let high = matches!(state, "high-focus" | "high-pressed");
+            login.focus(QUALITY);
+            if (login.state.view(true).quality == MenuQuality::High) != high {
+                login.activate(true);
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            login
+                .state
+                .settings
+                .storage_result(!matches!(state, "not-saved" | "not-saved-pressed"));
+            login.controls.set_progress(
+                QUALITY,
+                if matches!(state, "high-pressed" | "not-saved-pressed") {
+                    [1., 1.]
+                } else {
+                    [0., 0.]
+                },
+            );
+            if matches!(state, "done-focus" | "not-saved-pressed") {
+                login.focus(DONE);
+            }
+            let mut picture = login.prepare_host(extent, dpr, true, None)?;
+            if state == "disabled" {
+                // Authored shared-control specimen; v1 has no unavailable Quality mode.
+                let mut panel = login.panel.clone();
+                panel
+                    .controls
+                    .iter_mut()
+                    .find(|c| c.id == QUALITY)
+                    .unwrap()
+                    .enabled = false;
+                picture = Menu::default().prepare_panel(
+                    &mut TextCache::menu(),
+                    &panel,
+                    &login.controls,
+                    &login.input.state,
+                    &mut Default::default(),
+                    Default::default(),
+                    extent,
+                    dpr,
+                )?;
+                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
+                picture.backdrop = page.backdrop;
+                picture.resources.extend(page.resources);
+                assert!(matches!(
+                    panel
+                        .controls
+                        .iter()
+                        .find(|c| c.id == QUALITY)
+                        .unwrap()
+                        .kind,
+                    ControlKind::Toggle { checked: false, .. }
+                ));
+            }
+            let bytes = picture
+                .resources
+                .iter()
+                .map(|r| r.image.pixels.len())
+                .sum::<usize>();
+            if picture.resources.len() > 32
+                || bytes > 4 * 1024 * 1024
+                || picture.frame.draws.len() > if dpr <= 2. { 64 } else { 160 }
+            {
+                return Err(format!(
+                    "Settings compactness regression: {logical:?} {dpr} {state}: {} slots, {bytes} bytes, {} quads",
+                    picture.resources.len(),
+                    picture.frame.draws.len()
+                ));
+            }
+            let file = format!("settings-{state}-{}x{}-{dpr}x.png", logical[0], logical[1]);
+            capture(renderer, &picture, &output.join(&file))?;
+            measurements.push(serde_json::json!({"file":file,"logical":logical,"dpr":dpr,"state":state,"producer_quads":picture.frame.draws.len(),"gpu_draws_including_page":renderer.draw_call_count(),"slots":picture.resources.len(),"bytes":bytes,"max_tile_axis":picture.resources.iter().map(|r|r.asset.width.max(r.asset.height)).max(),"retained_outgoing_bytes":outgoing.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),"focus":format!("{:?}",login.controls.focus())}));
+        }
+        outgoing.frame.validate(
+            &outgoing
+                .resources
+                .iter()
+                .map(|r| (r.asset.into(), r.asset))
+                .collect(),
+        )?;
+        login.close_settings(true);
+        assert_eq!(login.controls.focus(), Some(SETTINGS));
+        let returned = login.prepare_host(extent, dpr, true, None)?;
+        capture(
+            renderer,
+            &returned,
+            &output.join(format!("return-{}x{}-{dpr}x.png", logical[0], logical[1])),
+        )?;
+    }
+    let revision = std::process::Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|e| e.to_string())?;
+    let fonts = [slither_client::menu_theme::ControlStyle::Heading, slither_client::menu_theme::ControlStyle::HelpText, slither_client::menu_theme::ControlStyle::PrimaryButton].map(|role| serde_json::json!({"role":format!("{role:?}"),"face":TextCache::native_face(slither_client::menu_theme::MenuTheme::default().text_style(role))}));
+    let manifest = serde_json::json!({"revision":String::from_utf8_lossy(&revision.stdout).trim(),"fixture":"authored synthetic; no game servers or external art","fonts":fonts,"panel_at_960x540":[200,110,560,320],"settings_record":"1:<0|1>","measurements":measurements,"limits":{"slots":32,"bytes":4*1024*1024,"producer_quads":160,"producer_quads_dpr_1_to_2":64},"unverified":"physical input, visible-window behavior, owner appearance/feel and live servers"});
+    std::fs::write(
+        output.join("settings.json"),
+        serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    if let Some(error) = validation.pop().await {
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
 fn main() {
     let result = std::env::args_os()
         .nth(1)
@@ -482,5 +1085,20 @@ fn main() {
     if let Err(e) = result {
         eprintln!("{e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn png_conversion_preserves_the_production_raster() {
+        let pixels = [40, 20, 10, 128, 5, 6, 7, 255, 0, 0, 0, 0];
+        let copy = pixels;
+        assert_eq!(
+            straight_alpha(&pixels),
+            [80, 40, 20, 128, 5, 6, 7, 255, 0, 0, 0, 0]
+        );
+        assert_eq!(pixels, copy);
     }
 }

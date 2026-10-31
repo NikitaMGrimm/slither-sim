@@ -16,7 +16,7 @@ mod desktop {
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
-        official::{self, Preparation},
+        official::{self, DirectoryPreparation, Preparation},
     };
     use std::{
         sync::Arc,
@@ -36,11 +36,12 @@ mod desktop {
         endpoint: Option<String>,
         nickname: String,
         skin: u8,
+        nickname_explicit: bool,
+        skin_explicit: bool,
         official: bool,
         server: Option<String>,
         headless: Option<crate::headless::Options>,
         cosmetics_dir: Option<std::path::PathBuf>,
-        wordmark: bool,
         accessory: Option<u8>,
     }
     pub fn options() -> Result<Option<Options>> {
@@ -60,7 +61,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--wordmark] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -69,7 +70,6 @@ mod desktop {
                     slither_wgpu_slice::game::server_endpoint(&e)?;
                     o.endpoint = Some(e);
                 }
-                "--wordmark" => o.wordmark = true,
                 "--official" => o.official = true,
                 "--headless" => headless = true,
                 "--duration" | "--frame-every" => {
@@ -94,7 +94,10 @@ mod desktop {
                     official::explicit_endpoint(&server)?;
                     o.server = Some(server);
                 }
-                "--nickname" => o.nickname = args.next().ok_or("Nickname required")?,
+                "--nickname" => {
+                    o.nickname = args.next().ok_or("Nickname required")?;
+                    o.nickname_explicit = true;
+                }
                 "--cosmetics-dir" => {
                     o.cosmetics_dir =
                         Some(args.next().ok_or("Cosmetics directory required")?.into())
@@ -111,6 +114,7 @@ mod desktop {
                     o.accessory = Some(id);
                 }
                 "--skin" => {
+                    o.skin_explicit = true;
                     o.skin = args
                         .next()
                         .ok_or("Skin required")?
@@ -157,8 +161,10 @@ mod desktop {
         started: Instant,
         cursor: [f64; 2],
         preparation: Option<Preparation>,
+        directory: Option<DirectoryPreparation>,
+        directory_snapshot: Option<Arc<official::DirectorySnapshot>>,
         nickname: String,
-        skin: u8,
+        play_appearance: slither_client::skin_studio::AppearanceSelection,
         schedule: Schedule,
         occluded: bool,
         surface_occluded: bool,
@@ -170,7 +176,14 @@ mod desktop {
     impl Running {
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            let effects = if self.login.champion.policy.visible() {
+            let effects = if self.login.picker.policy.visible() {
+                let effects = self
+                    .login
+                    .picker
+                    .input
+                    .execute(effects, &mut WindowEditHost(&self.window));
+                self.login.picker.commit_effects(effects)
+            } else if self.login.champion.policy.visible() {
                 let effects = self
                     .login
                     .champion
@@ -240,21 +253,68 @@ mod desktop {
             Err("Effect drain budget".into())
         }
         fn service(&mut self) -> Result<()> {
+            if let Some(directory) = &mut self.directory
+                && let Some(result) = directory.poll()
+            {
+                self.directory = None;
+                match result {
+                    Ok(snapshot) => {
+                        self.login
+                            .picker
+                            .policy
+                            .replace(&snapshot.servers, &snapshot.pings)
+                            .map_err(str::to_owned)?;
+                        self.directory_snapshot = Some(Arc::new(snapshot));
+                    }
+                    Err(error) => self.login.picker.policy.directory_failed(&error),
+                }
+                self.schedule.invalidate();
+            }
+            if self.login.picker.policy.take_directory_request() {
+                if self.official {
+                    if self.directory.is_none() {
+                        match DirectoryPreparation::start() {
+                            Ok(work) => {
+                                self.directory = Some(work);
+                                self.login.picker.policy.status =
+                                    "Measuring server latency...".into();
+                            }
+                            Err(error) => self.login.picker.policy.directory_failed(&error),
+                        }
+                    }
+                } else {
+                    self.login.picker.policy.status = "Directory available in official mode".into();
+                }
+            }
+            if let Some(value) = self.login.picker.policy.take_preference()
+                && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
+                && let Err(error) =
+                    slither_wgpu_slice::server_picker_native::write_preference(&path, &value)
+            {
+                eprintln!("Server preference write failed: {error}");
+            }
             if let Some(preparation) = &mut self.preparation
-                && let Some(result) = preparation.poll()
+                && let Some(completion) = preparation.poll()
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
+                official::complete_picker_preparation(
+                    &mut self.login.picker.policy,
+                    &mut self.directory_snapshot,
+                    &completion,
+                    cancelled,
+                    self.directory.is_some(),
+                )?;
                 if cancelled {
                     self.game.stop();
                 } else {
-                    match result {
+                    match completion.result {
                         Ok(prepared) => {
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
-                            if let Err(error) = self.game.play_with_profile(
+                            if let Err(error) = self.game.play_with_appearance(
                                 &prepared.endpoint,
                                 &self.nickname,
-                                self.skin,
+                                &self.play_appearance,
                                 &prepared.profile,
                             ) {
                                 self.game.fail(&error);
@@ -342,6 +402,14 @@ mod desktop {
         }
         fn visibility(&mut self) {
             let s = self.window.inner_size();
+            if self.occluded
+                || self.surface_occluded
+                || s.width == 0
+                || s.height == 0
+                || self.window.is_minimized() == Some(true)
+            {
+                self.login.studio.preview.pause();
+            }
             self.schedule.visibility(
                 !self.occluded
                     && !self.surface_occluded
@@ -383,6 +451,7 @@ mod desktop {
                     intent
                 {
                     self.nickname = nickname;
+                    self.play_appearance = self.login.studio.state.committed().selection();
                     self.game.set_requested_quality(match quality {
                         slither_client::menu_preferences::MenuQuality::High => {
                             slither_client::presentation::QualityMode::High
@@ -392,16 +461,35 @@ mod desktop {
                         }
                     });
                     if self.official {
-                        match Preparation::start(self.server.clone()) {
+                        let explicit = if self.login.picker.policy.changed() {
+                            None
+                        } else {
+                            self.server.clone()
+                        };
+                        let pending = DirectoryPreparation::take_for_play(
+                            explicit.as_deref(),
+                            &mut self.directory,
+                        );
+                        match Preparation::start_with_directory(
+                            explicit,
+                            self.login.picker.policy.selection.0,
+                            self.directory_snapshot.clone(),
+                            pending,
+                        ) {
                             Ok(preparation) => self.preparation = Some(preparation),
-                            Err(error) => self.game.fail(&error),
+                            Err(error) => {
+                                if self.directory.is_none() {
+                                    self.login.picker.policy.directory_failed(&error);
+                                }
+                                self.game.fail(&error);
+                            }
                         }
                     } else if let Some(endpoint) = &self.endpoint
-                        && let Err(error) = slither_wgpu_slice::endpoint_login::play(
+                        && let Err(error) = slither_wgpu_slice::endpoint_login::play_appearance(
                             &mut self.game,
                             endpoint,
                             &self.nickname,
-                            self.skin,
+                            &self.play_appearance,
                         )
                     {
                         self.game.fail(&error);
@@ -440,10 +528,19 @@ mod desktop {
                     None
                 })
             })();
-            let composed = match composed {
+            let mut composed = match composed {
                 Ok(picture) => picture,
                 Err(error) => return self.skip_bad_frame(p.frame.identity, error),
             };
+            if self.login.studio.state.visible()
+                && let Some(picture) = &mut composed
+                && let Err(error) = self
+                    .login
+                    .studio
+                    .append_preview(picture, self.game.menu_cosmetics())
+            {
+                return self.skip_bad_frame(p.frame.identity, error);
+            }
             let picture = composed.as_ref().unwrap_or(&p);
             if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
                 return match e {
@@ -460,6 +557,9 @@ mod desktop {
                 .present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
             {
                 Ok(true) => {
+                    if composed.is_some() && self.login.studio.state.visible() {
+                        self.login.studio.presented();
+                    }
                     self.game.presented(true)?;
                     self.game.bank.recycle_frame(p);
                     if let Some(picture) = composed {
@@ -584,8 +684,23 @@ mod desktop {
                 "Actual adapter {:?}; MSAA{}; no transport until explicit Play",
                 host.renderer.adapter_info, host.renderer.sample_count
             );
-            let mut login = NativeLogin::new(&options.nickname)?;
-            login.set_wordmark(options.wordmark);
+            let mut storage = slither_wgpu_slice::menu_storage::MenuStorage::native();
+            let mut restored = storage.restore();
+            restored
+                .override_cli(
+                    options
+                        .nickname_explicit
+                        .then_some(options.nickname.as_str()),
+                    options.skin_explicit.then_some(options.skin),
+                )
+                .map_err(str::to_owned)?;
+            let play_appearance = restored.record.selection();
+            let mut login = NativeLogin::with_preferences(restored.record, storage)?;
+            login.restore_settings(slither_wgpu_slice::menu_storage::SettingsStorage::native());
+            if let Some(path) = slither_wgpu_slice::server_picker_native::preference_path() {
+                login.picker.policy.selection =
+                    slither_wgpu_slice::server_picker_native::read_preference(&path);
+            }
             Ok(Running {
                 login,
                 endpoint: options.endpoint.clone(),
@@ -600,8 +715,10 @@ mod desktop {
                 started: Instant::now(),
                 cursor: [480., 270.],
                 preparation: None,
+                directory: None,
+                directory_snapshot: None,
                 nickname: String::new(),
-                skin: options.skin,
+                play_appearance,
                 schedule: Schedule::default(),
                 occluded: false,
                 surface_occluded: false,
@@ -638,21 +755,29 @@ mod desktop {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
+                    r.login.picker.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play()
                     && r.preparation.is_none()
                     && (r.official || r.endpoint.is_some());
                 let champion = r.login.champion.policy.visible();
                 if let WindowEvent::Focused(_) = &event {
-                    let inactive = if champion {
-                        &mut r.login.input
+                    if r.login.picker.policy.visible() {
+                        r.login.input.window_event(&event);
+                        r.login.champion.input.window_event(&event);
                     } else {
-                        &mut r.login.champion.input
-                    };
-                    // Retain window ownership across a committed panel handoff.
-                    inactive.window_event(&event);
+                        r.login.picker.input.window_event(&event);
+                        let inactive = if champion {
+                            &mut r.login.input
+                        } else {
+                            &mut r.login.champion.input
+                        };
+                        inactive.window_event(&event);
+                    }
                 }
-                let mapped = if champion {
+                let mapped = if r.login.picker.policy.visible() {
+                    r.login.picker.event(&event)
+                } else if champion {
                     r.login.champion.event(&event)
                 } else {
                     r.login.event(&event, admission)
@@ -665,6 +790,9 @@ mod desktop {
                 }
                 match event {
                     WindowEvent::CloseRequested => {
+                        if let Some(directory) = &r.directory {
+                            directory.cancel();
+                        }
                         if let Some(p) = &r.preparation {
                             p.cancel();
                         }
@@ -862,6 +990,13 @@ mod desktop {
             assert!(official.official);
             assert_eq!(official.server.as_deref(), Some("game.example:445"));
             assert_eq!(official.skin, 65);
+            assert!(official.skin_explicit && official.nickname_explicit);
+            let defaults = parse(&[]).unwrap().unwrap();
+            assert!(!defaults.skin_explicit && !defaults.nickname_explicit);
+            let explicit_defaults = parse(&["--skin", "0", "--nickname", "Player"])
+                .unwrap()
+                .unwrap();
+            assert!(explicit_defaults.skin_explicit && explicit_defaults.nickname_explicit);
             assert!(parse(&["--endpoint", "ws://localhost:19491/slither"]).is_ok());
             assert!(parse(&["--help"]).unwrap().is_none());
             for args in [
@@ -877,15 +1012,6 @@ mod desktop {
             ] {
                 assert!(parse(&args).is_err());
             }
-        }
-        #[test]
-        fn wordmark_overrides_local_logo_only_when_requested() {
-            assert!(!parse(&[]).unwrap().unwrap().wordmark);
-            let options = parse(&["--wordmark", "--cosmetics-dir", "synthetic-artwork"])
-                .unwrap()
-                .unwrap();
-            assert!(options.wordmark);
-            assert!(options.cosmetics_dir.is_some());
         }
         #[test]
         fn headless_requires_an_endpoint_and_bounded_explicit_output() {

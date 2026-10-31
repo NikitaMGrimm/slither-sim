@@ -39,6 +39,7 @@ pub mod presentation;
 pub mod profile_literals;
 pub mod protocol;
 pub mod session_policy;
+pub mod settings;
 pub mod start_page;
 pub mod state;
 pub mod stock_controller_policy;
@@ -120,3 +121,10 @@ mod hud_history_browser;
 
 #[cfg(target_arch = "wasm32")]
 mod leaderboard_history_browser;
+
+/// Shared server directory policy.
+pub mod server_directory;
+/// Shared server picker.
+pub mod server_picker;
+pub mod skin_studio;
+pub mod studio_preview;

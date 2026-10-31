@@ -15,8 +15,11 @@ A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
 Overlay image origins round to whole physical pixels after text baseline and
-alignment offsets. Controls and text rasterize at the window DPR and draw one
-source pixel per physical pixel. Clipping keeps whole texels inside the CSS clip;
+alignment offsets. Menu texel density is `min(window DPR, 5)` through one
+`MAX_MENU_RASTER_DENSITY` constant. Windows scaling tops out at 500%; above that,
+the 13 MiB menu allowance cannot hold the picker at 1:1. Higher DPR keeps CSS
+layout, the real viewport scale and hit/IME coordinates, while sampling the
+5x textures. Up to DPR 5, one source pixel remains one physical pixel. Clipping keeps whole texels inside the CSS clip;
 world nicknames retain their canvas placement. Pointer hit targets keep the core
 CSS layout; caret and IME candidate rectangles share physical-pixel rounding.
 Menu art is CPU-filtered on premultiplied pixels with Catmull-Rom once per source
@@ -31,20 +34,21 @@ menu controls, retaining its texture in the menu resources. `append_to` places
 it below every world draw, mapped to the capped world viewport when controls
 use the physical overlay. A hidden login emits no backdrop, even while the
 spinner remains. Hosts can take it for a separate world layer before composing
-a physical-resolution menu overlay. Logo art keeps its image aspect inside the
-unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
-and a text logo fallback approximate the controls at gameplay size. The spinner uses
+a physical-resolution menu overlay. The stroke wordmark keeps the 450x115 flow
+holder as its vertical anchor. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
+and a stroke wordmark approximate the controls at gameplay size. The spinner uses
 two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
 scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
 into one premultiplied antialiased raster at 128 CSS pixels times its animated
-scale and DPR, rounded to a physical pixel (at most 2048 pixels per side).
-One 1:1 quad applies alpha to the complete canvas,
+scale and capped menu density, rounded to a physical pixel (at most 2048 pixels per side).
+One quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-A static logo uses shared reveal/opacity timing; it does not reproduce animated
-strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
+Supported native logo glyphs use the [authored swelling stroke alphabet](wordmark.md);
+unsupported configurable text uses the installed bold-font fallback. Either path
+settles to a cached raster and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Both browser art loaders share reserved cosmetic-path rejection with the bounded
@@ -57,17 +61,18 @@ use solid materials without capsule shadows.
 - Menu has **64 replacing slots / 13 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
   are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
-  allowance comes from main's #358 full-growth 5x wordmark bound. Champion
-  controls retain compact sliced tiles and a separate 4 MiB regression.
+  allowance includes exact 5x control/shadow rasters and cropped wordmark tiles
+  through 1.1x outgoing growth; the active-picture 64 MiB limit is unchanged.
+  Champion controls retain compact sliced tiles and a separate 4 MiB regression.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Menu/HUD text uses exact DPR within the 2048px texture bound and its byte
-  budgets; world nicknames retain the 128px font guard and backing-space
+- Menu text uses the capped density and HUD text uses exact DPR, within the
+  2048px texture bound and their byte budgets; world nicknames retain the 128px font guard and backing-space
   diagnostics retain their 3x raster bound. Control atlas tiles stay within 512px;
   decoded menu art allows up to 2048px per axis. Menu decoding alone admits that
   density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
-  pixel budgets and the two-resident-logo-frame limit still apply.
+  pixel budgets still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
   menu art admission reserves the five procedural skin roles' 79,424 RGBA bytes;
   those mandatory roles also precede optional images at construction. Authored
@@ -85,7 +90,7 @@ use solid materials without capsule shadows.
 
 Native `--cosmetics-dir` and browser `/cosmetics/` use the same `Cosmetics`
 semantic manifest and decoder. Without a manifest, optional paths are
-`menu/logo.png`, `menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`,
+`menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`,
 `menu/quality-high.png` and `menu/quality-low.png`.
 Missing/malformed art keeps layout and hit targets with authored fallbacks.
 Builder/cosmetic entries are available for future chooser composition.
@@ -94,8 +99,6 @@ An optional **4,096-byte** UTF-8 `menu/manifest.txt` has this authored format:
 
 ```text
 menu-art-v1
-logo:0 1 menu/logo.png
-logo:1 2 menu/logo-next.png
 skin 1 menu/skin.png
 builder 1 menu/builder.png
 cosmetic 1 menu/cosmetic.png
@@ -104,8 +107,11 @@ quality-low 1 menu/quality-low.png
 ```
 
 Rows are role, positive u32 source revision and relative PNG/JPEG path. At most
-37 distinct rows: `logo:0` through `logo:31`, `skin`, `builder`, `cosmetic`,
-`quality-high`, `quality-low`. No server role is admitted yet.
+five native roles: `skin`, `builder`, `cosmetic`, `quality-high`, `quality-low`.
+The shared manifest still validates up to 37 rows for the standalone browser
+reference, including its legacy logo roles. Native ignores those rows rather
+than loading their image bytes; the remaining icons in existing packs still work.
+No server role is admitted yet.
 Paths are at most 128 ASCII characters (letters, digits, `_`, `-`, `.`, `/`).
 Empty, `.` and `..` components, absolute paths, URLs and duplicate roles/paths
 are rejected. Native/served reads check canonical containment, including links.
@@ -115,15 +121,16 @@ Images retain 4 MiB/file and 1,024px decode limits. Browser streaming reads cap
 manifest/image bytes before Rust decode; redirects/credentials are disabled and
 the source must have the page's origin. No official art or pack is included.
 
-Only the first two declared logos load at startup. `replace_menu_art` admits
-resolved bytes atomically and evicts the oldest other logo if needed: **at most
-two frames** reside. GPU revisions increase across replacement/eviction; older
-prepared pictures retain earlier pixels. Callers select semantic frame numbers.
+`replace_menu_art` admits the remaining icon bytes atomically; GPU revisions
+increase across replacement, and prepared pictures retain earlier pixels.
+Native has no bitmap logo role, frame selector or reveal helper. The standalone
+DOM pages retain their existing plain-text/art logo as a known reference-host
+difference; the future extension will reuse the native painter through WebGL2.
 
 ## Offline specimens
 
 Authored Rust/Node tests cover quotas, rejection/rollback, malformed/escaping
-manifests, contained serving, two-frame residency and prepared retention. With
+manifests, contained serving, icon replacement and prepared retention. With
 `CARGO_BUILD_JOBS=2` and a task-local target directory, from the repository root:
 
 ```sh
@@ -142,7 +149,8 @@ owner perceptual acceptance, physical IME/accessibility or real display pacing.
 
 The browser DOM loader uses the same role/path grammar, bounded same-origin
 streaming reads and PNG/JPEG dimensions checked before browser decode. Only
-logo:0, skin and the two quality roles mount in login (at most four images and
+skin and the two quality roles mount natively. The standalone DOM reference also
+mounts its legacy logo (at most four images and
 16 spinner dots). Its art shares the 16 MiB decoded cosmetics allowance: the
 WebGPU host loads world cosmetics first, then gives DOM art the remaining bytes,
 without decoding unused menu art into the GPU bank. Native retains the existing

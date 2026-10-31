@@ -12,6 +12,8 @@ pub enum ControlStyle {
     Nickname,
     /// Existing quality link, with only a keyboard focus surface.
     QualityButton,
+    /// Existing Change Skin artwork remains specialized; shared focus/hit ownership.
+    ChangeSkin,
     /// Purple action.
     SecondaryButton,
     /// Single-line purple editor.
@@ -22,8 +24,14 @@ pub enum ControlStyle {
     HelpText,
     /// Purple panel background.
     Surface,
+    /// Compact-shadow studio panel, with its own bounded physical repeat.
+    StudioSurface,
     /// Selection indication.
     SelectedCell,
+    /// Server directory row with compact decoration.
+    ListRow,
+    /// Login image/link caption; admission does not dim its retained artwork.
+    MenuLink,
 }
 /// Authored raster recipes already used by the native login.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -34,8 +42,12 @@ pub enum SurfaceRecipe {
     Overlay,
     /// Purple bordered field with its existing shadow.
     Field,
+    /// Studio panel with a repeat kept within one physical tile.
+    StudioPanel,
     /// Existing compact link/focus capsule.
     Compact,
+    /// Large modal surface with a wider uniform centre tile.
+    Panel,
 }
 /// Sampled control layer whose raster content is cached independently of opacity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -60,6 +72,8 @@ pub struct SurfaceTokens {
 /// Initial theme, seeded from the existing native login and browser overlay.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MenuTheme {
+    /// Modal dimming ink.
+    pub backdrop: [u8; 3],
     /// Pale lavender ink.
     pub text: [u8; 3],
     /// Muted field placeholder.
@@ -80,6 +94,7 @@ pub struct MenuTheme {
 impl Default for MenuTheme {
     fn default() -> Self {
         Self {
+            backdrop: [24, 34, 48],
             text: [224, 224, 255],
             placeholder: [112, 112, 176],
             selection: [150, 108, 213],
@@ -92,6 +107,18 @@ impl Default for MenuTheme {
     }
 }
 impl MenuTheme {
+    /// Small cached check indicator using the existing compact surface recipe.
+    pub fn toggle_indicator(self, checked: bool) -> SurfaceTokens {
+        SurfaceTokens {
+            colors: if checked {
+                [self.selection; 2]
+            } else {
+                [self.field; 2]
+            },
+            radius: 4,
+            recipe: SurfaceRecipe::Compact,
+        }
+    }
     /// Font raster tokens. Native Lucida bold currently resolves to Arial Bold.
     pub fn text_style(self, role: ControlStyle) -> TextStyle {
         use ControlStyle::*;
@@ -100,7 +127,7 @@ impl MenuTheme {
                 Heading => 24.,
                 HelpText => 18.,
                 PrimaryButton | LoginPlay | SecondaryButton => 20.,
-                QualityButton => 14.,
+                QualityButton | MenuLink => 14.,
                 _ => 15.,
             },
             weight: if matches!(role, Heading | PrimaryButton | LoginPlay | SecondaryButton) {
@@ -110,7 +137,7 @@ impl MenuTheme {
             },
             family: if matches!(
                 role,
-                PrimaryButton | LoginPlay | SecondaryButton | QualityButton
+                PrimaryButton | LoginPlay | SecondaryButton | QualityButton | MenuLink
             ) {
                 TextFamily::Arial
             } else {
@@ -128,7 +155,10 @@ impl MenuTheme {
     pub fn disabled_opacity(self, role: ControlStyle) -> f64 {
         if matches!(
             role,
-            ControlStyle::Nickname | ControlStyle::LoginPlay | ControlStyle::QualityButton
+            ControlStyle::Nickname
+                | ControlStyle::LoginPlay
+                | ControlStyle::QualityButton
+                | ControlStyle::StudioSurface
         ) {
             1.
         } else {
@@ -156,10 +186,26 @@ impl MenuTheme {
             colors: match role {
                 PrimaryButton | LoginPlay => [[86, 172, 129], [54, 108, 81]],
                 SecondaryButton => [[150, 108, 213], [100, 70, 150]],
+                ListRow | MenuLink => [[51, 51, 102]; 2],
+                SelectedCell => [self.selection; 2],
                 _ => [self.field; 2],
             },
-            radius: if role == QualityButton { 44 } else { 24 },
-            recipe: if matches!(role, Field | Nickname | Surface) {
+            radius: if role == QualityButton {
+                44
+            } else if matches!(role, ListRow | MenuLink | SelectedCell) {
+                4
+            } else if role == StudioSurface {
+                16
+            } else {
+                24
+            },
+            recipe: if matches!(role, ListRow | MenuLink | SelectedCell) {
+                SurfaceRecipe::Compact
+            } else if role == StudioSurface {
+                SurfaceRecipe::StudioPanel
+            } else if role == Surface {
+                SurfaceRecipe::Panel
+            } else if matches!(role, Field | Nickname) {
                 SurfaceRecipe::Field
             } else if role == QualityButton {
                 SurfaceRecipe::Compact

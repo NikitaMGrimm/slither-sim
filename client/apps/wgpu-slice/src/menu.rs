@@ -7,6 +7,7 @@ use crate::{
     render::PreparedFrame,
     scene::Resource,
     text::*,
+    wordmark,
 };
 use slither_client::{
     menu_controls::{ControlKind, PanelInputState, PanelView, ResolvedControl, intersection},
@@ -19,6 +20,9 @@ use slither_client::{
 use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
+// Windows scaling tops out at 500%. Above that, the picker cannot fit the
+// 13 MiB menu allowance at 1:1; capping texel density is visually negligible.
+pub const MAX_MENU_RASTER_DENSITY: f64 = 5.;
 pub(crate) const MENU_DRAW_QUOTA: &str = "Menu producer draw budget";
 pub(crate) const MENU_PICTURE_QUOTA: &str = "Menu whole-picture pixel budget";
 pub(crate) const MENU_RASTER_AXIS_QUOTA: &str = "Sliced menu raster axis budget";
@@ -32,13 +36,14 @@ const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
+    Indicator(u32, SurfaceTokens, [u8; 3], bool),
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
-pub const WORDMARK_GREEN: [u8; 3] = [86, 172, 129];
-pub const WORDMARK_PURPLE: [u8; 3] = [150, 76, 224];
+pub const WORDMARK_GREEN: [u8; 3] = wordmark::COLORS[0][1];
+pub const WORDMARK_PURPLE: [u8; 3] = wordmark::COLORS[1][1];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -292,7 +297,8 @@ impl MenuFrame {
 }
 #[derive(Default)]
 pub struct Menu {
-    pub wordmark: bool,
+    /// Change only the string to use another wordmark; None uses DEFAULT_TEXT.
+    pub wordmark_text: Option<String>,
     pub focus: Option<E>,
     pub skin_hovered: bool,
     pub skin_pressed: bool,
@@ -300,112 +306,79 @@ pub struct Menu {
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     next_handle: u64,
     spinner_revision: u64,
+    stroke: Option<StrokeCache>,
+}
+#[derive(Clone)]
+struct StrokeCache {
+    key: (String, u64, u64, u64),
+    sampled_at: f64,
+    resources: Vec<Resource>,
+    pieces: Vec<StrokePiece>,
+}
+#[derive(Clone)]
+struct StrokePiece {
+    atlas: usize,
+    offset: [u32; 2],
+    source: [u32; 4],
 }
 struct Label {
+    /// Material boundary for content below a later modal backdrop.
+    before: Option<usize>,
     text: String,
     rect: MenuRect,
     style: TextStyle,
     alpha: f64,
     align: Align,
-    reveal: f64,
-    reveal_span: Option<[f64; 2]>,
     line_box: bool,
     clip: Option<MenuRect>,
     fit: bool,
 }
-/// Two bold runs with one fitted size and a shared advance boundary.
-pub fn wordmark_runs(
-    text: &mut TextCache,
-    logo: MenuRect,
-    dpr: f64,
-) -> Result<[(MenuRect, TextStyle); 2]> {
-    let mut style = TextStyle {
-        size: logo.height,
-        weight: Weight::Bold,
-        family: Family::Arial,
-        slant: Slant::Normal,
-        color: WORDMARK_GREEN,
-    };
-    let cap = text.measure_panel("H", style)?.ascent;
-    style.size *= logo.height * 0.8 / cap;
-    let width = text.measure_panel("Slither", style)?.advance
-        + text.measure_panel("Client", style)?.advance;
-    style.size *= (logo.width / width).min(1.);
-    let mut physical = style;
-    physical.size *= dpr;
-    let left_px = text.measure_panel("Slither", physical)?.advance;
-    let right_px = text.measure_panel("Client", physical)?.advance;
-    // Snap the common origin and advance once. Rounding each run's origin
-    // independently can move the join one physical pixel in either direction.
-    let origin_px = ((logo.x + logo.width / 2.) * dpr - (left_px + right_px) / 2.).round();
-    let boundary_px = origin_px + left_px.round();
-    Ok([
-        (
-            MenuRect {
-                x: origin_px / dpr,
-                width: left_px / dpr,
-                ..logo
-            },
-            style,
-        ),
-        (
-            MenuRect {
-                x: boundary_px / dpr,
-                width: right_px / dpr,
-                ..logo
-            },
-            TextStyle {
-                color: WORDMARK_PURPLE,
-                ..style
-            },
-        ),
-    ])
+struct WordmarkRequest {
+    value: String,
+    holder: MenuRect,
+    viewport_width: f64,
+    alpha: f64,
+    reveal: f64,
+    draw_index: usize,
+    label_index: usize,
 }
-// Authored wipe: one opaque crop plus at most 32 one-pixel feather strips.
-// Source crops and destinations remain 1:1 on the snapped overlay path.
-fn reveal_draw(mut draw: Draw, reveal: f64, scale: f64, span: Option<[f64; 2]>) -> Vec<Draw> {
-    draw.snap_overlay(scale);
-    if reveal >= 1. {
-        return vec![draw];
+// One bounded indicator tile includes both the rounded fill and authored tick.
+fn toggle_indicator(size: u32, fill: [u8; 3], ink: [u8; 3], checked: bool) -> materials::RgbaImage {
+    let scale = f64::from(size) / 24.;
+    let mut pixels = Vec::with_capacity(size as usize * size as usize * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let p = [(f64::from(x) + 0.5) / scale, (f64::from(y) + 0.5) / scale];
+            let q = [(p[0] - 12.).abs() - 8., (p[1] - 12.).abs() - 8.];
+            let distance = q[0].max(0.).hypot(q[1].max(0.)) + q[0].max(q[1]).min(0.) - 4.;
+            let alpha = (0.5 - distance * scale).clamp(0., 1.);
+            let mut tick = 0_f64;
+            if checked {
+                for (a, b) in [([6., 12.], [10., 16.]), ([10., 16.], [18., 7.])] {
+                    let v = [b[0] - a[0], b[1] - a[1]];
+                    let t = (((p[0] - a[0]) * v[0] + (p[1] - a[1]) * v[1])
+                        / (v[0] * v[0] + v[1] * v[1]))
+                        .clamp(0., 1.);
+                    let d = (p[0] - a[0] - t * v[0]).hypot(p[1] - a[1] - t * v[1]);
+                    tick = tick.max((0.5 + (1.5 - d) * scale).clamp(0., 1.));
+                }
+            }
+            pixels.extend(
+                fill.into_iter()
+                    .zip(ink)
+                    // Menu textures use premultiplied production pixels, including edge coverage.
+                    .map(|(a, b)| {
+                        ((f64::from(a) * (1. - tick) + f64::from(b) * tick) * alpha).round() as u8
+                    }),
+            );
+            pixels.push((alpha * 255.).round() as u8);
+        }
     }
-    if reveal <= 0. {
-        return Vec::new();
+    materials::RgbaImage {
+        width: size,
+        height: size,
+        pixels,
     }
-    let source = draw.source.unwrap_or(BodyRect {
-        x: 0.,
-        y: 0.,
-        width: f64::from(draw.asset.width),
-        height: f64::from(draw.asset.height),
-    });
-    let feather = (12. * scale).round().clamp(1., 32.);
-    let span = span.unwrap_or([draw.destination.x, source.width / scale]);
-    let end = ((span[1] * scale + feather) * reveal).round()
-        - ((draw.destination.x - span[0]) * scale).round();
-    let solid = (end - feather).max(0.).min(source.width);
-    let mut result = Vec::new();
-    let mut crop = |x: f64, width: f64, alpha: f64| {
-        let mut part = draw.clone();
-        part.source = Some(BodyRect {
-            x: source.x + x,
-            width,
-            ..source
-        });
-        part.destination.x += x / scale;
-        part.destination.width = width / scale;
-        part.effective_alpha *= alpha;
-        result.push(part);
-    };
-    if solid > 0. {
-        crop(0., solid, 1.);
-    }
-    for x in solid as u32..(end.min(source.width) as u32) {
-        crop(
-            f64::from(x),
-            1.,
-            ((end - f64::from(x) - 0.5) / feather).clamp(0., 1.),
-        );
-    }
-    result
 }
 
 struct Composition<'a> {
@@ -415,10 +388,13 @@ struct Composition<'a> {
     next_handle: u64,
     spinner_revision: u64,
     scale: f64,
+    viewport_scale: f64,
     draws: Vec<Draw>,
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
-    quality_art: bool,
+    wordmark: Option<WordmarkRequest>,
+    old_stroke: Option<&'a StrokeCache>,
+    stroke: Option<StrokeCache>,
 }
 fn body(r: MenuRect) -> BodyRect {
     BodyRect {
@@ -449,6 +425,23 @@ pub struct PanelPaint<'a> {
     pub scroll: &'a mut BTreeMap<EditorId, f64>,
     pub theme: MenuTheme,
 }
+// The core advances logo_reveal by 0.00375 per 25 ms (start_page/menu.rs).
+const REVEAL_TICK: f64 = 0.00375;
+fn reveal_due(progress: f64, previous: Option<f64>) -> bool {
+    if progress >= 1. {
+        return previous.is_none_or(|p| p < 1.);
+    }
+    if progress < REVEAL_TICK {
+        return false;
+    }
+    // Leave a complete tick before the exact final raster. The core clock
+    // clamps at one, so deferring that final frame could otherwise never finish.
+    if progress > 1. - REVEAL_TICK {
+        return false;
+    }
+    previous.is_none_or(|p| progress < p || progress - p >= REVEAL_TICK - 1e-12)
+}
+
 impl Composition<'_> {
     #[allow(clippy::too_many_arguments)]
     fn panel(
@@ -462,12 +455,30 @@ impl Composition<'_> {
         resolved: &[ResolvedControl],
     ) -> Result<()> {
         if panel.visible {
+            if panel
+                .controls
+                .iter()
+                .any(|c| c.visible && matches!(c.kind, ControlKind::Backdrop))
+            {
+                for label in &mut self.labels {
+                    label.before.get_or_insert(self.draws.len());
+                }
+            }
             for r in resolved.iter().filter(|r| r.control.visible) {
                 let control = &r.control;
                 let enabled = panel.enabled && control.enabled;
                 let alpha = panel.alpha
                     * control.alpha
-                    * if enabled || matches!(control.kind, ControlKind::Label { .. }) {
+                    * if enabled
+                        || control.style == ControlStyle::MenuLink
+                        || matches!(
+                            control.kind,
+                            ControlKind::Label { .. }
+                                | ControlKind::Backdrop
+                                | ControlKind::Surface
+                                | ControlKind::ListRow { .. }
+                        )
+                    {
                         1.
                     } else {
                         theme.disabled_opacity(control.style)
@@ -484,23 +495,305 @@ impl Composition<'_> {
                                  align: Align,
                                  clip: MenuRect| {
                     c.labels.push(Label {
+                        before: None,
                         text: value,
                         rect,
                         style,
                         alpha,
                         align,
-                        reveal: 1.,
-                        reveal_span: None,
                         line_box: false,
                         clip: Some(clip),
                         fit: false,
                     });
                 };
                 match &control.kind {
+                    ControlKind::IconLink { label } | ControlKind::SettingsLink { label } => {
+                        let [hover, press] = input.progress(control.id);
+                        let link_alpha = if press > 0. {
+                            0.5
+                        } else if hover > 0. || input.focus() == Some(control.id) {
+                            1.
+                        } else {
+                            0.7
+                        };
+                        let icon = MenuRect {
+                            x: r.rect.x + (r.rect.width - 48.) / 2.,
+                            y: r.rect.y + 37.,
+                            width: 48.,
+                            height: 22.,
+                        };
+                        if matches!(control.kind, ControlKind::SettingsLink { .. }) {
+                            // Authored sliders glyph, using the link's existing palette.
+                            for (row, knob) in [(0, 12.), (1, 32.), (2, 22.)] {
+                                self.ink(
+                                    MenuRect {
+                                        y: icon.y + f64::from(row) * 8.,
+                                        height: 2.,
+                                        ..icon
+                                    },
+                                    theme.field,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                                self.ink(
+                                    MenuRect {
+                                        x: icon.x + knob,
+                                        y: icon.y + f64::from(row) * 8. - 2.,
+                                        width: 5.,
+                                        height: 6.,
+                                    },
+                                    theme.selection,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                            }
+                        } else {
+                            for row in 0..3 {
+                                let bar = MenuRect {
+                                    y: icon.y + f64::from(row) * 8.,
+                                    height: 6.,
+                                    ..icon
+                                };
+                                self.ink(bar, theme.field, alpha * link_alpha, r.clip)?;
+                                self.ink(
+                                    MenuRect {
+                                        x: bar.x + 4.,
+                                        y: bar.y + 2.,
+                                        width: 2.,
+                                        height: 2.,
+                                    },
+                                    theme.selection,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                            }
+                        }
+                        if input.focus() == Some(control.id) && enabled {
+                            for border in [
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y - 3.,
+                                    width: icon.width + 6.,
+                                    height: 1.,
+                                },
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y + icon.height + 2.,
+                                    width: icon.width + 6.,
+                                    height: 1.,
+                                },
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y - 2.,
+                                    width: 1.,
+                                    height: icon.height + 4.,
+                                },
+                                MenuRect {
+                                    x: icon.x + icon.width + 2.,
+                                    y: icon.y - 2.,
+                                    width: 1.,
+                                    height: icon.height + 4.,
+                                },
+                            ] {
+                                self.ink(border, theme.text, alpha, r.clip)?;
+                            }
+                        }
+                        add_label(
+                            self,
+                            label.clone(),
+                            MenuRect {
+                                y: r.rect.y + r.rect.height - 24.,
+                                height: 24.,
+                                ..r.rect
+                            },
+                            style,
+                            Align::Center,
+                            r.clip,
+                        );
+                        self.labels.last_mut().unwrap().alpha *= link_alpha;
+                    }
+                    ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
+                    ControlKind::Surface => self.sliced(
+                        r.rect,
+                        theme.surface(control.style, ControlState::Idle),
+                        alpha,
+                        surface_clip,
+                        r.scale,
+                    )?,
+                    ControlKind::ListRow {
+                        label,
+                        detail,
+                        selected,
+                        ping,
+                    } => {
+                        // Rows share tiny solid materials; only this window owns text rasters.
+                        let focused = input.focus() == Some(control.id);
+                        let color = if *selected {
+                            theme.selection
+                        } else if focused || input.progress(control.id)[0] > 0. {
+                            theme.field
+                        } else {
+                            theme
+                                .surface(ControlStyle::ListRow, ControlState::Idle)
+                                .colors[0]
+                        };
+                        self.fill(r.rect, color, alpha)?;
+                        let inset = 14. * r.scale;
+                        if *selected || focused {
+                            self.fill(
+                                MenuRect {
+                                    width: 3. * r.scale,
+                                    ..r.rect
+                                },
+                                theme.text,
+                                alpha,
+                            )?;
+                        }
+                        let left = MenuRect {
+                            x: r.rect.x + inset,
+                            width: r.rect.width * 0.45,
+                            ..r.rect
+                        };
+                        let right = MenuRect {
+                            x: r.rect.x + r.rect.width * 0.48,
+                            width: r.rect.width * 0.32,
+                            ..r.rect
+                        };
+                        add_label(
+                            self,
+                            label.clone(),
+                            left,
+                            style,
+                            Align::Left,
+                            intersection(left, r.clip),
+                        );
+                        add_label(
+                            self,
+                            detail.clone(),
+                            right,
+                            style,
+                            Align::Right,
+                            intersection(right, r.clip),
+                        );
+                        let bars = ping.map_or(0, |p| {
+                            if p < 80 {
+                                4
+                            } else if p < 160 {
+                                3
+                            } else if p < 300 {
+                                2
+                            } else {
+                                1
+                            }
+                        });
+                        for index in 0..4 {
+                            let h = (5. + index as f64 * 4.) * r.scale;
+                            self.fill(
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width
+                                        - inset
+                                        - (4 - index) as f64 * 7. * r.scale,
+                                    y: r.rect.y + (r.rect.height - h) / 2.,
+                                    width: 4. * r.scale,
+                                    height: h,
+                                },
+                                if index < bars {
+                                    if *selected {
+                                        theme.text
+                                    } else {
+                                        theme.selection
+                                    }
+                                } else {
+                                    theme.placeholder
+                                },
+                                alpha,
+                            )?;
+                        }
+                    }
                     ControlKind::Label { text: value } => {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
+                    ControlKind::Toggle { label, checked } => {
+                        let [hover, press] = input.progress(control.id);
+                        let indicator = MenuRect {
+                            x: r.rect.x + 16. * r.scale,
+                            y: r.rect.y + (r.rect.height - 24. * r.scale) / 2.,
+                            width: 24. * r.scale,
+                            height: 24. * r.scale,
+                        };
+                        let feedback = MenuRect {
+                            x: indicator.x - 8. * r.scale,
+                            y: indicator.y - 8. * r.scale,
+                            width: 40. * r.scale,
+                            height: 40. * r.scale,
+                        };
+                        // Checkboxes keep hover/focus/press paint beside the indicator;
+                        // a wide row needs no additional full-width capsule textures.
+                        for (state, opacity) in [
+                            (
+                                ControlState::Hovered,
+                                if enabled {
+                                    hover.max(if input.focus() == Some(control.id) {
+                                        0.33
+                                    } else {
+                                        0.
+                                    })
+                                } else {
+                                    0.
+                                },
+                            ),
+                            (ControlState::Pressed, if enabled { press } else { 0. }),
+                        ] {
+                            let mut tokens = theme.surface(control.style, state);
+                            tokens.recipe = SurfaceRecipe::Compact;
+                            self.sliced(feedback, tokens, alpha * opacity, surface_clip, r.scale)?;
+                        }
+                        let tokens = theme.toggle_indicator(*checked);
+                        let size = (indicator.width * self.scale).round().max(1.) as u32;
+                        if size > 512 {
+                            return Err(MENU_RASTER_AXIS_QUOTA.into());
+                        }
+                        let resource = self.cached_material(
+                            MaterialKey::Indicator(size, tokens, theme.text, *checked),
+                            || {
+                                Ok(toggle_indicator(
+                                    size,
+                                    tokens.colors[0],
+                                    theme.text,
+                                    *checked,
+                                ))
+                            },
+                        )?;
+                        let mut draw = image(&resource, indicator, alpha);
+                        if clip_draw(&mut draw, r.clip, self.scale) {
+                            self.push(draw)?;
+                        }
+                        add_label(
+                            self,
+                            label.clone(),
+                            MenuRect {
+                                x: r.rect.x + 54. * r.scale,
+                                width: r.rect.width - 70. * r.scale,
+                                ..r.rect
+                            },
+                            style,
+                            Align::Left,
+                            r.clip,
+                        );
+                    }
                     ControlKind::Button { label } => {
+                        if control.style == ControlStyle::ChangeSkin {
+                            if input.focus() == Some(control.id) {
+                                self.sliced(
+                                    r.rect,
+                                    theme.surface(ControlStyle::QualityButton, ControlState::Idle),
+                                    alpha * 0.35,
+                                    surface_clip,
+                                    r.scale,
+                                )?;
+                            }
+                            continue;
+                        }
                         let quality = control.style == ControlStyle::QualityButton;
                         let focused = input.focus() == Some(control.id);
                         if !quality || focused {
@@ -534,7 +827,7 @@ impl Composition<'_> {
                                 r.scale,
                             )?;
                         }
-                        if !quality || !self.quality_art {
+                        {
                             add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
                             let l = self.labels.last_mut().unwrap();
                             l.line_box = control.style == ControlStyle::LoginPlay;
@@ -575,7 +868,7 @@ impl Composition<'_> {
                             self.ink(g.selection_rect(), theme.selection, alpha * 0.45, clip)?;
                             if edit.caret_visible() {
                                 self.ink(
-                                    g.snapped_cursor_rect(self.scale),
+                                    g.snapped_cursor_rect(self.viewport_scale),
                                     theme.text,
                                     alpha,
                                     clip,
@@ -610,6 +903,19 @@ impl Composition<'_> {
         Ok(())
     }
 
+    fn fill(&mut self, rect: MenuRect, color: [u8; 3], alpha: f64) -> Result<()> {
+        if alpha == 0. {
+            return Ok(());
+        }
+        let resource = self.cached_material(MaterialKey::Solid([1, 1], color), || {
+            Ok(materials::RgbaImage {
+                width: 1,
+                height: 1,
+                pixels: vec![color[0], color[1], color[2], 255],
+            })
+        })?;
+        self.push(image(&resource, rect, alpha))
+    }
     fn cached_material(
         &mut self,
         key: MaterialKey,
@@ -670,8 +976,8 @@ impl Composition<'_> {
         let surface = match tokens.recipe {
             SurfaceRecipe::Button => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
-            SurfaceRecipe::Field => materials::MenuSurface::Nickname,
-            SurfaceRecipe::Compact => materials::MenuSurface::Compact,
+            SurfaceRecipe::Field | SurfaceRecipe::Panel => materials::MenuSurface::Nickname,
+            SurfaceRecipe::Compact | SurfaceRecipe::StudioPanel => materials::MenuSurface::Compact,
         };
         let pad = (surface.padding() * raster_scale).ceil() as u32;
         let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;
@@ -679,7 +985,21 @@ impl Composition<'_> {
             (r.width * scale).round().max(1.) as u32,
             (r.height * scale).round().max(1.) as u32,
         ];
-        let middle = 32;
+        // Uniform centre strips use logical pixels: DPR must not multiply
+        // the number of quads, including the fields/buttons above a modal.
+        let logical_middle = match tokens.recipe {
+            SurfaceRecipe::Panel => 64.,
+            SurfaceRecipe::Compact => 128.,
+            _ => 32.,
+        };
+        let middle = if tokens.recipe == SurfaceRecipe::StudioPanel {
+            // Keep the uniform panel repeat within the first physical tile. A
+            // repeat spanning two Y tiles doubles every interior row's draw cost.
+            // The server picker and existing controls retain their logical repeats.
+            512u32.saturating_sub(radius + pad).max(32)
+        } else {
+            (logical_middle * raster_scale).ceil().max(1.) as u32
+        };
         let atlas = size.map(|n| n.min(2 * radius + middle));
         let padded = atlas.map(|n| n + 2 * pad);
         if padded.iter().any(|n| *n > 2048) {
@@ -723,8 +1043,8 @@ impl Composition<'_> {
                 tiles.push((x, y, resource));
             }
         }
-        let xs = slice_axis(size[0], atlas[0], pad)?;
-        let ys = slice_axis(size[1], atlas[1], pad)?;
+        let xs = slice_axis(size[0], atlas[0], pad, middle)?;
+        let ys = slice_axis(size[1], atlas[1], pad, middle)?;
         check_menu_draws(xs.len() * ys.len())?;
         for &(dy, sy, h) in &ys {
             for &(dx, sx, w) in &xs {
@@ -790,9 +1110,35 @@ impl Composition<'_> {
         Ok(())
     }
     fn ink(&mut self, r: MenuRect, rgb: [u8; 3], alpha: f64, clip: MenuRect) -> Result<()> {
-        let r = intersection(r, clip);
+        // Avoid changing a real-DPR caret's exact size through subtracting its
+        // large absolute coordinates when clipping is a no-op.
+        let r = if self.viewport_scale > self.scale
+            && r.x >= clip.x
+            && r.y >= clip.y
+            && r.x + r.width <= clip.x + clip.width
+            && r.y + r.height <= clip.y + clip.height
+        {
+            r
+        } else {
+            intersection(r, clip)
+        };
         if alpha == 0. || r.width <= 0. || r.height <= 0. {
             return Ok(());
+        }
+        if self.viewport_scale > self.scale {
+            // Solid editor ink needs no high-density texture. Preserve its real
+            // DPR caret/selection geometry so painting and IME bounds still agree.
+            let resource = self.cached_material(MaterialKey::Solid([1, 1], rgb), || {
+                Ok(materials::RgbaImage {
+                    width: 1,
+                    height: 1,
+                    pixels: vec![rgb[0], rgb[1], rgb[2], 255],
+                })
+            })?;
+            let mut draw = image(&resource, r, alpha);
+            draw.snap_overlay(self.viewport_scale);
+            check_menu_draws(self.draws.len() + 1)?;
+            return frame::push_draw(&mut self.draws, draw);
         }
         let scale = self.scale;
         let size = [
@@ -859,6 +1205,297 @@ impl Composition<'_> {
         draw.snap_overlay(self.scale);
         Ok(draw)
     }
+    #[allow(clippy::too_many_arguments)]
+    fn stroke_wordmark(
+        &mut self,
+        value: &str,
+        holder: MenuRect,
+        viewport_width: f64,
+        alpha: f64,
+        reveal: f64,
+        text: &mut TextCache,
+        font_slots: usize,
+        font_only: bool,
+        reserved_draws: usize,
+    ) -> Result<()> {
+        let unit = holder.height / 16.;
+        let mut style = TextStyle {
+            size: holder.height * 0.8,
+            weight: Weight::Bold,
+            family: Family::Arial,
+            slant: Slant::Normal,
+            color: WORDMARK_GREEN,
+        };
+        let ascent = text.measure_panel("H", style)?.ascent;
+        style.size *= 10. * unit / ascent;
+        let mut layout = if font_only {
+            wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?
+        } else {
+            wordmark::layout(value, holder, viewport_width, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?
+        };
+        if !reveal.is_finite() {
+            return Err("Wordmark reveal bounds".into());
+        }
+        let reveal = reveal.clamp(0., 1.);
+        layout.fit_raster(self.scale)?;
+        if layout.words.iter().filter(|w| w.fallback).count()
+            + usize::from(layout.words.iter().any(|w| !w.fallback))
+            > font_slots
+        {
+            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?;
+        }
+        let stroke_start = self.draws.len();
+        if reveal > 0. && layout.words.iter().any(|w| !w.fallback) {
+            let key = (
+                value.to_owned(),
+                layout.unit.to_bits(),
+                self.scale.to_bits(),
+                layout
+                    .word_offset_pixels(&layout.words[0], self.scale)
+                    .to_bits(),
+            );
+            let old = self.old_stroke.filter(|old| old.key == key);
+            let due = reveal_due(reveal, old.map(|c| c.sampled_at));
+            if old.is_some() || due {
+                let cache = if !due {
+                    old.unwrap().clone()
+                } else {
+                    let raster = wordmark::raster(&layout, self.scale, reveal)?;
+                    // Retain only actual painted pixels (including the soft
+                    // shadow). Empty padding must not displace essential controls
+                    // at 5x DPR; cropping never changes the 1:1 physical scale.
+                    let mut bounds = [raster.width, raster.height, 0, 0];
+                    for (i, p) in raster.pixels.as_chunks::<4>().0.iter().enumerate() {
+                        if p[3] > 0 {
+                            let x = i as u32 % raster.width;
+                            let y = i as u32 / raster.width;
+                            bounds[0] = bounds[0].min(x);
+                            bounds[1] = bounds[1].min(y);
+                            bounds[2] = bounds[2].max(x + 1);
+                            bounds[3] = bounds[3].max(y + 1);
+                        }
+                    }
+                    if bounds[2] == 0 {
+                        bounds = [0, 0, 1, 1];
+                    }
+                    // At high DPR, pack nonempty horizontal bands into one
+                    // atlas. This preserves stroke/shadow pixels while excluding
+                    // the large holes between ascenders and lowercase bodies.
+                    // Ordinary DPR 1/2 retains one image and one draw.
+                    let mut regions = Vec::new();
+                    if self.scale > 3. {
+                        let band = (3. * self.scale).round() as u32;
+                        for y in (bounds[1]..bounds[3]).step_by(band as usize) {
+                            let height = (bounds[3] - y).min(band);
+                            let mut spans: Vec<[u32; 2]> = Vec::new();
+                            let mut left = None;
+                            for x in bounds[0]..=bounds[2] {
+                                let painted = x < bounds[2]
+                                    && (y..y + height).any(|row| {
+                                        raster.pixels[((row * raster.width + x) * 4 + 3) as usize]
+                                            > 0
+                                    });
+                                if painted && left.is_none() {
+                                    left = Some(x);
+                                }
+                                if !painted && let Some(start) = left.take() {
+                                    spans.push([start, x]);
+                                }
+                            }
+                            // Drop large transparent gaps without turning every
+                            // letter/counter into a draw. The shared producer
+                            // ceiling still admits controls, text and spinner.
+                            while spans.len() > 4 {
+                                let i = (0..spans.len() - 1)
+                                    .min_by_key(|i| spans[i + 1][0] - spans[*i][1])
+                                    .unwrap();
+                                let end = spans.remove(i + 1)[1];
+                                spans[i][1] = end;
+                            }
+                            for [left, right] in spans {
+                                for sx in (left..right).step_by(2048) {
+                                    regions.push([sx, y, (right - sx).min(2048), height]);
+                                }
+                            }
+                        }
+                    } else {
+                        for x in (bounds[0]..bounds[2]).step_by(2048) {
+                            regions.push([
+                                x,
+                                bounds[1],
+                                (bounds[2] - x).min(2048),
+                                bounds[3] - bounds[1],
+                            ]);
+                        }
+                    }
+                    check_menu_draws(
+                        self.draws.len()
+                            + regions.len()
+                            + reserved_draws
+                            + layout.words.iter().filter(|w| w.fallback).count(),
+                    )?;
+                    let mut pieces = Vec::new();
+                    let mut sizes: Vec<[u32; 2]> = vec![[0, 0]];
+                    regions.sort_by_key(|r| std::cmp::Reverse(r[2]));
+                    let row_height = regions.iter().map(|r| r[3]).max().unwrap_or(1);
+                    let rows_per_atlas = 2048 / row_height;
+                    let mut used: Vec<u32> = Vec::new();
+                    for [x, y, width, height] in regions {
+                        let row = used
+                            .iter()
+                            .position(|n| *n + width <= 2048)
+                            .unwrap_or(used.len());
+                        if row == used.len() {
+                            used.push(0);
+                        }
+                        let atlas = row / rows_per_atlas as usize;
+                        if atlas == sizes.len() {
+                            sizes.push([0, 0]);
+                        }
+                        let ax = used[row];
+                        let ay = row as u32 % rows_per_atlas * row_height;
+                        sizes[atlas][0] = sizes[atlas][0].max(ax + width);
+                        sizes[atlas][1] = sizes[atlas][1].max(ay + height);
+                        pieces.push(StrokePiece {
+                            atlas,
+                            offset: [x, y],
+                            source: [ax, ay, width, height],
+                        });
+                        used[row] += width;
+                    }
+                    sizes.retain(|s| s[0] > 0);
+                    let bytes = sizes
+                        .iter()
+                        .map(|s| s[0] as usize * s[1] as usize * 4)
+                        .sum::<usize>();
+                    preflight_menu_totals(
+                        self.materials.len()
+                            + sizes.len()
+                            + self.labels.len()
+                            + layout.words.iter().filter(|w| w.fallback).count(),
+                        self.materials
+                            .values()
+                            .map(|r| r.image.pixels.len())
+                            .sum::<usize>()
+                            + bytes,
+                    )?;
+                    let mut images: Vec<_> = sizes
+                        .into_iter()
+                        .map(|[width, height]| materials::RgbaImage {
+                            width,
+                            height,
+                            pixels: vec![0; width as usize * height as usize * 4],
+                        })
+                        .collect();
+                    for piece in &pieces {
+                        let [sx, sy, width, height] = piece.source;
+                        let dst = &mut images[piece.atlas];
+                        for row in 0..height {
+                            let src = ((piece.offset[1] + row) * raster.width + piece.offset[0])
+                                as usize
+                                * 4;
+                            let at = ((sy + row) * dst.width + sx) as usize * 4;
+                            dst.pixels[at..at + width as usize * 4]
+                                .copy_from_slice(&raster.pixels[src..src + width as usize * 4]);
+                        }
+                    }
+                    let mut resources = Vec::new();
+                    for image in images {
+                        self.next_handle = self
+                            .next_handle
+                            .checked_add(1)
+                            .filter(|h| {
+                                *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE
+                            })
+                            .ok_or("Menu material handle overflow")?;
+                        resources.push(Resource {
+                            asset: BodyAsset {
+                                handle: self.next_handle,
+                                revision: 1,
+                                width: image.width,
+                                height: image.height,
+                                status: BodyAssetStatus::Ready,
+                            },
+                            image: image.into(),
+                        });
+                    }
+                    StrokeCache {
+                        key,
+                        sampled_at: reveal,
+                        resources,
+                        pieces,
+                    }
+                };
+                check_menu_draws(
+                    self.draws.len()
+                        + cache.pieces.len()
+                        + reserved_draws
+                        + layout.words.iter().filter(|w| w.fallback).count(),
+                )?;
+                let origin = layout.origin_pixels(self.scale);
+                for piece in &cache.pieces {
+                    let resource = &cache.resources[piece.atlas];
+                    let [sx, sy, width, height] = piece.source;
+                    let mut draw = image(
+                        resource,
+                        MenuRect {
+                            x: (origin[0] + f64::from(piece.offset[0])) / self.scale,
+                            y: (origin[1] + f64::from(piece.offset[1])) / self.scale,
+                            width: f64::from(width) / self.scale,
+                            height: f64::from(height) / self.scale,
+                        },
+                        alpha,
+                    );
+                    draw.source = Some(BodyRect {
+                        x: f64::from(sx),
+                        y: f64::from(sy),
+                        width: f64::from(width),
+                        height: f64::from(height),
+                    });
+                    self.push(draw)?;
+                }
+                self.stroke = Some(cache);
+            }
+        }
+        // A mixed stroke/font line can retain more than one atlas. If that
+        // consumes its reserved slots, use the bounded font line as a whole.
+        if layout.words.iter().filter(|w| w.fallback).count()
+            + self.stroke.as_ref().map_or(0, |s| s.resources.len())
+            > font_slots
+        {
+            self.draws.truncate(stroke_start);
+            self.stroke = None;
+            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?;
+        }
+        for word in layout.words.iter().filter(|w| w.fallback) {
+            // One font run for the whole unsupported word, never a partial
+            // stroke word. Shape reveal is deliberately absent from this path.
+            let r = MenuRect {
+                x: layout.word_x_pixels(word, self.scale) / self.scale,
+                y: layout.rect.y + 2. * layout.unit,
+                width: word.width * layout.unit,
+                height: 11. * layout.unit,
+            };
+            self.label(&word.text, r, style.size * layout.unit / unit, true, alpha);
+            let label = self.labels.last_mut().unwrap();
+            label.style.color = if word.color == 0 {
+                WORDMARK_GREEN
+            } else {
+                WORDMARK_PURPLE
+            };
+            label.align = Align::Left;
+            label.line_box = true;
+        }
+        Ok(())
+    }
     fn push(&mut self, mut draw: Draw) -> Result<()> {
         draw.snap_overlay(self.scale);
         check_menu_draws(self.draws.len() + 1)?;
@@ -875,6 +1512,7 @@ impl Composition<'_> {
     }
     fn label(&mut self, text: &str, r: MenuRect, size: f64, bold: bool, alpha: f64) {
         self.labels.push(Label {
+            before: None,
             text: text.into(),
             rect: r,
             style: TextStyle {
@@ -886,23 +1524,12 @@ impl Composition<'_> {
             },
             alpha,
             align: Align::Center,
-            reveal: 1.,
-            reveal_span: None,
             line_box: false,
             clip: None,
             fit: true,
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
-        self.art_revealed(resource, r, alpha, 1.)
-    }
-    fn art_revealed(
-        &mut self,
-        resource: &Resource,
-        r: MenuRect,
-        alpha: f64,
-        reveal: f64,
-    ) -> Result<()> {
         let size = [
             (r.width * self.scale).round().max(1.) as u32,
             (r.height * self.scale).round().max(1.) as u32,
@@ -969,9 +1596,7 @@ impl Composition<'_> {
             height: f64::from(size[1]) / self.scale,
             ..r
         };
-        for draw in reveal_draw(image(&self.art[&key], r, alpha), reveal, self.scale, None) {
-            self.push(draw)?;
-        }
+        self.push(image(&self.art[&key], r, alpha))?;
         Ok(())
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
@@ -1040,11 +1665,14 @@ impl Menu {
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
-            scale: dpr,
+            scale: dpr.min(MAX_MENU_RASTER_DENSITY),
+            viewport_scale: dpr,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
+            wordmark: None,
+            old_stroke: self.stroke.as_ref(),
+            stroke: None,
         };
         c.panel(
             text,
@@ -1055,17 +1683,18 @@ impl Menu {
             theme,
             &resolved,
         )?;
-        let (result, next, spinner, materials, art) =
+        let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, None, None, Vec::new())?;
         self.next_handle = next;
         self.spinner_revision = spinner;
         self.materials = materials;
         self.art = art;
+        self.stroke = stroke;
         *scroll = staged_scroll;
         Ok(result)
     }
     /// Rasterize at the physical overlay scale. Geometry comes from the core layout;
-    /// a caller supplies the selected logo frame, never a filesystem path.
+    /// optional local icons never replace the authored stroke logo.
     #[allow(clippy::too_many_arguments)]
     pub fn prepare(
         &mut self,
@@ -1075,9 +1704,8 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
     ) -> Result<MenuFrame> {
-        self.prepare_with_input(text, view, layout, extent, dpr, cosmetics, logo_frame, None)
+        self.prepare_with_input(text, view, layout, extent, dpr, cosmetics, None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1089,12 +1717,9 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
         input: Option<&MenuInputState>,
     ) -> Result<MenuFrame> {
-        self.prepare_with_panel(
-            text, view, layout, extent, dpr, cosmetics, logo_frame, input, None,
-        )
+        self.prepare_with_panel(text, view, layout, extent, dpr, cosmetics, input, None)
     }
     #[allow(clippy::too_many_arguments)]
     pub fn prepare_with_panel(
@@ -1105,7 +1730,6 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
         input: Option<&MenuInputState>,
         panel: Option<PanelPaint<'_>>,
     ) -> Result<MenuFrame> {
@@ -1116,11 +1740,14 @@ impl Menu {
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
-            scale: dpr,
+            scale: dpr.min(MAX_MENU_RASTER_DENSITY),
+            viewport_scale: dpr,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
+            wordmark: None,
+            old_stroke: self.stroke.as_ref(),
+            stroke: None,
         };
         let a = view.login_alpha;
         let backdrop = if view.visible {
@@ -1145,53 +1772,21 @@ impl Menu {
             draw
         });
         if view.visible {
-            let qr = layout.viewport_rect(E::Quality);
-            let role = match view.quality {
-                slither_client::menu_preferences::MenuQuality::High => MenuArt::QualityHigh,
-                slither_client::menu_preferences::MenuQuality::Low => MenuArt::QualityLow,
-            };
-            if let Some(art) = cosmetics.and_then(|p| p.menu_art(role)) {
-                c.quality_art = true;
-                c.art(art, qr, a)?;
-            }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha;
-            // Authored wipe completes in the first quarter of the retained
-            // reveal clock (~1.67s), with bright partial art during the intro.
-            let logo_reveal = (4. * view.logo_reveal).clamp(0., 1.);
-            if let Some(art) = cosmetics
-                .filter(|_| !self.wordmark)
-                .and_then(|p| p.menu_art(MenuArt::Logo(logo_frame)))
-            {
-                // Local art may be taller than the 450x135 original; it must
-                // not paint over the rows below the holder.
-                let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
-                let room = layout.viewport_rect(E::LastLength).y - logo.y;
-                let fit = (room / natural).min(1.);
-                c.art_revealed(
-                    art,
-                    MenuRect {
-                        x: logo.x + logo.width * (1. - fit) / 2.,
-                        width: logo.width * fit,
-                        height: natural * fit,
-                        ..logo
-                    },
-                    logo_alpha,
-                    logo_reveal,
-                )?;
-            } else {
-                let runs = wordmark_runs(text, logo, dpr)?;
-                let span = [runs[0].0.x, runs[0].0.width + runs[1].0.width];
-                for ((r, style), value) in runs.into_iter().zip(["Slither", "Client"]) {
-                    c.label(value, r, style.size, true, logo_alpha);
-                    let label = c.labels.last_mut().unwrap();
-                    label.style = style;
-                    label.line_box = true;
-                    label.align = Align::Left;
-                    label.reveal = logo_reveal;
-                    label.reveal_span = Some(span);
-                }
-            }
+            c.wordmark = Some(WordmarkRequest {
+                value: self
+                    .wordmark_text
+                    .as_deref()
+                    .unwrap_or(wordmark::DEFAULT_TEXT)
+                    .to_owned(),
+                holder: logo,
+                viewport_width: f64::from(extent[0]) / dpr,
+                alpha: logo_alpha,
+                reveal: view.logo_reveal,
+                draw_index: c.draws.len(),
+                label_index: c.labels.len(),
+            });
             if view.tips_visible {
                 c.label(
                     view.tip,
@@ -1319,7 +1914,7 @@ impl Menu {
             let mut controls = PanelInputState::default();
             if let Some(id) = match self.focus {
                 Some(E::Play) => Some(slither_client::login_controls::PLAY),
-                Some(E::Quality) => Some(slither_client::login_controls::QUALITY),
+                Some(E::Settings) => Some(slither_client::login_controls::SETTINGS),
                 _ => input
                     .filter(|i| i.focus() == Some(EditorId::Nickname))
                     .map(|_| slither_client::login_controls::NICKNAME),
@@ -1364,7 +1959,7 @@ impl Menu {
             c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
         let spinner_draws = c.draws.split_off(spinner_start);
-        let (result, next, spinner, materials, art) =
+        let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, backdrop, world_cover, spinner_draws)?;
         if let (Some(p), Some(scroll)) = (panel, staged_scroll) {
             *p.scroll = scroll;
@@ -1374,6 +1969,7 @@ impl Menu {
         self.spinner_revision = spinner;
         self.materials = materials;
         self.art = art;
+        self.stroke = stroke;
         Ok(result)
     }
 }
@@ -1384,13 +1980,14 @@ type Published = (
     u64,
     BTreeMap<MaterialKey, Resource>,
     BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
+    Option<StrokeCache>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
-fn slice_axis(size: u32, atlas: u32, pad: u32) -> Result<Vec<(u32, u32, u32)>> {
+fn slice_axis(size: u32, atlas: u32, pad: u32, centre: u32) -> Result<Vec<(u32, u32, u32)>> {
     if size == atlas {
         return Ok(vec![(0, 0, size + 2 * pad)]);
     }
-    let edge = atlas.saturating_sub(32) / 2;
+    let edge = atlas.saturating_sub(centre) / 2;
     let middle = atlas - 2 * edge;
     let mut out = vec![(0, 0, edge + pad)];
     let mut offset = edge + pad;
@@ -1417,11 +2014,131 @@ impl Composition<'_> {
         world_cover: Option<Draw>,
         spinner_draws: Vec<Draw>,
     ) -> Result<Published> {
+        let request = self.wordmark.take();
+        let reserved_draws = spinner_draws.len()
+            + usize::from(backdrop.is_some())
+            + usize::from(world_cover.is_some());
+        let checkpoint = (self.draws.len(), self.labels.len(), self.next_handle);
+        let mut added = (0, 0);
+        if let Some(request) = &request {
+            match self.place_wordmark(text, request, false, reserved_draws) {
+                Ok(counts) => added = counts,
+                Err(error) if matches!(error.as_str(), MENU_CACHE_QUOTA | MENU_DRAW_QUOTA) => {
+                    self.draws.truncate(checkpoint.0);
+                    self.labels.truncate(checkpoint.1);
+                    self.stroke = None;
+                    self.next_handle = checkpoint.2;
+                    added = self.place_wordmark(text, request, true, reserved_draws)?;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        let mut result = self.compose_labels(
+            text,
+            extent,
+            dpr,
+            backdrop.clone(),
+            world_cover.clone(),
+            &spinner_draws,
+        );
+        if result
+            .as_ref()
+            .err()
+            .is_some_and(|error| matches!(error.as_str(), MENU_CACHE_QUOTA | MENU_DRAW_QUOTA))
+            && self.stroke.is_some()
+            && let Some(request) = &request
+        {
+            // TextCache's failed transaction has not published. Retry the logo
+            // only, using actual text bytes/draws rather than a guessed
+            // allowance. compose_labels restores staged draws before this retry;
+            // the fallback must pass the same aggregate checks.
+            self.draws
+                .drain(request.draw_index..request.draw_index + added.0);
+            self.labels
+                .drain(request.label_index..request.label_index + added.1);
+            for label in &mut self.labels {
+                if let Some(index) = &mut label.before
+                    && *index >= request.draw_index + added.0
+                {
+                    *index -= added.0;
+                }
+            }
+            self.stroke = None;
+            self.next_handle = checkpoint.2;
+            self.place_wordmark(text, request, true, reserved_draws)?;
+            result = self.compose_labels(text, extent, dpr, backdrop, world_cover, &spinner_draws);
+        }
+        Ok((
+            result?,
+            self.next_handle,
+            self.spinner_revision,
+            self.materials,
+            self.art,
+            self.stroke,
+        ))
+    }
+    fn place_wordmark(
+        &mut self,
+        text: &mut TextCache,
+        request: &WordmarkRequest,
+        font_only: bool,
+        reserved_draws: usize,
+    ) -> Result<(usize, usize)> {
+        let font_slots = MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
+        let draws = self.draws.len();
+        let labels = self.labels.len();
+        self.stroke_wordmark(
+            &request.value,
+            request.holder,
+            request.viewport_width,
+            request.alpha,
+            request.reveal,
+            text,
+            font_slots,
+            font_only,
+            reserved_draws + self.labels.len(),
+        )?;
+        let added = (self.draws.len() - draws, self.labels.len() - labels);
+        // Deferred logo text belongs below the first modal, just like the
+        // labels that existed when that modal was composed.
+        let before = self.labels[..labels].iter().filter_map(|l| l.before).min();
+        for label in &mut self.labels[labels..] {
+            label.before = before;
+        }
+        for label in &mut self.labels {
+            if let Some(index) = &mut label.before
+                && *index >= request.draw_index
+            {
+                *index += added.0;
+            }
+        }
+        self.draws[request.draw_index..].rotate_right(added.0);
+        self.labels[request.label_index..].rotate_right(added.1);
+        Ok(added)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn compose_labels(
+        &mut self,
+        text: &mut TextCache,
+        extent: [u32; 2],
+        dpr: f64,
+        backdrop: Option<Draw>,
+        world_cover: Option<Draw>,
+        spinner_draws: &[Draw],
+    ) -> Result<MenuFrame> {
         let material_bytes = self
             .materials
             .values()
             .map(|r| r.image.pixels.len())
-            .sum::<usize>();
+            .sum::<usize>()
+            + self.stroke.as_ref().map_or(0, |s| {
+                s.resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+            });
+        let material_slots =
+            self.materials.len() + self.stroke.as_ref().map_or(0, |s| s.resources.len());
         // Essential controls belong to the Menu allowance. Optional cosmetics
         // must not consume the capacity needed by Play, nickname or fallbacks.
         // Measure replacement faces normally. Fit full labels into their authored
@@ -1429,7 +2146,7 @@ impl Composition<'_> {
         for l in &mut self.labels {
             let width = text.measure_panel(&l.text, l.style)?.advance;
             let available = l.rect.width;
-            if l.fit && width > available && l.reveal_span.is_none() {
+            if l.fit && width > available {
                 l.style.size *= available / width;
             }
         }
@@ -1455,10 +2172,10 @@ impl Composition<'_> {
                     style: l.style,
                     position: [
                         l.rect.x
-                            + if l.align == Align::Left {
-                                0.
-                            } else {
-                                l.rect.width / 2.
+                            + match l.align {
+                                Align::Left => 0.,
+                                Align::Center => l.rect.width / 2.,
+                                Align::Right => l.rect.width,
                             },
                         if alphabetic {
                             placement.origin[1]
@@ -1492,16 +2209,24 @@ impl Composition<'_> {
                     })
             })
             .collect();
+        let draw_start = self.draws.len();
         let result = text.compose_menu(
             &runs,
             &clips,
             self.scale,
-            (self.materials.len(), material_bytes),
+            (material_slots, material_bytes),
             |groups| {
+                let mut underlays = BTreeMap::<usize, Vec<Draw>>::new();
+                let mut underlay_count = 0;
+                let mut foreground = Vec::new();
+                let reserved = spinner_draws.len()
+                    + usize::from(backdrop.is_some())
+                    + usize::from(world_cover.is_some());
                 let mut resources: BTreeMap<_, _> = self
                     .materials
                     .values()
                     .chain(self.art.values())
+                    .chain(self.stroke.iter().flat_map(|s| &s.resources))
                     .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
                     .collect();
                 for (group, label) in groups.into_iter().zip(&labels) {
@@ -1511,12 +2236,30 @@ impl Composition<'_> {
                         {
                             continue;
                         }
-                        for part in reveal_draw(draw, label.reveal, self.scale, label.reveal_span) {
-                            self.push(part)?;
+                        check_menu_draws(
+                            self.draws.len() + underlay_count + foreground.len() + 1 + reserved,
+                        )?;
+                        draw.snap_overlay(self.scale);
+                        if let Some(index) = label.before {
+                            underlays.entry(index).or_default().push(draw);
+                            underlay_count += 1;
+                        } else {
+                            foreground.push(draw);
                         }
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
+                // Admit all text/modal/spinner draws before changing the material
+                // sequence, so a failed attempt leaves its retry baseline intact.
+                check_menu_draws(self.draws.len() + underlay_count + foreground.len() + reserved)?;
+                frame::reserve_draws(
+                    &mut self.draws,
+                    underlay_count + foreground.len() + spinner_draws.len(),
+                )?;
+                for (index, draws) in underlays.into_iter().rev() {
+                    self.draws.splice(index..index, draws);
+                }
+                self.draws.extend(foreground);
                 // The spinner is above the login's text, including the fading tips.
                 check_menu_draws(
                     self.draws.len()
@@ -1525,7 +2268,7 @@ impl Composition<'_> {
                         + usize::from(world_cover.is_some()),
                 )?;
                 frame::reserve_draws(&mut self.draws, spinner_draws.len())?;
-                self.draws.extend(spinner_draws);
+                self.draws.extend_from_slice(spinner_draws);
                 let frame = Frame {
                     identity: 0,
                     extent,
@@ -1534,7 +2277,12 @@ impl Composition<'_> {
                     draws: std::mem::take(&mut self.draws),
                     snakes: Vec::new(),
                 };
-                frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;
+                if let Err(error) =
+                    frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())
+                {
+                    self.draws = frame.draws;
+                    return Err(error);
+                }
                 Ok(MenuFrame {
                     frame,
                     backdrop,
@@ -1542,84 +2290,17 @@ impl Composition<'_> {
                     resources: resources.into_values().collect(),
                 })
             },
-        )?;
-        Ok((
-            result,
-            self.next_handle,
-            self.spinner_revision,
-            self.materials,
-            self.art,
-        ))
+        );
+        self.labels = labels;
+        if result.is_err() {
+            // TextCache rolls back its staged resources. Match that transaction
+            // for text/spinner draws before retrying with a smaller logo.
+            self.draws.truncate(draw_start);
+        }
+        result
     }
 }
 
-#[cfg(test)]
-mod reveal_tests {
-    use super::*;
-    #[test]
-    fn reveal_is_bounded_monotone_and_separate_from_opacity() {
-        let resource = Resource {
-            asset: BodyAsset {
-                handle: 42,
-                revision: 1,
-                width: 900,
-                height: 270,
-                status: BodyAssetStatus::Ready,
-            },
-            image: materials::RgbaImage {
-                width: 900,
-                height: 270,
-                pixels: vec![],
-            }
-            .into(),
-        };
-        let draw = image(
-            &resource,
-            MenuRect {
-                x: 20.,
-                y: 50.,
-                width: 450.,
-                height: 135.,
-            },
-            0.8,
-        );
-        assert!(reveal_draw(draw.clone(), 0., 2., None).is_empty());
-        assert_eq!(
-            reveal_draw(draw.clone(), 1., 2., None)[0].effective_alpha,
-            0.8
-        );
-        let mut right = draw.clone();
-        right.destination.x += 450.;
-        let span = Some([20., 900.]);
-        assert!(reveal_draw(right.clone(), 0.25, 2., span).is_empty());
-        let left = reveal_draw(draw.clone(), 0.75, 2., span);
-        assert_eq!(left.len(), 1);
-        assert_eq!(left[0].effective_alpha, 0.8);
-        let right = reveal_draw(right, 0.75, 2., span);
-        assert!(right.len() <= 33);
-        assert_eq!(right[0].effective_alpha, 0.8);
-        let mut previous = 0.;
-        for fraction in [0.01, 0.1, 0.25, 0.5, 0.99] {
-            let parts = reveal_draw(draw.clone(), fraction, 2., None);
-            assert!(parts.len() <= 33);
-            let mut end = 0.;
-            for p in &parts {
-                let s = p.source.unwrap();
-                assert_eq!(s.x, end);
-                assert!(s.x + s.width <= 900.);
-                assert_eq!(p.destination.width * 2., s.width);
-                assert_eq!(p.destination.x, 20. + s.x / 2.);
-                assert!(p.effective_alpha > 0. && p.effective_alpha <= 0.8);
-                end += s.width;
-            }
-            if fraction >= 0.1 {
-                assert_eq!(parts[0].effective_alpha, 0.8);
-            }
-            assert!(end >= previous);
-            previous = end;
-        }
-    }
-}
 fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
     let r = draw.destination;
     let x = (r.x + draw.translation[0]).max((clip.x * scale).ceil() / scale);
@@ -1663,6 +2344,80 @@ mod quota_tests {
     use super::*;
 
     #[test]
+    fn failed_text_draw_admission_preserves_material_order_and_cache() {
+        let mut c = Composition {
+            old: &BTreeMap::new(),
+            old_art: &BTreeMap::new(),
+            materials: BTreeMap::new(),
+            next_handle: PAGE_HANDLE,
+            spinner_revision: 0,
+            scale: 1.,
+            viewport_scale: 1.,
+            draws: Vec::new(),
+            art: BTreeMap::new(),
+            labels: Vec::new(),
+            wordmark: None,
+            old_stroke: None,
+            stroke: None,
+        };
+        let rect = MenuRect {
+            x: 0.,
+            y: 0.,
+            width: 100.,
+            height: 30.,
+        };
+        let draw = c.solid_draw(rect, [80; 3], 1., [1, 1]).unwrap();
+        c.draws = vec![draw; 510];
+        for value in ["one", "two", "three"] {
+            c.label(value, rect, 15., false, 1.);
+        }
+        c.labels[0].before = Some(0);
+        let before = c.draws.clone();
+        let mut text = TextCache::menu();
+        let result = c.compose_labels(&mut text, [960, 720], 1., None, None, &[]);
+        assert_eq!(result.err().as_deref(), Some(MENU_DRAW_QUOTA));
+        assert_eq!(c.draws, before);
+        assert_eq!(text.cached_runs(), 0);
+        c.draws.truncate(509);
+        assert!(
+            c.compose_labels(&mut text, [960, 720], 1., None, None, &[])
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn toggle_indicator_corners_and_edges_are_premultiplied() {
+        let theme = MenuTheme::default();
+        for size in [24, 36, 48, 120] {
+            for checked in [false, true] {
+                let indicator = toggle_indicator(
+                    size,
+                    theme.toggle_indicator(checked).colors[0],
+                    theme.text,
+                    checked,
+                );
+                for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
+                    let offset = ((y * size + x) * 4) as usize;
+                    assert_eq!(
+                        &indicator.pixels[offset..offset + 4],
+                        &[0; 4],
+                        "{size} {checked} corner {x},{y}"
+                    );
+                }
+                assert!(
+                    indicator
+                        .pixels
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .all(|p| p[..3].iter().all(|c| *c <= p[3])),
+                    "{size} {checked}: RGB must not exceed alpha"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn solid_texture_axis_exhaustion_still_degrades() {
         let mut c = Composition {
             old: &BTreeMap::new(),
@@ -1671,10 +2426,13 @@ mod quota_tests {
             next_handle: PAGE_HANDLE,
             spinner_revision: 0,
             scale: 1.,
+            viewport_scale: 1.,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
+            wordmark: None,
+            old_stroke: None,
+            stroke: None,
         };
         let prepared = c
             .solid_draw(
@@ -1702,5 +2460,28 @@ mod quota_tests {
         assert!(!MenuFrame::append_optional(prepared, &mut picture).unwrap());
         assert_eq!(picture.frame, base.frame);
         assert!(picture.resources.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod reveal_clock_tests {
+    use super::*;
+    #[test]
+    fn reveal_updates_are_25ms_apart_and_finish_on_the_clamped_clock() {
+        let mut previous = None;
+        let mut times = Vec::new();
+        for ms in 0..=6700 {
+            let progress = (f64::from(ms) * REVEAL_TICK / 25.).min(1.);
+            if reveal_due(progress, previous) {
+                previous = Some(progress);
+                times.push(ms);
+            }
+        }
+        assert_eq!(times[0], 25);
+        assert!(times.windows(2).all(|t| t[1] - t[0] >= 25));
+        assert_eq!(previous, Some(1.));
+        assert!(times.last().copied().unwrap() <= 6667);
+        assert!(!reveal_due(1., previous));
+        assert!(reveal_due(0.1, previous)); // new reveal timeline
     }
 }

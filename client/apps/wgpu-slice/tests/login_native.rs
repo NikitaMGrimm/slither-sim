@@ -120,12 +120,12 @@ fn native_login_commit_focus_pointer_and_deferred_play() {
 }
 
 #[test]
-fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
+fn tab_focus_releases_all_holds_and_settings_has_no_play_effect() {
     let mut login = NativeLogin::new("").unwrap();
     login.step(0., true, false).unwrap();
     for focus in [
         slither_client::login_controls::PLAY,
-        slither_client::login_controls::QUALITY,
+        slither_client::login_controls::SETTINGS,
         slither_client::login_controls::NICKNAME,
     ] {
         let effects = login.focus(focus);
@@ -138,10 +138,12 @@ fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
             4
         );
     }
-    login.focus(slither_client::login_controls::QUALITY);
+    login.focus(slither_client::login_controls::SETTINGS);
     login.activate(true);
-    assert_eq!(login.state.view(true).quality, MenuQuality::Low);
+    assert!(login.state.settings.visible());
+    assert_eq!(login.state.view(true).quality, MenuQuality::High);
     assert!(login.step(16., true, false).unwrap().0.is_empty());
+    login.close_settings(true);
     assert_eq!(login.input.state.focus(), None);
     login.focus(slither_client::login_controls::NICKNAME);
     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
@@ -154,16 +156,28 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
         ([1200, 675], 1.25),
         ([1920, 1080], 2.),
         ([3840, 2160], 1.5),
+        ([5760, 3240], 6.),
+        ([6720, 3780], 7.),
+        ([7680, 4320], 8.),
     ] {
-        for element in [E::Play, E::NicknameHolder, E::Quality] {
+        for element in [E::Play, E::NicknameHolder, E::Settings] {
             let mut login = NativeLogin::new("Test").unwrap();
-            login.step(0., true, false).unwrap();
-            login.step(16., true, false).unwrap();
+            for now in (0..=9600).step_by(16) {
+                login.step(now as f64, true, false).unwrap();
+            }
             login
                 .prepare(physical.map(|n| (f64::from(n) / dpr) as u32), true, None)
                 .unwrap();
             let rect = login.layout.viewport_rect(element);
-            let center = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
+            let center = [
+                rect.x + rect.width / 2.,
+                rect.y
+                    + if element == E::Settings {
+                        46.
+                    } else {
+                        rect.height / 2.
+                    },
+            ];
             let host = login.prepare_host(physical, dpr, true, None).unwrap();
             assert_eq!(host.frame.extent, physical);
             assert_eq!(host.frame.viewport_scale, dpr);
@@ -193,7 +207,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                 E::Play => {
                     assert_eq!(
                         login
-                            .step(16., true, false)
+                            .step(9616., true, false)
                             .unwrap()
                             .0
                             .iter()
@@ -201,7 +215,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                             .count(),
                         1
                     );
-                    assert!(login.step(32., true, false).unwrap().0.is_empty());
+                    assert!(login.step(9632., true, false).unwrap().0.is_empty());
                 }
                 E::NicknameHolder => {
                     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
@@ -225,13 +239,17 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                             })
                         })
                         .unwrap();
-                    assert!(effects.iter().any(
-                        |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
+                    assert!(
+                        effects.iter().any(
+                            |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
                         if *position == [caret.destination.x,caret.destination.y]
                         && *size == [caret.destination.width,caret.destination.height])
-                    ));
+                        ),
+                        "DPR {dpr}: IME {effects:?}, caret {:?}",
+                        caret.destination
+                    );
                 }
-                E::Quality => assert_eq!(login.state.view(true).quality, MenuQuality::Low),
+                E::Settings => assert!(login.state.settings.visible()),
                 _ => unreachable!(),
             }
         }
@@ -941,47 +959,6 @@ fn windows_click_preferences_are_converted_to_logical_half_extents() {
 }
 
 #[test]
-fn quality_focus_keeps_the_existing_full_height_capsule() {
-    use slither_client::{login_controls::QUALITY, menu_theme::MenuTheme};
-    use slither_wgpu_slice::materials::{self, MenuSurface};
-    for dpr in [1., 1.5, 2.] {
-        let mut login = NativeLogin::new("").unwrap();
-        login.step(0., true, false).unwrap();
-        login.step(16., true, false).unwrap();
-        login.focus(QUALITY);
-        let picture = login
-            .prepare_host([(960. * dpr) as u32, (540. * dpr) as u32], dpr, true, None)
-            .unwrap();
-        let rect = login.layout.viewport_rect(E::Quality);
-        let expected = materials::menu_control(
-            [
-                (rect.width * dpr).ceil() as u32,
-                (rect.height * dpr).ceil() as u32,
-            ],
-            ((rect.height / 2.).ceil() * dpr).ceil(),
-            [MenuTheme::default().field; 2],
-            dpr,
-            MenuSurface::Compact,
-        )
-        .unwrap();
-        let half = expected.width.div_ceil(2);
-        let tile = picture
-            .resources
-            .iter()
-            .find(|r| r.image.width == half && r.image.height == expected.height)
-            .expect("full-height focus end cap");
-        for (got, want) in tile
-            .image
-            .pixels
-            .chunks_exact(half as usize * 4)
-            .zip(expected.pixels.chunks_exact(expected.width as usize * 4))
-        {
-            assert_eq!(got, &want[..half as usize * 4]);
-        }
-    }
-}
-
-#[test]
 fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
     use slither_client::{session_policy::Phase, start_page::MenuSession};
     use slither_wgpu_slice::menu_input_native::KeyInput;
@@ -1052,6 +1029,62 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
                 matches!(intents.as_slice(), [StartMenuIntent::Play { nickname, .. }] if nickname == "Stored")
             );
             assert!(login.step(96., true, false).unwrap().0.is_empty());
+        }
+    }
+}
+
+#[test]
+fn settled_login_density_cap_keeps_real_viewport_layout_and_hits() {
+    use slither_client::desktop_input::mouse_client_position;
+    for height in [540., 720.] {
+        let mut login = NativeLogin::new("Player").unwrap();
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false).unwrap();
+        }
+        let mut previous = None;
+        for dpr in [5., 6., 7., 8., 5.] {
+            let extent = [(960. * dpr) as u32, (height * dpr) as u32];
+            let frame = login.prepare_host(extent, dpr, true, None).unwrap();
+            assert_eq!(frame.frame.extent, extent);
+            assert_eq!(frame.frame.viewport_scale, dpr);
+            assert!(
+                frame.frame.draws.len()
+                    + usize::from(frame.backdrop.is_some())
+                    + usize::from(frame.world_cover.is_some())
+                    <= 512
+            );
+            assert!(
+                frame
+                    .resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+                    <= 13 * 1024 * 1024
+            );
+            let rects = [E::Logo, E::NicknameHolder, E::Play, E::Settings, E::Server]
+                .map(|e| login.layout.viewport_rect(e));
+            if let Some(old) = previous {
+                assert_eq!(rects, old);
+            }
+            previous = Some(rects);
+            let rect = login.layout.viewport_rect(E::Settings);
+            let point = mouse_client_position(
+                [(rect.x + rect.width / 2.) * dpr, (rect.y + 46.) * dpr],
+                dpr,
+            );
+            assert!(frame.frame.draws.iter().any(|draw| {
+                let r = draw.destination;
+                point[0] >= r.x
+                    && point[0] < r.x + r.width
+                    && point[1] >= r.y
+                    && point[1] < r.y + r.height
+            }));
+            let quality = login.state.view(true).quality;
+            login.pointer(point, Some(true), true);
+            login.pointer(point, Some(false), true);
+            assert!(login.state.settings.visible());
+            assert_eq!(login.state.view(true).quality, quality);
+            login.close_settings(true);
         }
     }
 }
