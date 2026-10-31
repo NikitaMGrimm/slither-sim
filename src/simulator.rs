@@ -2004,14 +2004,21 @@ impl Simulator {
         const CELL: f64 = 256.0;
         // The dense grid lists exactly the eaters whose cover holds a pellet's cell,
         // so it agrees with both paths below. They remain for circles it cannot index.
-        // A grid much larger than the food list costs more to allocate than it saves.
+        // Budget for both sides of the query: many eaters can amortize a dense
+        // grid even when pickups have depleted food. A food-only budget sends
+        // crowded worlds through the hashed fallback's per-pellet group scan.
+        // See the depleted-food regression in simulator/food_order_tests.rs.
         let dense = self.config.food_index
             && !eaters.is_empty()
             && self.eater_grid.build(
                 eaters
                     .iter()
                     .map(|&(_, center, radius, _)| (center, radius)),
-                self.food.len().saturating_mul(4).max(4096),
+                self.food
+                    .len()
+                    .max(eaters.len())
+                    .saturating_mul(4)
+                    .max(4096),
             );
         let indexed = !dense
             && self.config.food_index
