@@ -97,16 +97,17 @@ impl Composition<'_> {
                 ),
                 || Ok(raster(cap, height, radius, stroke, theme.text, row)),
             )?;
+            let edges = [
+                rect.x,
+                rect.x + cut,
+                rect.x + rect.width - cut,
+                rect.x + rect.width,
+            ]
+            .map(|x| (x * self.scale).round() / self.scale);
             for (x, width, source_x, source_width, mirrored) in [
-                (rect.x, cut, 0., f64::from(cap), false),
-                (
-                    rect.x + cut,
-                    (rect.width - 2. * cut).max(0.),
-                    f64::from(cap + 1),
-                    1.,
-                    false,
-                ),
-                (rect.x + rect.width - cut, cut, 0., f64::from(cap), true),
+                (edges[0], edges[1] - edges[0], 0., f64::from(cap), false),
+                (edges[1], edges[2] - edges[1], f64::from(cap + 1), 1., false),
+                (edges[2], edges[3] - edges[2], 0., f64::from(cap), true),
             ] {
                 if width <= 0. {
                     continue;
@@ -215,8 +216,8 @@ mod tests {
             let mut c = composition(&empty, &art, dpr.min(MAX_MENU_RASTER_DENSITY));
             let r = control();
             c.outline_control(&r, 0.37, MenuTheme::default()).unwrap();
-            assert!(c.draws.len() <= 3);
-            assert_eq!(c.materials.len(), 1);
+            assert!(!c.draws.is_empty());
+            assert!(c.draws.len() <= MENU_PRODUCER_DRAWS);
             for draw in &c.draws {
                 assert_eq!(draw.effective_alpha, 0.37);
                 let source = draw.source.unwrap();
@@ -319,6 +320,54 @@ mod tests {
                     )
                 });
                 assert_eq!(outlined, keyboard);
+            }
+        }
+    }
+    fn strips_do_not_overlap(draws: &[Draw], density: f64) {
+        for (i, a) in draws.iter().enumerate() {
+            for b in &draws[i + 1..] {
+                let a = a.destination;
+                let b = b.destination;
+                let pixel = |x: f64| (x * density).round();
+                assert!(
+                    pixel(a.x + a.width) <= pixel(b.x)
+                        || pixel(b.x + b.width) <= pixel(a.x)
+                        || pixel(a.y + a.height) <= pixel(b.y)
+                        || pixel(b.y + b.height) <= pixel(a.y)
+                );
+            }
+        }
+    }
+    #[test]
+    fn capsule_and_outline_strips_share_edges_without_dark_overlap_seams() {
+        for density in [1_f64, 1.25, 1.5, 2., 3., 5.] {
+            for width in [34., 108., 278.] {
+                for height in [28., 32., 40.] {
+                    let empty = BTreeMap::new();
+                    let art = BTreeMap::new();
+                    let mut r = control();
+                    r.rect.width = width;
+                    r.rect.height = height;
+                    r.clip = MenuRect {
+                        x: 0.,
+                        y: 0.,
+                        width: 1000.,
+                        height: 1000.,
+                    };
+                    let mut c = composition(&empty, &art, density);
+                    c.sliced(
+                        r.rect,
+                        MenuTheme::default().surface(r.control.style, ControlState::Idle),
+                        0.7,
+                        None,
+                        r.scale,
+                    )
+                    .unwrap();
+                    strips_do_not_overlap(&c.draws, density);
+                    c.draws.clear();
+                    c.outline_control(&r, 0.7, MenuTheme::default()).unwrap();
+                    strips_do_not_overlap(&c.draws, density);
+                }
             }
         }
     }

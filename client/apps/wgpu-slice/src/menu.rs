@@ -1641,24 +1641,20 @@ impl Composition<'_> {
         )?;
         let scale = self.scale;
         let vertical = r.height / f64::from(height);
-        let cap_width = f64::from(cap) * vertical;
-        let inner = f64::from(radius) * vertical;
+        let inner = (f64::from(radius) * vertical).min(r.width / 2.);
+        // Snap shared edges, not independent origins with unrounded widths:
+        // fractional overlaps otherwise darken the shadow along each join.
+        let edges = [
+            r.x - f64::from(pad) * vertical,
+            r.x + inner,
+            r.x + r.width - inner,
+            r.x + r.width + f64::from(pad) * vertical,
+        ]
+        .map(|x| (x * scale).round() / scale);
         for (x, width, source_x, source_width, mirrored) in [
-            (
-                r.x - f64::from(pad) * vertical,
-                cap_width,
-                0.,
-                f64::from(cap),
-                false,
-            ),
-            (
-                r.x + inner,
-                (r.width - 2. * inner).max(0.),
-                f64::from(cap),
-                1.,
-                false,
-            ),
-            (r.x + r.width - inner, cap_width, 0., f64::from(cap), true),
+            (edges[0], edges[1] - edges[0], 0., f64::from(cap), false),
+            (edges[1], edges[2] - edges[1], f64::from(cap), 1., false),
+            (edges[2], edges[3] - edges[2], 0., f64::from(cap), true),
         ] {
             if width == 0. {
                 continue;

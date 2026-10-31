@@ -24,6 +24,7 @@ fn fractional_narrow_builder_reveal_keeps_mirrored_capsule_sources_in_bounds() {
         for id in [ControlId(SWATCH_BASE + 2), ControlId(RUN_BASE), ADD] {
             login.studio.state.reveal_control(id, logical);
             login.prepare_host(extent, dpr, true, None).unwrap();
+            login.controls.keyboard_navigation();
             login.focus(id);
             let frame = login.prepare_host(extent, dpr, true, None).unwrap();
             for draw in &frame.frame.draws {

@@ -372,22 +372,18 @@ fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
             assert!(pixel((d.destination.y + d.translation[1]) * scale));
             if let Some(src) = d.source {
                 if (d.destination.width * scale - src.width).abs() >= 1e-7 {
-                    // Rounded focus stretches only a uniform centre column; corners remain 1:1.
-                    assert_eq!(src.width, 1.);
-                    assert_eq!(src.x + src.width, f64::from(d.asset.width));
-                    assert!(d.asset.width > 1);
+                    // Stretched crops must be uniform across their horizontal sampling footprint.
                     let image = &frame
                         .resources
                         .iter()
                         .find(|r| r.asset == d.asset)
                         .unwrap()
                         .image;
-                    let column = src.x as usize;
+                    let start = (src.x.floor() as usize).saturating_sub(1);
+                    let end = ((src.x + src.width).ceil() as usize + 1).min(image.width as usize);
                     for row in image.pixels.chunks_exact(image.width as usize * 4) {
-                        assert_eq!(
-                            &row[column * 4..column * 4 + 4],
-                            &row[(column - 1) * 4..column * 4]
-                        );
+                        let pixels = &row[start * 4..end * 4];
+                        assert!(pixels.chunks_exact(4).all(|p| p == &pixels[..4]));
                     }
                 }
             }
