@@ -9,18 +9,25 @@ fn presentation_bounds_fixed_tape_512_ticks() {
         agents: 6,
         world: Config {
             radius: 32000.,
+            pit: Some(crate::PitConfig { radius: 6000. }),
             food_count: 600,
             ambient_replenish_per_second: 8.,
             ..Config::sandbox()
         },
+        delivery: DeliveryProfile::Official,
+        minimap_interval_seconds: 0.07,
+        leaderboard_interval_seconds: 0.091,
+        local_records: true,
+        latency: LatencyConfig::measured_route(),
         ..Default::default()
     };
-    let mut sim = RawSimulator::new(7, config, 4).unwrap();
-    for slot in 0..4 {
+    let mut sim = RawSimulator::new(7, config, 6).unwrap();
+    for slot in 0..6 {
         assert!(sim.connect(slot, PlayerAppearance::default()).unwrap());
     }
     sim.protocol13(1);
     sim.full_minimap(1);
+    sim.protocol13(3);
     sim.physical_food(2);
     sim.request_session_id(0).unwrap();
     for slot in 0..6 {
@@ -39,14 +46,44 @@ fn presentation_bounds_fixed_tape_512_ticks() {
             .unwrap();
     }
     assert_eq!(sim.backend.world.snakes()[3].body.len(), 256);
+    let board = broadcast::Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
+    assert_eq!(
+        board
+            .order
+            .iter()
+            .map(|&(_, slot)| slot)
+            .collect::<Vec<_>>(),
+        [3, 0, 1, 2, 4, 5]
+    );
     // Optional complete JSONL artifact; the same test is overlaid onto the
     // pinned base for byte comparison, without changing either runtime.
     let mut trace = std::env::var_os("SLITHER_PRESENTATION_TRACE")
         .map(|path| std::io::BufWriter::new(std::fs::File::create(path).unwrap()));
-    let mut frames = [0; 4];
+    let mut frames = [0; 6];
     let mut deaths = 0;
     let mut respawns = 0;
+    let mut output_faults = 0;
     for tick in 0..512 {
+        // Miss several fronts for just one viewer, then resume its old history.
+        if tick == 160 || tick == 176 {
+            sim.backend.slots[1].connection.setup = tick == 176;
+        }
+        if tick == 384 {
+            sim.backend.slots[2].connection.downlink_bytes = connection::MAX_REMOTE_OUTPUT_BYTES;
+            sim.backend.slots[2].connection.pongs += 1;
+        }
+        if tick == 392 {
+            assert!(sim.connect(2, PlayerAppearance::default()).unwrap());
+            sim.physical_food(2);
+            respawns += 1;
+        }
+        if tick == 240 {
+            // Rebase both streams and queued times as the host does on deferral.
+            sim.set_wall_offset(0.125);
+        }
+        if tick == 120 {
+            sim.victory(0, b"fixed tape").unwrap();
+        }
         if tick == 96 || tick == 288 {
             let world = &mut sim.backend.world;
             world.retire(0).unwrap();
@@ -83,7 +120,24 @@ fn presentation_bounds_fixed_tape_512_ticks() {
             // Exercise invalidated bounds before the next physics step too.
             sim.backend.broadcast().unwrap();
         }
-        let commands: Vec<_> = (0..4)
+        // Co-located lifetimes exercise hidden pickups and birth ordering.
+        if tick == 48 {
+            let head = sim.backend.world.snakes()[2].head;
+            for size in [2., 3.] {
+                sim.backend
+                    .world
+                    .insert_food(crate::Food {
+                        x: head.x,
+                        y: head.y,
+                        value: 1.,
+                        size: Some(size),
+                        origin: None,
+                    })
+                    .unwrap();
+            }
+            sim.backend.broadcast().unwrap();
+        }
+        let commands: Vec<_> = (0..6)
             .map(|slot| {
                 let heading =
                     if slot == 0 && ((96..112).contains(&tick) || (288..304).contains(&tick)) {
@@ -91,19 +145,30 @@ fn presentation_bounds_fixed_tape_512_ticks() {
                     } else {
                         ((tick / 24 + slot * 17) % 251) as u8
                     };
-                sim.receive(slot, &[heading]).unwrap();
+                let mut messages = vec![vec![heading]];
                 if tick % 64 == 0 {
-                    sim.receive(slot, &[251]).unwrap();
+                    messages.push(vec![251]);
                 }
-                heading
+                if slot == 2 && tick % 32 == 0 {
+                    messages.push(vec![if tick % 64 == 0 { 253 } else { 254 }]);
+                }
+                for bytes in &messages {
+                    sim.receive(slot, bytes).unwrap();
+                }
+                (sim.time().to_bits(), messages)
             })
             .collect();
         let was_alive = sim.backend.world.snakes()[0].alive;
         sim.advance_ticks(1).unwrap();
+        if tick == 384 {
+            assert!(sim.backend.slots[2].connection.output_fault.is_some());
+            assert!(sim.backend.slots[3].connection.setup);
+            output_faults += 1;
+        }
         if was_alive && !sim.backend.world.snakes()[0].alive {
             deaths += 1;
         }
-        let queued: Vec<_> = (0..4)
+        let queued: Vec<_> = (0..6)
             .map(|slot| {
                 sim.backend.slots[slot]
                     .connection
@@ -113,7 +178,7 @@ fn presentation_bounds_fixed_tape_512_ticks() {
                     .collect::<Vec<_>>()
             })
             .collect();
-        let delivered: Vec<_> = (0..4)
+        let delivered: Vec<_> = (0..6)
             .map(|slot| {
                 let output = sim.drain(slot).unwrap();
                 frames[slot] += output.len();
@@ -152,6 +217,9 @@ fn presentation_bounds_fixed_tape_512_ticks() {
                     "foodBirths": births,
                     "deaths": sim.backend.world.deaths(),
                     "queued": queued, "delivered": delivered,
+                    "random": format!("{:?}", (&sim.backend.random, &sim.backend.spawn_random)),
+                    "connections": sim.backend.slots.iter().map(|s| format!("{:?}", s.connection)).collect::<Vec<_>>(),
+                    "reports": format!("{:?}", sim.backend.reports_for_trace()),
                 }),
             )
             .unwrap();
@@ -159,6 +227,52 @@ fn presentation_bounds_fixed_tape_512_ticks() {
         }
     }
     assert!(deaths >= 2);
-    assert_eq!(respawns, 2);
+    assert_eq!(respawns, 3);
+    assert_eq!(output_faults, 1);
     assert!(frames.into_iter().all(|count| count > 30));
+}
+
+#[test]
+fn partial_presentation_failure_keeps_the_serial_prefix() {
+    let mut backend = SimulatorBackend::new(
+        7,
+        SimulationConfig {
+            agents: 2,
+            world: Config {
+                radius: 6000.,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    backend.advance_ticks(4).unwrap();
+    backend.slots[0].connection.pongs = 1;
+    backend.slots[0]
+        .connection
+        .downlink
+        .resize(connection::MAX_IN_FLIGHT, (f64::MAX, vec![0]));
+    let later = format!("{:?}", backend.slots[1].connection);
+    let error = backend.broadcast().unwrap_err();
+    assert_eq!(error, "Downlink queue is full");
+    assert_eq!(format!("{:?}", backend.slots[1].connection), later);
+    let failed = serde_json::json!({
+        "world": backend.world.checkpoint().unwrap(),
+        "random": format!("{:?}", backend.random),
+        "connections": backend.slots.iter().map(|s| format!("{:?}", s.connection)).collect::<Vec<_>>(),
+        "reports": format!("{:?}", backend.reports_for_trace()),
+    });
+    backend.slots[0].connection.take_downlink();
+    backend.broadcast().unwrap();
+    if let Some(path) = std::env::var_os("SLITHER_PRESENTATION_FAILURE_TRACE") {
+        std::fs::write(path, serde_json::to_vec(&serde_json::json!({
+            "error": error, "failed": failed,
+            "world": backend.world.checkpoint().unwrap(),
+            "random": format!("{:?}", backend.random),
+            "connections": backend.slots.iter().map(|s| format!("{:?}", s.connection)).collect::<Vec<_>>(),
+            "reports": format!("{:?}", backend.reports_for_trace()),
+        })).unwrap()).unwrap();
+    }
 }

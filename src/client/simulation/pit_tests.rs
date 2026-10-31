@@ -63,7 +63,7 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
                 26,
             )
             .unwrap();
-        sim.backend.slots[slot].control.heading = 0.;
+        sim.backend.seats[slot].control.heading = 0.;
     }
     sim.physical_food(1);
     sim.advance_ticks(1).unwrap();
@@ -117,7 +117,7 @@ fn pit_markers_simultaneous_readers_keep_distinct_food_through_actual_pickup() {
             26,
         )
         .unwrap();
-    sim.backend.slots[1].control.heading = heading;
+    sim.backend.seats[1].control.heading = heading;
     sim.advance_ticks(1).unwrap();
     assert!(sim.backend.world.snakes().iter().all(|s| s.alive));
     assert!(sim.backend.world.food().is_empty());
@@ -455,7 +455,7 @@ fn shrinking_pit_keeps_decorated_handles_until_a_replacement_can_fade_in() {
             .world
             .correct_pose(0, head, body, heading)
             .unwrap();
-        sim.backend.slots[0].control.heading = heading;
+        sim.backend.seats[0].control.heading = heading;
     };
     near_pit(&mut sim);
     let mut state = ClientState::new();
@@ -741,7 +741,7 @@ fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
     sim.backend.world.retire(2).unwrap();
     let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
     assert_eq!(board.order, [(2., 1), (1., 0)]);
-    sim.backend.next_leaderboard = 0;
+    sim.backend.presenter.next_leaderboard = 0;
     sim.advance_ticks(1).unwrap();
     pump(&mut sim, &mut reader);
     let frame = reader.frame(sim.time()).unwrap();
@@ -768,7 +768,7 @@ fn rolling_kill_board_retains_dead_disconnected_seats_until_expiry() {
     assert_eq!(sim.backend.world.kill_score(1), Some(0));
     let board = Board::new(&sim.backend.world, &sim.backend.profiles).unwrap();
     assert_eq!(board.order, [(1., 0), (0., 1)]);
-    sim.backend.next_leaderboard = 0;
+    sim.backend.presenter.next_leaderboard = 0;
     sim.advance_ticks(1).unwrap();
     pump(&mut sim, &mut reader);
     let board = reader.frame(sim.time()).unwrap().hud.leaderboard.unwrap();
@@ -916,7 +916,7 @@ fn stock_pit_markers_survive_growth_shrink_and_settle_with_time_to_fade() {
                     .world
                     .correct_pose(0, head, body, heading)
                     .unwrap();
-                sim.backend.slots[0].control.heading = heading;
+                sim.backend.seats[0].control.heading = heading;
                 sim.advance_ticks(1).unwrap();
                 let now = sim.time();
                 ages.apply(&pump(&mut sim, &mut state), now);

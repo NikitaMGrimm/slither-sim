@@ -122,7 +122,6 @@ impl Connection {
 pub(super) struct Slot {
     pub(super) state: ClientState,
     pub(super) connection: Connection,
-    pub(super) life: u64,
     /// Command decided at `.0`, leaving the client after `.2` seconds of processing.
     pub(super) outbox: Option<(f64, Action, f64)>,
     /// Measured processing of the decision made at `.0`. It replaces the
@@ -130,17 +129,12 @@ pub(super) struct Slot {
     /// an action keeps the slot busy until `.0 + .1`.
     pub(super) processing_override: Option<(f64, f64)>,
     pub(super) previous_boost: Option<bool>,
-    /// Command in force on the server.
-    pub(super) control: Action,
     pub(super) pinged_at: Option<f64>,
     pub(super) records: Option<Vec<WireRecord>>,
     pub(super) record_bytes: usize,
     /// An external client exchanges this slot's raw payloads; the in-process
     /// decoder, pings, records and processing model stay idle.
     pub(super) remote: bool,
-    /// Life seen alive at the last tick; its later absence is a completed life
-    /// unless a disconnect or respawn cleared it first.
-    pub(super) living: Option<u64>,
 }
 impl Slot {
     /// Fail before events are applied that their records could not retain.
@@ -345,7 +339,7 @@ impl SimulatorBackend {
         }
         let remote = self.slots[slot].remote;
         let (groups, physical) = if let Some(legacy) = &mut self.slots[slot].connection.legacy {
-            let converted = match legacy.packets(packets, &mut self.legacy_maps) {
+            let converted = match legacy.packets(packets, &mut self.presenter.legacy_maps) {
                 Ok(converted) => converted,
                 // A conversion fault is this recipient's, like an overflow.
                 Err(reason) if remote => {
@@ -466,7 +460,7 @@ impl SimulatorBackend {
                 }
                 Uplink::Message(bytes) => match bytes[..] {
                     [heading @ 0..=250] => {
-                        self.slots[slot].control.heading = (f64::from(heading) + 0.5) * TAU / 251.;
+                        self.seats[slot].control.heading = (f64::from(heading) + 0.5) * TAU / 251.;
                     }
                     [252, amount] => {
                         // Keyboard turn: amounts below 128 turn the wanted heading
@@ -479,12 +473,12 @@ impl SimulatorBackend {
                             (amount - 128, 1.)
                         };
                         let turn = 0.033 * physics::scang(self.world.snakes()[slot].segments);
-                        let control = &mut self.slots[slot].control;
+                        let control = &mut self.seats[slot].control;
                         control.heading =
                             (control.heading + sign * turn * f64::from(count)).rem_euclid(TAU);
                     }
-                    [253] => self.slots[slot].control.boost = true,
-                    [254] => self.slots[slot].control.boost = false,
+                    [253] => self.seats[slot].control.boost = true,
+                    [254] => self.seats[slot].control.boost = false,
                     _ => return Err("Unsupported client message".into()),
                 },
             }

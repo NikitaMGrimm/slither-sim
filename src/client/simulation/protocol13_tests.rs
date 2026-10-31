@@ -46,11 +46,11 @@ fn full_map_cache_is_shared_only_for_the_current_broadcast() {
         }
         assert!(saw_map);
         assert_eq!(
-            sim.backend.legacy_maps.cached_packets(),
+            sim.backend.presenter.legacy_maps.cached_packets(),
             usize::from(full > 0)
         );
         sim.advance_ticks(1).unwrap();
-        assert_eq!(sim.backend.legacy_maps.cached_packets(), 0);
+        assert_eq!(sim.backend.presenter.legacy_maps.cached_packets(), 0);
     }
 }
 
@@ -153,8 +153,8 @@ fn battledome_legacy_keeps_kill_board_pit_raster_and_edge_food() {
         .world
         .restore(&serde_json::to_vec(&saved).unwrap(), Default::default())
         .unwrap();
-    sim.backend.next_minimap = 0;
-    sim.backend.next_leaderboard = 0;
+    sim.backend.presenter.next_minimap = 0;
+    sim.backend.presenter.next_leaderboard = 0;
     sim.advance_ticks(1).unwrap();
     let frames = sim.take(0).unwrap();
     let packets: Vec<_> = frames

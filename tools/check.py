@@ -60,6 +60,7 @@ def commands(group):
             ["cargo", "check", "-p", "slither-sim-py", "--all-targets", "--locked"],
             ["cargo", "run", "--locked", "--example", "basic"],
             ["cargo", "test", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
+            ["cargo", "test", "--locked", "--features", "perf-internals", "--test", "presentation_alloc"],
         ]
     if group == "tools":
         target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))

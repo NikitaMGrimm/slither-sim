@@ -216,11 +216,21 @@ pub(super) struct SnakeReports {
     /// Reported in the current tick.
     pub(super) motion_due: bool,
     pub(super) fam_due: bool,
-    /// Some recipient holds a value other than the last report, from an
-    /// appearance or a growth/tail mass; the next opportunity reports even
-    /// if the snake returned to that value.
+}
+
+/// Some recipient holds a value other than the last report, from an appearance
+/// or growth/tail mass. Rearm the next opportunity even if the snake returns to
+/// that value. This feedback can change while report opportunities are borrowed.
+#[derive(Clone, Debug, Default)]
+pub(super) struct ReportObservation {
     pub(super) motion_stale: bool,
     pub(super) fam_stale: bool,
+}
+impl ReportObservation {
+    pub(super) fn observe(&mut self, report: &SnakeReports, known: &KnownSnake) {
+        self.motion_stale |= [known.heading, known.wanted, known.speed] != report.motion;
+        self.fam_stale |= known.fam != report.fam;
+    }
 }
 
 impl KnownSnake {
@@ -249,8 +259,10 @@ impl SnakeReports {
         fam: u32,
         tick: u64,
         delivery: DeliveryProfile,
+        observed: &mut ReportObservation,
     ) {
         if self.life != life {
+            *observed = ReportObservation::default();
             *self = Self {
                 life,
                 motion,
@@ -269,17 +281,18 @@ impl SnakeReports {
         let responsive = delivery == DeliveryProfile::Responsive;
         let urgent = responsive && motion[1..] != self.motion[1..];
         self.motion_due =
-            (motion != self.motion || self.motion_stale) && (urgent || tick >= self.motion_at);
+            (motion != self.motion || observed.motion_stale) && (urgent || tick >= self.motion_at);
         if self.motion_due {
             self.motion = motion;
             self.motion_at = tick + MOTION_REPORT_TICKS;
-            self.motion_stale = false;
+            observed.motion_stale = false;
         }
-        self.fam_due = (fam != self.fam || self.fam_stale) && (responsive || tick >= self.fam_at);
+        self.fam_due =
+            (fam != self.fam || observed.fam_stale) && (responsive || tick >= self.fam_at);
         if self.fam_due {
             self.fam = fam;
             self.fam_at = tick + FAM_REPORT_TICKS;
-            self.fam_stale = false;
+            observed.fam_stale = false;
         }
     }
 
@@ -292,8 +305,10 @@ impl SnakeReports {
         fam: u32,
         now: f64,
         delivery: DeliveryProfile,
+        observed: &mut ReportObservation,
     ) {
         if self.life != life {
+            *observed = ReportObservation::default();
             *self = Self {
                 life,
                 motion,
@@ -306,26 +321,39 @@ impl SnakeReports {
         }
         let responsive = delivery == DeliveryProfile::Responsive;
         let urgent = responsive && motion[1..] != self.motion[1..];
-        self.motion_due = (motion != self.motion || self.motion_stale)
+        self.motion_due = (motion != self.motion || observed.motion_stale)
             && (urgent || now + 1e-9 >= self.motion_seconds);
         if self.motion_due {
             self.motion = motion;
             self.motion_seconds = now + MOTION_REPORT_TICKS as f64 * 0.007;
-            self.motion_stale = false;
+            observed.motion_stale = false;
         }
-        self.fam_due =
-            (fam != self.fam || self.fam_stale) && (responsive || now + 1e-9 >= self.fam_seconds);
+        self.fam_due = (fam != self.fam || observed.fam_stale)
+            && (responsive || now + 1e-9 >= self.fam_seconds);
         if self.fam_due {
             self.fam = fam;
             self.fam_seconds = now + FAM_REPORT_TICKS as f64 * 0.007;
-            self.fam_stale = false;
+            observed.fam_stale = false;
         }
     }
 
-    /// Note a recipient's view of this snake after its packets this tick.
-    pub(super) fn observe(&mut self, known: &KnownSnake) {
-        self.motion_stale |= [known.heading, known.wanted, known.speed] != self.motion;
-        self.fam_stale |= known.fam != self.fam;
+    /// Canonical old-layout projection for the cross-revision oracle only.
+    #[cfg(test)]
+    pub(super) fn trace(&self, observed: &ReportObservation) -> String {
+        format!(
+            "SnakeReports {{ life: {:?}, motion: {:?}, motion_at: {:?}, fam: {:?}, fam_at: {:?}, motion_seconds: {:?}, fam_seconds: {:?}, motion_due: {:?}, fam_due: {:?}, motion_stale: {:?}, fam_stale: {:?} }}",
+            self.life,
+            self.motion,
+            self.motion_at,
+            self.fam,
+            self.fam_at,
+            self.motion_seconds,
+            self.fam_seconds,
+            self.motion_due,
+            self.fam_due,
+            observed.motion_stale,
+            observed.fam_stale
+        )
     }
 }
 
