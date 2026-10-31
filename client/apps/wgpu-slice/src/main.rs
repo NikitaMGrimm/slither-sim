@@ -8,7 +8,7 @@ mod scheduling;
 #[cfg(not(target_arch = "wasm32"))]
 mod desktop {
     use crate::scheduling::Schedule;
-    use slither_client::session_policy::Phase;
+    use slither_client::{menu_input::EditIntent, session_policy::Phase};
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
@@ -620,193 +620,190 @@ mod desktop {
             if r.window.id() != id {
                 return;
             }
-            let result =
-                (|| -> Result<()> {
-                    if let WindowEvent::ModifiersChanged(modifiers) = &event {
-                        r.shift = modifiers.state().shift_key();
-                        r.login.input.modifiers(modifiers.state());
-                        r.login.champion.input.modifiers(modifiers.state());
-                    }
-                    let admission = r.game.can_play()
-                        && r.preparation.is_none()
-                        && (r.official || r.endpoint.is_some());
-                    if let WindowEvent::KeyboardInput { event, .. } = &event
-                        && event.state == ElementState::Pressed
-                        && !r.login.champion.policy.visible()
-                        && !r.login.state.view(admission).disabled
-                    {
-                        if event.logical_key == Key::Named(NamedKey::Tab) {
-                            let next = (r.login.focus + if r.shift { 2 } else { 1 }) % 3;
-                            let effects = r.login.focus(next);
-                            r.edit_effects(effects);
-                            r.schedule.invalidate();
-                            return Ok(());
-                        }
-                        if r.login.focus != 0
-                            && !event.repeat
-                            && matches!(
-                                event.logical_key,
-                                Key::Named(NamedKey::Enter | NamedKey::Space)
-                            )
-                        {
-                            r.login.activate(admission);
-                            r.schedule.invalidate();
-                            return Ok(());
-                        }
-                    }
-                    let champion = r.login.champion.policy.visible();
-                    if let WindowEvent::Focused(focused) = &event {
-                        if !focused {
-                            r.shift = false;
-                        }
-                        let inactive = if champion {
-                            &mut r.login.input
-                        } else {
-                            &mut r.login.champion.input
-                        };
-                        // Retain window ownership across a committed panel handoff.
-                        inactive.state.apply(
-                            slither_client::menu_input::EditIntent::WindowFocused(*focused),
-                        );
-                    }
-                    let mapped = if champion {
-                        r.login.champion.event(&event)
-                    } else {
-                        r.login.input.window_event(&event)
-                    };
-                    let effects = if champion {
-                        let effects = r
-                            .login
-                            .champion
-                            .input
-                            .execute(mapped.effects, &mut WindowEditHost(&r.window));
-                        r.login.champion.commit_effects(effects)
-                    } else {
-                        let effects = r
-                            .login
-                            .input
-                            .execute(mapped.effects, &mut WindowEditHost(&r.window));
-                        r.login
-                            .input
-                            .state
-                            .commit_menu(effects, &mut r.login.state, admission)
-                    };
-                    r.edit_effects(effects);
-                    r.champion_submission()?;
-                    if mapped.consumed {
+            let result = (|| -> Result<()> {
+                if let WindowEvent::ModifiersChanged(modifiers) = &event {
+                    r.shift = modifiers.state().shift_key();
+                    r.login.input.modifiers(modifiers.state());
+                    r.login.champion.input.modifiers(modifiers.state());
+                }
+                let admission = r.game.can_play()
+                    && r.preparation.is_none()
+                    && (r.official || r.endpoint.is_some());
+                if let WindowEvent::KeyboardInput { event, .. } = &event
+                    && event.state == ElementState::Pressed
+                    && !r.login.champion.policy.visible()
+                    && !r.login.state.view(admission).disabled
+                {
+                    if event.logical_key == Key::Named(NamedKey::Tab) {
+                        let next = (r.login.focus + if r.shift { 2 } else { 1 }) % 3;
+                        let effects = r.login.focus(next);
+                        r.edit_effects(effects);
                         r.schedule.invalidate();
                         return Ok(());
                     }
-                    match event {
-                        WindowEvent::CloseRequested => {
-                            if let Some(p) = &r.preparation {
-                                p.cancel();
-                            }
-                            r.game.stop();
-                            r.transport.close();
-                            l.exit();
+                    if r.login.focus != 0
+                        && !event.repeat
+                        && matches!(
+                            event.logical_key,
+                            Key::Named(NamedKey::Enter | NamedKey::Space)
+                        )
+                    {
+                        r.login.activate(admission);
+                        r.schedule.invalidate();
+                        return Ok(());
+                    }
+                }
+                let champion = r.login.champion.policy.visible();
+                if let WindowEvent::Focused(focused) = &event {
+                    if !focused {
+                        r.shift = false;
+                    }
+                    let inactive = if champion {
+                        &mut r.login.input
+                    } else {
+                        &mut r.login.champion.input
+                    };
+                    // Retain window ownership across a committed panel handoff.
+                    inactive.state.apply(EditIntent::WindowFocused(*focused));
+                }
+                let mapped = if champion {
+                    r.login.champion.event(&event)
+                } else {
+                    r.login.input.window_event(&event)
+                };
+                let effects = if champion {
+                    let effects = r
+                        .login
+                        .champion
+                        .input
+                        .execute(mapped.effects, &mut WindowEditHost(&r.window));
+                    r.login.champion.commit_effects(effects)
+                } else {
+                    let effects = r
+                        .login
+                        .input
+                        .execute(mapped.effects, &mut WindowEditHost(&r.window));
+                    r.login
+                        .input
+                        .state
+                        .commit_menu(effects, &mut r.login.state, admission)
+                };
+                r.edit_effects(effects);
+                r.champion_submission()?;
+                if mapped.consumed {
+                    r.schedule.invalidate();
+                    return Ok(());
+                }
+                match event {
+                    WindowEvent::CloseRequested => {
+                        if let Some(p) = &r.preparation {
+                            p.cancel();
                         }
-                        WindowEvent::RedrawRequested => {
-                            // An OS exposure can resume a surface that reported
-                            // occlusion even where winit has no Occluded event.
-                            if r.surface_occluded {
-                                r.surface_occluded = false;
+                        r.game.stop();
+                        r.transport.close();
+                        l.exit();
+                    }
+                    WindowEvent::RedrawRequested => {
+                        // An OS exposure can resume a surface that reported
+                        // occlusion even where winit has no Occluded event.
+                        if r.surface_occluded {
+                            r.surface_occluded = false;
+                            r.schedule.invalidate();
+                        }
+                        r.visibility();
+                        if r.schedule.begin_redraw(Instant::now()) {
+                            r.frame()?;
+                        }
+                    }
+                    WindowEvent::Occluded(occluded) => {
+                        r.occluded = occluded;
+                        if !occluded {
+                            r.surface_occluded = false;
+                        }
+                        r.visibility();
+                    }
+                    WindowEvent::Resized(s) => {
+                        r.surface_occluded = false;
+                        r.schedule.invalidate();
+                        r.visibility();
+                        r.host.resize([s.width, s.height])?;
+                        r.game.viewport(
+                            slither_wgpu_slice::render::backing_size([
+                                f64::from(s.width) / r.window.scale_factor(),
+                                f64::from(s.height) / r.window.scale_factor(),
+                            ])?,
+                            1.,
+                        )?;
+                    }
+                    WindowEvent::ScaleFactorChanged { .. } => r.schedule.invalidate(),
+                    WindowEvent::CursorMoved { position, .. } => {
+                        let d = r.window.scale_factor();
+                        r.cursor = slither_client::desktop_input::mouse_client_position(
+                            [position.x, position.y],
+                            d,
+                        );
+                        if r.login.intercepts_pointer(r.cursor) {
+                            let effects = r.login.pointer(r.cursor, None, admission);
+                            r.edit_effects(effects);
+                        } else {
+                            r.pointer(false)?;
+                        }
+                    }
+                    WindowEvent::MouseInput {
+                        state,
+                        button: MouseButton::Left,
+                        ..
+                    } => {
+                        if r.login.intercepts_pointer(r.cursor) {
+                            let effects = r.login.pointer(
+                                r.cursor,
+                                Some(state == ElementState::Pressed),
+                                admission,
+                            );
+                            r.edit_effects(effects);
+                            r.game.mouse_up();
+                            r.champion_submission()?;
+                        } else if state == ElementState::Pressed {
+                            r.pointer(true)?;
+                        } else {
+                            r.game.mouse_up();
+                        }
+                    }
+                    WindowEvent::Focused(false) => r.game.blur(),
+                    WindowEvent::Focused(true) => {
+                        r.surface_occluded = false;
+                        r.visibility();
+                        r.schedule.invalidate();
+                    }
+                    WindowEvent::KeyboardInput { event, .. } => {
+                        let down = event.state == ElementState::Pressed;
+                        match event.physical_key {
+                            PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
+                            PhysicalKey::Code(KeyCode::Escape) if down => {
+                                if let Some(p) = &r.preparation {
+                                    p.cancel();
+                                }
+                                r.game.stop();
+                                r.effects()?;
                                 r.schedule.invalidate();
                             }
-                            r.visibility();
-                            if r.schedule.begin_redraw(Instant::now()) {
-                                r.frame()?;
+                            PhysicalKey::Code(code) => {
+                                let name = match code {
+                                    KeyCode::ArrowLeft => "ArrowLeft",
+                                    KeyCode::ArrowRight => "ArrowRight",
+                                    KeyCode::ArrowUp => "ArrowUp",
+                                    KeyCode::Space => "Space",
+                                    _ => "",
+                                };
+                                r.game.key(name, down);
                             }
+                            _ => {}
                         }
-                        WindowEvent::Occluded(occluded) => {
-                            r.occluded = occluded;
-                            if !occluded {
-                                r.surface_occluded = false;
-                            }
-                            r.visibility();
-                        }
-                        WindowEvent::Resized(s) => {
-                            r.surface_occluded = false;
-                            r.schedule.invalidate();
-                            r.visibility();
-                            r.host.resize([s.width, s.height])?;
-                            r.game.viewport(
-                                slither_wgpu_slice::render::backing_size([
-                                    f64::from(s.width) / r.window.scale_factor(),
-                                    f64::from(s.height) / r.window.scale_factor(),
-                                ])?,
-                                1.,
-                            )?;
-                        }
-                        WindowEvent::ScaleFactorChanged { .. } => r.schedule.invalidate(),
-                        WindowEvent::CursorMoved { position, .. } => {
-                            let d = r.window.scale_factor();
-                            r.cursor = slither_client::desktop_input::mouse_client_position(
-                                [position.x, position.y],
-                                d,
-                            );
-                            if r.login.intercepts_pointer(r.cursor) {
-                                let effects = r.login.pointer(r.cursor, None, admission);
-                                r.edit_effects(effects);
-                            } else {
-                                r.pointer(false)?;
-                            }
-                        }
-                        WindowEvent::MouseInput {
-                            state,
-                            button: MouseButton::Left,
-                            ..
-                        } => {
-                            if r.login.intercepts_pointer(r.cursor) {
-                                let effects = r.login.pointer(
-                                    r.cursor,
-                                    Some(state == ElementState::Pressed),
-                                    admission,
-                                );
-                                r.edit_effects(effects);
-                                r.game.mouse_up();
-                                r.champion_submission()?;
-                            } else if state == ElementState::Pressed {
-                                r.pointer(true)?;
-                            } else {
-                                r.game.mouse_up();
-                            }
-                        }
-                        WindowEvent::Focused(false) => r.game.blur(),
-                        WindowEvent::Focused(true) => {
-                            r.surface_occluded = false;
-                            r.visibility();
-                            r.schedule.invalidate();
-                        }
-                        WindowEvent::KeyboardInput { event, .. } => {
-                            let down = event.state == ElementState::Pressed;
-                            match event.physical_key {
-                                PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
-                                PhysicalKey::Code(KeyCode::Escape) if down => {
-                                    if let Some(p) = &r.preparation {
-                                        p.cancel();
-                                    }
-                                    r.game.stop();
-                                    r.effects()?;
-                                    r.schedule.invalidate();
-                                }
-                                PhysicalKey::Code(code) => {
-                                    let name = match code {
-                                        KeyCode::ArrowLeft => "ArrowLeft",
-                                        KeyCode::ArrowRight => "ArrowRight",
-                                        KeyCode::ArrowUp => "ArrowUp",
-                                        KeyCode::Space => "Space",
-                                        _ => "",
-                                    };
-                                    r.game.key(name, down);
-                                }
-                                _ => {}
-                            }
-                        }
-                        _ => {}
                     }
-                    Ok(())
-                })();
+                    _ => {}
+                }
+                Ok(())
+            })();
             if let Err(e) = result {
                 self.fail(l, e);
             }

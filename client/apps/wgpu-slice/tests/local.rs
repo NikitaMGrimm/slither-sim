@@ -440,19 +440,16 @@ fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
     assert!(login.champion.policy.finished());
     for now in (800..=5000).step_by(40) {
         if game.phase() == Phase::Victory {
-            game.receive(g, &[b'p'], f64::from(now)).unwrap();
+            game.receive(g, b"p", f64::from(now)).unwrap();
         }
         pump(&mut game, f64::from(now));
         login.observe_game(&game).unwrap();
     }
     assert!(!login.state.view(true).champion_pending);
     assert!(login.state.view(true).ordinary_controls_visible);
-    assert!(
-        login
-            .sync_return_focus(game.can_play())
-            .iter()
-            .any(|e| *e == slither_client::menu_input::HostEditEffect::ImeAllowed(true))
-    );
+    assert!(login.sync_return_focus(game.can_play()).contains(
+        &slither_client::menu_input::HostEditEffect::ImeAllowed(true)
+    ));
 }
 
 #[test]

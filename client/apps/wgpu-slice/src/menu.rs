@@ -9,7 +9,10 @@ use crate::{
     text::*,
 };
 use slither_client::{
+    menu_controls::{ControlKind, PanelInputState, PanelView, ResolvedControl, intersection},
+    menu_input::{EditorId, MenuInputState},
     menu_layout::{MenuElement as E, MenuLayout, MenuRect, single_line_field_placement},
+    menu_theme::{ControlState, MenuTheme, SurfaceRecipe, SurfaceTokens},
     presentation::*,
     start_page::StartMenuView,
 };
@@ -23,7 +26,7 @@ const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
     Legacy(u32, u32, u8, u64, u64),
-    Control([u32; 2], u64, slither_client::menu_theme::SurfaceTokens),
+    Control([u32; 2], u64, SurfaceTokens),
     Solid([u32; 2], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
@@ -391,25 +394,24 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
     }
 }
 pub struct PanelPaint<'a> {
-    pub panel: &'a slither_client::menu_controls::PanelView,
-    pub input: &'a slither_client::menu_controls::PanelInputState,
-    pub edit: &'a slither_client::menu_input::MenuInputState,
-    pub scroll: &'a mut BTreeMap<slither_client::menu_input::EditorId, f64>,
-    pub theme: slither_client::menu_theme::MenuTheme,
+    pub panel: &'a PanelView,
+    pub input: &'a PanelInputState,
+    pub edit: &'a MenuInputState,
+    pub scroll: &'a mut BTreeMap<EditorId, f64>,
+    pub theme: MenuTheme,
 }
 impl Composition<'_> {
     #[allow(clippy::too_many_arguments)]
     fn panel(
         &mut self,
         text: &mut TextCache,
-        panel: &slither_client::menu_controls::PanelView,
-        input: &slither_client::menu_controls::PanelInputState,
-        edit: &slither_client::menu_input::MenuInputState,
-        scroll: &mut BTreeMap<slither_client::menu_input::EditorId, f64>,
-        theme: slither_client::menu_theme::MenuTheme,
-        resolved: &[slither_client::menu_controls::ResolvedControl],
+        panel: &PanelView,
+        input: &PanelInputState,
+        edit: &MenuInputState,
+        scroll: &mut BTreeMap<EditorId, f64>,
+        theme: MenuTheme,
+        resolved: &[ResolvedControl],
     ) -> Result<()> {
-        use slither_client::menu_controls::{ControlKind, intersection};
         if panel.visible {
             for r in resolved.iter().filter(|r| r.control.visible) {
                 let control = &r.control;
@@ -450,21 +452,16 @@ impl Composition<'_> {
                     ControlKind::Button { label } => {
                         self.sliced(
                             r.rect,
-                            theme.surface(
-                                control.style,
-                                slither_client::menu_theme::ControlState::Idle,
-                            ),
+                            theme.surface(control.style, ControlState::Idle),
                             alpha,
                             r.clip,
+                            r.scale,
                         )?;
                         let [hover, press] = input.progress(control.id);
                         if enabled {
                             self.sliced(
                                 r.rect,
-                                theme.surface(
-                                    control.style,
-                                    slither_client::menu_theme::ControlState::Hovered,
-                                ),
+                                theme.surface(control.style, ControlState::Hovered),
                                 alpha
                                     * hover.max(if input.focus() == Some(control.id) {
                                         0.33
@@ -472,15 +469,14 @@ impl Composition<'_> {
                                         0.
                                     }),
                                 r.clip,
+                                r.scale,
                             )?;
                             self.sliced(
                                 r.rect,
-                                theme.surface(
-                                    control.style,
-                                    slither_client::menu_theme::ControlState::Pressed,
-                                ),
+                                theme.surface(control.style, ControlState::Pressed),
                                 alpha * press,
                                 r.clip,
+                                r.scale,
                             )?;
                         }
                         add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
@@ -493,12 +489,10 @@ impl Composition<'_> {
                     } => {
                         self.sliced(
                             r.rect,
-                            theme.surface(
-                                control.style,
-                                slither_client::menu_theme::ControlState::Idle,
-                            ),
+                            theme.surface(control.style, ControlState::Idle),
                             alpha,
                             r.clip,
+                            r.scale,
                         )?;
                         let field = MenuRect {
                             x: r.rect.x + inset[0] * r.scale,
@@ -604,18 +598,23 @@ impl Composition<'_> {
     fn sliced(
         &mut self,
         r: MenuRect,
-        tokens: slither_client::menu_theme::SurfaceTokens,
+        tokens: SurfaceTokens,
         alpha: f64,
         clip: MenuRect,
+        control_scale: f64,
     ) -> Result<()> {
         let scale = self.scale;
+        let raster_scale = scale * control_scale;
+        if !raster_scale.is_finite() || !(0. ..=16.).contains(&raster_scale) || raster_scale == 0. {
+            return Err("Sliced menu scale budget".into());
+        }
         let surface = match tokens.recipe {
-            slither_client::menu_theme::SurfaceRecipe::Button => materials::MenuSurface::Play,
-            slither_client::menu_theme::SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
-            slither_client::menu_theme::SurfaceRecipe::Field => materials::MenuSurface::Nickname,
+            SurfaceRecipe::Button => materials::MenuSurface::Play,
+            SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
+            SurfaceRecipe::Field => materials::MenuSurface::Nickname,
         };
-        let pad = (surface.padding() * scale).ceil() as u32;
-        let radius = (f64::from(tokens.radius) * scale).ceil() as u32;
+        let pad = (surface.padding() * raster_scale).ceil() as u32;
+        let radius = (f64::from(tokens.radius) * raster_scale).ceil() as u32;
         let size = [
             (r.width * scale).round().max(1.) as u32,
             (r.height * scale).round().max(1.) as u32,
@@ -625,12 +624,21 @@ impl Composition<'_> {
         if atlas.iter().any(|n| n + 2 * pad > 512) {
             return Err("Sliced menu atlas axis budget".into());
         }
-        let resource = self
-            .cached_material(MaterialKey::Control(atlas, scale.to_bits(), tokens), || {
-                materials::menu_control(atlas, f64::from(radius), tokens.colors, scale, surface)
-            })?;
-        let xs = slice_axis(size[0], atlas[0], pad);
-        let ys = slice_axis(size[1], atlas[1], pad);
+        let resource = self.cached_material(
+            MaterialKey::Control(atlas, raster_scale.to_bits(), tokens),
+            || {
+                materials::menu_control(
+                    atlas,
+                    f64::from(radius),
+                    tokens.colors,
+                    raster_scale,
+                    surface,
+                )
+            },
+        )?;
+        let xs = slice_axis(size[0], atlas[0], pad)?;
+        let ys = slice_axis(size[1], atlas[1], pad)?;
+        check_menu_draws(xs.len() * ys.len())?;
         for &(dy, sy, h) in &ys {
             for &(dx, sx, w) in &xs {
                 let mut draw = image(
@@ -959,11 +967,11 @@ impl Menu {
     pub fn prepare_panel(
         &mut self,
         text: &mut TextCache,
-        panel: &slither_client::menu_controls::PanelView,
-        input: &slither_client::menu_controls::PanelInputState,
-        edit: &slither_client::menu_input::MenuInputState,
-        scroll: &mut BTreeMap<slither_client::menu_input::EditorId, f64>,
-        theme: slither_client::menu_theme::MenuTheme,
+        panel: &PanelView,
+        input: &PanelInputState,
+        edit: &MenuInputState,
+        scroll: &mut BTreeMap<EditorId, f64>,
+        theme: MenuTheme,
         extent: [u32; 2],
         dpr: f64,
     ) -> Result<MenuFrame> {
@@ -1026,7 +1034,7 @@ impl Menu {
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
         logo_frame: u8,
-        input: Option<&slither_client::menu_input::MenuInputState>,
+        input: Option<&MenuInputState>,
     ) -> Result<MenuFrame> {
         self.prepare_with_panel(
             text, view, layout, extent, dpr, cosmetics, logo_frame, input, None,
@@ -1042,7 +1050,7 @@ impl Menu {
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
         logo_frame: u8,
-        input: Option<&slither_client::menu_input::MenuInputState>,
+        input: Option<&MenuInputState>,
         panel: Option<PanelPaint<'_>>,
     ) -> Result<MenuFrame> {
         crate::render::dimensions(extent, dpr)?;
@@ -1430,9 +1438,9 @@ type Published = (
     BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
-fn slice_axis(size: u32, atlas: u32, pad: u32) -> Vec<(u32, u32, u32)> {
+fn slice_axis(size: u32, atlas: u32, pad: u32) -> Result<Vec<(u32, u32, u32)>> {
     if size == atlas {
-        return vec![(0, 0, size + 2 * pad)];
+        return Ok(vec![(0, 0, size + 2 * pad)]);
     }
     let edge = atlas.saturating_sub(32) / 2;
     let middle = atlas - 2 * edge;
@@ -1440,12 +1448,13 @@ fn slice_axis(size: u32, atlas: u32, pad: u32) -> Vec<(u32, u32, u32)> {
     let mut offset = edge + pad;
     let end = size - edge + pad;
     while offset < end {
+        check_menu_draws(out.len() + 2)?;
         let length = middle.min(end - offset);
         out.push((offset, edge + pad, length));
         offset += length;
     }
     out.push((end, atlas - edge + pad, edge + pad));
-    out
+    Ok(out)
 }
 impl Composition<'_> {
     fn finish(
