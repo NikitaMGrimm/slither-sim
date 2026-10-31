@@ -893,7 +893,7 @@ fn prepare_composed(
         push_draw(&mut draws, draw)?;
     }
     let [early, late] = std::mem::take(&mut bank.food_commands);
-    let food = plan_food_with_storage(
+    let food = plan_food_with_index(
         FoodPaintInput {
             foods: client.foods().foods(),
             view,
@@ -904,6 +904,7 @@ fn prepare_composed(
             entry_alpha: 1.,
             command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
         },
+        &mut bank.food_asset_index,
         early,
         late,
     )

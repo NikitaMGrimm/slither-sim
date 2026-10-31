@@ -10,6 +10,9 @@ use std::{
     time::{Duration, Instant},
 };
 #[cfg(windows)]
+#[path = "frame_perf/food.rs"]
+mod food;
+#[cfg(windows)]
 #[path = "../tests/support/announcement_tape.rs"]
 mod tape;
 
@@ -280,6 +283,13 @@ fn run(output: &Path) -> Result<()> {
 }
 #[cfg(windows)]
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--cpu-food") {
+        if let Err(e) = food::run() {
+            eprintln!("FRAME_PERF_FAILED: {e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let output = std::env::args_os()
         .nth(1)
         .expect("new external output directory");
