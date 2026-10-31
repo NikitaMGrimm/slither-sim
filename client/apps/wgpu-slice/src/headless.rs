@@ -280,6 +280,7 @@ impl Offscreen {
             .renderer
             .sync_resources(&picture.resources)
             .and_then(|()| self.renderer.render(&picture.frame, &self.view))
+            .map_err(String::from)
             .and_then(|()| self.wait());
         result?;
         let error = pollster::block_on(validation.pop());

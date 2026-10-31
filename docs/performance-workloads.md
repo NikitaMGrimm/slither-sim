@@ -40,6 +40,11 @@ cargo run --release --locked --example perf_baseline -- --list
 
 ## Families
 
+The Windows product's separate native frame workload (`client/docs/frame-performance.md`)
+measures synthetic offscreen preparation, resource synchronization, render
+submission and calling-thread heap bytes on each exposed hardware adapter.
+It is outside the simulator timing/trace suites below.
+
 - **Legacy:** `step-default`, `step-food`, `step-body`, `observe`, `portable` and
   `protocol` come first; the catalog holds their resolved definitions.
 - **Sandbox and official:** `Config::sandbox()` and `Config::official(n)` at

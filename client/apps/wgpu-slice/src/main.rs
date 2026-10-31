@@ -12,7 +12,7 @@ mod desktop {
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
-        gpu::{SurfaceHost, instance},
+        gpu::{RenderError, SurfaceHost, instance},
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
@@ -396,21 +396,32 @@ mod desktop {
                 return Ok(());
             };
             let view = self.login.state.view(admission);
-            let composed = if view.visible || view.spinner_visible {
-                let mut picture = p.clone();
-                self.login
-                    .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                    .append_to(&mut picture)?;
-                let effects = self.login.cursor_area()?;
-                self.edit_effects(effects);
-                Some(picture)
-            } else {
-                None
+            let composed = (|| -> Result<_> {
+                Ok(if view.visible || view.spinner_visible {
+                    let picture = self
+                        .login
+                        .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
+                        .compose_over(&p)?;
+                    let effects = self.login.cursor_area()?;
+                    self.edit_effects(effects);
+                    Some(picture)
+                } else {
+                    None
+                })
+            })();
+            let composed = match composed {
+                Ok(picture) => picture,
+                Err(error) => return self.skip_bad_frame(p.frame.identity, error),
             };
             let picture = composed.as_ref().unwrap_or(&p);
             if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
-                self.game.presented(false)?;
-                return Err(e);
+                return match e {
+                    RenderError::Frame(e) => self.skip_bad_frame(p.frame.identity, e),
+                    RenderError::Host(e) => {
+                        self.game.presented(false)?;
+                        Err(e)
+                    }
+                };
             }
             self.window.pre_present_notify();
             match self
@@ -428,13 +439,25 @@ mod desktop {
                     self.game.retry_frame(p)?;
                     self.schedule.retry(Instant::now());
                 }
-                Err(e) => {
+                Err(RenderError::Frame(e)) => {
+                    return self.skip_bad_frame(p.frame.identity, e);
+                }
+                Err(RenderError::Host(e)) => {
                     self.game.presented(false)?;
                     return Err(e);
                 }
             }
             self.effects()?;
             Ok(())
+        }
+        fn skip_bad_frame(&mut self, identity: u64, error: String) -> Result<()> {
+            self.host.discard_acquired();
+            self.game
+                .draw_diagnostics
+                .admit::<()>(identity, Err(error))?;
+            self.game.skip_frame()?;
+            self.schedule.retry(Instant::now());
+            self.effects()
         }
         fn log_present(&mut self) {
             if let Some((since, count, last, max_gap)) = &mut self.pacing_log {

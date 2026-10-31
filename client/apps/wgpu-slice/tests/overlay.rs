@@ -127,6 +127,15 @@ fn fixed_scale_reuses_text_rasters_across_frames_and_window_resize() {
     };
     assert!(!text_assets(&first).is_empty());
     assert_eq!(text_assets(&first), text_assets(&second));
+    for resource in &first.resources {
+        if let Some(next) = second.resources.iter().find(|r| r.asset == resource.asset) {
+            assert!(std::sync::Arc::ptr_eq(&resource.image, &next.image));
+        }
+    }
+    let cloned = first.clone();
+    for (original, copy) in first.resources.iter().zip(&cloned.resources) {
+        assert!(std::sync::Arc::ptr_eq(&original.image, &copy.image));
+    }
     assert_eq!(text_assets(&first), text_assets(&resized));
     game.window_viewport([3840, 2160], 1.).unwrap();
     let scale_changed = snapshot(&mut game, 103);
@@ -223,6 +232,67 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
             .sum::<usize>()
             <= slither_wgpu_slice::text::MENU_CACHE_BYTES
     );
+}
+
+#[test]
+fn login_clone_reserves_final_draw_storage_and_preserves_retry_picture() {
+    use slither_wgpu_slice::login_native::NativeLogin;
+    for separate_overlay in [false, true] {
+        let mut game = tape::playing();
+        let extent = game.window_viewport([960, 540], 1.).unwrap();
+        game.begin_redraw(40., extent, 1.).unwrap();
+        tape::effects(&mut game);
+        let mut picture = game.take_frame().unwrap();
+        if !separate_overlay {
+            picture
+                .frame
+                .draws
+                .extend(picture.overlay.take().unwrap().draws);
+        }
+        picture
+            .frame
+            .draws
+            .resize(29_804, picture.frame.draws[0].clone());
+        let original = picture.frame.clone();
+        let original_overlay = picture.overlay.clone();
+        let ui_extent = picture.ui_frame().extent;
+        let ui_scale = picture.ui_frame().viewport_scale;
+        let mut login = NativeLogin::new("Player").unwrap();
+        let mut expected = picture.clone();
+        login
+            .prepare_host(ui_extent, ui_scale, true, None)
+            .unwrap()
+            .append_to(&mut expected)
+            .unwrap();
+        let composed = login
+            .prepare_host(ui_extent, ui_scale, true, None)
+            .unwrap()
+            .compose_over(&picture)
+            .unwrap();
+        assert_eq!(composed.frame, expected.frame);
+        assert_eq!(composed.overlay, expected.overlay);
+        assert_eq!(composed.frame.draws.capacity(), composed.frame.draws.len());
+        if let Some(overlay) = &composed.overlay {
+            assert_eq!(overlay.draws.capacity(), overlay.draws.len());
+        }
+        assert_eq!(
+            composed
+                .resources
+                .iter()
+                .map(|r| r.asset)
+                .collect::<Vec<_>>(),
+            expected
+                .resources
+                .iter()
+                .map(|r| r.asset)
+                .collect::<Vec<_>>()
+        );
+        game.retry_frame(picture).unwrap();
+        let retry = game.take_frame().unwrap();
+        assert_eq!(retry.frame, original);
+        assert_eq!(retry.overlay, original_overlay);
+        game.presented(true).unwrap();
+    }
 }
 
 #[test]

@@ -175,7 +175,7 @@ fn resource(handle: u64, revision: u64, image: RgbaImage) -> Resource {
             height: image.height,
             status: BodyAssetStatus::Ready,
         },
-        image,
+        image: image.into(),
     }
 }
 

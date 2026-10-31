@@ -661,7 +661,8 @@ impl TextCache {
                             width,
                             height: h,
                             pixels,
-                        },
+                        }
+                        .into(),
                     },
                     start,
                     source_x: start - left,

@@ -679,8 +679,11 @@ impl LocalGame {
             |a,context|{let skin=resolve_authored_local_skin(a.skin,&a.custom_skin).map_err(|e|Ingress(e.to_string()))?;let presentation=if let Some(c)=&bank.borrow().cosmetics{c.appearance(a,context.own).map_err(Ingress)?}else{FacePresentation{face:skin.face,antenna:None}.into()};Ok(TintedPresentation{presentation,nickname_tint:Some(NicknameTint{base_rgb:bank.borrow().palette_rgb[skin.base_palette],random_units:[unit(),unit(),unit()]})})},
             |s,_|Ok(bank.borrow().food(s.raw_color,[unit(),unit()])),|s,_|Ok(bank.borrow().prey(s.raw_color,[unit(),unit()])),
             |c,_|{
-                if frames.borrow().len()>=16{return Err(Ingress("Setup draw budget".into()));}
                 serial.set(serial.get()+1);
+                if frames.borrow().len()>=16 {
+                    diagnostics.borrow_mut().admit::<()>(serial.get(),Err("Setup draw budget".into())).map_err(Ingress)?;
+                    return Ok(());
+                }
                 let prepared=render::prepare_gameplay(c,&mut bank.borrow_mut(),extent,scale,serial.get(),quality);
                 let Some(frame)=diagnostics.borrow_mut().admit(serial.get(),prepared).map_err(Ingress)? else {
                     frames.borrow_mut().push(None);
@@ -692,11 +695,15 @@ impl LocalGame {
                     frames.borrow_mut().push(None);
                     return Ok(());
                 }
-                captured_draws.set(draws);
                 // HUD projection follows the complete ingress report. Reserve its
                 // bounded atlas before retaining each immutable scene snapshot.
                 let bytes=captured_pixels.get()+frame.pixel_bytes()+crate::hud::MAX_PIXEL_BYTES;
-                if bytes>crate::bank::PIXEL_BUDGET{return Err(Ingress("Setup capture pixels budget".into()));}
+                if bytes>crate::bank::PIXEL_BUDGET {
+                    diagnostics.borrow_mut().admit::<()>(serial.get(),Err("Setup capture pixels budget".into())).map_err(Ingress)?;
+                    frames.borrow_mut().push(None);
+                    return Ok(());
+                }
+                captured_draws.set(draws);
                 captured_pixels.set(bytes);
                 frames.borrow_mut().push(Some(Picture { value: frame,
                     #[cfg(feature = "feel-trace")]
@@ -825,14 +832,18 @@ impl LocalGame {
                 else {
                     continue;
                 };
-                bytes += p
-                    .resources
-                    .iter()
-                    .map(|r| r.image.pixels.len())
-                    .sum::<usize>();
-                if bytes > crate::bank::PIXEL_BUDGET {
-                    return Err("Queued Setup pixels budget".into());
+                let next_bytes = bytes
+                    + p.resources
+                        .iter()
+                        .map(|r| r.image.pixels.len())
+                        .sum::<usize>();
+                if next_bytes > crate::bank::PIXEL_BUDGET {
+                    diagnostics
+                        .borrow_mut()
+                        .admit::<()>(identity, Err("Queued Setup pixels budget".into()))?;
+                    continue;
                 }
+                bytes = next_bytes;
                 pictures.push_back(Picture {
                     value: p,
                     #[cfg(feature = "feel-trace")]
@@ -1149,6 +1160,21 @@ impl LocalGame {
             .draws_since_statistics
             .checked_add(1)
             .ok_or("Quality draw counter exhausted")?;
+        Ok(())
+    }
+    /// Retire rejected pixels without losing the issued model/control transaction.
+    pub fn skip_frame(&mut self) -> Result<()> {
+        let kind = std::mem::replace(&mut self.inflight, 0);
+        if kind == 0 {
+            return Err("No issued frame".into());
+        }
+        if kind != 1 {
+            self.commit_work()?;
+        }
+        #[cfg(feature = "feel-trace")]
+        {
+            self.issued_observation = None;
+        }
         Ok(())
     }
     fn commit_work(&mut self) -> Result<()> {

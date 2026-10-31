@@ -224,6 +224,7 @@ fn pump(g: &mut LocalGame, t: f64) -> Vec<Vec<u8>> {
 }
 fn negotiating() -> LocalGame {
     let mut g = LocalGame::new(0.).unwrap();
+    g.draw_diagnostics.strict_validation = true;
     g.play("ws://127.0.0.1:19491/slither", "Player", 44)
         .unwrap();
     pump(&mut g, 1.);
@@ -1349,6 +1350,21 @@ fn regression_seventeenth_setup_rejects_without_publication() {
     assert!(g.take_frame().is_none());
 }
 #[test]
+fn release_setup_picture_budget_preserves_packet_admission_and_later_ingress() {
+    let mut g = negotiating();
+    g.draw_diagnostics.strict_validation = false;
+    let mut packets = vec![setup(); 17];
+    packets.push(snake(44));
+    g.receive(g.generation(), &bundle(&packets), 3.).unwrap();
+    assert_eq!(g.draw_diagnostics.skipped_frames, 1);
+    assert_eq!(g.phase(), Phase::Playing);
+    assert!(g.failure.is_none());
+    pictures(&mut g);
+    g.receive(g.generation(), &bundle(&[board()]), 4.).unwrap();
+    pump(&mut g, 20.);
+    assert_eq!(g.phase(), Phase::Playing);
+}
+#[test]
 fn regression_retained_picture_does_not_defer_handshake_expiry() {
     let mut g = negotiating();
     g.begin_frame(20., [960, 540], 1.).unwrap();
@@ -1498,8 +1514,59 @@ fn former_overflow_survives_production_preparation_retry_and_resize() {
 }
 
 #[test]
+fn rejected_issued_picture_keeps_controls_and_later_frames_running() {
+    let mut game = playing();
+    let mut control = playing();
+    game.draw_diagnostics.strict_validation = false;
+    for g in [&mut game, &mut control] {
+        g.key("ArrowLeft", true);
+        g.begin_frame(40., [960, 540], 1.).unwrap();
+    }
+    assert_eq!(effects(&mut game), effects(&mut control));
+    let mut bad = game.take_frame().unwrap();
+    let valid = control.take_frame().unwrap();
+    bad.frame.draws[0].asset.revision += 1;
+    let resident = bad
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    let rejected = bad.frame.validate(&resident);
+    assert_eq!(
+        rejected.as_ref().unwrap_err(),
+        "missing, stale or unready resource"
+    );
+    assert_eq!(
+        game.draw_diagnostics.admit(bad.frame.identity, rejected),
+        Ok(None)
+    );
+    game.skip_frame().unwrap();
+    control.presented(true).unwrap();
+    assert!(game.skip_frame().is_err());
+    assert_eq!(game.phase(), Phase::Playing);
+    assert!(game.failure.is_none());
+    assert_eq!(game.hud_text(), control.hud_text());
+    assert_eq!(
+        game.client().control_view().own.unwrap().raw_head,
+        control.client().control_view().own.unwrap().raw_head
+    );
+    for g in [&mut game, &mut control] {
+        g.receive(g.generation(), &bundle(&[board()]), 41.).unwrap();
+        g.begin_frame(60., [960, 540], 1.).unwrap();
+    }
+    assert_eq!(effects(&mut game), effects(&mut control));
+    let recovered = game.take_frame().unwrap();
+    let expected = control.take_frame().unwrap();
+    assert!(recovered.frame.identity > valid.frame.identity);
+    assert_eq!(recovered.frame, expected.frame);
+    game.presented(true).unwrap();
+    control.presented(true).unwrap();
+}
+
+#[test]
 fn draw_memory_overflow_skips_pictures_without_stalling_ingress_or_the_session() {
     let mut g = playing();
+    g.draw_diagnostics.strict_validation = false;
     let mut commands = Vec::new();
     // Authored single-color food in one visible sector: enough HQ commands to
     // exceed the CPU-record envelope, without increasing texture residency.
@@ -1584,6 +1651,7 @@ fn non_memory_rejection_after_crowded_setup_keeps_world_hud_rng_and_identity() {
 #[test]
 fn queued_setup_draw_records_share_one_memory_envelope() {
     let mut game = playing();
+    game.draw_diagnostics.strict_validation = false;
     let foods = (0..4000)
         .map(|i| vec![b'F', 11, 10, 41, (i % 100) as u8, (i / 100) as u8, 20])
         .collect::<Vec<_>>();

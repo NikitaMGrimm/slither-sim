@@ -61,7 +61,8 @@ impl MenuFrame {
                 width: 1,
                 height: 1,
                 pixels: vec![PAGE_COLOR[0], PAGE_COLOR[1], PAGE_COLOR[2], 255],
-            },
+            }
+            .into(),
         };
         let backdrop = image(
             &resource,
@@ -125,6 +126,47 @@ impl MenuFrame {
         self.frame.extent = extent;
         self.frame.viewport_scale = 1.;
         Ok(self)
+    }
+    /// Keep the retry picture intact and allocate its composed draw storage once.
+    pub fn compose_over(self, picture: &PreparedFrame) -> Result<PreparedFrame> {
+        let world_extra = usize::from(self.backdrop.is_some());
+        let ui_extra = self.frame.draws.len() + usize::from(self.world_cover.is_some());
+        check_menu_draws(world_extra + ui_extra)?;
+        frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
+        let copy = |frame: &Frame, extra: usize| -> Result<Frame> {
+            let mut draws = Vec::new();
+            draws
+                .try_reserve_exact(frame.draws.len() + extra)
+                .map_err(|_| "frame draw allocation failed")?;
+            draws.extend_from_slice(&frame.draws);
+            Ok(Frame {
+                identity: frame.identity,
+                extent: frame.extent,
+                viewport_scale: frame.viewport_scale,
+                tick: frame.tick,
+                draws,
+                snakes: frame.snakes.clone(),
+            })
+        };
+        let mut composed = PreparedFrame {
+            frame: copy(
+                &picture.frame,
+                world_extra
+                    + if picture.overlay.is_none() {
+                        ui_extra
+                    } else {
+                        0
+                    },
+            )?,
+            overlay: picture
+                .overlay
+                .as_ref()
+                .map(|f| copy(f, ui_extra))
+                .transpose()?,
+            resources: picture.resources.clone(),
+        };
+        self.append_to(&mut composed)?;
+        Ok(composed)
     }
     /// Put the page below every world draw and menu controls above them.
     /// A failed whole-picture admission publishes nothing.
@@ -382,7 +424,8 @@ impl Composition<'_> {
                         height: size[1],
                         pixels: [rgb[0], rgb[1], rgb[2], 255]
                             .repeat(size[0] as usize * size[1] as usize),
-                    },
+                    }
+                    .into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -444,7 +487,7 @@ impl Composition<'_> {
                         height: image.height,
                         status: BodyAssetStatus::Ready,
                     },
-                    image,
+                    image: image.into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -539,7 +582,8 @@ impl Composition<'_> {
                         width: size[0],
                         height: size[1],
                         pixels,
-                    },
+                    }
+                    .into(),
                 }
             };
             let bytes: usize = self.art.values().map(|r| r.image.pixels.len()).sum();
@@ -581,7 +625,7 @@ impl Composition<'_> {
                     height: side,
                     status: BodyAssetStatus::Ready,
                 },
-                image: pixels,
+                image: pixels.into(),
             }
         };
         let width = f64::from(side) / self.scale;
@@ -1115,7 +1159,8 @@ mod reveal_tests {
                 width: 900,
                 height: 270,
                 pixels: vec![],
-            },
+            }
+            .into(),
         };
         let draw = image(
             &resource,
