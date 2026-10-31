@@ -1,4 +1,4 @@
-//! Fixed desktop endpoint login; no acquisition or endpoint-dependent policy.
+//! Fixed direct login and explicit selection routing. Custom choices never authorize acquisition.
 use crate::{
     Result,
     game::{LocalGame, LoginProfile},
@@ -12,6 +12,24 @@ const PROFILE: LoginProfile = LoginProfile {
         111,
     ],
 };
+
+pub enum Connection<T> {
+    Direct(String),
+    Official(T),
+}
+/// Custom selections never invoke the official acquisition callback.
+pub fn prepare_selection<T>(
+    selection: &slither_client::server_picker::ServerPreference,
+    acquire: impl FnOnce(Option<u16>) -> Result<T>,
+) -> Result<Connection<T>> {
+    use slither_client::server_picker::ServerPreference;
+    match selection {
+        ServerPreference::Custom(address) => {
+            crate::official::explicit_endpoint(address).map(Connection::Direct)
+        }
+        choice => acquire(choice.official_id()).map(Connection::Official),
+    }
+}
 
 /// Interactive and headless desktop endpoints share this fixed profile; library Play stays zero.
 pub fn play(game: &mut LocalGame, endpoint: &str, nickname: &str, skin: u8) -> Result<u16> {

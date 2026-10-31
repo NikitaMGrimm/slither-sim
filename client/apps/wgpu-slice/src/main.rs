@@ -170,6 +170,10 @@ mod desktop {
         pacing_log: Option<(Instant, u32, Instant, f64)>,
     }
     impl Running {
+        fn can_play(&self) -> bool {
+            (!self.login.picker.policy.changed() && self.endpoint.is_some())
+                || self.login.picker.policy.can_play()
+        }
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
             let effects = if self.login.picker.policy.visible() {
@@ -191,9 +195,8 @@ mod desktop {
                     .login
                     .input
                     .execute(effects, &mut WindowEditHost(&self.window));
-                let admission = self.game.can_play()
-                    && self.preparation.is_none()
-                    && (self.official || self.endpoint.is_some());
+                let admission =
+                    self.game.can_play() && self.preparation.is_none() && self.can_play();
                 self.login
                     .input
                     .state
@@ -249,6 +252,15 @@ mod desktop {
             Err("Effect drain budget".into())
         }
         fn service(&mut self) -> Result<()> {
+            if !self.login.picker.policy.official_context() {
+                if let Some(directory) = &self.directory {
+                    directory.cancel();
+                    self.directory_progress = None;
+                }
+                if let Some(preparation) = &self.preparation {
+                    preparation.cancel();
+                }
+            }
             if let Some(progress) = &self.directory_progress
                 && let Some(snapshot) = progress.take()
             {
@@ -278,7 +290,7 @@ mod desktop {
                 self.schedule.invalidate();
             }
             if self.login.picker.policy.take_directory_request() {
-                if self.official {
+                if self.login.picker.policy.official_context() {
                     if self.directory.is_none() && self.preparation.is_none() {
                         match DirectoryPreparation::start() {
                             Ok(work) => {
@@ -293,6 +305,17 @@ mod desktop {
                 } else {
                     self.login.picker.policy.status = "Directory available in official mode".into();
                 }
+            }
+            if let Some(servers) = self.login.picker.policy.take_custom_write()
+                && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
+                && slither_wgpu_slice::server_picker_native::write_custom(
+                    &path.with_file_name("custom-servers.txt"),
+                    &servers,
+                )
+                .is_err()
+            {
+                self.login.picker.policy.custom_error =
+                    "Custom servers saved for this run only".into();
             }
             if let Some(value) = self.login.picker.policy.take_preference()
                 && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
@@ -460,9 +483,7 @@ mod desktop {
             // FIFO may have waited. Ingest everything now available before
             // sampling the next frame; receive() retains its own deferral rules.
             self.service()?;
-            let admission = self.game.can_play()
-                && self.preparation.is_none()
-                && (self.official || self.endpoint.is_some());
+            let admission = self.game.can_play() && self.preparation.is_none() && self.can_play();
             let (intents, effects) = self.login.step(
                 self.started.elapsed().as_secs_f64() * 1000.,
                 admission,
@@ -486,45 +507,65 @@ mod desktop {
                             slither_client::presentation::QualityMode::Low
                         }
                     });
-                    if self.official {
-                        let explicit = if self.login.picker.policy.changed() {
-                            None
-                        } else {
+                    if !self.can_play() {
+                        continue;
+                    }
+                    use slither_client::server_picker::ServerPreference;
+                    use slither_wgpu_slice::endpoint_login::{self, Connection};
+                    let cli_target = !self.login.picker.policy.changed() && self.server.is_some();
+                    let selection = if cli_target && !self.official {
+                        ServerPreference::Custom(self.server.clone().expect("CLI server"))
+                    } else if cli_target {
+                        self.login
+                            .picker
+                            .policy
+                            .selection
+                            .official_id()
+                            .map_or(ServerPreference::Automatic, ServerPreference::Official)
+                    } else {
+                        self.login.picker.policy.selection.clone()
+                    };
+                    let result = endpoint_login::prepare_selection(&selection, |id| {
+                        let explicit = if cli_target && self.official {
                             self.server.clone()
+                        } else {
+                            None
                         };
                         let pending = DirectoryPreparation::take_for_play(
                             explicit.as_deref(),
                             &mut self.directory,
                         );
-                        match Preparation::start_with_directory(
+                        Preparation::start_with_directory(
                             explicit,
-                            self.login.picker.policy.selection.0,
+                            id,
                             self.directory_snapshot.clone(),
                             pending,
-                        ) {
-                            Ok(preparation) => {
-                                if let Some(progress) = &preparation.progress {
-                                    self.directory_progress = Some(progress.clone());
-                                }
-                                self.preparation = Some(preparation);
+                        )
+                    });
+                    match result {
+                        Ok(Connection::Official(preparation)) => {
+                            if let Some(progress) = &preparation.progress {
+                                self.directory_progress = Some(progress.clone());
                             }
-                            Err(error) => {
-                                if self.directory.is_none() {
-                                    self.directory_progress = None;
-                                    self.login.picker.policy.directory_failed(&error);
-                                }
+                            self.preparation = Some(preparation);
+                        }
+                        Ok(Connection::Direct(endpoint)) => {
+                            if let Err(error) = endpoint_login::play_appearance(
+                                &mut self.game,
+                                &endpoint,
+                                &self.nickname,
+                                &self.play_appearance,
+                            ) {
                                 self.game.fail(&error);
                             }
                         }
-                    } else if let Some(endpoint) = &self.endpoint
-                        && let Err(error) = slither_wgpu_slice::endpoint_login::play_appearance(
-                            &mut self.game,
-                            endpoint,
-                            &self.nickname,
-                            &self.play_appearance,
-                        )
-                    {
-                        self.game.fail(&error);
+                        Err(error) => {
+                            if selection.custom_address().is_none() && self.directory.is_none() {
+                                self.directory_progress = None;
+                                self.login.picker.policy.directory_failed(&error);
+                            }
+                            self.game.fail(&error);
+                        }
                     }
                 }
             }
@@ -739,10 +780,28 @@ mod desktop {
             let mut login = NativeLogin::with_preferences(restored.record, storage)?;
             login.restore_settings(slither_wgpu_slice::menu_storage::SettingsStorage::native());
             if let Some(path) = slither_wgpu_slice::server_picker_native::preference_path() {
+                slither_wgpu_slice::server_picker_native::read_custom(
+                    &path.with_file_name("custom-servers.txt"),
+                    &mut login.picker.policy.custom,
+                );
                 login.picker.policy.selection =
                     slither_wgpu_slice::server_picker_native::read_preference(&path);
             }
             login.picker.policy.start_directory(options.official);
+            if !options.official
+                && let Some(server) = &options.server
+            {
+                let address = server.clone();
+                login.picker.policy.selection =
+                    slither_client::server_picker::ServerPreference::Custom(address.clone());
+            }
+            if let Some(address) = login.picker.policy.selection.custom_address() {
+                login
+                    .picker
+                    .input
+                    .state
+                    .reset_editor(slither_client::server_picker::ADDRESS_EDITOR, address);
+            }
             Ok(Running {
                 login,
                 endpoint: options.endpoint.clone(),
@@ -809,9 +868,7 @@ mod desktop {
                     r.login.champion.input.modifiers(modifiers.state());
                     r.login.picker.input.modifiers(modifiers.state());
                 }
-                let admission = r.game.can_play()
-                    && r.preparation.is_none()
-                    && (r.official || r.endpoint.is_some());
+                let admission = r.game.can_play() && r.preparation.is_none() && r.can_play();
                 let champion = r.login.champion.policy.visible();
                 if let WindowEvent::Focused(_) = &event {
                     if r.login.picker.policy.visible() {
@@ -1010,9 +1067,7 @@ mod desktop {
             );
         }
         if !options.official && options.endpoint.is_none() {
-            eprintln!(
-                "No connection mode configured; Play stays disabled. Use --server host:port or --official."
-            );
+            eprintln!("Choose a server in Servers, or use --server host:port or --official.");
         }
         let trace = latency::Run::from_env();
         let event_loop = EventLoop::<TransportWake>::with_user_event()
