@@ -15,7 +15,7 @@ synthetic fixture adds 24 straight 120-point snakes and 2,400 food to the offlin
 packet fixture. It exercises about 29,800 draw records; this is a density stress
 case, not a measurement of official-server populations.
 
-Each scene warms for 40 frames, then records 300 frames in `frames.csv` and three
+Each scene warms for 40 frames, then records 60 frames in `frames.csv` and three
 premultiplied RGBA8 readbacks. Preparation calls production world, HUD and login
 composition, including the native retained-picture clone. Client state is frozen
 to isolate frame preparation. Resource synchronization and render submission
@@ -28,7 +28,7 @@ thread, using a wrapper around `System`. They exclude driver heaps, GPU memory,
 worker threads and live/resident heap size. The renderer retains application
 MSAA targets and vertex buffers; wgpu still owns transient command/upload staging.
 
-Retain both release binaries and alternate five runs per side on the same PC.
+Retain both release binaries and alternate five runs per side on the same PC (300 measured frames per scene/side).
 Compare readback bytes within each adapter and report per-phase median/p95,
 per-frame allocation bytes, and variation across runs. Draw planning, geometry
 conversion and GPU submission remain work after cached texture copies disappear.

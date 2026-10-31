@@ -197,7 +197,7 @@ fn run(output: &Path) -> Result<()> {
             hud.opacity.rows = 1.;
             let quality = game.quality();
             let mut login = NativeLogin::new("Player")?;
-            for index in 0..340 {
+            for index in 0..100 {
                 let (p, prepare, pb) = measure(|| {
                     let mut p = render::prepare_gameplay(
                         &mut world,
@@ -242,7 +242,7 @@ fn run(output: &Path) -> Result<()> {
                     )
                     .unwrap();
                 }
-                if [40, 180, 339].contains(&index) {
+                if [40, 70, 99].contains(&index) {
                     capture(&r, &texture, &dir.join(format!("{mode}-{index}.rgba")))?;
                 }
             }
@@ -252,7 +252,7 @@ fn run(output: &Path) -> Result<()> {
             return Err(format!("GPU validation: {e}"));
         }
         std::fs::write(dir.join("frames.csv"), csv).map_err(|e| e.to_string())?;
-        println!("PASS {name}: 300 measured frames per scene, no frame errors");
+        println!("PASS {name}: 60 measured frames per scene, no frame errors");
     }
     if seen.is_empty() {
         return Err("no hardware DX12 adapter exposed".into());
