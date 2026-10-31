@@ -40,10 +40,11 @@ global menu/picture quotas and adds a compactness regression of 32 resources,
 4 MiB and 160 producer quads through DPR 1–5, with ≤64 quads through DPR 2.
 Inactive screen resources retire transactionally; retained pictures remain valid.
 
+On native non-Linux hosts (the app tests and specimen tool are not built on Linux),
 `menu_specimens <new-output-directory> --settings` produces finite offscreen PNGs
 and `settings.json` with geometry, revision, fonts, resource/quad costs and actual
 GPU draw runs. It includes 960×540 at 1×/1.5×/2×, narrow and DPR-5 cases, selected,
 focused, pressed, disabled and storage-failure states. Run with
-`CARGO_BUILD_JOBS=2`. Full verification is `npm run check`; neither proves physical
-input, owner appearance/feel or server acceptance. These checks open no windows
-and contact no game servers.
+`CARGO_BUILD_JOBS=2`. Full verification is `npm run check`, which skips native
+wgpu checks on Linux; neither proves physical input, owner appearance/feel or
+server acceptance. These checks open no windows and contact no game servers.
