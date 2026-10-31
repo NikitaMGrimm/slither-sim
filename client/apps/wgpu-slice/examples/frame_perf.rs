@@ -220,6 +220,9 @@ fn run(output: &Path) -> Result<()> {
                     }
                     Ok(p)
                 })?;
+                if p.frame.draws.len() < 20_000 {
+                    return Err("synthetic density did not reach the renderer".into());
+                }
                 let (_, sync, sb) = measure(|| r.sync_resources(&p.resources).map_err(Into::into))?;
                 let (_, submit, rb) = measure(|| {
                     r.render(&p.frame, &view)?;
@@ -250,6 +253,9 @@ fn run(output: &Path) -> Result<()> {
         }
         std::fs::write(dir.join("frames.csv"), csv).map_err(|e| e.to_string())?;
         println!("PASS {name}: 300 measured frames per scene, no frame errors");
+    }
+    if seen.is_empty() {
+        return Err("no hardware DX12 adapter exposed".into());
     }
     Ok(())
 }

@@ -1349,6 +1349,21 @@ fn regression_seventeenth_setup_rejects_without_publication() {
     assert!(g.take_frame().is_none());
 }
 #[test]
+fn release_setup_picture_budget_preserves_packet_admission_and_later_ingress() {
+    let mut g = negotiating();
+    g.draw_diagnostics.strict_validation = false;
+    let mut packets = vec![setup(); 17];
+    packets.push(snake(44));
+    g.receive(g.generation(), &bundle(&packets), 3.).unwrap();
+    assert_eq!(g.draw_diagnostics.skipped_frames, 1);
+    assert_eq!(g.phase(), Phase::Playing);
+    assert!(g.failure.is_none());
+    pictures(&mut g);
+    g.receive(g.generation(), &bundle(&[board()]), 4.).unwrap();
+    pump(&mut g, 20.);
+    assert_eq!(g.phase(), Phase::Playing);
+}
+#[test]
 fn regression_retained_picture_does_not_defer_handshake_expiry() {
     let mut g = negotiating();
     g.begin_frame(20., [960, 540], 1.).unwrap();

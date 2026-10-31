@@ -365,6 +365,11 @@ impl Renderer {
         self.textures.remove(&key).is_some()
     }
     pub fn sync_resources(&mut self, resources: &[Resource]) -> RenderResult<()> {
+        if self.lost.load(Ordering::SeqCst) {
+            return Err(RenderError::Host(
+                "GPU device lost; host stopped, scene retained".into(),
+            ));
+        }
         if resources.len() > 2048
             || resources
                 .iter()
@@ -998,6 +1003,12 @@ mod tests {
             buffer.unmap();
         }
         assert!(pollster::block_on(scope.pop()).is_none());
+        r.lost.store(true, Ordering::SeqCst);
+        assert!(matches!(r.sync_resources(&[]), Err(RenderError::Host(_))));
+        assert!(matches!(
+            r.render(&frame, &resized.create_view(&Default::default())),
+            Err(RenderError::Host(_))
+        ));
     }
 
     #[test]
