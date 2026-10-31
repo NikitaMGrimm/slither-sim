@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.9.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.2...v0.9.0) - 2026-10-31
+
 ### Fixed
 
 - Vlither players can join. Vlither answers the login challenge with its own
