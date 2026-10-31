@@ -176,7 +176,7 @@ mod native {
         PngEncoder::new_with_quality(
             fs::File::create(out.join(format!("{name}.png"))).map_err(|e| e.to_string())?,
             CompressionType::Fast,
-            FilterType::Adaptive,
+            FilterType::NoFilter,
         )
         .write_image(&rgba, w, h, image::ExtendedColorType::Rgba8)
         .map_err(|e| e.to_string())?;
@@ -258,6 +258,7 @@ mod native {
                         login.studio.presented();
                     }
                     // Explicit fractional clip cuts the surface/shadow; other controls stay intact.
+                renderer.sync_resources(&[])?;
                     let mut state = StudioState::new(AppearanceRecord {
                         builtin: 7,
                         ..Default::default()
