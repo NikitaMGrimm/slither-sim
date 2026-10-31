@@ -317,6 +317,14 @@ mod tests {
         bounds[0].max.x = 100000.0;
         bounds[0].max.y = 100000.0;
         assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+        let distant = Bounds::between(
+            Point { x: 65536.0, y: 0.0 },
+            Point {
+                x: 65578.0,
+                y: 42.0,
+            },
+        );
+        assert!(CollisionGrid::new(&[small, distant], &[200.0, 200.0]).is_none());
         let far = Bounds::between(
             Point {
                 x: 1048577.0,
