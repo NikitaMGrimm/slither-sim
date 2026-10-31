@@ -36,6 +36,14 @@ class CheckRunnerTests(unittest.TestCase):
         run.assert_not_called()
         self.assertIn("--no-default-features", output.getvalue())
 
+    def test_protocol_package_is_explicit_in_checks_and_both_consumer_filters(self):
+        for group in ("lint", "test", "wasm", "package"):
+            self.assertTrue(any("slither-protocol" in command for command in check.commands(group)), group)
+        workflow = (check.ROOT / ".github/workflows/checks.yml").read_text(encoding="utf-8")
+        for area in ("client", "e2e"):
+            line = next(line for line in workflow.splitlines() if f'echo "{area}=$(grep' in line)
+            self.assertIn("crates/slither-protocol/", line)
+
     def test_default_lists_every_host_group_without_optional_wasm(self):
         with patch.object(check.subprocess, "run") as run, redirect_stdout(io.StringIO()) as output:
             self.assertEqual(check.main(["--list"]), 0)

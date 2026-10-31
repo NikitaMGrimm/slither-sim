@@ -48,7 +48,7 @@ publish = ["crates-io"]
 
 [workspace]
 resolver = "3"
-members = ["ffi", "python", "client", "client/apps/wgpu-slice"]
+members = ["ffi", "python", "client", "client/apps/wgpu-slice", "crates/slither-protocol"]
 # Plain cargo commands at the root keep building and packaging only this crate.
 default-members = ["."]
 

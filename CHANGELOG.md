@@ -10,6 +10,9 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
+- Document owner-gated shared-protocol publication and archive verification
+  prerequisites, before any simulator dependency switch.
+
 - The hosting guide has a section on large bot worlds: size the tick from a
   world that has run for 15 minutes, watch for a growing backlog, run one large
   world per machine, and build with PGO and glibc's hugepage setting on Linux.

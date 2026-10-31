@@ -48,6 +48,12 @@ release = false
 name = "slither-wgpu-slice"
 release = false
 
+# Owner-gated bootstrap: enable independent protocol release preparation only
+# after package-aware publication/identity checks and trusted publishing exist.
+[[package]]
+name = "slither-protocol"
+release = false
+
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"
 protect_breaking_commits = true

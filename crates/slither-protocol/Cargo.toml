@@ -1,0 +1,13 @@
+[package]
+name = "slither-protocol"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+description = "Borrowed Slither wire framing, protocol-19 views and client message builders"
+repository = "https://github.com/NikitaMGrimm/slither-sim"
+readme = "README.md"
+license = "MIT"
+keywords = ["slither", "protocol", "parser", "wasm"]
+categories = ["parsing", "games", "no-std"]
+include = ["/src", "/tests", "/README.md", "/LICENSE", "/CHANGELOG.md"]
+publish = ["crates-io"]
