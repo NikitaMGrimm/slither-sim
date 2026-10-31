@@ -84,7 +84,8 @@ score. Duplicate outcomes and close-only phases cannot rewrite it. Missing
 captures stay blank; no disconnect supplies a score. Last-life content survives
 the next Play and disconnect; `EndScreenState` remains independent. Champion
 outcomes hand off to the native [shared champion controls](menu-controls.md), with
-ordinary controls disabled until the committed acknowledgement and editor fade.
+ordinary controls disabled until acknowledgement or terminal transport ends the
+editor, followed by its exit fade and the session's existing return.
 Browser development pages retain the labelled pending handoff.
 The menu follows the committed SessionPolicy hold/return fraction and retained
 accepted outcome, including after a transport close. It owns no death timer.
@@ -130,7 +131,9 @@ inference was incorrect. Native Save uses the shared
 [champion protocol boundary](menu-controls.md#victory-authority-and-send).
 
 Raw Unicode preedit and its optional UTF-8 byte selection stay separate from
-the committed value, field limit and undo history. Retaining raw preedit until
+the committed value, field limit and undo history. The preview keeps at most
+256 UTF-16 units on scalar boundaries, before copying/measuring/rasterizing;
+its byte selection clamps to that prefix. Retaining this raw Unicode prefix until
 commit approximates Chromium's input-event timing during composition, rather
 than establishing timing parity. Empty preedit immediately clears the raw
 preview, including winit's mandatory pre-Commit clear.

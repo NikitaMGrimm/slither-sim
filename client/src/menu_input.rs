@@ -80,10 +80,28 @@ fn boundary(text: &str, byte: usize) -> usize {
     byte
 }
 
+/// Preview-only bound, independent of each field's committed/wire limit.
+/// At most 768 UTF-8 bytes, keeping measurement and copied rasters bounded.
+pub const MAX_PREEDIT_UNITS: usize = 256;
+
+/// Copy only a bounded Unicode prefix, without splitting a UTF-16 surrogate pair.
+/// Adapters use this before copying an OS-owned string; the core rechecks it.
+pub fn bounded_preedit(text: &str) -> String {
+    let mut units = 0;
+    let end = text
+        .char_indices()
+        .find_map(|(byte, ch)| {
+            units += ch.len_utf16();
+            (units > MAX_PREEDIT_UNITS).then_some(byte)
+        })
+        .unwrap_or(text.len());
+    text[..end].to_owned()
+}
+
 /// A raw IME preview; selection offsets are UTF-8 bytes, as supplied by winit.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Preedit {
-    /// Unnormalized Unicode, separate from the committed value and undo history.
+    /// Bounded unnormalized Unicode, separate from committed text and history.
     pub text: String,
     /// Optional byte range; invalid host offsets are clamped to scalar boundaries.
     pub selection: Option<(usize, usize)>,
@@ -656,6 +674,7 @@ impl MenuInputState {
             }
             EditIntent::Preedit(text, selection) => {
                 self.pending = None;
+                let text = bounded_preedit(&text);
                 let selection = selection.map(|(a, c)| (boundary(&text, a), boundary(&text, c)));
                 let editor = self.editor_mut(field);
                 // Empty preedit clears the preview, including before Commit.

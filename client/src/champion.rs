@@ -29,7 +29,7 @@ impl ChampionState {
     pub fn finished(&self) -> bool {
         self.finished
     }
-    /// Sampled ordinary-control fade after the acknowledged editor disappears.
+    /// Sampled ordinary-control fade after the editor exits.
     pub fn ordinary_alpha(&self) -> f64 {
         if self.generation.is_none() {
             1.
@@ -42,11 +42,14 @@ impl ChampionState {
         if self.generation.is_some_and(|g| g != generation) {
             *self = Self::default();
         }
+        // Terminal transport ends the handoff without claiming it was saved.
+        // The existing menu/session return still controls login admission.
+        self.ending = session.champion_acknowledged
+            || matches!(session.phase, Phase::Failed | Phase::Disconnected);
         if self.generation.is_none() && session.outcome == Some(Phase::Victory) {
             self.generation = Some(generation);
             return true;
         }
-        self.ending = session.champion_acknowledged;
         false
     }
     /// Sample fades from the same core clock used by menu callbacks.

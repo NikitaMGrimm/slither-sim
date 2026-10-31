@@ -553,7 +553,7 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
 }
 
 #[test]
-fn champion_is_only_accepted_v1_and_survives_close_without_ordinary_focus() {
+fn champion_requires_v1_and_close_restores_ordinary_login() {
     use endpoint_tape::{bundle, effects, pump};
     for flag in [None, Some(0), Some(1), Some(2)] {
         let mut game = endpoint_tape::playing();
@@ -581,18 +581,22 @@ fn champion_is_only_accepted_v1_and_survives_close_without_ordinary_focus() {
             pump(&mut game, now);
             login.observe_game(&game).unwrap();
             let (intents, _) = login.step(now, game.can_play(), false).unwrap();
-            if flag == Some(1) {
+            if flag == Some(1)
+                && login.state.view(true).phase != slither_client::start_page::MenuPhase::Login
+            {
                 assert!(!intents.contains(&StartMenuIntent::FocusNickname));
             }
         }
         let view = login.state.view(true);
-        assert_eq!(view.champion_pending, flag == Some(1));
-        assert_eq!(view.ordinary_controls_visible, flag != Some(1));
+        assert!(!view.champion_pending);
+        assert!(view.ordinary_controls_visible);
         assert_eq!(
             view.last_life.label.is_empty(),
             !matches!(flag, Some(0 | 1))
         );
-        assert_eq!(view.disabled, flag == Some(1));
+        assert!(!view.disabled);
+        assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
+        assert!(!game.champion_session().champion_acknowledged);
     }
 }
 

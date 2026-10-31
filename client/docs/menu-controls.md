@@ -18,7 +18,11 @@ is still separate work.
 The small `EditorId` registry separates identity from `TextRule`. Existing
 `TextEditState` selection, bounded undo, token-acknowledged clipboard work and
 the IME Enter barrier serve both native paths. Equal descriptions and sampled
-animation updates retain preedit. The champion field scrolls horizontally and
+animation updates retain preedit. Unicode previews retain at most 256 UTF-16
+units, without splitting a scalar; native adapters bound their copy before
+measurement, and the core rechecks the limit and clamps byte selections. This
+preview-only cap does not change committed normalization or the Enter barrier.
+The champion field scrolls horizontally and
 clips text, selection, caret and preedit underline. Painting, pointer selection
 and logical IME candidate placement share measured advances. Native Lucida bold
 still resolves to Arial Bold; synthetic checks do not establish OS IME feel or
@@ -43,8 +47,9 @@ No profile acquisition, new socket or login authority participates in Save.
 Life-control argument 2 publishes `champion_acknowledged` only after ingress
 commits. The editor then fades out and ordinary controls fade in, at the same
 core clock seam. Login focus still waits for the existing return/picture/session
-admission. Transport close without that acknowledgement keeps a disabled
-champion handoff; it cannot claim that a message was saved.
+admission. Transport close or error before acknowledgement ends the editor
+through the same sampled fade and session return. It does not claim a saved
+message, resend, or enable login before the existing return completes.
 
 ## Painting and bounds
 

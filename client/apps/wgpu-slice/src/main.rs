@@ -318,8 +318,7 @@ mod desktop {
                 self.game.phase(),
                 Phase::Ready | Phase::Failed | Phase::Disconnected
             );
-            self.schedule
-                .activity(active || self.login.state.view(true).visible);
+            self.schedule.activity(active || self.login.needs_redraw());
             if !matches!(
                 self.game.phase(),
                 Phase::Opening | Phase::Challenge | Phase::Setup

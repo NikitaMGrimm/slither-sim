@@ -31,6 +31,10 @@ impl NativeLogin {
     pub fn set_wordmark(&mut self, enabled: bool) {
         self.menu.wordmark = enabled;
     }
+    pub fn needs_redraw(&self) -> bool {
+        // A terminal socket must not idle the host during the hidden death hold.
+        self.state.view(true).visible || self.champion_session.death_pending
+    }
     pub fn blocks_gameplay(&self) -> bool {
         self.champion.policy.visible()
             || matches!(
