@@ -41,7 +41,9 @@ impl std::fmt::Display for RenderError {
 }
 impl From<RenderError> for String {
     fn from(error: RenderError) -> Self {
-        error.to_string()
+        match error {
+            RenderError::Frame(e) | RenderError::Host(e) => e,
+        }
     }
 }
 type RenderResult<T> = std::result::Result<T, RenderError>;

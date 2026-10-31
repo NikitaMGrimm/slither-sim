@@ -65,6 +65,7 @@ fn appearance() -> Vec<u8> {
 #[derive(Clone, Debug)]
 pub struct Resource {
     pub asset: BodyAsset,
+    /// Cache eviction and retained pictures share immutable rasters without copying pixels.
     pub image: std::sync::Arc<RgbaImage>,
 }
 

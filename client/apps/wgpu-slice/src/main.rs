@@ -12,7 +12,7 @@ mod desktop {
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
-        gpu::{SurfaceHost, instance},
+        gpu::{RenderError, SurfaceHost, instance},
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
@@ -416,10 +416,8 @@ mod desktop {
             let picture = composed.as_ref().unwrap_or(&p);
             if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
                 return match e {
-                    slither_wgpu_slice::gpu::RenderError::Frame(e) => {
-                        self.skip_bad_frame(p.frame.identity, e)
-                    }
-                    slither_wgpu_slice::gpu::RenderError::Host(e) => {
+                    RenderError::Frame(e) => self.skip_bad_frame(p.frame.identity, e),
+                    RenderError::Host(e) => {
                         self.game.presented(false)?;
                         Err(e)
                     }
@@ -441,10 +439,10 @@ mod desktop {
                     self.game.retry_frame(p)?;
                     self.schedule.retry(Instant::now());
                 }
-                Err(slither_wgpu_slice::gpu::RenderError::Frame(e)) => {
+                Err(RenderError::Frame(e)) => {
                     return self.skip_bad_frame(p.frame.identity, e);
                 }
-                Err(slither_wgpu_slice::gpu::RenderError::Host(e)) => {
+                Err(RenderError::Host(e)) => {
                     self.game.presented(false)?;
                     return Err(e);
                 }
