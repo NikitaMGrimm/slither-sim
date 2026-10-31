@@ -120,12 +120,12 @@ fn native_login_commit_focus_pointer_and_deferred_play() {
 }
 
 #[test]
-fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
+fn tab_focus_releases_all_holds_and_settings_has_no_play_effect() {
     let mut login = NativeLogin::new("").unwrap();
     login.step(0., true, false).unwrap();
     for focus in [
         slither_client::login_controls::PLAY,
-        slither_client::login_controls::QUALITY,
+        slither_client::login_controls::SETTINGS,
         slither_client::login_controls::NICKNAME,
     ] {
         let effects = login.focus(focus);
@@ -138,10 +138,12 @@ fn tab_focus_releases_all_holds_and_quality_has_no_play_effect() {
             4
         );
     }
-    login.focus(slither_client::login_controls::QUALITY);
+    login.focus(slither_client::login_controls::SETTINGS);
     login.activate(true);
-    assert_eq!(login.state.view(true).quality, MenuQuality::Low);
+    assert!(login.state.settings.visible());
+    assert_eq!(login.state.view(true).quality, MenuQuality::High);
     assert!(login.step(16., true, false).unwrap().0.is_empty());
+    login.close_settings(true);
     assert_eq!(login.input.state.focus(), None);
     login.focus(slither_client::login_controls::NICKNAME);
     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
@@ -158,15 +160,24 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
         ([6720, 3780], 7.),
         ([7680, 4320], 8.),
     ] {
-        for element in [E::Play, E::NicknameHolder, E::Quality] {
+        for element in [E::Play, E::NicknameHolder, E::Settings] {
             let mut login = NativeLogin::new("Test").unwrap();
-            login.step(0., true, false).unwrap();
-            login.step(16., true, false).unwrap();
+            for now in (0..=9600).step_by(16) {
+                login.step(now as f64, true, false).unwrap();
+            }
             login
                 .prepare(physical.map(|n| (f64::from(n) / dpr) as u32), true, None)
                 .unwrap();
             let rect = login.layout.viewport_rect(element);
-            let center = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
+            let center = [
+                rect.x + rect.width / 2.,
+                rect.y
+                    + if element == E::Settings {
+                        46.
+                    } else {
+                        rect.height / 2.
+                    },
+            ];
             let host = login.prepare_host(physical, dpr, true, None).unwrap();
             assert_eq!(host.frame.extent, physical);
             assert_eq!(host.frame.viewport_scale, dpr);
@@ -196,7 +207,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                 E::Play => {
                     assert_eq!(
                         login
-                            .step(16., true, false)
+                            .step(9616., true, false)
                             .unwrap()
                             .0
                             .iter()
@@ -204,7 +215,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                             .count(),
                         1
                     );
-                    assert!(login.step(32., true, false).unwrap().0.is_empty());
+                    assert!(login.step(9632., true, false).unwrap().0.is_empty());
                 }
                 E::NicknameHolder => {
                     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
@@ -238,7 +249,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                         caret.destination
                     );
                 }
-                E::Quality => assert_eq!(login.state.view(true).quality, MenuQuality::Low),
+                E::Settings => assert!(login.state.settings.visible()),
                 _ => unreachable!(),
             }
         }
@@ -944,47 +955,6 @@ fn windows_click_preferences_are_converted_to_logical_half_extents() {
             [winsafe::co::SM::CXDOUBLECLK, winsafe::co::SM::CYDOUBLECLK]
                 .map(|m| f64::from(winsafe::GetSystemMetrics(m).max(1)) / (2. * dpr))
         );
-    }
-}
-
-#[test]
-fn quality_focus_keeps_the_existing_full_height_capsule() {
-    use slither_client::{login_controls::QUALITY, menu_theme::MenuTheme};
-    use slither_wgpu_slice::materials::{self, MenuSurface};
-    for dpr in [1., 1.5, 2.] {
-        let mut login = NativeLogin::new("").unwrap();
-        login.step(0., true, false).unwrap();
-        login.step(16., true, false).unwrap();
-        login.focus(QUALITY);
-        let picture = login
-            .prepare_host([(960. * dpr) as u32, (540. * dpr) as u32], dpr, true, None)
-            .unwrap();
-        let rect = login.layout.viewport_rect(E::Quality);
-        let expected = materials::menu_control(
-            [
-                (rect.width * dpr).ceil() as u32,
-                (rect.height * dpr).ceil() as u32,
-            ],
-            ((rect.height / 2.).ceil() * dpr).ceil(),
-            [MenuTheme::default().field; 2],
-            dpr,
-            MenuSurface::Compact,
-        )
-        .unwrap();
-        let half = expected.width.div_ceil(2);
-        let tile = picture
-            .resources
-            .iter()
-            .find(|r| r.image.width == half && r.image.height == expected.height)
-            .expect("full-height focus end cap");
-        for (got, want) in tile
-            .image
-            .pixels
-            .chunks_exact(half as usize * 4)
-            .zip(expected.pixels.chunks_exact(expected.width as usize * 4))
-        {
-            assert_eq!(got, &want[..half as usize * 4]);
-        }
     }
 }
 

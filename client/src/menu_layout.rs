@@ -96,8 +96,10 @@ pub enum MenuElement {
     Play,
     /// Bottom-left link.
     Skin,
-    /// Bottom-right link.
+    /// Bottom-centre server-directory link.
     Server,
+    /// Bottom-right product Settings icon and caption.
+    Settings,
     /// Top-right link.
     Quality,
     /// Centered spinner, before its independent animated center-origin scale.
@@ -116,7 +118,7 @@ pub struct MenuLayout {
     /// Whether the tips row participates in layout and hit testing.
     pub tips_visible: bool,
     origin: (f64, f64),
-    rects: [(MenuElement, MenuRect); 10],
+    rects: [(MenuElement, MenuRect); 11],
 }
 
 fn rect(x: f64, y: f64, width: f64, height: f64) -> MenuRect {
@@ -214,7 +216,11 @@ impl MenuLayout {
                 (MenuElement::Skin, rect(20., height - 16. - 89., 95., 89.)),
                 (
                     MenuElement::Server,
-                    rect(width - 20. - 107., height - 16. - 89., 107., 89.),
+                    rect((width - 107.) / 2., height - 16. - 89., 107., 89.),
+                ),
+                (
+                    MenuElement::Settings,
+                    rect(width - 20. - 95., height - 16. - 89., 95., 89.),
                 ),
                 (MenuElement::Quality, rect(width - 20. - 90., 16., 90., 87.)),
                 (
@@ -295,6 +301,10 @@ impl MenuLayout {
 fn fixed(element: MenuElement) -> bool {
     matches!(
         element,
-        MenuElement::Skin | MenuElement::Server | MenuElement::Quality | MenuElement::Spinner
+        MenuElement::Skin
+            | MenuElement::Server
+            | MenuElement::Settings
+            | MenuElement::Quality
+            | MenuElement::Spinner
     )
 }

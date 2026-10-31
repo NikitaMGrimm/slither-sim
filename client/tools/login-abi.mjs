@@ -29,6 +29,15 @@ for(const base of ['dist/web/slither_client','dist/wgpu-slice/pkg/slither_wgpu_s
     assert.equal(Object.hasOwn(retry.step(64,960,540,36,true,false),'request'),false);
     retry.free();admission?.free();
   }
+  for(const [record,legacy,quality] of [['1:0','1','low'],['1:1','0','high'],[undefined,'0','low'],['2:0:native','0','low'],['1:0:extra','00','high'],['1'.repeat(65),'0','low'],[undefined,undefined,'high']]) {
+    const migrated=new wasm.LoginMenu('en','1');
+    migrated.restore_settings(record,legacy);
+    assert.equal(migrated.step(0,960,540,36,true,false).quality,quality);
+    assert.equal(migrated.settings_record(),quality==='low'?'1:0':'1:1');
+    migrated.action('play',false,true);
+    assert.equal(migrated.step(16,960,540,36,true,false).requested_quality,quality);
+    migrated.free();
+  }
   const menu=new wasm.LoginMenu('fr','0');
   assert.equal(menu.edit('A😀\u007f'),'A  \u007f');
   let view=menu.step(0,1280,720,36,true,false);

@@ -10,8 +10,8 @@ use crate::{
 pub const NICKNAME: ControlId = ControlId(0);
 /// Deferred Play action identity.
 pub const PLAY: ControlId = ControlId(1);
-/// Quality toggle identity.
-pub const QUALITY: ControlId = ControlId(2);
+/// Login-only Settings entry; the old quality control is retired.
+pub const SETTINGS: ControlId = ControlId(2);
 /// Server directory link identity.
 pub const SERVER: ControlId = ControlId(3);
 /// Offline appearance editor, independent of endpoint availability.
@@ -42,14 +42,17 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
                 !view.play_disabled
             } else if id == SERVER {
                 crate::server_picker::available(view)
+            } else if id == SETTINGS {
+                crate::settings::available(view)
             } else {
                 !view.disabled
             },
             alpha,
             name,
             tab_order: Some(match id {
-                CHANGE_SKIN => 3,
-                SERVER => 4,
+                CHANGE_SKIN => 2,
+                SERVER => 3,
+                SETTINGS => 4,
                 _ => id.0,
             }),
             style,
@@ -114,21 +117,16 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
                 view.play_label.into(),
             ),
             control(
-                QUALITY,
-                E::Quality,
+                SETTINGS,
+                E::Settings,
                 1.,
-                ControlStyle::QualityButton,
-                1.,
-                true,
-                ControlKind::Button {
-                    label: if view.quality == crate::menu_preferences::MenuQuality::High {
-                        "High quality"
-                    } else {
-                        "Low quality"
-                    }
-                    .into(),
+                ControlStyle::MenuLink,
+                view.skin_alpha,
+                view.ordinary_controls_visible,
+                ControlKind::SettingsLink {
+                    label: "Settings".into(),
                 },
-                view.wording.graphics_quality.into(),
+                "Settings".into(),
             ),
             control(
                 SERVER,

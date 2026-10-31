@@ -25,6 +25,7 @@ fn picker() -> ServerPicker {
 }
 fn intent(p: &ServerPicker, id: ControlId) -> ControlIntent {
     ControlIntent {
+        checked: None,
         panel: 2,
         generation: p.generation,
         control: id,

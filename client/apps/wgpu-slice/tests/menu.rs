@@ -43,6 +43,37 @@ fn quality_roles_use_independent_default_bindings_and_reject_server() {
         art.menu_art(MenuArt::QualityLow).unwrap().asset.handle
     );
 }
+
+#[test]
+fn toggle_indicator_rejects_oversized_raster_before_allocation_or_cache_publication() {
+    let mut state = StartMenuState::new(MenuLocale::English, false, MenuQuality::High);
+    state.settings.open(&state.view(true));
+    let mut panel = state.settings.panel([960., 540.]);
+    panel
+        .controls
+        .iter_mut()
+        .find(|c| c.id == slither_client::settings::QUALITY)
+        .unwrap()
+        .placement
+        .scale = 32.;
+    let mut text = TextCache::menu();
+    assert!(
+        Menu::default()
+            .prepare_panel(
+                &mut text,
+                &panel,
+                &Default::default(),
+                &Default::default(),
+                &mut Default::default(),
+                Default::default(),
+                [960, 540],
+                1.
+            )
+            .is_err()
+    );
+    assert_eq!(text.cached_runs(), 0);
+    assert_eq!(text.cached_bytes(), 0);
+}
 fn png_rect(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
     image::RgbaImage::from_pixel(width, height, image::Rgba(color))

@@ -12,6 +12,9 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   let stored = '1';
   try { stored = realm.localStorage.getItem('slither-client-quality-v1') ?? '1'; } catch { /* Memory remains authoritative. */ }
   const policy = new LoginMenu(realm.navigator.language, stored);
+  let settings;
+  try { settings = realm.localStorage.getItem('slither-client-settings-v1')?.slice(0, 65); } catch { /* Read-only startup; no repair writes. */ }
+  policy.restore_settings(settings, stored);
   const root = document.createElement('div'); root.dataset.login = '';
   root.style.cssText = 'position:fixed;inset:0;z-index:20;pointer-events:none;color:#e0e0ff;font-family:Arial,sans-serif';
   const element = (tag, name, text = '') => {
@@ -90,7 +93,10 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   }
   listen(quality,'click',()=> {
     const value=policy.action('quality',false,available());
-    if(value!==undefined) try {realm.localStorage.setItem('slither-client-quality-v1',value);} catch { /* Best effort only. */ }
+    if(value!==undefined) {
+      try {realm.localStorage.setItem('slither-client-settings-v1',policy.settings_record());} catch { /* Memory remains authoritative. */ }
+      try {realm.localStorage.setItem('slither-client-quality-v1',value);} catch { /* Preserve compatibility with old dev/reference hosts. */ }
+    }
   });
   listen(root,'focusin',()=>release());
   listen(root,'focusout',()=>release());
