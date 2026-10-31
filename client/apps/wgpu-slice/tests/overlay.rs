@@ -19,6 +19,37 @@ fn snapshot(game: &mut LocalGame, identity: u64) -> render::PreparedFrame {
 }
 
 #[test]
+fn retired_storage_reuses_world_and_overlay_without_changing_an_issued_retry() {
+    let mut game = tape::playing();
+    game.window_viewport([960, 540], 1.).unwrap();
+    game.begin_redraw(40., [960, 540], 1.).unwrap();
+    tape::effects(&mut game);
+    let retained = game.take_frame().unwrap();
+    let original = retained.frame.clone();
+    let original_overlay = retained.overlay.clone();
+    game.retry_frame(retained).unwrap();
+
+    let retired = snapshot(&mut game, 100);
+    let pointers = [
+        retired.frame.draws.as_ptr(),
+        retired.overlay.as_ref().unwrap().draws.as_ptr(),
+    ];
+    let expected = snapshot(&mut game, 101);
+    game.bank.recycle_frame(retired);
+    let reused = snapshot(&mut game, 101);
+    assert_eq!(reused.frame, expected.frame);
+    assert_eq!(reused.overlay, expected.overlay);
+    assert_eq!(reused.frame.draws.as_ptr(), pointers[0]);
+    assert_eq!(reused.overlay.as_ref().unwrap().draws.as_ptr(), pointers[1]);
+
+    let retry = game.take_frame().unwrap();
+    assert_eq!(retry.frame, original);
+    assert_eq!(retry.overlay, original_overlay);
+    game.presented(true).unwrap();
+    game.bank.recycle_frame(retry);
+}
+
+#[test]
 fn physical_hud_keeps_css_anchors_and_leaves_world_quads_and_pixels_unchanged() {
     let mut game = tape::negotiating();
     let mut named = tape::snake(44);

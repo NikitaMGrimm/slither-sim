@@ -112,6 +112,41 @@ fn calls(plan: &FoodPaintPlan) -> impl Iterator<Item = &FoodImageCommand> {
 }
 
 #[test]
+fn retired_food_storage_preserves_barriers_and_reuses_both_lanes() {
+    let palette = Palette::new();
+    let assets = palette.assets();
+    let mut world = FoodWorld::new();
+    palette.spawn(&mut world, 1, Point { x: 12., y: 13. });
+    mature(&mut world);
+    let mut storage = [Vec::new(), Vec::new()];
+    for high_quality in [true, false, true] {
+        let mut input = input(&world, &assets);
+        input.quality.high_quality = high_quality;
+        input.quality.blend = if high_quality { 1. } else { 0. };
+        let expected = plan_food(input).unwrap();
+        let pointers = storage.each_ref().map(|v| v.as_ptr());
+        let capacities = storage.each_ref().map(|v| v.capacity());
+        let [early, late] = storage;
+        let actual = plan_food_with_storage(input, early, late).unwrap();
+        assert_eq!(actual, expected);
+        for (index, lane) in [&actual.early, &actual.late].into_iter().enumerate() {
+            if lane.len() <= capacities[index] {
+                assert_eq!(lane.as_ptr(), pointers[index]);
+            }
+        }
+        storage = [actual.early, actual.late];
+    }
+    let mut rejected = input(&world, &assets);
+    rejected.command_limit = 0;
+    let [early, late] = storage;
+    assert_eq!(
+        plan_food_with_storage(rejected, early, late),
+        plan_food(rejected)
+    );
+    assert_eq!(plan_food(rejected), Err(FoodPaintError::CommandLimit));
+}
+
+#[test]
 fn all_outline_all_body_and_per_food_late_glows_are_separate_reverse_passes() {
     let p = Palette::new();
     let assets = p.assets();

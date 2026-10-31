@@ -48,6 +48,13 @@ driver-allocation guarantee. Queued Setup pictures share the same aggregate
 64 MiB logical Draw allowance, including space for their bounded late HUDs;
 they retain the existing 16-picture and 64 MiB aggregate pixel checks.
 
+After successful native presentation, the consumed world/UI vectors return to
+the bank. At most two spare vectors retain an aggregate 64 MiB of Draw capacity;
+queued and retried pictures keep their own immutable storage. Preparation takes
+these vectors exclusively. Body commands and the early/late food commands also
+reuse retired storage under the existing per-picture command limits. Failed
+preparation can discard scratch capacity, but never publishes a partial plan.
+
 The [WebGPU default limits](https://www.w3.org/TR/2026/CRD-webgpu-20260915/#limits)
 allow a 268,435,456-byte `maxBufferSize`, a 2,048-byte
 `maxVertexBufferArrayStride`, 8 vertex buffers and 16 attributes. Each chunk uses

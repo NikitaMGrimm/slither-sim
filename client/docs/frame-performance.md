@@ -9,6 +9,7 @@ target/release/examples/frame_perf.exe C:/new/external/output
 ```
 
 It enumerates one DX12 adapter per vendor/device pair, excluding CPU adapters.
+Set `FRAME_PERF_VULKAN=1` to run the same offscreen cases on Vulkan for pixel checks.
 Each adapter runs world, world plus physical HUD, and world/HUD plus
 native login at 960x540, using the renderer's normal sample count. The authored
 synthetic fixture adds 24 straight 120-point snakes and 2,400 food to the offline
@@ -22,6 +23,9 @@ are frozen to isolate frame preparation. Resource synchronization and render
 submission (world plus overlay) are timed separately. GPU completion waits, readbacks and
 logging are outside those CPU phase timings. This does not measure simulation,
 networking, desktop pacing, scanout or gameplay FPS.
+
+Completed pictures return their owned draw vectors to the bank, matching native
+retirement; queued/retried pictures are never lent to the next preparation.
 
 Heap counts are requested Rust allocation/reallocation bytes on the calling
 thread, using a wrapper around `System`. They exclude driver heaps, GPU memory,

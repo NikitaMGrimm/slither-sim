@@ -462,10 +462,19 @@ fn generate<F: FnMut(FoodImageCommand)>(
 /// barriers are mandatory. Later Canvas submission and model commit are owned
 /// by the parent; failed submission does not promise pixel rollback.
 pub fn plan_food(input: FoodPaintInput<'_>) -> Result<FoodPaintPlan, FoodPaintError> {
+    plan_food_with_storage(input, Vec::new(), Vec::new())
+}
+
+/// Reuse retired early/late commands without changing validation or paint barriers.
+pub fn plan_food_with_storage(
+    input: FoodPaintInput<'_>,
+    mut early: Vec<FoodImageCommand>,
+    mut late: Vec<FoodImageCommand>,
+) -> Result<FoodPaintPlan, FoodPaintError> {
     validate(input)?;
     let counts = generate(input, |_| {})?;
-    let mut early = Vec::new();
-    let mut late = Vec::new();
+    early.clear();
+    late.clear();
     early
         .try_reserve_exact(counts.early)
         .map_err(|_| FoodPaintError::Allocation)?;

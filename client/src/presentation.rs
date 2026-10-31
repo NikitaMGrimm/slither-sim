@@ -71,6 +71,7 @@ pub use body_painter::{
     BodyPaintQuality, BodyPaintRecipe, BodyPaintSample, BodyPaintView, BodyPaintVisual,
     BodyPalette, BodyRect, BodyRun, BodyStyle, BodyVariantMode, MAX_BODY_PAINT_COMMANDS,
     MAX_BODY_PAINT_SAMPLES, plan_standard_body, plan_standard_body_with_antenna,
+    plan_standard_body_with_storage,
 };
 pub use boundary::{BOUNDARY_SAMPLES, BoundaryRadius};
 pub use camera::{CAMERA_SAMPLES, CameraCorrections};
@@ -97,6 +98,7 @@ pub use food::{
 pub use food_painter::{
     FoodCullBounds, FoodImageCommand, FoodImageDraw, FoodPaintCounts, FoodPaintError,
     FoodPaintInput, FoodPaintPass, FoodPaintPlan, MAX_FOOD_PAINT_COMMANDS, plan_food,
+    plan_food_with_storage,
 };
 pub(crate) use hud::HudLeaderboardRowsBudget;
 pub use hud::{

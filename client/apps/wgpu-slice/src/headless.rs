@@ -416,6 +416,7 @@ impl Host<'_> {
             if first_encounter {
                 self.capture("first-other")?;
             }
+            self.game.bank.recycle_frame(picture);
             self.effects()?;
         }
         if self.game.has_frame() {

@@ -113,6 +113,13 @@ impl Fixture {
     }
 
     fn plan(&self) -> Result<BodyPaintPlan, BodyPaintError> {
+        self.plan_in(None)
+    }
+
+    fn plan_in(
+        &self,
+        storage: Option<Vec<BodyImageCommand>>,
+    ) -> Result<BodyPaintPlan, BodyPaintError> {
         let palettes: Vec<_> = self
             .variants
             .iter()
@@ -122,7 +129,7 @@ impl Fixture {
                 boost_glow: *glow,
             })
             .collect();
-        plan_standard_body(BodyPaintInput {
+        let input = BodyPaintInput {
             geometry: BodyPaintGeometry {
                 samples: &self.samples,
                 active_count: self.active_count,
@@ -147,7 +154,15 @@ impl Fixture {
             visual: self.visual,
             entry_alpha: self.entry_alpha,
             command_limit: self.limit,
-        })
+        };
+        match storage {
+            None => plan_standard_body(input),
+            Some(commands) => slither_client::presentation::plan_standard_body_with_storage(
+                input,
+                slither_client::presentation::AntennaBarrierEffect::Disabled,
+                commands,
+            ),
+        }
     }
 
     fn low_quality(&mut self) {
@@ -173,6 +188,27 @@ impl Fixture {
             },
         ];
     }
+}
+
+#[test]
+fn retired_body_storage_preserves_commands_across_growth_shrink_and_rejection() {
+    let mut storage = Vec::new();
+    for n in [64, 8, 32, 128, 16] {
+        let fixture = Fixture::new(n);
+        let expected = fixture.plan().unwrap();
+        let pointer = storage.as_ptr();
+        let capacity = storage.capacity();
+        let actual = fixture.plan_in(Some(storage)).unwrap();
+        assert_eq!(actual, expected);
+        if expected.commands.len() <= capacity {
+            assert_eq!(actual.commands.as_ptr(), pointer);
+        }
+        storage = actual.commands;
+    }
+    let mut rejected = Fixture::new(16);
+    rejected.limit = 0;
+    assert_eq!(rejected.plan_in(Some(storage)), rejected.plan());
+    assert_eq!(rejected.plan(), Err(BodyPaintError::CommandLimit));
 }
 
 fn pass(plan: &BodyPaintPlan, which: BodyPaintPass) -> Vec<&BodyImageCommand> {

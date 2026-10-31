@@ -430,6 +430,10 @@ mod desktop {
             {
                 Ok(true) => {
                     self.game.presented(true)?;
+                    self.game.bank.recycle_frame(p);
+                    if let Some(picture) = composed {
+                        self.game.bank.recycle_frame(picture);
+                    }
                     let effects = self.login.sync_return_focus(self.game.can_play());
                     self.edit_effects(effects);
                     self.schedule.presented();
