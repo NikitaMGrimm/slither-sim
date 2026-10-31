@@ -130,7 +130,9 @@ impl MenuTheme {
             colors: if checked {
                 [self.selection; 2]
             } else {
-                [self.field; 2]
+                // Two-row settings leaves one toggle unfocused; its empty box
+                // must remain visible against the panel's field colour.
+                [self.backdrop; 2]
             },
             radius: 4,
             recipe: SurfaceRecipe::Compact,

@@ -1073,8 +1073,16 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
                 ));
             }
             let file = format!("settings-{state}-{}x{}-{dpr}x.png", logical[0], logical[1]);
+            // The synthetic disabled panel uses a fresh painter/handle namespace.
+            // Retire the preceding upload set before and after this isolated case.
+            if state == "disabled" {
+                renderer.sync_resources(&[])?;
+            }
             capture(renderer, &picture, &output.join(&file))?;
             measurements.push(serde_json::json!({"file":file,"logical":logical,"dpr":dpr,"state":state,"producer_quads":picture.frame.draws.len(),"gpu_draws_including_page":renderer.draw_call_count(),"slots":picture.resources.len(),"bytes":bytes,"max_tile_axis":picture.resources.iter().map(|r|r.asset.width.max(r.asset.height)).max(),"retained_outgoing_bytes":outgoing.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),"focus":format!("{:?}",login.controls.focus())}));
+            if state == "disabled" {
+                renderer.sync_resources(&[])?;
+            }
         }
         outgoing.frame.validate(
             &outgoing

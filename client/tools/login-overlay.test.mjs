@@ -17,7 +17,6 @@ function fixture(extra = {}, adapter = {}, storage) {
   class Policy {
     restore_settings(...args){calls.push(['restore_settings',...args]);}
     settings_record(){return '2:0:original';}
-    world_resolution(){return 'original';}
     edit(value){composingValue=value;return value;}
     action(...args){actions.push(args);return args[0]==='quality'?'0':undefined;}
     play_label(){return 'Play';}
