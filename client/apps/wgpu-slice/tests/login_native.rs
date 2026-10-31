@@ -145,6 +145,23 @@ fn tab_focus_releases_all_holds_and_settings_has_no_play_effect() {
     assert!(login.step(16., true, false).unwrap().0.is_empty());
     login.close_settings(true);
     assert_eq!(login.input.state.focus(), None);
+    for frame in 2..256 {
+        let (intents, _) = login.step(f64::from(frame) * 16., true, false).unwrap();
+        assert!(
+            !intents
+                .iter()
+                .any(|i| matches!(i, StartMenuIntent::Play { .. }))
+        );
+        if !login.state.settings.visible() {
+            break;
+        }
+        assert_eq!(login.input.state.focus(), None);
+    }
+    assert!(!login.state.settings.visible());
+    assert_eq!(
+        login.controls.focus(),
+        Some(slither_client::login_controls::SETTINGS)
+    );
     login.focus(slither_client::login_controls::NICKNAME);
     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
 }
