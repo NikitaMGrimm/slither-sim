@@ -19,6 +19,7 @@ use slither_client::{
     start_page::StartMenuView,
 };
 use std::collections::BTreeMap;
+mod studio_surface;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 // Windows scaling tops out at 500%. Above that, the picker cannot fit the
@@ -721,6 +722,13 @@ impl Composition<'_> {
                         self.studio_solid(r.rect, alpha, theme, true)?
                     }
                     ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
+                    ControlKind::Surface if panel.id == 3 => self.studio_panel(
+                        r.rect,
+                        theme.surface(control.style, ControlState::Idle),
+                        alpha,
+                        surface_clip,
+                        r.scale,
+                    )?,
                     ControlKind::Surface => self.sliced(
                         r.rect,
                         theme.surface(control.style, ControlState::Idle),
@@ -3012,6 +3020,7 @@ mod quota_tests {
         };
         let draw = c.solid_draw(rect, [80; 3], 1., [1, 1]).unwrap();
         c.draws = vec![draw; 510];
+        c.attribution.add(MenuComponent::Other, 510);
         for value in ["one", "two", "three"] {
             c.label(value, rect, 15., false, 1.);
         }
@@ -3023,10 +3032,12 @@ mod quota_tests {
         assert_eq!(c.draws, before);
         assert_eq!(text.cached_runs(), 0);
         c.draws.truncate(509);
-        assert!(
-            c.compose_labels(&mut text, [960, 720], 1., None, None, &[])
-                .is_ok()
-        );
+        c.attribution.remove(MenuComponent::Other, 1);
+        let retried = c
+            .compose_labels(&mut text, [960, 720], 1., None, None, &[])
+            .unwrap();
+        assert_eq!(retried.attribution.total(), retried.frame.draws.len());
+        assert_eq!(retried.draw_counts(0).admitted_menu(), 512);
     }
 
     #[test]
