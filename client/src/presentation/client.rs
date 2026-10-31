@@ -659,6 +659,8 @@ impl Entry {
 pub struct AnimatedClient {
     #[cfg(feature = "feel-trace")]
     trace: Option<crate::feel_trace::Recorder>,
+    #[cfg(feature = "feel-trace")]
+    trace_setup_heads: Option<crate::feel_trace::PacketHeads>,
     received: ClientState,
     announcements_enabled: bool,
     announcements: AnnouncementState,
@@ -710,6 +712,8 @@ impl AnimatedClient {
         Ok(Self {
             #[cfg(feature = "feel-trace")]
             trace: None,
+            #[cfg(feature = "feel-trace")]
+            trace_setup_heads: None,
             received: ClientState::default(),
             announcements_enabled: false,
             announcements: AnnouncementState::default(),
@@ -1971,7 +1975,32 @@ impl AnimatedClient {
             boundaries: Vec::new(),
         });
         let mut received = self.received.clone();
-        let applied = if self.minimap_enabled {
+        #[cfg(feature = "feel-trace")]
+        let mut setup_heads = self
+            .trace
+            .as_ref()
+            .and_then(|r| r.geometry_ids())
+            .map(|ids| (ids, Vec::new()));
+        #[cfg(feature = "feel-trace")]
+        let traced = if let Some(heads) = &mut setup_heads {
+            Some(received.apply_frame_with_setup_packet_heads(
+                bytes,
+                header,
+                self.score_enabled,
+                self.minimap_enabled,
+                collector.as_mut(),
+                heads,
+            ))
+        } else {
+            None
+        };
+        // Geometry alone opts into command-boundary snapshots. Ordinary callbacks
+        // must continue seeing the pre-transaction received state.
+        #[cfg(not(feature = "feel-trace"))]
+        let traced: Option<Result<crate::state::AppliedFrame, StateError>> = None;
+        let applied = if let Some(traced) = traced {
+            traced
+        } else if self.minimap_enabled {
             received.apply_frame_with_minimap_events(
                 bytes,
                 header,
@@ -1986,6 +2015,8 @@ impl AnimatedClient {
             received.apply_frame_with_events(bytes, header)
         }
         .map_err(ClientPresentationError::from)?;
+        #[cfg(feature = "feel-trace")]
+        let mut setup_heads = setup_heads.into_iter().flat_map(|(_, heads)| heads);
         if self.minimap_enabled {
             validate_minimap_work(&applied.events, self.minimap.view().dimension)?;
         }
@@ -2033,7 +2064,7 @@ impl AnimatedClient {
             self.face_presentation_enabled |= enable_face_presentation;
             self.accessory_presentation_enabled |= enable_accessory_presentation;
             #[cfg(feature = "feel-trace")]
-            self.trace_boundary("update", None, None, None);
+            self.trace_boundary("update", None, None, None, None);
             return Ok((applied.report, None));
         }
         let mut next = self.clone();
@@ -2122,7 +2153,15 @@ impl AnimatedClient {
                                 },
                             );
                         }
+                        #[cfg(feature = "feel-trace")]
+                        {
+                            next.trace_setup_heads = setup_heads.next();
+                        }
                         on_setup(&mut next, setup.insert(value))?;
+                        #[cfg(feature = "feel-trace")]
+                        {
+                            next.trace_setup_heads = None;
+                        }
                         if let Some(journal) = &mut journal {
                             journal.setup_draw(command_index, next.score_view());
                         }
@@ -2475,7 +2514,7 @@ impl AnimatedClient {
         }
         next.received = received;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", None, None, None);
+        next.trace_boundary("update", None, None, None, None);
         *self = next;
         Ok((applied.report, journal))
     }
@@ -2541,7 +2580,7 @@ impl AnimatedClient {
         }
         next.advance_entities(step, now_ms)?;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", Some(step), None, None);
+        next.trace_boundary("update", Some(step), None, None, None);
         *self = next;
         Ok(step)
     }
@@ -3254,6 +3293,7 @@ impl AnimatedClient {
                 .find(|p| p.snake.own)
                 .and_then(|p| p.snake.body_geometry.as_ref())
                 .map(|body| body.samples.as_slice()),
+            Some(&prepared),
         );
         Ok(prepared)
     }
@@ -3285,9 +3325,10 @@ impl AnimatedClient {
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
         body: Option<&[BodyPaintSample]>,
+        prepared: Option<&[PreparedAccessorySnake]>,
     ) {
         if let Some(recorder) = &self.trace {
-            recorder.observe(self, phase, step, extent, body);
+            recorder.observe(self, phase, step, extent, body, prepared);
         }
     }
 
@@ -3311,6 +3352,27 @@ impl AnimatedClient {
     /// Latest committed received state, including food and protocol caches/counters.
     pub fn received(&self) -> &ClientState {
         &self.received
+    }
+
+    #[cfg(feature = "feel-trace")]
+    pub(crate) fn geometry_packet_comparable(&self, token: SnakeObjectToken, id: u16) -> bool {
+        self.lookup_index(id).is_some_and(|index| {
+            let entry = &self.entries[index];
+            entry.token == token && entry.snake.metrics().alive
+        })
+    }
+
+    #[cfg(feature = "feel-trace")]
+    pub(crate) fn geometry_packet_head(&self, id: u16) -> Option<Point> {
+        if let Some(heads) = &self.trace_setup_heads {
+            return heads.head(id);
+        }
+        let packet = self.received.snakes.get(&id)?;
+        let center = self.received.setup.as_ref().map_or(0., |s| s.grid_center);
+        Some(Point {
+            x: packet.head.x + center,
+            y: packet.head.y + center,
+        })
     }
 
     /// Retained food instances in dense insertion/swap order, including flights.
@@ -4264,7 +4326,14 @@ mod resolved_draw_tests {
         let anchors = client.own_snake().unwrap().body().points().to_vec();
         let mut shifted = body.clone();
         shifted[4].x += 16.;
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&shifted));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&shifted),
+            None,
+        );
         let mutant = recorder.take().pop().unwrap();
         assert_eq!(client.own_snake().unwrap().body().points(), anchors);
         assert_eq!(&baseline.values[..38], &mutant.values[..38]);
@@ -4285,7 +4354,14 @@ mod resolved_draw_tests {
         // The entire bounded output is retained; an oversized draw fails loudly.
         let mut bounded = vec![body[0]; MAX_BODY_TRACE_POINTS];
         bounded.last_mut().unwrap().x += 32.;
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&bounded),
+            None,
+        );
         let row = recorder.take().pop().unwrap();
         assert_eq!(row.values[37] as usize, MAX_BODY_TRACE_POINTS);
         let tail = bounded.last().unwrap();
@@ -4294,7 +4370,14 @@ mod resolved_draw_tests {
             750. + (f64::from(tail.x) - client.camera().position().x) * client.camera().zoom()
         );
         bounded.push(body[0]);
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&bounded),
+            None,
+        );
         assert!(recorder.has_failed());
         assert!(recorder.last_draw().is_none());
         assert!(recorder.take().is_empty());

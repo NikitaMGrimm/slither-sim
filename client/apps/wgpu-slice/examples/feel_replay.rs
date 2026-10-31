@@ -5,6 +5,8 @@ mod driver;
 mod latency;
 #[path = "feel_replay/observation.rs"]
 mod observation;
+#[path = "feel_replay/smoothing.rs"]
+mod smoothing;
 #[path = "../tests/support/announcement_tape.rs"]
 mod synthetic_tape;
 use serde_json::{Value, json};
@@ -311,6 +313,11 @@ fn run() -> Result<()> {
     io::stdin()
         .read_to_string(&mut input)
         .map_err(|e| e.to_string())?;
+    if args == ["--smoothing-lag-probe"] {
+        let request = serde_json::from_str(&input).map_err(|e| e.to_string())?;
+        println!("{}", smoothing::run(request)?);
+        return Ok(());
+    }
     if !args.is_empty() {
         return Err("Expected no arguments".into());
     }
@@ -357,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn overflow_observation_is_retained_without_claiming_a_picture_acknowledgement() {
+    fn overflow_respects_strict_debug_and_release_skip_contracts() {
         let mut steps = Vec::new();
         let mut step = |kind: &str, now: f64, packet: Option<Vec<u8>>| {
             let mut value = json!({"event":{"seq":steps.len(),"sourceId":format!("synthetic-{}",steps.len()),
@@ -385,8 +392,17 @@ mod tests {
             "surface":{"width":960,"height":540},"dpr":1});
         let result = replay(
             json!({"geometry":geometry,"pointer":{"x":0,"y":0},"steps":steps,"durationMs":60}),
-        )
-        .unwrap();
+        );
+        // Native debug intentionally surfaces invalid frames; release records a
+        // skipped picture. The old test incorrectly expected release in debug.
+        if cfg!(debug_assertions) {
+            assert_eq!(
+                result.unwrap_err(),
+                slither_wgpu_slice::frame::DRAW_MEMORY_LIMIT
+            );
+            return;
+        }
+        let result = result.unwrap();
         let samples = result["body"]["samples"].as_array().unwrap();
         let draw_rows = samples
             .iter()

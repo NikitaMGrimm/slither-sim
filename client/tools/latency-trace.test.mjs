@@ -116,6 +116,67 @@ function tail(stage, id, related = '0', detail = '0') {
   rows.forEach((r, i) => r.ns = String(i * 1000));
   return rows;
 }
+
+function terminalFixture() {
+  const rows = fixture();
+  const loss = rows.find(r => r.stage === 'flushed');
+  rows.splice(rows.indexOf(loss), 0, { ...loss, stage: 'normal_close', id: '90', related: '0' });
+  loss.stage = 'closed_unflushed'; loss.related = '90';
+  rows.forEach((r, i) => r.ns = String(i * 1000));
+  return rows;
+}
+test('terminal accepted-but-unflushed sends are counted without inventing delivery', () => {
+  const rows = terminalFixture();
+  const result = analyze(encode(rows));
+  assert.equal(result.complete, true);
+  assert.equal(result.closedUnflushed, 1);
+  assert.equal(result.distributions.acceptedToFlushed, undefined);
+  assert.equal(result.distributions.admissionToFlushed, undefined);
+  assert.equal(result.distributions.decisionToAccepted.count, 1);
+  const duplicate = structuredClone(rows);
+  duplicate.splice(-1, 0, { ...rows.find(r => r.stage === 'closed_unflushed'), stage: 'flushed' });
+  duplicate.forEach((r, i) => r.ns = String(i * 1000));
+  assert.throws(() => analyze(encode(duplicate)), /duplicate send completion/);
+  const orphan = structuredClone(rows);
+  orphan.find(r => r.stage === 'closed_unflushed').id = '9999';
+  assert.throws(() => analyze(encode(orphan)), /completion|orphan/);
+});
+
+test('terminal losses require a normal-close witness', () => {
+  const rows = terminalFixture();
+  assert.throws(() => analyze(encode(rows.filter(r => r.stage !== 'normal_close'))), /orphan.*normal_close/);
+  rows.find(r => r.stage === 'closed_unflushed').related = '0';
+  assert.throws(() => analyze(encode(rows)), /missing normal-close witness/);
+});
+
+test('send after terminal close is rejected even with a complete lifecycle and equal timestamps', () => {
+  for (const tied of [false, true]) {
+    const rows = terminalFixture();
+    const later = ['effect', 'accepted', 'ack_effect', 'flushed'].map(stage => ({ ...rows[0], stage, id: '99', related: '0', detail: stage === 'effect' ? '1' : '0' }));
+    rows.splice(-1, 0, ...later);
+    const close = rows.findIndex(r => r.stage === 'normal_close');
+    rows.forEach((r, i) => r.ns = String((tied && i >= close ? close : i) * 1000));
+    assert.throws(() => analyze(encode(rows)), /send after terminal close/);
+    // The same complete send is legal on the next connection generation.
+    later.forEach(r => r.generation = 2);
+    assert.equal(analyze(encode(rows)).complete, true);
+  }
+});
+
+test('a send created before close cannot be accepted or flushed afterwards', () => {
+  const rows = terminalFixture();
+  rows.splice(rows.findIndex(r => r.stage === 'normal_close'), 0,
+    { ...rows[0], stage: 'effect', id: '99', related: '0', detail: '1' });
+  rows.splice(-1, 0, ...['accepted','ack_effect','flushed'].map(stage => ({ ...rows[0], stage, id: '99', related: '0', detail: '0' })));
+  rows.forEach((r, i) => r.ns = String(i * 1000));
+  assert.throws(() => analyze(encode(rows)), /send after terminal close/);
+});
+
+test('fatal shutdown I/O invalidates analysis even without pending send loss', () => {
+  for (const operation of ['1', '2', '3']) {
+    assert.throws(() => analyze(encode(tail('transport_failed', '0', '0', operation))), /failed stage transport_failed/);
+  }
+});
 test('every nonzero wire effect and poll reference must resolve', () => {
   for (const stage of ['write', 'write_blocked', 'flush_blocked']) {
     for (const [id, poll] of [['9999', '0'], ['0', '8888'], ['9999', '8888']]) {

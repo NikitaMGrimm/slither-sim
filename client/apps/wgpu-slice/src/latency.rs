@@ -317,10 +317,25 @@ pub fn flushed() {
     });
 }
 pub fn abandoned() {
+    retire_writes("send_abandoned");
+}
+/// A normal shutdown can discard accepted bytes. This is terminal, not delivery.
+pub fn closed_unflushed() {
+    let boundary = next();
+    STATE.with_borrow_mut(|s| {
+        push(s, "normal_close", boundary, 0, 0);
+        for index in 0..s.pending_writes.len() {
+            let id = s.pending_writes[index];
+            push(s, "closed_unflushed", id, boundary, 0);
+        }
+        s.pending_writes.clear();
+    });
+}
+fn retire_writes(stage: &'static str) {
     STATE.with_borrow_mut(|s| {
         for index in 0..s.pending_writes.len() {
             let id = s.pending_writes[index];
-            push(s, "send_abandoned", id, 0, 0);
+            push(s, stage, id, 0, 0);
         }
         s.pending_writes.clear();
     });
@@ -635,6 +650,34 @@ mod tests {
         assert!(buffers.rows.iter().all(|rows| rows.len() == 2));
         assert_eq!(buffers.active, 0);
         assert_eq!(buffers.dropped, 0);
+    }
+    #[test]
+    fn normal_shutdown_retires_pending_sends_once_without_a_flush() {
+        let recorder = Recorder::new(32);
+        {
+            let _buffer = recorder.attach();
+            accepted(7);
+            closed_unflushed();
+            abandoned();
+        }
+        let (rows, dropped) = recorder.snapshot();
+        assert_eq!(dropped, 0);
+        let boundary = rows.iter().find(|r| r.stage == "normal_close").unwrap();
+        assert!(
+            rows.iter()
+                .any(|r| r.stage == "closed_unflushed" && r.related == boundary.id)
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|r| r.stage == "closed_unflushed" && r.id == 7)
+                .count(),
+            1
+        );
+        assert!(
+            !rows
+                .iter()
+                .any(|r| matches!(r.stage, "flushed" | "send_abandoned"))
+        );
     }
     #[test]
     fn run_budget_counts_loss_and_stops_registration_growth() {

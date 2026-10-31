@@ -9,14 +9,15 @@ const groups = Object.fromEntries(Object.entries({
     backpressure flush_blocked last_ingress decision_input coalesced`,
   boundary: 'retried superseded skipped presented',
   dependency: 'decision_input coalesced',
-  failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed',
-  effect: 'accepted flushed ack_effect host_close decision backpressure',
-  send: 'accepted flushed decision backpressure',
+  failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed transport_failed',
+  effect: 'accepted flushed closed_unflushed ack_effect host_close decision backpressure',
+  send: 'accepted flushed closed_unflushed decision backpressure',
+  sendActivity: 'accepted flushed decision decision_input backpressure write write_blocked flush_blocked',
   optionalEffect: 'write write_blocked flush_blocked',
   optionalPoll: 'write write_blocked flush_blocked backpressure handshake_read',
   packet: 'apply_begin apply_end deferred',
   watermark: 'build_begin build_end superseded retried last_ingress',
-  plain: 'thread_end ready poll poll_ready read handshake_read message callback admitted suppressed effect acquire_begin acquire_end',
+  plain: 'thread_end ready poll poll_ready read handshake_read message callback admitted suppressed effect acquire_begin acquire_end normal_close',
 }).map(([name, names]) => [name, new Set(names.split(/\s+/))]));
 const stages = new Set(Object.values(groups).flatMap(group => [...group]));
 const integer = x => Number.isSafeInteger(x) && x >= 0;
@@ -122,13 +123,28 @@ export function analyze(text, { cpu = false } = {}) {
     const ack = acknowledged ?? closed;
     check(ack.t >= r.t, 'effect acknowledgement precedes decision');
     if (r.detail === '1') {
-      const accepted = one('accepted', r), flushed = one('flushed', r);
-      check(accepted.t >= r.t && flushed.t >= accepted.t, 'invalid effect send order');
-      add('acceptedToFlushed', accepted.t, flushed.t);
+      const accepted = one('accepted', r), flushed = table('flushed').get(key(r)), closed = table('closed_unflushed').get(key(r));
+      check(Boolean(flushed) !== Boolean(closed), 'missing/duplicate send completion');
+      check(accepted.t >= r.t && (flushed ?? closed).t >= accepted.t, 'invalid effect send order');
+      if (flushed) add('acceptedToFlushed', accepted.t, flushed.t);
     }
   }
   for (const r of classified('effect')) one('effect', r);
   for (const r of classified('send')) check(one('effect', r).detail === '1', 'send stage on non-send effect');
+  const closedGenerations = new Set();
+  for (const r of each('normal_close')) {
+    const generation = `${r.thread}/${r.generation}`;
+    check(r.id !== '0' && r.related === '0' && r.detail === '0' && !closedGenerations.has(generation), 'duplicate/invalid normal close');
+    closedGenerations.add(generation);
+    check(!lines.some(e => e.thread === r.thread && e.generation === r.generation && e.event > r.event
+      && (groups.sendActivity.has(e.stage) || (e.stage === 'effect' && e.detail === '1')
+        || (e.stage === 'ack_effect' && one('effect', e).detail === '1'))), 'send after terminal close');
+  }
+  for (const r of each('closed_unflushed')) {
+    check(r.related !== '0', 'terminal loss missing normal-close witness');
+    const boundary = one('normal_close', r, r.related), accepted = one('accepted', r);
+    check(accepted.event < boundary.event && boundary.event < r.event, 'invalid terminal loss order');
+  }
   for (const r of classified('optionalEffect')) if (r.id !== '0') {
     check(one('effect', r).t <= r.t, 'write precedes effect');
   }
@@ -147,12 +163,12 @@ export function analyze(text, { cpu = false } = {}) {
     if (r.related !== '0') check(one('apply_end', r, r.related).t <= r.t, 'ingress watermark precedes application');
   }
   for (const r of [...each('decision'), ...lines.filter(r => r.stage === 'decision_input')]) {
-    const decision = one('decision', r), accepted = one('accepted', r), flushed = one('flushed', r);
+    const decision = one('decision', r), accepted = one('accepted', r), flushed = table('flushed').get(key(r));
     if (r.stage === 'decision') add('decisionToAccepted', decision.t, accepted.t);
     if (r.related !== '0') {
       const admitted = input(r.related);
       add('admissionToDecision', admitted.t, decision.t);
-      add('admissionToFlushed', admitted.t, flushed.t);
+      if (flushed) add('admissionToFlushed', admitted.t, flushed.t);
     }
   }
   const closed = p => check(!p.submit && !p.sync && !p.present, 'unfinished picture span');
@@ -210,7 +226,8 @@ export function analyze(text, { cpu = false } = {}) {
     distributions[name] = { count: values.length, p50Ms: q(.5), p95Ms: q(.95), maxMs: values.at(-1) };
   }
   return { format: header.format, run: header.run, sourceRevision: header.sourceRevision,
-    complete: true, endpoint: cpu ? 'CPU replay (no GPU/present proof)' : 'native CPU stages', distributions };
+    complete: true, closedUnflushed: each('closed_unflushed').length,
+    endpoint: cpu ? 'CPU replay (no GPU/present proof)' : 'native CPU stages', distributions };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

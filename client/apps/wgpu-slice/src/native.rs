@@ -33,6 +33,7 @@ pub(crate) type Socket = WebSocket<Wire>;
 struct TestIo {
     read_bytes: usize,
     block_writes: bool,
+    flushes_before_reset: Option<usize>,
 }
 /// An absolute handshake deadline bounds slow-drip peers and connector cancellation/join.
 pub(crate) struct Wire {
@@ -125,6 +126,13 @@ impl Write for Wire {
     }
     fn flush(&mut self) -> io::Result<()> {
         self.budget()?;
+        #[cfg(test)]
+        if let Some(left) = &mut self.test_io.flushes_before_reset {
+            if *left == 0 {
+                return Err(ErrorKind::ConnectionReset.into());
+            }
+            *left -= 1;
+        }
         let result = match &mut self.ready {
             Some(stream) => stream.flush(),
             None => self.stream.flush(),
@@ -563,6 +571,9 @@ impl Transport {
             .iter()
             .any(|e| matches!(e, Event::Closed(_) | Event::Failed(_, _)))
         {
+            if !events.iter().any(|e| matches!(e, Event::Failed(_, _))) {
+                latency::closed_unflushed();
+            }
             self.drop_socket();
             self.readiness.take();
             self.pending_bytes = 0;
@@ -589,9 +600,21 @@ impl Transport {
             }
         }
         if let Some(s) = &mut self.socket {
-            let _ = s.close(None);
-            let _ = s.flush();
+            let close_failed = s.close(None).is_err_and(|e| !would_block(&e));
+            let flush_failed = s.flush().is_err_and(|e| !would_block(&e));
             let _ = s.get_ref().stream.shutdown(Shutdown::Both);
+            // Shutdown stays best-effort for play, but fatal I/O must invalidate
+            // analysis before pending sends are retired as normal terminal loss.
+            if close_failed || flush_failed {
+                latency::event(
+                    "transport_failed",
+                    0,
+                    0,
+                    u64::from(close_failed) + 2 * u64::from(flush_failed),
+                );
+            } else {
+                latency::closed_unflushed();
+            }
         }
         self.drop_socket();
         self.readiness.take();
@@ -654,6 +677,62 @@ mod tests {
         }
     }
 
+    #[test]
+    fn shutdown_reset_is_failed_and_would_block_has_a_normal_close_witness() {
+        for resets_after in [Some(0), Some(1), None] {
+            let trace = latency::Recorder::new(4096);
+            let guard = trace.attach();
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
+            let (finish, finished) = mpsc::channel();
+            let peer = thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                let _socket = tungstenite::accept(stream).unwrap();
+                finished.recv_timeout(Duration::from_secs(3)).unwrap();
+            });
+            let (mut transport, _) = waking_connection(endpoint);
+            transport
+                .socket
+                .as_mut()
+                .unwrap()
+                .get_mut()
+                .test_io
+                .block_writes = true;
+            transport
+                .execute(&Effect {
+                    generation: 1,
+                    id: 2,
+                    kind: EffectKind::Send(vec![42]),
+                })
+                .unwrap();
+            let wire = transport.socket.as_mut().unwrap().get_mut();
+            wire.test_io.block_writes = resets_after.is_none();
+            wire.test_io.flushes_before_reset = resets_after;
+            transport.close();
+            transport.close(); // Drop/another shutdown must not invent another boundary.
+            finish.send(()).unwrap();
+            peer.join().unwrap();
+            drop(guard);
+            let (rows, dropped) = trace.snapshot();
+            assert_eq!(dropped, 0);
+            if let Some(after) = resets_after {
+                let failed = rows.iter().find(|r| r.stage == "transport_failed").unwrap();
+                assert_eq!(failed.detail, if after == 0 { 3 } else { 2 });
+                assert!(
+                    !rows
+                        .iter()
+                        .any(|r| matches!(r.stage, "normal_close" | "closed_unflushed"))
+                );
+            } else {
+                let closes: Vec<_> = rows.iter().filter(|r| r.stage == "normal_close").collect();
+                assert_eq!(closes.len(), 1);
+                assert!(rows.iter().any(|r| r.stage == "closed_unflushed"
+                    && r.id == 2
+                    && r.related == closes[0].id));
+                assert!(!rows.iter().any(|r| r.stage == "transport_failed"));
+            }
+        }
+    }
     #[test]
     fn initiated_close_waits_for_the_peer_and_flushes_under_backpressure() {
         // ORIGINAL SYNTHETIC peer. A delayed echo distinguishes a completed

@@ -10,6 +10,10 @@ use crate::presentation::{
 use crate::state::Point;
 use std::sync::{Arc, Mutex};
 
+mod geometry;
+pub(crate) use geometry::PacketHeads;
+pub use geometry::{GeometryObservation, GeometrySnake};
+
 /// Trace capacity for the complete prepared centerline, in original sample order.
 /// Larger production draws fail the measuring run; no point may be omitted.
 pub const MAX_BODY_TRACE_POINTS: usize = 8193;
@@ -29,6 +33,7 @@ pub struct Observation {
 
 #[derive(Debug, Default)]
 struct Journal {
+    geometry: Option<geometry::Journal>,
     next_sequence: u64,
     rows: Vec<Observation>,
     errors: Vec<String>,
@@ -50,6 +55,35 @@ impl PartialEq for Recorder {
     }
 }
 impl Recorder {
+    pub(crate) fn geometry_ids(&self) -> Option<[u16; 2]> {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .geometry
+            .as_ref()
+            .map(|g| g.ids)
+    }
+    /// Enable a separate bounded own/enemy geometry journal; v3 cells are unchanged.
+    /// A fresh recorder is required for another run; pending geometry is never replaced.
+    pub fn record_geometry(&self, ids: [u16; 2]) {
+        let mut journal = self.0.lock().expect("trace journal");
+        assert!(
+            journal.geometry.is_none(),
+            "geometry recorder already enabled"
+        );
+        journal.geometry = Some(geometry::Journal::new(ids));
+    }
+
+    /// Drain prepared geometry, joined by the existing immutable observation ID.
+    pub fn take_geometry(&self) -> Vec<GeometryObservation> {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .geometry
+            .as_mut()
+            .map_or_else(Vec::new, |g| std::mem::take(&mut g.rows))
+    }
+
     /// Explicit observation failures; draining them never clears the failure gate.
     pub fn take_errors(&self) -> Vec<String> {
         std::mem::take(&mut self.0.lock().expect("trace journal").errors)
@@ -124,6 +158,7 @@ impl Recorder {
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
         body: Option<&[BodyPaintSample]>,
+        prepared: Option<&[crate::presentation::PreparedAccessorySnake]>,
     ) {
         let mut journal = self.0.lock().expect("trace journal");
         if phase == "draw" {
@@ -270,7 +305,17 @@ impl Recorder {
         if phase == "draw" {
             journal.last_draw = Some(row.clone());
         }
+        let sequence = row.sequence;
         journal.rows.push(row);
+        if let Some(prepared) = prepared
+            && let Some(geometry) = journal.geometry.as_mut()
+            && !geometry.observe(Some(sequence), client, prepared)
+        {
+            journal.failed = true;
+            journal
+                .errors
+                .push("Incomplete/overflow prepared geometry".into());
+        }
     }
 
     /// Copy numeric observations and decimal identities into JS.
@@ -319,13 +364,13 @@ mod tests {
     fn observation_identity_distinguishes_equal_values_and_survives_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None, None);
-        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None, None);
+        recorder.observe(&client, "draw", None, None, None, None);
         let rows = recorder.take();
         assert_eq!(rows[0].values, rows[1].values);
         assert_ne!(rows[0].sequence, rows[1].sequence);
         assert_eq!(recorder.last_draw(), Some(rows[1].clone()));
-        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None, None);
         assert!(recorder.take()[0].sequence > rows[1].sequence);
     }
 
@@ -333,9 +378,9 @@ mod tests {
     fn pictures_acknowledge_only_the_submitted_identity_across_row_drains() {
         let recorder = Recorder::default();
         let client = AnimatedClient::new(0.).unwrap();
-        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None, None);
         let skipped = recorder.last_draw_sequence().unwrap();
-        recorder.observe(&client, "draw", None, None, None);
+        recorder.observe(&client, "draw", None, None, None, None);
         let submitted = recorder.last_draw_sequence().unwrap();
         assert_eq!(recorder.take().len(), 2);
         assert!(recorder.take_pictures().is_empty());
