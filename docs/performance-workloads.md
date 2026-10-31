@@ -163,6 +163,27 @@ cargo test --release --locked --features perf-internals --example perf_baseline 
 
 The row measures engine cost in a prescribed synthetic world, not live capacity.
 
+## Grown-snake collision grid
+
+`engine-collision-grid-4096` is a synthetic `full` row, enabled by
+`perf-internals`. It steps 4,096 living snakes on a 64 by 64 lattice with
+512-unit spacing: 4,095 have eight anchors, and slot zero has 532. Bodies
+are straight with 42-unit anchor spacing. The radius is fixed at 60,000;
+food, prey and kiosk shrinkage are disabled. All snakes hold heading zero
+without boosting. Every 16 ticks the scene is rebuilt outside timing, keeping
+the population above the dense-grid dispatch threshold. Losing a snake fails
+the row. This isolates grid insertion with a grown outlier and expanded head
+queries; it is not a live capacity claim.
+
+The default sample contains 512 ticks; traces contain two and retain complete
+initial and per-tick authoritative state and events plus a terminal record.
+`--profile` records the usual separate phase counters; `--parallel` is rejected.
+Compare it with:
+
+```sh
+python -B tools/perf_compare.py --base BASE --features perf-internals --cases engine-collision-grid-4096 --output outputs/perf/collision-grid
+```
+
 ## Shared-policy workload
 
 `shared-forager-a4-mean-8` is a separate local-only row. It runs eight synthetic sandbox
