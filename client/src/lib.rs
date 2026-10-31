@@ -120,3 +120,8 @@ mod hud_history_browser;
 
 #[cfg(target_arch = "wasm32")]
 mod leaderboard_history_browser;
+
+/// Shared server directory policy.
+pub mod server_directory;
+/// Shared server picker.
+pub mod server_picker;

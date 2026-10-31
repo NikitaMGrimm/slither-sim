@@ -16,7 +16,7 @@ mod desktop {
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
-        official::{self, Preparation},
+        official::{self, DirectoryPreparation, Preparation},
     };
     use std::{
         sync::Arc,
@@ -157,6 +157,8 @@ mod desktop {
         started: Instant,
         cursor: [f64; 2],
         preparation: Option<Preparation>,
+        directory: Option<DirectoryPreparation>,
+        directory_snapshot: Option<Arc<official::DirectorySnapshot>>,
         nickname: String,
         skin: u8,
         schedule: Schedule,
@@ -170,7 +172,14 @@ mod desktop {
     impl Running {
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            let effects = if self.login.champion.policy.visible() {
+            let effects = if self.login.picker.policy.visible() {
+                let effects = self
+                    .login
+                    .picker
+                    .input
+                    .execute(effects, &mut WindowEditHost(&self.window));
+                self.login.picker.commit_effects(effects)
+            } else if self.login.champion.policy.visible() {
                 let effects = self
                     .login
                     .champion
@@ -240,6 +249,46 @@ mod desktop {
             Err("Effect drain budget".into())
         }
         fn service(&mut self) -> Result<()> {
+            if let Some(directory) = &mut self.directory
+                && let Some(result) = directory.poll()
+            {
+                self.directory = None;
+                match result {
+                    Ok(snapshot) => {
+                        self.login
+                            .picker
+                            .policy
+                            .replace(&snapshot.servers, &snapshot.pings)
+                            .map_err(str::to_owned)?;
+                        self.directory_snapshot = Some(Arc::new(snapshot));
+                    }
+                    Err(error) => self.login.picker.policy.status = error,
+                }
+                self.schedule.invalidate();
+            }
+            if self.login.picker.policy.take_directory_request() {
+                if self.official {
+                    if self.directory.is_none() {
+                        match DirectoryPreparation::start() {
+                            Ok(work) => {
+                                self.directory = Some(work);
+                                self.login.picker.policy.status =
+                                    "Measuring server latency...".into();
+                            }
+                            Err(error) => self.login.picker.policy.status = error,
+                        }
+                    }
+                } else {
+                    self.login.picker.policy.status = "Directory available in official mode".into();
+                }
+            }
+            if let Some(value) = self.login.picker.policy.take_preference()
+                && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
+                && let Err(error) =
+                    slither_wgpu_slice::server_picker_native::write_preference(&path, &value)
+            {
+                eprintln!("Server preference write failed: {error}");
+            }
             if let Some(preparation) = &mut self.preparation
                 && let Some(result) = preparation.poll()
             {
@@ -250,6 +299,14 @@ mod desktop {
                 } else {
                     match result {
                         Ok(prepared) => {
+                            if let Some(snapshot) = prepared.directory {
+                                self.login
+                                    .picker
+                                    .policy
+                                    .replace(&snapshot.servers, &snapshot.pings)
+                                    .map_err(str::to_owned)?;
+                                self.directory_snapshot = Some(snapshot);
+                            }
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
                             if let Err(error) = self.game.play_with_profile(
                                 &prepared.endpoint,
@@ -392,7 +449,17 @@ mod desktop {
                         }
                     });
                     if self.official {
-                        match Preparation::start(self.server.clone()) {
+                        let explicit = if self.login.picker.policy.changed() {
+                            None
+                        } else {
+                            self.server.clone()
+                        };
+                        match Preparation::start_with_directory(
+                            explicit,
+                            self.login.picker.policy.selection.0,
+                            self.directory_snapshot.clone(),
+                            self.directory.take(),
+                        ) {
                             Ok(preparation) => self.preparation = Some(preparation),
                             Err(error) => self.game.fail(&error),
                         }
@@ -585,6 +652,10 @@ mod desktop {
                 host.renderer.adapter_info, host.renderer.sample_count
             );
             let mut login = NativeLogin::new(&options.nickname)?;
+            if let Some(path) = slither_wgpu_slice::server_picker_native::preference_path() {
+                login.picker.policy.selection =
+                    slither_wgpu_slice::server_picker_native::read_preference(&path);
+            }
             login.set_wordmark(options.wordmark);
             Ok(Running {
                 login,
@@ -600,6 +671,8 @@ mod desktop {
                 started: Instant::now(),
                 cursor: [480., 270.],
                 preparation: None,
+                directory: None,
+                directory_snapshot: None,
                 nickname: String::new(),
                 skin: options.skin,
                 schedule: Schedule::default(),
@@ -638,21 +711,29 @@ mod desktop {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
+                    r.login.picker.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play()
                     && r.preparation.is_none()
                     && (r.official || r.endpoint.is_some());
                 let champion = r.login.champion.policy.visible();
                 if let WindowEvent::Focused(_) = &event {
-                    let inactive = if champion {
-                        &mut r.login.input
+                    if r.login.picker.policy.visible() {
+                        r.login.input.window_event(&event);
+                        r.login.champion.input.window_event(&event);
                     } else {
-                        &mut r.login.champion.input
-                    };
-                    // Retain window ownership across a committed panel handoff.
-                    inactive.window_event(&event);
+                        r.login.picker.input.window_event(&event);
+                        let inactive = if champion {
+                            &mut r.login.input
+                        } else {
+                            &mut r.login.champion.input
+                        };
+                        inactive.window_event(&event);
+                    }
                 }
-                let mapped = if champion {
+                let mapped = if r.login.picker.policy.visible() {
+                    r.login.picker.event(&event)
+                } else if champion {
                     r.login.champion.event(&event)
                 } else {
                     r.login.event(&event, admission)
@@ -665,6 +746,9 @@ mod desktop {
                 }
                 match event {
                     WindowEvent::CloseRequested => {
+                        if let Some(directory) = &r.directory {
+                            directory.cancel();
+                        }
                         if let Some(p) = &r.preparation {
                             p.cancel();
                         }

@@ -67,7 +67,8 @@ the [shared menu controls](menu-controls.md), with committed victory/send/ack
 authority; browser development hosts retain the pending champion handoff. Fragment opacity multiplies the shared retained
 fade outside raster keys. Existing nickname and HUD cache quotas stay unchanged.
 The [menu resource layer](menu-resources.md) supplies native login controls and
-semantic local art. Both browsers share a semantic DOM login overlay backed by
+semantic local art. The [server picker](server-picker.md) uses shared directory
+and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
 
 The wgpu crate still includes its small synthetic diagnostic executable and

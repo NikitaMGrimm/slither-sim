@@ -9,7 +9,7 @@ use slither_client::profile_literals;
 use std::{
     collections::BTreeMap,
     io::Read,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -29,6 +29,7 @@ const DIRECTORY_LIMIT: usize = 256 * 1024;
 pub struct Prepared {
     pub endpoint: String,
     pub profile: LoginProfile,
+    pub directory: Option<Arc<DirectorySnapshot>>,
 }
 
 /// One preparation per Play, outside the event loop and before the session deadline starts.
@@ -39,13 +40,32 @@ pub struct Preparation {
 }
 impl Preparation {
     pub fn start(server: Option<String>) -> Result<Self> {
+        Self::start_selected(server, None)
+    }
+    pub fn start_selected(server: Option<String>, id: Option<u16>) -> Result<Self> {
+        Self::start_with_directory(server, id, None, None)
+    }
+    pub fn start_with_directory(
+        server: Option<String>,
+        id: Option<u16>,
+        cached: Option<Arc<DirectorySnapshot>>,
+        pending: Option<DirectoryPreparation>,
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::sync_channel(1);
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
         let worker = thread::Builder::new()
             .name("official-discovery".into())
             .spawn(move || {
-                let result = prepare(server.as_deref(), &flag);
+                let result = (|| {
+                    // Reuse the picker's in-flight sweep instead of racing a new one.
+                    let cached = if let Some(pending) = pending {
+                        Some(Arc::new(pending.finish(&flag)?))
+                    } else {
+                        cached
+                    };
+                    prepare_cached_with(server.as_deref(), id, &flag, fetch, probe_clusters, cached)
+                })();
                 let _ = sender.send(result);
             })
             .map_err(|e| e.to_string())?;
@@ -84,6 +104,92 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
     } else {
         Ok(())
     }
+}
+
+/// Directory/ping work has no login profile, game socket or session authority.
+pub struct DirectorySnapshot {
+    pub servers: Vec<Server>,
+    pub pings: BTreeMap<u16, u32>,
+}
+pub struct DirectoryPreparation {
+    receiver: mpsc::Receiver<Result<DirectorySnapshot>>,
+    cancel: Arc<AtomicBool>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+impl DirectoryPreparation {
+    fn finish(self, cancel: &AtomicBool) -> Result<DirectorySnapshot> {
+        loop {
+            if let Err(error) = check_cancel(cancel) {
+                self.cancel();
+                return Err(error);
+            }
+            match self.receiver.recv_timeout(Duration::from_millis(20)) {
+                Ok(result) => return result,
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err("Directory worker stopped".into());
+                }
+            }
+        }
+    }
+    pub fn start() -> Result<Self> {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let flag = cancel.clone();
+        let worker = thread::Builder::new()
+            .name("server-directory".into())
+            .spawn(move || {
+                let result = directory_with(&flag, fetch, probe_clusters);
+                let _ = sender.send(result);
+            })
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            receiver,
+            cancel,
+            worker: Some(worker),
+        })
+    }
+    pub fn poll(&mut self) -> Option<Result<DirectorySnapshot>> {
+        match self.receiver.try_recv() {
+            Ok(result) => Some(result),
+            Err(mpsc::TryRecvError::Empty) => None,
+            Err(mpsc::TryRecvError::Disconnected) => Some(Err("Directory worker stopped".into())),
+        }
+    }
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::SeqCst);
+    }
+}
+impl Drop for DirectoryPreparation {
+    fn drop(&mut self) {
+        self.cancel();
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+fn directory_with(
+    cancel: &Arc<AtomicBool>,
+    mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+    measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
+) -> Result<DirectorySnapshot> {
+    check_cancel(cancel)?;
+    let (page_url, page) = get(&Url::parse(PAGE).expect("constant URL"), PAGE_LIMIT, cancel)?;
+    let script_url = client_script(
+        std::str::from_utf8(&page.0).map_err(|_| "Invalid page encoding")?,
+        &page_url,
+    )?;
+    drop(page);
+    let (_, script) = get(&script_url, SCRIPT_LIMIT, cancel)?;
+    let url =
+        directory_url(std::str::from_utf8(&script.0).map_err(|_| "Invalid script encoding")?)?;
+    drop(script);
+    let (_, bytes) = get(&url, DIRECTORY_LIMIT, cancel)?;
+    let servers = decode_directory(&bytes.0)?;
+    drop(bytes);
+    let pings = measure(&servers, cancel);
+    check_cancel(cancel)?;
+    Ok(DirectorySnapshot { servers, pings })
 }
 
 struct Inert(Vec<u8>);
@@ -296,122 +402,7 @@ pub fn directory_url(source: &str) -> Result<Url> {
     found.ok_or_else(|| "Official script has no supported directory URL".into())
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Server {
-    pub address: SocketAddr,
-    pub population: u16,
-    pub cluster: u16,
-    pub id: u16,
-    pub active: bool,
-}
-impl Server {
-    pub fn endpoint(&self) -> String {
-        format!("ws://{}/slither", self.address)
-    }
-}
-
-pub fn decode_directory(encoded: &[u8]) -> Result<Vec<Server>> {
-    let encoded = encoded.trim_ascii();
-    if encoded.len() > DIRECTORY_LIMIT
-        || encoded.first() != Some(&b'a')
-        || encoded.len() <= 1
-        || !(encoded.len() - 1).is_multiple_of(56)
-    {
-        return Err("Invalid directory length/version".into());
-    }
-    let mut servers = Vec::new();
-    for (record_index, chars) in encoded[1..].as_chunks::<56>().0.iter().enumerate() {
-        let mut record = [0u8; 28];
-        for (index, pair) in chars.as_chunks::<2>().0.iter().enumerate() {
-            let mut value = 0;
-            for (half, byte) in pair.iter().enumerate() {
-                if !byte.is_ascii_lowercase() {
-                    return Err("Invalid directory character".into());
-                }
-                let shift = ((record_index * 56 + index * 2 + half) * 7) % 26;
-                let nibble = (usize::from(byte - b'a') + 26 - shift) % 26;
-                if nibble > 15 {
-                    return Err("Invalid directory nibble".into());
-                }
-                value = value * 16 + nibble as u8;
-            }
-            record[index] = value;
-        }
-        let port = u16::from_be_bytes([record[21], record[22]]);
-        if port == 0 {
-            return Err("Invalid directory port".into());
-        }
-        let base = Server {
-            address: SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(record[1], record[2], record[3], record[4])),
-                port,
-            ),
-            population: u16::from_be_bytes([record[23], record[24]]),
-            cluster: u16::from(record[25]),
-            id: u16::from_be_bytes([record[26], record[27]]),
-            active: record[0] <= 26,
-        };
-        let ipv6 = Ipv6Addr::from(<[u8; 16]>::try_from(&record[5..21]).expect("record span"));
-        if !ipv6.is_unspecified() {
-            let mut v6 = base.clone();
-            v6.address = SocketAddr::new(IpAddr::V6(ipv6), port);
-            v6.cluster += 1000;
-            servers.push(base);
-            servers.push(v6);
-        } else {
-            servers.push(base);
-        }
-        if servers.len() > 4096 {
-            return Err("Directory server limit".into());
-        }
-    }
-    Ok(servers)
-}
-
-/// Fresh selection has no historical exclusions. Tied cluster minima prefer the higher ID.
-pub fn select_server(servers: &[Server], pings: &BTreeMap<u16, u32>, unit: f64) -> Result<usize> {
-    if servers.is_empty() || !(0.0..1.0).contains(&unit) {
-        return Err("Invalid server selection input".into());
-    }
-    let best = pings
-        .iter()
-        .min_by_key(|(id, ms)| (**ms, std::cmp::Reverse(**id)));
-    if let Some((&cluster, _)) = best {
-        let eligible: Vec<_> = servers
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.cluster == cluster && s.active)
-            .collect();
-        let total: u64 = eligible
-            .iter()
-            .map(|(_, s)| u64::from(s.population) + 5)
-            .sum();
-        let mut cumulative = 0.0;
-        for (position, &(index, server)) in eligible.iter().enumerate() {
-            cumulative += (f64::from(server.population) + 5.0) / total as f64;
-            if cumulative >= unit || position + 1 == eligible.len() {
-                return Ok(index);
-            }
-        }
-    }
-    // Original fallback: stable port order, random seed, then reverse scan with population >20.
-    let mut order: Vec<_> = (0..servers.len()).collect();
-    order.sort_by_key(|i| servers[*i].address.port());
-    let mut chosen = order[(unit * order.len() as f64) as usize];
-    let ping = |s: &Server| {
-        pings
-            .get(&s.cluster)
-            .copied()
-            .unwrap_or(if s.active { 9_999_998 } else { 9_999_999 })
-    };
-    for index in order.into_iter().rev() {
-        if servers[index].population > 20 && ping(&servers[index]) <= ping(&servers[chosen]) {
-            chosen = index;
-        }
-    }
-    Ok(chosen)
-}
-
+pub use slither_client::server_directory::{Server, decode_directory, select_server};
 pub fn explicit_endpoint(server: &str) -> Result<String> {
     let endpoint = format!("ws://{server}/slither");
     let url = server_endpoint(&endpoint)?;
@@ -545,8 +536,27 @@ pub fn prepare(server: Option<&str>, cancel: &Arc<AtomicBool>) -> Result<Prepare
 fn prepare_with(
     server: Option<&str>,
     cancel: &Arc<AtomicBool>,
+    get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+    measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
+) -> Result<Prepared> {
+    prepare_selected_with(server, None, cancel, get, measure)
+}
+fn prepare_selected_with(
+    server: Option<&str>,
+    id: Option<u16>,
+    cancel: &Arc<AtomicBool>,
+    get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+    measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
+) -> Result<Prepared> {
+    prepare_cached_with(server, id, cancel, get, measure, None)
+}
+fn prepare_cached_with(
+    server: Option<&str>,
+    id: Option<u16>,
+    cancel: &Arc<AtomicBool>,
     mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
+    cached: Option<Arc<DirectorySnapshot>>,
 ) -> Result<Prepared> {
     let forced = server.map(explicit_endpoint).transpose()?;
     check_cancel(cancel)?;
@@ -558,7 +568,7 @@ fn prepare_with(
     drop(page);
     let (_, script) = get(&script_url, SCRIPT_LIMIT, cancel)?;
     let profile = profile(&script.0)?;
-    let directory = if forced.is_none() {
+    let directory = if forced.is_none() && cached.is_none() {
         Some(directory_url(
             std::str::from_utf8(&script.0).map_err(|_| "Invalid script encoding")?,
         )?)
@@ -566,9 +576,9 @@ fn prepare_with(
         None
     };
     drop(script);
-    let endpoint = if let Some(endpoint) = forced {
-        endpoint
-    } else {
+    let snapshot = if let Some(cached) = cached {
+        Some(cached)
+    } else if forced.is_none() {
         let (_, bytes) = get(
             &directory.expect("automatic directory"),
             DIRECTORY_LIMIT,
@@ -578,10 +588,32 @@ fn prepare_with(
         drop(bytes);
         let pings = measure(&servers, cancel);
         check_cancel(cancel)?;
-        servers[select_server(&servers, &pings, rand::random())?].endpoint()
+        Some(Arc::new(DirectorySnapshot { servers, pings }))
+    } else {
+        None
+    };
+    let endpoint = if let Some(endpoint) = forced {
+        endpoint
+    } else {
+        let snapshot = snapshot.as_ref().expect("automatic directory");
+        if let Some(id) = id {
+            let rows = slither_client::server_picker::ranked(&snapshot.servers, &snapshot.pings);
+            let selected = rows
+                .iter()
+                .find(|r| r.server.id == id)
+                .ok_or("Selected server is no longer in the directory")?;
+            explicit_endpoint(&selected.server.address.to_string())?
+        } else {
+            snapshot.servers[select_server(&snapshot.servers, &snapshot.pings, rand::random())?]
+                .endpoint()
+        }
     };
     check_cancel(cancel)?;
-    Ok(Prepared { endpoint, profile })
+    Ok(Prepared {
+        endpoint,
+        profile,
+        directory: snapshot,
+    })
 }
 
 #[cfg(test)]
@@ -591,6 +623,181 @@ mod tests {
     // ORIGINAL SYNTHETIC page/script; no retained reference or acquisition authority.
     const SCRIPT: &[u8] =
         b"var client_version=4242; var cpw=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19];";
+    fn synthetic_directory() -> Vec<u8> {
+        synthetic_ids([24, 42])
+    }
+    fn synthetic_ids(ids: impl IntoIterator<Item = u16>) -> Vec<u8> {
+        let mut bytes = vec![b'a'];
+        for id in ids {
+            let mut record = [0u8; 28];
+            record[1..5].copy_from_slice(&[192, 0, 2, 1]);
+            record[21..23].copy_from_slice(&(400 + id).to_be_bytes());
+            record[24] = 40;
+            record[25] = 1;
+            record[26..28].copy_from_slice(&id.to_be_bytes());
+            for nibble in record.iter().flat_map(|b| [b >> 4, b & 15]) {
+                let offset = bytes.len() - 1;
+                bytes.push(b'a' + ((usize::from(nibble) + offset * 7) % 26) as u8);
+            }
+        }
+        bytes
+    }
+    #[test]
+    fn repeated_opens_and_cached_play_reuse_one_directory_and_ping_sweep() {
+        use slither_client::server_picker::ServerPicker;
+        use std::cell::Cell;
+        let fetches = Cell::new(0);
+        let sweeps = Cell::new(0);
+        let bytes = synthetic_ids(1..=2000);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut get = |url: &Url, _: usize, _: &AtomicBool| {
+            fetches.set(fetches.get() + 1);
+            Ok((
+                url.clone(),
+                Inert(match url.path() {
+                    "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                    "/s/game999.js" => {
+                        [SCRIPT, b"getData('https://slither.io/i999.txt',handler);"].concat()
+                    }
+                    "/i999.txt" => bytes.clone(),
+                    _ => panic!("unexpected fetch"),
+                }),
+            ))
+        };
+        let mut picker = ServerPicker::default();
+        picker.open();
+        assert!(picker.take_directory_request());
+        for _ in 0..3 {
+            picker.close();
+            picker.open();
+            assert!(!picker.take_directory_request());
+        }
+        let snapshot = Arc::new(
+            directory_with(&cancel, &mut get, |servers, _| {
+                assert_eq!(servers.len(), 2000);
+                sweeps.set(sweeps.get() + 1);
+                BTreeMap::from([(1, 12)])
+            })
+            .unwrap(),
+        );
+        picker.replace(&snapshot.servers, &snapshot.pings).unwrap();
+        for _ in 0..3 {
+            picker.close();
+            picker.open();
+            if picker.take_directory_request() {
+                directory_with(&cancel, &mut get, |_, _| {
+                    sweeps.set(sweeps.get() + 1);
+                    BTreeMap::new()
+                })
+                .unwrap();
+            }
+        }
+        assert_eq!((fetches.get(), sweeps.get()), (3, 1));
+        for choice in [None, Some(42), Some(24)] {
+            let prepared = prepare_cached_with(
+                None,
+                choice,
+                &cancel,
+                &mut get,
+                |_, _| panic!("cached Play must not ping"),
+                Some(snapshot.clone()),
+            )
+            .unwrap();
+            assert!(Arc::ptr_eq(prepared.directory.as_ref().unwrap(), &snapshot));
+            if let Some(id) = choice {
+                assert_eq!(
+                    prepared.endpoint,
+                    format!("ws://192.0.2.1:{}/slither", 400 + id)
+                );
+            }
+        }
+        assert_eq!((fetches.get(), sweeps.get()), (9, 1)); // Only fresh page/profile script per Play.
+    }
+    #[test]
+    fn play_can_take_the_existing_directory_worker_and_cancel_its_wait() {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        sender
+            .send(Ok(DirectorySnapshot {
+                servers: decode_directory(&synthetic_directory()).unwrap(),
+                pings: BTreeMap::from([(1, 12)]),
+            }))
+            .unwrap();
+        let pending = DirectoryPreparation {
+            receiver,
+            cancel: Arc::new(AtomicBool::new(false)),
+            worker: None,
+        };
+        assert_eq!(
+            pending
+                .finish(&AtomicBool::new(false))
+                .unwrap()
+                .servers
+                .len(),
+            2
+        );
+        let (_sender, receiver) = mpsc::sync_channel(1);
+        let flag = Arc::new(AtomicBool::new(false));
+        let pending = DirectoryPreparation {
+            receiver,
+            cancel: flag.clone(),
+            worker: None,
+        };
+        assert!(pending.finish(&AtomicBool::new(true)).is_err());
+        assert!(flag.load(Ordering::SeqCst));
+    }
+    #[test]
+    fn picker_directory_effect_needs_no_profile_or_session_and_selected_play_uses_id() {
+        let get = |url: &Url, _limit: usize, _cancel: &AtomicBool| {
+            Ok((
+                url.clone(),
+                Inert(match url.path() {
+                    "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                    "/s/game999.js" => b"getData('https://slither.io/i999.txt',handler);".to_vec(),
+                    "/i999.txt" => synthetic_directory(),
+                    _ => panic!("unexpected effect"),
+                }),
+            ))
+        };
+        let cancel = Arc::new(AtomicBool::new(false));
+        let snapshot = directory_with(&cancel, get, |s, _| {
+            assert_eq!(s.len(), 2);
+            BTreeMap::from([(1, 12)])
+        })
+        .unwrap();
+        assert_eq!(snapshot.servers[1].id, 42);
+        assert_eq!(snapshot.pings[&1], 12);
+        for (id, expected) in [(42, Some("ws://192.0.2.1:442/slither")), (77, None)] {
+            let result = prepare_selected_with(
+                None,
+                Some(id),
+                &cancel,
+                |url, limit, cancel| {
+                    let (url, mut bytes) = get(url, limit, cancel)?;
+                    if url.path() == "/s/game999.js" {
+                        bytes.0.extend_from_slice(SCRIPT);
+                    }
+                    Ok((url, bytes))
+                },
+                |_, _| BTreeMap::from([(1, 12)]),
+            );
+            match expected {
+                Some(endpoint) => assert_eq!(result.unwrap().endpoint, endpoint),
+                None => assert_eq!(
+                    result.err().unwrap(),
+                    "Selected server is no longer in the directory"
+                ),
+            }
+        }
+        cancel.store(true, Ordering::SeqCst);
+        assert!(
+            directory_with(
+                &cancel,
+                |_, _, _| panic!("cancelled before fetch"),
+                |_, _| panic!("cancelled before probe")
+            )
+            .is_err()
+        );
+    }
     #[test]
     fn automatic_preparation_composes_page_profile_directory_and_selection() {
         let mut calls = Vec::new();

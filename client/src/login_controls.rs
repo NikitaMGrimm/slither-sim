@@ -12,6 +12,8 @@ pub const NICKNAME: ControlId = ControlId(0);
 pub const PLAY: ControlId = ControlId(1);
 /// Quality toggle identity.
 pub const QUALITY: ControlId = ControlId(2);
+/// Server directory link identity.
+pub const SERVER: ControlId = ControlId(3);
 /// Build controls without adding admission or return-phase policy.
 pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> PanelView {
     let holder = layout.logical_rect(E::NicknameHolder);
@@ -34,6 +36,8 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
             visible,
             enabled: if id == PLAY {
                 !view.play_disabled
+            } else if id == SERVER {
+                crate::server_picker::available(view)
             } else {
                 !view.disabled
             },
@@ -105,6 +109,18 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
                     .into(),
                 },
                 view.wording.graphics_quality.into(),
+            ),
+            control(
+                SERVER,
+                E::Server,
+                1.,
+                ControlStyle::MenuLink,
+                view.skin_alpha,
+                view.ordinary_controls_visible,
+                ControlKind::IconLink {
+                    label: "Choose Server".into(),
+                },
+                "Choose server".into(),
             ),
         ],
     }
