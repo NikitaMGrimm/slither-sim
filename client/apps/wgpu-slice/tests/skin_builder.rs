@@ -348,7 +348,7 @@ fn empty_builder_exit_and_empty_builder_save_send_their_own_selection() {
                 .unwrap();
                 state.open(0., true);
                 state.step(230.);
-                state.cycle(next, UnlockSnapshot::default());
+                state.cycle(next);
                 state.set_section(StudioSection::Builder, 230.);
                 if retained_custom {
                     state.edit_builder(|b| b.reset());
@@ -357,7 +357,7 @@ fn empty_builder_exit_and_empty_builder_save_send_their_own_selection() {
                     state.set_section(StudioSection::BuiltIn, 410.);
                 }
                 let saved = state
-                    .save("Bytes", 410., UnlockSnapshot::default(), &mut || {
+                    .save("Bytes", 410., &mut || {
                         panic!("empty builder sampled entropy")
                     })
                     .unwrap()
@@ -424,9 +424,7 @@ fn authored_and_retained_patterns_reach_actual_login_with_exact_bytes_and_base()
             state.open(0., true);
             state.set_section(StudioSection::Builder, 0.);
             let record = state
-                .save("Bytes", 230., UnlockSnapshot::default(), &mut || {
-                    panic!("retained entropy")
-                })
+                .save("Bytes", 230., &mut || panic!("retained entropy"))
                 .unwrap()
                 .unwrap();
             assert_eq!(sent(&record.selection()), expected(skin, &custom));

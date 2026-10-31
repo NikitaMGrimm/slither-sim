@@ -10,7 +10,9 @@ pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
 // are their RGBA dimensions in procedural(); no eager rasterization is needed.
 const PROCEDURAL_PIXEL_BYTES: usize = (2 * 64 * 64 + 2 * 48 * 48 + 84 * 84) * 4;
 mod menu_art;
+mod studio;
 pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
+pub use studio::{CosmeticArtStatus, THUMBNAIL_PIXEL_BUDGET};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BackgroundArt {
@@ -101,6 +103,25 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
     decode_bounded(bytes, 1024)
 }
 fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
+    let rgba = bounded_reader(bytes, max_extent)?
+        .decode()
+        .map_err(image_error)?
+        .into_rgba8();
+    let (width, height) = rgba.dimensions();
+    let mut pixels = rgba.into_raw();
+    for p in pixels.as_chunks_mut::<4>().0.iter_mut() {
+        for i in 0..3 {
+            p[i] = ((u16::from(p[i]) * u16::from(p[3]) + 127) / 255) as u8;
+        }
+    }
+    Ok(RgbaImage {
+        width,
+        height,
+        pixels,
+    })
+}
+// PNG decoder construction expands metadata even for a dimension-only probe.
+fn bounded_reader(bytes: &[u8], max_extent: u32) -> Result<image::ImageReader<Cursor<&[u8]>>> {
     if bytes.is_empty() || bytes.len() > MAX_ENCODED_BYTES {
         return Err("Cosmetic encoded image budget".into());
     }
@@ -116,21 +137,61 @@ fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(max_extent);
     limits.max_image_height = Some(max_extent);
-    limits.max_alloc = Some(16 * 1024 * 1024);
+    limits.max_alloc = Some(COSMETIC_PIXEL_BUDGET as u64);
     reader.limits(limits);
-    let rgba = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
-    let (width, height) = rgba.dimensions();
-    let mut pixels = rgba.into_raw();
-    for p in pixels.as_chunks_mut::<4>().0.iter_mut() {
-        for i in 0..3 {
-            p[i] = ((u16::from(p[i]) * u16::from(p[3]) + 127) / 255) as u8;
+    if reader.format() == Some(image::ImageFormat::Png) {
+        check_png_metadata_budget(bytes)?;
+    }
+    Ok(reader)
+}
+fn check_png_metadata_budget(bytes: &[u8]) -> Result<()> {
+    use std::io::Read;
+    fn after_null(bytes: &[u8]) -> Option<&[u8]> {
+        bytes.iter().position(|b| *b == 0).map(|i| &bytes[i + 1..])
+    }
+    let mut chunks = &bytes[8..];
+    let mut remaining = COSMETIC_PIXEL_BUDGET as u64;
+    while !chunks.is_empty() {
+        let header = chunks.get(..12).ok_or("Invalid PNG chunk")?;
+        let length = u32::from_be_bytes(header[..4].try_into().unwrap()) as usize;
+        if length > chunks.len() - 12 {
+            return Err("Invalid PNG chunk".into());
+        }
+        let kind = &header[4..8];
+        let data = &chunks[8..8 + length];
+        let compressed = match kind {
+            b"iCCP" | b"zTXt" => after_null(data).and_then(|v| v.strip_prefix(&[0])),
+            b"iTXt" => after_null(data)
+                .and_then(|v| v.strip_prefix(&[1, 0]))
+                .and_then(after_null)
+                .and_then(after_null),
+            _ => None,
+        };
+        if let Some(compressed) = compressed {
+            // png 0.18 ignores ICC limit errors. Count expanded metadata with a fixed
+            // streaming buffer before constructing its decoder, so those files fail closed.
+            let count = std::io::copy(
+                &mut flate2::read::ZlibDecoder::new(compressed).take(remaining + 1),
+                &mut std::io::sink(),
+            )
+            .map_err(|e| e.to_string())?;
+            remaining = remaining
+                .checked_sub(count)
+                .ok_or("Cosmetic metadata budget")?;
+        }
+        chunks = &chunks[12 + length..];
+        if kind == b"IEND" {
+            break;
         }
     }
-    Ok(RgbaImage {
-        width,
-        height,
-        pixels,
-    })
+    Ok(())
+}
+fn image_error(error: image::ImageError) -> String {
+    if matches!(error, image::ImageError::Limits(_)) {
+        format!("Cosmetic image budget: {error}")
+    } else {
+        error.to_string()
+    }
 }
 
 #[derive(Default)]
@@ -186,6 +247,7 @@ pub struct Cosmetics {
     accessories: BTreeMap<u8, Resource>,
     pub own_accessory: Option<u8>,
     menu: menu_art::MenuArtCache,
+    studio: studio::StudioArt,
 }
 impl Cosmetics {
     /// Share ready face/bulb pixels with the isolated preview. No accessory selection/grant.
@@ -196,10 +258,18 @@ impl Cosmetics {
             accessories: Default::default(),
             own_accessory: None,
             menu: Default::default(),
+            studio: Default::default(),
         }
     }
     /// The only byte-source seam. Native and browser bind it to local development inputs.
-    pub fn load(mut resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
+    pub fn load(resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
+        Self::load_selected(resolve, own, false)
+    }
+    fn load_selected(
+        mut resolve: impl FnMut(&str) -> Result<Vec<u8>>,
+        own: Option<u8>,
+        selected_only: bool,
+    ) -> Result<Self> {
         let mut images = Images::default();
         if let Ok(bytes) = resolve(MANIFEST_PATH)
             && let Err(error) = images.manifest(&bytes)
@@ -207,6 +277,12 @@ impl Cosmetics {
             eprintln!("Menu manifest unavailable: {error}");
         }
         for path in paths().into_iter().chain(images.menu_paths()) {
+            let accessory = ACCESSORIES.iter().enumerate().find_map(|(id, entry)| {
+                (path == format!("s/a_{}.png", entry.0)).then_some(id as u8)
+            });
+            if selected_only && accessory.is_some_and(|id| Some(id) != own) {
+                continue;
+            }
             if let Err(error) = resolve(&path).and_then(|bytes| images.add(&path, &bytes)) {
                 eprintln!("Cosmetic {path} unavailable: {error}");
             }
@@ -216,6 +292,9 @@ impl Cosmetics {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn directory(directory: &std::path::Path, own: Option<u8>) -> Result<Self> {
         use std::io::Read;
+        if own.is_some_and(|id| id > 31) {
+            return Err("Accessory must be 0..31".into());
+        }
         let root = match directory.canonicalize() {
             Ok(root) => root,
             Err(error) => {
@@ -223,7 +302,7 @@ impl Cosmetics {
                 return Self::from_images(Images::default(), own);
             }
         };
-        Self::load(
+        let mut result = Self::load_selected(
             |path| {
                 let file = root.join(path).canonicalize().map_err(|e| e.to_string())?;
                 if !file.starts_with(&root) {
@@ -244,8 +323,12 @@ impl Cosmetics {
                     .map_err(|e| e.to_string())?;
                 Ok(bytes)
             },
-            own,
-        )
+            None,
+            true,
+        )?;
+        result.studio.directory = Some(root);
+        result.commit_accessory(own)?;
+        Ok(result)
     }
     pub fn from_images(mut images: Images, own: Option<u8>) -> Result<Self> {
         if own.is_some_and(|v| usize::from(v) >= ACCESSORIES.len()) {
@@ -328,6 +411,7 @@ impl Cosmetics {
             accessories,
             own_accessory: own,
             menu: images.menu,
+            studio: Default::default(),
         };
         Ok(result)
     }
@@ -373,23 +457,10 @@ impl Cosmetics {
         let skin = self
             .skin(a.skin, &a.custom_skin)
             .map_err(|e| e.to_string())?;
-        // Single-image eyes bypass the entire accessory branch in the stock painter.
-        let accessory = if matches!(skin.face, FaceGeometry::SingleImage(_)) {
-            None
-        } else {
-            self.selected_accessory(own).map(|(id, _)| {
-                let v = ACCESSORIES[usize::from(id)];
-                StaticHeadAccessoryGeometry {
-                    forward: match skin.face {
-                        FaceGeometry::Paired(face) => face.eyes.forward,
-                        _ => StandardEyeGeometry::default().forward,
-                    },
-                    image_scale: v.1,
-                    pivot_x: v.2,
-                    pivot_y: v.3,
-                }
-            })
-        };
+        let accessory = self
+            .preview_accessory(&skin)
+            .map(|(geometry, _)| geometry)
+            .filter(|_| own);
         Ok(AccessoryPresentation {
             presentation: FacePresentation {
                 face: skin.face,

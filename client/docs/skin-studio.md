@@ -1,10 +1,9 @@
 # Native skin studio
 
 Change Skin opens an offline, modal studio from ordinary idle login,
-including when no endpoint is configured. Previous/Next cycle 0–64 and skip 42
-in both directions. No unlock grants exist in this delivery: local art and
-`--accessory` cannot unlock studio choices. Built-in and Builder share one draft;
-Cosmetics remains deferred.
+including when no endpoint is configured. Previous/Next cycle every ID 0–64,
+including 42. None and cosmetic IDs 0–31 are all selectable by default. Built-in,
+Builder and Cosmetics share one draft; there is no lock, grant, import or redemption flow.
 Saved skin 65 and existing custom patterns remain usable unchanged; either arrow
 explicitly selects a built-in and retains the old custom bytes separately.
 
@@ -56,6 +55,40 @@ edited as complete normal runs still Save unchanged; their editor starts empty.
 Repaints, restoration, Cancel and unchanged/empty Save consume no entropy.
 The old three-palette development editor and Wasm preference API are unchanged.
 
+## Cosmetics
+
+The four-column, three-row window includes None and all 32 IDs. Arrows/Home/End
+move one roving focus stop; Enter/Space selects without saving. Wheel and page
+arrows move the bounded window, with stable item IDs and generation-bound capture.
+The selected item stays independent of keyboard focus. Narrow windows retain
+28px targets; very short windows display fewer grid rows, and very small tab
+bars use short labels with complete semantic names.
+
+Art comes only from the contained local `--cosmetics-dir` pack. No official art is
+bundled. Existing manifest roles, revisions, relative-path checks and allowlists
+remain unchanged. Native loading keeps base face/background/menu sources and the
+committed accessory, rather than eagerly retaining all 32 full accessory images.
+The studio retains at most twelve 128px thumbnails and one selected full source,
+with one serial decode at a time. Only the twelve visible items plus one row of
+metadata are projected (the fixed catalogue has 33 entries, below 1,024).
+Off-window thumbnails are evicted; selected full art stays pinned. Readiness is
+rechecked using contained file identities before publication. Replacement revisions
+remain monotonic and earlier prepared pictures own immutable pixels.
+
+The existing 4 MiB encoded-file, 1,024px world-image and 16 MiB decoded-art limits
+remain. Retained plus staged pixel allocations are preflighted before decode;
+thumbnails have a separate 4 MiB allowance. Missing, corrupt or over-budget art
+shows a placeholder/status without changing the selected preference. None always
+removes the local attachment. The preview shares only the requested ready source,
+uses gameplay's own-head attachment geometry and suppresses it for single-image
+faces. Its fit includes the complete rotated attachment.
+
+Save commits this field with the whole draft once; Cancel discards it with all
+other edits. The next explicit Play applies the committed local selection through
+a narrow idle-login setter, including after an earlier game. It does not rerun
+startup configuration or reset the bank/session. Neither cosmetic selection nor
+source readiness changes any login byte. Explicitly choosing built-in 42 sends 42.
+
 ## Storage
 
 Native storage is `%LOCALAPPDATA%/SlitherClient/menu.v2`, with a bounded read
@@ -67,12 +100,13 @@ versions and unreadable files disable persistence for the run. Typed read outcom
 keep I/O failures separate from corrupt contents. Failed writes preserve the memory
 commit and display “Saved for this run” on return. Nickname is sampled from its
 current login owner. Explicit `--nickname` / `--skin` override restored values
-for the run; omitted options do not erase saved choices.
+for the run; omitted options do not erase saved choices. Explicit `--accessory`
+overrides the saved cosmetic for the run without a startup write.
 
 The ASCII record is
 `2:<nickname hex>:<b|c>:<builtin hex>:<custom base hex>:<custom hex>:<--|00..1f>`.
-Inactive custom data and a future cosmetic preference remain separate from
-unlock grants. Retained custom bytes keep opaque prefixes and raw tails unchanged,
+Inactive custom data and the local cosmetic selection are retained independently.
+Cosmetic IDs never enter the wire snapshot or replace its `[0,255]` markers. Retained custom bytes keep opaque prefixes and raw tails unchanged,
 subject to the wire's 255-byte bound. Header/run validation applies only to newly
 authored patterns; v1 migration, the old development editor and inbound resolver
 retain their existing rules.
@@ -117,4 +151,12 @@ Use `--builder` instead for the edit/reset/47-colour/save/restore strips at
 
 All fixtures are authored and offline. Owner appearance/feel, real native
 keyboard/IME/accessibility, GPU/display pacing, outside-server operation and
-extension readiness are unverified. Gated cosmetics remains a later delivery.
+extension readiness are unverified.
+
+Use `menu_specimens NEW_EXTERNAL_DIRECTORY --cosmetics AUTHORED_ART_DIRECTORY`
+for authored-art 1x/1.5x/2x specimens, entry/return and save/restore states, and a
+DPR 1–8 ledger including 1.25/1.5/1.75, missing art, narrow/short-wide layouts,
+first entry and section fades. The completed sweep must stay at or below 448
+admitted menu records, with a 96-record Cosmetics allowance. The hard limits stay
+64 menu slots, 13 MiB and 512 records. Run `--test studio_cosmetics` for the
+cosmetic-only byte, preview, setter, control and quota regressions.

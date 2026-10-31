@@ -136,6 +136,13 @@ pub enum ControlKind {
         /// Roving selected item.
         selected: bool,
     },
+    /// One item in the local-art window; None is a real selectable item.
+    CosmeticCell {
+        /// Local art ID, never a wire field.
+        cosmetic: Option<u8>,
+        /// Committed draft selection, independent of roving focus.
+        selected: bool,
+    },
     /// One login link: server icon above an unboxed caption.
     IconLink {
         /// Visible caption and accessible name.
@@ -332,7 +339,8 @@ impl PanelView {
                 };
                 let selected = match r.control.kind {
                     ControlKind::SectionTab { selected, .. }
-                    | ControlKind::Swatch { selected, .. } => Some(selected),
+                    | ControlKind::Swatch { selected, .. }
+                    | ControlKind::CosmeticCell { selected, .. } => Some(selected),
                     _ => None,
                 };
                 let (role, value, actions) = match r.control.kind {
@@ -352,6 +360,11 @@ impl PanelView {
                             "Palette {palette}{}",
                             count.map_or_else(String::new, |n| format!(", {n} colours"))
                         ),
+                        vec![PanelAction::Focus, PanelAction::Activate],
+                    ),
+                    ControlKind::CosmeticCell { cosmetic, .. } => (
+                        AccessibleRole::GridCell,
+                        cosmetic.map_or_else(|| "None".into(), |id| format!("Cosmetic {id}")),
                         vec![PanelAction::Focus, PanelAction::Activate],
                     ),
                     ControlKind::Backdrop => (

@@ -21,6 +21,8 @@ pub const MENU_MATERIAL_HANDLE_BASE: u64 = 0x7000_0000_0000_0000;
 // Menus have their own text cache and are composed over the world picture,
 // so their text cannot count up from the world's TEXT_HANDLE_BASE.
 pub const MENU_TEXT_HANDLE_BASE: u64 = 0x8000_0000_0000_0000;
+// A returned world picture may still own an earlier revision of the selected art.
+pub const STUDIO_COSMETIC_HANDLE_BASE: u64 = 0xa000_0000_0000_0000;
 #[derive(Clone)]
 pub struct Family {
     pub variants: Vec<BodyAssetUse>,
@@ -363,6 +365,7 @@ mod tests {
             COSMETIC_HANDLE_BASE,
             MENU_MATERIAL_HANDLE_BASE,
             MENU_TEXT_HANDLE_BASE,
+            STUDIO_COSMETIC_HANDLE_BASE,
         ];
         for (i, base) in bases.iter().enumerate() {
             assert_eq!(base % HANDLE_NAMESPACE_SIZE, 0);

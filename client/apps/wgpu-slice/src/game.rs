@@ -289,6 +289,19 @@ impl LocalGame {
         self.bank.cosmetics = Some(cosmetics);
         Ok(())
     }
+    /// Update only the next own-head art choice, including returns after the first Play.
+    pub fn set_committed_cosmetic(&mut self, choice: Option<u8>) -> Result<()> {
+        if choice.is_some_and(|id| id > 31) {
+            return Err("Accessory must be 0..31".into());
+        }
+        if !self.can_play() {
+            return Err("Commit cosmetics on idle login".into());
+        }
+        if let Some(c) = &mut self.bank.cosmetics {
+            c.commit_accessory(choice)?;
+        }
+        Ok(())
+    }
     pub fn menu_cosmetics(&self) -> Option<&crate::cosmetics::Cosmetics> {
         self.bank.cosmetics.as_ref()
     }

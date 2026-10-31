@@ -466,6 +466,8 @@ mod desktop {
                 {
                     self.nickname = nickname;
                     self.play_appearance = self.login.studio.state.committed().selection();
+                    self.game
+                        .set_committed_cosmetic(self.login.studio.state.committed().cosmetic)?;
                     self.game.set_requested_quality(match quality {
                         slither_client::menu_preferences::MenuQuality::High => {
                             slither_client::presentation::QualityMode::High
@@ -523,6 +525,10 @@ mod desktop {
                 self.schedule.retry(Instant::now());
                 return Ok(());
             };
+            self.login.studio.sync_art(
+                physical.map(|n| f64::from(n) / dpr),
+                self.game.bank.cosmetics.as_mut(),
+            )?;
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
@@ -709,6 +715,10 @@ mod desktop {
                     options.skin_explicit.then_some(options.skin),
                 )
                 .map_err(str::to_owned)?;
+            if options.accessory.is_some() {
+                restored.record.cosmetic = options.accessory;
+            }
+            game.set_committed_cosmetic(restored.record.cosmetic)?;
             let play_appearance = restored.record.selection();
             let mut login = NativeLogin::with_preferences(restored.record, storage)?;
             login.restore_settings(slither_wgpu_slice::menu_storage::SettingsStorage::native());

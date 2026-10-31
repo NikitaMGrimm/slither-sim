@@ -44,12 +44,22 @@ impl AppearancePreview {
     pub fn time(&self) -> f64 {
         self.time
     }
-    /// The caller supplies readiness-resolved skin and entropy; no art can grant entry.
+    /// The caller supplies readiness-resolved skin and deterministic pose entropy.
     pub fn prepare(
         &self,
         skin: &SkinDescriptor,
         bounds: MenuRect,
         tape: &[[f64; 2]],
+    ) -> Result<PreviewPose, String> {
+        self.prepare_with_accessory(skin, bounds, tape, None)
+    }
+    /// Fit the complete ready attachment as well as the body and antenna envelope.
+    pub fn prepare_with_accessory(
+        &self,
+        skin: &SkinDescriptor,
+        bounds: MenuRect,
+        tape: &[[f64; 2]],
+        accessory: Option<(StaticHeadAccessoryGeometry, Point)>,
     ) -> Result<PreviewPose, String> {
         if tape.is_empty() || bounds.width <= 0. || bounds.height <= 0. {
             return Err("Invalid preview bounds/tape".into());
@@ -81,9 +91,34 @@ impl AppearancePreview {
             })
             .collect();
         // Reserve complete bulb/chain extents as well as the tail and body shadows.
-        let zoom = (bounds.width / 650.).min(bounds.height / 240.).min(1.3);
+        let mut envelope = [-325f64, -120f64, 325f64, 120f64];
+        if let Some((geometry, source)) = accessory {
+            geometry.validate().map_err(|e| e.to_string())?;
+            let radius = geometry.image_scale
+                * geometry
+                    .pivot_x
+                    .abs()
+                    .max((source.x - geometry.pivot_x).abs())
+                    .hypot(
+                        geometry
+                            .pivot_y
+                            .abs()
+                            .max((source.y - geometry.pivot_y).abs()),
+                    )
+                + geometry.forward;
+            envelope[0] = envelope[0].min(anchors[0].x - radius);
+            envelope[1] = envelope[1].min(anchors[0].y - radius);
+            envelope[2] = envelope[2].max(anchors[0].x + radius);
+            envelope[3] = envelope[3].max(anchors[0].y + radius);
+        }
+        let zoom = (bounds.width / (envelope[2] - envelope[0]))
+            .min(bounds.height / (envelope[3] - envelope[1]))
+            .min(1.3);
         let view = BodyPaintView {
-            camera: Point { x: 0., y: 0. },
+            camera: Point {
+                x: (envelope[0] + envelope[2]) / 2.,
+                y: (envelope[1] + envelope[3]) / 2.,
+            },
             zoom,
             half_width: bounds.x + bounds.width / 2.,
             half_height: bounds.y + bounds.height / 2.,

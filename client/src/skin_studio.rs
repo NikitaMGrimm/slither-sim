@@ -25,6 +25,14 @@ pub const BACKDROP: ControlId = ControlId(5);
 pub const BUILT_IN_TAB: ControlId = ControlId(6);
 /// Builder section tab.
 pub const BUILDER_TAB: ControlId = ControlId(7);
+/// Local cosmetic section.
+pub const COSMETICS_TAB: ControlId = ControlId(8);
+/// Cosmetic page navigation.
+pub const COSMETIC_PREVIOUS: ControlId = ControlId(20);
+/// Next window of cosmetics.
+pub const COSMETIC_NEXT: ControlId = ControlId(21);
+/// Stable None/ID indices (None=0, IDs 0..31=1..32).
+pub const COSMETIC_BASE: u16 = 400;
 /// Builder actions after the windowed run strip.
 pub const REMOVE: ControlId = ControlId(14);
 /// Recolour the selected run with the focused palette.
@@ -43,6 +51,7 @@ pub const SWATCH_BASE: u16 = 100;
 pub const RUN_BASE: u16 = 200;
 
 mod builder_view;
+mod cosmetics_view;
 pub use builder_view::Navigation;
 
 /// Owned snapshot taken at explicit Play, before asynchronous profile acquisition.
@@ -89,19 +98,6 @@ impl AppearanceSelection {
     }
 }
 
-/// Grants are not inferred from stored selection, asset readiness or CLI options.
-/// No grant producer is mounted. A later explicit importer can extend this snapshot.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct UnlockSnapshot {
-    _private: (),
-}
-impl UnlockSnapshot {
-    /// This delivery deliberately has no unlocks, including skin 42.
-    pub fn skin_available(self, skin: u8) -> bool {
-        skin <= 64 && skin != 42
-    }
-}
-
 /// Complete v2 preference, retaining inactive custom data independently.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AppearanceRecord {
@@ -115,7 +111,7 @@ pub struct AppearanceRecord {
     pub custom_bytes: Vec<u8>,
     /// Whether the custom choice is active.
     pub active_custom: bool,
-    /// Stored future preference only; this never grants or selects an accessory.
+    /// Local own-head selection; never part of AppearanceSelection or login bytes.
     pub cosmetic: Option<u8>,
 }
 impl AppearanceRecord {
@@ -285,13 +281,15 @@ impl RestoredAppearance {
         Ok(())
     }
 }
-/// Mounted studio sections; cosmetics remain a later delivery.
+/// Mounted studio sections sharing one transaction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StudioSection {
     /// Built-in selection, including retained legacy choices.
     BuiltIn,
     /// Bounded custom-pattern editor.
     Builder,
+    /// Local own-head art.
+    Cosmetics,
 }
 /// Bounded draft; large imported custom runs remain opaque and unchanged.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -324,6 +322,8 @@ pub struct StudioState {
     section_alpha: f64,
     editor_scroll: ScrollList,
     run_window: ScrollList,
+    cosmetic_window: ScrollList,
+    cosmetic_focus: usize,
 }
 impl StudioState {
     /// Start closed with a validated committed appearance.
@@ -341,6 +341,8 @@ impl StudioState {
             section_alpha: 1.,
             editor_scroll: ScrollList::new(1),
             run_window: ScrollList::new(4),
+            cosmetic_window: ScrollList::new(3),
+            cosmetic_focus: 0,
         })
     }
     /// The only source of the next Play snapshot.
@@ -383,6 +385,9 @@ impl StudioState {
         self.section_alpha = 1.;
         self.editor_scroll = ScrollList::new(1);
         self.run_window = ScrollList::new(4);
+        self.cosmetic_focus = self.committed.cosmetic.map_or(0, |id| usize::from(id) + 1);
+        self.cosmetic_window = ScrollList::new(3);
+        self.cosmetic_window.reveal(self.cosmetic_focus / 4, 9);
         self.generation += 1;
         self.phase = Phase::Entering(now);
         self.alpha = 0.;
@@ -417,25 +422,26 @@ impl StudioState {
     pub fn take_return_focus(&mut self) -> bool {
         std::mem::take(&mut self.restore_focus)
     }
-    /// Select a new built-in, preserving inactive custom bytes and skipping locked IDs.
-    pub fn cycle(&mut self, next: bool, grants: UnlockSnapshot) {
+    /// Select a built-in in 0..64, preserving inactive custom bytes.
+    pub fn cycle(&mut self, next: bool) {
         if !self.interactive() {
             return;
         }
+        let previous = self
+            .draft
+            .as_ref()
+            .expect("mounted draft")
+            .record
+            .selection()
+            .skin;
         let record = &mut self.draft.as_mut().expect("mounted draft").record;
-        let mut id = record.selection().skin;
-        loop {
-            id = if next {
-                if id >= 64 { 0 } else { id + 1 }
-            } else if id == 0 || id > 64 {
-                64
-            } else {
-                id - 1
-            };
-            if grants.skin_available(id) {
-                break;
-            }
-        }
+        let id = if next {
+            if previous >= 64 { 0 } else { previous + 1 }
+        } else if previous == 0 || previous > 64 {
+            64
+        } else {
+            previous - 1
+        };
         record.builtin = id;
         record.active_custom = false;
         self.draft.as_mut().expect("mounted draft").builder_active = false;
@@ -511,7 +517,6 @@ impl StudioState {
         &mut self,
         nickname: &str,
         now: f64,
-        grants: UnlockSnapshot,
         random_byte: &mut impl FnMut() -> u8,
     ) -> Result<Option<AppearanceRecord>, &'static str> {
         if !self.interactive() {
@@ -526,14 +531,6 @@ impl StudioState {
                 custom_bytes: record.custom_bytes.clone(),
             }
             .validate_authored()?;
-        }
-        // A retained legacy choice remains byte-preserving. New selections
-        // must still be available at commit, independently of ready artwork.
-        if record.selection() != self.committed.selection()
-            && !record.active_custom
-            && !grants.skin_available(record.selection().skin)
-        {
-            return Err("Skin unavailable");
         }
         let draft = self.draft.as_ref().expect("mounted draft");
         if draft.builder.changed() && draft.builder.pattern().colours() > 0 {
@@ -594,8 +591,6 @@ impl StudioState {
             "Saved custom skin".into()
         } else if selection.skin == 65 {
             "Saved skin 65".into()
-        } else if selection.skin == 42 {
-            "Saved skin 42".into()
         } else {
             format!("Skin {} / 64", selection.skin)
         };
@@ -724,7 +719,7 @@ impl StudioState {
         panel.controls.sort_by_key(|c| match c.id {
             BACKDROP => 0,
             ControlId(0) | ControlId(1) => 1,
-            BUILT_IN_TAB | BUILDER_TAB => 2,
+            BUILT_IN_TAB | BUILDER_TAB | COSMETICS_TAB => 2,
             ControlId(4) => 4,
             CANCEL => 5,
             SAVE => 6,
