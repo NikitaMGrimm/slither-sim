@@ -1,8 +1,9 @@
 # Native server picker
 
 The login's Servers icon opens an authored modal through the shared control
-painter. The first open requests directory discovery and latency measurement in
-official mode; it never grants Play, creates a game session, or sends login.
+painter. Official mode requests directory discovery and latency measurement in
+the background once the native login is up. Opening the picker joins that work;
+it never grants Play, creates a game session, or sends login.
 Subsequent opens reuse the process's completed directory and ping samples;
 there is no open-count or timed refresh. An in-flight request is shared.
 If acquisition fails or Play cancels it before completion, the next open retries
@@ -18,6 +19,21 @@ cluster, then socket address, making injected results deterministic. Active
 servers and the saved selection appear in the list; numeric search can also
 select an inactive directory entry.
 
+The worker publishes decoded servers before probing and coalesces incremental
+cluster minima into one bounded in-memory progress slot. The host polls it at
+50 ms while discovery or Play preparation is running, including after Play
+takes the worker. Partial results are for display only: automatic Play still
+waits for the unchanged ping sweep and selects from its completed samples.
+Partial results never become the completed cache or suppress a retry after
+cancellation/failure. Fetch limits, cancellation and probe deadlines are unchanged.
+
+While the picker is visible (including its exit fade), progress and completion
+update latency text in place and retain row order and visible membership. They
+keep the same control generation, focus, pointer capture and scroll window.
+The next open applies the latest deduplication and latency order, with unknown
+pings last. The initial decoded list can appear while search is focused without
+resetting its editor. Actual directory replacement still cancels stale captures.
+
 Search strips non-digits and retains at most four digits. A changed value whose
 numeric ID matches selects immediately and closes, including leading zeroes;
 an empty changed value has numeric value zero. Search does not invent regions
@@ -32,7 +48,7 @@ missing, malformed or unreadable storage restores automatic. A failed write
 leaves the in-memory choice intact. No endpoints or historical pings persist.
 An explicit CLI server wins until the user chooses a row or Automatic.
 
-Play still acquires a fresh profile through `official::prepare`. A saved ID is
+Play still acquires a fresh profile through the official preparation worker. A saved ID is
 resolved against the retained directory using measured pings, then passes through
 `explicit_endpoint`; a missing ID reports an acquisition error rather than
 playing elsewhere. Directory fetches and pings remain bounded, cancellable
@@ -47,7 +63,7 @@ does not wait on it, and its success or failure is handled independently.
 The shared `ScrollList` admits six rows per window, independent of directory
 size. Only these `ListRow` controls have text rasters and draws. Wheel, arrows,
 Page Up/Down and Home/End navigate the bounded window; Tab wraps within the
-modal. Directory replacement cancels old pointer captures and activations.
+modal.
 Backdrop click and Escape close; blank panel space shields the backdrop.
 Gameplay presses stay suspended, releases still propagate, and nickname focus
 returns after the exit fade. Geometry, hit-testing and IME placement remain in

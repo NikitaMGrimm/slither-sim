@@ -85,6 +85,7 @@ pub struct ServerPicker {
     directory_ready: bool,
     changed: bool,
     dirty: bool,
+    pending_rows: Option<Vec<DirectoryRow>>,
 }
 impl Default for ServerPicker {
     fn default() -> Self {
@@ -103,6 +104,7 @@ impl Default for ServerPicker {
             directory_ready: false,
             changed: false,
             dirty: false,
+            pending_rows: None,
         }
     }
 }
@@ -116,6 +118,13 @@ impl ServerPicker {
     pub fn changed(&self) -> bool {
         self.changed
     }
+    /// Called once when the native login starts; endpoint mode stays offline.
+    pub fn start_directory(&mut self, official: bool) {
+        if official && !self.directory_requested {
+            self.request = true;
+            self.directory_requested = true;
+        }
+    }
     pub fn open(&mut self) {
         if self.open {
             return;
@@ -124,6 +133,11 @@ impl ServerPicker {
         self.generation = self.generation.wrapping_add(1);
         self.search.clear();
         self.list = ScrollList::new(VISIBLE_ROWS);
+        if let Some(rows) = self.pending_rows.take() {
+            self.rows = rows;
+        }
+        self.rows
+            .sort_by_key(|r| (r.ping.is_none(), r.ping.unwrap_or(0), r.server.id));
         // Completed samples are reused; only unfinished failures re-arm acquisition.
         if !self.directory_requested {
             self.request = true;
@@ -172,12 +186,64 @@ impl ServerPicker {
             return Err("Directory server limit");
         }
         self.rows = ranked(servers, pings);
+        self.pending_rows = None;
         self.directory_ready = true;
         self.directory_requested = true;
         self.request = false;
         self.generation = self.generation.wrapping_add(1); // Cancel captures across reordered rows.
         self.list.window(self.entries().len());
         self.status = if self.rows.is_empty() {
+            "No servers available".into()
+        } else {
+            format!("{} servers / measured latency", self.rows.len())
+        };
+        Ok(())
+    }
+    /// Progress is provisional until the sweep completes. Keep row identity/order
+    /// while visible (including exit fade); re-sort on the next open instead.
+    /// See docs/server-picker.md for the focus/capture/scroll rule.
+    pub fn update_directory(
+        &mut self,
+        servers: &[Server],
+        pings: &BTreeMap<u16, u32>,
+        complete: bool,
+    ) -> Result<(), &'static str> {
+        if servers.len() > 4096 {
+            return Err("Directory server limit");
+        }
+        let mut rows = ranked(servers, pings);
+        let old_by_id: BTreeMap<_, _> = self
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| (row.server.id, (index, row.server.active)))
+            .collect();
+        let same_ids = rows.len() == self.rows.len()
+            && rows
+                .iter()
+                .all(|row| old_by_id.contains_key(&row.server.id));
+        if self.visible() && !self.rows.is_empty() && same_ids {
+            self.pending_rows = Some(rows.clone());
+            // Progress belongs to the same decoded directory. Retain the visible
+            // representative's active flag too, so deduplication cannot move rows.
+            rows.sort_by_key(|row| old_by_id[&row.server.id].0);
+            for row in &mut rows {
+                row.server.active = old_by_id[&row.server.id].1;
+            }
+        } else {
+            self.pending_rows = None;
+            if !self.rows.is_empty() && !same_ids {
+                self.generation = self.generation.wrapping_add(1);
+            }
+        }
+        self.rows = rows;
+        self.directory_ready = complete;
+        self.directory_requested = true;
+        self.request = false;
+        self.list.window(self.entries().len());
+        self.status = if !complete {
+            format!("{} servers / measuring latency...", self.rows.len())
+        } else if self.rows.is_empty() {
             "No servers available".into()
         } else {
             format!("{} servers / measured latency", self.rows.len())

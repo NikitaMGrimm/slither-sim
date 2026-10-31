@@ -163,6 +163,7 @@ mod desktop {
         cursor: [f64; 2],
         preparation: Option<Preparation>,
         directory: Option<DirectoryPreparation>,
+        directory_progress: Option<official::DirectoryProgress>,
         directory_snapshot: Option<Arc<official::DirectorySnapshot>>,
         nickname: String,
         play_appearance: slither_client::skin_studio::AppearanceSelection,
@@ -254,16 +255,27 @@ mod desktop {
             Err("Effect drain budget".into())
         }
         fn service(&mut self) -> Result<()> {
+            if let Some(progress) = &self.directory_progress
+                && let Some(snapshot) = progress.take()
+            {
+                self.login
+                    .picker
+                    .policy
+                    .update_directory(&snapshot.servers, &snapshot.pings, false)
+                    .map_err(str::to_owned)?;
+                self.schedule.invalidate();
+            }
             if let Some(directory) = &mut self.directory
                 && let Some(result) = directory.poll()
             {
                 self.directory = None;
+                self.directory_progress = None;
                 match result {
                     Ok(snapshot) => {
                         self.login
                             .picker
                             .policy
-                            .replace(&snapshot.servers, &snapshot.pings)
+                            .update_directory(&snapshot.servers, &snapshot.pings, true)
                             .map_err(str::to_owned)?;
                         self.directory_snapshot = Some(Arc::new(snapshot));
                     }
@@ -273,9 +285,10 @@ mod desktop {
             }
             if self.login.picker.policy.take_directory_request() {
                 if self.official {
-                    if self.directory.is_none() {
+                    if self.directory.is_none() && self.preparation.is_none() {
                         match DirectoryPreparation::start() {
                             Ok(work) => {
+                                self.directory_progress = Some(work.progress.clone());
                                 self.directory = Some(work);
                                 self.login.picker.policy.status =
                                     "Measuring server latency...".into();
@@ -299,6 +312,9 @@ mod desktop {
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
+                if self.directory.is_none() {
+                    self.directory_progress = None;
+                }
                 official::complete_picker_preparation(
                     &mut self.login.picker.policy,
                     &mut self.directory_snapshot,
@@ -328,7 +344,7 @@ mod desktop {
                     }
                 }
             }
-            self.discovery_poll = if self.preparation.is_some() {
+            self.discovery_poll = if self.preparation.is_some() || self.directory.is_some() {
                 Some(
                     self.discovery_poll
                         .filter(|t| *t > Instant::now())
@@ -495,6 +511,7 @@ mod desktop {
                             Ok(preparation) => self.preparation = Some(preparation),
                             Err(error) => {
                                 if self.directory.is_none() {
+                                    self.directory_progress = None;
                                     self.login.picker.policy.directory_failed(&error);
                                 }
                                 self.game.fail(&error);
@@ -702,7 +719,7 @@ mod desktop {
                 .map_err(|e| e.to_string())?;
             let host = pollster::block_on(SurfaceHost::new(&i, surface, [s.width, s.height]))?;
             println!(
-                "Actual adapter {:?}; MSAA{}; no transport until explicit Play",
+                "Actual adapter {:?}; MSAA{}; no game session until explicit Play",
                 host.renderer.adapter_info, host.renderer.sample_count
             );
             let mut storage = slither_wgpu_slice::menu_storage::MenuStorage::native();
@@ -726,6 +743,7 @@ mod desktop {
                 login.picker.policy.selection =
                     slither_wgpu_slice::server_picker_native::read_preference(&path);
             }
+            login.picker.policy.start_directory(options.official);
             Ok(Running {
                 login,
                 endpoint: options.endpoint.clone(),
@@ -741,6 +759,7 @@ mod desktop {
                 cursor: [480., 270.],
                 preparation: None,
                 directory: None,
+                directory_progress: None,
                 directory_snapshot: None,
                 nickname: String::new(),
                 play_appearance,

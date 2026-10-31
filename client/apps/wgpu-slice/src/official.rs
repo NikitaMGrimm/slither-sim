@@ -47,7 +47,7 @@ pub fn complete_picker_preparation(
 ) -> Result<()> {
     if let Some(snapshot) = &completion.directory {
         picker
-            .replace(&snapshot.servers, &snapshot.pings)
+            .update_directory(&snapshot.servers, &snapshot.pings, true)
             .map_err(str::to_owned)?;
         *cached = Some(snapshot.clone());
     }
@@ -145,10 +145,23 @@ pub struct DirectorySnapshot {
     pub servers: Vec<Server>,
     pub pings: BTreeMap<u16, u32>,
 }
+/// One coalesced snapshot, bounded independently of event-loop polling speed.
+/// This remains observable after Play takes ownership of the worker.
+#[derive(Clone, Default)]
+pub struct DirectoryProgress(Arc<Mutex<Option<DirectorySnapshot>>>);
+impl DirectoryProgress {
+    pub fn take(&self) -> Option<DirectorySnapshot> {
+        self.0.lock().expect("directory progress").take()
+    }
+    fn publish(&self, snapshot: DirectorySnapshot) {
+        *self.0.lock().expect("directory progress") = Some(snapshot);
+    }
+}
 pub struct DirectoryPreparation {
     receiver: mpsc::Receiver<Result<DirectorySnapshot>>,
     cancel: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
+    pub progress: DirectoryProgress,
 }
 impl DirectoryPreparation {
     pub fn take_for_play(explicit: Option<&str>, pending: &mut Option<Self>) -> Option<Self> {
@@ -175,13 +188,29 @@ impl DirectoryPreparation {
         }
     }
     pub fn start() -> Result<Self> {
+        Self::start_with(fetch, probe_clusters_with)
+    }
+    fn start_with(
+        get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)> + Send + 'static,
+        measure: impl FnOnce(
+            &[Server],
+            &Arc<AtomicBool>,
+            &(dyn Fn(BTreeMap<u16, u32>) + Sync),
+        ) -> BTreeMap<u16, u32>
+        + Send
+        + 'static,
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::sync_channel(1);
         let cancel = Arc::new(AtomicBool::new(false));
         let flag = cancel.clone();
+        let progress = DirectoryProgress::default();
+        let updates = progress.clone();
         let worker = thread::Builder::new()
             .name("server-directory".into())
             .spawn(move || {
-                let result = directory_with(&flag, fetch, probe_clusters);
+                let result = directory_stream_with(&flag, get, measure, |snapshot| {
+                    updates.publish(snapshot)
+                });
                 let _ = sender.send(result);
             })
             .map_err(|e| e.to_string())?;
@@ -189,6 +218,7 @@ impl DirectoryPreparation {
             receiver,
             cancel,
             worker: Some(worker),
+            progress,
         })
     }
     pub fn poll(&mut self) -> Option<Result<DirectorySnapshot>> {
@@ -210,10 +240,28 @@ impl Drop for DirectoryPreparation {
         }
     }
 }
+#[cfg(test)]
 fn directory_with(
     cancel: &Arc<AtomicBool>,
     mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
+) -> Result<DirectorySnapshot> {
+    directory_stream_with(
+        cancel,
+        &mut get,
+        |servers, flag, _| measure(servers, flag),
+        |_| {},
+    )
+}
+fn directory_stream_with(
+    cancel: &Arc<AtomicBool>,
+    mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
+    measure: impl FnOnce(
+        &[Server],
+        &Arc<AtomicBool>,
+        &(dyn Fn(BTreeMap<u16, u32>) + Sync),
+    ) -> BTreeMap<u16, u32>,
+    publish: impl Fn(DirectorySnapshot) + Sync,
 ) -> Result<DirectorySnapshot> {
     check_cancel(cancel)?;
     let (page_url, page) = get(&Url::parse(PAGE).expect("constant URL"), PAGE_LIMIT, cancel)?;
@@ -229,7 +277,17 @@ fn directory_with(
     let (_, bytes) = get(&url, DIRECTORY_LIMIT, cancel)?;
     let servers = decode_directory(&bytes.0)?;
     drop(bytes);
-    let pings = measure(&servers, cancel);
+    check_cancel(cancel)?;
+    publish(DirectorySnapshot {
+        servers: servers.clone(),
+        pings: BTreeMap::new(),
+    });
+    let pings = measure(&servers, cancel, &|pings| {
+        publish(DirectorySnapshot {
+            servers: servers.clone(),
+            pings,
+        });
+    });
     check_cancel(cancel)?;
     Ok(DirectorySnapshot { servers, pings })
 }
@@ -468,6 +526,13 @@ pub fn explicit_endpoint(server: &str) -> Result<String> {
 }
 
 fn probe_clusters(servers: &[Server], cancel: &Arc<AtomicBool>) -> BTreeMap<u16, u32> {
+    probe_clusters_with(servers, cancel, &|_| {})
+}
+fn probe_clusters_with(
+    servers: &[Server],
+    cancel: &Arc<AtomicBool>,
+    publish: &(dyn Fn(BTreeMap<u16, u32>) + Sync),
+) -> BTreeMap<u16, u32> {
     let mut clusters = BTreeMap::<u16, Vec<IpAddr>>::new();
     for server in servers.iter().rev() {
         let addresses = clusters.entry(server.cluster).or_default();
@@ -529,12 +594,15 @@ fn probe_clusters(servers: &[Server], cancel: &Arc<AtomicBool>) -> BTreeMap<u16,
                                     started.elapsed().as_millis() as u64,
                                     Ordering::SeqCst,
                                 );
+                                let mut results = results.lock().expect("probe results");
                                 results
-                                    .lock()
-                                    .expect("probe results")
                                     .entry(id)
                                     .and_modify(|old: &mut u32| *old = (*old).min(ms))
                                     .or_insert(ms);
+                                // Serialize publication with the minimum update so
+                                // a slower thread cannot overwrite newer samples.
+                                publish(results.clone());
+                                drop(results);
                                 count += 1;
                                 if count == 3 {
                                     break;
@@ -682,14 +750,107 @@ mod tests {
     fn synthetic_directory() -> Vec<u8> {
         synthetic_ids([24, 42])
     }
+    #[test]
+    fn startup_worker_streams_before_completion_and_play_joins_it() {
+        let (phase_tx, phase_rx) = mpsc::sync_channel(1);
+        let (continue_tx, continue_rx) = mpsc::sync_channel(1);
+        let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.start_directory(true);
+        assert!(picker.take_directory_request());
+        let mut pending = Some(
+            DirectoryPreparation::start_with(
+                |url, _, _| {
+                    Ok((
+                        url.clone(),
+                        Inert(match url.path() {
+                            "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                            "/s/game999.js" => {
+                                b"getData('https://slither.io/i999.txt',handler);".to_vec()
+                            }
+                            "/i999.txt" => synthetic_clusters([(24, 1), (42, 2)]),
+                            _ => panic!("unexpected fetch"),
+                        }),
+                    ))
+                },
+                move |_, _, publish| {
+                    phase_tx.send(()).unwrap();
+                    continue_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    publish(BTreeMap::from([(1, 90)]));
+                    phase_tx.send(()).unwrap();
+                    continue_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    BTreeMap::from([(1, 90), (2, 12)])
+                },
+            )
+            .unwrap(),
+        );
+        let progress = pending.as_ref().unwrap().progress.clone();
+        phase_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        picker.open();
+        assert!(!picker.take_directory_request());
+        let early = progress.take().expect("directory before first reply");
+        picker
+            .update_directory(&early.servers, &early.pings, false)
+            .unwrap();
+        assert_eq!(picker.rows.len(), 2);
+        assert!(picker.rows.iter().all(|r| r.ping.is_none()));
+        assert!(pending.as_mut().unwrap().poll().is_none());
+        let transferred = DirectoryPreparation::take_for_play(None, &mut pending);
+        assert!(pending.is_none());
+        let (done_tx, done_rx) = mpsc::sync_channel(1);
+        let play = thread::spawn(move || {
+            let completion = prepare_pending_with(
+                None,
+                None,
+                &Arc::new(AtomicBool::new(false)),
+                transferred,
+                None,
+                |url, _, _| {
+                    Ok((
+                        url.clone(),
+                        Inert(match url.path() {
+                            "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                            "/s/game999.js" => SCRIPT.to_vec(),
+                            _ => panic!("Play must reuse the directory"),
+                        }),
+                    ))
+                },
+                |_, _| panic!("Play must reuse the sweep"),
+            );
+            done_tx.send(completion).unwrap();
+        });
+        continue_tx.send(()).unwrap();
+        phase_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let update = progress
+            .take()
+            .expect("progress after Play takes the worker");
+        picker
+            .update_directory(&update.servers, &update.pings, false)
+            .unwrap();
+        assert_eq!(picker.rows[0].ping, Some(90));
+        assert_eq!(picker.rows[1].ping, None);
+        assert!(matches!(done_rx.try_recv(), Err(mpsc::TryRecvError::Empty)));
+        continue_tx.send(()).unwrap();
+        let completion = done_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        play.join().unwrap();
+        let prepared = completion.result.as_ref().unwrap();
+        assert_eq!(prepared.directory.as_ref().unwrap().pings[&2], 12);
+        assert_eq!(prepared.endpoint, "ws://192.0.2.1:442/slither");
+        let mut cached = None;
+        complete_picker_preparation(&mut picker, &mut cached, &completion, false, false).unwrap();
+        assert_eq!(picker.rows[0].ping, Some(90));
+        assert_eq!(picker.rows[1].ping, Some(12));
+    }
     fn synthetic_ids(ids: impl IntoIterator<Item = u16>) -> Vec<u8> {
+        synthetic_clusters(ids.into_iter().map(|id| (id, 1)))
+    }
+    fn synthetic_clusters(records: impl IntoIterator<Item = (u16, u8)>) -> Vec<u8> {
         let mut bytes = vec![b'a'];
-        for id in ids {
+        for (id, cluster) in records {
             let mut record = [0u8; 28];
             record[1..5].copy_from_slice(&[192, 0, 2, 1]);
             record[21..23].copy_from_slice(&(400 + id).to_be_bytes());
             record[24] = 40;
-            record[25] = 1;
+            record[25] = cluster;
             record[26..28].copy_from_slice(&id.to_be_bytes());
             for nibble in record.iter().flat_map(|b| [b >> 4, b & 15]) {
                 let offset = bytes.len() - 1;
@@ -789,6 +950,7 @@ mod tests {
             receiver,
             cancel: directory_cancel.clone(),
             worker: None,
+            progress: DirectoryProgress::default(),
         });
         let explicit = Some("192.0.2.1:445");
         let transferred = DirectoryPreparation::take_for_play(explicit, &mut pending);
@@ -892,6 +1054,7 @@ mod tests {
             receiver,
             cancel: directory_cancel.clone(),
             worker: None,
+            progress: DirectoryProgress::default(),
         };
         let preparation =
             Preparation::start_with_directory(None, None, None, Some(pending)).unwrap();
@@ -988,6 +1151,7 @@ mod tests {
                 receiver,
                 cancel: Arc::new(AtomicBool::new(false)),
                 worker: None,
+                progress: DirectoryProgress::default(),
             };
             let completion = prepare_pending_with(
                 None,
@@ -1133,6 +1297,7 @@ mod tests {
             receiver,
             cancel: Arc::new(AtomicBool::new(false)),
             worker: None,
+            progress: DirectoryProgress::default(),
         });
         let transferred = DirectoryPreparation::take_for_play(None, &mut pending).unwrap();
         assert!(pending.is_none());
@@ -1150,6 +1315,7 @@ mod tests {
             receiver,
             cancel: flag.clone(),
             worker: None,
+            progress: DirectoryProgress::default(),
         };
         assert!(pending.finish(&AtomicBool::new(true)).is_err());
         assert!(flag.load(Ordering::SeqCst));
