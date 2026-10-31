@@ -1061,18 +1061,15 @@ fn settled_login_density_cap_keeps_real_viewport_layout_and_hits() {
                     .sum::<usize>()
                     <= 13 * 1024 * 1024
             );
-            let rects = [E::Logo, E::NicknameHolder, E::Play, E::Quality, E::Server]
+            let rects = [E::Logo, E::NicknameHolder, E::Play, E::Settings, E::Server]
                 .map(|e| login.layout.viewport_rect(e));
             if let Some(old) = previous {
                 assert_eq!(rects, old);
             }
             previous = Some(rects);
-            let rect = login.layout.viewport_rect(E::Quality);
+            let rect = login.layout.viewport_rect(E::Settings);
             let point = mouse_client_position(
-                [
-                    (rect.x + rect.width / 2.) * dpr,
-                    (rect.y + rect.height / 2.) * dpr,
-                ],
+                [(rect.x + rect.width / 2.) * dpr, (rect.y + 46.) * dpr],
                 dpr,
             );
             assert!(frame.frame.draws.iter().any(|draw| {
@@ -1085,7 +1082,9 @@ fn settled_login_density_cap_keeps_real_viewport_layout_and_hits() {
             let quality = login.state.view(true).quality;
             login.pointer(point, Some(true), true);
             login.pointer(point, Some(false), true);
-            assert_ne!(login.state.view(true).quality, quality);
+            assert!(login.state.settings.visible());
+            assert_eq!(login.state.view(true).quality, quality);
+            login.close_settings(true);
         }
     }
 }

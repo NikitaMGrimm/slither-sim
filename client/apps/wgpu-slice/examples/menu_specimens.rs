@@ -923,7 +923,7 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
     use slither_client::{
-        login_controls::SETTINGS,
+        login_controls::{NICKNAME, SETTINGS},
         menu_controls::ControlKind,
         menu_preferences::MenuQuality,
         settings::{DONE, QUALITY},
@@ -951,13 +951,15 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
     ] {
         let extent = logical.map(|v| (v * dpr) as u32);
         login.close_settings(true);
-        login.focus(SETTINGS);
+        login.focus(NICKNAME);
+        assert_eq!(login.controls.focus(), Some(NICKNAME));
         let outgoing = login.prepare_host(extent, dpr, true, None)?;
         capture(
             renderer,
             &outgoing,
             &output.join(format!("login-{}x{}-{dpr}x.png", logical[0], logical[1])),
         )?;
+        login.focus(SETTINGS);
         login.open_settings(true);
         for state in [
             "high-focus",

@@ -247,7 +247,7 @@ impl NativeLogin {
         self.controls.sync_focus(&self.panel, &mut self.input.state)
     }
     /// Startup-only restoration; never writes or changes appearance storage.
-    pub fn restore_settings(&mut self, mut storage: crate::menu_storage::SettingsStorage) {
+    pub fn restore_settings(&mut self, storage: crate::menu_storage::SettingsStorage) {
         self.state.settings = slither_client::settings::SettingsState::new(storage.restore());
         self.settings_storage = storage;
     }
@@ -319,8 +319,7 @@ impl NativeLogin {
                     .action(MenuAction::Enter { composing: false }, admission);
             }
             Some(SETTINGS) => {
-                // The caller publishes sync effects after activation, like Play.
-                self.state.settings.open(&view);
+                self.open_settings(admission);
             }
             Some(SERVER) if slither_client::server_picker::available(&view) => {
                 self.picker.policy.open();
@@ -469,6 +468,12 @@ impl NativeLogin {
                 ) && !event.repeat
                     && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
                 {
+                    if self.controls.focus() == Some(SETTINGS) {
+                        return NativeInputResult {
+                            consumed: true,
+                            effects: self.open_settings(admission),
+                        };
+                    }
                     self.activate(admission);
                     return NativeInputResult {
                         consumed: true,

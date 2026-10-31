@@ -65,7 +65,22 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
         assert_eq!(login.controls.focus(), Some(id));
     }
     login.focus(SETTINGS);
-    assert!(key(&mut login, NamedKey::Enter));
+    let opened = login.key(
+        KeyInput {
+            logical: &Key::Named(NamedKey::Enter),
+            physical: PhysicalKey::Code(KeyCode::Enter),
+            text: None,
+            state: ElementState::Pressed,
+            repeat: false,
+        },
+        true,
+    );
+    assert!(opened.consumed);
+    assert!(
+        opened
+            .effects
+            .contains(&slither_client::menu_input::HostEditEffect::ReleasePointerBoost)
+    );
     assert!(login.state.settings.visible());
     assert_eq!(login.controls.focus(), Some(QUALITY));
     assert_eq!(login.input.state.focus(), None);
@@ -159,10 +174,10 @@ impl Drop for Temp {
 }
 
 #[test]
-fn native_storage_bounded_read_no_startup_write_atomic_replace_and_unreadable_lock() {
+fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry() {
     let temp = Temp::new();
     let path = temp.0.join("settings.txt");
-    let mut storage = SettingsStorage::at(Some(temp.0.clone()));
+    let storage = SettingsStorage::at(Some(temp.0.clone()));
     assert_eq!(storage.restore().quality, Q::High);
     assert!(!path.exists());
     for (bytes, quality) in [
@@ -183,11 +198,11 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_unreadable_lo
     std::fs::remove_file(&path).unwrap();
     std::fs::create_dir(&path).unwrap();
     assert_eq!(storage.restore().quality, Q::High);
-    assert!(!storage.enabled);
     std::fs::remove_dir(&path).unwrap();
     std::fs::write(&path, "1:0").unwrap();
-    assert!(storage.save("1:1").is_err());
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:0");
+    storage.save("1:1").unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
+    storage.save("1:0").unwrap();
     let mut login = settled();
     login.restore_settings(SettingsStorage::at(Some(temp.0.clone())));
     assert_eq!(login.state.view(true).quality, Q::Low);
@@ -232,6 +247,29 @@ fn failed_replace_keeps_old_data_and_memory_and_does_not_retry_each_frame() {
     key(&mut login, NamedKey::Space);
     login.step(9648., true, false).unwrap();
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
+}
+
+#[cfg(windows)]
+#[test]
+fn startup_read_failure_does_not_block_later_explicit_save() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let temp = Temp::new();
+    let path = temp.0.join("settings.txt");
+    std::fs::write(&path, "1:1").unwrap();
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&path)
+        .unwrap();
+    let mut login = settled();
+    login.restore_settings(SettingsStorage::at(Some(temp.0.clone())));
+    assert_eq!(login.state.view(true).quality, Q::High);
+    drop(lock);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
+    login.open_settings(true);
+    key(&mut login, NamedKey::Space);
+    login.step(9616., true, false).unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:0");
 }
 
 #[test]

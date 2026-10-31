@@ -76,22 +76,18 @@ impl MenuStorage {
     }
 }
 
-/// Independent Quality record; unreadable files disable writes for this run.
+/// Independent Quality record; each explicit change may retry persistence.
 pub struct SettingsStorage {
     directory: Option<PathBuf>,
-    pub enabled: bool,
 }
 impl SettingsStorage {
     pub fn native() -> Self {
         Self::at(std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("SlitherClient")))
     }
     pub fn at(directory: Option<PathBuf>) -> Self {
-        Self {
-            directory,
-            enabled: true,
-        }
+        Self { directory }
     }
-    pub fn restore(&mut self) -> slither_client::settings::SettingsPreferences {
+    pub fn restore(&self) -> slither_client::settings::SettingsPreferences {
         use slither_client::settings::{MAX_SETTINGS_BYTES, SettingsPreferences};
         let Some(directory) = &self.directory else {
             return SettingsPreferences::default();
@@ -109,16 +105,10 @@ impl SettingsStorage {
         })();
         match result {
             Ok(record) => SettingsPreferences::restore(record.as_deref(), None),
-            Err(_) => {
-                self.enabled = false;
-                SettingsPreferences::default()
-            }
+            Err(_) => SettingsPreferences::default(),
         }
     }
     pub fn save(&self, record: &str) -> Result<(), String> {
-        if !self.enabled {
-            return Err("Settings storage unreadable this run".into());
-        }
         slither_client::settings::SettingsPreferences::parse(record)
             .ok_or("Invalid settings record")?;
         let directory = self

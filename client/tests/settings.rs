@@ -12,6 +12,24 @@ fn menu(quality: Q) -> StartMenuState {
 }
 
 #[test]
+fn settings_identity_rejects_studio_activations() {
+    let mut menu = menu(Q::High);
+    menu.settings.open(&menu.view(true));
+    let panel = menu.settings.panel([960., 540.]);
+    let studio = slither_client::skin_studio::StudioState::new(Default::default())
+        .unwrap()
+        .panel([960., 540.], "");
+    assert_ne!(panel.id, studio.id);
+    let mut input = PanelInputState::default();
+    input.sync(&panel, &mut MenuInputState::default());
+    let mut intent = input.activate(&panel, Activation::Space).unwrap();
+    intent.panel = studio.id;
+    menu.settings.activate(intent);
+    assert_eq!(menu.settings.preferences().quality, Q::High);
+    assert_eq!(menu.settings.take_write(), None);
+}
+
+#[test]
 fn strict_record_and_exact_legacy_precedence_never_schedule_startup_writes() {
     for (legacy, expected) in [
         (None, Q::High),

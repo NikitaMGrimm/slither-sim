@@ -366,7 +366,10 @@ fn toggle_indicator(size: u32, fill: [u8; 3], ink: [u8; 3], checked: bool) -> ma
             pixels.extend(
                 fill.into_iter()
                     .zip(ink)
-                    .map(|(a, b)| (f64::from(a) * (1. - tick) + f64::from(b) * tick).round() as u8),
+                    // Menu textures use premultiplied production pixels, including edge coverage.
+                    .map(|(a, b)| {
+                        ((f64::from(a) * (1. - tick) + f64::from(b) * tick) * alpha).round() as u8
+                    }),
             );
             pixels.push((alpha * 255.).round() as u8);
         }
@@ -2353,7 +2356,6 @@ mod quota_tests {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
             wordmark: None,
             old_stroke: None,
             stroke: None,
@@ -2381,6 +2383,38 @@ mod quota_tests {
             c.compose_labels(&mut text, [960, 720], 1., None, None, &[])
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn toggle_indicator_corners_and_edges_are_premultiplied() {
+        let theme = MenuTheme::default();
+        for size in [24, 36, 48, 120] {
+            for checked in [false, true] {
+                let indicator = toggle_indicator(
+                    size,
+                    theme.toggle_indicator(checked).colors[0],
+                    theme.text,
+                    checked,
+                );
+                for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
+                    let offset = ((y * size + x) * 4) as usize;
+                    assert_eq!(
+                        &indicator.pixels[offset..offset + 4],
+                        &[0; 4],
+                        "{size} {checked} corner {x},{y}"
+                    );
+                }
+                assert!(
+                    indicator
+                        .pixels
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .all(|p| p[..3].iter().all(|c| *c <= p[3])),
+                    "{size} {checked}: RGB must not exceed alpha"
+                );
+            }
+        }
     }
 
     #[test]

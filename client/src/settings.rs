@@ -8,7 +8,7 @@ pub const QUALITY: ControlId = ControlId(2);
 /// Close without reverting the immediately applied preference.
 pub const DONE: ControlId = ControlId(3);
 /// Stable panel identity, separate from login, champion and directory.
-pub const PANEL: u16 = 3;
+pub const PANEL: u16 = 4;
 
 /// Requested settings, never the renderer's adaptive runtime state.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

@@ -21,9 +21,10 @@ server-choice records remain separate.
 
 Native uses `%APPDATA%/SlitherClient/settings.txt`, reads at most 65 bytes, and
 shares the appearance adapter's same-directory temporary-write/atomic-replace
-helper. An unreadable file disables writes for the run. A failed write keeps the
-old file and in-memory choice and shows “Not saved; applies this session”. It
-retries only on the next explicit change. Native had no persisted legacy Quality
+helper. A failed startup read falls back in memory without writing. A failed write
+keeps the old file and in-memory choice and shows “Not saved; applies this session”.
+Each explicit change attempts persistence again, including after a startup read
+failure. Native had no persisted legacy Quality
 file. The browser dev/reference hosts retain their UI and legacy key, migrating
 through the same copied Wasm parser at `slither-client-settings-v1` and retaining
 `slither-client-quality-v1` for older hosts. They perform no startup writes.
