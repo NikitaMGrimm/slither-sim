@@ -19,7 +19,7 @@ and every other legacy value, including missing/unreadable, means High. Startup
 does not write or repair malformed, oversized or future records. Appearance and
 server-choice records remain separate.
 
-Native uses `%APPDATA%/SlitherClient/settings.txt`, reads at most 65 bytes, and
+Native uses `%LOCALAPPDATA%/SlitherClient/settings.txt`, reads at most 65 bytes, and
 shares the appearance adapter's same-directory temporary-write/atomic-replace
 helper. A failed startup read falls back in memory without writing. A failed write
 keeps the old file and in-memory choice and shows “Not saved; applies this session”.

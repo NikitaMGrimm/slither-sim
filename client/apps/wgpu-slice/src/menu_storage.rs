@@ -82,7 +82,7 @@ pub struct SettingsStorage {
 }
 impl SettingsStorage {
     pub fn native() -> Self {
-        Self::at(std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("SlitherClient")))
+        Self::at(std::env::var_os("LOCALAPPDATA").map(|p| PathBuf::from(p).join("SlitherClient")))
     }
     pub fn at(directory: Option<PathBuf>) -> Self {
         Self { directory }
