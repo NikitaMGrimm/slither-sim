@@ -49,8 +49,8 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         let effects = login.pointer(point, Some(false), true);
         assert!(effects.contains(&HostEditEffect::ReleasePointerBoost));
         assert!(login.picker.policy.is_open());
-        assert!(login.picker.policy.take_directory_request());
-        assert_eq!(login.picker.controls.focus(), Some(SEARCH));
+        assert!(!login.picker.policy.take_directory_request());
+        assert_eq!(login.picker.controls.focus(), Some(ADDRESS));
         login
             .picker
             .policy
@@ -76,7 +76,7 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         assert!(!row.hit([row.rect.x + row.rect.width, row.rect.y]));
         login.pointer(point, Some(true), true);
         login.pointer(point, Some(false), true);
-        assert_eq!(login.picker.policy.selection.0, Some(5));
+        assert_eq!(login.picker.policy.selection.official_id(), Some(5));
         for now in (656..=1200).step_by(16) {
             login.step(now as f64, true, false).unwrap();
         }
@@ -289,6 +289,8 @@ fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
     let resolved = picker.panel.resolve(picker.viewport).unwrap();
     let search = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
     let point = [search.rect.x + 20., search.rect.y + search.rect.height / 2.];
+    picker.pointer(&mut text, point, Some(true)).unwrap();
+    picker.pointer(&mut text, point, Some(false)).unwrap();
     for query in ["909", "808"] {
         let effects = picker.input.state.apply(EditIntent::KeyText(query.into()));
         picker.commit_effects(effects);
@@ -301,7 +303,7 @@ fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
         assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), "");
         assert_eq!(picker.policy.search, "");
         assert!(picker.policy.is_open());
-        assert_eq!(picker.policy.selection, ServerPreference(None));
+        assert_eq!(picker.policy.selection, ServerPreference::Automatic);
     }
 }
 #[test]
@@ -309,6 +311,8 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     let mut p = NativeServerPicker::default();
     p.policy.replace(&servers(), &BTreeMap::new()).unwrap();
     p.open();
+    p.controls.focus_control(&p.panel, SEARCH);
+    p.controls.sync_focus(&p.panel, &mut p.input.state);
     let effects = key(&mut p, NamedKey::ArrowDown, KeyCode::ArrowDown);
     p.commit_effects(effects);
     assert_eq!(p.controls.focus(), Some(ControlId(16)));
@@ -320,22 +324,27 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     assert_eq!(p.controls.focus(), Some(CLOSE));
     let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
     p.commit_effects(effects);
+    assert_eq!(p.controls.focus(), Some(ADDRESS));
+    for _ in 0..3 {
+        let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
+        p.commit_effects(effects);
+    }
     assert_eq!(p.controls.focus(), Some(SEARCH));
     let effects = p.input.state.apply(EditIntent::KeyText("19x99".into()));
     p.commit_effects(effects);
-    assert_eq!(p.policy.selection.0, Some(1999));
+    assert_eq!(p.policy.selection.official_id(), Some(1999));
     assert!(!p.policy.is_open());
     let directory =
         std::env::temp_dir().join(format!("slither-server-pref-{}", std::process::id()));
     std::fs::create_dir(&directory).unwrap();
     let path = directory.join("choice");
-    assert_eq!(read_preference(&path), ServerPreference(None));
+    assert_eq!(read_preference(&path), ServerPreference::Automatic);
     write_preference(&path, &p.policy.take_preference().unwrap()).unwrap();
-    assert_eq!(read_preference(&path), ServerPreference(Some(1999)));
+    assert_eq!(read_preference(&path), ServerPreference::Official(1999));
     assert!(write_preference(&directory, "1:auto").is_err());
-    assert_eq!(p.policy.selection.0, Some(1999));
+    assert_eq!(p.policy.selection.official_id(), Some(1999));
     std::fs::write(&path, "1:77".repeat(1000)).unwrap();
-    assert_eq!(read_preference(&path), ServerPreference(None));
+    assert_eq!(read_preference(&path), ServerPreference::Automatic);
     std::fs::remove_file(path).unwrap();
     std::fs::remove_dir(directory).unwrap();
 }

@@ -627,7 +627,7 @@ impl Composition<'_> {
                                 )?;
                             }
                         }
-                        if *selected || input.focus() == Some(control.id) {
+                        if *selected || input.focus_visible() == Some(control.id) {
                             for border in [
                                 MenuRect {
                                     height: 1.,
@@ -663,7 +663,7 @@ impl Composition<'_> {
                         selected,
                     } => {
                         self.swatch(r, *palette, count.is_some(), alpha, theme)?;
-                        if *selected || input.focus() == Some(control.id) {
+                        if *selected || input.focus_visible() == Some(control.id) {
                             for border in [
                                 MenuRect {
                                     height: 1.,
@@ -721,7 +721,7 @@ impl Composition<'_> {
                         let [hover, press] = input.progress(control.id);
                         let link_alpha = if press > 0. {
                             0.5
-                        } else if hover > 0. || input.focus() == Some(control.id) {
+                        } else if hover > 0. || input.focus_visible() == Some(control.id) {
                             1.
                         } else {
                             0.7
@@ -778,7 +778,7 @@ impl Composition<'_> {
                                 )?;
                             }
                         }
-                        if input.focus() == Some(control.id) && enabled {
+                        if input.focus_visible() == Some(control.id) && enabled {
                             for border in [
                                 MenuRect {
                                     x: icon.x - 3.,
@@ -847,7 +847,7 @@ impl Composition<'_> {
                         ping,
                     } => {
                         // Rows share tiny solid materials; only this window owns text rasters.
-                        let focused = input.focus() == Some(control.id);
+                        let focused = input.focus_visible() == Some(control.id);
                         let color = if *selected {
                             theme.selection
                         } else if focused || input.progress(control.id)[0] > 0. {
@@ -953,7 +953,7 @@ impl Composition<'_> {
                             (
                                 ControlState::Hovered,
                                 if enabled {
-                                    hover.max(if input.focus() == Some(control.id) {
+                                    hover.max(if input.focus_visible() == Some(control.id) {
                                         0.33
                                     } else {
                                         0.
@@ -1003,7 +1003,7 @@ impl Composition<'_> {
                     }
                     ControlKind::Button { label } | ControlKind::SectionTab { label, .. } => {
                         if control.style == ControlStyle::ChangeSkin {
-                            if input.focus() == Some(control.id) {
+                            if input.focus_visible() == Some(control.id) {
                                 self.sliced(
                                     r.rect,
                                     theme.surface(ControlStyle::QualityButton, ControlState::Idle),
@@ -1021,7 +1021,7 @@ impl Composition<'_> {
                                 | ControlStyle::StudioSave
                                 | ControlStyle::StudioCancel
                         );
-                        let focused = input.focus() == Some(control.id);
+                        let focused = input.focus_visible() == Some(control.id);
                         let [hover, press] = input.progress(control.id);
                         if !quality || focused {
                             self.sliced(
@@ -1044,7 +1044,7 @@ impl Composition<'_> {
                                 r.rect,
                                 theme.surface(control.style, ControlState::Hovered),
                                 alpha
-                                    * hover.max(if input.focus() == Some(control.id) {
+                                    * hover.max(if input.focus_visible() == Some(control.id) {
                                         0.33
                                     } else {
                                         0.

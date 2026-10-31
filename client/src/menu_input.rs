@@ -27,14 +27,23 @@ pub enum TextRule {
     Champion,
     /// At most four decimal digits.
     NumericServer,
+    /// Bounded single-line user-owned host:port; the host validates URL syntax.
+    ServerAddress,
 }
 impl TextRule {
     /// Normalize raw units, including isolated surrogate halves.
     pub fn normalize_units(self, units: &[u16]) -> String {
+        if self == Self::ServerAddress {
+            return String::from_utf16_lossy(&units[..units.len().min(512)])
+                .chars()
+                .map(|c| if c.is_control() { ' ' } else { c })
+                .collect();
+        }
         let limit = match self {
             Self::Nickname => 24,
             Self::Champion => 140,
             Self::NumericServer => 4,
+            Self::ServerAddress => 512,
         };
         units
             .iter()

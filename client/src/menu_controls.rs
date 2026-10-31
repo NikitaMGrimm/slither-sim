@@ -511,6 +511,7 @@ pub struct PanelInputState {
     modal: bool,
     synced_focus: Option<(u16, u64, ControlId)>,
     selection: MouseSelection,
+    keyboard_focus: bool,
 }
 impl PanelInputState {
     /// Set an available keyboard target through the same admission gate as Tab.
@@ -521,11 +522,20 @@ impl PanelInputState {
             .any(|c| c.id == id && Self::available(panel, c))
         {
             self.focus = Some(id);
+            self.keyboard_focus = true;
         }
     }
     /// Current logical focus.
     pub fn focus(&self) -> Option<ControlId> {
         self.focus
+    }
+    /// Focus decoration follows keyboard navigation; pointer focus still edits/captures.
+    pub fn focus_visible(&self) -> Option<ControlId> {
+        self.keyboard_focus.then_some(self.focus).flatten()
+    }
+    /// A key can change input modality without moving logical focus.
+    pub fn keyboard_input(&mut self) {
+        self.keyboard_focus = true;
     }
     /// Current pointer capture, also used by host drag-selection.
     pub fn capture(&self) -> Option<ControlId> {
@@ -659,6 +669,7 @@ impl PanelInputState {
     }
     /// Explicit Tab order wraps within the mounted panel and skips unavailable controls.
     pub fn tab(&mut self, panel: &PanelView, reverse: bool) {
+        self.keyboard_focus = true;
         let mut order: Vec<_> = panel
             .controls
             .iter()
@@ -695,6 +706,7 @@ impl PanelInputState {
             .map(|r| r.control.id);
         self.hovered = hit;
         if down == Some(true) {
+            self.keyboard_focus = false;
             if self.selection.last.is_some_and(|(id, ..)| Some(id) != hit) {
                 self.selection = MouseSelection::default();
             }
