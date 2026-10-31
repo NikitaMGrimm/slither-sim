@@ -432,8 +432,8 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
                 Packet::Eaten(f.sector.map(|[x, y]| (x, y)), f.offset[0], f.offset[1])
             }
             v19::Message::SectorClear([x, y]) => Packet::ClearSector(x, y),
-            // The simulator historically projects the first prey angle as heading,
-            // unlike the presentation lane. Keep that order and the TAU expression.
+            // Keep the simulator's TAU operation order for both angles. The client's
+            // prey_angle24 helper uses a distinct multiplication sequence.
             v19::Message::PreyAppearance(p) => Packet::PreyAppear(
                 p.id,
                 (
