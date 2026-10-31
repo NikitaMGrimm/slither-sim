@@ -299,7 +299,10 @@ impl Cosmetics {
                         .flatten()
                 });
             if let Some(r) = ready {
-                result.accessories.insert(id, r.clone());
+                let mut preview = r.clone();
+                preview.asset.handle = crate::bank::STUDIO_COSMETIC_HANDLE_BASE
+                    + r.asset.handle % crate::bank::HANDLE_NAMESPACE_SIZE;
+                result.accessories.insert(id, preview);
                 result.own_accessory = Some(id);
             }
         }
@@ -457,5 +460,82 @@ mod tests {
         let art = Cosmetics::directory(&directory.0, None).unwrap();
         assert!(art.menu_art(MenuArt::Cosmetic).is_some());
         assert!(art.accessories.is_empty());
+    }
+
+    #[test]
+    fn refreshed_preview_art_composes_with_an_older_world_revision() {
+        use crate::{
+            frame::Draw, menu::MenuFrame, menu_storage::MenuStorage, render::PreparedFrame,
+            skin_studio_native::SkinStudioNative,
+        };
+        use slither_client::skin_studio::AppearanceRecord;
+        let directory = Directory::new();
+        directory.accessory(0, [32, 24]);
+        let mut art = Cosmetics::directory(&directory.0, Some(0)).unwrap();
+        let old = art.accessory(true).unwrap().clone();
+        let mut studio = SkinStudioNative::new(
+            AppearanceRecord {
+                builtin: 7,
+                cosmetic: Some(0),
+                ..Default::default()
+            },
+            MenuStorage::at(None),
+        )
+        .unwrap();
+        studio.open(true);
+        studio.step(230.);
+        directory.accessory(0, [48, 24]);
+        studio.sync_art([960., 540.], Some(&mut art)).unwrap();
+        let fresh = art
+            .preview_sources_for(Some(0))
+            .accessory(true)
+            .unwrap()
+            .asset;
+        assert_ne!(fresh.handle, old.asset.handle);
+        assert_ne!(fresh.revision, old.asset.revision);
+        let mut frame = MenuFrame::world_crossfade([960, 540], 1., 0.)
+            .unwrap()
+            .frame;
+        frame.draws.push(Draw {
+            corners: None,
+            asset: old.asset,
+            source: None,
+            repeat_uv: None,
+            black_effect: false,
+            destination: BodyRect {
+                x: 10.,
+                y: 10.,
+                width: 32.,
+                height: 24.,
+            },
+            translation: [0.; 2],
+            rotation: 0.,
+            effective_alpha: 1.,
+            blend: BodyBlend::SourceOver,
+        });
+        let mut picture = PreparedFrame {
+            frame,
+            overlay: None,
+            resources: vec![old.clone()],
+        };
+        studio.append_preview(&mut picture, Some(&art)).unwrap();
+        assert!(picture.resources.iter().any(|r| r.asset == old.asset));
+        assert!(picture.resources.iter().any(|r| r.asset == fresh));
+        picture
+            .frame
+            .validate(
+                &picture
+                    .resources
+                    .iter()
+                    .map(|r| (r.asset.into(), r.asset))
+                    .collect(),
+            )
+            .unwrap();
+        assert_eq!(
+            art.accessory(true).unwrap().asset,
+            old.asset,
+            "preview must not commit world art"
+        );
+        assert_eq!(art.accessory(true).unwrap().image.pixels, old.image.pixels);
     }
 }
