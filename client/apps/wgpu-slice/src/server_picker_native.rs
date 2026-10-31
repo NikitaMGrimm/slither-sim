@@ -59,7 +59,7 @@ impl NativeServerPicker {
     fn actions(&mut self) {
         if self.policy.take_add_request() {
             let value = self.input.state.editor(ADDRESS_EDITOR).text().to_owned();
-            let result = normalize_custom_server(&value)
+            let result = normalize_custom_server(value.trim())
                 .and_then(|address| self.policy.add_custom(address).map_err(str::to_owned));
             match result {
                 Ok(()) => {
@@ -311,6 +311,39 @@ pub fn normalize_custom_server(value: &str) -> Result<String> {
     result.map_err(|_: String| "Enter a valid host:port".into())
 }
 const CUSTOM_FILE_LIMIT: usize = MAX_CUSTOM_SERVERS * (MAX_CUSTOM_ADDRESS + 1) + 2;
+pub struct CustomServerStorage {
+    path: PathBuf,
+}
+impl CustomServerStorage {
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+    /// Merge user operations with the latest bounded record, not a startup snapshot.
+    /// Unreadable/malformed storage retains the caller's in-memory fallback.
+    pub fn apply(
+        &self,
+        operation: &CustomServerOperation,
+        current: &mut Vec<String>,
+    ) -> Result<()> {
+        let mut servers = current.clone();
+        read_custom(&self.path, &mut servers);
+        match operation {
+            CustomServerOperation::Add(address) => {
+                let address = normalize_custom_server(address)?;
+                if !servers.contains(&address) {
+                    if servers.len() == MAX_CUSTOM_SERVERS {
+                        *current = servers;
+                        return Err("Custom server limit: 32".into());
+                    }
+                    servers.push(address);
+                }
+            }
+            CustomServerOperation::Remove(address) => servers.retain(|s| s != address),
+        }
+        *current = servers;
+        write_custom(&self.path, current)
+    }
+}
 /// Invalid/missing/oversized data never replaces the caller's in-memory list.
 pub fn read_custom(path: &Path, current: &mut Vec<String>) -> bool {
     let read = (|| -> Option<Vec<String>> {

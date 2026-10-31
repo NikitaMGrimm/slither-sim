@@ -472,35 +472,43 @@ fn picker_reopening_inherits_the_current_opener_modality() {
 }
 
 #[test]
-fn text_navigation_reveals_pointer_focused_search_without_activating() {
-    for (navigation, code) in [
-        (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
-        (NamedKey::ArrowRight, KeyCode::ArrowRight),
-        (NamedKey::Home, KeyCode::Home),
-        (NamedKey::End, KeyCode::End),
+fn text_navigation_reveals_pointer_focused_fields_without_activating() {
+    for (field, editor, value, official) in [
+        (SEARCH, SEARCH_EDITOR, "123", true),
+        (ADDRESS, ADDRESS_EDITOR, "192.0.2.9:445", false),
     ] {
-        let mut p = NativeServerPicker::default();
-        p.open();
-        p.policy.alpha = 1.;
-        p.sync();
-        let resolved = p.panel.resolve(p.viewport).unwrap();
-        let r = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
-        let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
-        let mut text = slither_wgpu_slice::text::TextCache::menu();
-        p.pointer(&mut text, point, Some(true)).unwrap();
-        p.pointer(&mut text, point, Some(false)).unwrap();
-        p.input.state.apply(EditIntent::KeyText("123".into()));
-        assert_eq!(p.controls.focus(), Some(SEARCH));
-        assert_eq!(p.controls.visible_focus(), None);
-        let effects = key(&mut p, navigation, code);
-        assert!(
-            effects
-                .iter()
-                .all(|e| !matches!(e, HostEditEffect::Activate(_)))
-        );
-        assert_eq!(p.controls.visible_focus(), Some(SEARCH));
-        assert_eq!(p.input.state.editor(SEARCH_EDITOR).text(), "123");
-        assert!(p.policy.is_open());
-        assert_eq!(p.policy.selection, ServerPreference(None));
+        for (navigation, code) in [
+            (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
+            (NamedKey::ArrowRight, KeyCode::ArrowRight),
+            (NamedKey::Home, KeyCode::Home),
+            (NamedKey::End, KeyCode::End),
+        ] {
+            let mut p = NativeServerPicker::default();
+            p.policy.start_directory(official);
+            p.open();
+            p.policy.alpha = 1.;
+            p.sync();
+            let resolved = p.panel.resolve(p.viewport).unwrap();
+            let r = resolved.iter().find(|r| r.control.id == field).unwrap();
+            let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+            let mut text = slither_wgpu_slice::text::TextCache::menu();
+            p.pointer(&mut text, point, Some(true)).unwrap();
+            p.pointer(&mut text, point, Some(false)).unwrap();
+            p.input.state.apply(EditIntent::KeyText(value.into()));
+            assert_eq!(p.controls.focus(), Some(field));
+            assert_eq!(p.controls.visible_focus(), None);
+            let effects = key(&mut p, navigation, code);
+            assert!(
+                effects
+                    .iter()
+                    .all(|e| !matches!(e, HostEditEffect::Activate(_)))
+            );
+            assert_eq!(p.controls.visible_focus(), Some(field));
+            assert_eq!(p.input.state.editor(editor).text(), value);
+            assert!(p.policy.is_open());
+            assert_eq!(p.policy.selection, ServerPreference::Automatic);
+            assert!(p.policy.custom.is_empty());
+            assert_eq!(p.policy.take_directory_request(), official);
+        }
     }
 }

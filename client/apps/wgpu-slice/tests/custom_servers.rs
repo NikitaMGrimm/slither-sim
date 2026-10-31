@@ -113,7 +113,44 @@ fn add_validate_select_and_remove_custom_servers_without_acquisition() {
     assert!(!p.policy.take_directory_request());
 }
 #[test]
-fn address_field_keyboard_mouse_and_focus_visible_share_normal_editing() {
+fn pasted_address_trims_outer_whitespace_but_rejects_it_inside() {
+    let mut p = NativeServerPicker::default();
+    let mut text = TextCache::menu();
+    p.open();
+    p.policy.alpha = 1.;
+    p.sync();
+    for value in [
+        "192.0.2.9:445\n",
+        " \r\n192.0.2.9:445\t",
+        "\u{2003}192.0.2.9:445\u{2003}",
+        "192.0.2.\n9:445",
+        "192.0.2.9 :445",
+    ] {
+        address(&mut p, "");
+        let effects = p.input.state.apply(EditIntent::Paste);
+        let token = effects
+            .iter()
+            .find_map(|effect| match effect {
+                HostEditEffect::ReadClipboard(token) => Some(*token),
+                _ => None,
+            })
+            .unwrap();
+        let effects = p.input.state.apply(EditIntent::ClipboardRead {
+            token,
+            result: Ok(value.into()),
+        });
+        p.commit_effects(effects);
+        click(&mut p, &mut text, ADD_CUSTOM);
+        assert_eq!(p.policy.custom, ["192.0.2.9:445"]);
+        assert_eq!(
+            p.policy.custom_error.is_empty(),
+            !value.trim().chars().any(char::is_whitespace)
+        );
+        assert!(!p.policy.take_directory_request());
+    }
+}
+#[test]
+fn address_field_keyboard_mouse_and_visible_focus_share_normal_editing() {
     let mut p = NativeServerPicker::default();
     let mut text = TextCache::menu();
     p.open();
@@ -239,6 +276,125 @@ fn custom_storage_is_bounded_atomic_and_ignores_invalid_records() {
     std::fs::remove_file(choice).unwrap();
     std::fs::remove_dir(blocked).unwrap();
     std::fs::remove_dir(root).unwrap();
+}
+#[test]
+fn separate_storage_handles_merge_operations_from_stale_instance_lists() {
+    let root = std::env::temp_dir().join(format!("custom-operations-{}", std::process::id()));
+    std::fs::create_dir(&root).unwrap();
+    let path = root.join("custom-servers.txt");
+    let first = CustomServerStorage::new(path.clone());
+    let second = CustomServerStorage::new(path.clone());
+    let mut a = Vec::new();
+    let mut b = Vec::new();
+    let add = |n| CustomServerOperation::Add(format!("192.0.2.{n}:80"));
+    first.apply(&add(1), &mut a).unwrap();
+    second.apply(&add(2), &mut b).unwrap();
+    assert_eq!(b, ["192.0.2.1:80", "192.0.2.2:80"]);
+    first.apply(&add(1), &mut a).unwrap();
+    assert_eq!(a, b); // A duplicate Add refreshes the stale list too.
+    second
+        .apply(&CustomServerOperation::Remove(a[0].clone()), &mut b)
+        .unwrap();
+    first.apply(&add(3), &mut a).unwrap();
+    assert_eq!(a, ["192.0.2.2:80", "192.0.2.3:80"]); // Do not resurrect a removed entry.
+    for n in 4..=33 {
+        first.apply(&add(n), &mut a).unwrap();
+    }
+    assert!(second.apply(&add(34), &mut b).is_err());
+    assert_eq!(b, a);
+    assert_eq!(b.len(), MAX_CUSTOM_SERVERS);
+    let mut disk = Vec::new();
+    assert!(read_custom(&path, &mut disk));
+    assert_eq!(disk, a);
+
+    // Malformed storage falls back to this instance's list and still applies the edit.
+    std::fs::write(&path, "1\ninvalid\n").unwrap();
+    second
+        .apply(&CustomServerOperation::Remove(b[0].clone()), &mut b)
+        .unwrap();
+    assert_eq!(b.len(), MAX_CUSTOM_SERVERS - 1);
+    assert!(read_custom(&path, &mut disk));
+    assert_eq!(disk, b);
+    std::fs::remove_file(&path).unwrap();
+    first.apply(&add(1), &mut a).unwrap_err(); // Missing file uses the full in-memory fallback.
+    a.truncate(1);
+    std::fs::create_dir(&path).unwrap();
+    assert!(first.apply(&add(34), &mut a).is_err());
+    assert_eq!(a, ["192.0.2.2:80", "192.0.2.34:80"]);
+    std::fs::remove_dir(path).unwrap();
+    std::fs::remove_dir(root).unwrap();
+}
+#[test]
+fn cosmetics_arrow_focus_uses_shared_modality() {
+    use slither_client::skin_studio::{COSMETIC_BASE, COSMETICS_TAB};
+    use slither_wgpu_slice::login_native::NativeLogin;
+    let mut login = NativeLogin::new("Player").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    assert!(login.studio.open(true));
+    login.step(9830., true, false).unwrap();
+    login.studio.activate(COSMETICS_TAB, "Player");
+    login.step(10020., true, false).unwrap();
+    login.prepare_host([960, 720], 1., true, None).unwrap();
+    let resolved = login.panel.resolve([960., 720.]).unwrap();
+    let cell = resolved
+        .iter()
+        .find(|r| r.control.id == ControlId(COSMETIC_BASE + 1))
+        .unwrap();
+    let point = [
+        cell.rect.x + cell.rect.width / 2.,
+        cell.rect.y + cell.rect.height / 2.,
+    ];
+    for down in [true, false] {
+        login.pointer(point, Some(down), true);
+    }
+    let logical = Key::Named(NamedKey::ArrowRight);
+    login.key(
+        KeyInput {
+            logical: &logical,
+            physical: PhysicalKey::Code(KeyCode::ArrowRight),
+            text: None,
+            state: ElementState::Pressed,
+            repeat: false,
+        },
+        true,
+    );
+    assert_eq!(login.controls.focus(), Some(ControlId(COSMETIC_BASE + 2)));
+    assert_eq!(login.controls.visible_focus(), login.controls.focus());
+    let before = login.prepare_host([960, 720], 1., true, None).unwrap();
+    let resolved = login.panel.resolve([960., 720.]).unwrap();
+    let target = resolved
+        .iter()
+        .find(|r| Some(r.control.id) == login.controls.focus())
+        .unwrap();
+    assert!(matches!(
+        target.control.kind,
+        ControlKind::CosmeticCell {
+            selected: false,
+            ..
+        }
+    ));
+    let point = [
+        target.rect.x + target.rect.width / 2.,
+        target.rect.y + target.rect.height / 2.,
+    ];
+    // Change only input modality; keep the selected cosmetic and focused cell fixed.
+    for down in [true, false] {
+        login
+            .controls
+            .pointer(&login.panel, &resolved, point, Some(down));
+    }
+    assert!(login.controls.visible_focus().is_none());
+    let mouse = login.prepare_host([960, 720], 1., true, None).unwrap();
+    assert!(before.frame.draws.len() > mouse.frame.draws.len());
+    login.controls.keyboard_navigation();
+    let after = login.prepare_host([960, 720], 1., true, None).unwrap();
+    assert_eq!(before.frame.draws.len(), after.frame.draws.len());
+    for (a, b) in before.frame.draws.iter().zip(&after.frame.draws) {
+        assert_eq!(a.destination, b.destination);
+        assert_eq!(a.effective_alpha, b.effective_alpha);
+    }
 }
 #[test]
 fn dense_custom_and_mixed_windows_fit_the_existing_native_menu_limits() {

@@ -24,7 +24,8 @@ internally; IPv6 authorities use brackets. `--official --server host:port` keeps
 the explicit server but fetches fresh login values on Play.
 
 Custom addresses use the same admission as `--server`: a host and nonzero port,
-bracketed IPv6, with no URL scheme, credentials, path, query or whitespace. The
+bracketed IPv6, with no URL scheme, credentials, path, query or internal whitespace.
+The field trims leading/trailing whitespace before validation, including pasted newlines. The
 field retains at most 512 UTF-16 units; canonical saved authorities are bounded
 to 512 bytes. Add validates before mutation, deduplicates canonical authorities
 and caps the list at 32 entries. Remove applies only to a visible custom row.
@@ -77,8 +78,11 @@ A failed write leaves the in-memory choice intact.
 The adjacent `custom-servers.txt` stores version `1` on its first line and one
 canonical user-entered authority per following line. Reads are capped at 16,418
 bytes; malformed, oversized, duplicate or unsupported records leave the current
-in-memory list intact. Writes atomically replace the record only after an
-explicit Add/Remove. Official endpoints and all historical pings never persist;
+in-memory list intact. Each explicit Add/Remove re-reads that bounded record,
+merges the operation (deduplicated Add or addressed Remove), keeps the 32-entry
+cap and atomically writes it back. The picker refreshes from the merged list,
+preserving edits saved by other instances since startup. Failed or malformed
+reads use the current in-memory list instead. Official endpoints and all historical pings never persist;
 the user's own custom authorities and custom choice are user data and may
 persist. An explicit CLI server wins until a picker choice/context action.
 `--official` overrides a restored custom choice with official Automatic for that

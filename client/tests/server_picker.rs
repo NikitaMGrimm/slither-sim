@@ -78,10 +78,13 @@ fn custom_entries_are_bounded_deduplicated_windowed_and_removable() {
                 <= 6
         );
     }
-    assert_eq!(p.take_custom_write().unwrap().len(), MAX_CUSTOM_SERVERS);
+    assert_eq!(p.take_custom_operations().len(), MAX_CUSTOM_SERVERS);
     assert!(p.add_custom("192.0.2.33:445".into()).is_err());
     p.add_custom("192.0.2.1:445".into()).unwrap();
-    assert!(p.take_custom_write().is_none());
+    assert_eq!(
+        p.take_custom_operations(),
+        vec![CustomServerOperation::Add("192.0.2.1:445".into())]
+    );
     for invalid in [
         "",
         "bad address:445",
@@ -100,6 +103,10 @@ fn custom_entries_are_bounded_deduplicated_windowed_and_removable() {
     assert_eq!(ServerPreference::restore(Some(&record)), p.selection);
     p.open();
     assert!(p.activate(intent(&p, ControlId(8192))));
+    assert_eq!(
+        p.take_custom_operations(),
+        vec![CustomServerOperation::Remove("192.0.2.1:445".into())]
+    );
     assert_eq!(p.custom.len(), MAX_CUSTOM_SERVERS - 1);
     assert_eq!(p.selection, ServerPreference::Automatic);
     assert!(!p.can_play());
@@ -108,6 +115,29 @@ fn custom_entries_are_bounded_deduplicated_windowed_and_removable() {
     assert!(!p.take_directory_request());
     p.add_custom("192.0.2.33:445".into()).unwrap();
     assert_eq!(p.custom.len(), MAX_CUSTOM_SERVERS);
+}
+#[test]
+fn arrows_from_remove_navigate_relative_to_its_server_row() {
+    for count in [1, 2, MAX_CUSTOM_SERVERS] {
+        let mut p = ServerPicker::default();
+        p.open();
+        for n in 1..=count {
+            p.add_custom(format!("192.0.2.{n}:445")).unwrap();
+        }
+        for index in [0, count - 1] {
+            for delta in [-1, 1] {
+                let expected = index.saturating_add_signed(delta).min(count - 1);
+                let target = p.navigate(Some(ControlId(8192 + index as u16)), delta);
+                assert_eq!(target, ControlId(16 + expected as u16));
+                assert!(
+                    p.panel([960., 720.])
+                        .controls
+                        .iter()
+                        .any(|c| c.id == target)
+                );
+            }
+        }
+    }
 }
 #[test]
 fn custom_address_editing_is_bounded_and_preserves_hostname_text() {

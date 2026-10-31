@@ -19,6 +19,11 @@ pub const OFFICIAL: ControlId = ControlId(11);
 pub const ADDRESS_EDITOR: EditorId = EditorId(3);
 pub const MAX_CUSTOM_SERVERS: usize = 32;
 pub const MAX_CUSTOM_ADDRESS: usize = 512;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CustomServerOperation {
+    Add(String),
+    Remove(String),
+}
 const REMOVE_BASE: u16 = 8192;
 /// The directory UI is available on ordinary login even without Play admission.
 pub fn available(view: &crate::start_page::StartMenuView) -> bool {
@@ -130,7 +135,7 @@ pub struct ServerPicker {
     pub custom_error: String,
     official_context: bool,
     add_request: bool,
-    custom_dirty: bool,
+    custom_operations: Vec<CustomServerOperation>,
 }
 impl Default for ServerPicker {
     fn default() -> Self {
@@ -154,7 +159,7 @@ impl Default for ServerPicker {
             custom_error: String::new(),
             official_context: false,
             add_request: false,
-            custom_dirty: false,
+            custom_operations: Vec::new(),
         }
     }
 }
@@ -250,8 +255,16 @@ impl ServerPicker {
     pub fn take_add_request(&mut self) -> bool {
         std::mem::take(&mut self.add_request)
     }
-    pub fn take_custom_write(&mut self) -> Option<Vec<String>> {
-        std::mem::take(&mut self.custom_dirty).then(|| self.custom.clone())
+    pub fn take_custom_operations(&mut self) -> Vec<CustomServerOperation> {
+        std::mem::take(&mut self.custom_operations)
+    }
+    /// Storage may merge edits from other instances; invalidate row captures if indices change.
+    pub fn refresh_custom(&mut self, servers: Vec<String>) {
+        if self.custom != servers {
+            self.custom = servers;
+            self.generation = self.generation.wrapping_add(1);
+            self.list.window(self.total());
+        }
     }
     /// The adapter supplies an authority validated by the same parser as --server.
     pub fn add_custom(&mut self, address: String) -> Result<(), &'static str> {
@@ -259,13 +272,16 @@ impl ServerPicker {
             return Err("Enter a valid host:port");
         }
         if self.custom.contains(&address) {
+            self.custom_operations
+                .push(CustomServerOperation::Add(address));
             return Ok(());
         }
         if self.custom.len() >= MAX_CUSTOM_SERVERS {
             return Err("Custom server limit: 32");
         }
-        self.custom.push(address);
-        self.custom_dirty = true;
+        self.custom.push(address.clone());
+        self.custom_operations
+            .push(CustomServerOperation::Add(address));
         self.generation = self.generation.wrapping_add(1);
         self.list.reveal(self.custom.len() - 1, self.total());
         Ok(())
@@ -277,7 +293,8 @@ impl ServerPicker {
             self.changed = true;
             self.dirty = true;
         }
-        self.custom_dirty = true;
+        self.custom_operations
+            .push(CustomServerOperation::Remove(address));
         self.generation = self.generation.wrapping_add(1);
         self.list.window(self.total());
     }
@@ -468,18 +485,28 @@ impl ServerPicker {
                 ADDRESS
             };
         }
-        let index = current.and_then(|c| c.0.checked_sub(ROW_BASE)).map_or_else(
-            || {
-                if delta == isize::MIN {
-                    0
-                } else if delta < 0 || delta == isize::MAX {
-                    total - 1
+        let index = current
+            .and_then(|c| {
+                if c.0 >= REMOVE_BASE {
+                    c.0.checked_sub(REMOVE_BASE)
+                        .filter(|i| usize::from(*i) < self.custom.len())
                 } else {
-                    0
+                    c.0.checked_sub(ROW_BASE)
+                        .filter(|i| usize::from(*i) < total)
                 }
-            },
-            |i| usize::from(i).saturating_add_signed(delta).min(total - 1),
-        );
+            })
+            .map_or_else(
+                || {
+                    if delta == isize::MIN {
+                        0
+                    } else if delta < 0 || delta == isize::MAX {
+                        total - 1
+                    } else {
+                        0
+                    }
+                },
+                |i| usize::from(i).saturating_add_signed(delta).min(total - 1),
+            );
         self.list.reveal(index, total);
         ControlId(ROW_BASE + index as u16)
     }

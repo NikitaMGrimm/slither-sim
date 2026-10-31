@@ -306,16 +306,20 @@ mod desktop {
                     self.login.picker.policy.status = "Directory available in official mode".into();
                 }
             }
-            if let Some(servers) = self.login.picker.policy.take_custom_write()
+            let operations = self.login.picker.policy.take_custom_operations();
+            if !operations.is_empty()
                 && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
-                && slither_wgpu_slice::server_picker_native::write_custom(
-                    &path.with_file_name("custom-servers.txt"),
-                    &servers,
-                )
-                .is_err()
             {
-                self.login.picker.policy.custom_error =
-                    "Custom servers saved for this run only".into();
+                let storage = slither_wgpu_slice::server_picker_native::CustomServerStorage::new(
+                    path.with_file_name("custom-servers.txt"),
+                );
+                let mut servers = self.login.picker.policy.custom.clone();
+                for operation in operations {
+                    if let Err(error) = storage.apply(&operation, &mut servers) {
+                        self.login.picker.policy.custom_error = error;
+                    }
+                }
+                self.login.picker.policy.refresh_custom(servers);
             }
             if let Some(value) = self.login.picker.policy.take_preference()
                 && let Some(path) = slither_wgpu_slice::server_picker_native::preference_path()
