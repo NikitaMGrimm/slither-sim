@@ -610,7 +610,29 @@ fn connecting_play_dims_the_whole_button_but_return_uses_its_own_alpha() {
         .filter(|(a, b)| a.effective_alpha != b.effective_alpha)
         .collect();
     // Every base-capsule tile and the one white Play label share the multiplier.
-    assert!(changed.iter().any(|(a, _)| a.asset.handle >> 60 == 7));
+    let play = layout().viewport_rect(slither_client::menu_layout::MenuElement::Play);
+    let enabled_play_tiles = enabled
+        .frame
+        .draws
+        .iter()
+        .filter(|d| {
+            let r = d.destination;
+            d.effective_alpha > 0.
+                && d.asset.handle >> 60 == 7
+                && r.x >= play.x - 21.
+                && r.x + r.width <= play.x + play.width + 21.
+                && r.y >= play.y - 21.
+                && r.y + r.height <= play.y + play.height + 21.
+        })
+        .count();
+    assert!(enabled_play_tiles > 0);
+    assert_eq!(
+        changed
+            .iter()
+            .filter(|(a, _)| a.asset.handle >> 60 == 7)
+            .count(),
+        enabled_play_tiles
+    );
     assert_eq!(
         changed
             .iter()
@@ -618,7 +640,6 @@ fn connecting_play_dims_the_whole_button_but_return_uses_its_own_alpha() {
             .count(),
         1
     );
-    let play = layout().viewport_rect(slither_client::menu_layout::MenuElement::Play);
     for (a, b) in changed {
         let r = a.destination;
         assert!(r.x >= play.x - 21. && r.x + r.width <= play.x + play.width + 21.);
