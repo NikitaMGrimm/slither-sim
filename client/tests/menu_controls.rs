@@ -345,7 +345,10 @@ fn gesture(
     c.select_text(
         e,
         EditorId::Champion,
-        hit,
+        TextHit {
+            caret: hit,
+            character: hit,
+        },
         point,
         down == Some(true),
         shift,
@@ -499,4 +502,30 @@ fn double_click_drag_preserves_the_word_until_crossing_its_boundary() {
     assert_eq!(e.editor(EditorId::Champion).selection(), (4, 14));
     gesture(&p, &mut c, &mut e, 1, None, false, 40., [-10., 0.]);
     assert_eq!(e.editor(EditorId::Champion).selection(), (7, 0));
+}
+
+#[test]
+fn word_selection_uses_character_while_single_click_uses_nearest_caret() {
+    let (p, mut c, mut e) = mouse_fixture();
+    e.reset_editor(EditorId::Champion, "one_12 two");
+    gesture(&p, &mut c, &mut e, 6, Some(true), false, 0., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (6, 6));
+    gesture(&p, &mut c, &mut e, 6, Some(false), false, 1., [0.; 2]);
+    let resolved = p.resolve([960., 720.]).unwrap();
+    let point = [resolved[2].rect.x + 20., resolved[2].rect.y + 20.];
+    c.pointer(&p, &resolved, point, Some(true));
+    c.select_text(
+        &mut e,
+        EditorId::Champion,
+        TextHit {
+            caret: 6,
+            character: 5,
+        },
+        point,
+        true,
+        false,
+        20.,
+        ClickSettings::default(),
+    );
+    assert_eq!(e.editor(EditorId::Champion).selection(), (0, 6));
 }

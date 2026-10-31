@@ -4,6 +4,7 @@ use crate::{
     text::{TextCache, TextStyle},
 };
 use slither_client::{
+    menu_controls::TextHit,
     menu_input::TextEditState,
     menu_layout::{FieldTextPlacement, MenuRect, field_content_rect, single_line_field_placement},
 };
@@ -91,24 +92,40 @@ impl EditorGeometry {
             style,
         })
     }
-    pub fn hit(&self, text: &mut TextCache, committed: &str, x: f64) -> Result<usize> {
+    pub fn hit(&self, text: &mut TextCache, committed: &str, x: f64) -> Result<TextHit> {
         if x <= self.rect.x {
-            return Ok(0);
+            return Ok(TextHit {
+                caret: 0,
+                character: 0,
+            });
         }
         if x >= self.rect.x + self.rect.width {
-            return Ok(committed.len());
+            return Ok(TextHit {
+                caret: committed.len(),
+                character: committed.len(),
+            });
         }
         let x = x - self.rect.x + self.scroll;
         let mut previous = 0.;
         for (byte, ch) in committed.char_indices() {
             let end = byte + ch.len_utf8();
             let next = text.measure_panel(&committed[..end], self.style)?.advance;
-            if x < (previous + next) / 2. {
-                return Ok(byte);
+            if x < next {
+                return Ok(TextHit {
+                    caret: if x < (previous + next) / 2. {
+                        byte
+                    } else {
+                        end
+                    },
+                    character: byte,
+                });
             }
             previous = next;
         }
-        Ok(committed.len())
+        Ok(TextHit {
+            caret: committed.len(),
+            character: committed.len(),
+        })
     }
     pub fn text_origin(&self) -> [f64; 2] {
         [

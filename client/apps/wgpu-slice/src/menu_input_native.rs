@@ -84,7 +84,7 @@ impl NativeMenuInput {
             && let Some((editor, geometry)) =
                 crate::editor_geometry::field_geometry(text, r, &self.state, scroll)?
         {
-            let caret = geometry.hit(text, self.state.editor(editor).text(), point[0])?;
+            let hit = geometry.hit(text, self.state.editor(editor).text(), point[0])?;
             let now = self
                 .pointer_epoch
                 .get_or_insert_with(std::time::Instant::now)
@@ -94,7 +94,7 @@ impl NativeMenuInput {
             effects.extend(controls.select_text(
                 &mut self.state,
                 editor,
-                caret,
+                hit,
                 point,
                 down == Some(true),
                 self.modifiers.shift_key(),

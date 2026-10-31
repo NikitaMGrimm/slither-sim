@@ -344,6 +344,14 @@ pub struct ControlIntent {
     /// Activation origin.
     pub activation: Activation,
 }
+/// Copied text hit in UTF-8 byte offsets, measured with the painted font.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextHit {
+    /// Nearest insertion boundary, used for caret placement and dragging.
+    pub caret: usize,
+    /// Character under the pointer; text length when past the final character.
+    pub character: usize,
+}
 /// Generic focus/capture/damping, sampled by the existing core clock.
 #[derive(Clone, Debug, Default)]
 pub struct PanelInputState {
@@ -475,7 +483,7 @@ impl PanelInputState {
         &mut self,
         edit: &mut MenuInputState,
         editor: EditorId,
-        caret: usize,
+        hit: TextHit,
         point: [f64; 2],
         pressed: bool,
         shift: bool,
@@ -490,7 +498,7 @@ impl PanelInputState {
         };
         let intent = self
             .selection
-            .select(control, state, caret, point, pressed, shift, now, settings);
+            .select(control, state, hit, point, pressed, shift, now, settings);
         intent.map_or_else(Vec::new, |intent| edit.apply(intent))
     }
     /// Explicit Tab order wraps within the mounted panel and skips unavailable controls.
@@ -630,7 +638,7 @@ impl MouseSelection {
         &mut self,
         control: ControlId,
         editor: &crate::menu_input::TextEditState,
-        caret: usize,
+        hit: TextHit,
         point: [f64; 2],
         pressed: bool,
         shift: bool,
@@ -642,7 +650,7 @@ impl MouseSelection {
             return None;
         }
         let text = editor.text();
-        let mut caret = caret.min(text.len());
+        let mut caret = hit.caret.min(text.len());
         while !text.is_char_boundary(caret) {
             caret -= 1;
         }
@@ -666,7 +674,7 @@ impl MouseSelection {
             } else if count == 3 {
                 (0, text.len())
             } else if count == 2 {
-                word_at(text, caret)
+                word_at(text, hit.character)
             } else {
                 (caret, caret)
             };
@@ -696,6 +704,10 @@ impl MouseSelection {
     }
 }
 fn word_at(text: &str, caret: usize) -> (usize, usize) {
+    let mut caret = caret.min(text.len());
+    while !text.is_char_boundary(caret) {
+        caret -= 1;
+    }
     let start = if caret == text.len() {
         text.char_indices().next_back().map_or(0, |(i, _)| i)
     } else {
