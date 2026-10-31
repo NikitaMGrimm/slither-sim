@@ -546,9 +546,9 @@ impl Composition<'_> {
                     };
                 let mut style = theme.text_style(control.style);
                 style.size *= r.scale;
-                // The panel's layout box still bounds text/hits. Decoration may
-                // use its complete padding unless the description explicitly clips it.
-                let surface_clip = control.clip.map(|_| r.clip);
+                // A fully visible control keeps its shadow outside the content window.
+                // Partly scrolled controls still crop both body and decoration.
+                let surface_clip = decoration_clip(r);
                 let add_label = |c: &mut Composition<'_>,
                                  value: String,
                                  rect: MenuRect,
@@ -640,7 +640,20 @@ impl Composition<'_> {
                                 )?;
                             }
                         }
-                        if *selected || input.focus() == Some(control.id) {
+                        if *selected {
+                            self.studio_solid(
+                                MenuRect {
+                                    x: inner.x,
+                                    y: inner.y,
+                                    width: 4. * r.scale,
+                                    height: 4. * r.scale,
+                                },
+                                alpha,
+                                theme,
+                                false,
+                            )?;
+                        }
+                        if input.visible_focus() == Some(control.id) {
                             self.outline_control(r, alpha, theme)?;
                         }
                     }
@@ -650,7 +663,23 @@ impl Composition<'_> {
                         selected,
                     } => {
                         self.swatch(r, *palette, count.is_some(), alpha, theme)?;
-                        if *selected || input.focus() == Some(control.id) {
+                        if *selected {
+                            self.studio_solid(
+                                intersection(
+                                    MenuRect {
+                                        x: r.rect.x + r.rect.width / 2. - 2. * r.scale,
+                                        y: r.rect.y + r.rect.height - 5. * r.scale,
+                                        width: 4. * r.scale,
+                                        height: 2. * r.scale,
+                                    },
+                                    r.clip,
+                                ),
+                                alpha,
+                                theme,
+                                false,
+                            )?;
+                        }
+                        if input.visible_focus() == Some(control.id) {
                             self.outline_control(r, alpha, theme)?;
                         }
                         if let Some(count) = count {
@@ -682,7 +711,7 @@ impl Composition<'_> {
                         let [hover, press] = input.progress(control.id);
                         let link_alpha = if press > 0. {
                             0.5
-                        } else if hover > 0. || input.focus() == Some(control.id) {
+                        } else if hover > 0. || input.visible_focus() == Some(control.id) {
                             1.
                         } else {
                             0.7
@@ -739,7 +768,7 @@ impl Composition<'_> {
                                 )?;
                             }
                         }
-                        if input.focus() == Some(control.id) && enabled {
+                        if input.visible_focus() == Some(control.id) && enabled {
                             self.outline(
                                 r,
                                 MenuRect {
@@ -792,7 +821,7 @@ impl Composition<'_> {
                         ping,
                     } => {
                         // Rows share tiny solid materials; only this window owns text rasters.
-                        let focused = input.focus() == Some(control.id);
+                        let focused = input.visible_focus() == Some(control.id);
                         let color = if *selected {
                             theme.selection
                         } else if focused || input.progress(control.id)[0] > 0. {
@@ -901,7 +930,7 @@ impl Composition<'_> {
                             (
                                 ControlState::Hovered,
                                 if enabled {
-                                    hover.max(if input.focus() == Some(control.id) {
+                                    hover.max(if input.visible_focus() == Some(control.id) {
                                         0.33
                                     } else {
                                         0.
@@ -917,7 +946,7 @@ impl Composition<'_> {
                             self.sliced(feedback, tokens, alpha * opacity, surface_clip, r.scale)?;
                         }
                         let tokens = theme.toggle_indicator(*checked);
-                        let focused = input.focus() == Some(control.id) && enabled;
+                        let focused = input.visible_focus() == Some(control.id) && enabled;
                         let size = (indicator.width * self.scale).round().max(1.) as u32;
                         if size > 512 {
                             return Err(MENU_RASTER_AXIS_QUOTA.into());
@@ -953,7 +982,7 @@ impl Composition<'_> {
                     }
                     ControlKind::Button { label } | ControlKind::SectionTab { label, .. } => {
                         if control.style == ControlStyle::ChangeSkin {
-                            if input.focus() == Some(control.id) {
+                            if input.visible_focus() == Some(control.id) {
                                 self.sliced(
                                     r.rect,
                                     theme.surface(ControlStyle::QualityButton, ControlState::Idle),
@@ -971,7 +1000,7 @@ impl Composition<'_> {
                                 | ControlStyle::StudioSave
                                 | ControlStyle::StudioCancel
                         );
-                        let focused = input.focus() == Some(control.id);
+                        let focused = input.visible_focus() == Some(control.id);
                         let [hover, press] = input.progress(control.id);
                         if !quality || focused {
                             self.sliced(
@@ -994,7 +1023,7 @@ impl Composition<'_> {
                                 r.rect,
                                 theme.surface(control.style, ControlState::Hovered),
                                 alpha
-                                    * hover.max(if input.focus() == Some(control.id) {
+                                    * hover.max(if input.visible_focus() == Some(control.id) {
                                         0.33
                                     } else {
                                         0.
@@ -1032,12 +1061,8 @@ impl Composition<'_> {
                                 false,
                             )?;
                         }
-                        if compact && (focused || hover > 0.) && enabled {
-                            self.outline_control(
-                                r,
-                                alpha * if focused { 1. } else { hover * 0.33 },
-                                theme,
-                            )?;
+                        if compact && focused && enabled {
+                            self.outline_control(r, alpha, theme)?;
                         }
                         if focused && enabled && !compact {
                             self.outline_control(r, alpha, theme)?;
@@ -1057,7 +1082,7 @@ impl Composition<'_> {
                             surface_clip,
                             r.scale,
                         )?;
-                        if input.focus() == Some(control.id) && enabled {
+                        if input.visible_focus() == Some(control.id) && enabled {
                             self.outline_control(r, alpha, theme)?;
                         }
                         let inset = inset.map(|n| n * r.scale);
@@ -2496,6 +2521,9 @@ impl Menu {
                     .map(|_| slither_client::login_controls::NICKNAME),
             } {
                 controls.set_focus(id);
+                if self.focus.is_some() {
+                    controls.keyboard_navigation();
+                }
             }
             controls.set_progress(
                 slither_client::login_controls::PLAY,
@@ -2562,6 +2590,19 @@ type Published = (
     Option<StrokeCache>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
+fn decoration_clip(r: &ResolvedControl) -> Option<MenuRect> {
+    r.control
+        .clip
+        .and_then(|_| (!contains_rect(r.clip, r.rect)).then_some(r.clip))
+}
+
+fn contains_rect(outer: MenuRect, inner: MenuRect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height
+}
+
 fn slice_axis(size: u32, atlas: u32, pad: u32, centre: u32) -> Result<Vec<(u32, u32, u32)>> {
     if size == atlas {
         return Ok(vec![(0, 0, size + 2 * pad)]);
@@ -3098,8 +3139,14 @@ mod quota_tests {
                     focused,
                 );
                 if focused {
-                    let offset = (size / 2 * 4) as usize;
-                    assert_eq!(&indicator.pixels[offset..offset + 4], &[224, 224, 255, 255]);
+                    let plain = toggle_indicator(
+                        size,
+                        theme.toggle_indicator(checked).colors[0],
+                        theme.text,
+                        checked,
+                        false,
+                    );
+                    assert_ne!(indicator.pixels, plain.pixels);
                 }
                 for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
                     let offset = ((y * size + x) * 4) as usize;

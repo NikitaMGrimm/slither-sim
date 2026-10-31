@@ -90,6 +90,9 @@ impl NativeServerPicker {
         let composing = self.input.state.editor(SEARCH_EDITOR).composing();
         let mut effects = Vec::new();
         if event.state == ElementState::Pressed && !composing {
+            if matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space)) {
+                self.controls.keyboard_navigation();
+            }
             match event.logical {
                 Key::Named(NamedKey::Escape) => self.policy.close(),
                 Key::Named(NamedKey::Tab) => self.controls.tab(&self.panel, self.input.shift_key()),

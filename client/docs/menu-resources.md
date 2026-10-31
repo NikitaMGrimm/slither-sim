@@ -168,8 +168,12 @@ horizontal text scroll do not. Login control migration remains a follow-up.
 
 ## Native focus outlines
 
-Focus outlines use the idle control radius, with half-height corners for studio
-capsules. Hollow, premultiplied half-rasters stretch into three strips; position,
+Keyboard focus outlines use the idle control radius, with half-height corners for
+studio capsules, inset inside the control bounds. Pointer focus stays silent;
+selection uses a separate marker. A studio round trip restores the opener's
+focus modality and clears pointer feedback. Fully visible controls retain their
+complete shadow padding outside the content window; partially scrolled controls
+remain clipped. Hollow, premultiplied half-rasters stretch into three strips; position,
 clip and fade opacity stay outside the cache key. Tall outlines retain 512px
 tiles. Checkbox focus shares its existing indicator raster, preserving Settings'
 32-slot envelope. The menu raster density cap remains 5, with the real DPR still

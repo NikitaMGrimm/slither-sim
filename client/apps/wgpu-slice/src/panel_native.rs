@@ -105,6 +105,12 @@ impl NativePanel {
         if let WindowEvent::KeyboardInput { event, .. } = event
             && event.state == ElementState::Pressed
         {
+            if matches!(
+                event.logical_key,
+                Key::Named(NamedKey::Enter | NamedKey::Space)
+            ) {
+                self.controls.keyboard_navigation();
+            }
             let composing = self
                 .input
                 .state

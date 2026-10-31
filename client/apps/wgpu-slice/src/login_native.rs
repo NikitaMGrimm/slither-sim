@@ -178,6 +178,9 @@ impl NativeLogin {
         if self.studio.state.take_return_focus()
             && self.state.view(true).phase == slither_client::start_page::MenuPhase::Login
         {
+            self.menu.skin_hovered = false;
+            self.menu.skin_pressed = false;
+            self.controls.blur();
             let mut effects = self.sync_controls(admission);
             effects.extend(self.focus(CHANGE_SKIN));
             return effects;
@@ -236,6 +239,9 @@ impl NativeLogin {
             && !self.picker.policy.visible()
             && !self.state.settings.visible();
         if self.studio.open(admitted) {
+            self.menu.skin_hovered = false;
+            self.menu.skin_pressed = false;
+            self.state.play_pointer(false, false, true);
             self.controls.blur();
             self.sync_controls(true)
         } else {
@@ -386,6 +392,24 @@ impl NativeLogin {
             keyboard::{Key, NamedKey},
         };
         let view = self.state.view(admission);
+        if event.state == ElementState::Pressed
+            && matches!(
+                event.logical,
+                Key::Named(
+                    NamedKey::Tab
+                        | NamedKey::Enter
+                        | NamedKey::Space
+                        | NamedKey::ArrowLeft
+                        | NamedKey::ArrowRight
+                        | NamedKey::ArrowUp
+                        | NamedKey::ArrowDown
+                        | NamedKey::Home
+                        | NamedKey::End
+                )
+            )
+        {
+            self.controls.keyboard_navigation();
+        }
         if self.state.settings.visible() {
             let mut effects = Vec::new();
             if event.state == ElementState::Pressed && !event.repeat {

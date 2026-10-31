@@ -48,6 +48,7 @@ impl Sweep<'_> {
                 )
             })?;
         if let Some(id) = focus {
+            login.controls.keyboard_navigation();
             login.focus(id);
         }
         for control in &login.panel.controls {
@@ -92,7 +93,7 @@ impl Sweep<'_> {
         let wide = self.logical == [960., 540.];
         let screenshot = !self.ready
             && [1., 1.5, 2.].contains(&self.dpr)
-            && focus.is_some()
+            && (focus.is_some() || name.starts_with("roundtrip-"))
             && (wide || name == "cosmetics-cell" || name == "settings-toggle");
         if screenshot {
             if studio {
@@ -247,6 +248,60 @@ impl Sweep<'_> {
                 &format!("early-builder-{t}"),
                 None,
                 t == 1.,
+            )?;
+        }
+        for keyboard in [false, true] {
+            let mut roundtrip = NativeLogin::new("Focus")?;
+            for now in (0..=9600).step_by(16) {
+                roundtrip.step(now as f64, true, false)?;
+            }
+            roundtrip.prepare_host(
+                self.logical.map(|v| (v * self.dpr).round() as u32),
+                self.dpr,
+                true,
+                None,
+            )?;
+            let click = |login: &mut NativeLogin, id| -> Result<()> {
+                let resolved = login.panel.resolve(self.logical).map_err(str::to_owned)?;
+                let r = resolved
+                    .iter()
+                    .find(|r| r.control.id == id)
+                    .ok_or("Missing click fixture")?;
+                let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+                login.pointer(point, Some(true), true);
+                login.pointer(point, Some(false), true);
+                Ok(())
+            };
+            if keyboard {
+                roundtrip.controls.keyboard_navigation();
+                roundtrip.focus(login_ids::CHANGE_SKIN);
+                roundtrip.activate(true);
+            } else {
+                click(&mut roundtrip, login_ids::CHANGE_SKIN)?;
+            }
+            roundtrip.step(9900., true, false)?;
+            let modality = if keyboard { "keyboard" } else { "mouse" };
+            self.sample(
+                &mut roundtrip,
+                &mut art,
+                &format!("roundtrip-{modality}-open"),
+                None,
+                false,
+            )?;
+            if keyboard {
+                roundtrip.focus(CANCEL);
+                roundtrip.activate(true);
+            } else {
+                click(&mut roundtrip, CANCEL)?;
+            }
+            roundtrip.step(10200., true, false)?;
+            roundtrip.sync_return_focus(true);
+            self.sample(
+                &mut roundtrip,
+                &mut art,
+                &format!("roundtrip-{modality}-return"),
+                None,
+                false,
             )?;
         }
         Ok(())

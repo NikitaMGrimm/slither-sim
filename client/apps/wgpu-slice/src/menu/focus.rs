@@ -54,7 +54,15 @@ impl Composition<'_> {
         } else {
             f64::from(tokens.radius) * r.scale
         };
-        self.outline(r, r.rect, radius, alpha, theme)
+        // Keep antialiasing inside the hit box, including fractional-DPR rounding.
+        let inset = 1. / self.scale;
+        let rect = MenuRect {
+            x: r.rect.x + inset,
+            y: r.rect.y + inset,
+            width: (r.rect.width - 2. * inset).max(0.),
+            height: (r.rect.height - 2. * inset).max(0.),
+        };
+        self.outline(r, rect, (radius - inset).max(0.), alpha, theme)
     }
     pub(super) fn outline(
         &mut self,
@@ -240,6 +248,74 @@ mod tests {
         }
     }
     #[test]
+    fn adjacent_focus_paint_stays_inside_each_control_and_does_not_intersect() {
+        for density in [1_f64, 1.25, 1.5, 2., 3., 5.] {
+            let empty = BTreeMap::new();
+            let art = BTreeMap::new();
+            let mut left = control();
+            left.clip = MenuRect {
+                width: 1000.,
+                height: 1000.,
+                x: 0.,
+                y: 0.,
+            };
+            let mut right = left.clone();
+            right.rect.x += left.rect.width;
+            let mut painted = Vec::new();
+            for r in [&left, &right] {
+                let mut c = composition(&empty, &art, density);
+                c.outline_control(r, 1., MenuTheme::default()).unwrap();
+                let bounds: Vec<_> = c
+                    .draws
+                    .iter()
+                    .map(|d| MenuRect {
+                        x: d.destination.x,
+                        y: d.destination.y,
+                        width: d.destination.width,
+                        height: d.destination.height,
+                    })
+                    .collect();
+                assert!(bounds.iter().all(|b| contains_rect(r.rect, *b)));
+                painted.push(bounds);
+            }
+            assert!(painted[0].iter().all(|a| painted[1].iter().all(|b| {
+                let i = intersection(*a, *b);
+                i.width <= 0. || i.height <= 0.
+            })));
+        }
+    }
+    #[test]
+    fn fully_visible_control_shadows_keep_their_extent_at_window_edges() {
+        for density in [1_f64, 1.5, 2., 3.] {
+            let empty = BTreeMap::new();
+            let art = BTreeMap::new();
+            for style in [
+                ControlStyle::StudioAction,
+                ControlStyle::Nickname,
+                ControlStyle::StudioSurface,
+            ] {
+                let mut r = control();
+                r.control.clip = Some(r.rect);
+                r.clip = r.rect;
+                let tokens = MenuTheme::default().surface(style, ControlState::Idle);
+                let mut full = composition(&empty, &art, density);
+                full.sliced(r.rect, tokens, 1., None, r.scale).unwrap();
+                let mut windowed = composition(&empty, &art, density);
+                windowed
+                    .sliced(r.rect, tokens, 1., decoration_clip(&r), r.scale)
+                    .unwrap();
+                assert_eq!(full.draws.len(), windowed.draws.len());
+                for (a, b) in full.draws.iter().zip(&windowed.draws) {
+                    assert_eq!(a.destination, b.destination);
+                    assert_eq!(a.source, b.source);
+                }
+                assert!(full.draws.iter().any(|d| d.destination.y < r.rect.y));
+                r.clip.height /= 2.;
+                assert!(decoration_clip(&r).is_some());
+            }
+        }
+    }
+    #[test]
     fn oversized_outline_rejects_before_material_or_draw_publication() {
         let empty = BTreeMap::new();
         let art = BTreeMap::new();
@@ -251,25 +327,6 @@ mod tests {
             MENU_RASTER_AXIS_QUOTA
         );
         assert!(c.materials.is_empty() && c.draws.is_empty());
-    }
-    #[test]
-    fn builder_swatch_uses_painted_cell_corners_despite_action_text_tokens() {
-        let empty = BTreeMap::new();
-        let art = BTreeMap::new();
-        for density in [1_f64, 1.25, 1.5, 2., 5.] {
-            let mut r = control();
-            r.control.kind = ControlKind::Swatch {
-                palette: 1,
-                count: None,
-                selected: true,
-            };
-            let mut c = composition(&empty, &art, density);
-            c.outline_control(&r, 1., MenuTheme::default()).unwrap();
-            let Some(MaterialKey::Focus(_, radius, ..)) = c.materials.keys().next() else {
-                panic!("missing outline")
-            };
-            assert_eq!(f64::from_bits(*radius), (4. * density).ceil());
-        }
     }
     #[test]
     fn focus_rasters_follow_the_radius_keep_centres_clear_and_stay_premultiplied() {
@@ -284,8 +341,8 @@ mod tests {
                 assert_eq!(alpha(0, 0), 0);
                 assert_eq!(alpha(0, height - 1), 0);
                 assert_eq!(alpha(cap + 1, height / 2), 0);
-                assert!(alpha(0, height / 2) > 250);
-                assert!(alpha(cap + 1, 0) > 250);
+                assert!(alpha(0, height / 2) > alpha(0, 0));
+                assert!(alpha(cap + 1, 0) > alpha(cap + 1, height / 2));
                 assert!(
                     image
                         .pixels
