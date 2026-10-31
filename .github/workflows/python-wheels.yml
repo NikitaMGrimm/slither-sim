@@ -88,7 +88,7 @@ jobs:
       # Cargo then keeps every remaining locked version.
       - name: Drop the client crates from the sdist's workspace
         run: |
-          sed -i 's|, "client", "client/apps/wgpu-slice"\]|]|' Cargo.toml
+          sed -i 's|, "client", "client/apps/wgpu-slice"||' Cargo.toml
           if grep -q '"client' Cargo.toml; then echo "client members still listed" >&2; exit 1; fi
           cargo metadata --format-version 1 > /dev/null
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0

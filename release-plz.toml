@@ -7,7 +7,7 @@ release_always = false
 publish = false
 git_tag_enable = false
 git_release_enable = false
-pr_name = "chore(release): prepare v{{ version }}"
+pr_name = "chore(release): prepare{% if version %} v{{ version }}{% endif %}"
 pr_body = """
 {% for release in releases %}
 <!-- release-plz {{ release.package }} {{ release.previous_version }} {{ release.next_version }} {{ release.semver_check }} -->
@@ -48,11 +48,19 @@ release = false
 name = "slither-wgpu-slice"
 release = false
 
-# The owner manually publishes 0.1.0 after A0 merges. Keep version bumps and
-# publication disabled here; the simulator-switch PR will wire release.yml.
+# With two released packages, release-plz would name tags (and changelog links)
+# slither-sim-vX.Y.Z; release.yml tags the simulator vX.Y.Z.
+[[package]]
+name = "slither-sim"
+git_tag_name = "v{{ version }}"
+
+# Independently versioned; publication is ordered and guarded by release.yml.
 [[package]]
 name = "slither-protocol"
-release = false
+release = true
+changelog_path = "crates/slither-protocol/CHANGELOG.md"
+features_always_increment_minor = false
+semver_check = true
 
 [changelog]
 header = "# Changelog\n\n## Unreleased\n"

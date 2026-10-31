@@ -3,8 +3,8 @@ name: Release
 on:
   push:
     branches: [main]
-    tags: ['v*']
-    paths: ['Cargo.toml', 'Cargo.lock', 'CHANGELOG.md']
+    tags: ['v*', 'slither-protocol-v*']
+    paths: ['Cargo.toml', 'Cargo.lock', 'CHANGELOG.md', 'crates/slither-protocol/Cargo.toml', 'crates/slither-protocol/CHANGELOG.md']
   schedule:
     - cron: '23 * * * *'
   workflow_dispatch:
@@ -37,6 +37,7 @@ jobs:
       commit: ${{ steps.target.outputs.commit }}
       tag: ${{ steps.target.outputs.tag }}
       ready: ${{ steps.cooldown.outputs.ready }}
+      package: ${{ steps.target.outputs.package }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -72,28 +73,65 @@ jobs:
         env:
           RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
           RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          RELEASE_PACKAGE: ${{ steps.target.outputs.package }}
         run: python3 tools/release.py "$RELEASE_TAG" --commit "$RELEASE_COMMIT" >> "$GITHUB_OUTPUT"
-      - name: Verify package
-        if: steps.target.outputs.tag != '' && steps.package.outputs.already_published != 'true'
-        working-directory: release-source
-        run: cargo publish --locked --dry-run --registry crates-io
       - name: Check publication cooldown or maintainer release merge
         if: steps.target.outputs.tag != ''
         id: cooldown
         env:
           RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
           RELEASE_TAG: ${{ steps.target.outputs.tag }}
+          RELEASE_PACKAGE: ${{ steps.target.outputs.package }}
         run: python3 tools/release_automation.py publication-ready >> "$GITHUB_OUTPUT"
+      - name: Verify protocol before a prerequisite upload
+        if: steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.protocol_needed == 'true'
+        working-directory: release-source
+        run: cargo publish --locked --dry-run -p slither-protocol --registry crates-io
       - name: Authenticate with crates.io
         if: (github.event_name == 'workflow_dispatch' && inputs.tag == '') || (steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true')
         id: auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Explain protocol authentication failure
+        if: failure() && steps.auth.outcome == 'failure' && (steps.cooldown.outputs.protocol_needed == 'true' || steps.target.outputs.package == 'slither-protocol')
+        run: |
+          echo '::error::slither-protocol publication requires crates.io Trusted Publisher authentication for NikitaMGrimm/slither-sim, release.yml, no environment. Authentication failed; no fallback token or simulator upload is allowed.'
+          exit 1
+      - name: Publish protocol prerequisite
+        if: steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.protocol_needed == 'true'
+        working-directory: release-source
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: |
+          cargo publish --locked -p slither-protocol --registry crates-io || {
+            echo '::error::slither-protocol upload failed. Check its registered Trusted Publisher and registry response; simulator publication is blocked.'
+            exit 1
+          }
+      - name: Wait for the protocol registry dependency
+        if: steps.cooldown.outputs.ready == 'true' && steps.target.outputs.package == 'slither-sim'
+        env:
+          RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
+        run: |
+          if git cat-file -e "$RELEASE_COMMIT:crates/slither-protocol/Cargo.toml" 2>/dev/null; then
+            python3 tools/release_automation.py wait-protocol
+          fi
+      - name: Verify selected package against registry dependencies
+        if: steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true'
+        working-directory: release-source
+        env:
+          RELEASE_PACKAGE: ${{ steps.target.outputs.package }}
+        run: cargo publish --locked --dry-run -p "$RELEASE_PACKAGE" --registry crates-io
       - name: Publish crate
         if: steps.cooldown.outputs.ready == 'true' && steps.cooldown.outputs.already_published != 'true'
         working-directory: release-source
-        run: cargo publish --locked --registry crates-io
+        run: cargo publish --locked -p "$RELEASE_PACKAGE" --registry crates-io
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          RELEASE_PACKAGE: ${{ steps.target.outputs.package }}
+      - name: Confirm independent protocol publication
+        if: steps.cooldown.outputs.ready == 'true' && steps.target.outputs.package == 'slither-protocol'
+        env:
+          RELEASE_COMMIT: ${{ steps.target.outputs.commit }}
+        run: python3 tools/release_automation.py wait-protocol
       - name: Create GitHub Release
         if: steps.cooldown.outputs.ready == 'true'
         env:
@@ -123,7 +161,7 @@ jobs:
   # done, and dispatching vVERSION rebuilds and uploads only missing files.
   python-dist:
     needs: release
-    if: needs.release.outputs.ready == 'true'
+    if: needs.release.outputs.ready == 'true' && needs.release.outputs.package == 'slither-sim'
     permissions:
       contents: read
     uses: ./.github/workflows/python-wheels.yml
@@ -156,7 +194,7 @@ jobs:
   # every archive and replaces the uploaded set, checksums included.
   binaries:
     needs: release
-    if: needs.release.outputs.ready == 'true'
+    if: needs.release.outputs.ready == 'true' && needs.release.outputs.package == 'slither-sim'
     permissions:
       contents: read
     uses: ./.github/workflows/release-binaries.yml

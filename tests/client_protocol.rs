@@ -225,6 +225,95 @@ fn setup() -> Vec<u8> {
     setup_with(1, 430, 430)
 }
 
+// Simulator compatibility cases from the shared-reader behavior matrix. These
+// are authored inputs, not claims about canonical/official packet admission.
+#[test]
+fn shared_reader_preserves_sim_setup_and_control_admission() {
+    let mut packet = setup();
+    packet[8..10].fill(0); // Zero sector count remains admitted in the sim lane.
+    packet[27..30].fill(0); // Explicit zero radius remains admitted.
+    packet.push(2); // Team mode without the optional team byte.
+    let mut state = ClientState::new();
+    state.new_connection(0.).unwrap();
+    state.receive_packet(&packet, 0., 0.).unwrap();
+    let settings = state.frame(0.).unwrap().settings.unwrap();
+    assert_eq!(settings.sector_count_along_edge, 0);
+    assert_eq!(settings.team_val, None);
+    assert!(
+        state
+            .receive_packet(&packet, 0., 0.)
+            .unwrap_err()
+            .contains("setup")
+    );
+    for pong in [&b"p"[..], &b"p\0\xffextra"[..]] {
+        state.receive_packet(pong, 0., 0.).unwrap();
+    }
+    for over in [&b"v"[..], &b"v\x02extra"[..]] {
+        state.receive_packet(over, 0., 0.).unwrap();
+    }
+}
+
+#[test]
+fn shared_reader_preserves_padded_removal_and_own_motion_tails() {
+    let mut client = Client::new();
+    client.send(&straight(9, 0.));
+    for command in *b"d7" {
+        client.send(&[command, 64, 65, 90, 255, 255]);
+    }
+    let before = client.frame();
+    assert_eq!(
+        client.state.receive_packet(&[b'5', 1], 0., client.time),
+        Err("Malformed '5' packet of 2 bytes".into())
+    );
+    assert_eq!(client.frame(), before);
+    for len in 3..=7 {
+        let mut packet = vec![b's', 0, 17];
+        packet.resize(len, 255);
+        client.send(&packet);
+    }
+    // Historical framing accepts low IDs inside a bundle and has no client cap.
+    let low = bundled(&[&[1], &b"iignored"[..], &b"6unsupported"[..]]);
+    assert_eq!(
+        split_frame(&low).unwrap(),
+        vec![&[1][..], &b"iignored"[..], &b"6unsupported"[..]]
+    );
+    client.state.receive_frame(&low, client.time).unwrap();
+}
+
+#[test]
+fn shared_minimap_preserves_budget_priority_and_unreachable_escape() {
+    let mut client = Client::new();
+    // A reachable truncated escape fails, but an escape after the last cell is opaque.
+    client.send(&[b'M', 0, 1, 64, 255]);
+    let before = client.frame();
+    assert_eq!(
+        client
+            .state
+            .receive_packet(&[b'M', 0, 1, 255], 0., client.time),
+        Err("Truncated minimap run".into())
+    );
+    assert_eq!(client.frame(), before);
+    assert_eq!(
+        client
+            .state
+            .receive_packet(&[b'L', 255, 2, 0, 255], 0., client.time),
+        Err("Unsupported team minimap: 255 layers of 512x512 exceed the 1048576-cell limit".into())
+    );
+    assert_eq!(client.frame(), before);
+    for packet in [
+        &[b'M', 0, 0][..],
+        &[b'U', 0, 0][..],
+        &[b'L', 1, 0, 0][..],
+        &[b'M', 2, 1][..],
+    ] {
+        assert_eq!(
+            client.state.receive_packet(packet, 0., client.time),
+            Err("Invalid minimap size".into())
+        );
+        assert_eq!(client.frame(), before);
+    }
+}
+
 #[test]
 fn unsupported_contraction_cannot_poison_received_geometry() {
     for contraction in [1001, u16::MAX] {

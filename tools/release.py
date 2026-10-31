@@ -17,6 +17,20 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = "https://crates.io/api/v1/crates"
+PROTOCOL = "slither-protocol"
+MANIFESTS = {"slither-sim": "Cargo.toml", PROTOCOL: "crates/slither-protocol/Cargo.toml"}
+
+
+def selected_name():
+    name = os.environ.get("RELEASE_PACKAGE", "slither-sim")
+    if name not in MANIFESTS:
+        raise ValueError(f"Unsupported release package: {name}")
+    return name
+
+
+def version_tag(package):
+    prefix = "" if package["name"] == "slither-sim" else f"{package['name']}-"
+    return f"{prefix}v{package['version']}"
 
 
 def require_main_ci(commit, timeout=300, dispatch_ref=None):
@@ -74,7 +88,7 @@ def cooldown_ready(name, now=None, manual_release=None):
     manual = manual_release or {}
     timestamps = [manual["merged_at"] if manual and item.get("num") == manual["version"] else item["created_at"]
                   for item in versions]
-    timestamps.extend(manual["merged_at"] if manual and item.get("tag_name") == f"v{manual['version']}"
+    timestamps.extend(manual["merged_at"] if manual and item.get("tag_name") == version_tag({"name": name, "version": manual["version"]})
                       else item["published_at"] for item in releases if not item["draft"])
     if manual_release:
         timestamps.append(manual["merged_at"])
@@ -99,8 +113,9 @@ def version_table(manifest):
     return manifest["workspace"]["package"] if inherits_version(manifest) else manifest["package"]
 
 
-def package_at(commit):
-    manifest = tomllib.loads(subprocess.check_output(["git", "show", f"{commit}:Cargo.toml"], cwd=ROOT, text=True))
+def package_at(commit, name=None):
+    path = MANIFESTS[name or selected_name()]
+    manifest = tomllib.loads(subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=ROOT, text=True))
     return {**manifest["package"], "version": version_table(manifest)["version"]}
 
 
@@ -124,16 +139,50 @@ def published_commit(name, version):
 
 
 def prepare(tag, package, commit):
-    if tag != f"v{package['version']}":
-        raise ValueError("Tag must be v followed by the exact Cargo.toml version")
+    if tag != version_tag(package):
+        raise ValueError(f"Tag must be {version_tag(package)} for this package version")
     if package.get("publish") != ["crates-io"]:
         raise ValueError("Manifest must restrict publishing to crates-io")
     existing = published_commit(package["name"], package["version"])
     if existing is not None and existing != commit:
-        raise ValueError("Version is already published from a different commit; bump the version")
+        # An independent protocol version can be reused by later simulator
+        # releases only while its entire package source is unchanged. Registry
+        # checksum and clean-checkout identity were checked by published_commit.
+        if package["name"] != PROTOCOL or not same_protocol_source(existing, commit):
+            raise ValueError("Version is already published from a different commit; bump the version")
     prerelease = "-" in package["version"].split("+", 1)[0]
     return {"version": package["version"], "already_published": str(existing is not None).lower(),
             "prerelease": str(prerelease).lower()}
+
+
+def same_protocol_source(published, selected):
+    def tree(commit):
+        return subprocess.check_output(["git", "rev-parse", f"{commit}:crates/slither-protocol"],
+                                       cwd=ROOT, text=True).strip()
+    return tree(published) == tree(selected)
+
+
+def wait_protocol(commit, timeout=300):
+    """Wait for Cargo's sparse index, then recheck immutable registry identity."""
+    package = package_at(commit, PROTOCOL)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            entries = fetch("https://index.crates.io/sl/it/slither-protocol").decode().splitlines()
+            visible = any(json.loads(line)["vers"] == package["version"] and not json.loads(line).get("yanked", False)
+                          for line in entries)
+        except HTTPError as error:
+            if error.code != 404:
+                raise
+            visible = False
+        if visible:
+            result = prepare(version_tag(package), package, commit)
+            if result["already_published"] == "true":
+                return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError(f"{PROTOCOL} {package['version']} did not become visible in the registry")
+        time.sleep(min(5, remaining))
 
 
 def main():

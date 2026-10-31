@@ -2197,12 +2197,9 @@ fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
             key = (key + 17) % 26;
         }
     }
-    let mut reply = Vec::with_capacity(24);
-    let mut rotation = 2;
-    for letter in 0..24 {
-        reply.push(b'A' + (letter + rotation) % 26);
-        rotation = (rotation + 3 + letter) % 26;
-    }
+    let reply = slither_protocol::challenge::ntl_legacy_24(&framed[3..])
+        .expect("fixed local legacy challenge")
+        .to_vec();
     (framed, reply)
 }
 
@@ -2223,13 +2220,17 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 3]), String> {
             key = (key + 17) % 26;
         }
     }
-    let literal = [first.as_slice(), second.as_slice()].concat();
+    use slither_protocol::challenge::{Grammar, literal_27, vlither_27};
+    let grammar = Grammar::ExactTemplate;
+    let literal = literal_27(&encoded, grammar)
+        .expect("fixed local stock challenge")
+        .to_vec();
     let solved = challenge::solve_challenge(&encoded)?;
     // Client-derived compatibility: for-loop9/vlither 8612bc12,
     // app/src/network/callback.c decode_secret advances by 2 + value, not 4.
-    // This challenge is not authentication; keep both existing replies.
-    let mut vlither = literal.clone();
-    challenge::rotate_reply(&mut vlither, 2);
+    let vlither = vlither_27(&encoded, grammar)
+        .expect("fixed local Vlither challenge")
+        .to_vec();
     Ok((encoded, [literal, solved, vlither]))
 }
 
