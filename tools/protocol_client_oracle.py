@@ -110,6 +110,15 @@ def main():
     manifest = tomllib.loads((client / "Cargo.toml").read_text(encoding="utf-8"))
     if "slither-protocol" in manifest.get("dependencies", {}):
         parser.error(f"circular oracle: use --client-root from pre-adoption {PRE_ADOPTION_COMMIT}")
+    # Record which client source produced the bits. tests/numerics.rs keeps the
+    # fixed expectations; this only makes an unpinned regeneration visible.
+    head = subprocess.run(["git", "-C", str(client), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=False).stdout.strip() or "unknown"
+    pinned = subprocess.run(["git", "-C", str(client), "diff", "--quiet", PRE_ADOPTION_COMMIT, "--", "."],
+                            capture_output=True, check=False).returncode == 0
+    print(f"// client source: {head}; matches {PRE_ADOPTION_COMMIT[:8]}: {'yes' if pinned else 'NO'}")
+    if not pinned:
+        print("// warning: not the pinned pre-adoption client; don't copy these bits into tests")
     # Copy these two actual private functions without rewriting their arithmetic.
     # Only math::cos/sin are replaced in the temporary module: cos returns its
     # argument and spacing=1, origin=0 makes advance().x that exact angle. This
