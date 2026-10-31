@@ -6,6 +6,7 @@ pub mod challenge;
 pub mod extensions;
 pub mod frame;
 pub mod scalar;
+pub mod v13;
 pub mod v19;
 
 /// Structural and scalar failures; unknown opcodes are returned as values.
