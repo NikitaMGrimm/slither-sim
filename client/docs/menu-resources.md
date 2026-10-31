@@ -165,3 +165,22 @@ wide texture. Uniform tall surfaces tile in both axes. Each tile charges the
 existing producer cap; all material/text slots share the same Menu allowance.
 Theme raster content enters cache keys, while position, sampled alpha and
 horizontal text scroll do not. Login control migration remains a follow-up.
+
+## Native focus outlines
+
+Focus outlines use the idle control radius, with half-height corners for studio
+capsules. Hollow, premultiplied half-rasters stretch into three strips; position,
+clip and fade opacity stay outside the cache key. Tall outlines retain 512px
+tiles. Checkbox focus shares its existing indicator raster, preserving Settings'
+32-slot envelope. The menu raster density cap remains 5, with the real DPR still
+controlling presentation and input.
+
+Run `cargo run --manifest-path apps/wgpu-slice/Cargo.toml --example menu_specimens
+-- NEW_EXTERNAL_DIRECTORY --focus` from `client/`, with `CARGO_BUILD_JOBS=2`.
+The fixed-clock sweep covers DPR 1–8 plus 1.25/1.5/1.75, wide/narrow/short layouts,
+Settings, each studio section, section fades, return and early Builder entry.
+It checks 512 menu records, 64 slots, 13 MiB and the studio's 448-record envelope.
+Generated solid images exercise art-loaded budgets; all exported screenshots use
+only procedural geometry and placeholders. It never reads an art directory or
+connects to a server. The ledger records copied focus states, not physical
+keyboard, accessibility or visible-window acceptance.

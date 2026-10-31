@@ -134,7 +134,7 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     );
     assert_eq!(login.controls.focus(), Some(SERVER));
     let focused = login.prepare([960, 720], false, None).unwrap();
-    assert_eq!(focused.frame.draws.len(), unfocused.frame.draws.len() + 4);
+    assert_eq!(focused.frame.draws.len(), unfocused.frame.draws.len() + 3);
     for id in [PLAY, SETTINGS] {
         assert!(
             !login
