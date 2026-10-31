@@ -43,7 +43,7 @@ One 1:1 quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-A static logo uses shared opacity timing with a plain fade. The no-art/`--wordmark`
+Bitmap logo art retains #358's feathered reveal, separate from shared opacity. The no-art/`--wordmark`
 path uses the [authored swelling stroke alphabet](wordmark.md), settles to a cached
 raster, and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.

@@ -1263,3 +1263,134 @@ fn integer_translation_reuses_stroke_pixels() {
     assert_eq!(pictures[0].1 + 1., pictures[1].1);
     assert!(std::sync::Arc::ptr_eq(&pictures[0].2, &pictures[1].2));
 }
+
+#[test]
+fn production_outgoing_spinner_and_wordmark_fit_at_dpr_five() {
+    use slither_client::start_page::{MenuAction, MenuPhase};
+    use slither_wgpu_slice::{menu_specimen, text::MENU_CACHE_BYTES};
+    let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
+    state.edit_nickname(&"Player".encode_utf16().collect::<Vec<_>>());
+    for now in (0..=7200).step_by(16) {
+        state.step(f64::from(now), false).unwrap();
+    }
+    state.action(MenuAction::Play, true);
+    for now in (7216..=8192).step_by(16) {
+        state.step(f64::from(now), false).unwrap();
+    }
+    assert_eq!(state.view(true).spinner_alpha, 1.);
+    assert!(state.begin_outgoing());
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let extent = [8000, 5400];
+    let mut peak = (0, 0);
+    for frame in 0..=32 {
+        state.step(f64::from(8192 + 16 * frame), false).unwrap();
+        let view = state.view(true);
+        if view.transition < 1. {
+            assert_eq!(view.phase, MenuPhase::Outgoing);
+        }
+        assert!(view.spinner_visible && view.spinner_alpha > 0.);
+        if frame > 0 {
+            assert!(view.spinner_alpha < 1.);
+        }
+        let layout = menu_specimen::layout(&mut text, &view, extent, 5.).unwrap();
+        let p = menu
+            .prepare(&mut text, &view, &layout, extent, 5., None, 0)
+            .unwrap_or_else(|e| panic!("transition {}: {e}", view.transition));
+        let bytes = p
+            .resources
+            .iter()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>();
+        peak.0 = peak.0.max(bytes);
+        peak.1 = peak.1.max(p.frame.draws.len());
+        assert!(bytes <= MENU_CACHE_BYTES);
+        assert!(p.frame.draws.len() <= 512);
+        assert!(
+            p.resources
+                .iter()
+                .all(|r| r.image.width <= 2048 && r.image.height <= 2048)
+        );
+    }
+    eprintln!("outgoing peak: {} bytes, {} draws", peak.0, peak.1);
+}
+
+#[test]
+fn local_bitmap_retains_the_feathered_reveal_and_separate_opacity() {
+    use slither_wgpu_slice::menu_specimen;
+    let mut images = Images::default();
+    images
+        .add("menu/logo.png", &png_rect(450, 135, [80, 200, 100, 255]))
+        .unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    let asset = art.menu_art(MenuArt::Logo(0)).unwrap().asset;
+    let mut view = menu_specimen::view(0).unwrap();
+    view.login_alpha = 0.8;
+    let mut text = TextCache::menu();
+    let mut menu = Menu::default();
+    let layout = menu_specimen::layout(&mut text, &view, [1920, 1080], 1.).unwrap();
+    for reveal in [0., 0.05, 0.125, 0.25, 1.] {
+        view.logo_reveal = reveal;
+        let p = menu
+            .prepare(&mut text, &view, &layout, [1920, 1080], 1., Some(&art), 0)
+            .unwrap();
+        let draws: Vec<_> = p.frame.draws.iter().filter(|d| d.asset == asset).collect();
+        if reveal == 0. {
+            assert!(draws.is_empty());
+        } else if reveal < 0.25 {
+            assert!(draws.len() > 1 && draws.len() <= 33);
+            let width = draws.iter().map(|d| d.source.unwrap().width).sum::<f64>();
+            assert_eq!(width, ((450. + 12.) * (reveal * 4.)).round());
+            assert!(
+                draws
+                    .iter()
+                    .any(|d| d.effective_alpha > 0. && d.effective_alpha < 0.8)
+            );
+            assert!(draws.iter().all(|d| d.effective_alpha <= 0.8));
+        } else {
+            assert_eq!(draws.len(), 1);
+            assert_eq!(draws[0].effective_alpha, 0.8);
+        }
+    }
+}
+
+#[test]
+fn many_case_boundaries_and_long_runs_fit_the_font_fallback() {
+    use slither_wgpu_slice::{
+        menu_specimen,
+        text::{MENU_CACHE_BYTES, MENU_CACHE_RUNS},
+    };
+    for dpr in [6., 8.] {
+        for value in ["Ab".repeat(60), "w".repeat(128)] {
+            let mut menu = Menu::default();
+            menu.wordmark_text = Some(value);
+            let mut text = TextCache::menu();
+            let view = menu_specimen::view(0).unwrap();
+            let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+            let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+            let p = menu
+                .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+                .unwrap();
+            let material_slots = p
+                .resources
+                .iter()
+                .filter(|r| r.asset.handle >> 60 == 7)
+                .count();
+            assert!(material_slots + text.cached_runs() <= MENU_CACHE_RUNS);
+            assert!(
+                p.resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+                    <= MENU_CACHE_BYTES
+            );
+            assert!(
+                p.resources
+                    .iter()
+                    .all(|r| r.image.width <= 2048 && r.image.height <= 2048)
+            );
+            assert!(p.frame.draws.len() < 512);
+            assert!(p.frame.draws.iter().any(|d| d.asset.handle >> 60 == 8));
+        }
+    }
+}

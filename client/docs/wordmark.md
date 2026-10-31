@@ -33,7 +33,7 @@ the independent `login_alpha * logo_alpha`. The soft shadow follows the current
 drawn mask. During motion at DPR 1-3 its coverage and blur run at half resolution;
 higher densities retain the full shadow to keep packed atlas bounds. The exact
 settled frame always uses the original full-resolution pen and shadow. Bitmap
-logo art uses a plain fade instead of the earlier wipe.
+logo art retains #358's feathered reveal on its separate four-times reveal clock.
 
 Reveal rasters are capped at 40 Hz: a new raster requires at least 25 ms of
 the retained reveal clock. Intervening frames keep the same shared image.
@@ -50,8 +50,11 @@ canvas is capped at 10 MiB; retained tiles share the existing 64-slot/13 MiB
 Menu allowance with controls and text. Stroke rasters are bounded to DPR 5.5.
 Scale/pixel admission limits select a whole-word installed-font layout fitted
 to the legacy holder; invalid input and other errors still propagate. Other
-admission failures preserve the previous cache. These are ceilings, not eager
-allocations.
+admission failures preserve the previous cache. Font colour runs are admitted
+only after the controls and spinner are known: adjacent equal-colour words share
+a label, and an over-budget suffix becomes an ellipsis. The whole font line fits
+the holder. Final slot/byte admission stays in the shared menu composition.
+These are ceilings, not eager allocations.
 
 Every word (including a font fallback) uses one snapped physical canvas origin
 plus its rounded relative advance. Absolute word origins never round separately;
@@ -62,7 +65,10 @@ the same image at the new origin.
 
 Above DPR 3, nonempty horizontal bands are packed in bounded atlases to avoid
 charging transparent areas around the letters against essential controls. This
-retains within-band gaps to share the 512-draw cap with sliced controls; a pixel-exact reconstruction test
+keeps at most four regions per band, merging the smallest gaps to share the
+512-draw cap with sliced controls. Larger transparent gaps are not retained, so
+the outgoing wordmark, fading spinner and text fit the same 13 MiB ceiling. A
+pixel-exact reconstruction test
 checks that packing neither drops, overlaps nor changes the raster pixels.
 
 Offline authored tests: `cargo test -p slither-wgpu-slice --locked --test wordmark

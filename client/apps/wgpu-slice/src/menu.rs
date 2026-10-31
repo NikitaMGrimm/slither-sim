@@ -330,6 +330,62 @@ struct Label {
     clip: Option<MenuRect>,
     fit: bool,
 }
+// Authored wipe: one opaque crop plus at most 32 one-pixel feather strips.
+// Source crops and destinations remain 1:1 on the snapped overlay path.
+fn reveal_draw(mut draw: Draw, reveal: f64, scale: f64, span: Option<[f64; 2]>) -> Vec<Draw> {
+    draw.snap_overlay(scale);
+    if reveal >= 1. {
+        return vec![draw];
+    }
+    if reveal <= 0. {
+        return Vec::new();
+    }
+    let source = draw.source.unwrap_or(BodyRect {
+        x: 0.,
+        y: 0.,
+        width: f64::from(draw.asset.width),
+        height: f64::from(draw.asset.height),
+    });
+    let feather = (12. * scale).round().clamp(1., 32.);
+    let span = span.unwrap_or([draw.destination.x, source.width / scale]);
+    let end = ((span[1] * scale + feather) * reveal).round()
+        - ((draw.destination.x - span[0]) * scale).round();
+    let solid = (end - feather).max(0.).min(source.width);
+    let mut result = Vec::new();
+    let mut crop = |x: f64, width: f64, alpha: f64| {
+        let mut part = draw.clone();
+        part.source = Some(BodyRect {
+            x: source.x + x,
+            width,
+            ..source
+        });
+        part.destination.x += x / scale;
+        part.destination.width = width / scale;
+        part.effective_alpha *= alpha;
+        result.push(part);
+    };
+    if solid > 0. {
+        crop(0., solid, 1.);
+    }
+    for x in solid as u32..(end.min(source.width) as u32) {
+        crop(
+            f64::from(x),
+            1.,
+            ((end - f64::from(x) - 0.5) / feather).clamp(0., 1.),
+        );
+    }
+    result
+}
+
+struct WordmarkRequest {
+    value: String,
+    holder: MenuRect,
+    viewport_width: f64,
+    alpha: f64,
+    reveal: f64,
+    draw_index: usize,
+    label_index: usize,
+}
 struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
@@ -341,6 +397,7 @@ struct Composition<'a> {
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
     quality_art: bool,
+    wordmark: Option<WordmarkRequest>,
     old_stroke: Option<&'a StrokeCache>,
     stroke: Option<StrokeCache>,
 }
@@ -1041,6 +1098,7 @@ impl Composition<'_> {
         alpha: f64,
         reveal: f64,
         text: &mut TextCache,
+        font_slots: usize,
     ) -> Result<()> {
         let unit = holder.height / 16.;
         let mut style = TextStyle {
@@ -1070,10 +1128,19 @@ impl Composition<'_> {
             ) {
                 return Err(error);
             }
-            layout = wordmark::fallback_layout(value, holder, viewport_width, |s| {
+            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
                 Ok(text.measure_panel(s, style)?.advance / unit)
             })?;
         }
+        if layout.words.iter().filter(|w| w.fallback).count()
+            + usize::from(layout.words.iter().any(|w| !w.fallback))
+            > font_slots
+        {
+            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?;
+        }
+        let stroke_start = self.draws.len();
         if reveal > 0. && layout.words.iter().any(|w| !w.fallback) {
             let key = (
                 value.to_owned(),
@@ -1116,16 +1183,32 @@ impl Composition<'_> {
                         let band = (3. * self.scale).round() as u32;
                         for y in (bounds[1]..bounds[3]).step_by(band as usize) {
                             let height = (bounds[3] - y).min(band);
-                            let painted = |x: u32| {
-                                (y..y + height).any(|row| {
-                                    raster.pixels[((row * raster.width + x) * 4 + 3) as usize] > 0
-                                })
-                            };
-                            // Retain gaps within each band: sliced controls also
-                            // consume draws, so splitting every letter's holes
-                            // would exceed the shared 512-draw producer ceiling.
-                            if let Some(left) = (bounds[0]..bounds[2]).find(|x| painted(*x)) {
-                                let right = (left..bounds[2]).rfind(|x| painted(*x)).unwrap() + 1;
+                            let mut spans: Vec<[u32; 2]> = Vec::new();
+                            let mut left = None;
+                            for x in bounds[0]..=bounds[2] {
+                                let painted = x < bounds[2]
+                                    && (y..y + height).any(|row| {
+                                        raster.pixels[((row * raster.width + x) * 4 + 3) as usize]
+                                            > 0
+                                    });
+                                if painted && left.is_none() {
+                                    left = Some(x);
+                                }
+                                if !painted && let Some(start) = left.take() {
+                                    spans.push([start, x]);
+                                }
+                            }
+                            // Drop large transparent gaps without turning every
+                            // letter/counter into a draw. The shared producer
+                            // ceiling still admits controls, text and spinner.
+                            while spans.len() > 4 {
+                                let i = (0..spans.len() - 1)
+                                    .min_by_key(|i| spans[i + 1][0] - spans[*i][1])
+                                    .unwrap();
+                                let end = spans.remove(i + 1)[1];
+                                spans[i][1] = end;
+                            }
+                            for [left, right] in spans {
                                 for sx in (left..right).step_by(2048) {
                                     regions.push([sx, y, (right - sx).min(2048), height]);
                                 }
@@ -1249,6 +1332,18 @@ impl Composition<'_> {
                 self.stroke = Some(cache);
             }
         }
+        // A mixed stroke/font line can retain more than one atlas. If that
+        // consumes its reserved slots, use the bounded font line as a whole.
+        if layout.words.iter().filter(|w| w.fallback).count()
+            + self.stroke.as_ref().map_or(0, |s| s.resources.len())
+            > font_slots
+        {
+            self.draws.truncate(stroke_start);
+            self.stroke = None;
+            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?;
+        }
         for word in layout.words.iter().filter(|w| w.fallback) {
             // One font run for the whole unsupported word, never a partial
             // stroke word. Shape reveal is deliberately absent from this path.
@@ -1304,6 +1399,15 @@ impl Composition<'_> {
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
+        self.art_revealed(resource, r, alpha, 1.)
+    }
+    fn art_revealed(
+        &mut self,
+        resource: &Resource,
+        r: MenuRect,
+        alpha: f64,
+        reveal: f64,
+    ) -> Result<()> {
         let size = [
             (r.width * self.scale).round().max(1.) as u32,
             (r.height * self.scale).round().max(1.) as u32,
@@ -1370,7 +1474,10 @@ impl Composition<'_> {
             height: f64::from(size[1]) / self.scale,
             ..r
         };
-        self.push(image(&self.art[&key], r, alpha))
+        for draw in reveal_draw(image(&self.art[&key], r, alpha), reveal, self.scale, None) {
+            self.push(draw)?;
+        }
+        Ok(())
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
         if view.spinner_scale <= 0. {
@@ -1443,6 +1550,7 @@ impl Menu {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            wordmark: None,
             old_stroke: self.stroke.as_ref(),
             stroke: None,
         };
@@ -1522,6 +1630,7 @@ impl Menu {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            wordmark: None,
             old_stroke: self.stroke.as_ref(),
             stroke: None,
         };
@@ -1568,9 +1677,7 @@ impl Menu {
                 let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
                 let room = layout.viewport_rect(E::LastLength).y - logo.y;
                 let fit = (room / natural).min(1.);
-                // A static bitmap cannot swell along its strokes. Keep the
-                // shared fade rather than implying motion with a lateral wipe.
-                c.art(
+                c.art_revealed(
                     art,
                     MenuRect {
                         x: logo.x + logo.width * (1. - fit) / 2.,
@@ -1579,18 +1686,22 @@ impl Menu {
                         ..logo
                     },
                     logo_alpha,
+                    (4. * view.logo_reveal).clamp(0., 1.),
                 )?;
             } else {
-                c.stroke_wordmark(
-                    self.wordmark_text
+                c.wordmark = Some(WordmarkRequest {
+                    value: self
+                        .wordmark_text
                         .as_deref()
-                        .unwrap_or(wordmark::DEFAULT_TEXT),
-                    logo,
-                    f64::from(extent[0]) / dpr,
-                    logo_alpha,
-                    view.logo_reveal,
-                    text,
-                )?;
+                        .unwrap_or(wordmark::DEFAULT_TEXT)
+                        .to_owned(),
+                    holder: logo,
+                    viewport_width: f64::from(extent[0]) / dpr,
+                    alpha: logo_alpha,
+                    reveal: view.logo_reveal,
+                    draw_index: c.draws.len(),
+                    label_index: c.labels.len(),
+                });
             }
             if view.tips_visible {
                 c.label(
@@ -1819,6 +1930,27 @@ impl Composition<'_> {
         world_cover: Option<Draw>,
         spinner_draws: Vec<Draw>,
     ) -> Result<Published> {
+        if let Some(request) = self.wordmark.take() {
+            // All controls and the fading spinner are known here. Keep menu
+            // accounting in this final composition, before admitting logo text.
+            let font_slots =
+                MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
+            let draws = self.draws.len();
+            let labels = self.labels.len();
+            self.stroke_wordmark(
+                &request.value,
+                request.holder,
+                request.viewport_width,
+                request.alpha,
+                request.reveal,
+                text,
+                font_slots,
+            )?;
+            let added_draws = self.draws.len() - draws;
+            let added_labels = self.labels.len() - labels;
+            self.draws[request.draw_index..].rotate_right(added_draws);
+            self.labels[request.label_index..].rotate_right(added_labels);
+        }
         let material_bytes = self
             .materials
             .values()
@@ -2030,6 +2162,7 @@ mod quota_tests {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            wordmark: None,
             old_stroke: None,
             stroke: None,
         };
