@@ -1163,6 +1163,12 @@ struct Open<S = TcpStream> {
     queued_bytes: usize,
 }
 
+#[derive(Debug)]
+enum SendError {
+    Transport,
+    Policy(String),
+}
+
 enum Stage {
     Http(Box<MidHandshake<ServerHandshake<ReadBudget<TcpStream>, Upgrade>>>),
     Open(Box<Open>),
@@ -1469,12 +1475,17 @@ impl<S: io::Read + io::Write> Open<S> {
                 self.socket.get_mut().read_blocked = false;
             }
             match self.socket.read() {
-                Ok(Message::Binary(bytes)) => {
-                    if let Err(reason) = self.receive(gate, &bytes, wall) {
+                Ok(Message::Binary(bytes)) => match self.receive(gate, &bytes, wall) {
+                    Ok(()) => {}
+                    Err(SendError::Transport) => {
+                        self.release(gate);
+                        return Ok(false);
+                    }
+                    Err(SendError::Policy(reason)) => {
                         self.reject(gate, now, &reason);
                         return Ok(true);
                     }
-                }
+                },
                 Ok(Message::Text(_)) => {
                     self.reject(gate, now, "Expected binary messages");
                     return Ok(true);
@@ -1503,14 +1514,13 @@ impl<S: io::Read + io::Write> Open<S> {
                 }
             }
         }
-        self.send_due(gate, now, wall)?;
-        Ok(true)
+        self.send_due(gate, now, wall)
     }
 
     /// Apply one client message received at wall time `wall`. An error
     /// closes only this connection.
-    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), String> {
-        match (self.phase, bytes) {
+    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), SendError> {
+        let result = match (self.phase, bytes) {
             (Phase::Hello { framed: false }, [1]) => self.request(Framing::Bare),
             (Phase::Hello { framed: false }, [2]) => self.request(Framing::Sequence(1)),
             (Phase::Hello { .. }, [1 | 2]) => Err("Repeated framing request".into()),
@@ -1522,7 +1532,7 @@ impl<S: io::Read + io::Write> Open<S> {
             (Phase::Hello { .. }, [99, 0]) => {
                 self.phase = Phase::Reply;
                 let challenge = gate.challenge.clone();
-                self.send(challenge)
+                return self.send(challenge);
             }
             // Client-derived: NTL's protocol toggle uses [99], and disabling
             // its dynamic map uses [99,3]. All share the same reply solver.
@@ -1533,7 +1543,7 @@ impl<S: io::Read + io::Write> Open<S> {
                 let (challenge, reply) = legacy_challenge();
                 self.legacy_reply = Some(reply);
                 self.phase = Phase::Reply;
-                self.send(challenge)
+                return self.send(challenge);
             }
             (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
@@ -1568,7 +1578,8 @@ impl<S: io::Read + io::Write> Open<S> {
             }
             (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
-        }
+        };
+        result.map_err(SendError::Policy)
     }
 
     fn request(&mut self, framing: Framing) -> Result<(), String> {
@@ -1599,23 +1610,30 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     /// Send queued frames due by wall time `wall`. Only host faults are errors.
-    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
+    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<bool, String> {
         while self.queued.front().is_some_and(|(at, _)| *at <= wall) {
             let (_, message) = self.queued.pop_front().unwrap();
             self.queued_bytes -= output_cost(&message);
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
-            if let Err(reason) = self.send(message) {
-                self.reject(gate, now, &reason);
-                break;
+            match self.send(message) {
+                Ok(()) => {}
+                Err(SendError::Transport) => {
+                    self.release(gate);
+                    return Ok(false);
+                }
+                Err(SendError::Policy(reason)) => {
+                    self.reject(gate, now, &reason);
+                    break;
+                }
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Queue one elapsed-framed message with this connection's header.
-    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), String> {
+    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), SendError> {
         if let Framing::Sequence(next) = &mut self.framing {
             framed[..2].copy_from_slice(&next.to_be_bytes());
             *next = next.wrapping_add(1);
@@ -1633,9 +1651,16 @@ impl<S: io::Read + io::Write> Open<S> {
                 Ok(())
             }
             Err(tungstenite::Error::WriteBufferFull(_)) => {
-                Err("Client is reading too slowly".into())
+                Err(SendError::Policy("Client is reading too slowly".into()))
             }
-            Err(error) => Err(error.to_string()),
+            // A peer disconnect is not an admission policy rejection. Preserve
+            // that distinction until the caller can release its slot.
+            Err(
+                tungstenite::Error::Io(_)
+                | tungstenite::Error::ConnectionClosed
+                | tungstenite::Error::AlreadyClosed,
+            ) => Err(SendError::Transport),
+            Err(error) => Err(SendError::Policy(error.to_string())),
         }
     }
 
@@ -2237,6 +2262,78 @@ mod tests {
         }
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
+        }
+    }
+
+    #[test]
+    fn challenge_write_disconnect_does_not_count_as_admission_rejection() {
+        struct Disconnected {
+            input: Readable,
+            writes: usize,
+        }
+
+        impl io::Read for Disconnected {
+            fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+                self.input.read(bytes)
+            }
+        }
+
+        impl io::Write for Disconnected {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                Err(io::ErrorKind::ConnectionReset.into())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        for request in [&[99, 0][..], &[99][..]] {
+            for policy_limit in [false, true] {
+                let (mut gateway, _simulation) = pit_gateway();
+                let (encoded, _) = challenge_parts().unwrap();
+                gateway.gate.challenge = vec![0, 0, b'6'];
+                gateway.gate.challenge.extend(encoded);
+                // The peer's hello is already buffered when it disconnects.
+                let mut bytes = vec![130, 129, 0, 0, 0, 0, 1];
+                bytes.extend([130, 128 | request.len() as u8, 0, 0, 0, 0]);
+                bytes.extend(request);
+                let mut config = socket_config().write_buffer_size(0);
+                if policy_limit {
+                    config = config.max_write_buffer_size(8);
+                }
+                let socket = WebSocket::from_raw_socket(
+                    ReadBudget::new(Disconnected {
+                        input: Readable {
+                            bytes: bytes.into(),
+                            read: 0,
+                            first_read: None,
+                        },
+                        writes: 0,
+                    }),
+                    tungstenite::protocol::Role::Server,
+                    Some(config),
+                );
+                let mut open = Open::new(socket, false);
+                let active = open
+                    .service(&mut gateway.gate, Instant::now(), 0., Duration::ZERO, true)
+                    .unwrap();
+                let counts = gateway.gate.shared.admission_rejections.lock().unwrap();
+                if policy_limit {
+                    assert!(active);
+                    assert!(matches!(open.phase, Phase::Closing(_)));
+                    assert_eq!(counts.len(), 1);
+                    assert_eq!(
+                        counts.get(&("reply", "Client is reading too slowly".to_owned())),
+                        Some(&1)
+                    );
+                } else {
+                    assert!(counts.is_empty(), "transport failure counted: {counts:?}");
+                    assert!(!active, "transport failure must release the connection");
+                    assert!(open.socket.get_ref().inner.writes > 0);
+                }
+            }
         }
     }
 
