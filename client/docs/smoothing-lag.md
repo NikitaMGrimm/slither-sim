@@ -51,6 +51,8 @@ The journal is limited to 4,096 prepared observations and 8,193 painter points
 per selected snake; any loss fails the run, never samples it. Ordinary builds
 contain no geometry hook. The finite driver drains every picture and exports
 all warmup/measured frames, packets, lifecycle records, controls and failures.
+An error during the production loop exports the observed prefix with
+`completed:false`; the runner retains it and continues the remaining strata.
 
 `e = truth − drawn` is reported as Euclidean norm, tangent and lateral components.
 Positive `1000·e_parallel/v` means drawn behind; negative means ahead. This
@@ -77,6 +79,9 @@ truth-residual step. They are finite frame displacements, not instantaneous jump
 measurements. Turns, boost and delivery jitter remain separate strata. Wrapped
 heading steps, direction reversals, ack gaps, duplicates, skipped pictures and
 longest stale-head runs are reported too.
+Float32 painter quantization contributes to high-order derivatives. Completeness
+means coverage and joins, not that the proposed positional safety targets pass;
+their violations remain valid baseline results.
 
 Response t10/t50/t90 use the paired position/heading change divided by the declared
 step amplitude, relative to the first changed packet's admission. Every crossing
@@ -103,6 +108,7 @@ independent trials or confidence intervals. p99 with fewer than 1,000 samples is
 explicitly descriptive only; larger frame counts still do not establish a
 run-level confidence bound. Screen pixels, live servers, real network jitter,
 GPU/display pacing, physical input and closed-loop reaction remain unverified.
+Instrumentation overhead is not measured by these logical-clock experiments.
 No candidate smoothing change or owner feel acceptance is evaluated here.
 
 ## Reproduce

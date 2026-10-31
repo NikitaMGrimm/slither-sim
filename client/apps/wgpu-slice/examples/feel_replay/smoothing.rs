@@ -88,6 +88,10 @@ struct Packet {
 }
 
 pub fn run(config: Value) -> Result<Value> {
+    probe(config, None)
+}
+
+fn probe(config: Value, malformed_at: Option<usize>) -> Result<Value> {
     let speed = match config["speed"].as_str() {
         Some("stationary") if config["anchors"] == false => 0.,
         Some("normal") => 180.,
@@ -201,18 +205,26 @@ pub fn run(config: Value) -> Result<Value> {
     let mut lifecycle = Vec::new();
     loop {
         // Frozen tie order: packet generation order at equal delivery, then redraw.
-        while next < packets.len() && packets[next].arrival <= now {
-            let p = &packets[next];
-            d.packet(&p.bytes, p.arrival)?;
-            if let Some(id) = p.anchor {
-                pose_time = p.generated;
-                pose_id = id;
+        let step = (|| -> Result<()> {
+            while next < packets.len() && packets[next].arrival <= now {
+                let p = &packets[next];
+                d.packet(&p.bytes, p.arrival)?;
+                if let Some(id) = p.anchor {
+                    pose_time = p.generated;
+                    pose_id = id;
+                }
+                next += 1;
             }
-            next += 1;
-        }
-        d.redraw(now, now)?;
+            if malformed_at == Some(frame) {
+                d.packet(&bundle(&[vec![b'g']]), now)?;
+            }
+            d.redraw(now, now)
+        })();
         let acknowledged = std::mem::take(&mut d.acknowledged_pictures);
         for g in d.recorder.take_geometry() {
+            if g.snakes.len() != 2 {
+                failures.push(format!("frame {frame}: missing selected snake geometry"));
+            }
             let ack = acknowledged.contains(&g.sequence);
             let mut snakes = Vec::new();
             for s in &g.snakes {
@@ -251,6 +263,12 @@ pub fn run(config: Value) -> Result<Value> {
         lifecycle.append(&mut d.lifecycle);
         d.recorder.take();
         d.recorder.take_random();
+        // A failed production boundary must still export every prior/partial row.
+        // Returning `?` here would discard the measuring run's diagnostic prefix.
+        if let Err(error) = step {
+            failures.push(format!("frame {frame} at {now} ms: {error}"));
+            break;
+        }
         frame += 1;
         let next_time = if period > 0. {
             ORIGIN + frame as f64 * period
@@ -263,7 +281,9 @@ pub fn run(config: Value) -> Result<Value> {
         now = next_time;
     }
     d.game.stop();
-    d.drain_effects(now)?;
+    if let Err(error) = d.drain_effects(now) {
+        failures.push(format!("shutdown: {error}"));
+    }
     if d.game.feel_pending() != [0, 0] {
         failures.push("Pending work at completion".into());
     }
@@ -294,5 +314,25 @@ mod tests {
         }
         assert_eq!(path(180., false, 7), [10180., 10000.]);
         assert_eq!(path(-42., true, 8), [9958., 10120.]);
+    }
+    #[test]
+    fn production_failure_exports_the_observed_prefix_and_rejects_completion() {
+        let result=probe(json!({"rate":"170","speed":"normal","motion":"straight","jitterMs":0,"delayMs":20,"impulse":false}),Some(5)).unwrap();
+        assert_eq!(result["completed"], false);
+        assert_eq!(result["rows"].as_array().unwrap().len(), 5);
+        assert!(
+            result["failures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e.as_str().unwrap().contains("frame 5"))
+        );
+        assert!(
+            result["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|r| r["acknowledged"] == true)
+        );
     }
 }

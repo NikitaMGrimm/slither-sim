@@ -55,8 +55,14 @@ impl PartialEq for Recorder {
 }
 impl Recorder {
     /// Enable a separate bounded own/enemy geometry journal; v3 cells are unchanged.
+    /// A fresh recorder is required for another run; pending geometry is never replaced.
     pub fn record_geometry(&self, ids: [u16; 2]) {
-        self.0.lock().expect("trace journal").geometry = Some(geometry::Journal::new(ids));
+        let mut journal = self.0.lock().expect("trace journal");
+        assert!(
+            journal.geometry.is_none(),
+            "geometry recorder already enabled"
+        );
+        journal.geometry = Some(geometry::Journal::new(ids));
     }
 
     /// Drain prepared geometry, joined by the existing immutable observation ID.
