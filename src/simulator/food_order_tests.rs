@@ -30,7 +30,10 @@ fn chronological(world: &mut Simulator) {
 #[test]
 fn unordered_storage_matches_chronological_linear_steps() {
     let mut rng = Random(0x5a17);
-    for scene in 0..300 {
+    // 60 scenes cover every combination of the size, arena, refill and radius
+    // cycles below (lcm of 4, 3, 2 and 5); 300 scenes took over two minutes per
+    // CI test configuration in debug builds.
+    for scene in 0..60 {
         let n = [1, 8, 24, 80][scene % 4];
         let mut config = if scene % 3 == 0 {
             Config::official(n)
