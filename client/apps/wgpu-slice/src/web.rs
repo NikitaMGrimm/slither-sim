@@ -192,7 +192,7 @@ impl LocalGameplay {
                 }
                 Err(e) => {
                     self.game.presented(false)?;
-                    return Err(e);
+                    return Err(e.into());
                 }
             }
         }
