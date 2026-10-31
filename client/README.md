@@ -74,6 +74,12 @@ wordmark. `--cosmetics-dir` still supplies backgrounds, skins, accessories and m
 icons. [Settings](docs/settings.md) on the login selects and remembers Quality
 for the next Play.
 
+With no connection flags, open [Servers](docs/server-picker.md), add a `host:port`
+and choose its Custom row to Play directly. Custom entries and choices save
+locally. The picker stays offline until Load official is chosen; a restored
+official ID alone does not start discovery. `--official` remains an explicit
+opt-in to official discovery and fresh login values.
+
 
 Browser (Canvas2D):
 

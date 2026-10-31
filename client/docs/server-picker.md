@@ -1,9 +1,18 @@
 # Native server picker
 
-The login's Servers icon opens an authored modal through the shared control
-painter. Official mode requests directory discovery and latency measurement in
-the background once the native login is up. Opening the picker joins that work;
-it never grants Play, creates a game session, or sends login.
+The login's Servers icon opens a shared modal with a `host:port` field, Add,
+saved Custom entries and an explicit Load official action. A no-flag launch
+stays offline: opening the picker, restoring a saved official ID and adding or
+choosing custom entries do not fetch the official website. Choose a custom row
+to enable direct Play with the fixed login. Removing the selected custom entry
+leaves Play unconfigured until another choice is made.
+
+Load official enters official context and requests discovery. `--official`
+opts into that context at login, starting directory discovery and latency
+measurement in the background. Opening the picker then joins that work;
+it never grants Play, creates a game session, or sends login. Choosing a Custom
+row leaves official context and cancels unfinished official work. Direct Play
+never invokes official profile acquisition, directory fetching or probing.
 Subsequent opens reuse the process's completed directory and ping samples;
 there is no open-count or timed refresh. An in-flight request is shared.
 If acquisition fails or Play cancels it before completion, the next open retries
@@ -13,6 +22,17 @@ Direct `--server host:port` keeps its explicit server and performs no discovery
 or website fetch. It uses the fixed login and builds `ws://host:port/slither`
 internally; IPv6 authorities use brackets. `--official --server host:port` keeps
 the explicit server but fetches fresh login values on Play.
+
+Custom addresses use the same admission as `--server`: a host and nonzero port,
+bracketed IPv6, with no URL scheme, credentials, path, query or whitespace. The
+field retains at most 512 UTF-16 units; canonical saved authorities are bounded
+to 512 bytes. Add validates before mutation, deduplicates canonical authorities
+and caps the list at 32 entries. Remove applies only to a visible custom row.
+Custom entries form a group above official rows and have no automatic pings.
+The shared six-server `ScrollList` bounds both groups, with headers outside the
+navigable row indices. Keyboard navigation and mouse selection use the ordinary
+editor path; only keyboard focus paints focus decoration. Mouse clicks retain
+text editing/caret behavior without a focus outline.
 
 `server_directory` owns bounded decoding and the existing automatic selection
 policy. IPv4/IPv6 alternatives remain separate in the decoded directory.
@@ -47,15 +67,24 @@ an empty changed value has numeric value zero. Search does not invent regions
 or silently filter the directory. Clicking the search field deliberately clears
 its text on every click, including when already focused, matching the reference.
 
-Automatic (best ping) is the default. A separate versioned preference records
-only the chosen ID (`1:<id>`), or `1:auto`, like the independent quality
-preference. The Windows host reads/writes `SlitherClient/server-choice.txt`
-beneath its local application data directory. Reads are capped at 32 bytes;
-missing, malformed or unreadable storage restores automatic. A failed write
-leaves the in-memory choice intact. No endpoints or historical pings persist.
-An explicit CLI server wins until the user chooses a row or Automatic.
+Official Automatic (best ping) remains the default choice, but does not opt a
+no-flag launch into official context. `SlitherClient/server-choice.txt` beneath
+local application data still loads `1:<id>` and `1:auto`; a custom choice uses
+`2:custom:<authority>`. Reads are capped at 544 bytes and custom authorities are
+revalidated. Missing, malformed or unreadable choice storage restores Automatic.
+A failed write leaves the in-memory choice intact.
 
-Play still acquires a fresh profile through the official preparation worker. A saved ID is
+The adjacent `custom-servers.txt` stores version `1` on its first line and one
+canonical user-entered authority per following line. Reads are capped at 16,418
+bytes; malformed, oversized, duplicate or unsupported records leave the current
+in-memory list intact. Writes atomically replace the record only after an
+explicit Add/Remove. Official endpoints and all historical pings never persist;
+the user's own custom authorities and custom choice are user data and may
+persist. An explicit CLI server wins until a picker choice/context action.
+`--official` overrides a restored custom choice with official Automatic for that
+run; this startup override does not rewrite the saved choice.
+
+Official Play still acquires a fresh profile through its preparation worker. A saved ID is
 resolved against the retained directory using measured pings, then passes through
 `explicit_endpoint`; a missing ID reports an acquisition error rather than
 playing elsewhere. Directory fetches and pings remain bounded, cancellable
@@ -67,7 +96,7 @@ profile acquisition or selected-ID resolution; reopening reuses those samples.
 An explicit or forced endpoint leaves pending discovery with the picker; Play
 does not wait on it, and its success or failure is handled independently.
 
-The shared `ScrollList` admits six rows per window, independent of directory
+The shared `ScrollList` admits six server rows per window, independent of directory
 size. Only these `ListRow` controls have text rasters and draws. Wheel, arrows,
 Page Up/Down and Home/End navigate the bounded window; Tab wraps within the
 modal.
@@ -89,7 +118,10 @@ scrolling to both ends, exact numeric
 selection, stale captures, storage failure and no Play on open.
 
 From `client/`, with `CARGO_BUILD_JOBS=2`, run the core `server_directory` and
-`server_picker` integration tests and the app `server_picker` test. The finite
+`server_picker` integration tests and app `server_picker` / `custom_servers`
+tests. The finite `menu_specimens <new-external-directory> --picker-panel`
+example emits art-free panel specimens using synthetic addresses and no
+preference-file or network effects. The older finite
 `menu_specimens <new-external-directory> --server-picker` example emits login,
 picker and scrolled PNGs at 1x/1.5x/2x, plus the retained 960x540 to 960x720
 logical resize at DPR 3 and resource counts. It uses authored

@@ -119,7 +119,11 @@ impl SettingsStorage {
     }
 }
 
-fn atomic_write(directory: &std::path::Path, name: &str, bytes: &str) -> Result<(), String> {
+pub(crate) fn atomic_write(
+    directory: &std::path::Path,
+    name: &str,
+    bytes: &str,
+) -> Result<(), String> {
     std::fs::create_dir_all(directory).map_err(|e| e.to_string())?;
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let temp = directory.join(format!(

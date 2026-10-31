@@ -186,6 +186,10 @@ async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--picker-panel") {
+        return picker_panel::specimens(&mut renderer, output);
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--cosmetics") {
         let directory = std::env::args_os()
             .nth(3)
@@ -249,7 +253,7 @@ async fn run(output: &Path) -> Result<()> {
                 .policy
                 .replace(&servers, &pings)
                 .map_err(str::to_owned)?;
-            login.picker.policy.selection = ServerPreference(Some(25));
+            login.picker.policy.selection = ServerPreference::Official(25);
             login.picker.open();
             for _ in 0..40 {
                 now += 16.;
@@ -1183,3 +1187,7 @@ mod studio_panel;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/cosmetics.rs"]
 mod cosmetics_studio;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/picker_panel.rs"]
+mod picker_panel;

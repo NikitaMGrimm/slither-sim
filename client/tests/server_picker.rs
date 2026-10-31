@@ -33,6 +33,101 @@ fn intent(p: &ServerPicker, id: ControlId) -> ControlIntent {
     }
 }
 #[test]
+fn custom_context_stays_offline_until_explicit_official_opt_in() {
+    for saved in [
+        ServerPreference::Automatic,
+        ServerPreference::Official(42),
+        ServerPreference::Custom("192.0.2.1:445".into()),
+    ] {
+        let mut p = ServerPicker::default();
+        let direct = saved.custom_address().is_some();
+        p.selection = saved;
+        assert_eq!(p.can_play(), direct);
+        for _ in 0..3 {
+            p.open();
+            assert!(!p.take_directory_request());
+            p.close();
+        }
+        p.open();
+        assert!(p.activate(intent(&p, OFFICIAL)));
+        assert!(p.official_context());
+        assert!(p.can_play());
+        assert!(p.take_directory_request());
+        assert!(!p.take_directory_request());
+        p.directory_failed("Injected failure");
+        assert!(p.activate(intent(&p, OFFICIAL)));
+        assert!(!p.take_directory_request());
+        p.close();
+        p.open();
+        assert!(p.take_directory_request());
+    }
+}
+#[test]
+fn custom_entries_are_bounded_deduplicated_windowed_and_removable() {
+    let mut p = ServerPicker::default();
+    p.open();
+    for index in 1..=MAX_CUSTOM_SERVERS {
+        p.add_custom(format!("192.0.2.{index}:445")).unwrap();
+        let panel = p.panel([960., 720.]);
+        assert!(
+            panel
+                .controls
+                .iter()
+                .filter(|c| matches!(c.kind, ControlKind::ListRow { .. }))
+                .count()
+                <= 6
+        );
+    }
+    assert_eq!(p.take_custom_write().unwrap().len(), MAX_CUSTOM_SERVERS);
+    assert!(p.add_custom("192.0.2.33:445".into()).is_err());
+    p.add_custom("192.0.2.1:445".into()).unwrap();
+    assert!(p.take_custom_write().is_none());
+    for invalid in [
+        "",
+        "bad address:445",
+        "host:445\n",
+        &"x".repeat(MAX_CUSTOM_ADDRESS + 1),
+    ] {
+        assert!(p.add_custom(invalid.into()).is_err());
+    }
+    p.scroll(isize::MIN);
+    assert!(p.activate(intent(&p, ControlId(16))));
+    assert_eq!(p.selection.custom_address(), Some("192.0.2.1:445"));
+    assert!(p.can_play());
+    assert!(!p.official_context());
+    assert!(!p.take_directory_request());
+    let record = p.take_preference().unwrap();
+    assert_eq!(ServerPreference::restore(Some(&record)), p.selection);
+    p.open();
+    assert!(p.activate(intent(&p, ControlId(8192))));
+    assert_eq!(p.custom.len(), MAX_CUSTOM_SERVERS - 1);
+    assert_eq!(p.selection, ServerPreference::Automatic);
+    assert!(!p.can_play());
+    assert!(p.take_preference().is_some());
+    assert!(p.is_open());
+    assert!(!p.take_directory_request());
+    p.add_custom("192.0.2.33:445".into()).unwrap();
+    assert_eq!(p.custom.len(), MAX_CUSTOM_SERVERS);
+}
+#[test]
+fn custom_address_editing_is_bounded_and_preserves_hostname_text() {
+    use slither_client::menu_input::TextRule;
+    for address in ["192.0.2.1:445", "[2001:db8::1]:80", "bücher.example:443"] {
+        assert_eq!(
+            TextRule::ServerAddress.normalize_units(&address.encode_utf16().collect::<Vec<_>>()),
+            address
+        );
+    }
+    let text = TextRule::ServerAddress.normalize_units(&vec![b'a' as u16; 2048]);
+    assert_eq!(text.len(), 512);
+    assert!(
+        !TextRule::ServerAddress
+            .normalize_units(&[0, 10, 13])
+            .chars()
+            .any(char::is_control)
+    );
+}
+#[test]
 fn dedupe_fastest_address_ties_and_unknown_pings() {
     let a = server(7, 1, true);
     let mut v6 = a.clone();
@@ -96,7 +191,7 @@ fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
     p.update_directory(&servers, &BTreeMap::new(), false)
         .unwrap();
     input.sync(&p.panel([960., 720.]), &mut edit);
-    assert_eq!(input.focus(), Some(SEARCH));
+    assert_eq!(input.focus(), Some(ADDRESS));
     let target = p.navigate(None, isize::MAX);
     let panel = p.panel([960., 720.]);
     input.sync(&panel, &mut edit);
@@ -129,7 +224,7 @@ fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
         )
         .unwrap();
     assert!(p.activate(activation));
-    assert_eq!(p.selection.0, Some(20));
+    assert_eq!(p.selection.official_id(), Some(20));
     p.open();
     assert_eq!(p.rows[0].server.id, 20);
     assert_eq!(p.rows[1].server.id, 19);
@@ -162,6 +257,7 @@ fn progress_defers_duplicate_membership_changes_and_invalidates_a_new_directory(
         server(8, 2, true),
     ];
     let mut p = ServerPicker::default();
+    p.start_directory(true);
     p.open();
     p.update_directory(&servers, &BTreeMap::new(), false)
         .unwrap();
@@ -198,21 +294,22 @@ fn numeric_rule_exact_selection_and_inactive_id() {
     assert!(!p.search("a001"));
     assert_eq!(p.search, "001");
     assert!(p.search("x10a24more9"));
-    assert_eq!(p.selection.0, Some(1024));
+    assert_eq!(p.selection.official_id(), Some(1024));
     assert!(!p.is_open());
     assert_eq!(p.take_preference().as_deref(), Some("1:1024"));
     assert_eq!(p.take_preference(), None);
     p.open();
     assert_eq!(p.entries().len(), 2); // Selected inactive server stays reachable.
     assert!(p.search("0012"));
-    assert_eq!(p.selection.0, Some(12));
+    assert_eq!(p.selection.official_id(), Some(12));
 }
 #[test]
 fn open_is_only_directory_effect_automatic_is_default_and_preference_roundtrip() {
     let mut p = ServerPicker::default();
+    p.start_directory(true);
     p.step(0.).unwrap();
     p.open();
-    assert_eq!(p.selection, ServerPreference(None));
+    assert_eq!(p.selection, ServerPreference::Automatic);
     assert!(p.take_directory_request());
     assert!(!p.take_directory_request());
     assert_eq!(p.take_preference(), None);
@@ -224,7 +321,7 @@ fn open_is_only_directory_effect_automatic_is_default_and_preference_roundtrip()
     assert!(p.step(79.).is_err());
     assert!(p.step(f64::NAN).is_err());
     for value in [None, Some(0), Some(65535)] {
-        let pref = ServerPreference(value);
+        let pref = value.map_or(ServerPreference::Automatic, ServerPreference::Official);
         assert_eq!(ServerPreference::restore(Some(&pref.serialize())), pref);
     }
     for bad in [
@@ -236,16 +333,20 @@ fn open_is_only_directory_effect_automatic_is_default_and_preference_roundtrip()
         "2:42",
         "1:99999999999999",
     ] {
-        assert_eq!(ServerPreference::restore(Some(bad)), ServerPreference(None));
+        assert_eq!(
+            ServerPreference::restore(Some(bad)),
+            ServerPreference::Automatic
+        );
     }
-    p.selection = ServerPreference(Some(42));
+    p.selection = ServerPreference::Official(42);
     p.open();
     assert!(p.activate(intent(&p, AUTOMATIC)));
-    assert_eq!(p.selection, ServerPreference(None));
+    assert_eq!(p.selection, ServerPreference::Automatic);
 }
 #[test]
 fn opens_reuse_successful_empty_and_inflight_directory_results() {
     let mut p = ServerPicker::default();
+    p.start_directory(true);
     p.open();
     assert!(p.take_directory_request());
     for _ in 0..3 {
@@ -268,6 +369,7 @@ fn directory_failure_retries_only_on_next_open_and_preserves_completed_results()
         "Discovery cancelled",
     ] {
         let mut p = ServerPicker::default();
+        p.start_directory(true);
         p.open();
         // Failure also clears any effect not yet consumed by the adapter.
         p.directory_failed(status);
@@ -306,7 +408,7 @@ fn large_window_focus_scroll_and_refresh_cancel_capture() {
     assert!(panel.controls.iter().any(
         |c| matches!(&c.kind,ControlKind::Label {text} if text.starts_with("1995–2000 of 2000"))
     ));
-    assert!(panel.controls.len() < 20);
+    assert!(panel.controls.len() < 26);
     assert_eq!(
         panel
             .controls
@@ -346,11 +448,11 @@ fn backdrop_panel_shield_tab_trap_and_closing_selection() {
     let mut input = PanelInputState::default();
     let mut edit = MenuInputState::default();
     input.sync(&panel, &mut edit);
-    assert_eq!(input.focus(), Some(SEARCH));
+    assert_eq!(input.focus(), Some(ADDRESS));
     input.tab(&panel, true);
     assert_eq!(input.focus(), Some(CLOSE));
     input.tab(&panel, false);
-    assert_eq!(input.focus(), Some(SEARCH));
+    assert_eq!(input.focus(), Some(ADDRESS));
     let r = resolved
         .iter()
         .find(|r| r.control.id == ControlId(1))
