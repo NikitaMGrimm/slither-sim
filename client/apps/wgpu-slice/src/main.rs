@@ -262,7 +262,7 @@ mod desktop {
                             .map_err(str::to_owned)?;
                         self.directory_snapshot = Some(Arc::new(snapshot));
                     }
-                    Err(error) => self.login.picker.policy.status = error,
+                    Err(error) => self.login.picker.policy.directory_failed(&error),
                 }
                 self.schedule.invalidate();
             }
@@ -275,7 +275,7 @@ mod desktop {
                                 self.login.picker.policy.status =
                                     "Measuring server latency...".into();
                             }
-                            Err(error) => self.login.picker.policy.status = error,
+                            Err(error) => self.login.picker.policy.directory_failed(&error),
                         }
                     }
                 } else {
@@ -294,19 +294,17 @@ mod desktop {
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
+                official::complete_picker_preparation(
+                    &mut self.login.picker.policy,
+                    &mut self.directory_snapshot,
+                    &result,
+                    cancelled,
+                )?;
                 if cancelled {
                     self.game.stop();
                 } else {
                     match result {
                         Ok(prepared) => {
-                            if let Some(snapshot) = prepared.directory {
-                                self.login
-                                    .picker
-                                    .policy
-                                    .replace(&snapshot.servers, &snapshot.pings)
-                                    .map_err(str::to_owned)?;
-                                self.directory_snapshot = Some(snapshot);
-                            }
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
                             if let Err(error) = self.game.play_with_profile(
                                 &prepared.endpoint,
@@ -461,7 +459,10 @@ mod desktop {
                             self.directory.take(),
                         ) {
                             Ok(preparation) => self.preparation = Some(preparation),
-                            Err(error) => self.game.fail(&error),
+                            Err(error) => {
+                                self.login.picker.policy.directory_failed(&error);
+                                self.game.fail(&error);
+                            }
                         }
                     } else if let Some(endpoint) = &self.endpoint
                         && let Err(error) = slither_wgpu_slice::endpoint_login::play(

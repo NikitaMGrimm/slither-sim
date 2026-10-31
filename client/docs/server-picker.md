@@ -5,6 +5,9 @@ painter. The first open requests directory discovery and latency measurement in
 official mode; it never grants Play, creates a game session, or sends login.
 Subsequent opens reuse the process's completed directory and ping samples;
 there is no open-count or timed refresh. An in-flight request is shared.
+If acquisition fails or Play cancels it before completion, the next open retries
+once. Failure never starts an automatic retry loop or discards completed samples,
+including a successfully empty directory.
 Custom endpoint mode keeps its explicit endpoint and performs no discovery.
 
 `server_directory` owns bounded decoding and the existing automatic selection

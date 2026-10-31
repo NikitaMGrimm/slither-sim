@@ -146,6 +146,42 @@ fn opens_reuse_successful_empty_and_inflight_directory_results() {
     }
 }
 #[test]
+fn directory_failure_retries_only_on_next_open_and_preserves_completed_results() {
+    for status in [
+        "Directory worker stopped",
+        "Thread start failed",
+        "Discovery cancelled",
+    ] {
+        let mut p = ServerPicker::default();
+        p.open();
+        // Failure also clears any effect not yet consumed by the adapter.
+        p.directory_failed(status);
+        assert_eq!(p.status, status);
+        for _ in 0..3 {
+            p.open();
+            assert!(!p.take_directory_request());
+        }
+        p.close();
+        p.open();
+        assert!(p.take_directory_request());
+        for _ in 0..3 {
+            p.close();
+            p.open();
+            assert!(!p.take_directory_request());
+        }
+        for servers in [vec![], vec![server(42, 1, true)]] {
+            p.replace(&servers, &BTreeMap::new()).unwrap();
+            let completed_status = p.status.clone();
+            p.directory_failed(status);
+            assert_eq!(p.status, completed_status);
+            p.close();
+            p.open();
+            assert!(!p.take_directory_request());
+            assert_eq!(p.rows.len(), servers.len());
+        }
+    }
+}
+#[test]
 fn large_window_focus_scroll_and_refresh_cancel_capture() {
     let mut p = picker();
     p.open();

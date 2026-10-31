@@ -32,6 +32,29 @@ pub struct Prepared {
     pub directory: Option<Arc<DirectorySnapshot>>,
 }
 
+/// Publish completed directory data before handling Play cancellation/failure.
+pub fn complete_picker_preparation(
+    picker: &mut slither_client::server_picker::ServerPicker,
+    cached: &mut Option<Arc<DirectorySnapshot>>,
+    result: &Result<Prepared>,
+    cancelled: bool,
+) -> Result<()> {
+    if let Ok(prepared) = result
+        && let Some(snapshot) = &prepared.directory
+    {
+        picker
+            .replace(&snapshot.servers, &snapshot.pings)
+            .map_err(str::to_owned)?;
+        *cached = Some(snapshot.clone());
+    }
+    if cancelled {
+        picker.directory_failed("Directory acquisition cancelled");
+    } else if let Err(error) = result {
+        picker.directory_failed(error);
+    }
+    Ok(())
+}
+
 /// One preparation per Play, outside the event loop and before the session deadline starts.
 pub struct Preparation {
     receiver: mpsc::Receiver<Result<Prepared>>,
@@ -712,6 +735,129 @@ mod tests {
             }
         }
         assert_eq!((fetches.get(), sweeps.get()), (9, 1)); // Only fresh page/profile script per Play.
+    }
+    #[test]
+    fn cancelled_play_does_not_strand_picker() {
+        let mut picker = slither_client::server_picker::ServerPicker::default();
+        picker.open();
+        assert!(picker.take_directory_request());
+        picker.status = "Measuring server latency...".into();
+        picker.close();
+
+        // Keep the sender alive: the production Play worker can only wait or cancel,
+        // never proceed to its network effects in this regression.
+        let (_sender, receiver) = mpsc::sync_channel(1);
+        let directory_cancel = Arc::new(AtomicBool::new(false));
+        let pending = DirectoryPreparation {
+            receiver,
+            cancel: directory_cancel.clone(),
+            worker: None,
+        };
+        let preparation =
+            Preparation::start_with_directory(None, None, None, Some(pending)).unwrap();
+        preparation.cancel();
+        let result = preparation
+            .receiver
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap();
+        assert!(preparation.cancelled());
+        assert_eq!(result.as_ref().err().unwrap(), "Discovery cancelled");
+        let mut cached = None;
+        complete_picker_preparation(&mut picker, &mut cached, &result, preparation.cancelled())
+            .unwrap();
+        drop(preparation);
+        assert!(directory_cancel.load(Ordering::SeqCst));
+        assert!(cached.is_none());
+        assert_ne!(picker.status, "Measuring server latency...");
+        let mut requests = 0;
+        for _ in 0..3 {
+            picker.open();
+            requests += usize::from(picker.take_directory_request());
+            picker.close();
+        }
+        assert_eq!(requests, 1);
+    }
+    #[test]
+    fn failed_directory_fetch_retries_once_on_reopen_without_a_loop() {
+        let mut picker = slither_client::server_picker::ServerPicker::default();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut fetches = 0;
+        picker.open();
+        for attempt in 1..=2 {
+            assert!(picker.take_directory_request());
+            let result = directory_with(
+                &cancel,
+                |_, _, _| {
+                    fetches += 1;
+                    Err("Injected fetch failure".into())
+                },
+                |_, _| panic!("failed fetch must not ping"),
+            );
+            picker.directory_failed(&result.err().unwrap());
+            assert_eq!(fetches, attempt);
+            for _ in 0..3 {
+                picker.open();
+                assert!(!picker.take_directory_request());
+            }
+            picker.close();
+            picker.open();
+        }
+    }
+    #[test]
+    fn play_completion_caches_success_and_rearms_dropped_snapshot_errors() {
+        for (id, cancelled) in [(Some(77), false), (Some(42), false), (Some(42), true)] {
+            let mut picker = slither_client::server_picker::ServerPicker::default();
+            picker.open();
+            assert!(picker.take_directory_request());
+            picker.close();
+            let snapshot = Arc::new(DirectorySnapshot {
+                servers: decode_directory(&synthetic_directory()).unwrap(),
+                pings: BTreeMap::from([(1, 12)]),
+            });
+            // A missing selection fails after acquisition, dropping the snapshot.
+            let result = prepare_cached_with(
+                None,
+                id,
+                &Arc::new(AtomicBool::new(false)),
+                |url, _, _| {
+                    Ok((
+                        url.clone(),
+                        Inert(if url.path() == "/" {
+                            b"<script src='/s/game999.js'></script>".to_vec()
+                        } else {
+                            SCRIPT.to_vec()
+                        }),
+                    ))
+                },
+                |_, _| panic!("completed acquisition must not ping"),
+                Some(snapshot.clone()),
+            );
+            assert_eq!(result.is_ok(), id == Some(42));
+            let mut cached = None;
+            complete_picker_preparation(&mut picker, &mut cached, &result, cancelled).unwrap();
+            if id == Some(42) {
+                assert!(Arc::ptr_eq(cached.as_ref().unwrap(), &snapshot));
+                assert_eq!(picker.rows.len(), 2);
+                // A later failed Play cannot discard completed directory data.
+                complete_picker_preparation(
+                    &mut picker,
+                    &mut cached,
+                    &Err("Profile failed".into()),
+                    false,
+                )
+                .unwrap();
+            } else {
+                assert!(cached.is_none());
+                assert!(picker.rows.is_empty());
+            }
+            let mut requests = 0;
+            for _ in 0..3 {
+                picker.open();
+                requests += usize::from(picker.take_directory_request());
+                picker.close();
+            }
+            assert_eq!(requests, usize::from(id != Some(42)));
+        }
     }
     #[test]
     fn play_can_take_the_existing_directory_worker_and_cancel_its_wait() {

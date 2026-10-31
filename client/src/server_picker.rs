@@ -82,6 +82,7 @@ pub struct ServerPicker {
     previous: Option<f64>,
     request: bool,
     directory_requested: bool,
+    directory_ready: bool,
     changed: bool,
     dirty: bool,
 }
@@ -99,6 +100,7 @@ impl Default for ServerPicker {
             previous: None,
             request: false,
             directory_requested: false,
+            directory_ready: false,
             changed: false,
             dirty: false,
         }
@@ -122,7 +124,7 @@ impl ServerPicker {
         self.generation = self.generation.wrapping_add(1);
         self.search.clear();
         self.list = ScrollList::new(VISIBLE_ROWS);
-        // Opens re-rank retained samples; they never refresh acquisition or pings.
+        // Completed samples are reused; only unfinished failures re-arm acquisition.
         if !self.directory_requested {
             self.request = true;
             self.directory_requested = true;
@@ -133,6 +135,15 @@ impl ServerPicker {
     }
     pub fn take_directory_request(&mut self) -> bool {
         std::mem::take(&mut self.request)
+    }
+    /// Retry incomplete acquisition on the next open, never in a failure loop.
+    /// A successful empty directory is still a completed, reusable result.
+    pub fn directory_failed(&mut self, status: &str) {
+        if !self.directory_ready {
+            self.directory_requested = false;
+            self.request = false;
+            self.status = status.to_owned();
+        }
     }
     pub fn take_preference(&mut self) -> Option<String> {
         std::mem::take(&mut self.dirty).then(|| self.selection.serialize())
@@ -161,6 +172,7 @@ impl ServerPicker {
             return Err("Directory server limit");
         }
         self.rows = ranked(servers, pings);
+        self.directory_ready = true;
         self.directory_requested = true;
         self.request = false;
         self.generation = self.generation.wrapping_add(1); // Cancel captures across reordered rows.
