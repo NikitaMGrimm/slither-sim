@@ -117,6 +117,20 @@ Newly encoded frames wake an idle socket thread. On Windows a per-host
 high-resolution timer also keeps its input polling responsive, without spinning.
 Slow clients disconnect before exhausting output buffers. Overload defers
 wall-clock ticks and shifts delivery, slowing world time without skipping physics.
+Deferred ticks show players a growing ping. For a world that is overloaded or
+gets heavier as it ages, set `maxTick` (seconds) instead. Each tick then lasts
+the real time since the previous tick started, between `simulation.world.dt` and
+`maxTick`; when the work finishes early, the host still waits out the configured
+tick. The world keeps real time instead of falling behind, at the cost of uneven
+pacing on overloaded ticks. In a public session on 2026-10-31 with 64,000 bots,
+a 0.08 s tick and `maxTick` 0.1, ticks measured 80.06 ms at the median and 91 ms
+at p99, with no lost time in the measured window. This is one session, not a
+capacity guarantee. Work longer than `maxTick` still loses time: `--stats`
+reports it as `lost_seconds`, and `RunningHost::lost_seconds()` returns the
+total. Motion and mass reports follow elapsed time, even on capped ticks.
+Protocol 19 frames carry each tick's length. Protocol 13 frames don't, so NTL
+shows stretched ticks as slightly faster motion. Without `maxTick` the host
+keeps fixed ticks and identical output.
 Remote output queues in both the simulation and socket thread each allow 2 MiB,
 charging payload bytes plus a 64-byte allowance per message. Exceeding this
 host resource policy closes only that connection, for either protocol; legacy
@@ -141,6 +155,7 @@ Keep the handle alive while serving.
 | --- | --- |
 | `local_addr()` | Bound socket address. |
 | `ticks()` / `deferred_ticks()` | Executed physics ticks / wall-clock ticks postponed under load. |
+| `lost_seconds()` | Wall seconds discarded above `maxTick` (zero in fixed mode). |
 | `simulation_seconds()` | Wall seconds spent running simulation ticks; divide its increase by elapsed wall time for simulation-thread load. |
 | `players()` | Connected socket players, excluding background bots. |
 | `admission_rejections()` | Cumulative admission rejection counts keyed by phase and reason. |

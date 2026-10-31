@@ -4145,3 +4145,271 @@ fn spawn_search_exhaustion_does_not_mean_the_arena_is_full() {
         "Spawn candidate search exhausted: no sampled position fits inside the arena"
     );
 }
+
+#[test]
+fn variable_ticks_deliver_growth_boost_anchors_and_peer_turns() {
+    // Main's fixed mode intentionally retains its tick-count gates. The
+    // adaptive path alone switches to the 42/105 ms elapsed-time gates.
+    for (dt, variable) in [(0.007, false), (0.040, true)] {
+        let mut config = raw_config(3);
+        config.world.radius = 32000.;
+        config.world.dt = dt;
+        config.world.boundary_mode = if dt >= 0.036 {
+            crate::BoundaryMode::Hard
+        } else {
+            crate::BoundaryMode::Sliding
+        };
+        config.world.food_count = 0;
+        config.world.ambient_replenish_per_second = 0.;
+        config.world.prey.count = 0;
+        let mut sim = RawSimulator::new(7, config, 3).unwrap();
+        let mut driver = Remote::connect(&mut sim, 0, "Driver");
+        let mut watcher = Remote::connect(&mut sim, 1, "Watcher");
+        sim.connect(2, profile("Legacy")).unwrap();
+        sim.protocol13(2);
+        for (slot, y) in [(0, 0.), (1, 500.), (2, -500.)] {
+            let body: Vec<_> = (0..12)
+                .map(|i| Point {
+                    x: -5000. - i as f64 * 42.,
+                    y,
+                })
+                .collect();
+            sim.backend
+                .world
+                .correct_mass(slot, body.clone(), 0.9)
+                .unwrap();
+            sim.backend
+                .world
+                .correct_pose(slot, body[0], body, 0.)
+                .unwrap();
+            sim.backend.slots[slot].control.heading = 0.;
+        }
+        sim.backend
+            .world
+            .replace_food(
+                (0..20)
+                    .map(|i| Food {
+                        x: -4800. + i as f64 * 42.,
+                        y: 0.,
+                        value: 1.,
+                        size: Some(12.),
+                        origin: Some(Origin::Ambient),
+                    })
+                    .collect(),
+            )
+            .unwrap();
+        let mut anchor_packets = 0;
+        let mut growth_packets = 0;
+        let mut peer_motions = Vec::new();
+        let mut legacy_motions = Vec::new();
+        let mut legacy_anchor = None;
+        let mut legacy_growth = 0;
+        let mut pickups = 0;
+        let mut expected_time = 0.;
+        let mut header_ms = 0u64;
+        let mut stock_ms = 0u64;
+        for tick in 0..(3. / dt).ceil() as usize {
+            let actual_dt = if variable {
+                [0.040, 0.057, 0.080, 0.043][tick % 4]
+            } else {
+                dt
+            };
+            if variable {
+                sim.set_dt(actual_dt).unwrap();
+            }
+            expected_time += actual_dt;
+            sim.receive(0, &[0]).unwrap();
+            sim.receive(0, &[if tick as f64 * dt >= 0.5 { 253 } else { 254 }])
+                .unwrap();
+            sim.receive(1, &[((tick / 3) % 30) as u8]).unwrap();
+            sim.advance_ticks(1).unwrap();
+            pickups += sim.backend.world.pickup_events().unwrap().len();
+            let stock = &sim.backend.slots[0].connection;
+            for (at, bytes) in &stock.downlink {
+                stock_ms += u64::from(u16::from_be_bytes([bytes[0], bytes[1]]));
+                assert_eq!(
+                    stock_ms,
+                    ((at - stock.setup_at.unwrap()) * 1000.).round() as u64
+                );
+            }
+            let packets = driver.pump(&mut sim, 0);
+            watcher.pump(&mut sim, 1);
+            for (at, frame) in sim.take(2).unwrap() {
+                header_ms += u64::from(u16::from_be_bytes([frame[0], frame[1]]));
+                let setup = sim.backend.slots[2].connection.setup_at.unwrap();
+                assert_eq!(header_ms, ((at - setup) * 1000.).round() as u64);
+                for p in protocol::split_frame(&frame).unwrap() {
+                    let id = p.get(1..3).map(|id| u16::from_be_bytes([id[0], id[1]]));
+                    if id == Some(0) && p[0] == b's' && p.len() > 7 {
+                        let custom = 23 + p[22] as usize;
+                        let at = custom + 2 + p[custom] as usize;
+                        let coordinate = |at| {
+                            u32::from_be_bytes([0, p[at], p[at + 1], p[at + 2]]) as f64 / 5.
+                                - f64::from(encode::GRID_CENTER)
+                        };
+                        let mut front = Point {
+                            x: coordinate(at),
+                            y: coordinate(at + 3),
+                        };
+                        for delta in p[at + 6..].as_chunks::<2>().0 {
+                            front.x += (f64::from(delta[0]) - 127.) / 2.;
+                            front.y += (f64::from(delta[1]) - 127.) / 2.;
+                        }
+                        legacy_anchor = Some(front);
+                    }
+                    if id == Some(0) && matches!(p[0], b'g' | b'G' | b'n' | b'N') {
+                        let point = if matches!(p[0], b'g' | b'n') {
+                            Point {
+                                x: f64::from(u16::from_be_bytes([p[3], p[4]]))
+                                    - f64::from(encode::GRID_CENTER),
+                                y: f64::from(u16::from_be_bytes([p[5], p[6]]))
+                                    - f64::from(encode::GRID_CENTER),
+                            }
+                        } else {
+                            let previous = legacy_anchor.expect("appearance before legacy anchor");
+                            Point {
+                                x: previous.x + f64::from(p[3]) - 128.,
+                                y: previous.y + f64::from(p[4]) - 128.,
+                            }
+                        };
+                        legacy_anchor = Some(point);
+                        legacy_growth += usize::from(matches!(p[0], b'n' | b'N'));
+                    }
+                    if id == Some(1) && matches!(p[0], b'e' | b'E' | b'3' | b'4' | b'5') {
+                        legacy_motions.push(sim.time());
+                    }
+                }
+            }
+            anchor_packets += packets
+                .iter()
+                .filter(|p| matches!(p[0], b'G' | b'N' | b'=' | b'+'))
+                .count();
+            growth_packets += packets
+                .iter()
+                .filter(|p| matches!(p[0], b'N' | b'+'))
+                .count();
+            if packets.iter().any(|p| {
+                matches!(p[0], b'e' | b'E' | b'3' | b'4' | b'5') && p.get(1..3) == Some(&[0, 1])
+            }) {
+                peer_motions.push(sim.time());
+            }
+            assert!(sim.backend.world.snakes().iter().all(|s| s.alive));
+            let frame = driver.frame(&sim);
+            let observation = frame.observation.unwrap();
+            let peer = observation.opponents.iter().find(|s| s.id == "1").unwrap();
+            let physical = sim.backend.world.snakes()[1].heading;
+            let difference = peer.heading - physical;
+            assert!(
+                difference.sin().atan2(difference.cos()).abs() <= 0.2,
+                "peer turn prediction lagged at dt={dt}, tick={tick}"
+            );
+            let me = observation.me;
+            let actual = &sim.backend.world.snakes()[0];
+            // The independent legacy absolute/delta reconstruction follows the
+            // authoritative body anchor, including growth and boosted steps.
+            assert!(
+                legacy_anchor.unwrap().distance(actual.body[0]) < 2.,
+                "legacy dt={dt}, tick={tick}"
+            );
+            assert_eq!(me.segments, actual.segments, "dt={dt}, tick={tick}");
+            // Head prediction is reconstructed from 42-unit anchors and a
+            // quantized speed, rather than absolute head reports each tick.
+            assert!(
+                me.head.distance(actual.head)
+                    <= physics::ANCHOR_SPACING + physics::BOOST_SPEED * actual_dt,
+                "dt={dt}, tick={tick}, predicted={:?}, actual={:?}, error={}",
+                me.head,
+                actual.head,
+                me.head.distance(actual.head)
+            );
+        }
+        assert!(
+            anchor_packets > 10 && growth_packets > 0 && pickups > 0,
+            "dt={dt}"
+        );
+        assert!(peer_motions.len() > 10, "dt={dt}");
+        assert!(
+            peer_motions
+                .windows(2)
+                .all(|w| w[1] - w[0] <= 0.13 + if variable { 0.080 } else { dt })
+        );
+        assert!(legacy_growth > 0 && legacy_motions.len() > 10, "dt={dt}");
+        assert!(
+            legacy_motions
+                .windows(2)
+                .all(|w| w[1] - w[0] <= 0.13 + if variable { 0.080 } else { dt })
+        );
+        assert!((sim.time() - expected_time).abs() < 1e-9);
+    }
+}
+
+#[test]
+fn adaptive_report_gates_follow_elapsed_time_and_reset_on_new_life() {
+    let mut reports = SnakeReports::default();
+    reports.update_timed(1, [0, 0, 80], 0, 0., DeliveryProfile::Official);
+    let mut motion = Vec::new();
+    let mut mass = Vec::new();
+    for (i, now) in [0.040, 0.097, 0.177, 0.220, 0.260, 0.317]
+        .into_iter()
+        .enumerate()
+    {
+        reports.update_timed(
+            1,
+            [i as u8 + 1, 0, 80],
+            i as u32 + 1,
+            now,
+            DeliveryProfile::Official,
+        );
+        if reports.motion_due {
+            motion.push(i);
+        }
+        if reports.fam_due {
+            mass.push(i);
+        }
+    }
+    assert_eq!(motion, [0, 1, 2, 3, 5]);
+    assert_eq!(mass, [0, 2, 5]);
+    reports.update_timed(2, [0, 0, 80], 0, 0.320, DeliveryProfile::Official);
+    assert!(!reports.motion_due && !reports.fam_due);
+    reports.update_timed(2, [1, 0, 80], 1, 0.321, DeliveryProfile::Official);
+    assert!(reports.motion_due && reports.fam_due);
+}
+
+#[test]
+fn adaptive_mass_gate_counts_real_time_discarded_by_the_step_cap() {
+    let mut config = raw_config(1);
+    config.delivery = DeliveryProfile::Official;
+    config.world.dt = 0.040;
+    config.world.boundary_mode = crate::BoundaryMode::Hard;
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    let mut sim = RawSimulator::new(7, config, 1).unwrap();
+    sim.connect(0, PlayerAppearance::default()).unwrap();
+    sim.set_dt(0.040).unwrap();
+    sim.advance_ticks(1).unwrap();
+    let body = sim.backend.world.snakes()[0].body.clone();
+    sim.backend
+        .world
+        .correct_mass(0, body.clone(), 0.1)
+        .unwrap();
+    sim.advance_ticks(1).unwrap();
+    assert!(sim.backend.reports[0].fam_due);
+    sim.set_dt(0.080).unwrap();
+    sim.set_wall_offset(0.040); // 120 ms elapsed; physics advances only 80 ms.
+    sim.backend.world.correct_mass(0, body, 0.2).unwrap();
+    sim.advance_ticks(1).unwrap();
+    assert!((sim.time() - 0.160).abs() < 1e-9);
+    assert!(sim.backend.reports[0].fam_due); // 120 real ms since the last report.
+}
+
+#[test]
+fn per_tick_duration_rejection_preserves_world_and_config() {
+    let mut sim = RawSimulator::new(7, raw_config(1), 1).unwrap();
+    let original = sim.backend.world.config().dt;
+    for dt in [f64::NAN, f64::INFINITY, 0., -0.01, 0.080] {
+        // 80 ms requires a hard rim; a sliding world must reject it.
+        assert!(sim.set_dt(dt).is_err());
+        assert_eq!(sim.dt(), original);
+        assert_eq!(sim.time(), 0.);
+    }
+}

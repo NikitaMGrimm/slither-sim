@@ -15,6 +15,12 @@
   world per machine, and build with PGO and glibc's hugepage setting on Linux.
   A dated report records what a public 64,000-bot session measured
   ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-31-64k-session/REPORT.md)).
+- An optional `maxTick` host setting lets an overloaded world stretch its
+  ticks instead of falling behind, which players see as a growing ping. Each
+  tick then lasts the real time since the previous one, up to `maxTick`;
+  `--stats` reports any time lost above that cap as `lost_seconds`. Fixed ticks
+  stay the default, with identical output. `Simulator::set_dt` changes the tick
+  length between steps.
 - With `--stats`, the host also counts refused connections by stage and
   reason, so the log shows why players can't join. No client addresses or
   request data are recorded.

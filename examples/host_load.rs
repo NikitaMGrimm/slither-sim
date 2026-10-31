@@ -409,6 +409,7 @@ pub fn benchmark(
     let host = Host::bind(HostConfig {
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
         seed: 7,
+        max_tick: None,
         players: PlayerConfig {
             max: clients,
             latency: LatencyConfig::fixed(0.),
