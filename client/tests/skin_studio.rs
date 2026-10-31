@@ -9,18 +9,18 @@ fn state(skin: u8) -> StudioState {
     .unwrap()
 }
 #[test]
-fn cycle_wrap_skip_and_saved_65_are_exact() {
+fn cycle_wrap_all_65_and_saved_65_are_exact() {
     for (skin, next, expected) in [
         (0, false, 64),
         (64, true, 0),
-        (41, true, 43),
-        (43, false, 41),
+        (41, true, 42),
+        (43, false, 42),
         (65, false, 64),
         (65, true, 0),
     ] {
         let mut studio = state(skin);
         studio.open(0., true);
-        studio.cycle(next, UnlockSnapshot::default());
+        studio.cycle(next);
         assert_eq!(studio.draft().unwrap().record.selection().skin, expected);
     }
     let mut studio = state(65);
@@ -34,9 +34,7 @@ fn cycle_wrap_skip_and_saved_65_are_exact() {
     );
     assert_eq!(
         studio
-            .save("", 230., UnlockSnapshot::default(), &mut || panic!(
-                "retained Save sampled entropy"
-            ))
+            .save("", 230., &mut || panic!("retained Save sampled entropy"))
             .unwrap()
             .unwrap()
             .selection()
@@ -46,12 +44,12 @@ fn cycle_wrap_skip_and_saved_65_are_exact() {
     let mut studio = state(0);
     studio.open(0., true);
     let mut seen = std::collections::BTreeSet::new();
-    for _ in 0..64 {
+    for _ in 0..65 {
         seen.insert(studio.draft().unwrap().record.builtin);
-        studio.cycle(true, UnlockSnapshot::default());
+        studio.cycle(true);
     }
-    assert_eq!(seen.len(), 64);
-    assert!(!seen.contains(&42));
+    assert_eq!(seen.len(), 65);
+    assert!(seen.contains(&42));
     assert!(!seen.contains(&65));
 }
 #[test]
@@ -61,7 +59,7 @@ fn save_is_one_commit_cancel_is_none_and_focus_waits_for_return() {
     assert!(studio.open(0., true));
     studio.step(115.);
     assert_eq!(studio.alpha(), 0.5);
-    studio.cycle(true, UnlockSnapshot::default());
+    studio.cycle(true);
     assert_eq!(studio.committed().builtin, 7);
     studio.cancel(115.);
     studio.step(344.);
@@ -74,9 +72,9 @@ fn save_is_one_commit_cancel_is_none_and_focus_waits_for_return() {
     assert_eq!(studio.committed().builtin, 7);
     studio.open(400., true);
     studio.step(630.);
-    studio.cycle(true, UnlockSnapshot::default());
+    studio.cycle(true);
     let saved = studio
-        .save("Current", 630., UnlockSnapshot::default(), &mut || {
+        .save("Current", 630., &mut || {
             panic!("built-in Save sampled entropy")
         })
         .unwrap()
@@ -85,7 +83,7 @@ fn save_is_one_commit_cancel_is_none_and_focus_waits_for_return() {
     assert_eq!(saved.nickname, "Current");
     assert!(
         studio
-            .save("Other", 631., UnlockSnapshot::default(), &mut || panic!(
+            .save("Other", 631., &mut || panic!(
                 "repeated Save sampled entropy"
             ))
             .unwrap()
@@ -192,7 +190,7 @@ fn every_existing_login_is_byte_identical_after_unchanged_save() {
             let mut studio = StudioState::new(record).unwrap();
             studio.open(0., true);
             let saved = studio
-                .save("Bytes", 230., UnlockSnapshot::default(), &mut || {
+                .save("Bytes", 230., &mut || {
                     panic!("retained Save sampled entropy")
                 })
                 .unwrap()

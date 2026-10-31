@@ -12,6 +12,8 @@ pub struct SkinStudioNative {
     pub now: f64,
     pub preview: AppearancePreview,
     pub wheel: f64,
+    pub(crate) viewport: [f64; 2],
+    pub thumbnails: std::collections::BTreeMap<u8, Resource>,
     bank: Bank,
     fallback: Cosmetics,
     staged: Option<AppearancePreview>,
@@ -25,6 +27,8 @@ impl SkinStudioNative {
             now: 0.,
             preview: Default::default(),
             wheel: 0.,
+            viewport: [960., 540.],
+            thumbnails: Default::default(),
             bank: Bank::new()?,
             fallback: Cosmetics::from_images(Default::default(), None)?,
             staged: None,
@@ -68,6 +72,20 @@ impl SkinStudioNative {
         match control {
             BUILT_IN_TAB => self.state.set_section(StudioSection::BuiltIn, self.now),
             BUILDER_TAB => self.state.set_section(StudioSection::Builder, self.now),
+            COSMETICS_TAB => self.state.set_section(StudioSection::Cosmetics, self.now),
+            COSMETIC_PREVIOUS => self.state.scroll_cosmetics(
+                -(self.state.cosmetic_range(self.viewport).len().div_ceil(4) as isize),
+                self.viewport,
+            ),
+            COSMETIC_NEXT => self.state.scroll_cosmetics(
+                self.state.cosmetic_range(self.viewport).len().div_ceil(4) as isize,
+                self.viewport,
+            ),
+            id if (COSMETIC_BASE..COSMETIC_BASE + 33).contains(&id.0) => {
+                let index = id.0 - COSMETIC_BASE;
+                self.state
+                    .select_cosmetic((index > 0).then(|| (index - 1) as u8));
+            }
             ADD => self.state.edit_builder(|b| {
                 b.append(PALETTES[b.palette]);
             }),
@@ -91,31 +109,26 @@ impl SkinStudioNative {
                 b.selected = (b.selected + 1).min(b.pattern().runs().len().saturating_sub(1))
             }),
             PREVIOUS => {
-                self.state.cycle(false, UnlockSnapshot::default());
+                self.state.cycle(false);
                 self.status.clear();
             }
             NEXT => {
-                self.state.cycle(true, UnlockSnapshot::default());
+                self.state.cycle(true);
                 self.status.clear();
             }
             CANCEL | BACKDROP => self.state.cancel(self.now),
-            SAVE => {
-                match self
-                    .state
-                    .save(nickname, self.now, UnlockSnapshot::default(), random_byte)
-                {
-                    Ok(Some(record)) => {
-                        self.status = if self.storage.save(&record).is_ok() {
-                            "Skin saved"
-                        } else {
-                            "Saved for this run"
-                        }
-                        .into()
+            SAVE => match self.state.save(nickname, self.now, random_byte) {
+                Ok(Some(record)) => {
+                    self.status = if self.storage.save(&record).is_ok() {
+                        "Skin saved"
+                    } else {
+                        "Saved for this run"
                     }
-                    Err(e) => self.status = e.into(),
-                    _ => {}
+                    .into()
                 }
-            }
+                Err(e) => self.status = e.into(),
+                _ => {}
+            },
             id if id.0 >= RUN_BASE => self.state.edit_builder(|b| {
                 let index = usize::from(id.0 - RUN_BASE);
                 if index < b.pattern().runs().len() {
@@ -132,7 +145,54 @@ impl SkinStudioNative {
             }
         }
     }
-    /// Ready-only resolver is identical to gameplay's full-art fallback, without accessories.
+    /// Decode local art serially before copying the active panel; it never commits a choice.
+    pub fn sync_art(
+        &mut self,
+        viewport: [f64; 2],
+        cosmetics: Option<&mut Cosmetics>,
+    ) -> Result<()> {
+        self.viewport = viewport;
+        self.thumbnails.clear();
+        let Some(c) = cosmetics else {
+            if self.state.interactive() && self.state.section == StudioSection::Cosmetics {
+                self.status = self.state.preview_cosmetic().map_or_else(
+                    || "No cosmetic".into(),
+                    |id| format!("Cosmetic {id} - art unavailable"),
+                );
+            }
+            return Ok(());
+        };
+        if !self.state.visible() {
+            c.release_studio();
+            return Ok(());
+        }
+        let visible: Vec<_> = if self.state.section == StudioSection::Cosmetics {
+            self.state
+                .cosmetic_range(viewport)
+                .filter(|i| *i > 0)
+                .map(|i| (i - 1) as u8)
+                .collect()
+        } else {
+            vec![]
+        };
+        c.prepare_studio(&visible, self.state.preview_cosmetic())?;
+        self.thumbnails = c.studio_thumbnails();
+        if self.state.interactive() && self.state.section == StudioSection::Cosmetics {
+            self.status = self.state.preview_cosmetic().map_or_else(
+                || "No cosmetic".into(),
+                |id| {
+                    use crate::cosmetics::CosmeticArtStatus::*;
+                    match c.studio_status(id) {
+                        Ready => format!("Cosmetic {id}"),
+                        Missing => format!("Cosmetic {id} - art unavailable"),
+                        OverBudget => format!("Cosmetic {id} - art budget exceeded"),
+                    }
+                },
+            );
+        }
+        Ok(())
+    }
+    /// Ready-only resolver and single-image suppression match own-head gameplay art.
     pub fn prepare_preview(
         &mut self,
         extent: [u32; 2],
@@ -141,16 +201,10 @@ impl SkinStudioNative {
     ) -> Result<(Frame, Vec<Resource>)> {
         self.staged = None;
         self.bank.cosmetics = Some(match cosmetics {
-            Some(c) => c.preview_sources(),
+            Some(c) => c.preview_sources_for(self.state.preview_cosmetic()),
             None => self.fallback.preview_sources(),
         });
         let selection = self.state.preview_selection().map_err(str::to_owned)?;
-        if selection != self.state.committed().selection()
-            && selection.custom_bytes.is_empty()
-            && !UnlockSnapshot::default().skin_available(selection.skin)
-        {
-            return Err("Preview selection unavailable".into());
-        }
         let sources = self.bank.cosmetics.as_ref().expect("preview sources");
         let skin = sources
             .skin(selection.skin, &selection.custom_bytes)
@@ -167,10 +221,20 @@ impl SkinStudioNative {
             self.status = "Some preview art is unavailable".into();
         }
         let area = extent.map(|v| f64::from(v) / dpr);
-        let pose = self.preview.prepare(
+        let accessory = sources.preview_accessory(&skin).map(|(g, a)| {
+            (
+                g,
+                slither_client::state::Point {
+                    x: f64::from(a.width),
+                    y: f64::from(a.height),
+                },
+            )
+        });
+        let pose = self.preview.prepare_with_accessory(
             &skin,
             StudioState::preview_bounds(area),
             &[[0.25, 0.75], [0.65, 0.35], [0.45, 0.55]],
+            accessory,
         )?;
         let picture = crate::render::prepare_studio_preview(
             &mut self.bank,

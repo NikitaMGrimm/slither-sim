@@ -507,7 +507,9 @@ pub fn prepare_studio_preview(
             zoom: pose.view.zoom,
             death_progress: 0.,
         },
-        None,
+        bank.cosmetics
+            .as_ref()
+            .and_then(|c| c.preview_accessory(skin)),
         &mut draws,
     )?;
     if draws.len() > 1024 {

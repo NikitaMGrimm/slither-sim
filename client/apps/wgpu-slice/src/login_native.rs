@@ -651,6 +651,7 @@ impl NativeLogin {
             view.skin_alpha *= alpha;
         }
         let area = extent.map(|n| f64::from(n) / dpr);
+        self.studio.viewport = area;
         let resized = area != self.area || dpr != self.pixel_scale;
         if resized {
             self.controls.blur();
@@ -697,6 +698,7 @@ impl NativeLogin {
                 cosmetics,
                 Some(&self.input.state),
                 Some(crate::menu::PanelPaint {
+                    thumbnails: Some(&self.studio.thumbnails),
                     panel: &self.panel,
                     input: &self.controls,
                     edit: &self.input.state,
@@ -732,6 +734,7 @@ impl NativeLogin {
             // Keep specialized logo/result producers, suppress the old pending label.
             view.champion_pending = false;
             Some(crate::menu::PanelPaint {
+                thumbnails: None,
                 panel: &self.champion.panel,
                 input: &self.champion.controls,
                 edit: &self.champion.input.state,
@@ -742,6 +745,7 @@ impl NativeLogin {
             self.picker.viewport = area;
             self.picker.panel = self.picker.policy.panel(area);
             Some(crate::menu::PanelPaint {
+                thumbnails: None,
                 panel: &self.picker.panel,
                 input: &self.picker.controls,
                 edit: &self.picker.input.state,
@@ -750,6 +754,7 @@ impl NativeLogin {
             })
         } else {
             Some(crate::menu::PanelPaint {
+                thumbnails: None,
                 panel: &self.panel,
                 input: &self.controls,
                 edit: &self.input.state,

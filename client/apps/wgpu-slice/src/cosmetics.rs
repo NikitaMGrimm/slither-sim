@@ -10,7 +10,9 @@ pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
 // are their RGBA dimensions in procedural(); no eager rasterization is needed.
 const PROCEDURAL_PIXEL_BYTES: usize = (2 * 64 * 64 + 2 * 48 * 48 + 84 * 84) * 4;
 mod menu_art;
+mod studio;
 pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
+pub use studio::{CosmeticArtStatus, THUMBNAIL_PIXEL_BUDGET};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BackgroundArt {
@@ -186,6 +188,7 @@ pub struct Cosmetics {
     accessories: BTreeMap<u8, Resource>,
     pub own_accessory: Option<u8>,
     menu: menu_art::MenuArtCache,
+    studio: studio::StudioArt,
 }
 impl Cosmetics {
     /// Share ready face/bulb pixels with the isolated preview. No accessory selection/grant.
@@ -196,10 +199,18 @@ impl Cosmetics {
             accessories: Default::default(),
             own_accessory: None,
             menu: Default::default(),
+            studio: Default::default(),
         }
     }
     /// The only byte-source seam. Native and browser bind it to local development inputs.
-    pub fn load(mut resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
+    pub fn load(resolve: impl FnMut(&str) -> Result<Vec<u8>>, own: Option<u8>) -> Result<Self> {
+        Self::load_selected(resolve, own, false)
+    }
+    fn load_selected(
+        mut resolve: impl FnMut(&str) -> Result<Vec<u8>>,
+        own: Option<u8>,
+        selected_only: bool,
+    ) -> Result<Self> {
         let mut images = Images::default();
         if let Ok(bytes) = resolve(MANIFEST_PATH)
             && let Err(error) = images.manifest(&bytes)
@@ -207,6 +218,12 @@ impl Cosmetics {
             eprintln!("Menu manifest unavailable: {error}");
         }
         for path in paths().into_iter().chain(images.menu_paths()) {
+            let accessory = ACCESSORIES.iter().enumerate().find_map(|(id, entry)| {
+                (path == format!("s/a_{}.png", entry.0)).then_some(id as u8)
+            });
+            if selected_only && accessory.is_some_and(|id| Some(id) != own) {
+                continue;
+            }
             if let Err(error) = resolve(&path).and_then(|bytes| images.add(&path, &bytes)) {
                 eprintln!("Cosmetic {path} unavailable: {error}");
             }
@@ -216,6 +233,9 @@ impl Cosmetics {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn directory(directory: &std::path::Path, own: Option<u8>) -> Result<Self> {
         use std::io::Read;
+        if own.is_some_and(|id| id > 31) {
+            return Err("Accessory must be 0..31".into());
+        }
         let root = match directory.canonicalize() {
             Ok(root) => root,
             Err(error) => {
@@ -223,7 +243,7 @@ impl Cosmetics {
                 return Self::from_images(Images::default(), own);
             }
         };
-        Self::load(
+        let mut result = Self::load_selected(
             |path| {
                 let file = root.join(path).canonicalize().map_err(|e| e.to_string())?;
                 if !file.starts_with(&root) {
@@ -244,8 +264,12 @@ impl Cosmetics {
                     .map_err(|e| e.to_string())?;
                 Ok(bytes)
             },
-            own,
-        )
+            None,
+            true,
+        )?;
+        result.studio.directory = Some(root);
+        result.commit_accessory(own)?;
+        Ok(result)
     }
     pub fn from_images(mut images: Images, own: Option<u8>) -> Result<Self> {
         if own.is_some_and(|v| usize::from(v) >= ACCESSORIES.len()) {
@@ -328,6 +352,7 @@ impl Cosmetics {
             accessories,
             own_accessory: own,
             menu: images.menu,
+            studio: Default::default(),
         };
         Ok(result)
     }
@@ -373,23 +398,10 @@ impl Cosmetics {
         let skin = self
             .skin(a.skin, &a.custom_skin)
             .map_err(|e| e.to_string())?;
-        // Single-image eyes bypass the entire accessory branch in the stock painter.
-        let accessory = if matches!(skin.face, FaceGeometry::SingleImage(_)) {
-            None
-        } else {
-            self.selected_accessory(own).map(|(id, _)| {
-                let v = ACCESSORIES[usize::from(id)];
-                StaticHeadAccessoryGeometry {
-                    forward: match skin.face {
-                        FaceGeometry::Paired(face) => face.eyes.forward,
-                        _ => StandardEyeGeometry::default().forward,
-                    },
-                    image_scale: v.1,
-                    pivot_x: v.2,
-                    pivot_y: v.3,
-                }
-            })
-        };
+        let accessory = self
+            .preview_accessory(&skin)
+            .map(|(geometry, _)| geometry)
+            .filter(|_| own);
         Ok(AccessoryPresentation {
             presentation: FacePresentation {
                 face: skin.face,

@@ -53,6 +53,9 @@ impl StudioState {
     }
     /// Scroll only active builder content; capture is cancelled by the adapter.
     pub fn scroll_editor(&mut self, rows: isize, viewport: [f64; 2]) {
+        if self.interactive() && self.section == StudioSection::Cosmetics {
+            self.scroll_cosmetics(rows, viewport);
+        }
         if self.interactive() && self.section == StudioSection::Builder {
             self.editor_scroll = self.editor_window(viewport);
             self.editor_scroll.scroll(rows, BUILDER_ROWS);
@@ -60,6 +63,13 @@ impl StudioState {
     }
     /// Keep the roving item or a Tab destination visible without moving the preview/footer.
     pub fn reveal_control(&mut self, id: ControlId, viewport: [f64; 2]) {
+        if self.section == StudioSection::Cosmetics {
+            if id.0 >= COSMETIC_BASE && id.0 < COSMETIC_BASE + 33 {
+                self.cosmetic_focus = usize::from(id.0 - COSMETIC_BASE);
+                self.cosmetic_window.reveal(self.cosmetic_focus / 4, 9);
+            }
+            return;
+        }
         if self.section != StudioSection::Builder {
             return;
         }
@@ -93,18 +103,28 @@ impl StudioState {
         if !self.interactive() {
             return focus;
         }
-        if [BUILT_IN_TAB, BUILDER_TAB].contains(&focus) {
-            let section = match direction {
-                Left | Home => StudioSection::BuiltIn,
-                Right | End => StudioSection::Builder,
+        if [BUILT_IN_TAB, BUILDER_TAB, COSMETICS_TAB].contains(&focus) {
+            let tabs = [BUILT_IN_TAB, BUILDER_TAB, COSMETICS_TAB];
+            let at = tabs.iter().position(|id| *id == focus).unwrap();
+            let next = match direction {
+                Left => at.saturating_sub(1),
+                Right => (at + 1).min(2),
+                Home => 0,
+                End => 2,
                 _ => return focus,
             };
-            self.set_section(section, now);
-            return if section == StudioSection::Builder {
-                BUILDER_TAB
-            } else {
-                BUILT_IN_TAB
-            };
+            self.set_section(
+                [
+                    StudioSection::BuiltIn,
+                    StudioSection::Builder,
+                    StudioSection::Cosmetics,
+                ][next],
+                now,
+            );
+            return tabs[next];
+        }
+        if self.section == StudioSection::Cosmetics {
+            return self.navigate_cosmetic(focus, direction);
         }
         if self.section != StudioSection::Builder {
             return focus;
@@ -140,37 +160,50 @@ impl StudioState {
     pub(super) fn mount_sections(&self, panel: &mut PanelView, viewport: [f64; 2]) {
         let b = Self::bounds(viewport);
         panel.controls.retain(|c| c.id != ControlId(2));
-        for (id, label, selected, x) in [
-            (
-                BUILT_IN_TAB,
-                "Built-in".to_owned(),
-                self.section == StudioSection::BuiltIn,
-                24.,
-            ),
-            (
-                BUILDER_TAB,
-                "Builder".to_owned(),
-                self.section == StudioSection::Builder,
-                b.width / 2. + 4.,
-            ),
-        ] {
+        let available = b.width - 64.;
+        let widths = if b.width < 320. {
+            [60., 60., available - 120.]
+        } else if b.width < 640. {
+            [available * 0.3, available * 0.3, available * 0.4]
+        } else {
+            [available / 3.; 3]
+        };
+        for (index, (id, label, section)) in [
+            (BUILT_IN_TAB, "Built-in", StudioSection::BuiltIn),
+            (BUILDER_TAB, "Builder", StudioSection::Builder),
+            (COSMETICS_TAB, "Cosmetics", StudioSection::Cosmetics),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let width = widths[index];
+            let x = 24. + widths[..index].iter().sum::<f64>() + index as f64 * 8.;
+            let visible_label = if b.width < 320. {
+                ["Skin", "Edit", "Art"][index]
+            } else {
+                label
+            };
+            let selected = self.section == section;
             panel.controls.push(Control {
                 id,
-                placement: Placement::rect(b.x + x, b.y + 68., (b.width - 56.) / 2., 32.),
+                placement: Placement::rect(b.x + x, b.y + 68., width, 32.),
                 clip: None,
                 visible: true,
                 enabled: self.interactive(),
                 alpha: 1.,
-                name: label.clone(),
+                name: label.into(),
                 tab_order: selected.then_some(0),
                 style: ControlStyle::StudioAction,
-                kind: ControlKind::SectionTab { label, selected },
+                kind: ControlKind::SectionTab {
+                    label: visible_label.into(),
+                    selected,
+                },
             });
         }
-        panel.initial_focus = Some(if self.section == StudioSection::Builder {
-            BUILDER_TAB
-        } else {
-            BUILT_IN_TAB
+        panel.initial_focus = Some(match self.section {
+            StudioSection::BuiltIn => BUILT_IN_TAB,
+            StudioSection::Builder => BUILDER_TAB,
+            StudioSection::Cosmetics => COSMETICS_TAB,
         });
         for c in &mut panel.controls {
             match c.id {
@@ -180,6 +213,10 @@ impl StudioState {
                 SAVE => c.tab_order = Some(11),
                 _ => {}
             }
+        }
+        if self.section == StudioSection::Cosmetics {
+            self.mount_cosmetics(panel, viewport);
+            return;
         }
         if self.section != StudioSection::Builder {
             for control in &mut panel.controls {

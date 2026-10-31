@@ -10,7 +10,7 @@ fn studio(record: AppearanceRecord) -> StudioState {
     s
 }
 fn saved(s: &mut StudioState) -> AppearanceRecord {
-    s.save("Bytes", 410., UnlockSnapshot::default(), &mut || {
+    s.save("Bytes", 410., &mut || {
         panic!("retained/empty sampled entropy")
     })
     .unwrap()
@@ -96,9 +96,7 @@ fn long_legacy_runs_are_bounded_editable_and_split_at_255() {
     s.edit_builder(|b| b.recolour(41).unwrap());
     let mut samples = [4, 5].into_iter();
     let changed = s
-        .save("Bytes", 410., UnlockSnapshot::default(), &mut || {
-            samples.next().unwrap()
-        })
+        .save("Bytes", 410., &mut || samples.next().unwrap())
         .unwrap()
         .unwrap();
     assert_eq!(&changed.custom_bytes[..8], &[255, 255, 255, 0, 0, 0, 4, 5]);
@@ -134,19 +132,9 @@ fn changed_save_samples_two_bytes_once_and_preview_never_serializes_a_spacer() {
         calls += 1;
         if calls == 1 { 0 } else { 255 }
     };
-    assert!(
-        s.save("😀", 410., UnlockSnapshot::default(), &mut random)
-            .is_err()
-    );
-    let record = s
-        .save("Bytes", 410., UnlockSnapshot::default(), &mut random)
-        .unwrap()
-        .unwrap();
-    assert!(
-        s.save("Bytes", 411., UnlockSnapshot::default(), &mut random)
-            .unwrap()
-            .is_none()
-    );
+    assert!(s.save("😀", 410., &mut random).is_err());
+    let record = s.save("Bytes", 410., &mut random).unwrap().unwrap();
+    assert!(s.save("Bytes", 411., &mut random).unwrap().is_none());
     assert_eq!(calls, 2);
     assert_eq!(&record.custom_bytes[..8], &[255, 255, 255, 0, 0, 0, 0, 255]);
     assert_eq!(&record.custom_bytes[8..], &preview.custom_bytes[8..]);
@@ -200,10 +188,10 @@ fn reset_empty_save_reuses_committed_custom_or_builtin_and_cancel_discards_all()
         b.append(41);
     });
     s.set_section(StudioSection::BuiltIn, 410.);
-    s.cycle(true, UnlockSnapshot::default());
+    s.cycle(true);
     let mut calls = 0;
     let got = s
-        .save("Bytes", 410., UnlockSnapshot::default(), &mut || {
+        .save("Bytes", 410., &mut || {
             calls += 1;
             9
         })
@@ -296,7 +284,7 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                 s.step(230.);
                 if cycle_first {
                     // Exercise both the original skin 7 and a draft built-in 8.
-                    s.cycle(true, UnlockSnapshot::default());
+                    s.cycle(true);
                 }
                 let before_builder = s.preview_selection().unwrap();
                 s.set_section(StudioSection::Builder, 230.);
@@ -309,7 +297,7 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                 }
                 s.set_section(StudioSection::BuiltIn, 410.);
                 if choose_builtin {
-                    s.cycle(true, UnlockSnapshot::default());
+                    s.cycle(true);
                 }
                 let preview = s.preview_selection().unwrap();
                 if choose_builtin {
@@ -332,10 +320,7 @@ fn returning_to_builtin_keeps_title_preview_and_save_on_one_selection() {
                     "Saved custom skin".into()
                 };
                 assert_eq!(*title, ControlKind::Label { text: expected });
-                let committed = s
-                    .save("Bytes", 410., UnlockSnapshot::default(), &mut || 0)
-                    .unwrap()
-                    .unwrap();
+                let committed = s.save("Bytes", 410., &mut || 0).unwrap().unwrap();
                 assert_eq!(committed.selection(), preview);
             }
         }
@@ -353,7 +338,7 @@ fn visiting_empty_builder_preserves_builtin_pick_and_both_cycle_directions() {
         .unwrap();
         s.open(0., true);
         s.step(230.);
-        s.cycle(next, UnlockSnapshot::default());
+        s.cycle(next);
         s.set_section(StudioSection::Builder, 230.);
         s.set_section(StudioSection::BuiltIn, 410.);
         let picked = if next { 8 } else { 6 };
@@ -363,7 +348,7 @@ fn visiting_empty_builder_preserves_builtin_pick_and_both_cycle_directions() {
             (Some(!next), picked),
         ] {
             if let Some(next) = direction {
-                s.cycle(next, UnlockSnapshot::default());
+                s.cycle(next);
             }
             let preview = s.preview_selection().unwrap();
             assert_eq!(preview.skin, expected);

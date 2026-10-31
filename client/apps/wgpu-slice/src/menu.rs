@@ -38,6 +38,7 @@ const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
+    Thumbnail(frame::ResourceKey),
     Indicator(u32, SurfaceTokens, [u8; 3], bool),
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
@@ -437,6 +438,8 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
 }
 pub struct PanelPaint<'a> {
     pub panel: &'a PanelView,
+    /// Only the active cosmetic window; resources are charged to the normal menu cache.
+    pub thumbnails: Option<&'a BTreeMap<u8, Resource>>,
     pub input: &'a PanelInputState,
     pub edit: &'a MenuInputState,
     pub scroll: &'a mut BTreeMap<EditorId, f64>,
@@ -470,6 +473,7 @@ impl Composition<'_> {
         scroll: &mut BTreeMap<EditorId, f64>,
         theme: MenuTheme,
         resolved: &[ResolvedControl],
+        thumbnails: Option<&BTreeMap<u8, Resource>>,
     ) -> Result<()> {
         if panel.visible {
             if panel
@@ -486,7 +490,9 @@ impl Composition<'_> {
                 self.component = if panel.id == 0 {
                     MenuComponent::LoginControls
                 } else if panel.id == 3 {
-                    use slither_client::skin_studio::{BUILDER_TAB, BUILT_IN_TAB, CANCEL, SAVE};
+                    use slither_client::skin_studio::{
+                        BUILDER_TAB, BUILT_IN_TAB, CANCEL, COSMETICS_TAB, SAVE,
+                    };
                     match control.kind {
                         ControlKind::Backdrop => MenuComponent::StudioShade,
                         ControlKind::Surface => MenuComponent::StudioSurface,
@@ -495,6 +501,7 @@ impl Composition<'_> {
                             slither_client::menu_controls::ControlId(4),
                             BUILT_IN_TAB,
                             BUILDER_TAB,
+                            COSMETICS_TAB,
                             CANCEL,
                             SAVE,
                         ]
@@ -553,6 +560,103 @@ impl Composition<'_> {
                     });
                 };
                 match &control.kind {
+                    ControlKind::CosmeticCell { cosmetic, selected } => {
+                        self.sliced(
+                            r.rect,
+                            theme.surface(ControlStyle::SelectedCell, ControlState::Idle),
+                            alpha,
+                            surface_clip,
+                            r.scale,
+                        )?;
+                        let inner = MenuRect {
+                            x: r.rect.x + 4.,
+                            y: r.rect.y + 4.,
+                            width: r.rect.width - 8.,
+                            height: r.rect.height - 8.,
+                        };
+                        if let Some(source) =
+                            cosmetic.and_then(|id| thumbnails.and_then(|t| t.get(&id)))
+                        {
+                            let factor = (inner.width / f64::from(source.asset.width))
+                                .min(inner.height / f64::from(source.asset.height));
+                            let width = f64::from(source.asset.width) * factor;
+                            let height = f64::from(source.asset.height) * factor;
+                            let rect = MenuRect {
+                                x: inner.x + (inner.width - width) / 2.,
+                                y: inner.y + (inner.height - height) / 2.,
+                                width,
+                                height,
+                            };
+                            // One <=128px resource per cell, shared across DPRs. Never enlarge the thumbnail cache.
+                            self.materials.insert(
+                                MaterialKey::Thumbnail(source.asset.into()),
+                                source.clone(),
+                            );
+                            let mut draw = image(source, rect, alpha);
+                            draw.source = Some(BodyRect {
+                                x: 0.,
+                                y: 0.,
+                                width: f64::from(source.asset.width),
+                                height: f64::from(source.asset.height),
+                            });
+                            if clip_scaled_draw(&mut draw, r.clip, self.scale) {
+                                self.push(draw)?;
+                            }
+                        } else if cosmetic.is_none() {
+                            add_label(self, "None".into(), r.rect, style, Align::Center, r.clip);
+                        } else {
+                            for mark in [
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width / 2. - 6.,
+                                    y: r.rect.y + r.rect.height / 2. - 1.,
+                                    width: 12.,
+                                    height: 2.,
+                                },
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width / 2. - 1.,
+                                    y: r.rect.y + r.rect.height / 2. - 6.,
+                                    width: 2.,
+                                    height: 12.,
+                                },
+                            ] {
+                                self.studio_solid(
+                                    intersection(mark, r.clip),
+                                    alpha * 0.6,
+                                    theme,
+                                    false,
+                                )?;
+                            }
+                        }
+                        if *selected || input.focus() == Some(control.id) {
+                            for border in [
+                                MenuRect {
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    y: r.rect.y + r.rect.height - 1.,
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width - 1.,
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                            ] {
+                                self.studio_solid(
+                                    intersection(border, r.clip),
+                                    alpha,
+                                    theme,
+                                    false,
+                                )?;
+                            }
+                        }
+                    }
                     ControlKind::Swatch {
                         palette,
                         count,
@@ -2213,6 +2317,7 @@ impl Menu {
             &mut staged_scroll,
             theme,
             &resolved,
+            None,
         )?;
         let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, None, None, Vec::new())?;
@@ -2472,6 +2577,7 @@ impl Menu {
                 &mut BTreeMap::new(),
                 MenuTheme::default(),
                 &resolved,
+                None,
             )?;
         }
         let mut staged_scroll = panel.as_ref().map(|p| p.scroll.clone());
@@ -2488,6 +2594,7 @@ impl Menu {
                 staged_scroll.as_mut().expect("panel scroll"),
                 p.theme,
                 &resolved,
+                p.thumbnails,
             )?;
         }
         let spinner_start = c.draws.len();

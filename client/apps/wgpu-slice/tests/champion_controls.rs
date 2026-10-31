@@ -508,6 +508,7 @@ fn champion_keeps_returning_login_last_length_geometry_and_fade() {
                 None,
                 None,
                 Some(PanelPaint {
+                    thumbnails: None,
                     panel: &p,
                     input: &input,
                     edit: &edit,
@@ -703,6 +704,7 @@ fn champion_and_logo_share_the_complete_menu_budget_at_high_dpr() {
             None,
             None,
             Some(PanelPaint {
+                thumbnails: None,
                 panel: &panel,
                 input: &input,
                 edit: &edit,
@@ -784,6 +786,7 @@ fn standard_champion_keeps_the_logo_within_draw_capacity_at_dpr_five_to_eight() 
                     None,
                     None,
                     Some(PanelPaint {
+                        thumbnails: None,
                         panel: &panel,
                         input: &input,
                         edit: &edit,
