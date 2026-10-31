@@ -19,46 +19,56 @@ Neither changes release preparation or publication authorization.
 
 ## Shared protocol bootstrap (owner-gated)
 
-`crates/slither-protocol` has independent SemVer (initially 0.1.0), an MIT
-license file and publishable metadata. A0 adds the real reader without a root
-runtime dependency. After A0 merges, the owner will manually publish 0.1.0
-using a crates.io token: Trusted Publishing cannot create a new crate.
-The owner's first publication is approved; A0 verification only runs
-`cargo publish -p slither-protocol --dry-run --locked` and does not upload.
-B uses a client path dependency without crates.io; A adds the simulator
-dependency after the protocol version is available in the registry.
-`release-plz.toml` explicitly disables protocol publication and version bumps.
-The existing publisher still selects only slither-sim; the simulator-switch
-PR will wire the protocol into `release.yml`.
+`crates/slither-protocol` has independent SemVer and its own changelog.
+The owner manually published 0.1.0 from A0 (`ef733563`, #393), with approval.
+Its crates.io Trusted Publisher is **registered** for repository
+`NikitaMGrimm/slither-sim`, workflow `release.yml`, with no environment.
+Authentication failures stop the workflow with an explicit protocol-publication
+error; there is no saved-token fallback or simulator upload after failure.
 
-- TODO (owner, first publish): check crates.io name availability/ownership and
-  publish 0.1.0 from the merged A0 revision. Register its Trusted Publisher
-  identity after creation, before automated publication is enabled. The
-  simulator's registration does not authorize the new package.
-- TODO (owner-approved release work): register independent protocol version and
-  changelog handling in release-plz; breaking changes before 1.0 bump its minor
-  version. Preserve `[workspace.package]` for simulator/ABI/Python and the rolling
-  simulator release PR's version intent.
-- TODO: make release tooling package-aware before enabling protocol release
-  preparation/publication. Verify and publish the protocol archive **before**
-  any slither-sim version that needs it; wait for the registry version to be
-  visible before root packaging/publication. Root dependencies then specify
-  both `path` and a compatible registry `version`, optional under `networking`.
-  Preserve exact-commit CI, extracted/normalized archive identity, immutable
-  root tags, retries/idempotence and cooldown/authorization checks for each
-  selected package. Adding a workspace member is not a publisher implementation.
-- TODO before A: exercise Rust 1.99 multi-package verification with the actual
-  dependency edge (`cargo +1.99.0 package --locked -p slither-protocol -p
-  slither-sim --registry crates-io`). A0's package group selects both independent
-  archives and verifies them; it cannot prove the later unpublished dependency
-  bootstrap. Do not bypass archive verification with `--no-verify` or a patch.
-- TODO before A delivery: verify extracted protocol/root archives and normalized
-  manifests, root CLI/library, C ABI and Python maturin sdist/wheel source
-  closure. A working workspace is not proof that published consumers resolve.
+Release-plz prepares independent protocol version/changelog changes, including a
+minor bump for breaking changes before 1.0. `[workspace.package]` continues to
+own the simulator/ABI/Python version. Do not change that version as part of a
+protocol refactor. The client remains unpublished.
 
-The client stays unpublished and B needs no crates.io release. The manual
-first publication belongs to the owner; A0 adds no release automation and
-does not access a token. Ordinary simulator releases keep their existing guards.
+`release.yml` selects either the simulator (`vVERSION`) or protocol
+(`slither-protocol-vVERSION`). It requires successful CI at the exact selected
+main commit, immutable tags and verified registry archive/checksum/clean-source
+identity. An existing protocol version can serve a later simulator release only
+if its complete package source tree matches the published revision; changed
+protocol source requires its own version bump. Root identity remains tied to
+its original exact commit.
+
+Before a simulator upload, the publisher checks the protocol's separate
+cooldown or verified metadata-only maintainer merge authorization, verifies
+and publishes its archive if absent, then waits for Cargo's sparse registry
+index and rechecks archive identity. Only then does it verify and publish
+slither-sim against that registry dependency. A protocol-only release uses the
+same guards and does not build Python distributions or simulator binaries.
+Retries reuse existing uploads; source, tag, authentication or registry errors
+stop publication. The 12-hour gate is retained for each new package upload.
+Metadata-only release PRs may update either or both versions/changelogs and
+exact corresponding workspace lock entries; code or dependency changes need
+ordinary review. Minor/major bumps still require a maintainer merge.
+
+The package check runs Rust 1.99 multi-package verification with the real
+optional `path` + `version = "0.1"` dependency under `networking`:
+
+```sh
+cargo +1.99.0 package --locked -p slither-protocol -p slither-sim --registry crates-io
+python3 tools/verify_packages.py
+```
+
+The second command verifies the extracted normalized manifests and checks the
+root library/CLI against a **registry** protocol dependency. Do not bypass
+archive verification with `--no-verify` or a local patch. The tools group builds
+and tests the Python wheel and C ABI; `python-wheels.yml` also builds and tests
+a maturin sdist after pruning unpublished client workspace members. The sdist
+must include the protocol dependency's source/manifest closure even though the
+Python extension itself uses the simulator's core feature set.
+
+No implementation or validation command in this procedure authorizes a new
+publication; owner release authorization and the gates above still apply.
 
 ## Manual releases
 

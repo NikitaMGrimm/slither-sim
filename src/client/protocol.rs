@@ -1,6 +1,7 @@
 //! Protocol-19 decoding into the client contract, shared by every backend.
 //!
-//! Wire layouts follow the stock client parser and `tools/fidelity/slither_protocol.py`.
+//! Wire extraction uses `slither_protocol` with historical simulator admission.
+//! The independent Python reader stays in `tools/fidelity/slither_protocol.py`.
 //! Coordinates are centered by subtracting the setup grid center. Only transmitted
 //! state is kept: kill counts come only from `k` reports, private score credits are
 //! never reconstructed, and unknown values stay unknown rather than being filled
@@ -15,11 +16,8 @@ use super::{
     },
     minimap::{MAX_FRAME_MINIMAP_CELLS, Minimap, MinimapDecoder},
 };
-use crate::{
-    Action, Arena, Food, Observation, Point, Snake,
-    physics::{self, SPEED_UNIT_SECONDS},
-    prey::Prey,
-};
+use crate::{Action, Arena, Food, Observation, Point, Snake, physics, prey::Prey};
+use slither_protocol::{DecodeAdmission, DecodeError, ErrorKind, frame, scalar, v19};
 use std::collections::{BTreeMap, VecDeque};
 use std::f64::consts::TAU;
 use std::sync::OnceLock;
@@ -104,38 +102,6 @@ fn malformed(p: &[u8]) -> String {
         p.len()
     )
 }
-fn byte(p: &[u8], i: usize) -> Result<u8, String> {
-    p.get(i).copied().ok_or_else(|| truncated(p))
-}
-fn u16_at(p: &[u8], i: usize) -> Result<u16, String> {
-    Ok(u16::from(byte(p, i)?) << 8 | u16::from(byte(p, i + 1)?))
-}
-fn u24_at(p: &[u8], i: usize) -> Result<u32, String> {
-    Ok(u32::from(byte(p, i)?) << 16 | u32::from(byte(p, i + 1)?) << 8 | u32::from(byte(p, i + 2)?))
-}
-fn angle24(p: &[u8], i: usize) -> Result<f64, String> {
-    Ok(f64::from(u24_at(p, i)?) * TAU / 16_777_215.)
-}
-fn angle8(p: &[u8], i: usize) -> Result<f64, String> {
-    Ok(f64::from(byte(p, i)?) * TAU / 256.)
-}
-fn speed8(p: &[u8], i: usize) -> Result<f64, String> {
-    Ok(f64::from(byte(p, i)?) / 18. / SPEED_UNIT_SECONDS)
-}
-fn fraction24(p: &[u8], i: usize) -> Result<f64, String> {
-    Ok(f64::from(u24_at(p, i)?) / 16_777_215.)
-}
-/// Big-endian 32 bits read as the stock client's signed `<<24` expression.
-fn i32_at(p: &[u8], i: usize) -> Result<i32, String> {
-    let bytes = p.get(i..i + 4).ok_or_else(|| truncated(p))?;
-    Ok(i32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
-}
-/// A length-prefixed byte string at `i`; returns the bytes and the next offset.
-fn short_bytes(p: &[u8], i: usize) -> Result<(&[u8], usize), String> {
-    let end = i + 1 + usize::from(byte(p, i)?);
-    Ok((p.get(i + 1..end).ok_or_else(|| truncated(p))?, end))
-}
-
 /// Split one elapsed-ms framed message into command packets.
 pub fn split_frame(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
     if bytes.len() < 3 {
@@ -146,33 +112,21 @@ pub fn split_frame(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
 
 /// Both timed and header-free connections use the same packet bundling.
 pub(crate) fn split_payload(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
-    let Some(&first) = bytes.first() else {
-        return Err("Empty packet payload".into());
-    };
-    if first >= 32 {
-        return Ok(vec![bytes]);
-    }
-    let mut m = 0;
-    let mut packets = Vec::new();
-    while m < bytes.len() {
-        let length = if bytes[m] < 32 {
-            if m + 1 >= bytes.len() {
-                return Err("Truncated packet length".into());
-            }
-            let length = usize::from(bytes[m]) << 8 | usize::from(bytes[m + 1]);
-            m += 2;
-            length
-        } else {
-            m += 1;
-            usize::from(bytes[m - 1] - 32)
-        };
-        if length == 0 || length > bytes.len() - m {
-            return Err("Invalid packet length".into());
+    frame::decode_frame(
+        bytes,
+        frame::Header::Absent,
+        frame::Limits::UNBOUNDED,
+        frame::FrameAdmission::Historical,
+    )
+    .map(|frame| frame.commands().map(|command| command.bytes).collect())
+    .map_err(|error| {
+        match error.kind {
+            ErrorKind::Empty => "Empty packet payload",
+            ErrorKind::Truncated => "Truncated packet length",
+            _ => "Invalid packet length",
         }
-        packets.push(&bytes[m..m + length]);
-        m += length;
-    }
-    Ok(packets)
+        .into()
+    })
 }
 
 /// Only the supported challenge grammar identifies header-free framing; timing
@@ -188,15 +142,11 @@ pub fn action_packets(
     action: Action,
     previous_boost: Option<bool>,
 ) -> Result<Vec<Vec<u8>>, String> {
-    if !action.heading.is_finite() {
-        return Err("Action heading must be finite".into());
-    }
-    let heading = (action.heading.rem_euclid(TAU) * 251. / TAU)
-        .floor()
-        .min(250.) as u8;
-    let mut packets = vec![vec![heading]];
+    let heading = v19::client::sim_heading(action.heading)
+        .map_err(|_| "Action heading must be finite".to_owned())?;
+    let mut packets = vec![heading.to_vec()];
     if previous_boost != Some(action.boost) {
-        packets.push(vec![if action.boost { 253 } else { 254 }]);
+        packets.push(v19::client::boost(action.boost).to_vec());
     }
     Ok(packets)
 }
@@ -352,312 +302,200 @@ impl Packet<'_> {
     }
 }
 
+// Preserve the public simulator diagnostics, including its validation priority.
+// The shared reader owns acceptance and field extraction; these are error labels.
+fn decode_error(p: &[u8], error: DecodeError) -> String {
+    match p.first() {
+        None => "Empty packet".into(),
+        Some(b'a') if p.len() < 25 => "Short setup packet".into(),
+        Some(b'a') if p[23] != PROTOCOL_VERSION => format!(
+            "Unsupported protocol version {}; expected {PROTOCOL_VERSION}",
+            p[23]
+        ),
+        Some(b'a') if matches!(p.len(), 26 | 28 | 29) => truncated(p),
+        Some(b'a') if u16::from_be_bytes([p[21], p[22]]) > 1000 => {
+            "Unsupported body contraction; expected 0 through 1".into()
+        }
+        Some(b'a') => "Invalid setup values".into(),
+        Some(b'~') => "Invalid SlitherSim rules packet".into(),
+        Some(b's' | b'l' | b'm') => truncated(p),
+        Some(b'd' | b'7') if p.len() == 2 => truncated(p),
+        _ if error.kind == ErrorKind::Truncated => truncated(p),
+        _ => malformed(p),
+    }
+}
+
+fn target(value: v19::Target) -> Target {
+    match value {
+        v19::Target::Own => Target::Own,
+        v19::Target::Id(id) => Target::Id(id),
+        _ => unreachable!("new shared target requires a simulator projection"),
+    }
+}
+
 fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
-    let Some(&code) = p.first() else {
-        return Err("Empty packet".into());
-    };
-    let n = p.len();
-    Ok(match code {
-        super::rules_packet::COMMAND => Packet::Rules(super::rules_packet::decode(p)?),
-        b'a' => {
-            if n < 25 {
-                return Err("Short setup packet".into());
-            }
-            if p[23] != PROTOCOL_VERSION {
-                return Err(format!(
-                    "Unsupported protocol version {}; expected {PROTOCOL_VERSION}",
-                    p[23]
-                ));
-            }
-            // Bytes 25..27 are the stock client's `real_sid` server number, shown
-            // as "server N" on the minimap. They never identify the own snake.
-            if matches!(n, 26 | 28 | 29) {
-                return Err(truncated(p));
-            }
-            let grid_center = u24_at(p, 1)?;
-            let max_segments = u16_at(p, 4)?;
-            let sector_size = u16_at(p, 6)?;
-            let body_contraction = f64::from(u16_at(p, 21)?) / 1000.;
-            let body_spacing = f64::from(p[24]);
-            if !(0. ..=1.).contains(&body_contraction) {
-                return Err("Unsupported body contraction; expected 0 through 1".into());
-            }
-            if grid_center == 0 || max_segments == 0 || sector_size == 0 || p[24] == 0 {
-                return Err("Invalid setup values".into());
-            }
-            let radius = if n >= 30 {
-                f64::from(u24_at(p, 27)?)
-            } else {
-                f64::from(grid_center) * 0.98
-            };
-            // Stock `game_mode` 2 is team mode; only then is the next byte `team_val`.
-            let game_mode = p.get(30).copied();
-            let hundredths = |i| -> Result<f64, String> { Ok(f64::from(u16_at(p, i)?) / 100.) };
-            let thousandths = |i| -> Result<f64, String> { Ok(f64::from(u16_at(p, i)?) / 1000.) };
-            Packet::Setup(Setup {
+    // Minimap syntax is deliberately deferred to validation after setup/budgets,
+    // as before extraction. Eager decoding would change error precedence.
+    if matches!(p.first(), Some(b'M' | b'V' | b'U' | b'u' | b'L')) {
+        return Ok(Packet::Minimap(p));
+    }
+    Ok(
+        match v19::decode(p, DecodeAdmission::Sim).map_err(|error| decode_error(p, error))? {
+            v19::Message::Setup(s) => Packet::Setup(Setup {
                 settings: ServerSettings {
                     protocol: PROTOCOL_VERSION,
-                    grid_center,
-                    sector_size,
-                    max_segments,
-                    body_spacing,
-                    body_contraction,
-                    sector_count_along_edge: u16_at(p, 8)?,
-                    spangdv: f64::from(p[10]) / 10.,
-                    nsp1: hundredths(11)?,
-                    nsp2: hundredths(13)?,
-                    nsp3: hundredths(15)?,
-                    mamu: thousandths(17)?,
-                    mamu2: thousandths(19)?,
-                    server_number: if n >= 27 { Some(u16_at(p, 25)?) } else { None },
-                    game_mode,
-                    team_val: if game_mode == Some(2) {
-                        p.get(31).copied()
-                    } else {
-                        None
-                    },
+                    grid_center: s.grid_center,
+                    sector_size: s.sector_size,
+                    max_segments: s.max_segments,
+                    body_spacing: f64::from(s.body_spacing),
+                    body_contraction: f64::from(s.contraction) / 1000.,
+                    sector_count_along_edge: s.sector_count,
+                    spangdv: f64::from(s.spangdv) / 10.,
+                    nsp1: f64::from(s.nsp1) / 100.,
+                    nsp2: f64::from(s.nsp2) / 100.,
+                    nsp3: f64::from(s.nsp3) / 100.,
+                    mamu: f64::from(s.mamu) / 1000.,
+                    mamu2: f64::from(s.mamu2) / 1000.,
+                    server_number: s.server_number,
+                    game_mode: s.game_mode,
+                    team_val: s.team,
                 },
-                radius,
-                scores: score_table(max_segments),
-            })
-        }
-        b's' if n - 1 <= 6 => {
-            // Short `s` removes a snake; the stock client treats byte 3 == 1 as a kill.
-            Packet::Remove(u16_at(p, 1)?, p.get(3).map(|&b| b == 1))
-        }
-        b's' => {
-            let skin = byte(p, 15)?;
-            let (name, m) = short_bytes(p, 22)?;
-            let (custom_skin, m) = short_bytes(p, m)?;
-            let profile = Profile {
-                name: latin1(name),
-                skin,
-                custom_skin: custom_skin.to_vec(),
-                cosmetic: byte(p, m)?,
-            };
-            let mut m = m + 1;
-            let mut first = None;
-            let mut deltas = Vec::new();
-            let mut iang = None;
-            if m < n {
-                first = Some((
-                    f64::from(u24_at(p, m)?) / 5.,
-                    f64::from(u24_at(p, m + 3)?) / 5.,
-                ));
-                m += 6;
-                while m < n {
-                    if m + 2 == n {
-                        iang = Some(u16_at(p, m)?);
-                    } else {
-                        deltas.push((
-                            (f64::from(byte(p, m)?) - 127.) / 2.,
-                            (f64::from(byte(p, m + 1)?) - 127.) / 2.,
-                        ));
+                radius: s
+                    .radius
+                    .map(f64::from)
+                    .unwrap_or_else(|| f64::from(s.grid_center) * 0.98),
+                scores: score_table(s.max_segments),
+            }),
+            v19::Message::SnakeAppearance(s) => {
+                let mut deltas = Vec::new();
+                let mut iang = None;
+                for delta in s.body.deltas() {
+                    match delta {
+                        v19::BodyDelta::HalfUnits([x, y]) => {
+                            deltas.push((scalar::delta_half(x), scalar::delta_half(y)))
+                        }
+                        v19::BodyDelta::FinalDirection(direction) => iang = Some(direction),
+                        _ => unreachable!("new shared body delta requires a simulator projection"),
                     }
-                    m += 2;
                 }
+                Packet::Appear(Appearance {
+                    id: s.id,
+                    profile: Profile {
+                        name: latin1(s.name),
+                        skin: s.skin,
+                        custom_skin: s.custom_skin.to_vec(),
+                        cosmetic: s.cosmetic,
+                    },
+                    heading: scalar::angle24(s.heading),
+                    wanted: scalar::angle24(s.wanted_heading),
+                    speed: scalar::full_speed(s.speed),
+                    fam: scalar::fraction24(s.fraction),
+                    head: (scalar::position5(s.head[0]), scalar::position5(s.head[1])),
+                    first: s
+                        .body
+                        .first
+                        .map(|[x, y]| (scalar::position5(x), scalar::position5(y))),
+                    deltas,
+                    iang,
+                })
             }
-            Packet::Appear(Appearance {
-                id: u16_at(p, 1)?,
-                profile,
-                heading: angle24(p, 3)?,
-                wanted: angle24(p, 7)?,
-                speed: f64::from(u16_at(p, 10)?) / 1000. / SPEED_UNIT_SECONDS,
-                fam: fraction24(p, 12)?,
-                head: (
-                    f64::from(u24_at(p, 16)?) / 5.,
-                    f64::from(u24_at(p, 19)?) / 5.,
-                ),
-                first,
-                deltas,
-                iang,
-            })
-        }
-        b'g' | b'n' | b'G' | b'N' | b'+' | b'=' => {
-            let own = matches!(code, b'G' | b'N')
-                || (code == b'=' && n == 7)
-                || (code == b'+' && n == 10);
-            let (target, m) = if own {
-                (Target::Own, 1)
-            } else {
-                (Target::Id(u16_at(p, 1)?), 3)
-            };
-            let payload = n.saturating_sub(m);
-            let grow = matches!(code, b'n' | b'N' | b'+');
-            let (iang, absolute, fam_at) = match (code, payload) {
-                (b'+', 9) | (b'=', 6) => (
-                    Some(u16_at(p, m)?),
-                    Some((u16_at(p, m + 2)?, u16_at(p, m + 4)?)),
-                    m + 6,
-                ),
-                (b'g' | b'G', 0) | (b'n' | b'N', 3) => (None, None, m),
-                (b'g' | b'G', 2) | (b'n' | b'N', 5) => (Some(u16_at(p, m)?), None, m + 2),
-                _ => return Err(malformed(p)),
-            };
-            Packet::Anchor {
-                target,
-                iang,
-                absolute,
-                fam: if grow {
-                    Some(fraction24(p, fam_at)?)
-                } else {
-                    None
-                },
+            v19::Message::SnakeRemoval(s) => Packet::Remove(s.id, s.raw_status.map(|b| b == 1)),
+            v19::Message::Anchor(a) => Packet::Anchor {
+                target: target(a.target),
+                iang: a.direction,
+                absolute: a.absolute.map(|[x, y]| (x, y)),
+                fam: a.fraction.map(scalar::fraction24),
+            },
+            v19::Message::Motion(m) => Packet::Motion {
+                target: target(m.target),
+                heading: m.heading.map(scalar::angle8),
+                wanted: m.wanted_heading.map(scalar::angle8),
+                speed: m.speed.map(scalar::compact_speed),
+            },
+            v19::Message::Mass { id, fraction } => Packet::Fam(id, scalar::fraction24(fraction)),
+            v19::Message::Tail { id, fraction } => {
+                Packet::Tail(id, fraction.map(scalar::fraction24))
             }
-        }
-        b'e' | b'E' | b'3' | b'4' | b'5' | b'd' | b'7' => {
-            let own = matches!(code, b'd' | b'7') || n - 1 <= 2;
-            let (target, m) = if own {
-                (Target::Own, 1)
-            } else {
-                (Target::Id(u16_at(p, 1)?), 3)
-            };
-            let all = || -> Result<_, String> {
-                Ok((
-                    Some(angle8(p, m)?),
-                    Some(angle8(p, m + 1)?),
-                    Some(speed8(p, m + 2)?),
-                ))
-            };
-            let (heading, wanted, speed) = match (n, code) {
-                (6, _) => all()?,
-                (5 | 3, b'e') => (Some(angle8(p, m)?), None, Some(speed8(p, m + 1)?)),
-                (5 | 3, b'E' | b'4') => (None, Some(angle8(p, m)?), Some(speed8(p, m + 1)?)),
-                (5 | 3, b'3' | b'5') => (Some(angle8(p, m)?), Some(angle8(p, m + 1)?), None),
-                (4 | 2, b'e') => (Some(angle8(p, m)?), None, None),
-                (4 | 2, b'E' | b'4') => (None, Some(angle8(p, m)?), None),
-                (4 | 2, b'3') => (None, None, Some(speed8(p, m)?)),
-                (4 | 2, b'd' | b'7') => all()?,
-                _ => return Err(malformed(p)),
-            };
-            Packet::Motion {
-                target,
-                heading,
-                wanted,
-                speed,
-            }
-        }
-        b'h' if n == 6 => Packet::Fam(u16_at(p, 1)?, fraction24(p, 3)?),
-        b'r' if n == 3 => Packet::Tail(u16_at(p, 1)?, None),
-        b'r' if n == 6 => Packet::Tail(u16_at(p, 1)?, Some(fraction24(p, 3)?)),
-        b'R' if n == 2 => Packet::Credit(p[1]),
-        b'F' if n >= 3 && (n - 3).is_multiple_of(4) => Packet::Sector(
-            p[1],
-            p[2],
-            p[3..]
-                .as_chunks::<4>()
-                .0
-                .iter()
-                .map(|&[_, rx, ry, size]| (rx, ry, f64::from(size) / 5.))
-                .collect(),
-        ),
-        b'b' | b'f' => match n - 1 {
-            3 => Packet::Pellet(None, p[1], p[2], f64::from(p[3]) / 5.),
-            4 => Packet::Pellet(None, p[1], p[2], f64::from(p[4]) / 5.),
-            5 => Packet::Pellet(Some((p[1], p[2])), p[3], p[4], f64::from(p[5]) / 5.),
-            6 => Packet::Pellet(Some((p[1], p[2])), p[3], p[4], f64::from(p[6]) / 5.),
-            _ => return Err(malformed(p)),
-        },
-        b'c' | b'C' | b'<' => {
-            let eater = usize::from(code == b'<') * 2;
-            match (n - 1).checked_sub(eater) {
-                Some(2) => Packet::Eaten(None, p[1], p[2]),
-                Some(4) => Packet::Eaten(Some((p[1], p[2])), p[3], p[4]),
-                _ => return Err(malformed(p)),
-            }
-        }
-        b'w' if n == 3 => Packet::ClearSector(p[1], p[2]),
-        b'y' => match n - 1 {
-            2 | 4 => Packet::PreyRemove(u16_at(p, 1)?),
-            19 => Packet::PreyAppear(
-                u16_at(p, 1)?,
-                (f64::from(u24_at(p, 4)?) / 5., f64::from(u24_at(p, 7)?) / 5.),
-                f64::from(p[10]) / 5.,
-                angle24(p, 12)?,
-                angle24(p, 15)?,
-                f64::from(u16_at(p, 18)?) / 1000. / SPEED_UNIT_SECONDS,
+            v19::Message::ScoreAdjustment(credit) => Packet::Credit(credit),
+            v19::Message::FoodSector(s) => Packet::Sector(
+                s.sector[0],
+                s.sector[1],
+                s.foods()
+                    .map(|f| (f.offset[0], f.offset[1], f64::from(f.size) / 5.))
+                    .collect(),
             ),
-            _ => return Err(malformed(p)),
-        },
-        b'j' => {
-            let m = 7;
-            let speed = |i| -> Result<_, String> {
-                Ok(Some(f64::from(u16_at(p, i)?) / 1000. / SPEED_UNIT_SECONDS))
-            };
-            // Byte `m` is a turn direction where present; it is not decoded.
-            let (heading, wanted, speed) = match n - 1 {
-                6 => (None, None, None),
-                8 => (None, None, speed(m)?),
-                9 => (Some(angle24(p, m)?), None, None),
-                10 => (None, Some(angle24(p, m + 1)?), None),
-                11 => (Some(angle24(p, m)?), None, speed(m + 3)?),
-                12 => (None, Some(angle24(p, m + 1)?), speed(m + 4)?),
-                13 => (Some(angle24(p, m + 1)?), Some(angle24(p, m + 4)?), None),
-                15 => (
-                    Some(angle24(p, m + 1)?),
-                    Some(angle24(p, m + 4)?),
-                    speed(m + 7)?,
+            v19::Message::FoodSpawn(f) => Packet::Pellet(
+                f.sector.map(|[x, y]| (x, y)),
+                f.offset[0],
+                f.offset[1],
+                f64::from(f.size) / 5.,
+            ),
+            v19::Message::FoodEaten(f) => {
+                Packet::Eaten(f.sector.map(|[x, y]| (x, y)), f.offset[0], f.offset[1])
+            }
+            v19::Message::SectorClear([x, y]) => Packet::ClearSector(x, y),
+            // The simulator historically projects the first prey angle as heading,
+            // unlike the presentation lane. Keep that order and the TAU expression.
+            v19::Message::PreyAppearance(p) => Packet::PreyAppear(
+                p.id,
+                (
+                    scalar::position5(p.position[0]),
+                    scalar::position5(p.position[1]),
                 ),
-                _ => return Err(malformed(p)),
-            };
-            Packet::PreyMove {
-                id: u16_at(p, 1)?,
+                f64::from(p.size) / 5.,
+                scalar::angle24(p.wanted_heading),
+                scalar::angle24(p.heading),
+                scalar::full_speed(p.speed),
+            ),
+            v19::Message::PreyRemoval { id, .. } => Packet::PreyRemove(id),
+            v19::Message::PreyMotion(p) => Packet::PreyMove {
+                id: p.id,
                 position: (
-                    1. + f64::from(u16_at(p, 3)?) * 3.,
-                    1. + f64::from(u16_at(p, 5)?) * 3.,
+                    scalar::prey_position(p.position[0]),
+                    scalar::prey_position(p.position[1]),
                 ),
-                heading,
-                wanted,
-                speed,
+                heading: p.heading.map(scalar::angle24),
+                wanted: p.wanted_heading.map(scalar::angle24),
+                speed: p.speed.map(scalar::full_speed),
+            },
+            v19::Message::Leaderboard(l) => Packet::Leaderboard {
+                own_position: l.local_row(),
+                rank: l.rank(),
+                player_count: l.population(),
+                rows: l
+                    .rows()
+                    .map(|r| {
+                        (
+                            r.count(),
+                            scalar::fraction24(r.raw_fraction()),
+                            r.raw_color(),
+                            latin1(r.name()),
+                        )
+                    })
+                    .collect(),
+            },
+            v19::Message::Announcement(a) => Packet::Record {
+                segments: a.count(),
+                fam: scalar::fraction24(a.raw_fraction()),
+                name: latin1(a.name()),
+                message: latin1(a.message()),
+            },
+            v19::Message::Session {
+                server_id,
+                session_id,
+            } => Packet::Session(server_id, session_id),
+            v19::Message::TeamScores(s) if !s.is_history() => {
+                Packet::TeamScore(s.scores().next().unwrap())
             }
-        }
-        b'M' | b'V' | b'U' | b'u' | b'L' => Packet::Minimap(p),
-        b'l' => {
-            let mut rows = Vec::new();
-            let mut m = 6;
-            while m < n {
-                let (name, next) = short_bytes(p, m + 6)?;
-                rows.push((u16_at(p, m)?, fraction24(p, m + 2)?, p[m + 5], latin1(name)));
-                m = next;
-            }
-            Packet::Leaderboard {
-                own_position: byte(p, 1)?,
-                rank: u16_at(p, 2)?,
-                player_count: u16_at(p, 4)?,
-                rows,
-            }
-        }
-        b'm' => {
-            let (name, m) = short_bytes(p, 7)?;
-            Packet::Record {
-                segments: u24_at(p, 1)?,
-                fam: fraction24(p, 4)?,
-                name: latin1(name),
-                message: latin1(&p[m..]),
-            }
-        }
-        b'S' if n == 7 => {
-            Packet::Session(u16_at(p, 1)?, u32::from_be_bytes([p[3], p[4], p[5], p[6]]))
-        }
-        b'o' if n == 9 => Packet::TeamScore([i32_at(p, 1)?, i32_at(p, 5)?]),
-        b'o' if n > 1 && (n - 1).is_multiple_of(8) => Packet::TeamHistory(
-            (1..n)
-                .step_by(8)
-                .map(|i| Ok([i32_at(p, i)?, i32_at(p, i + 4)?]))
-                .collect::<Result<_, String>>()?,
-        ),
-        b'k' if n == 6 => Packet::Kills(u16_at(p, 1)?, u24_at(p, 3)?),
-        // The stock sector display list adds no food knowledge beyond F/w.
-        b'W' if n == 3 => Packet::Ignored,
-        b'p' => Packet::Pong,
-        b'v' => Packet::GameOver,
-        b'z' if n == 4 => Packet::Radius(f64::from(u24_at(p, 1)?)),
-        b'h' | b'r' | b'R' | b'F' | b'w' | b'z' | b'S' | b'o' | b'k' | b'W' => {
-            return Err(malformed(p));
-        }
-        // Challenge, admin `i` and other commands carry no state this contract exposes.
-        _ => Packet::Ignored,
-    })
+            v19::Message::TeamScores(s) => Packet::TeamHistory(s.scores().collect()),
+            v19::Message::Kills { id, count } => Packet::Kills(id, count),
+            v19::Message::Pong(_) => Packet::Pong,
+            v19::Message::LifeControl { .. } => Packet::GameOver,
+            v19::Message::Radius(radius) => Packet::Radius(f64::from(radius)),
+            v19::Message::Rules(rules) => Packet::Rules(super::rules_packet::from_wire(rules)?),
+            _ => Packet::Ignored,
+        },
+    )
 }
 
 /// Per-snake bookkeeping beside the receipt tracker, keyed by wire id.

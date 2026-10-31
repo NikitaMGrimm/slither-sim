@@ -126,36 +126,22 @@ pub fn login_packet(nickname: &str, skin: u8) -> Result<Vec<u8>, String> {
         ));
     }
     let name: Vec<_> = nickname.chars().map(|c| c as u8).collect();
-    let mut packet = vec![
-        115,
-        30,
-        1,
-        35,
-        54,
-        206,
-        204,
-        169,
-        97,
-        178,
-        74,
-        136,
-        124,
-        117,
-        14,
-        210,
-        106,
-        236,
-        8,
-        208,
-        136,
-        213,
-        140,
-        111,
-        skin,
-        name.len() as u8,
-    ];
-    packet.extend(name);
-    packet.extend([0, 255]);
+    use slither_protocol::v19::client::{ModernLogin, write_login};
+    let mut packet = vec![0; 28 + name.len()];
+    write_login(
+        ModernLogin {
+            client_version: 0x0123,
+            page_echo: &[
+                54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106, 236, 8, 208, 136, 213,
+                140, 111,
+            ],
+            nickname: &name,
+            skin,
+            custom_skin: &[],
+        },
+        &mut packet,
+    )
+    .expect("admitted Latin-1 nickname and exact output capacity");
     Ok(packet)
 }
 

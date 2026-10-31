@@ -130,45 +130,15 @@ fn charge_cells(remaining: &mut usize, cells: usize) -> Result<(), String> {
     Ok(())
 }
 
-/// Decode one stock run-length layer of `cells` cells starting at `cursor`, calling
-/// `set` with each occupied index. Bytes of 128 or more skip `k - 128` cells; with
-/// `extended`, 255 skips `126 * next byte`. Other bytes carry seven cells, high bit
-/// first. Reverse order starts at the last index, as the stock M/V/U/L loops do.
-/// A layer ends when its cells or the payload are exhausted.
-fn layer(
+// Header sizing stays here solely to preserve consumer budget/error ordering.
+// The shared parser validates dimensions and owns the complete run grammar.
+fn selected(
     payload: &[u8],
-    cursor: &mut usize,
-    cells: usize,
-    extended: bool,
-    reverse: bool,
-    mut set: impl FnMut(usize),
-) -> Result<(), String> {
-    let mut done = 0;
-    while *cursor < payload.len() && done < cells {
-        let k = payload[*cursor];
-        *cursor += 1;
-        if k >= 128 {
-            let skip = if extended && k == 255 {
-                let n = *payload.get(*cursor).ok_or("Truncated minimap run")?;
-                *cursor += 1;
-                126 * usize::from(n)
-            } else {
-                usize::from(k - 128)
-            };
-            done = (done + skip).min(cells);
-        } else {
-            for bit in (0..7).rev() {
-                if done == cells {
-                    break;
-                }
-                if k & (1 << bit) != 0 {
-                    set(if reverse { cells - 1 - done } else { done });
-                }
-                done += 1;
-            }
-        }
-    }
-    Ok(())
+    side: usize,
+) -> Result<slither_protocol::v19::minimap::SelectedCells<'_>, String> {
+    slither_protocol::v19::minimap::parse_minimap(payload, slither_protocol::DecodeAdmission::Sim)
+        .and_then(|packet| packet.selected(side as u16))
+        .map_err(|_| "Truncated minimap run".into())
 }
 
 fn side_at(payload: &[u8], at: usize) -> Result<usize, String> {
@@ -271,11 +241,11 @@ impl MinimapDecoder {
                     .as_mut()
                     .ok_or("Minimap delta before full snapshot")?;
                 charge_cells(remaining_cells, base.len())?;
-                let mut toggled = Vec::new();
-                layer(payload, &mut 1, base.len(), true, true, |i| toggled.push(i))?;
+                let toggled = selected(payload, map.side)?;
                 // V toggles mmdata and paints the modern target. A legacy u
                 // picture must not supply its untouched cells.
-                for i in toggled {
+                for cell in toggled {
+                    let i = cell.index;
                     base[i] ^= 1;
                     map.cells[i] = base[i];
                 }
@@ -287,7 +257,9 @@ impl MinimapDecoder {
                 charge_cells(remaining_cells, side * side)?;
                 self.resize(side);
                 let mut cells = vec![0; side * side];
-                layer(payload, &mut 3, cells.len(), false, true, |i| cells[i] = 1)?;
+                for cell in selected(payload, side)? {
+                    cells[cell.index] = 1;
+                }
                 self.show_modern(side, cells, receipt);
                 self.teams = None;
             }
@@ -295,7 +267,9 @@ impl MinimapDecoder {
                 charge_cells(remaining_cells, LEGACY_SIDE * LEGACY_SIDE)?;
                 self.resize(LEGACY_SIDE);
                 let mut cells = vec![0; LEGACY_SIDE * LEGACY_SIDE];
-                layer(payload, &mut 1, cells.len(), false, false, |i| cells[i] = 1)?;
+                for cell in selected(payload, LEGACY_SIDE)? {
+                    cells[cell.index] = 1;
+                }
                 self.show(LEGACY_SIDE, cells, receipt);
                 self.teams = None;
             }
@@ -310,16 +284,11 @@ impl MinimapDecoder {
                 }
                 charge_cells(remaining_cells, (usize::from(count) + 1) * side * side)?;
                 self.resize(side);
-                let mut cursor = 4;
                 let mut union = vec![0; side * side];
-                let mut layers = Vec::with_capacity(usize::from(count));
-                for _ in 0..count {
-                    let mut cells = vec![0; side * side];
-                    layer(payload, &mut cursor, cells.len(), true, true, |i| {
-                        cells[i] = 1;
-                        union[i] = 1;
-                    })?;
-                    layers.push(cells);
+                let mut layers = vec![vec![0; side * side]; usize::from(count)];
+                for cell in selected(payload, side)? {
+                    layers[usize::from(cell.layer)][cell.index] = 1;
+                    union[cell.index] = 1;
                 }
                 self.show_modern(side, union, receipt);
                 self.teams = Some((side, layers, receipt));
@@ -486,7 +455,7 @@ impl Minimap {
     /// Modern M/V command payload, including command byte but no transport header.
     /// Decode transactionally: a malformed delta cannot corrupt the last snapshot.
     pub fn packet(previous: Option<&Self>, payload: &[u8]) -> Result<Self, String> {
-        let (mut map, mut cursor, delta) = match payload.first() {
+        let (mut map, delta) = match payload.first() {
             Some(b'M') => {
                 let side = snapshot_side(payload)?;
                 (
@@ -495,7 +464,6 @@ impl Minimap {
                         cells: vec![0; side * side],
                         age_seconds: 0.,
                     },
-                    3,
                     false,
                 )
             }
@@ -505,18 +473,17 @@ impl Minimap {
                     .clone();
                 map.validate()?;
                 map.age_seconds = 0.;
-                (map, 1, true)
+                (map, true)
             }
             _ => return Err("Expected modern M/V minimap packet".into()),
         };
-        let cells = map.cells.len();
-        layer(payload, &mut cursor, cells, true, true, |i| {
+        for cell in selected(payload, map.side)? {
             if delta {
-                map.cells[i] ^= 1;
+                map.cells[cell.index] ^= 1;
             } else {
-                map.cells[i] = 1;
+                map.cells[cell.index] = 1;
             }
-        })?;
+        }
         Ok(map)
     }
 

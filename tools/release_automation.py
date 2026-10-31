@@ -1,8 +1,10 @@
 """Reconcile the rolling release PR and select an immutable publication commit."""
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
+from pathlib import PurePosixPath
 import re
 import subprocess
 import sys
@@ -10,6 +12,34 @@ import time
 import tomllib
 
 import release
+
+
+@contextmanager
+def selected_package(name):
+    previous = os.environ.get("RELEASE_PACKAGE")
+    os.environ["RELEASE_PACKAGE"] = name
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("RELEASE_PACKAGE", None)
+        else:
+            os.environ["RELEASE_PACKAGE"] = previous
+
+
+def protocol_dependency(commit):
+    manifest = tomllib.loads(git("show", f"{commit}:Cargo.toml"))
+    return release.PROTOCOL in manifest.get("dependencies", {})
+
+
+def protocol_prerequisite(commit):
+    """Each new package upload has its own immutable-source and release gate."""
+    if release.selected_name() == release.PROTOCOL or not protocol_dependency(commit):
+        return {"ready": "true", "protocol_needed": "false"}
+    with selected_package(release.PROTOCOL):
+        package = release.package_at(commit)
+        result = publication_ready(release.version_tag(package), commit)
+    return {"ready": result["ready"], "protocol_needed": str(result["already_published"] != "true").lower()}
 
 
 def git(*args):
@@ -39,43 +69,82 @@ def bot_pr(pr):
             and pr["base"]["ref"] == "main" and not pr["draft"])
 
 
+def release_markers(pr):
+    return re.findall(r"<!-- release-plz (\S+) (\S+) (\S+) (\S+) -->", pr["body"] or "")
+
+
+def metadata_files(names):
+    files = {"Cargo.lock"}
+    for name in names:
+        path = release.MANIFESTS[name]
+        files.update((path, str(PurePosixPath(path).with_name("CHANGELOG.md"))))
+    return files
+
+
 def eligible_patch(pr, package, files, main):
-    marker = re.findall(r"<!-- release-plz (\S+) (\S+) (\S+) (\S+) -->", pr["body"] or "")
-    if len(marker) != 1 or not bot_pr(pr) or pr["base"]["sha"] != main:
+    markers = release_markers(pr)
+    chosen = [m for m in markers if m[0] == package["name"]]
+    if (len(chosen) != 1 or len({m[0] for m in markers}) != len(markers)
+            or not bot_pr(pr) or pr["base"]["sha"] != main
+            or any(m[0] not in release.MANIFESTS for m in markers)):
         return False
-    name, previous, proposed, semver = marker[0]
-    return (name == package["name"] and previous == package["version"]
-            and is_patch(previous, proposed) and semver == "compatible"
+    return (chosen[0][1] == package["version"]
+            and all(is_patch(previous, proposed) and semver == "compatible"
+                    for _, previous, proposed, semver in markers)
             and pr["mergeable_state"] == "clean"
-            and {item["filename"] for item in files} == {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"})
+            and {item["filename"] for item in files} == metadata_files(m[0] for m in markers))
 
 
-def metadata_only(main, head, package, patch_only=True):
+def metadata_only(main, head, package, patch_only=True, markers=None):
     subprocess.run(["git", "fetch", "origin", head], cwd=release.ROOT, check=True)
     if git("merge-base", main, head) != main:
         return False
     before = tomllib.loads(git("show", f"{main}:Cargo.toml"))
     after = tomllib.loads(git("show", f"{head}:Cargo.toml"))
-    proposed = release.version_table(after)["version"]
-    if proposed == package["version"] or (patch_only and not is_patch(package["version"], proposed)):
-        return False
-    release.version_table(after)["version"] = release.version_table(before)["version"]
+    old_root, new_root = release.version_table(before)["version"], release.version_table(after)["version"]
+    versions = {}
+    changed = set()
+    if old_root != new_root:
+        versions[before["package"]["name"]] = (old_root, new_root)
+        changed.add("slither-sim")
+    release.version_table(after)["version"] = old_root
     if before != after:
         return False
-    # Workspace members that inherit the version move with the root package.
-    bumped = {package["name"]}
-    if release.inherits_version(after):
-        for member in after["workspace"].get("members", []):
-            manifest = tomllib.loads(git("show", f"{head}:{member}/Cargo.toml"))
-            if release.inherits_version(manifest):
-                bumped.add(manifest["package"]["name"])
+    # Independently versioned protocol metadata; all other workspace manifests
+    # stay immutable. Inherited root/ABI/Python lock entries move together.
+    for member in after.get("workspace", {}).get("members", []):
+        path = f"{member}/Cargo.toml"
+        old = tomllib.loads(git("show", f"{main}:{path}"))
+        new = tomllib.loads(git("show", f"{head}:{path}"))
+        name = old["package"]["name"]
+        if name == release.PROTOCOL:
+            previous, proposed = old["package"]["version"], new["package"]["version"]
+            if previous != proposed:
+                versions[name] = (previous, proposed)
+                changed.add(name)
+            new["package"]["version"] = previous
+        elif release.inherits_version(old) and old_root != new_root:
+            versions[name] = (old_root, new_root)
+        if old != new:
+            return False
+    if package["name"] not in changed or versions[package["name"]][0] != package["version"]:
+        return False
+    if markers is not None and ({m[0]: m[1:3] for m in markers} != {name: versions[name] for name in changed}
+                                or len(markers) != len(changed)):
+        return False
+    if patch_only and any(not is_patch(*pair) for pair in versions.values()):
+        return False
+    actual = set(git("diff", "--name-only", main, head).splitlines())
+    if actual != metadata_files(changed):
+        return False
     before_lock = tomllib.loads(git("show", f"{main}:Cargo.lock"))
     after_lock = tomllib.loads(git("show", f"{head}:Cargo.lock"))
     for item in after_lock["package"]:
-        if item["name"] in bumped and "source" not in item:
+        if item["name"] in versions and "source" not in item:
+            previous, proposed = versions[item["name"]]
             if item["version"] != proposed:
                 return False
-            item["version"] = package["version"]
+            item["version"] = previous
     return before_lock == after_lock
 
 
@@ -90,7 +159,8 @@ def merge_patch(package):
     ensure_pr_checks(pr)
     files = release.github_pages(repo_path(f"pulls/{pr['number']}/files?per_page=100"))
     main = git("rev-parse", "origin/main")
-    if not eligible_patch(pr, package, files, main) or not metadata_only(main, pr["head"]["sha"], package):
+    if not eligible_patch(pr, package, files, main) or not metadata_only(
+            main, pr["head"]["sha"], package, markers=release_markers(pr)):
         print("Release PR awaits compatible patch metadata, current main and successful checks.", file=sys.stderr)
         return
     # The endpoint enforces branch protection; the SHA prevents merging an uninspected update.
@@ -103,7 +173,7 @@ def merge_patch(package):
 
 def version_commit(version):
     # Later main commits may retain this version. Publish its original version-bump commit.
-    commits = git("log", "--first-parent", "--format=%H", "origin/main", "--", "Cargo.toml").splitlines()
+    commits = git("log", "--first-parent", "--format=%H", "origin/main", "--", release.MANIFESTS[release.selected_name()]).splitlines()
     candidate = None
     for commit in commits:
         if release.package_at(commit)["version"] == version:
@@ -133,12 +203,15 @@ def manual_release_merge(commit):
     if (not bot_pr(pr) or not pr.get("merged") or pr.get("merge_commit_sha") != commit
             or not pr.get("merged_at") or (pr.get("merged_by") or {}).get("type") != "User"):
         return None
-    marker = re.findall(r"<!-- release-plz (\S+) (\S+) (\S+) (\S+) -->", pr["body"] or "")
-    if len(marker) != 1 or marker[0][:3] != (package["name"], before["version"], package["version"]):
+    markers = release_markers(pr)
+    marker = [m for m in markers if m[0] == package["name"]]
+    if (len(marker) != 1 or len({m[0] for m in markers}) != len(markers)
+            or any(m[0] not in release.MANIFESTS for m in markers)
+            or marker[0][:3] != (package["name"], before["version"], package["version"])):
         return None
     files = set(git("diff", "--name-only", parent, commit).splitlines())
-    if (files == {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"}
-            and metadata_only(parent, commit, before, patch_only=False)):
+    if (files == metadata_files(m[0] for m in markers)
+            and metadata_only(parent, commit, before, patch_only=False, markers=markers)):
         return pr
 
 
@@ -162,7 +235,7 @@ def publication_target(commit):
     subprocess.run(["git", "merge-base", "--is-ancestor", commit, "origin/main"],
                    cwd=release.ROOT, check=True)
     package = release.package_at(commit)
-    tag = f"v{package['version']}"
+    tag = release.version_tag(package)
     release.prepare(tag, package, commit)
     ensure_tag(tag, commit)
     return {"tag": tag, "commit": commit}
@@ -192,7 +265,7 @@ def select_automatic():
     versions = release.registry_versions(package["name"])
     releases = release.github_pages(repo_path("releases?per_page=100"))
     completed = {item["tag_name"] for item in releases if not item["draft"]}
-    unfinished = [item for item in versions if f"v{item['num']}" not in completed]
+    unfinished = [item for item in versions if release.version_tag({**package, "version": item["num"]}) not in completed]
     if unfinished:
         previous = max(unfinished, key=lambda item: item["created_at"])
         commit = release.published_commit(package["name"], previous["num"])
@@ -229,9 +302,13 @@ def ensure_pr_checks(pr):
     refresh_main()
     main = git("rev-parse", "origin/main")
     files = release.github_pages(repo_path(f"pulls/{pr['number']}/files?per_page=100"))
+    markers = release_markers(pr)
+    if not markers or any(m[0] not in release.MANIFESTS for m in markers):
+        raise ValueError("Release PR must identify only supported packages")
     if (pr["base"]["sha"] != main
-            or {item["filename"] for item in files} != {"Cargo.toml", "Cargo.lock", "CHANGELOG.md"}
-            or not metadata_only(main, pr["head"]["sha"], release.package_at(main), patch_only=False)):
+            or {item["filename"] for item in files} != metadata_files(m[0] for m in release_markers(pr))
+            or not metadata_only(main, pr["head"]["sha"], release.package_at(main, markers[0][0]),
+                                 patch_only=False, markers=markers)):
         print("Release PR must contain only current release metadata before CI approval.", file=sys.stderr)
         return
     for attempt in range(7):
@@ -259,38 +336,53 @@ def ensure_pr_checks(pr):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("select", "prepare", "start-pr-checks", "publication-ready"))
+    parser.add_argument("command", choices=("select", "prepare", "start-pr-checks", "publication-ready", "wait-protocol"))
     args = parser.parse_args()
     if args.command == "start-pr-checks":
         start_pr_checks()
         return
+    if args.command == "wait-protocol":
+        release.wait_protocol(os.environ["RELEASE_COMMIT"])
+        return
     if args.command == "publication-ready":
         commit = git("rev-parse", f"{os.environ['RELEASE_COMMIT']}^{{commit}}")
         result = publication_ready(os.environ["RELEASE_TAG"], commit)
+        if result["ready"] == "true":
+            result.update(protocol_prerequisite(commit))
         for key, value in result.items():
             print(f"{key}={value}")
         return
     if args.command == "prepare":
-        package = release.package_at("HEAD")
         # Do not propose another version while a merged release is still unpublished.
-        ready = release.published_commit(package["name"], package["version"]) is not None
+        ready = all(release.published_commit(name, release.package_at("HEAD", name)["version"]) is not None
+                    for name in release.MANIFESTS)
         print(f"ready={str(ready).lower()}")
         return
     event = os.environ["GITHUB_EVENT_NAME"]
     tag = os.environ.get("RELEASE_TAG", "")
+    result = None
     if event == "schedule" or (event == "workflow_dispatch" and tag == "auto"):
-        result = select_automatic()
+        for name in release.MANIFESTS:
+            with selected_package(name):
+                result = select_automatic()
+            if result:
+                result["package"] = name
+                break
     elif event == "push" and os.environ.get("GITHUB_REF") == "refs/heads/main":
-        result = select_merged()
+        for name in release.MANIFESTS:
+            with selected_package(name):
+                result = select_merged()
+            if result:
+                result["package"] = name
+                break
     elif event == "push" or tag:
         if not tag:
             tag = os.environ["GITHUB_REF_NAME"]
-        if not re.fullmatch(r"v[0-9][0-9A-Za-z.+-]*", tag):
+        if not re.fullmatch(r"(?:slither-protocol-)?v[0-9][0-9A-Za-z.+-]*", tag):
             raise ValueError("Expected a version tag")
         commit = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
-        result = {"tag": tag, "commit": commit}
-    else:
-        result = None  # Empty dispatch retains the authentication-only connection test.
+        result = {"tag": tag, "commit": commit,
+                  "package": release.PROTOCOL if tag.startswith("slither-protocol-") else "slither-sim"}
     for key, value in (result or {}).items():
         print(f"{key}={value}")
 

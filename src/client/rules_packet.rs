@@ -23,57 +23,31 @@ pub(crate) fn encode(rules: WorldRules) -> Vec<u8> {
     packet
 }
 
+#[cfg(test)]
 pub(crate) fn decode(packet: &[u8]) -> Result<WorldRules, String> {
-    let invalid = || "Invalid SlitherSim rules packet".to_owned();
-    if packet.len() != LENGTH
-        || packet[0] != COMMAND
-        || packet[1] != VERSION
-        || packet[3] & !15 != 0
-    {
-        return Err(invalid());
-    }
-    let boundary_mode = match packet[2] {
-        0 => BoundaryMode::Sliding,
-        1 => BoundaryMode::Hard,
-        _ => return Err(invalid()),
-    };
-    let flags = packet[3];
-    let optional = |bit, value: f64| -> Result<Option<f64>, String> {
-        if flags & bit == 0 {
-            if value != 0. {
-                return Err(invalid());
-            }
-            Ok(None)
-        } else if value.is_finite() && value > 0. {
-            Ok(Some(value))
-        } else {
-            Err(invalid())
-        }
-    };
-    let pit_radius = optional(1, f64::from_be_bytes(packet[4..12].try_into().unwrap()))?;
-    let min = u32::from_be_bytes(packet[12..16].try_into().unwrap());
-    let min_score = if flags & 2 != 0 {
-        if !MassFloor::score_range().contains(&min) {
-            return Err(invalid());
-        }
-        Some(min)
-    } else {
-        if min != 0 {
-            return Err(invalid());
-        }
-        None
-    };
-    let kill_score_seconds = optional(4, f64::from_be_bytes(packet[16..24].try_into().unwrap()))?;
-    let free_boost_at_floor = flags & 8 != 0;
-    if free_boost_at_floor != min_score.is_some() {
-        return Err(invalid());
+    let wire = slither_protocol::extensions::slither_sim::decode(packet)
+        .map_err(|_| "Invalid SlitherSim rules packet".to_owned())?;
+    from_wire(wire)
+}
+
+pub(crate) fn from_wire(
+    wire: slither_protocol::extensions::slither_sim::RulesRef<'_>,
+) -> Result<WorldRules, String> {
+    let min_score = (wire.flags & 2 != 0).then_some(wire.raw_min_score);
+    if min_score.is_some_and(|min| !MassFloor::score_range().contains(&min)) {
+        return Err("Invalid SlitherSim rules packet".into());
     }
     Ok(WorldRules {
-        boundary_mode,
-        pit_radius,
+        boundary_mode: if wire.boundary == 0 {
+            BoundaryMode::Sliding
+        } else {
+            BoundaryMode::Hard
+        },
+        pit_radius: (wire.flags & 1 != 0).then(|| f64::from_bits(wire.pit_radius_bits)),
         min_score,
-        kill_score_seconds,
-        free_boost_at_floor,
+        kill_score_seconds: (wire.flags & 4 != 0)
+            .then(|| f64::from_bits(wire.kill_score_seconds_bits)),
+        free_boost_at_floor: wire.flags & 8 != 0,
     })
 }
 

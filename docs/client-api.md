@@ -7,6 +7,11 @@ examples. The Rust runner uses the same default `ForagerBot` as host bots and
 native background clients.
 The Python example retains its own simple policy.
 
+The optional `networking` feature uses [`slither-protocol`](https://crates.io/crates/slither-protocol)
+for protocol-19 wire reading and challenge replies. `client::protocol` keeps
+the simulator projection, received state and historical admission rules.
+Core-only and bot-only builds do not depend on the wire crate.
+
 ## Interface versions
 
 Interfaces are experimental; only the current version of each interface is
