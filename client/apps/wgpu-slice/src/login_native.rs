@@ -328,6 +328,7 @@ impl NativeLogin {
                 self.open_settings(admission);
             }
             Some(SERVER) if slither_client::server_picker::available(&view) => {
+                self.picker.controls.inherit_modality(&self.controls);
                 self.picker.policy.open();
                 self.picker
                     .input
@@ -620,6 +621,7 @@ impl NativeLogin {
                         }
                         SETTINGS => effects.extend(self.open_settings(admission)),
                         SERVER => {
+                            self.picker.controls.inherit_modality(&self.controls);
                             effects.extend(self.input.state.apply(EditIntent::Focus(None)));
                             effects.extend(self.picker.open());
                         }

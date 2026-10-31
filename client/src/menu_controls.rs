@@ -533,6 +533,10 @@ impl PanelInputState {
     pub fn visible_focus(&self) -> Option<ControlId> {
         self.focus.filter(|_| self.keyboard_focus)
     }
+    /// A modal with its own input owner inherits the opener's input modality.
+    pub fn inherit_modality(&mut self, opener: &Self) {
+        self.keyboard_focus = opener.keyboard_focus;
+    }
     /// Tab, directional navigation and keyboard activation expose the current target.
     pub fn keyboard_navigation(&mut self) {
         self.keyboard_focus = true;
