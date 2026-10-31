@@ -32,7 +32,7 @@ the chosen platform font/flow implementation. The numeric tests use authored
 Lucida font box for the last-length line, the two NBSPs around the bold Arial
 Play label, and the 20px gap directly after the nickname border box. Creation
 and retained updates use the same measurements. The logo flow holder stays
-450x115. Native nickname, Play, tips and wordmark use ascent/descent baselines;
+450x115. Native nickname, Play, tips and font fallbacks use ascent/descent baselines;
 tips use a normal line at the top of their reserved row. Nickname painting,
 pointer selection and IME anchoring share the single-line input content box.
 `menu_layout::single_line_field_placement(field, inset, font_size, ascent,
@@ -47,14 +47,13 @@ call this same API without depending on the login renderer.
 The caret uses a 530ms on/off clock from the menu
 callback, restarted by focus/edit/movement; raw IME preedit stays separate.
 
-Native local logo art keeps its aspect ratio and independent opacity. An authored
-left-to-right wipe uses the retained reveal fraction, one opaque crop and at
-most 32 physical-pixel feather strips per raster. No masked texture revisions
-or shaders are added. Without local logo art, or with desktop `--wordmark`, two
-bold measured runs form the green/purple SlitherClient wordmark inside the same
-holder. The two runs share one reveal span and one fitted size. Authored tests
-and offscreen specimens establish these effects, not original curve-motion or
-physical IME parity. Login scales about the center
+Native local logo art keeps its aspect ratio and independent opacity, with a
+plain fade. Without local logo art, or with desktop `--wordmark`, the authored
+[stroke wordmark](wordmark.md) swells and ripples into place on the retained
+reveal clock, then stops. Its natural letter height follows the same holder;
+longer text extends horizontally and fits uniformly only at the viewport margin.
+Authored tests and offscreen specimens establish these effects, not original
+curve-motion or physical IME parity. Login scales about the center
 of its viewport-sized border box, with its 64px margin outside that box. Fixed
 corner links and the centered 128px spinner are siblings: they never inherit the
 login transform. The spinner uses its own center-origin scale from the view.

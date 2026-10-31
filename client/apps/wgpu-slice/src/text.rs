@@ -43,8 +43,9 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
-// Shared ceiling inherited from #358: exact 5x controls and full-growth wordmark.
-// Champion controls retain their own compactness regression below this ceiling.
+// Exact 5x controls, last-life/Play Again and cropped stroke-logo tiles through
+// 1.1x outgoing growth: tests/menu.rs::stroke_wordmark_overrides_only_logo_art_with_bounded_tiled_rasters.
+// The aggregate 13 MiB admission and 64 MiB whole-picture guard both apply.
 pub const MENU_CACHE_BYTES: usize = 13 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;

@@ -33,7 +33,7 @@ use the physical overlay. A hidden login emits no backdrop, even while the
 spinner remains. Hosts can take it for a separate world layer before composing
 a physical-resolution menu overlay. Logo art keeps its image aspect inside the
 unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
-and a text logo fallback approximate the controls at gameplay size. The spinner uses
+and a stroke wordmark approximate the controls at gameplay size. The spinner uses
 two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
 scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
@@ -43,8 +43,9 @@ One 1:1 quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-A static logo uses shared reveal/opacity timing; it does not reproduce animated
-strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
+A static logo uses shared opacity timing with a plain fade. The no-art/`--wordmark`
+path uses the [authored swelling stroke alphabet](wordmark.md), settles to a cached
+raster, and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Both browser art loaders share reserved cosmetic-path rejection with the bounded
@@ -57,8 +58,8 @@ use solid materials without capsule shadows.
 - Menu has **64 replacing slots / 13 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
   are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
-  allowance comes from main's #358 full-growth 5x wordmark bound. Champion
-  controls retain compact sliced tiles and a separate 4 MiB regression.
+  allowance includes exact 5x control/shadow rasters and cropped wordmark tiles
+  through 1.1x outgoing growth; the active-picture 64 MiB limit is unchanged.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.

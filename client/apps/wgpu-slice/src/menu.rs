@@ -7,6 +7,7 @@ use crate::{
     render::PreparedFrame,
     scene::Resource,
     text::*,
+    wordmark,
 };
 use slither_client::{
     menu_controls::{ControlKind, PanelInputState, PanelView, ResolvedControl, intersection},
@@ -37,8 +38,8 @@ enum MaterialKey {
     Solid([u32; 2], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
-pub const WORDMARK_GREEN: [u8; 3] = [86, 172, 129];
-pub const WORDMARK_PURPLE: [u8; 3] = [150, 76, 224];
+pub const WORDMARK_GREEN: [u8; 3] = wordmark::COLORS[0][1];
+pub const WORDMARK_PURPLE: [u8; 3] = wordmark::COLORS[1][1];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -293,6 +294,8 @@ impl MenuFrame {
 #[derive(Default)]
 pub struct Menu {
     pub wordmark: bool,
+    /// Change only the string to use another wordmark; None uses DEFAULT_TEXT.
+    pub wordmark_text: Option<String>,
     pub focus: Option<E>,
     pub skin_hovered: bool,
     pub skin_pressed: bool,
@@ -300,6 +303,19 @@ pub struct Menu {
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     next_handle: u64,
     spinner_revision: u64,
+    stroke: Option<StrokeCache>,
+}
+#[derive(Clone)]
+struct StrokeCache {
+    key: (String, u64, u64, u16),
+    resources: Vec<Resource>,
+    pieces: Vec<StrokePiece>,
+}
+#[derive(Clone)]
+struct StrokePiece {
+    atlas: usize,
+    offset: [u32; 2],
+    source: [u32; 4],
 }
 struct Label {
     /// Material boundary for content below a later modal backdrop.
@@ -309,107 +325,10 @@ struct Label {
     style: TextStyle,
     alpha: f64,
     align: Align,
-    reveal: f64,
-    reveal_span: Option<[f64; 2]>,
     line_box: bool,
     clip: Option<MenuRect>,
     fit: bool,
 }
-/// Two bold runs with one fitted size and a shared advance boundary.
-pub fn wordmark_runs(
-    text: &mut TextCache,
-    logo: MenuRect,
-    dpr: f64,
-) -> Result<[(MenuRect, TextStyle); 2]> {
-    let mut style = TextStyle {
-        size: logo.height,
-        weight: Weight::Bold,
-        family: Family::Arial,
-        slant: Slant::Normal,
-        color: WORDMARK_GREEN,
-    };
-    let cap = text.measure_panel("H", style)?.ascent;
-    style.size *= logo.height * 0.8 / cap;
-    let width = text.measure_panel("Slither", style)?.advance
-        + text.measure_panel("Client", style)?.advance;
-    style.size *= (logo.width / width).min(1.);
-    let mut physical = style;
-    physical.size *= dpr;
-    let left_px = text.measure_panel("Slither", physical)?.advance;
-    let right_px = text.measure_panel("Client", physical)?.advance;
-    // Snap the common origin and advance once. Rounding each run's origin
-    // independently can move the join one physical pixel in either direction.
-    let origin_px = ((logo.x + logo.width / 2.) * dpr - (left_px + right_px) / 2.).round();
-    let boundary_px = origin_px + left_px.round();
-    Ok([
-        (
-            MenuRect {
-                x: origin_px / dpr,
-                width: left_px / dpr,
-                ..logo
-            },
-            style,
-        ),
-        (
-            MenuRect {
-                x: boundary_px / dpr,
-                width: right_px / dpr,
-                ..logo
-            },
-            TextStyle {
-                color: WORDMARK_PURPLE,
-                ..style
-            },
-        ),
-    ])
-}
-// Authored wipe: one opaque crop plus at most 32 one-pixel feather strips.
-// Source crops and destinations remain 1:1 on the snapped overlay path.
-fn reveal_draw(mut draw: Draw, reveal: f64, scale: f64, span: Option<[f64; 2]>) -> Vec<Draw> {
-    draw.snap_overlay(scale);
-    if reveal >= 1. {
-        return vec![draw];
-    }
-    if reveal <= 0. {
-        return Vec::new();
-    }
-    let source = draw.source.unwrap_or(BodyRect {
-        x: 0.,
-        y: 0.,
-        width: f64::from(draw.asset.width),
-        height: f64::from(draw.asset.height),
-    });
-    let feather = (12. * scale).round().clamp(1., 32.);
-    let span = span.unwrap_or([draw.destination.x, source.width / scale]);
-    let end = ((span[1] * scale + feather) * reveal).round()
-        - ((draw.destination.x - span[0]) * scale).round();
-    let solid = (end - feather).max(0.).min(source.width);
-    let mut result = Vec::new();
-    let mut crop = |x: f64, width: f64, alpha: f64| {
-        let mut part = draw.clone();
-        part.source = Some(BodyRect {
-            x: source.x + x,
-            width,
-            ..source
-        });
-        part.destination.x += x / scale;
-        part.destination.width = width / scale;
-        part.effective_alpha *= alpha;
-        result.push(part);
-    };
-    if solid > 0. {
-        crop(0., solid, 1.);
-    }
-    for x in solid as u32..(end.min(source.width) as u32) {
-        crop(
-            f64::from(x),
-            1.,
-            ((end - f64::from(x) - 0.5) / feather).clamp(0., 1.),
-        );
-    }
-    result
-}
-
 struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
@@ -421,6 +340,8 @@ struct Composition<'a> {
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
     quality_art: bool,
+    old_stroke: Option<&'a StrokeCache>,
+    stroke: Option<StrokeCache>,
 }
 fn body(r: MenuRect) -> BodyRect {
     BodyRect {
@@ -510,8 +431,6 @@ impl Composition<'_> {
                         style,
                         alpha,
                         align,
-                        reveal: 1.,
-                        reveal_span: None,
                         line_box: false,
                         clip: Some(clip),
                         fit: false,
@@ -1095,6 +1014,225 @@ impl Composition<'_> {
         draw.snap_overlay(self.scale);
         Ok(draw)
     }
+    #[allow(clippy::too_many_arguments)]
+    fn stroke_wordmark(
+        &mut self,
+        value: &str,
+        holder: MenuRect,
+        viewport_width: f64,
+        alpha: f64,
+        reveal: f64,
+        text: &mut TextCache,
+    ) -> Result<()> {
+        let unit = holder.height / 16.;
+        let mut style = TextStyle {
+            size: holder.height * 0.8,
+            weight: Weight::Bold,
+            family: Family::Arial,
+            slant: Slant::Normal,
+            color: WORDMARK_GREEN,
+        };
+        let ascent = text.measure_panel("H", style)?.ascent;
+        style.size *= 10. * unit / ascent;
+        let layout = wordmark::layout(value, holder, viewport_width, |s| {
+            Ok(text.measure_panel(s, style)?.advance / unit)
+        })?;
+        // ~30 updates/s over the shared 6.67 s reveal. The exact settled key is
+        // permanent; outgoing opacity/growth never enters the reveal clock.
+        if !reveal.is_finite() {
+            return Err("Wordmark reveal bounds".into());
+        }
+        let step = (reveal.clamp(0., 1.) * 200.).floor() as u16;
+        if step > 0 && layout.words.iter().any(|w| !w.fallback) {
+            wordmark::raster_size(&layout, self.scale)?;
+            let key = (
+                value.to_owned(),
+                layout.unit.to_bits(),
+                self.scale.to_bits(),
+                step,
+            );
+            let cache = if let Some(old) = self.old_stroke.filter(|old| old.key == key) {
+                old.clone()
+            } else {
+                let raster = wordmark::raster(&layout, self.scale, f64::from(step) / 200.)?;
+                // Retain only actual painted pixels (including the soft
+                // shadow). Empty padding must not displace essential controls
+                // at 5x DPR; cropping never changes the 1:1 physical scale.
+                let mut bounds = [raster.width, raster.height, 0, 0];
+                for (i, p) in raster.pixels.as_chunks::<4>().0.iter().enumerate() {
+                    if p[3] > 0 {
+                        let x = i as u32 % raster.width;
+                        let y = i as u32 / raster.width;
+                        bounds[0] = bounds[0].min(x);
+                        bounds[1] = bounds[1].min(y);
+                        bounds[2] = bounds[2].max(x + 1);
+                        bounds[3] = bounds[3].max(y + 1);
+                    }
+                }
+                if bounds[2] == 0 {
+                    bounds = [0, 0, 1, 1];
+                }
+                // At high DPR, pack nonempty horizontal bands into one
+                // atlas. This preserves stroke/shadow pixels while excluding
+                // the large holes between ascenders and lowercase bodies.
+                // Ordinary DPR 1/2 retains one image and one draw.
+                let mut regions = Vec::new();
+                if self.scale > 3. {
+                    let band = (3. * self.scale).round() as u32;
+                    for y in (bounds[1]..bounds[3]).step_by(band as usize) {
+                        let height = (bounds[3] - y).min(band);
+                        let mut left = None;
+                        for x in bounds[0]..=bounds[2] {
+                            let painted = x < bounds[2]
+                                && (y..y + height).any(|row| {
+                                    raster.pixels[((row * raster.width + x) * 4 + 3) as usize] > 0
+                                });
+                            if painted && left.is_none() {
+                                left = Some(x);
+                            }
+                            if !painted && let Some(start) = left.take() {
+                                for sx in (start..x).step_by(2048) {
+                                    regions.push([sx, y, (x - sx).min(2048), height]);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for x in (bounds[0]..bounds[2]).step_by(2048) {
+                        regions.push([
+                            x,
+                            bounds[1],
+                            (bounds[2] - x).min(2048),
+                            bounds[3] - bounds[1],
+                        ]);
+                    }
+                }
+                check_menu_draws(self.draws.len() + regions.len())?;
+                let mut pieces = Vec::new();
+                let mut sizes: Vec<[u32; 2]> = vec![[0, 0]];
+                regions.sort_by_key(|r| std::cmp::Reverse(r[2]));
+                let row_height = regions.iter().map(|r| r[3]).max().unwrap_or(1);
+                let rows_per_atlas = 2048 / row_height;
+                let mut used: Vec<u32> = Vec::new();
+                for [x, y, width, height] in regions {
+                    let row = used
+                        .iter()
+                        .position(|n| *n + width <= 2048)
+                        .unwrap_or(used.len());
+                    if row == used.len() {
+                        used.push(0);
+                    }
+                    let atlas = row / rows_per_atlas as usize;
+                    if atlas == sizes.len() {
+                        sizes.push([0, 0]);
+                    }
+                    let ax = used[row];
+                    let ay = row as u32 % rows_per_atlas * row_height;
+                    sizes[atlas][0] = sizes[atlas][0].max(ax + width);
+                    sizes[atlas][1] = sizes[atlas][1].max(ay + height);
+                    pieces.push(StrokePiece {
+                        atlas,
+                        offset: [x, y],
+                        source: [ax, ay, width, height],
+                    });
+                    used[row] += width;
+                }
+                sizes.retain(|s| s[0] > 0);
+                let bytes = sizes
+                    .iter()
+                    .map(|s| s[0] as usize * s[1] as usize * 4)
+                    .sum::<usize>();
+                preflight_menu_totals(sizes.len(), bytes)?;
+                let mut images: Vec<_> = sizes
+                    .into_iter()
+                    .map(|[width, height]| materials::RgbaImage {
+                        width,
+                        height,
+                        pixels: vec![0; width as usize * height as usize * 4],
+                    })
+                    .collect();
+                for piece in &pieces {
+                    let [sx, sy, width, height] = piece.source;
+                    let dst = &mut images[piece.atlas];
+                    for row in 0..height {
+                        let src =
+                            ((piece.offset[1] + row) * raster.width + piece.offset[0]) as usize * 4;
+                        let at = ((sy + row) * dst.width + sx) as usize * 4;
+                        dst.pixels[at..at + width as usize * 4]
+                            .copy_from_slice(&raster.pixels[src..src + width as usize * 4]);
+                    }
+                }
+                let mut resources = Vec::new();
+                for image in images {
+                    self.next_handle = self
+                        .next_handle
+                        .checked_add(1)
+                        .filter(|h| {
+                            *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE
+                        })
+                        .ok_or("Menu material handle overflow")?;
+                    resources.push(Resource {
+                        asset: BodyAsset {
+                            handle: self.next_handle,
+                            revision: 1,
+                            width: image.width,
+                            height: image.height,
+                            status: BodyAssetStatus::Ready,
+                        },
+                        image: image.into(),
+                    });
+                }
+                StrokeCache {
+                    key,
+                    resources,
+                    pieces,
+                }
+            };
+            let origin = layout.origin_pixels(self.scale);
+            for piece in &cache.pieces {
+                let resource = &cache.resources[piece.atlas];
+                let [sx, sy, width, height] = piece.source;
+                let mut draw = image(
+                    resource,
+                    MenuRect {
+                        x: (origin[0] + f64::from(piece.offset[0])) / self.scale,
+                        y: (origin[1] + f64::from(piece.offset[1])) / self.scale,
+                        width: f64::from(width) / self.scale,
+                        height: f64::from(height) / self.scale,
+                    },
+                    alpha,
+                );
+                draw.source = Some(BodyRect {
+                    x: f64::from(sx),
+                    y: f64::from(sy),
+                    width: f64::from(width),
+                    height: f64::from(height),
+                });
+                self.push(draw)?;
+            }
+            self.stroke = Some(cache);
+        }
+        for word in layout.words.iter().filter(|w| w.fallback) {
+            // One font run for the whole unsupported word, never a partial
+            // stroke word. Shape reveal is deliberately absent from this path.
+            let r = MenuRect {
+                x: layout.word_x_pixels(word, self.scale) / self.scale,
+                y: layout.rect.y + 2. * layout.unit,
+                width: word.width * layout.unit,
+                height: 11. * layout.unit,
+            };
+            self.label(&word.text, r, style.size * layout.unit / unit, true, alpha);
+            let label = self.labels.last_mut().unwrap();
+            label.style.color = if word.color == 0 {
+                WORDMARK_GREEN
+            } else {
+                WORDMARK_PURPLE
+            };
+            label.align = Align::Left;
+            label.line_box = true;
+        }
+        Ok(())
+    }
     fn push(&mut self, mut draw: Draw) -> Result<()> {
         draw.snap_overlay(self.scale);
         check_menu_draws(self.draws.len() + 1)?;
@@ -1123,23 +1261,12 @@ impl Composition<'_> {
             },
             alpha,
             align: Align::Center,
-            reveal: 1.,
-            reveal_span: None,
             line_box: false,
             clip: None,
             fit: true,
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
-        self.art_revealed(resource, r, alpha, 1.)
-    }
-    fn art_revealed(
-        &mut self,
-        resource: &Resource,
-        r: MenuRect,
-        alpha: f64,
-        reveal: f64,
-    ) -> Result<()> {
         let size = [
             (r.width * self.scale).round().max(1.) as u32,
             (r.height * self.scale).round().max(1.) as u32,
@@ -1206,10 +1333,7 @@ impl Composition<'_> {
             height: f64::from(size[1]) / self.scale,
             ..r
         };
-        for draw in reveal_draw(image(&self.art[&key], r, alpha), reveal, self.scale, None) {
-            self.push(draw)?;
-        }
-        Ok(())
+        self.push(image(&self.art[&key], r, alpha))
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
         if view.spinner_scale <= 0. {
@@ -1282,6 +1406,8 @@ impl Menu {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            old_stroke: self.stroke.as_ref(),
+            stroke: None,
         };
         c.panel(
             text,
@@ -1292,12 +1418,13 @@ impl Menu {
             theme,
             &resolved,
         )?;
-        let (result, next, spinner, materials, art) =
+        let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, None, None, Vec::new())?;
         self.next_handle = next;
         self.spinner_revision = spinner;
         self.materials = materials;
         self.art = art;
+        self.stroke = stroke;
         *scroll = staged_scroll;
         Ok(result)
     }
@@ -1358,6 +1485,8 @@ impl Menu {
             art: BTreeMap::new(),
             labels: Vec::new(),
             quality_art: false,
+            old_stroke: self.stroke.as_ref(),
+            stroke: None,
         };
         let a = view.login_alpha;
         let backdrop = if view.visible {
@@ -1393,9 +1522,6 @@ impl Menu {
             }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha;
-            // Authored wipe completes in the first quarter of the retained
-            // reveal clock (~1.67s), with bright partial art during the intro.
-            let logo_reveal = (4. * view.logo_reveal).clamp(0., 1.);
             if let Some(art) = cosmetics
                 .filter(|_| !self.wordmark)
                 .and_then(|p| p.menu_art(MenuArt::Logo(logo_frame)))
@@ -1405,7 +1531,9 @@ impl Menu {
                 let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
                 let room = layout.viewport_rect(E::LastLength).y - logo.y;
                 let fit = (room / natural).min(1.);
-                c.art_revealed(
+                // A static bitmap cannot swell along its strokes. Keep the
+                // shared fade rather than implying motion with a lateral wipe.
+                c.art(
                     art,
                     MenuRect {
                         x: logo.x + logo.width * (1. - fit) / 2.,
@@ -1414,20 +1542,18 @@ impl Menu {
                         ..logo
                     },
                     logo_alpha,
-                    logo_reveal,
                 )?;
             } else {
-                let runs = wordmark_runs(text, logo, dpr)?;
-                let span = [runs[0].0.x, runs[0].0.width + runs[1].0.width];
-                for ((r, style), value) in runs.into_iter().zip(["Slither", "Client"]) {
-                    c.label(value, r, style.size, true, logo_alpha);
-                    let label = c.labels.last_mut().unwrap();
-                    label.style = style;
-                    label.line_box = true;
-                    label.align = Align::Left;
-                    label.reveal = logo_reveal;
-                    label.reveal_span = Some(span);
-                }
+                c.stroke_wordmark(
+                    self.wordmark_text
+                        .as_deref()
+                        .unwrap_or(wordmark::DEFAULT_TEXT),
+                    logo,
+                    f64::from(extent[0]) / dpr,
+                    logo_alpha,
+                    view.logo_reveal,
+                    text,
+                )?;
             }
             if view.tips_visible {
                 c.label(
@@ -1601,7 +1727,7 @@ impl Menu {
             c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
         let spinner_draws = c.draws.split_off(spinner_start);
-        let (result, next, spinner, materials, art) =
+        let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, backdrop, world_cover, spinner_draws)?;
         if let (Some(p), Some(scroll)) = (panel, staged_scroll) {
             *p.scroll = scroll;
@@ -1611,6 +1737,7 @@ impl Menu {
         self.spinner_revision = spinner;
         self.materials = materials;
         self.art = art;
+        self.stroke = stroke;
         Ok(result)
     }
 }
@@ -1621,6 +1748,7 @@ type Published = (
     u64,
     BTreeMap<MaterialKey, Resource>,
     BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
+    Option<StrokeCache>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
 fn slice_axis(size: u32, atlas: u32, pad: u32, centre: u32) -> Result<Vec<(u32, u32, u32)>> {
@@ -1658,7 +1786,14 @@ impl Composition<'_> {
             .materials
             .values()
             .map(|r| r.image.pixels.len())
-            .sum::<usize>();
+            .sum::<usize>()
+            + self.stroke.as_ref().map_or(0, |s| {
+                s.resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+            });
+        let material_slots = c.materials.len() + self.stroke.as_ref().map_or(0, |s| s.resources.len());
         // Essential controls belong to the Menu allowance. Optional cosmetics
         // must not consume the capacity needed by Play, nickname or fallbacks.
         // Measure replacement faces normally. Fit full labels into their authored
@@ -1666,7 +1801,7 @@ impl Composition<'_> {
         for l in &mut self.labels {
             let width = text.measure_panel(&l.text, l.style)?.advance;
             let available = l.rect.width;
-            if l.fit && width > available && l.reveal_span.is_none() {
+            if l.fit && width > available {
                 l.style.size *= available / width;
             }
         }
@@ -1733,7 +1868,7 @@ impl Composition<'_> {
             &runs,
             &clips,
             self.scale,
-            (self.materials.len(), material_bytes),
+            (material_slots, material_bytes),
             |groups| {
                 let mut underlays = BTreeMap::<usize, Vec<Draw>>::new();
                 let mut underlay_count = 0;
@@ -1741,6 +1876,7 @@ impl Composition<'_> {
                     .materials
                     .values()
                     .chain(self.art.values())
+                    .chain(self.stroke.iter().flat_map(|s| &s.resources))
                     .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
                     .collect();
                 for (group, label) in groups.into_iter().zip(&labels) {
@@ -1750,14 +1886,12 @@ impl Composition<'_> {
                         {
                             continue;
                         }
-                        for part in reveal_draw(draw, label.reveal, self.scale, label.reveal_span) {
-                            if let Some(index) = label.before {
-                                check_menu_draws(self.draws.len() + underlay_count + 1)?;
-                                underlays.entry(index).or_default().push(part);
-                                underlay_count += 1;
-                            } else {
-                                self.push(part)?;
-                            }
+                        if let Some(index) = label.before {
+                            check_menu_draws(self.draws.len() + underlay_count + 1)?;
+                            underlays.entry(index).or_default().push(draw);
+                            underlay_count += 1;
+                        } else {
+                            self.push(draw)?;
                         }
                         resources.insert(resource.asset.into(), resource);
                     }
@@ -1798,77 +1932,11 @@ impl Composition<'_> {
             self.spinner_revision,
             self.materials,
             self.art,
+            self.stroke,
         ))
     }
 }
 
-#[cfg(test)]
-mod reveal_tests {
-    use super::*;
-    #[test]
-    fn reveal_is_bounded_monotone_and_separate_from_opacity() {
-        let resource = Resource {
-            asset: BodyAsset {
-                handle: 42,
-                revision: 1,
-                width: 900,
-                height: 270,
-                status: BodyAssetStatus::Ready,
-            },
-            image: materials::RgbaImage {
-                width: 900,
-                height: 270,
-                pixels: vec![],
-            }
-            .into(),
-        };
-        let draw = image(
-            &resource,
-            MenuRect {
-                x: 20.,
-                y: 50.,
-                width: 450.,
-                height: 135.,
-            },
-            0.8,
-        );
-        assert!(reveal_draw(draw.clone(), 0., 2., None).is_empty());
-        assert_eq!(
-            reveal_draw(draw.clone(), 1., 2., None)[0].effective_alpha,
-            0.8
-        );
-        let mut right = draw.clone();
-        right.destination.x += 450.;
-        let span = Some([20., 900.]);
-        assert!(reveal_draw(right.clone(), 0.25, 2., span).is_empty());
-        let left = reveal_draw(draw.clone(), 0.75, 2., span);
-        assert_eq!(left.len(), 1);
-        assert_eq!(left[0].effective_alpha, 0.8);
-        let right = reveal_draw(right, 0.75, 2., span);
-        assert!(right.len() <= 33);
-        assert_eq!(right[0].effective_alpha, 0.8);
-        let mut previous = 0.;
-        for fraction in [0.01, 0.1, 0.25, 0.5, 0.99] {
-            let parts = reveal_draw(draw.clone(), fraction, 2., None);
-            assert!(parts.len() <= 33);
-            let mut end = 0.;
-            for p in &parts {
-                let s = p.source.unwrap();
-                assert_eq!(s.x, end);
-                assert!(s.x + s.width <= 900.);
-                assert_eq!(p.destination.width * 2., s.width);
-                assert_eq!(p.destination.x, 20. + s.x / 2.);
-                assert!(p.effective_alpha > 0. && p.effective_alpha <= 0.8);
-                end += s.width;
-            }
-            if fraction >= 0.1 {
-                assert_eq!(parts[0].effective_alpha, 0.8);
-            }
-            assert!(end >= previous);
-            previous = end;
-        }
-    }
-}
 fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
     let r = draw.destination;
     let x = (r.x + draw.translation[0]).max((clip.x * scale).ceil() / scale);
