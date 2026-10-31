@@ -1151,6 +1151,21 @@ impl LocalGame {
             .ok_or("Quality draw counter exhausted")?;
         Ok(())
     }
+    /// Retire rejected pixels without losing the issued model/control transaction.
+    pub fn skip_frame(&mut self) -> Result<()> {
+        let kind = std::mem::replace(&mut self.inflight, 0);
+        if kind == 0 {
+            return Err("No issued frame".into());
+        }
+        if kind != 1 {
+            self.commit_work()?;
+        }
+        #[cfg(feature = "feel-trace")]
+        {
+            self.issued_observation = None;
+        }
+        Ok(())
+    }
     fn commit_work(&mut self) -> Result<()> {
         let w = self.work.take().ok_or("Missing frame work")?;
         self.client = w.world.ok_or("Missing world candidate")?;

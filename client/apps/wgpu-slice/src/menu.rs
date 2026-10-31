@@ -61,7 +61,8 @@ impl MenuFrame {
                 width: 1,
                 height: 1,
                 pixels: vec![PAGE_COLOR[0], PAGE_COLOR[1], PAGE_COLOR[2], 255],
-            },
+            }
+            .into(),
         };
         let backdrop = image(
             &resource,
@@ -382,7 +383,8 @@ impl Composition<'_> {
                         height: size[1],
                         pixels: [rgb[0], rgb[1], rgb[2], 255]
                             .repeat(size[0] as usize * size[1] as usize),
-                    },
+                    }
+                    .into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -444,7 +446,7 @@ impl Composition<'_> {
                         height: image.height,
                         status: BodyAssetStatus::Ready,
                     },
-                    image,
+                    image: image.into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -581,7 +583,7 @@ impl Composition<'_> {
                     height: side,
                     status: BodyAssetStatus::Ready,
                 },
-                image: pixels,
+                image: pixels.into(),
             }
         };
         let width = f64::from(side) / self.scale;

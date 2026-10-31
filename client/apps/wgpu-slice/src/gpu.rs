@@ -12,11 +12,39 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use wgpu::util::DeviceExt;
 
 #[path = "draw_runs.rs"]
 mod draw_runs;
 use draw_runs::{DrawState, Pipeline, draw_runs};
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum RenderError {
+    Frame(String),
+    Host(String),
+}
+impl From<String> for RenderError {
+    fn from(error: String) -> Self {
+        Self::Frame(error)
+    }
+}
+impl From<&str> for RenderError {
+    fn from(error: &str) -> Self {
+        Self::Frame(error.into())
+    }
+}
+impl std::fmt::Display for RenderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Frame(e) | Self::Host(e) => f.write_str(e),
+        }
+    }
+}
+impl From<RenderError> for String {
+    fn from(error: RenderError) -> Self {
+        error.to_string()
+    }
+}
+type RenderResult<T> = std::result::Result<T, RenderError>;
 
 struct Texture {
     asset: BodyAsset,
@@ -24,6 +52,17 @@ struct Texture {
     bind: wgpu::BindGroup,
     repeat_bind: wgpu::BindGroup,
     black: bool,
+}
+#[derive(Default)]
+struct VertexChunk {
+    buffer: Option<wgpu::Buffer>,
+    bytes: Vec<u8>,
+    states: Vec<DrawState>,
+}
+struct Multisample {
+    extent: [u32; 2],
+    samples: u32,
+    view: wgpu::TextureView,
 }
 pub struct Renderer {
     pub sample_count: u32,
@@ -38,6 +77,8 @@ pub struct Renderer {
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
     lost: Arc<AtomicBool>,
+    multisample: Option<Multisample>,
+    vertices: Vec<VertexChunk>,
 }
 impl Renderer {
     pub async fn new(
@@ -194,13 +235,17 @@ impl Renderer {
             black_over,
             textures: BTreeMap::new(),
             lost,
+            multisample: None,
+            vertices: Vec::new(),
         })
     }
-    pub fn upload(&mut self, r: &Resource) -> Result<()> {
+    pub fn upload(&mut self, r: &Resource) -> RenderResult<()> {
         let a = r.asset;
         let key = ResourceKey::from(a);
         if self.lost.load(Ordering::SeqCst) {
-            return Err("GPU device lost; host stopped, scene retained".into());
+            return Err(RenderError::Host(
+                "GPU device lost; host stopped, scene retained".into(),
+            ));
         }
         // WebGL2's 2048px downlevel cap keeps the future WebGL2 extension path valid.
         let max_dimension = wgpu::Limits::downlevel_webgl2_defaults().max_texture_dimension_2d;
@@ -317,7 +362,7 @@ impl Renderer {
     pub fn release(&mut self, key: ResourceKey) -> bool {
         self.textures.remove(&key).is_some()
     }
-    pub fn sync_resources(&mut self, resources: &[Resource]) -> Result<()> {
+    pub fn sync_resources(&mut self, resources: &[Resource]) -> RenderResult<()> {
         if resources.len() > 2048
             || resources
                 .iter()
@@ -343,16 +388,27 @@ impl Renderer {
         }
         Ok(())
     }
-    pub fn render(&self, frame: &Frame, target: &wgpu::TextureView) -> Result<()> {
+    pub fn render(&mut self, frame: &Frame, target: &wgpu::TextureView) -> RenderResult<()> {
         self.render_inner(frame, target, false)
     }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
-    pub fn render_overlay(&self, frame: &Frame, target: &wgpu::TextureView) -> Result<()> {
+    pub fn render_overlay(
+        &mut self,
+        frame: &Frame,
+        target: &wgpu::TextureView,
+    ) -> RenderResult<()> {
         self.render_inner(frame, target, true)
     }
-    fn render_inner(&self, frame: &Frame, target: &wgpu::TextureView, overlay: bool) -> Result<()> {
+    fn render_inner(
+        &mut self,
+        frame: &Frame,
+        target: &wgpu::TextureView,
+        overlay: bool,
+    ) -> RenderResult<()> {
         if self.lost.load(Ordering::SeqCst) {
-            return Err("GPU device lost; no gameplay reset/retry".into());
+            return Err(RenderError::Host(
+                "GPU device lost; no gameplay reset/retry".into(),
+            ));
         }
         let resident = self
             .textures
@@ -369,14 +425,14 @@ impl Renderer {
         {
             return Err("Render attachment budget".into());
         }
-        // One scratch allocation, direct serialization, no per-quad heap objects.
-        // Buffers belong to this call: render(&self) never overwrites another
-        // caller's in-flight vertices. All validation finishes before submission.
-        let chunk_size = VERTEX_CHUNK_QUADS;
-        let mut bytes = Vec::with_capacity(frame.draws.len().min(chunk_size) * QUAD_VERTEX_BYTES);
-        let mut states = Vec::with_capacity(frame.draws.len().min(chunk_size));
-        let mut chunks = Vec::with_capacity(frame.draws.len().div_ceil(chunk_size));
-        for quad in quads {
+        let chunk_count = frame.draws.len().div_ceil(VERTEX_CHUNK_QUADS);
+        self.vertices
+            .resize_with(chunk_count.max(self.vertices.len()), VertexChunk::default);
+        for chunk in &mut self.vertices {
+            chunk.bytes.clear();
+            chunk.states.clear();
+        }
+        for (index, quad) in quads.enumerate() {
             let quad = quad?;
             if overlay
                 && (quad.blend != slither_client::presentation::BodyBlend::SourceOver
@@ -384,39 +440,54 @@ impl Renderer {
             {
                 return Err("Overlay requires source-over quads".into());
             }
-            for vertex in quad.vertices {
-                for value in vertex {
-                    bytes.extend_from_slice(&value.to_le_bytes());
+            let chunk = &mut self.vertices[index / VERTEX_CHUNK_QUADS];
+            if chunk.states.is_empty() {
+                let count = (frame.draws.len() - index).min(VERTEX_CHUNK_QUADS);
+                if chunk.bytes.capacity() < count * QUAD_VERTEX_BYTES {
+                    chunk.bytes.reserve_exact(count * QUAD_VERTEX_BYTES);
+                }
+                if chunk.states.capacity() < count {
+                    chunk.states.reserve_exact(count);
                 }
             }
-            states.push(DrawState::new(&quad, self.textures[&quad.key].black));
-            if states.len() == chunk_size {
-                chunks.push((
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("ordered vertex chunk"),
-                            contents: &bytes,
-                            usage: wgpu::BufferUsages::VERTEX,
-                        }),
-                    std::mem::replace(&mut states, Vec::with_capacity(chunk_size)),
-                ));
-                bytes.clear();
+            for vertex in quad.vertices {
+                for value in vertex {
+                    chunk.bytes.extend_from_slice(&value.to_le_bytes());
+                }
             }
+            chunk
+                .states
+                .push(DrawState::new(&quad, self.textures[&quad.key].black));
         }
-        if !states.is_empty() {
-            chunks.push((
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("ordered vertex chunk"),
-                        contents: &bytes,
-                        usage: wgpu::BufferUsages::VERTEX,
-                    }),
-                states,
-            ));
+        // Validate every quad before touching GPU buffers. Exclusive calls submit
+        // before the next write; queue ordering protects prior in-flight draws,
+        // including when the overlay reuses the world's buffers.
+        for chunk in &mut self.vertices[..chunk_count] {
+            let size = chunk.bytes.len() as u64;
+            if chunk.buffer.as_ref().is_none_or(|b| b.size() < size) {
+                let capacity = size
+                    .next_power_of_two()
+                    .min((VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES) as u64);
+                chunk.buffer = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("ordered vertex chunk"),
+                    size: capacity,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                }));
+            }
+            self.queue.write_buffer(
+                chunk.buffer.as_ref().expect("vertex buffer"),
+                0,
+                &chunk.bytes,
+            );
         }
-        let mut encoder = self.device.create_command_encoder(&Default::default());
-        let multisample = if samples > 1 {
-            Some(self.device.create_texture(&wgpu::TextureDescriptor {
+        if samples > 1
+            && self
+                .multisample
+                .as_ref()
+                .is_none_or(|m| m.extent != frame.extent || m.samples != samples)
+        {
+            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("quad edge coverage"),
                 size: wgpu::Extent3d {
                     width: frame.extent[0],
@@ -429,20 +500,23 @@ impl Renderer {
                 format: self.format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
-            }))
-        } else {
-            None
-        };
-        let msaa_view = multisample
-            .as_ref()
-            .map(|t| t.create_view(&Default::default()));
+            });
+            self.multisample = Some(Multisample {
+                extent: frame.extent,
+                samples,
+                view: texture.create_view(&Default::default()),
+            });
+        }
+        let msaa_view =
+            (samples > 1).then(|| &self.multisample.as_ref().expect("MSAA target").view);
+        let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("offline gameplay"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: msaa_view.as_ref().unwrap_or(target),
+                    view: msaa_view.unwrap_or(target),
                     depth_slice: None,
-                    resolve_target: msaa_view.as_ref().map(|_| target),
+                    resolve_target: msaa_view.map(|_| target),
                     ops: wgpu::Operations {
                         load: if overlay {
                             wgpu::LoadOp::Load
@@ -460,9 +534,9 @@ impl Renderer {
                 ..Default::default()
             });
             let mut previous: Option<DrawState> = None;
-            for (buffer, states) in &chunks {
-                pass.set_vertex_buffer(0, buffer.slice(..));
-                for (state, vertices) in draw_runs(states.iter().copied()) {
+            for chunk in &self.vertices[..chunk_count] {
+                pass.set_vertex_buffer(0, chunk.buffer.as_ref().expect("vertex buffer").slice(..));
+                for (state, vertices) in draw_runs(chunk.states.iter().copied()) {
                     if previous.is_none_or(|p| p.pipeline != state.pipeline) {
                         pass.set_pipeline(match state.pipeline {
                             Pipeline::BlackOver => &self.black_over,
@@ -622,17 +696,17 @@ impl SurfaceHost {
         Ok(())
     }
     pub fn present(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, false, None)
+        self.present_inner(frame, false, None).map_err(Into::into)
     }
     /// Render at the desktop policy size, then scale the complete image like a CSS canvas.
     pub fn present_scaled(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, true, None)
+        self.present_inner(frame, true, None).map_err(Into::into)
     }
     pub fn present_scaled_with_overlay(
         &mut self,
         frame: &Frame,
         overlay: Option<&Frame>,
-    ) -> Result<bool> {
+    ) -> RenderResult<bool> {
         self.present_inner(frame, true, overlay)
     }
     /// Native waits for FIFO capacity before sampling the next model timestamp
@@ -678,7 +752,7 @@ impl SurfaceHost {
         frame: &Frame,
         scale: bool,
         overlay: Option<&Frame>,
-    ) -> Result<bool> {
+    ) -> RenderResult<bool> {
         if overlay.is_some_and(|f| f.extent != self.extent) {
             return Err("overlay/surface extent mismatch".into());
         }
@@ -717,7 +791,7 @@ impl SurfaceHost {
                 ));
             }
         }
-        if !self.acquire()? {
+        if !self.acquire().map_err(RenderError::Host)? {
             return Ok(false);
         }
         let texture = self.acquired.take().expect("acquired surface");

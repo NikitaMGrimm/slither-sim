@@ -1500,6 +1500,7 @@ fn former_overflow_survives_production_preparation_retry_and_resize() {
 #[test]
 fn draw_memory_overflow_skips_pictures_without_stalling_ingress_or_the_session() {
     let mut g = playing();
+    g.draw_diagnostics.strict_validation = false;
     let mut commands = Vec::new();
     // Authored single-color food in one visible sector: enough HQ commands to
     // exceed the CPU-record envelope, without increasing texture residency.
@@ -1584,6 +1585,7 @@ fn non_memory_rejection_after_crowded_setup_keeps_world_hud_rng_and_identity() {
 #[test]
 fn queued_setup_draw_records_share_one_memory_envelope() {
     let mut game = playing();
+    game.draw_diagnostics.strict_validation = false;
     let foods = (0..4000)
         .map(|i| vec![b'F', 11, 10, 41, (i % 100) as u8, (i / 100) as u8, 20])
         .collect::<Vec<_>>();

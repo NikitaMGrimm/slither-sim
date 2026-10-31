@@ -47,21 +47,54 @@ pub(crate) fn push_draw(draws: &mut Vec<Draw>, draw: Draw) -> Result<()> {
 }
 
 /// Recoverable picture failures, separate from session failure and bot observations.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DrawDiagnostics {
     pub skipped_frames: u64,
     pub last_skipped_identity: Option<u64>,
+    pub strict_validation: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    last_log: Option<std::time::Instant>,
+}
+impl Default for DrawDiagnostics {
+    fn default() -> Self {
+        Self {
+            skipped_frames: 0,
+            last_skipped_identity: None,
+            strict_validation: cfg!(any(debug_assertions, test, target_arch = "wasm32")),
+            #[cfg(not(target_arch = "wasm32"))]
+            last_log: None,
+        }
+    }
 }
 impl DrawDiagnostics {
-    pub(crate) fn admit<T>(&mut self, identity: u64, result: Result<T>) -> Result<Option<T>> {
+    pub fn admit<T>(&mut self, identity: u64, result: Result<T>) -> Result<Option<T>> {
         match result {
-            Err(error) if error == DRAW_MEMORY_LIMIT => {
+            // Native release skips bad pictures; debug/tests expose validation bugs.
+            Err(error)
+                if !self.strict_validation
+                    || (cfg!(target_arch = "wasm32") && error == DRAW_MEMORY_LIMIT) =>
+            {
                 self.skipped_frames = self.skipped_frames.saturating_add(1);
                 self.last_skipped_identity = Some(identity);
+                #[cfg(not(target_arch = "wasm32"))]
+                if self.should_log(std::time::Instant::now()) {
+                    eprintln!("Frame skipped: {error}");
+                }
                 Ok(None)
             }
             other => other.map(Some),
         }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    fn should_log(&mut self, now: std::time::Instant) -> bool {
+        if self
+            .last_log
+            .is_some_and(|last| now.duration_since(last) < std::time::Duration::from_secs(5))
+        {
+            return false;
+        }
+        self.last_log = Some(now);
+        true
     }
 }
 
@@ -365,6 +398,41 @@ impl Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn strict_validation_returns_errors_and_release_skips_and_recovers() {
+        assert!(DrawDiagnostics::default().strict_validation);
+        for strict in [true, false] {
+            let mut diagnostics = DrawDiagnostics {
+                strict_validation: strict,
+                ..Default::default()
+            };
+            for error in [
+                "missing, stale or unready resource",
+                "Active GPU resource budget",
+                DRAW_MEMORY_LIMIT,
+            ] {
+                let result = diagnostics.admit::<()>(7, Err(error.into()));
+                if strict {
+                    assert_eq!(result, Err(error.into()));
+                    assert_eq!(diagnostics.skipped_frames, 0);
+                } else {
+                    assert_eq!(result, Ok(None));
+                    assert_eq!(diagnostics.last_skipped_identity, Some(7));
+                }
+            }
+            assert_eq!(diagnostics.admit(8, Ok(42)), Ok(Some(42)));
+            assert_eq!(diagnostics.skipped_frames, if strict { 0 } else { 3 });
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn frame_error_logging_is_bounded_even_when_errors_change() {
+        let mut diagnostics = DrawDiagnostics::default();
+        let now = std::time::Instant::now();
+        assert!(diagnostics.should_log(now));
+        assert!(!diagnostics.should_log(now + std::time::Duration::from_secs(4)));
+        assert!(diagnostics.should_log(now + std::time::Duration::from_secs(5)));
+    }
     #[test]
     fn viewport_overlap_uses_rotated_geometry_positive_alpha_and_backing_scale() {
         // ORIGINAL SYNTHETIC image rectangles; no source image or GPU.

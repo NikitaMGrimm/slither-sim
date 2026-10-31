@@ -24,7 +24,8 @@ fn upload(r: &mut Renderer, handle: u64, size: [u32; 2], pixels: Vec<u8>) -> Res
             width: size[0],
             height: size[1],
             pixels,
-        },
+        }
+        .into(),
     })?;
     Ok(asset)
 }

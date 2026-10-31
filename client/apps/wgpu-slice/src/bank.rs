@@ -232,7 +232,7 @@ impl Bank {
                     *i,
                     Resource {
                         asset: self.assets[*i],
-                        image,
+                        image: image.into(),
                     },
                 );
             }
@@ -271,7 +271,7 @@ impl Bank {
     /// Own the pixels of queued Setup pictures independently of LRU eviction.
     pub fn stage_text(&mut self, identity: u64, resources: Vec<Resource>) -> Result<()> {
         // Preparation is ordered. Reused identities replace only unpublished
-        // pixels left by an aborted candidate; admitted pictures own their copies.
+        // pixels left by an aborted candidate; admitted pictures retain shared images.
         self.text_frames.retain(|key, _| *key < identity);
         if resources.is_empty() {
             return Ok(());

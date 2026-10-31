@@ -127,6 +127,15 @@ fn fixed_scale_reuses_text_rasters_across_frames_and_window_resize() {
     };
     assert!(!text_assets(&first).is_empty());
     assert_eq!(text_assets(&first), text_assets(&second));
+    for resource in &first.resources {
+        if let Some(next) = second.resources.iter().find(|r| r.asset == resource.asset) {
+            assert!(std::sync::Arc::ptr_eq(&resource.image, &next.image));
+        }
+    }
+    let cloned = first.clone();
+    for (original, copy) in first.resources.iter().zip(&cloned.resources) {
+        assert!(std::sync::Arc::ptr_eq(&original.image, &copy.image));
+    }
     assert_eq!(text_assets(&first), text_assets(&resized));
     game.window_viewport([3840, 2160], 1.).unwrap();
     let scale_changed = snapshot(&mut game, 103);
