@@ -7,7 +7,7 @@ release_always = false
 publish = false
 git_tag_enable = false
 git_release_enable = false
-pr_name = "chore(release): prepare v{{ version }}"
+pr_name = "chore(release): prepare{% if version %} v{{ version }}{% endif %}"
 pr_body = """
 {% for release in releases %}
 <!-- release-plz {{ release.package }} {{ release.previous_version }} {{ release.next_version }} {{ release.semver_check }} -->
