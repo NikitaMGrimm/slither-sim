@@ -64,6 +64,8 @@ mod markers;
 mod minimap;
 #[cfg(test)]
 mod pit_tests;
+#[cfg(test)]
+mod presentation_bounds_tests;
 mod prey_visibility;
 #[cfg(test)]
 mod protocol13_tests;

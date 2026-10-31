@@ -370,17 +370,7 @@ impl SimulatorBackend {
         let food_changes = self.sync_food_sectors()?;
         self.assign_prey_wire()?;
         self.update_prey_clocks()?;
-        let bounds: Vec<[f64; 4]> = self
-            .world
-            .snakes()
-            .iter()
-            .map(|snake| {
-                snake.body.iter().fold(
-                    [snake.head.x, snake.head.y, snake.head.x, snake.head.y],
-                    |[x0, y0, x1, y1], p| [x0.min(p.x), y0.min(p.y), x1.max(p.x), y1.max(p.y)],
-                )
-            })
-            .collect();
+        let bounds = self.world.presentation_bounds();
         let grid = if let Some(mut grid) = self.coverage_grid.take() {
             grid.update(self.world.snakes(), &bounds, self.world.config().vision);
             grid

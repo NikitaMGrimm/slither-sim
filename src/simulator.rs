@@ -1,6 +1,8 @@
 pub mod checkpoint;
 #[cfg(test)]
 mod collision_bounds_tests;
+#[cfg(feature = "networking")]
+mod host_bounds;
 mod initialization;
 mod join_order;
 use join_order::JoinOrder;
