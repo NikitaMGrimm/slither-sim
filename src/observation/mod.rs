@@ -3,6 +3,9 @@ use crate::{Constraint, ErrorKind, SimError};
 use crate::{model::*, physics::Bounds, prey::Prey, simulator::Simulator};
 use std::ops::Range;
 
+mod snakes;
+use snakes::SnakeIndex;
+
 /// Fewest observers worth a parallel task: one observation takes roughly 10-30
 /// microseconds, and waking pool threads costs tens of microseconds.
 #[cfg(feature = "parallel")]
@@ -33,7 +36,7 @@ impl<'a> VisibleState<'a> {
     /// Observation of one slot, without the batch index.
     pub(crate) fn observe(self, index: usize) -> Result<Observation, SimError> {
         let mut slot = None;
-        Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot)?;
+        Observer::new(self, 1).observe_into(index, &mut Vec::new(), &mut slot, None)?;
         Ok(slot.expect("observed"))
     }
 }
@@ -187,13 +190,25 @@ impl<'a> Observer<'a> {
         });
         Self { world, index }
     }
-    /// Refill `slot` for `index`, reusing its vectors. `marks` is empty or has one
-    /// zeroed bit per food item; it is zeroed again on return.
+    fn snake_index(&self, observers: usize) -> Option<SnakeIndex> {
+        // Keep the tree batch-local so the small-batch constructor/layout stays
+        // unchanged. It needs only the bounds already built by this observer.
+        // Fresh official 1/6 batches, five pairs: forcing a tree at 64 snakes was
+        // noise (11.75 -> 11.66 us/decision); at 256 the tree alone improved
+        // 16.21 -> 15.91 us. Keep smaller batches scanning.
+        self.index
+            .as_ref()
+            .filter(|_| self.world.snakes.len() >= 256 && observers >= 8)
+            .map(|i| SnakeIndex::new(self.world.snakes, &i.bodies))
+    }
+    /// Refill `slot` for `index`, reusing its vectors. `marks` is zeroed scratch
+    /// space for food bits and optional word summaries; it is zeroed on return.
     fn observe_into(
         &self,
         index: usize,
         marks: &mut Vec<u64>,
         slot: &mut Option<Observation>,
+        snakes: Option<&SnakeIndex>,
     ) -> Result<(), SimError> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or_else(|| {
@@ -212,7 +227,7 @@ impl<'a> Observer<'a> {
             opponents: &mut opponents,
             kept: 0,
         };
-        self.visit(index, marks, &mut copies)?;
+        self.visit(index, marks, &mut copies, snakes)?;
         let kept = copies.kept;
         opponents.truncate(kept);
         let me = match previous_me {
@@ -243,6 +258,29 @@ impl<'a> Observer<'a> {
         index: usize,
         marks: &mut Vec<u64>,
         sink: &mut impl Sink,
+        snakes: Option<&SnakeIndex>,
+    ) -> Result<(), SimError> {
+        // Specialize both flags: earlier shared hot loops regressed small catalog
+        // batches by 2-5%. The scan variant keeps their indexed branches out.
+        // Five paired immutable official trials: summaries reduced observation
+        // CPU from 25.0 to 20.6 us at 264k food, and 74.7 to 41.6 us at 1.06M.
+        // Eight-observer observe-sparse was 3% slower in five pairs: its visible
+        // indices are already clustered. Keep summaries to large indexed batches.
+        match snakes {
+            None => self.visit_indexed::<false, false>(index, marks, sink, snakes),
+            Some(_) if self.world.food.len() >= 262_144 => {
+                self.visit_indexed::<true, true>(index, marks, sink, snakes)
+            }
+            Some(_) => self.visit_indexed::<true, false>(index, marks, sink, snakes),
+        }
+    }
+    #[inline(always)]
+    fn visit_indexed<const SPATIAL: bool, const SPARSE: bool>(
+        &self,
+        index: usize,
+        marks: &mut Vec<u64>,
+        sink: &mut impl Sink,
+        snakes: Option<&SnakeIndex>,
     ) -> Result<(), SimError> {
         let w = self.world;
         let me = w.snakes.get(index).ok_or_else(|| {
@@ -277,12 +315,17 @@ impl<'a> Observer<'a> {
                 },
                 b,
             )) => {
-                marks.resize(w.food.len().div_ceil(64), 0);
+                let words = w.food.len().div_ceil(64);
+                marks.resize(words + if SPARSE { words.div_ceil(64) } else { 0 }, 0);
+                let (marks, summary) = marks.split_at_mut(words);
                 let mut count = 0;
                 let mut first = usize::MAX;
                 // Branch-free: about half the candidates are visible, unpredictably.
                 let mut mark = |i: usize, seen: bool| {
                     marks[i / 64] |= u64::from(seen) << (i % 64);
+                    if SPARSE {
+                        summary[i / 4096] |= u64::from(seen) << (i / 64 % 64);
+                    }
                     count += usize::from(seen);
                     first = first.min(if seen { i / 64 } else { usize::MAX });
                 };
@@ -315,15 +358,35 @@ impl<'a> Observer<'a> {
                 // Ascending bit order restores the original food order.
                 sink.reserve_food(count);
                 let mut reported = 0;
-                for (word, bits) in marks.iter_mut().enumerate().skip(first) {
-                    if reported == count {
-                        break;
+                if SPARSE {
+                    // Each summary bit selects one nonempty word of 64 food indices.
+                    for (group, bits) in summary.iter_mut().enumerate().skip(first / 64) {
+                        if reported == count {
+                            break;
+                        }
+                        let mut active = std::mem::take(bits);
+                        while active != 0 {
+                            let word = group * 64 + active.trailing_zeros() as usize;
+                            let mut bits = std::mem::take(&mut marks[word]);
+                            while bits != 0 {
+                                sink.food(word * 64 + bits.trailing_zeros() as usize);
+                                reported += 1;
+                                bits &= bits - 1;
+                            }
+                            active &= active - 1;
+                        }
                     }
-                    let mut bits = std::mem::take(bits);
-                    while bits != 0 {
-                        sink.food(word * 64 + bits.trailing_zeros() as usize);
-                        reported += 1;
-                        bits &= bits - 1;
+                } else {
+                    for (word, bits) in marks.iter_mut().enumerate().skip(first) {
+                        if reported == count {
+                            break;
+                        }
+                        let mut bits = std::mem::take(bits);
+                        while bits != 0 {
+                            sink.food(word * 64 + bits.trailing_zeros() as usize);
+                            reported += 1;
+                            bits &= bits - 1;
+                        }
                     }
                 }
             }
@@ -339,6 +402,26 @@ impl<'a> Observer<'a> {
             if visible(p.position) {
                 sink.prey(i);
             }
+        }
+        if SPATIAL && let (Some((Index { bodies, .. }, q)), Some(tree)) = (query, snakes) {
+            let mut opponents = Vec::new();
+            tree.visit(q, |i| opponents.push(i));
+            // Tree traversal is spatial; predicates and sinks retain world order.
+            opponents.sort_unstable();
+            for i in opponents {
+                let s = &w.snakes[i];
+                let b = bodies[i];
+                if i != index
+                    && !(b.max.x < q.min.x
+                        || b.min.x > q.max.x
+                        || b.max.y < q.min.y
+                        || b.min.y > q.max.y)
+                    && (visible(s.head) || s.body.iter().any(|&p| visible(p)))
+                {
+                    sink.opponent(i);
+                }
+            }
+            return Ok(());
         }
         let visible_opponents = w
             .snakes
@@ -436,6 +519,9 @@ impl Simulator {
     }
     /// [`observe_all`](Self::observe_all) into `observations`, reusing its vectors
     /// to keep allocation low when observing every decision.
+    // Keep the batch out of caller tick loops: inlining regressed the 500-snake
+    // step-only catalog row by 1.3% in five paired, 16-block samples.
+    #[inline(never)]
     pub fn observe_all_into(&self, observations: &mut Vec<Option<Observation>>) {
         self.observe_matching(None, observations)
             .expect("observations of existing slots cannot fail")
@@ -471,6 +557,7 @@ impl Simulator {
         sightings.truncate(self.snakes().len());
         sightings.resize_with(self.snakes().len(), || None);
         let observer = Observer::new(VisibleState::of(self), self.living());
+        let snakes = observer.snake_index(self.living());
         for (i, slot) in sightings.iter_mut().enumerate() {
             if !self.snakes()[i].alive {
                 *slot = None;
@@ -481,7 +568,7 @@ impl Simulator {
             sighting.prey.clear();
             sighting.opponents.clear();
             observer
-                .visit(i, marks, sighting)
+                .visit(i, marks, sighting, snakes.as_ref())
                 .expect("existing slots are observable");
         }
     }
@@ -510,11 +597,12 @@ impl Simulator {
         observations.truncate(self.snakes().len());
         observations.resize_with(self.snakes().len(), || None);
         let observer = Observer::new(VisibleState::of(self), observers);
+        let snakes = observer.snake_index(observers);
         let observe_range = |range: Range<usize>, slots: &mut [Option<Observation>]| {
             let mut marks = Vec::new();
             for (i, slot) in range.zip(slots) {
                 if wanted[i] {
-                    observer.observe_into(i, &mut marks, slot)?;
+                    observer.observe_into(i, &mut marks, slot, snakes.as_ref())?;
                 } else {
                     *slot = None;
                 }
@@ -534,6 +622,9 @@ impl Simulator {
         observe_range(0..self.snakes().len(), observations)
     }
 }
+
+#[cfg(test)]
+mod parity;
 
 #[cfg(test)]
 mod tests {

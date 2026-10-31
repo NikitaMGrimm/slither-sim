@@ -37,6 +37,11 @@
 
 ### Performance
 
+- Bot observations in large worlds find nearby snakes through a bounds tree
+  instead of checking every snake, and skip empty stretches of the food list
+  when restoring food order. In a fresh 10,000-snake official-density world,
+  observation CPU per decision falls from about 123 to 42 µs, and the 500-bot
+  catalog step gets about 13% faster. Observations are unchanged.
 - Food pickup reads pellet coordinates straight from its index and looks up a
   pellet's list position only when it is eaten. In a frozen 10,000-snake
   world, world CPU per tick falls from about 11.7 to 11.1 ms. Pickup results
