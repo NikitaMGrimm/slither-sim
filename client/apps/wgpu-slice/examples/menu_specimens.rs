@@ -715,6 +715,26 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
         &picture,
         &output.join("studio-narrow-360x640.png"),
     )?;
+    for (name, logical) in [("narrow", [360., 640.]), ("short-wide", [960., 360.])] {
+        for scale in [1., 1.5, 2.] {
+            renderer.sync_resources(&[])?;
+            let mut login = NativeLogin::new("")?;
+            login.step(0., false, false)?;
+            login.open_studio();
+            login.step(230., false, false)?;
+            login.studio.status = "Saved for this run".into();
+            let extent = logical.map(|n| (n * scale) as u32);
+            let mut picture = login.prepare_host(extent, scale, false, None)?;
+            let (preview, resources) = login.studio.prepare_preview(extent, scale, None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
+            capture(
+                renderer,
+                &picture,
+                &output.join(format!("studio-{name}-status-{scale}x.png")),
+            )?;
+        }
+    }
     std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
     Ok(())
 }

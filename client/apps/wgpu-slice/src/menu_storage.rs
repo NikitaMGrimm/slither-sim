@@ -1,5 +1,7 @@
 //! Bounded native v2 adapter. Startup reads only; Save performs one atomic replacement.
-use slither_client::skin_studio::{AppearanceRecord, MAX_RECORD_BYTES, RestoredAppearance};
+use slither_client::skin_studio::{
+    AppearanceRecord, MAX_RECORD_BYTES, PreferenceInput, RestoredAppearance,
+};
 use std::{
     io::{Read, Write},
     path::PathBuf,
@@ -21,12 +23,17 @@ impl MenuStorage {
         }
     }
     pub fn restore(&mut self) -> RestoredAppearance {
-        let read = |name: &str| -> Option<String> {
-            let path = self.directory.as_ref()?.join(name);
+        let read = |name: &str| -> PreferenceInput {
+            let Some(directory) = &self.directory else {
+                return PreferenceInput::Missing;
+            };
+            let path = directory.join(name);
             let file = match std::fs::File::open(path) {
                 Ok(f) => f,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-                Err(_) => return Some("2:unreadable".into()),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    return PreferenceInput::Missing;
+                }
+                Err(_) => return PreferenceInput::Unreadable,
             };
             let mut bytes = Vec::new();
             if file
@@ -34,14 +41,22 @@ impl MenuStorage {
                 .read_to_end(&mut bytes)
                 .is_err()
             {
-                return Some("2:unreadable".into());
+                return PreferenceInput::Unreadable;
             }
-            Some(String::from_utf8(bytes).unwrap_or_else(|_| "2:corrupt".into()))
+            match String::from_utf8(bytes) {
+                Ok(text) => PreferenceInput::Text(text),
+                Err(_) => PreferenceInput::Corrupt,
+            }
         };
         let v2 = read("menu.v2");
-        let v1 = if v2.is_none() { read("menu.v1") } else { None };
-        let mut restored = RestoredAppearance::restore(v2.as_deref(), v1.as_deref());
-        if v2.is_none() && v1.is_none() {
+        let v1 = if v2 == PreferenceInput::Missing {
+            read("menu.v1")
+        } else {
+            PreferenceInput::Missing
+        };
+        let missing = v2 == PreferenceInput::Missing && v1 == PreferenceInput::Missing;
+        let mut restored = RestoredAppearance::restore(v2, v1);
+        if missing {
             restored.record.nickname = "Player".into();
         }
         self.enabled = restored.persistence_enabled;

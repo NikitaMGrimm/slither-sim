@@ -911,7 +911,7 @@ impl Composition<'_> {
         let middle = if tokens.recipe == SurfaceRecipe::StudioPanel {
             // Keep the uniform panel repeat within the first physical tile. A
             // repeat spanning two Y tiles doubles every interior row's draw cost.
-            // Existing fields/buttons retain their 32px repeat and shadow recipe.
+            // The server picker and existing controls retain their logical repeats.
             512u32.saturating_sub(radius + pad).max(32)
         } else {
             (logical_middle * raster_scale).ceil().max(1.) as u32

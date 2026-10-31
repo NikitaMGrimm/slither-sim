@@ -103,7 +103,7 @@ fn picker_is_available_without_a_play_route_and_immediate_close_restores_focus()
 }
 #[test]
 fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_play() {
-    use slither_client::login_controls::{PLAY, QUALITY, SERVER};
+    use slither_client::login_controls::{CHANGE_SKIN, PLAY, QUALITY, SERVER};
     let mut login = NativeLogin::new("").unwrap();
     for now in (0..=9600).step_by(16) {
         login.step(now as f64, false, false).unwrap();
@@ -121,6 +121,17 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
         false,
     );
     assert!(result.consumed);
+    assert_eq!(login.controls.focus(), Some(CHANGE_SKIN));
+    login.key(
+        KeyInput {
+            logical: &logical,
+            physical: PhysicalKey::Code(KeyCode::Tab),
+            text: None,
+            state: ElementState::Pressed,
+            repeat: false,
+        },
+        false,
+    );
     assert_eq!(login.controls.focus(), Some(SERVER));
     let focused = login.prepare([960, 720], false, None).unwrap();
     assert_eq!(focused.frame.draws.len(), unfocused.frame.draws.len() + 4);

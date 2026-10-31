@@ -10,7 +10,6 @@ pub struct SkinStudioNative {
     pub storage: MenuStorage,
     pub status: String,
     pub now: f64,
-    pub outside_pressed: bool,
     pub preview: AppearancePreview,
     bank: Bank,
     fallback: Cosmetics,
@@ -23,7 +22,6 @@ impl SkinStudioNative {
             storage,
             status: String::new(),
             now: 0.,
-            outside_pressed: false,
             preview: Default::default(),
             bank: Bank::new()?,
             fallback: Cosmetics::from_images(Default::default(), None)?,
@@ -44,7 +42,6 @@ impl SkinStudioNative {
         if opened {
             self.status.clear();
             self.preview = Default::default();
-            self.outside_pressed = false;
         }
         opened
     }
@@ -58,7 +55,7 @@ impl SkinStudioNative {
                 self.state.cycle(true, UnlockSnapshot::default());
                 self.status.clear();
             }
-            CANCEL => self.state.cancel(self.now),
+            CANCEL | BACKDROP => self.state.cancel(self.now),
             SAVE => match self
                 .state
                 .save(nickname, self.now, UnlockSnapshot::default())
@@ -76,9 +73,6 @@ impl SkinStudioNative {
             },
             _ => {}
         }
-    }
-    pub fn cancel_capture(&mut self) {
-        self.outside_pressed = false;
     }
     /// Ready-only resolver is identical to gameplay's full-art fallback, without accessories.
     pub fn prepare_preview(

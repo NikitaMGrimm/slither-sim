@@ -30,11 +30,19 @@ pub struct AppearanceSelection {
     pub custom_bytes: Vec<u8>,
 }
 impl AppearanceSelection {
-    /// Studio admission is separate from the tolerant inbound renderer and old editor.
-    pub fn validate(&self) -> Result<(), &'static str> {
+    /// Retained wire data follows the encoder's byte bound, without interpreting its prefix/runs.
+    pub fn validate_wire(&self) -> Result<(), &'static str> {
         if self.skin > 65 {
             return Err("Unsupported skin");
         }
+        if self.custom_bytes.len() > 255 {
+            return Err("Invalid custom length");
+        }
+        Ok(())
+    }
+    /// Only newly authored studio patterns require the builder header and complete valid runs.
+    pub fn validate_authored(&self) -> Result<(), &'static str> {
+        self.validate_wire()?;
         let bytes = &self.custom_bytes;
         if bytes.is_empty() {
             return Ok(());
@@ -110,12 +118,12 @@ impl AppearanceRecord {
             skin: self.builtin,
             custom_bytes: vec![],
         }
-        .validate()?;
+        .validate_wire()?;
         AppearanceSelection {
             skin: self.custom_base,
             custom_bytes: self.custom_bytes.clone(),
         }
-        .validate()?;
+        .validate_wire()?;
         if (self.active_custom && self.custom_bytes.is_empty())
             || self.cosmetic.is_some_and(|v| v > 31)
         {
@@ -169,7 +177,19 @@ impl AppearanceRecord {
         Some(record)
     }
 }
-/// Startup restoration result. Unknown versions disable writes for this run.
+/// Storage read outcome, separate from the versioned record grammar.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PreferenceInput {
+    /// No file/key exists.
+    Missing,
+    /// An existing record could not be read; its contents must remain protected.
+    Unreadable,
+    /// Bytes were read but cannot represent a text record.
+    Corrupt,
+    /// Bounded text, including malformed or unknown-version records.
+    Text(String),
+}
+/// Startup restoration result. Unknown or unreadable records disable writes for this run.
 pub struct RestoredAppearance {
     /// Restored/default player choices.
     pub record: AppearanceRecord,
@@ -178,14 +198,38 @@ pub struct RestoredAppearance {
 }
 impl RestoredAppearance {
     /// Read v2 first; only an absent v2 allows v1 migration. Never writes at startup.
-    pub fn restore(v2: Option<&str>, v1: Option<&str>) -> Self {
-        if let Some(saved) = v2 {
-            return Self {
-                record: AppearanceRecord::parse(saved).unwrap_or_default(),
-                persistence_enabled: saved.split(':').next() == Some("2"),
-            };
-        }
-        let old = MenuPreferences::restore(false, v1.unwrap_or("")).view();
+    pub fn restore(v2: PreferenceInput, v1: PreferenceInput) -> Self {
+        let legacy = match v2 {
+            PreferenceInput::Text(saved) => {
+                return Self {
+                    record: AppearanceRecord::parse(&saved).unwrap_or_default(),
+                    persistence_enabled: saved.split(':').next() == Some("2"),
+                };
+            }
+            PreferenceInput::Unreadable => {
+                return Self {
+                    record: Default::default(),
+                    persistence_enabled: false,
+                };
+            }
+            PreferenceInput::Corrupt => {
+                return Self {
+                    record: Default::default(),
+                    persistence_enabled: true,
+                };
+            }
+            PreferenceInput::Missing => match v1 {
+                PreferenceInput::Text(saved) => saved,
+                PreferenceInput::Unreadable => {
+                    return Self {
+                        record: Default::default(),
+                        persistence_enabled: false,
+                    };
+                }
+                PreferenceInput::Missing | PreferenceInput::Corrupt => String::new(),
+            },
+        };
+        let old = MenuPreferences::restore(false, &legacy).view();
         Self {
             record: AppearanceRecord {
                 nickname: old.nickname,
@@ -364,6 +408,13 @@ impl StudioState {
         let mut record = self.draft.as_ref().expect("mounted draft").record.clone();
         record.nickname = nickname.into();
         record.validate()?;
+        if record.custom_bytes != self.committed.custom_bytes {
+            AppearanceSelection {
+                skin: record.custom_base,
+                custom_bytes: record.custom_bytes.clone(),
+            }
+            .validate_authored()?;
+        }
         // A retained legacy choice remains byte-preserving. New selections
         // must still be available at commit, independently of ready artwork.
         if record.selection() != self.committed.selection()
@@ -394,14 +445,14 @@ impl StudioState {
                 x: b.x + 24.,
                 y: b.y + 112.,
                 width: b.width - 328.,
-                height: b.height - 208.,
+                height: b.height - 232.,
             }
         } else {
             MenuRect {
                 x: b.x + 24.,
                 y: b.y + 88.,
                 width: b.width - 48.,
-                height: b.height - 268.,
+                height: b.height - 308.,
             }
         }
     }
@@ -410,7 +461,13 @@ impl StudioState {
         let b = Self::bounds(viewport);
         let wide = b.width >= 640.;
         let x = if wide { b.width - 280. } else { 24. };
-        let y = if wide { 160. } else { b.height - 176. };
+        // Navigation ends at least 12px above the reserved status band, even
+        // in short panels. The footer keeps its existing bottom inset.
+        let y = if wide {
+            160f64.min(b.height - 208.)
+        } else {
+            b.height - 208.
+        };
         let selection = self
             .draft
             .as_ref()

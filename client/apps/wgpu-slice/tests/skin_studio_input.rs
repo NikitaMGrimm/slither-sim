@@ -130,6 +130,61 @@ fn pending_play_cannot_open_studio_and_preview_clock_pauses_without_catch_up() {
 }
 
 #[test]
+fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
+    use slither_client::login_controls::{NICKNAME, PLAY, QUALITY, SERVER};
+    let mut login = NativeLogin::new("").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(f64::from(now), true, false).unwrap();
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    let resolved = login.panel.resolve([960., 540.]).unwrap();
+    let skin = resolved
+        .iter()
+        .find(|r| r.control.id == CHANGE_SKIN)
+        .unwrap();
+    let server = resolved.iter().find(|r| r.control.id == SERVER).unwrap();
+    assert!(skin.control.visible && skin.control.enabled);
+    assert!(server.control.visible && server.control.enabled);
+    assert_eq!(skin.rect.y, server.rect.y);
+    assert!(!skin.hit([
+        server.rect.x + server.rect.width / 2.,
+        server.rect.y + server.rect.height / 2.
+    ]));
+    login.focus(NICKNAME);
+    for id in [PLAY, QUALITY, CHANGE_SKIN, SERVER, NICKNAME] {
+        key(&mut login, NamedKey::Tab);
+        assert_eq!(login.controls.focus(), Some(id));
+    }
+    login.input.modifiers(ModifiersState::SHIFT);
+    for id in [SERVER, CHANGE_SKIN, QUALITY, PLAY, NICKNAME] {
+        key(&mut login, NamedKey::Tab);
+        assert_eq!(login.controls.focus(), Some(id));
+    }
+    login.input.modifiers(ModifiersState::empty());
+    login.focus(SERVER);
+    key(&mut login, NamedKey::Enter);
+    assert!(login.picker.policy.visible());
+    login.open_studio();
+    assert!(!login.studio.state.visible());
+
+    let mut login = NativeLogin::new("").unwrap();
+    login.step(0., false, false).unwrap();
+    login.open_studio();
+    login.step(230., false, false).unwrap();
+    // Control ids belong to the active panel; a login action cannot pierce it.
+    login.focus(SERVER);
+    login.activate(false);
+    assert!(!login.picker.policy.visible());
+    login.pointer([100., 100.], Some(true), false);
+    login.pointer([100., 100.], Some(false), false);
+    assert!(login.studio.state.interactive());
+    // Releasing outside after pressing the surface must not dismiss the modal.
+    login.pointer([100., 100.], Some(true), false);
+    login.pointer([0., 0.], Some(false), false);
+    assert!(login.studio.state.interactive());
+}
+
+#[test]
 fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_five() {
     for dpr in 1..=5 {
         let dpr = f64::from(dpr);
@@ -203,6 +258,7 @@ fn login_constructor_and_champion_return_retain_their_existing_normalization_and
         slither_client::login_controls::NICKNAME,
         slither_client::login_controls::PLAY,
         CHANGE_SKIN,
+        slither_client::login_controls::SERVER,
     ] {
         assert_eq!(
             login

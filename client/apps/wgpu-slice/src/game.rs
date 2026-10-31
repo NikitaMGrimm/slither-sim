@@ -365,7 +365,7 @@ impl LocalGame {
             return Err("Explicit Play unavailable".into());
         }
         server_endpoint(endpoint)?;
-        appearance.validate()?;
+        appearance.validate_wire()?;
         let login = protocol::encode_login(
             profile.client_version,
             &profile.page_echo,

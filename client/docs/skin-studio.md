@@ -25,7 +25,8 @@ Native storage is `%LOCALAPPDATA%/SlitherClient/menu.v2`, with a bounded read
 replacement. Startup does not create directories, rewrite corrupt files or
 write/delete v1. Absent v2 imports `menu.v1` using the existing v1 validation.
 Present malformed v2 defaults atomically and is replaced only on Save. Unknown
-versions disable persistence for the run. Failed writes preserve the memory
+versions and unreadable files disable persistence for the run. Typed read outcomes
+keep I/O failures separate from corrupt contents. Failed writes preserve the memory
 commit and display “Saved for this run” on return. Nickname is sampled from its
 current login owner. Explicit `--nickname` / `--skin` override restored values
 for the run; omitted options do not erase saved choices.
@@ -33,8 +34,10 @@ for the run; omitted options do not erase saved choices.
 The ASCII record is
 `2:<nickname hex>:<b|c>:<builtin hex>:<custom base hex>:<custom hex>:<--|00..1f>`.
 Inactive custom data and a future cosmetic preference remain separate from
-unlock grants. Zero headers and builder headers are admitted by the studio;
-the old development editor and tolerant inbound resolver retain their rules.
+unlock grants. Retained custom bytes keep opaque prefixes and raw tails unchanged,
+subject to the wire's 255-byte bound. Header/run validation applies only to newly
+authored patterns; v1 migration, the old development editor and inbound resolver
+retain their existing rules.
 No official browser keys are read. `slither-client.menu.v2` is reserved for a
 future browser adapter; the development Canvas page continues using v1.
 

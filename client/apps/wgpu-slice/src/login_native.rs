@@ -288,14 +288,12 @@ impl NativeLogin {
         use winit::event::WindowEvent;
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
-            self.studio.cancel_capture();
         }
         if matches!(
             event,
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
         ) {
             self.controls.blur();
-            self.studio.cancel_capture();
         }
         if let WindowEvent::KeyboardInput { event, .. } = event {
             return self.key(event.into(), admission);
@@ -416,19 +414,6 @@ impl NativeLogin {
         }
         if self.studio.state.visible() {
             let mut effects = self.sync_controls(admission);
-            let outside = !slither_client::skin_studio::StudioState::bounds(self.area)
-                .contains(point[0], point[1]);
-            if down == Some(true) {
-                self.studio.outside_pressed = outside;
-            }
-            let dismiss = down == Some(false) && outside && self.studio.outside_pressed;
-            if down == Some(false) {
-                self.studio.outside_pressed = false;
-            }
-            if dismiss {
-                self.studio.state.cancel(self.studio.now);
-                self.controls.blur();
-            }
             let resolved = self.panel.resolve(self.area).unwrap_or_default();
             if let Some(intent) = self.controls.pointer(&self.panel, &resolved, point, down) {
                 self.studio
@@ -522,7 +507,6 @@ impl NativeLogin {
         let area = extent.map(|n| f64::from(n) / dpr);
         if area != self.area || dpr != self.pixel_scale {
             self.controls.blur();
-            self.studio.cancel_capture();
         }
         self.pixel_scale = dpr;
         let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;

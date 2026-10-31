@@ -79,6 +79,47 @@ fn failed_storage_keeps_one_memory_commit_and_cancel_never_writes() {
     assert_eq!(std::fs::read_dir(&path).unwrap().count(), 1);
     std::fs::remove_dir_all(path).unwrap();
 }
+
+#[test]
+#[cfg(windows)]
+fn unreadable_v2_stays_protected_after_transient_sharing_violation_ends() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let path = temp();
+    let saved = AppearanceRecord {
+        nickname: "Stored".into(),
+        builtin: 7,
+        custom_base: 65,
+        custom_bytes: vec![0, 0, 0, 0, 0, 0, 0, 0, 2, 41],
+        cosmetic: Some(31),
+        ..Default::default()
+    };
+    let mut storage = MenuStorage::at(Some(path.clone()));
+    storage.save(&saved).unwrap();
+    let original = std::fs::read(path.join("menu.v2")).unwrap();
+    let lock = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(path.join("menu.v2"))
+        .unwrap();
+    let restored = storage.restore();
+    assert!(!restored.persistence_enabled);
+    assert!(!storage.enabled);
+    drop(lock);
+    let mut studio = SkinStudioNative::new(restored.record, storage).unwrap();
+    studio.open(true);
+    studio.step(230.);
+    studio.activate(NEXT, "");
+    studio.activate(SAVE, "Current");
+    assert_eq!(studio.status, "Saved for this run");
+    assert_eq!(studio.state.committed().builtin, 1);
+    assert_eq!(std::fs::read(path.join("menu.v2")).unwrap(), original);
+    assert_eq!(
+        AppearanceRecord::parse(std::str::from_utf8(&original).unwrap()),
+        Some(saved)
+    );
+    assert_eq!(std::fs::read_dir(&path).unwrap().count(), 1);
+    std::fs::remove_dir_all(path).unwrap();
+}
 #[test]
 fn delayed_profile_and_endpoint_send_frozen_exact_appearance_only_on_play() {
     for skin in [0, 41, 64, 65] {
