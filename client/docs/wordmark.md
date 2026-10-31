@@ -29,7 +29,11 @@ smoothly to exactly zero at completion. Most stroke volume arrives in the first
 the independent `login_alpha * logo_alpha`. The soft shadow follows the current
 drawn mask. Bitmap logo art now uses a plain fade instead of the earlier wipe.
 
-Reveal sampling has 200 steps (about 30 updates/s), followed by one static key.
+Reveal rasters are capped at 40 Hz: a new raster requires at least 25 ms of
+the retained reveal clock. Intervening frames keep the same shared image.
+Geometry/text changes invalidate that cache independently. Motion samples use
+the elapsed reveal fraction, so skipped updates do not change pacing; the exact
+final frame settles once and then keeps a static key.
 Cached atlases retain shared immutable `Arc<RgbaImage>` images; preparing another
 frame clones their handles rather than copying pixels. No idle rasterization or
 logo texture upload occurs. A resize or outgoing size

@@ -1053,3 +1053,45 @@ fn high_dpr_atlas_reassembles_the_exact_raster_without_seams_or_overlap() {
     assert_eq!(actual, expected.pixels);
     assert!(p.frame.draws.len() <= 512);
 }
+
+#[test]
+fn reveal_frames_inside_25ms_reuse_the_shared_raster() {
+    use slither_wgpu_slice::menu_specimen;
+    let mut text = TextCache::menu();
+    let mut menu = Menu::default();
+    let mut view = menu_specimen::view(0).unwrap();
+    let layout = menu_specimen::layout(&mut text, &view, [1920, 1080], 1.).unwrap();
+    let mut previous = None;
+    let mut changes = Vec::new();
+    for ms in 0..=100 {
+        view.logo_reveal = f64::from(ms) * 0.00375 / 25.;
+        let p = menu
+            .prepare(&mut text, &view, &layout, [1920, 1080], 1., None, 0)
+            .unwrap();
+        let logo = p.frame.draws.iter().find(|d| {
+            d.source.is_some() && d.asset.handle < slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+        });
+        if let Some(draw) = logo {
+            let image = p
+                .resources
+                .iter()
+                .find(|r| r.asset == draw.asset)
+                .unwrap()
+                .image
+                .clone();
+            if let Some((asset, old)) = &previous {
+                if *asset == draw.asset {
+                    assert!(std::sync::Arc::ptr_eq(old, &image));
+                } else {
+                    changes.push(ms);
+                }
+            } else {
+                changes.push(ms);
+            }
+            previous = Some((draw.asset, image));
+        } else {
+            assert!(ms < 25);
+        }
+    }
+    assert_eq!(changes, [25, 50, 75, 100]);
+}

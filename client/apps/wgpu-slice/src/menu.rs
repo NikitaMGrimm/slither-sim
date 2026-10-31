@@ -307,7 +307,8 @@ pub struct Menu {
 }
 #[derive(Clone)]
 struct StrokeCache {
-    key: (String, u64, u64, u16),
+    key: (String, u64, u64),
+    sampled_at: f64,
     resources: Vec<Resource>,
     pieces: Vec<StrokePiece>,
 }
@@ -372,6 +373,23 @@ pub struct PanelPaint<'a> {
     pub scroll: &'a mut BTreeMap<EditorId, f64>,
     pub theme: MenuTheme,
 }
+// The core advances logo_reveal by 0.00375 per 25 ms (start_page/menu.rs).
+const REVEAL_TICK: f64 = 0.00375;
+fn reveal_due(progress: f64, previous: Option<f64>) -> bool {
+    if progress >= 1. {
+        return previous.is_none_or(|p| p < 1.);
+    }
+    if progress < REVEAL_TICK {
+        return false;
+    }
+    // Leave a complete tick before the exact final raster. The core clock
+    // clamps at one, so deferring that final frame could otherwise never finish.
+    if progress > 1. - REVEAL_TICK {
+        return false;
+    }
+    previous.is_none_or(|p| progress < p || progress - p >= REVEAL_TICK - 1e-12)
+}
+
 impl Composition<'_> {
     #[allow(clippy::too_many_arguments)]
     fn panel(
@@ -1037,180 +1055,184 @@ impl Composition<'_> {
         let layout = wordmark::layout(value, holder, viewport_width, |s| {
             Ok(text.measure_panel(s, style)?.advance / unit)
         })?;
-        // ~30 updates/s over the shared 6.67 s reveal. The exact settled key is
-        // permanent; outgoing opacity/growth never enters the reveal clock.
         if !reveal.is_finite() {
             return Err("Wordmark reveal bounds".into());
         }
-        let step = (reveal.clamp(0., 1.) * 200.).floor() as u16;
-        if step > 0 && layout.words.iter().any(|w| !w.fallback) {
+        let reveal = reveal.clamp(0., 1.);
+        if reveal > 0. && layout.words.iter().any(|w| !w.fallback) {
             wordmark::raster_size(&layout, self.scale)?;
             let key = (
                 value.to_owned(),
                 layout.unit.to_bits(),
                 self.scale.to_bits(),
-                step,
             );
-            let cache = if let Some(old) = self.old_stroke.filter(|old| old.key == key) {
-                old.clone()
-            } else {
-                let raster = wordmark::raster(&layout, self.scale, f64::from(step) / 200.)?;
-                // Retain only actual painted pixels (including the soft
-                // shadow). Empty padding must not displace essential controls
-                // at 5x DPR; cropping never changes the 1:1 physical scale.
-                let mut bounds = [raster.width, raster.height, 0, 0];
-                for (i, p) in raster.pixels.as_chunks::<4>().0.iter().enumerate() {
-                    if p[3] > 0 {
-                        let x = i as u32 % raster.width;
-                        let y = i as u32 / raster.width;
-                        bounds[0] = bounds[0].min(x);
-                        bounds[1] = bounds[1].min(y);
-                        bounds[2] = bounds[2].max(x + 1);
-                        bounds[3] = bounds[3].max(y + 1);
+            let old = self.old_stroke.filter(|old| old.key == key);
+            let due = reveal_due(reveal, old.map(|c| c.sampled_at));
+            if old.is_some() || due {
+                let cache = if !due {
+                    old.unwrap().clone()
+                } else {
+                    let raster = wordmark::raster(&layout, self.scale, reveal)?;
+                    // Retain only actual painted pixels (including the soft
+                    // shadow). Empty padding must not displace essential controls
+                    // at 5x DPR; cropping never changes the 1:1 physical scale.
+                    let mut bounds = [raster.width, raster.height, 0, 0];
+                    for (i, p) in raster.pixels.as_chunks::<4>().0.iter().enumerate() {
+                        if p[3] > 0 {
+                            let x = i as u32 % raster.width;
+                            let y = i as u32 / raster.width;
+                            bounds[0] = bounds[0].min(x);
+                            bounds[1] = bounds[1].min(y);
+                            bounds[2] = bounds[2].max(x + 1);
+                            bounds[3] = bounds[3].max(y + 1);
+                        }
                     }
-                }
-                if bounds[2] == 0 {
-                    bounds = [0, 0, 1, 1];
-                }
-                // At high DPR, pack nonempty horizontal bands into one
-                // atlas. This preserves stroke/shadow pixels while excluding
-                // the large holes between ascenders and lowercase bodies.
-                // Ordinary DPR 1/2 retains one image and one draw.
-                let mut regions = Vec::new();
-                if self.scale > 3. {
-                    let band = (3. * self.scale).round() as u32;
-                    for y in (bounds[1]..bounds[3]).step_by(band as usize) {
-                        let height = (bounds[3] - y).min(band);
-                        let mut left = None;
-                        for x in bounds[0]..=bounds[2] {
-                            let painted = x < bounds[2]
-                                && (y..y + height).any(|row| {
-                                    raster.pixels[((row * raster.width + x) * 4 + 3) as usize] > 0
-                                });
-                            if painted && left.is_none() {
-                                left = Some(x);
-                            }
-                            if !painted && let Some(start) = left.take() {
-                                for sx in (start..x).step_by(2048) {
-                                    regions.push([sx, y, (x - sx).min(2048), height]);
+                    if bounds[2] == 0 {
+                        bounds = [0, 0, 1, 1];
+                    }
+                    // At high DPR, pack nonempty horizontal bands into one
+                    // atlas. This preserves stroke/shadow pixels while excluding
+                    // the large holes between ascenders and lowercase bodies.
+                    // Ordinary DPR 1/2 retains one image and one draw.
+                    let mut regions = Vec::new();
+                    if self.scale > 3. {
+                        let band = (3. * self.scale).round() as u32;
+                        for y in (bounds[1]..bounds[3]).step_by(band as usize) {
+                            let height = (bounds[3] - y).min(band);
+                            let mut left = None;
+                            for x in bounds[0]..=bounds[2] {
+                                let painted = x < bounds[2]
+                                    && (y..y + height).any(|row| {
+                                        raster.pixels[((row * raster.width + x) * 4 + 3) as usize]
+                                            > 0
+                                    });
+                                if painted && left.is_none() {
+                                    left = Some(x);
+                                }
+                                if !painted && let Some(start) = left.take() {
+                                    for sx in (start..x).step_by(2048) {
+                                        regions.push([sx, y, (x - sx).min(2048), height]);
+                                    }
                                 }
                             }
                         }
+                    } else {
+                        for x in (bounds[0]..bounds[2]).step_by(2048) {
+                            regions.push([
+                                x,
+                                bounds[1],
+                                (bounds[2] - x).min(2048),
+                                bounds[3] - bounds[1],
+                            ]);
+                        }
                     }
-                } else {
-                    for x in (bounds[0]..bounds[2]).step_by(2048) {
-                        regions.push([
-                            x,
-                            bounds[1],
-                            (bounds[2] - x).min(2048),
-                            bounds[3] - bounds[1],
-                        ]);
+                    check_menu_draws(self.draws.len() + regions.len())?;
+                    let mut pieces = Vec::new();
+                    let mut sizes: Vec<[u32; 2]> = vec![[0, 0]];
+                    regions.sort_by_key(|r| std::cmp::Reverse(r[2]));
+                    let row_height = regions.iter().map(|r| r[3]).max().unwrap_or(1);
+                    let rows_per_atlas = 2048 / row_height;
+                    let mut used: Vec<u32> = Vec::new();
+                    for [x, y, width, height] in regions {
+                        let row = used
+                            .iter()
+                            .position(|n| *n + width <= 2048)
+                            .unwrap_or(used.len());
+                        if row == used.len() {
+                            used.push(0);
+                        }
+                        let atlas = row / rows_per_atlas as usize;
+                        if atlas == sizes.len() {
+                            sizes.push([0, 0]);
+                        }
+                        let ax = used[row];
+                        let ay = row as u32 % rows_per_atlas * row_height;
+                        sizes[atlas][0] = sizes[atlas][0].max(ax + width);
+                        sizes[atlas][1] = sizes[atlas][1].max(ay + height);
+                        pieces.push(StrokePiece {
+                            atlas,
+                            offset: [x, y],
+                            source: [ax, ay, width, height],
+                        });
+                        used[row] += width;
                     }
-                }
-                check_menu_draws(self.draws.len() + regions.len())?;
-                let mut pieces = Vec::new();
-                let mut sizes: Vec<[u32; 2]> = vec![[0, 0]];
-                regions.sort_by_key(|r| std::cmp::Reverse(r[2]));
-                let row_height = regions.iter().map(|r| r[3]).max().unwrap_or(1);
-                let rows_per_atlas = 2048 / row_height;
-                let mut used: Vec<u32> = Vec::new();
-                for [x, y, width, height] in regions {
-                    let row = used
+                    sizes.retain(|s| s[0] > 0);
+                    let bytes = sizes
                         .iter()
-                        .position(|n| *n + width <= 2048)
-                        .unwrap_or(used.len());
-                    if row == used.len() {
-                        used.push(0);
-                    }
-                    let atlas = row / rows_per_atlas as usize;
-                    if atlas == sizes.len() {
-                        sizes.push([0, 0]);
-                    }
-                    let ax = used[row];
-                    let ay = row as u32 % rows_per_atlas * row_height;
-                    sizes[atlas][0] = sizes[atlas][0].max(ax + width);
-                    sizes[atlas][1] = sizes[atlas][1].max(ay + height);
-                    pieces.push(StrokePiece {
-                        atlas,
-                        offset: [x, y],
-                        source: [ax, ay, width, height],
-                    });
-                    used[row] += width;
-                }
-                sizes.retain(|s| s[0] > 0);
-                let bytes = sizes
-                    .iter()
-                    .map(|s| s[0] as usize * s[1] as usize * 4)
-                    .sum::<usize>();
-                preflight_menu_totals(sizes.len(), bytes)?;
-                let mut images: Vec<_> = sizes
-                    .into_iter()
-                    .map(|[width, height]| materials::RgbaImage {
-                        width,
-                        height,
-                        pixels: vec![0; width as usize * height as usize * 4],
-                    })
-                    .collect();
-                for piece in &pieces {
-                    let [sx, sy, width, height] = piece.source;
-                    let dst = &mut images[piece.atlas];
-                    for row in 0..height {
-                        let src =
-                            ((piece.offset[1] + row) * raster.width + piece.offset[0]) as usize * 4;
-                        let at = ((sy + row) * dst.width + sx) as usize * 4;
-                        dst.pixels[at..at + width as usize * 4]
-                            .copy_from_slice(&raster.pixels[src..src + width as usize * 4]);
-                    }
-                }
-                let mut resources = Vec::new();
-                for image in images {
-                    self.next_handle = self
-                        .next_handle
-                        .checked_add(1)
-                        .filter(|h| {
-                            *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE
+                        .map(|s| s[0] as usize * s[1] as usize * 4)
+                        .sum::<usize>();
+                    preflight_menu_totals(sizes.len(), bytes)?;
+                    let mut images: Vec<_> = sizes
+                        .into_iter()
+                        .map(|[width, height]| materials::RgbaImage {
+                            width,
+                            height,
+                            pixels: vec![0; width as usize * height as usize * 4],
                         })
-                        .ok_or("Menu material handle overflow")?;
-                    resources.push(Resource {
-                        asset: BodyAsset {
-                            handle: self.next_handle,
-                            revision: 1,
-                            width: image.width,
-                            height: image.height,
-                            status: BodyAssetStatus::Ready,
+                        .collect();
+                    for piece in &pieces {
+                        let [sx, sy, width, height] = piece.source;
+                        let dst = &mut images[piece.atlas];
+                        for row in 0..height {
+                            let src = ((piece.offset[1] + row) * raster.width + piece.offset[0])
+                                as usize
+                                * 4;
+                            let at = ((sy + row) * dst.width + sx) as usize * 4;
+                            dst.pixels[at..at + width as usize * 4]
+                                .copy_from_slice(&raster.pixels[src..src + width as usize * 4]);
+                        }
+                    }
+                    let mut resources = Vec::new();
+                    for image in images {
+                        self.next_handle = self
+                            .next_handle
+                            .checked_add(1)
+                            .filter(|h| {
+                                *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE
+                            })
+                            .ok_or("Menu material handle overflow")?;
+                        resources.push(Resource {
+                            asset: BodyAsset {
+                                handle: self.next_handle,
+                                revision: 1,
+                                width: image.width,
+                                height: image.height,
+                                status: BodyAssetStatus::Ready,
+                            },
+                            image: image.into(),
+                        });
+                    }
+                    StrokeCache {
+                        key,
+                        sampled_at: reveal,
+                        resources,
+                        pieces,
+                    }
+                };
+                let origin = layout.origin_pixels(self.scale);
+                for piece in &cache.pieces {
+                    let resource = &cache.resources[piece.atlas];
+                    let [sx, sy, width, height] = piece.source;
+                    let mut draw = image(
+                        resource,
+                        MenuRect {
+                            x: (origin[0] + f64::from(piece.offset[0])) / self.scale,
+                            y: (origin[1] + f64::from(piece.offset[1])) / self.scale,
+                            width: f64::from(width) / self.scale,
+                            height: f64::from(height) / self.scale,
                         },
-                        image: image.into(),
+                        alpha,
+                    );
+                    draw.source = Some(BodyRect {
+                        x: f64::from(sx),
+                        y: f64::from(sy),
+                        width: f64::from(width),
+                        height: f64::from(height),
                     });
+                    self.push(draw)?;
                 }
-                StrokeCache {
-                    key,
-                    resources,
-                    pieces,
-                }
-            };
-            let origin = layout.origin_pixels(self.scale);
-            for piece in &cache.pieces {
-                let resource = &cache.resources[piece.atlas];
-                let [sx, sy, width, height] = piece.source;
-                let mut draw = image(
-                    resource,
-                    MenuRect {
-                        x: (origin[0] + f64::from(piece.offset[0])) / self.scale,
-                        y: (origin[1] + f64::from(piece.offset[1])) / self.scale,
-                        width: f64::from(width) / self.scale,
-                        height: f64::from(height) / self.scale,
-                    },
-                    alpha,
-                );
-                draw.source = Some(BodyRect {
-                    x: f64::from(sx),
-                    y: f64::from(sy),
-                    width: f64::from(width),
-                    height: f64::from(height),
-                });
-                self.push(draw)?;
+                self.stroke = Some(cache);
             }
-            self.stroke = Some(cache);
         }
         for word in layout.words.iter().filter(|w| w.fallback) {
             // One font run for the whole unsupported word, never a partial
@@ -2019,5 +2041,28 @@ mod quota_tests {
         assert!(!MenuFrame::append_optional(prepared, &mut picture).unwrap());
         assert_eq!(picture.frame, base.frame);
         assert!(picture.resources.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod reveal_clock_tests {
+    use super::*;
+    #[test]
+    fn reveal_updates_are_25ms_apart_and_finish_on_the_clamped_clock() {
+        let mut previous = None;
+        let mut times = Vec::new();
+        for ms in 0..=6700 {
+            let progress = (f64::from(ms) * REVEAL_TICK / 25.).min(1.);
+            if reveal_due(progress, previous) {
+                previous = Some(progress);
+                times.push(ms);
+            }
+        }
+        assert_eq!(times[0], 25);
+        assert!(times.windows(2).all(|t| t[1] - t[0] >= 25));
+        assert_eq!(previous, Some(1.));
+        assert!(times.last().copied().unwrap() <= 6667);
+        assert!(!reveal_due(1., previous));
+        assert!(reveal_due(0.1, previous)); // new reveal timeline
     }
 }
