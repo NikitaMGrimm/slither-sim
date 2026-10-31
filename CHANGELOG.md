@@ -7,12 +7,14 @@
 - The simulator's networking code now reads messages through
   `slither-protocol`, with unchanged results. In local benchmarks, decoding bot
   frames takes 4–15% less time.
+
 ### Fixed
 
 - Vlither players can join. Vlither answers the login challenge with its own
   built-in formula, which differs from the stock client's, so the host used to
   close every Vlither connection with "Invalid challenge reply". The host now
   accepts that answer too, with or without a custom skin.
+
 ### Added
 
 - The repository adds `slither-protocol`, a small crate that reads slither.io
