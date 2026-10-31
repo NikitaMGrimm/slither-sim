@@ -1110,3 +1110,156 @@ fn is_stroke_draw(
         && d.destination.y >= holder.y - 1.
         && d.destination.y + d.destination.height <= holder.y + holder.height + 1.
 }
+
+#[test]
+fn wordmark_raster_limits_use_font_labels_and_preserve_menu_and_errors() {
+    use slither_client::menu_layout::MenuElement;
+    use slither_wgpu_slice::menu_specimen;
+    let mut text = TextCache::menu();
+    let mut menu = Menu::default();
+    let mut view = menu_specimen::view(0).unwrap();
+    for dpr in [6., 8.] {
+        let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+        let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+        let holder = layout.viewport_rect(MenuElement::Logo);
+        let p = menu
+            .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+            .unwrap_or_else(|e| panic!("DPR {dpr}: {e}"));
+        assert!(!p.frame.draws.iter().any(|d| is_stroke_draw(d, holder)));
+        // Both whole words use the installed-font text namespace and colours.
+        for rgb in [
+            slither_wgpu_slice::menu::WORDMARK_GREEN,
+            slither_wgpu_slice::menu::WORDMARK_PURPLE,
+        ] {
+            assert!(
+                p.resources
+                    .iter()
+                    .filter(|r| r.asset.handle >> 60 == 8)
+                    .any(|r| {
+                        r.image
+                            .pixels
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .any(|pixel| pixel[..3] == rgb && pixel[3] == 255)
+                    })
+            );
+        }
+        assert!(
+            p.frame
+                .draws
+                .iter()
+                .any(|d| d.destination.y > holder.y + holder.height)
+        );
+        assert!(
+            p.resources
+                .iter()
+                .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+        );
+        assert!(
+            p.resources
+                .iter()
+                .map(|r| r.image.pixels.len())
+                .sum::<usize>()
+                <= slither_wgpu_slice::text::MENU_CACHE_BYTES
+        );
+        menu.wordmark_text = Some("x".repeat(129));
+        assert_eq!(
+            menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+                .err()
+                .as_deref(),
+            Some("Wordmark layout bounds")
+        );
+        menu.wordmark_text = None;
+        view.logo_reveal = f64::NAN;
+        assert_eq!(
+            menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+                .err()
+                .as_deref(),
+            Some("Wordmark reveal bounds")
+        );
+        view.logo_reveal = 1.;
+    }
+}
+
+#[test]
+fn resized_stroke_cache_matches_fresh_pixels_and_snapped_positions() {
+    use slither_client::menu_layout::MenuElement;
+    use slither_wgpu_slice::menu_specimen;
+    let snapshot = |p: &slither_wgpu_slice::menu::MenuFrame, holder| {
+        p.frame
+            .draws
+            .iter()
+            .filter(|d| is_stroke_draw(d, holder))
+            .map(|d| {
+                let r = p.resources.iter().find(|r| r.asset == d.asset).unwrap();
+                (
+                    d.destination,
+                    d.source,
+                    r.image.width,
+                    r.image.height,
+                    r.image.pixels.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    for dpr in [1., 1.25, 1.5, 2.] {
+        for progress in [0.5, 1.] {
+            let mut text = TextCache::menu();
+            let mut view = menu_specimen::view(0).unwrap();
+            view.logo_reveal = progress;
+            let mut cached = Menu::default();
+            for width in [1920, 1921, 1922, 1923] {
+                let extent = [width, 1080];
+                let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+                let holder = layout.viewport_rect(MenuElement::Logo);
+                let actual = cached
+                    .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+                    .unwrap();
+                let fresh = Menu::default()
+                    .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+                    .unwrap();
+                let actual = snapshot(&actual, holder);
+                assert!(!actual.is_empty());
+                assert!(
+                    actual == snapshot(&fresh, holder),
+                    "width={width}, DPR={dpr}, progress={progress}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn integer_translation_reuses_stroke_pixels() {
+    use slither_client::menu_layout::MenuElement;
+    use slither_wgpu_slice::menu_specimen;
+    let mut text = TextCache::menu();
+    let mut menu = Menu::default();
+    let view = menu_specimen::view(0).unwrap();
+    let mut pictures = Vec::new();
+    for width in [1920, 1922] {
+        let extent = [width, 1080];
+        let layout = menu_specimen::layout(&mut text, &view, extent, 1.).unwrap();
+        let p = menu
+            .prepare(&mut text, &view, &layout, extent, 1., None, 0)
+            .unwrap();
+        let draw = p
+            .frame
+            .draws
+            .iter()
+            .find(|d| is_stroke_draw(d, layout.viewport_rect(MenuElement::Logo)))
+            .unwrap();
+        let image = p
+            .resources
+            .iter()
+            .find(|r| r.asset == draw.asset)
+            .unwrap()
+            .image
+            .clone();
+        pictures.push((draw.asset, draw.destination.x, image));
+    }
+    assert_eq!(pictures[0].0, pictures[1].0);
+    assert_eq!(pictures[0].1 + 1., pictures[1].1);
+    assert!(std::sync::Arc::ptr_eq(&pictures[0].2, &pictures[1].2));
+}

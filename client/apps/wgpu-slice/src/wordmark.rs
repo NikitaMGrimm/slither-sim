@@ -17,6 +17,8 @@ pub const COLORS: [[[u8; 3]; 2]; 2] = [
 pub const MAX_CHARACTERS: usize = 128;
 // Temporary full canvas; retained nonempty tiles share the 13 MiB Menu cap.
 pub const MAX_RASTER_BYTES: usize = 10 * 1024 * 1024;
+pub(crate) const RASTER_SCALE_QUOTA: &str = "Wordmark raster scale bounds";
+pub(crate) const RASTER_PIXEL_QUOTA: &str = "Wordmark raster byte budget";
 const PEN: f64 = 0.86;
 const TRACKING: f64 = 1.25;
 
@@ -39,6 +41,11 @@ impl Layout {
     pub fn origin_pixels(&self, dpr: f64) -> [f64; 2] {
         [self.rect.x * dpr, self.rect.y * dpr].map(f64::round)
     }
+    /// The raster depends on this local offset, even when a resize leaves its
+    /// snapped canvas origin unchanged. Whole-pixel translations need no new pixels.
+    pub(crate) fn word_offset_pixels(&self, word: &Word, dpr: f64) -> f64 {
+        self.word_x_pixels(word, dpr) - self.origin_pixels(dpr)[0]
+    }
     /// Snap the line's first word once, then use rounded relative advances.
     pub fn word_x_pixels(&self, word: &Word, dpr: f64) -> f64 {
         let first = self.words.first().map_or(0., |w| w.x);
@@ -53,6 +60,30 @@ pub fn layout(
     value: &str,
     holder: MenuRect,
     viewport_width: f64,
+    fallback_width: impl FnMut(&str) -> Result<f64>,
+) -> Result<Layout> {
+    layout_impl(value, holder, viewport_width, false, fallback_width)
+}
+pub(crate) fn fallback_layout(
+    value: &str,
+    holder: MenuRect,
+    viewport_width: f64,
+    fallback_width: impl FnMut(&str) -> Result<f64>,
+) -> Result<Layout> {
+    // The legacy plain-font logo fits the holder, unlike the wider stroke line.
+    layout_impl(
+        value,
+        holder,
+        viewport_width.min(holder.width + 32.),
+        true,
+        fallback_width,
+    )
+}
+fn layout_impl(
+    value: &str,
+    holder: MenuRect,
+    viewport_width: f64,
+    font_only: bool,
     mut fallback_width: impl FnMut(&str) -> Result<f64>,
 ) -> Result<Layout> {
     if value.chars().count() > MAX_CHARACTERS
@@ -83,7 +114,7 @@ pub fn layout(
             advance += 4.;
             continue;
         }
-        let fallback = !chunk.chars().all(|c| glyph(c).is_some());
+        let fallback = font_only || !chunk.chars().all(|c| glyph(c).is_some());
         let width = if fallback {
             fallback_width(&chunk)?
         } else {
@@ -273,14 +304,14 @@ pub fn samples(layout: &Layout, progress: f64) -> Result<Vec<Sample>> {
 /// downsampled or enlarged by the snapped overlay. Admission precedes allocation.
 pub fn raster_size(layout: &Layout, dpr: f64) -> Result<[u32; 2]> {
     if !dpr.is_finite() || dpr <= 0. || dpr > 5.5 {
-        return Err("Wordmark raster scale bounds".into());
+        return Err(RASTER_SCALE_QUOTA.into());
     }
     let size = [
         (layout.rect.width * dpr).ceil().max(1.) as u32,
         (layout.rect.height * dpr).ceil().max(1.) as u32,
     ];
     if size[1] > 2048 || u64::from(size[0]) * u64::from(size[1]) * 4 > MAX_RASTER_BYTES as u64 {
-        return Err("Wordmark raster byte budget".into());
+        return Err(RASTER_PIXEL_QUOTA.into());
     }
     Ok(size)
 }
@@ -457,10 +488,9 @@ fn blur(mask: &mut [u8], size: [u32; 2], radius: usize) {
 pub fn raster(layout: &Layout, dpr: f64, progress: f64) -> Result<RgbaImage> {
     let size = raster_size(layout, dpr)?;
     let mut physical = layout.clone();
-    let origin_x = layout.origin_pixels(dpr)[0];
     for (word, original) in physical.words.iter_mut().zip(&layout.words) {
         // Relative advances are rounded once from the same canvas origin.
-        word.x = (layout.word_x_pixels(original, dpr) - origin_x) / (layout.unit * dpr);
+        word.x = layout.word_offset_pixels(original, dpr) / (layout.unit * dpr);
     }
     let mut mask = vec![0; size[0] as usize * size[1] as usize];
     // Colour belongs to the circle, including its round end and displaced

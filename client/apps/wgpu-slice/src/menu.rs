@@ -307,7 +307,7 @@ pub struct Menu {
 }
 #[derive(Clone)]
 struct StrokeCache {
-    key: (String, u64, u64),
+    key: (String, u64, u64, u64),
     sampled_at: f64,
     resources: Vec<Resource>,
     pieces: Vec<StrokePiece>,
@@ -1052,19 +1052,36 @@ impl Composition<'_> {
         };
         let ascent = text.measure_panel("H", style)?.ascent;
         style.size *= 10. * unit / ascent;
-        let layout = wordmark::layout(value, holder, viewport_width, |s| {
+        let mut layout = wordmark::layout(value, holder, viewport_width, |s| {
             Ok(text.measure_panel(s, style)?.advance / unit)
         })?;
         if !reveal.is_finite() {
             return Err("Wordmark reveal bounds".into());
         }
         let reveal = reveal.clamp(0., 1.);
+        if layout.words.iter().any(|w| !w.fallback)
+            && let Err(error) = wordmark::raster_size(&layout, self.scale)
+        {
+            // Only raster admission limits select the installed-font path.
+            // Invalid input and unexpected raster/logic errors still propagate.
+            if !matches!(
+                error.as_str(),
+                wordmark::RASTER_SCALE_QUOTA | wordmark::RASTER_PIXEL_QUOTA
+            ) {
+                return Err(error);
+            }
+            layout = wordmark::fallback_layout(value, holder, viewport_width, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?;
+        }
         if reveal > 0. && layout.words.iter().any(|w| !w.fallback) {
-            wordmark::raster_size(&layout, self.scale)?;
             let key = (
                 value.to_owned(),
                 layout.unit.to_bits(),
                 self.scale.to_bits(),
+                layout
+                    .word_offset_pixels(&layout.words[0], self.scale)
+                    .to_bits(),
             );
             let old = self.old_stroke.filter(|old| old.key == key);
             let due = reveal_due(reveal, old.map(|c| c.sampled_at));

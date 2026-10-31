@@ -42,17 +42,23 @@ the elapsed reveal fraction, so skipped updates do not change pacing; the exact
 final frame settles once and then keeps a static key.
 Cached atlases retain shared immutable `Arc<RgbaImage>` images; preparing another
 frame clones their handles rather than copying pixels. No idle rasterization or
-logo texture upload occurs. A resize or outgoing size
-change produces a new exact-DPR raster. Premultiplied CPU pixels are cropped to
+logo texture upload occurs. Size or centring-phase changes produce a new
+exact-DPR raster. Premultiplied CPU pixels are cropped to
 nonempty bounds including the shadow and tiled horizontally at 2048px. Each
 tile is one snapped 1:1 draw, with no texture minification. The transient RGBA
 canvas is capped at 10 MiB; retained tiles share the existing 64-slot/13 MiB
-Menu allowance with controls and text. DPR is bounded to 5.5; admission failure
-preserves the previous cache. These are ceilings, not eager allocations.
+Menu allowance with controls and text. Stroke rasters are bounded to DPR 5.5.
+Scale/pixel admission limits select a whole-word installed-font layout fitted
+to the legacy holder; invalid input and other errors still propagate. Other
+admission failures preserve the previous cache. These are ceilings, not eager
+allocations.
 
 Every word (including a font fallback) uses one snapped physical canvas origin
 plus its rounded relative advance. Absolute word origins never round separately;
 fractional-DPR regressions retain the same boundary rule as the prior font logo.
+The raster cache includes the first word's local physical offset from the snapped
+canvas origin. A centring phase change rebuilds it; integer translations reuse
+the same image at the new origin.
 
 Above DPR 3, nonempty horizontal bands are packed in bounded atlases to avoid
 charging transparent areas around the letters against essential controls. This
