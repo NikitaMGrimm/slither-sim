@@ -64,6 +64,10 @@
 
 ### Performance
 
+- Collision tests compare squared distances first and take the slower exact
+  distance only near the boundary. The 32-snake Battledome step gets about 1.3%
+  faster, with all ten timing pairs faster, and a live 64,000-bot world about
+  3.6%. Collision results are unchanged.
 - In worlds with 4,096 or more snakes, one long snake no longer widens the
   collision-grid area of every other body. Long snakes search a wider area
   themselves instead. On a synthetic
