@@ -10,8 +10,8 @@ const groups = Object.fromEntries(Object.entries({
   boundary: 'retried superseded skipped presented',
   dependency: 'decision_input coalesced',
   failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed',
-  effect: 'accepted flushed ack_effect host_close decision backpressure',
-  send: 'accepted flushed decision backpressure',
+  effect: 'accepted flushed closed_unflushed ack_effect host_close decision backpressure',
+  send: 'accepted flushed closed_unflushed decision backpressure',
   optionalEffect: 'write write_blocked flush_blocked',
   optionalPoll: 'write write_blocked flush_blocked backpressure handshake_read',
   packet: 'apply_begin apply_end deferred',
@@ -122,13 +122,17 @@ export function analyze(text, { cpu = false } = {}) {
     const ack = acknowledged ?? closed;
     check(ack.t >= r.t, 'effect acknowledgement precedes decision');
     if (r.detail === '1') {
-      const accepted = one('accepted', r), flushed = one('flushed', r);
-      check(accepted.t >= r.t && flushed.t >= accepted.t, 'invalid effect send order');
-      add('acceptedToFlushed', accepted.t, flushed.t);
+      const accepted = one('accepted', r), flushed = table('flushed').get(key(r)), closed = table('closed_unflushed').get(key(r));
+      check(Boolean(flushed) !== Boolean(closed), 'missing/duplicate send completion');
+      check(accepted.t >= r.t && (flushed ?? closed).t >= accepted.t, 'invalid effect send order');
+      if (flushed) add('acceptedToFlushed', accepted.t, flushed.t);
     }
   }
   for (const r of classified('effect')) one('effect', r);
   for (const r of classified('send')) check(one('effect', r).detail === '1', 'send stage on non-send effect');
+  for (const r of each('closed_unflushed')) {
+    check(!each('effect').some(e => e.thread === r.thread && e.generation === r.generation && e.detail === '1' && e.t > r.t), 'send after terminal close');
+  }
   for (const r of classified('optionalEffect')) if (r.id !== '0') {
     check(one('effect', r).t <= r.t, 'write precedes effect');
   }
@@ -147,12 +151,12 @@ export function analyze(text, { cpu = false } = {}) {
     if (r.related !== '0') check(one('apply_end', r, r.related).t <= r.t, 'ingress watermark precedes application');
   }
   for (const r of [...each('decision'), ...lines.filter(r => r.stage === 'decision_input')]) {
-    const decision = one('decision', r), accepted = one('accepted', r), flushed = one('flushed', r);
+    const decision = one('decision', r), accepted = one('accepted', r), flushed = table('flushed').get(key(r));
     if (r.stage === 'decision') add('decisionToAccepted', decision.t, accepted.t);
     if (r.related !== '0') {
       const admitted = input(r.related);
       add('admissionToDecision', admitted.t, decision.t);
-      add('admissionToFlushed', admitted.t, flushed.t);
+      if (flushed) add('admissionToFlushed', admitted.t, flushed.t);
     }
   }
   const closed = p => check(!p.submit && !p.sync && !p.present, 'unfinished picture span');
@@ -210,7 +214,8 @@ export function analyze(text, { cpu = false } = {}) {
     distributions[name] = { count: values.length, p50Ms: q(.5), p95Ms: q(.95), maxMs: values.at(-1) };
   }
   return { format: header.format, run: header.run, sourceRevision: header.sourceRevision,
-    complete: true, endpoint: cpu ? 'CPU replay (no GPU/present proof)' : 'native CPU stages', distributions };
+    complete: true, closedUnflushed: each('closed_unflushed').length,
+    endpoint: cpu ? 'CPU replay (no GPU/present proof)' : 'native CPU stages', distributions };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

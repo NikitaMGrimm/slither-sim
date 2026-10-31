@@ -108,6 +108,10 @@ connector thread across the HTTP upgrade. They never enter the game protocol.
   inventing a game acknowledgement or changing its shutdown policy. A Send
   always requires its own acknowledgement and flush. `game_failed` invalidates
   analysis.
+  A normal session shutdown can instead retire an accepted send as
+  `closed_unflushed`. The analyzer accepts and counts this terminal loss without
+  including it in any flush distribution. Missing both terminal states, duplicate
+  flush/close completion, and transport failures still fail validation.
 
 ## Analyze and calibrate
 

@@ -563,6 +563,9 @@ impl Transport {
             .iter()
             .any(|e| matches!(e, Event::Closed(_) | Event::Failed(_, _)))
         {
+            if !events.iter().any(|e| matches!(e, Event::Failed(_, _))) {
+                latency::closed_unflushed();
+            }
             self.drop_socket();
             self.readiness.take();
             self.pending_bytes = 0;
@@ -593,6 +596,7 @@ impl Transport {
             let _ = s.flush();
             let _ = s.get_ref().stream.shutdown(Shutdown::Both);
         }
+        latency::closed_unflushed();
         self.drop_socket();
         self.readiness.take();
         self.pending_bytes = 0;

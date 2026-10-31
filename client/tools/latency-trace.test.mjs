@@ -116,6 +116,28 @@ function tail(stage, id, related = '0', detail = '0') {
   rows.forEach((r, i) => r.ns = String(i * 1000));
   return rows;
 }
+
+test('terminal accepted-but-unflushed sends are counted without inventing delivery', () => {
+  const rows = fixture();
+  rows.find(r => r.stage === 'flushed').stage = 'closed_unflushed';
+  const result = analyze(encode(rows));
+  assert.equal(result.complete, true);
+  assert.equal(result.closedUnflushed, 1);
+  assert.equal(result.distributions.acceptedToFlushed, undefined);
+  assert.equal(result.distributions.admissionToFlushed, undefined);
+  assert.equal(result.distributions.decisionToAccepted.count, 1);
+  const duplicate = structuredClone(rows);
+  duplicate.splice(-1, 0, { ...rows.find(r => r.stage === 'closed_unflushed'), stage: 'flushed' });
+  duplicate.forEach((r, i) => r.ns = String(i * 1000));
+  assert.throws(() => analyze(encode(duplicate)), /duplicate send completion/);
+  const orphan = structuredClone(rows);
+  orphan.find(r => r.stage === 'closed_unflushed').id = '9999';
+  assert.throws(() => analyze(encode(orphan)), /completion|orphan/);
+  const later = structuredClone(rows);
+  later.splice(-1, 0, { ...rows.find(r => r.stage === 'effect'), id: '99', ns: '999999' });
+  later.forEach((r, i) => r.ns = String(i * 1000));
+  assert.throws(() => analyze(encode(later)), /completion|terminal/);
+});
 test('every nonzero wire effect and poll reference must resolve', () => {
   for (const stage of ['write', 'write_blocked', 'flush_blocked']) {
     for (const [id, poll] of [['9999', '0'], ['0', '8888'], ['9999', '8888']]) {
