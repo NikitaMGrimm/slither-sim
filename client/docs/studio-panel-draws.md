@@ -36,8 +36,8 @@ loads no external art and executes no transport effects.
 From the repository root, with `CARGO_BUILD_JOBS=2`:
 
 ```text
-cargo run --locked -p slither-wgpu-slice --example studio_panel_specimens -- NEW_OUTPUT_DIRECTORY
-cargo run --locked -p slither-wgpu-slice --example studio_panel_specimens -- NEW_AFTER_DIRECTORY BEFORE_DIRECTORY
+cargo run --locked -p slither-wgpu-slice --example menu_specimens -- NEW_OUTPUT_DIRECTORY --studio-panel
+cargo run --locked -p slither-wgpu-slice --example menu_specimens -- NEW_AFTER_DIRECTORY --studio-panel BEFORE_DIRECTORY
 ```
 
 Capture the first side before changing the painter, using the same additive
@@ -46,6 +46,7 @@ settings. Lossless PNG encodings may differ; comparisons decode the complete
 RGBA images. `draws.csv` reconciles each component and both counters;
 `pixels.csv` reports the maximum channel delta, its pixel/channel and the number
 of changed channels for every paired frame. Any nonzero value is a mismatch,
-not pixel identity. Required checks use the normal client build settings;
+not pixel identity. The mode saves all images and CSV rows, then exits with an
+error if any compared frame differs. Required checks use the normal client build settings;
 optional PNG-only dependency optimization can accelerate the capture tool on
 both sides without changing the client painter.

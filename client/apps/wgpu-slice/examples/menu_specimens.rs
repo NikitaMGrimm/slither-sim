@@ -2,9 +2,11 @@
 use slither_wgpu_slice::{
     Result,
     cosmetics::{Cosmetics, Images, MenuArt},
+    frame::Frame,
     gpu::{Renderer, instance},
     menu::{Menu, MenuFrame},
     menu_specimen,
+    scene::Resource,
     text::TextCache,
 };
 use std::{io::Cursor, path::Path, sync::mpsc, time::Duration};
@@ -22,8 +24,29 @@ fn capture_scaled(
     if let Some(backdrop) = &p.backdrop {
         frame.draws.insert(0, backdrop.clone());
     }
-    renderer.sync_resources(&p.resources)?;
+    let pixels = readback(renderer, &frame, &p.resources, physical)?;
     let [width, height] = physical.unwrap_or(p.frame.extent);
+    image::save_buffer(file, &pixels, width, height, image::ColorType::Rgba8)
+        .map_err(|e| e.to_string())?;
+    println!(
+        "{} draws={} pixel_bytes={}",
+        file.display(),
+        frame.draws.len(),
+        p.resources
+            .iter()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>()
+    );
+    Ok(())
+}
+fn readback(
+    renderer: &mut Renderer,
+    frame: &Frame,
+    resources: &[Resource],
+    physical: Option<[u32; 2]>,
+) -> Result<Vec<u8>> {
+    renderer.sync_resources(resources)?;
+    let [width, height] = physical.unwrap_or(frame.extent);
     let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("menu specimen"),
         size: wgpu::Extent3d {
@@ -39,7 +62,7 @@ fn capture_scaled(
         view_formats: &[],
     });
     if physical.is_some() {
-        let [w, h] = p.frame.extent;
+        let [w, h] = frame.extent;
         let backing = renderer.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("native host backing"),
             size: wgpu::Extent3d {
@@ -55,7 +78,7 @@ fn capture_scaled(
             view_formats: &[],
         });
         let source = backing.create_view(&Default::default());
-        renderer.render(&frame, &source)?;
+        renderer.render(frame, &source)?;
         // Same linear final scaling as SurfaceHost::present_scaled.
         let blitter = wgpu::util::TextureBlitterBuilder::new(
             &renderer.device,
@@ -72,7 +95,7 @@ fn capture_scaled(
         );
         renderer.queue.submit([encoder.finish()]);
     } else {
-        renderer.render_overlay(&frame, &texture.create_view(&Default::default()))?;
+        renderer.render_overlay(frame, &texture.create_view(&Default::default()))?;
     }
     let row = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
@@ -122,24 +145,16 @@ fn capture_scaled(
         .slice(..)
         .get_mapped_range()
         .map_err(|e| e.to_string())?;
-    let pixels: Vec<_> = data
-        .chunks_exact(row as usize)
-        .flat_map(|r| r[..width as usize * 4].iter().copied())
-        .collect();
-    image::save_buffer(file, &pixels, width, height, image::ColorType::Rgba8)
-        .map_err(|e| e.to_string())?;
+    let mut pixels = vec![0; width as usize * height as usize * 4];
+    for (destination, source) in pixels
+        .chunks_exact_mut(width as usize * 4)
+        .zip(data.chunks_exact(row as usize))
+    {
+        destination.copy_from_slice(&source[..width as usize * 4]);
+    }
     drop(data);
     buffer.unmap();
-    println!(
-        "{} draws={} pixel_bytes={}",
-        file.display(),
-        frame.draws.len(),
-        p.resources
-            .iter()
-            .map(|r| r.image.pixels.len())
-            .sum::<usize>()
-    );
-    Ok(())
+    Ok(pixels)
 }
 /// PNG stores straight alpha; production textures retain premultiplied pixels.
 fn straight_alpha(premultiplied: &[u8]) -> Vec<u8> {
@@ -170,6 +185,12 @@ fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--studio-panel") {
+        let reference = std::env::args_os().nth(3);
+        return studio_panel::specimens(&mut renderer, output, reference.as_deref().map(Path::new))
+            .await;
+    }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--settings") {
         return settings_specimens(output, &mut renderer).await;
@@ -1145,3 +1166,7 @@ mod tests {
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/builder.rs"]
 mod builder;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/studio_panel.rs"]
+mod studio_panel;

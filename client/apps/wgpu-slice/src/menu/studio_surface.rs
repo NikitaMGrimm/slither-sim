@@ -134,7 +134,22 @@ mod tests {
                 old_stroke: None,
                 stroke: None,
             };
-            for (w, h) in [(896., 476.), (328., 476.), (896., 328.), (28., 28.)] {
+            // Odd physical panel extents, subpixel/tiny panels, and zero axes
+            // exercise rounding and the legacy minimum-one-pixel path.
+            for (w, h) in [
+                (896., 476.),
+                (328., 476.),
+                (896., 328.),
+                (897. / density, 477. / density),
+                (329. / density, 33. / density),
+                (28., 28.),
+                (1. / density, 1. / density),
+                (2. / density, 3. / density),
+                (0.25 / density, 0.5 / density),
+                (0., 0.),
+                (0., 1.),
+                (1., 0.),
+            ] {
                 for clipped in [false, true] {
                     let rect = MenuRect {
                         x: 16.,
@@ -154,7 +169,28 @@ mod tests {
                     let mut after = make();
                     before.sliced(rect, tokens, 0.5, clip, 1.).unwrap();
                     after.studio_panel(rect, tokens, 0.5, clip, 1.).unwrap();
+                    let extent = [w, h].map(|n| (n * density).round().max(1.) as u32);
+                    for c in [&before, &after] {
+                        let mut frame = MenuFrame::world_crossfade(extent, density, 0.)
+                            .unwrap()
+                            .frame;
+                        frame.draws = c.draws.clone();
+                        frame
+                            .validate(
+                                &c.materials
+                                    .values()
+                                    .map(|r| (r.asset.into(), r.asset))
+                                    .collect(),
+                            )
+                            .unwrap();
+                    }
                     assert!(after.draws.len() <= before.draws.len());
+                    if w * density <= 3. && h * density <= 5. {
+                        assert_eq!(
+                            before.draws, after.draws,
+                            "tiny/degenerate records must be identical"
+                        );
+                    }
                     if density >= 2. && w == 896. && h == 476. {
                         assert!(after.draws.len() < before.draws.len());
                     }
