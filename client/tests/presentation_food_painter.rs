@@ -138,12 +138,20 @@ fn retired_food_storage_preserves_barriers_and_reuses_both_lanes() {
     }
     let mut rejected = input(&world, &assets);
     rejected.command_limit = 0;
-    let [early, late] = storage;
+    let [early, late] = std::mem::take(&mut storage);
     assert_eq!(
         plan_food_with_storage(rejected, early, late),
         plan_food(rejected)
     );
     assert_eq!(plan_food(rejected), Err(FoodPaintError::CommandLimit));
+    let mut recovered = input(&world, &assets);
+    recovered.quality.high_quality = false;
+    recovered.quality.blend = 0.;
+    let [early, late] = storage;
+    let actual = plan_food_with_storage(recovered, early, late).unwrap();
+    assert_eq!(actual, plan_food(recovered).unwrap());
+    assert!(!actual.early.is_empty());
+    assert!(actual.late.is_empty());
 }
 
 #[test]

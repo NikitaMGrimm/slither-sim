@@ -207,8 +207,15 @@ fn retired_body_storage_preserves_commands_across_growth_shrink_and_rejection() 
     }
     let mut rejected = Fixture::new(16);
     rejected.limit = 0;
-    assert_eq!(rejected.plan_in(Some(storage)), rejected.plan());
+    assert_eq!(
+        rejected.plan_in(Some(std::mem::take(&mut storage))),
+        rejected.plan()
+    );
     assert_eq!(rejected.plan(), Err(BodyPaintError::CommandLimit));
+    let recovered = Fixture::new(3);
+    let actual = recovered.plan_in(Some(storage)).unwrap();
+    assert_eq!(actual, recovered.plan().unwrap());
+    assert!(!actual.commands.is_empty());
 }
 
 fn pass(plan: &BodyPaintPlan, which: BodyPaintPass) -> Vec<&BodyImageCommand> {
