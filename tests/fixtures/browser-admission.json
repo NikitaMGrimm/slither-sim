@@ -35,5 +35,18 @@
     9,
     8
   ],
-  "setupProtocol": 19
+  "setupProtocol": 19,
+  "vlither": {
+    "source": "for-loop9/vlither app/src/network/callback.c decode_secret",
+    "revision": "8612bc12186547fc385ea38a399b144973338384",
+    "description": "Synthetic protocol-19 admission from client format facts, not a captured login or third-party code. Fixed host literal rotated with step 2; custom-skin random bytes fixed to 17/29.",
+    "framing": [1],
+    "request": [99, 0],
+    "replyAscii": "NakfounHrfSimobKaupTcerekzh",
+    "login": [115, 30, 1, 35, 54, 206, 204, 169, 97, 178, 74, 136, 124, 117, 14, 210, 106, 236, 8, 208, 136, 213, 140, 111, 7, 7, 86, 108, 105, 116, 104, 101, 114, 0, 0],
+    "nickname": "Vlither",
+    "skin": 7,
+    "customSkin": [255, 255, 255, 0, 0, 0, 17, 29, 3, 9, 3, 7],
+    "setupProtocol": 19
+  }
 }

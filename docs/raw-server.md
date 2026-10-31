@@ -68,6 +68,10 @@ zero. `bots.latency` independently models bot links and processing.
 
 `--stats SECONDS` prints periodic [tick rate, load and population](hosting.md#run-as-a-service)
 to stderr; the interval must be positive and may include fractional seconds.
+It also prints cumulative admission rejection counts by phase and the close
+reason sent to the client. HTTP failures use fixed labels because there is no
+WebSocket close frame. Counts contain no addresses, nicknames or request data;
+client-initiated disconnects and rejections after login are excluded.
 
 ### Presets
 
@@ -139,6 +143,7 @@ Keep the handle alive while serving.
 | `ticks()` / `deferred_ticks()` | Executed physics ticks / wall-clock ticks postponed under load. |
 | `simulation_seconds()` | Wall seconds spent running simulation ticks; divide its increase by elapsed wall time for simulation-thread load. |
 | `players()` | Connected socket players, excluding background bots. |
+| `admission_rejections()` | Cumulative admission rejection counts keyed by phase and reason. |
 | `is_finished()` | Whether a host thread has stopped; call `wait()` for its result. |
 | `wait()` | Consume the handle and block until a host thread fails; return its error. |
 | `stop()` | Consume the handle, stop and join all threads; report any earlier failure. |
@@ -190,6 +195,13 @@ buffer. They accept its rotated 24-byte reply. This compatibility choice serves
 some browser mods;
 the [official catalog](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-protocol13-catalog/REPORT.md)
 observed the stock 27-byte challenge even for that request. Neither is authentication.
+
+The stock challenge also accepts Vlither's step-2 rotated reply, derived from
+[`callback.c` `decode_secret` at 8612bc12](https://github.com/for-loop9/vlither/blob/8612bc12186547fc385ea38a399b144973338384/app/src/network/callback.c).
+The synthetic [admission fixture](https://github.com/NikitaMGrimm/slither-sim/blob/main/tests/fixtures/browser-admission.json) replays
+its framing, challenge reply and protocol-19 login with and without custom skin
+through a loopback host. This covers admission, not the desktop client's rendering
+or a full live-client session; no GPL client implementation is included.
 
 Protocol 13 sends individual messages with elapsed headers by default, explicit
 snake IDs and coordinate-based body/food updates. Both protocols normally use

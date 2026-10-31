@@ -2,8 +2,17 @@
 
 ## Unreleased
 
+### Fixed
+
+- Vlither players can join. Vlither answers the login challenge with its own
+  built-in formula, which differs from the stock client's, so the host used to
+  close every Vlither connection with "Invalid challenge reply". The host now
+  accepts that answer too, with or without a custom skin.
 ### Added
 
+- With `--stats`, the host also counts refused connections by stage and
+  reason, so the log shows why players can't join. No client addresses or
+  request data are recorded.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind

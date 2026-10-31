@@ -135,6 +135,17 @@ stats: ticks/s=142.86 deferred_ticks=0 simulation_load=41.2% players=40 bot_slot
 - `players`: connected players, including those waiting to spawn.
 - `bot_slots`: configured background bots.
 
+With `--stats`, failed admissions also produce cumulative counts, for example:
+
+```text
+admission_rejections: phase=reply reason="Invalid challenge reply" count=3
+```
+
+Phases are `http`, `hello`, `reply` and `login`. Reasons match WebSocket policy
+close text; HTTP failures use fixed labels (`Not found`, `HTTP timeout`, or
+`Invalid WebSocket handshake`). No client addresses or request data are logged.
+Normal disconnects and rejections after login do not increment these counts.
+
 ## Connect
 
 Clients connect to `ws://HOST:444/slither`. The stock browser client can be

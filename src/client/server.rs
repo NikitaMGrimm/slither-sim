@@ -33,7 +33,7 @@ use super::{
 use crate::Action;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     io,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
@@ -264,12 +264,40 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
+    admission_rejections: Mutex<BTreeMap<(&'static str, String), u64>>,
     /// Commands per socket slot sent to the simulation and not yet consumed.
     pending: Vec<AtomicUsize>,
     failure: Mutex<Option<String>>,
 }
 
 impl Shared {
+    fn reject_admission(&self, phase: &'static str, reason: &str) {
+        let mut counts = self
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let count = counts.entry((phase, reason.to_owned())).or_default();
+        *count = count.saturating_add(1);
+    }
+
+    fn reject_handshake(&self, error: &tungstenite::Error) {
+        // Handshake errors can contain peer input. Retain only host-owned labels,
+        // including the existing HTTP path rejection, never request data.
+        let reason = match error {
+            tungstenite::Error::Io(_)
+            | tungstenite::Error::ConnectionClosed
+            | tungstenite::Error::AlreadyClosed
+            | tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::HandshakeIncomplete,
+            ) => return,
+            tungstenite::Error::Http(response) if response.status() == StatusCode::NOT_FOUND => {
+                "Not found"
+            }
+            _ => "Invalid WebSocket handshake",
+        };
+        self.reject_admission("http", reason);
+    }
+
     fn wake_socket(&self) -> Result<(), String> {
         #[cfg(windows)]
         self.socket_wake.notify().map_err(|e| e.to_string())?;
@@ -425,6 +453,7 @@ impl Host {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..self.max_clients).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         });
@@ -529,6 +558,16 @@ impl RunningHost {
     /// Connected socket players in the shared world.
     pub fn players(&self) -> usize {
         self.shared.players.load(Ordering::Relaxed)
+    }
+
+    /// Cumulative server-initiated admission rejections by phase and reason.
+    /// Contains no peer addresses, names or raw handshake errors.
+    pub fn admission_rejections(&self) -> BTreeMap<(&'static str, String), u64> {
+        self.shared
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Whether a host thread has stopped. Call [`Self::wait`] for its result.
@@ -1017,8 +1056,8 @@ struct Gate {
     /// The `6` message with an elapsed header, transformed per connection.
     challenge: Vec<u8>,
     /// Exact accepted replies: the literal-copy compatibility profile and the
-    /// rotated reply observed from the native and tested stock clients.
-    replies: [Vec<u8>; 2],
+    /// rotated replies from the native/stock clients and Vlither.
+    replies: [Vec<u8>; 3],
     commands: Sender<Command>,
     shared: Arc<Shared>,
 }
@@ -1122,6 +1161,12 @@ struct Open<S = TcpStream> {
     /// Frames from the world waiting for their delivery time, in order.
     queued: VecDeque<(f64, Vec<u8>)>,
     queued_bytes: usize,
+}
+
+#[derive(Debug)]
+enum SendError {
+    Transport,
+    Policy(String),
 }
 
 enum Stage {
@@ -1308,7 +1353,10 @@ impl Gateway {
                     physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    self.gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             };
             self.sessions.push(Session {
                 accepted: now,
@@ -1341,14 +1389,20 @@ impl Session {
     ) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
-            Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
+            Stage::Http(_) if age >= HTTP_TIMEOUT => {
+                gate.shared.reject_admission("http", "HTTP timeout");
+                Stage::Closed
+            }
             Stage::Http(mid) => match mid.handshake() {
                 Ok(socket) => Stage::Open(Box::new(Open::new(
                     socket,
                     self.physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             },
             Stage::Open(mut open) => {
                 if open.service(gate, now, wall, age, readable)? {
@@ -1421,12 +1475,17 @@ impl<S: io::Read + io::Write> Open<S> {
                 self.socket.get_mut().read_blocked = false;
             }
             match self.socket.read() {
-                Ok(Message::Binary(bytes)) => {
-                    if let Err(reason) = self.receive(gate, &bytes, wall) {
+                Ok(Message::Binary(bytes)) => match self.receive(gate, &bytes, wall) {
+                    Ok(()) => {}
+                    Err(SendError::Transport) => {
+                        self.release(gate);
+                        return Ok(false);
+                    }
+                    Err(SendError::Policy(reason)) => {
                         self.reject(gate, now, &reason);
                         return Ok(true);
                     }
-                }
+                },
                 Ok(Message::Text(_)) => {
                     self.reject(gate, now, "Expected binary messages");
                     return Ok(true);
@@ -1455,14 +1514,13 @@ impl<S: io::Read + io::Write> Open<S> {
                 }
             }
         }
-        self.send_due(gate, now, wall)?;
-        Ok(true)
+        self.send_due(gate, now, wall)
     }
 
     /// Apply one client message received at wall time `wall`. An error
     /// closes only this connection.
-    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), String> {
-        match (self.phase, bytes) {
+    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), SendError> {
+        let result = match (self.phase, bytes) {
             (Phase::Hello { framed: false }, [1]) => self.request(Framing::Bare),
             (Phase::Hello { framed: false }, [2]) => self.request(Framing::Sequence(1)),
             (Phase::Hello { .. }, [1 | 2]) => Err("Repeated framing request".into()),
@@ -1474,7 +1532,7 @@ impl<S: io::Read + io::Write> Open<S> {
             (Phase::Hello { .. }, [99, 0]) => {
                 self.phase = Phase::Reply;
                 let challenge = gate.challenge.clone();
-                self.send(challenge)
+                return self.send(challenge);
             }
             // Client-derived: NTL's protocol toggle uses [99], and disabling
             // its dynamic map uses [99,3]. All share the same reply solver.
@@ -1485,7 +1543,7 @@ impl<S: io::Read + io::Write> Open<S> {
                 let (challenge, reply) = legacy_challenge();
                 self.legacy_reply = Some(reply);
                 self.phase = Phase::Reply;
-                self.send(challenge)
+                return self.send(challenge);
             }
             (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
@@ -1520,7 +1578,8 @@ impl<S: io::Read + io::Write> Open<S> {
             }
             (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
-        }
+        };
+        result.map_err(SendError::Policy)
     }
 
     fn request(&mut self, framing: Framing) -> Result<(), String> {
@@ -1551,23 +1610,30 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     /// Send queued frames due by wall time `wall`. Only host faults are errors.
-    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
+    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<bool, String> {
         while self.queued.front().is_some_and(|(at, _)| *at <= wall) {
             let (_, message) = self.queued.pop_front().unwrap();
             self.queued_bytes -= output_cost(&message);
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
-            if let Err(reason) = self.send(message) {
-                self.reject(gate, now, &reason);
-                break;
+            match self.send(message) {
+                Ok(()) => {}
+                Err(SendError::Transport) => {
+                    self.release(gate);
+                    return Ok(false);
+                }
+                Err(SendError::Policy(reason)) => {
+                    self.reject(gate, now, &reason);
+                    break;
+                }
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Queue one elapsed-framed message with this connection's header.
-    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), String> {
+    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), SendError> {
         if let Framing::Sequence(next) = &mut self.framing {
             framed[..2].copy_from_slice(&next.to_be_bytes());
             *next = next.wrapping_add(1);
@@ -1585,9 +1651,16 @@ impl<S: io::Read + io::Write> Open<S> {
                 Ok(())
             }
             Err(tungstenite::Error::WriteBufferFull(_)) => {
-                Err("Client is reading too slowly".into())
+                Err(SendError::Policy("Client is reading too slowly".into()))
             }
-            Err(error) => Err(error.to_string()),
+            // A peer disconnect is not an admission policy rejection. Preserve
+            // that distinction until the caller can release its slot.
+            Err(
+                tungstenite::Error::Io(_)
+                | tungstenite::Error::ConnectionClosed
+                | tungstenite::Error::AlreadyClosed,
+            ) => Err(SendError::Transport),
+            Err(error) => Err(SendError::Policy(error.to_string())),
         }
     }
 
@@ -1630,11 +1703,20 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     fn reject(&mut self, gate: &mut Gate, now: Instant, reason: &str) {
+        let phase = match self.phase {
+            Phase::Hello { .. } => Some("hello"),
+            Phase::Reply => Some("reply"),
+            Phase::Login => Some("login"),
+            Phase::Playing(_) | Phase::Closing(_) => None,
+        };
         self.release(gate);
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
         let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
             end -= 1;
+        }
+        if let Some(phase) = phase {
+            gate.shared.reject_admission(phase, &reason[..end]);
         }
         let _ = self.socket.close(Some(CloseFrame {
             code: CloseCode::Policy,
@@ -2015,8 +2097,8 @@ fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
     (framed, reply)
 }
 
-/// Encoded challenge source and its two accepted replies.
-fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
+/// Encoded challenge source and its three accepted replies.
+fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 3]), String> {
     let (first, second) = CHALLENGE_LITERAL;
     let mut source = b"var a = \"".to_vec();
     source.extend(first);
@@ -2034,7 +2116,12 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
     }
     let literal = [first.as_slice(), second.as_slice()].concat();
     let solved = challenge::solve_challenge(&encoded)?;
-    Ok((encoded, [literal, solved]))
+    // Client-derived compatibility: for-loop9/vlither 8612bc12,
+    // app/src/network/callback.c decode_secret advances by 2 + value, not 4.
+    // This challenge is not authentication; keep both existing replies.
+    let mut vlither = literal.clone();
+    challenge::rotate_reply(&mut vlither, 2);
+    Ok((encoded, [literal, solved, vlither]))
 }
 
 #[cfg(test)]
@@ -2175,6 +2262,78 @@ mod tests {
         }
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
+        }
+    }
+
+    #[test]
+    fn challenge_write_disconnect_does_not_count_as_admission_rejection() {
+        struct Disconnected {
+            input: Readable,
+            writes: usize,
+        }
+
+        impl io::Read for Disconnected {
+            fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+                self.input.read(bytes)
+            }
+        }
+
+        impl io::Write for Disconnected {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                Err(io::ErrorKind::ConnectionReset.into())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        for request in [&[99, 0][..], &[99][..]] {
+            for policy_limit in [false, true] {
+                let (mut gateway, _simulation) = pit_gateway();
+                let (encoded, _) = challenge_parts().unwrap();
+                gateway.gate.challenge = vec![0, 0, b'6'];
+                gateway.gate.challenge.extend(encoded);
+                // The peer's hello is already buffered when it disconnects.
+                let mut bytes = vec![130, 129, 0, 0, 0, 0, 1];
+                bytes.extend([130, 128 | request.len() as u8, 0, 0, 0, 0]);
+                bytes.extend(request);
+                let mut config = socket_config().write_buffer_size(0);
+                if policy_limit {
+                    config = config.max_write_buffer_size(8);
+                }
+                let socket = WebSocket::from_raw_socket(
+                    ReadBudget::new(Disconnected {
+                        input: Readable {
+                            bytes: bytes.into(),
+                            read: 0,
+                            first_read: None,
+                        },
+                        writes: 0,
+                    }),
+                    tungstenite::protocol::Role::Server,
+                    Some(config),
+                );
+                let mut open = Open::new(socket, false);
+                let active = open
+                    .service(&mut gateway.gate, Instant::now(), 0., Duration::ZERO, true)
+                    .unwrap();
+                let counts = gateway.gate.shared.admission_rejections.lock().unwrap();
+                if policy_limit {
+                    assert!(active);
+                    assert!(matches!(open.phase, Phase::Closing(_)));
+                    assert_eq!(counts.len(), 1);
+                    assert_eq!(
+                        counts.get(&("reply", "Client is reading too slowly".to_owned())),
+                        Some(&1)
+                    );
+                } else {
+                    assert!(counts.is_empty(), "transport failure counted: {counts:?}");
+                    assert!(!active, "transport failure must release the connection");
+                    assert!(open.socket.get_ref().inner.writes > 0);
+                }
+            }
         }
     }
 
@@ -2656,6 +2815,7 @@ mod tests {
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..sockets).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         })
@@ -2695,7 +2855,7 @@ mod tests {
             occupied: vec![true],
             generations: vec![1],
             challenge: Vec::new(),
-            replies: [Vec::new(), Vec::new()],
+            replies: [Vec::new(), Vec::new(), Vec::new()],
             commands,
             shared: simulation.shared.clone(),
         };
@@ -3379,12 +3539,13 @@ mod tests {
 
     #[test]
     fn challenge_round_trips_through_the_restricted_solver() {
-        let (encoded, [literal, solved]) = challenge_parts().unwrap();
+        let (encoded, [literal, solved, vlither]) = challenge_parts().unwrap();
         assert!(encoded.iter().all(u8::is_ascii_lowercase));
         assert_eq!(literal, b"SlitherSimLocalHostChalleng");
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+        assert_eq!(vlither, b"NakfounHrfSimobKaupTcerekzh");
     }
 
     /// Manually clocked socket gateway and world: no worker races or sleeps are
@@ -3415,7 +3576,7 @@ mod tests {
                 occupied: vec![false],
                 generations: vec![0],
                 challenge: Vec::new(),
-                replies: [Vec::new(), Vec::new()],
+                replies: [Vec::new(), Vec::new(), Vec::new()],
                 commands,
                 shared: shared.clone(),
             },
