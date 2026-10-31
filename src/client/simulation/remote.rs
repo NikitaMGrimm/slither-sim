@@ -42,8 +42,7 @@ impl RawSimulator {
         })
     }
 
-    #[cfg(test)]
-    pub(super) fn time(&self) -> f64 {
+    pub(crate) fn time(&self) -> f64 {
         self.backend.time()
     }
 
@@ -55,6 +54,21 @@ impl RawSimulator {
 
     pub(crate) fn dt(&self) -> f64 {
         self.backend.world.config().dt
+    }
+
+    pub(crate) fn wall_offset(&self) -> f64 {
+        self.backend.wall_offset
+    }
+
+    pub(crate) fn set_wall_offset(&mut self, offset: f64) {
+        self.shift_links(offset - self.backend.wall_offset);
+        self.backend.wall_offset = offset;
+    }
+
+    pub(crate) fn set_dt(&mut self, dt: f64) -> Result<(), String> {
+        self.backend.world.set_dt(dt).map_err(|e| e.to_string())?;
+        self.backend.variable_dt = true;
+        Ok(())
     }
     pub(crate) fn waits_for_spawn(&self) -> bool {
         self.backend.world.config().spawn_radius.is_some()

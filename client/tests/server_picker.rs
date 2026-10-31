@@ -73,6 +73,120 @@ fn dedupe_fastest_address_ties_and_unknown_pings() {
     );
 }
 #[test]
+fn startup_requests_once_and_endpoint_mode_stays_offline() {
+    let mut p = ServerPicker::default();
+    p.start_directory(false);
+    assert!(!p.take_directory_request());
+    p.start_directory(true);
+    assert!(p.take_directory_request());
+    p.start_directory(true);
+    p.open();
+    assert!(!p.take_directory_request());
+}
+#[test]
+fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
+    let servers: Vec<_> = (1..=20).map(|id| server(id, id, true)).collect();
+    let mut p = ServerPicker::default();
+    p.start_directory(true);
+    assert!(p.take_directory_request());
+    p.open();
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&p.panel([960., 720.]), &mut edit);
+    p.update_directory(&servers, &BTreeMap::new(), false)
+        .unwrap();
+    input.sync(&p.panel([960., 720.]), &mut edit);
+    assert_eq!(input.focus(), Some(SEARCH));
+    let target = p.navigate(None, isize::MAX);
+    let panel = p.panel([960., 720.]);
+    input.sync(&panel, &mut edit);
+    input.focus_control(&panel, target);
+    let resolved = panel.resolve([960., 720.]).unwrap();
+    let row = resolved.iter().find(|r| r.control.id == target).unwrap();
+    let point = [row.rect.x + 10., row.rect.y + 10.];
+    input.pointer(&panel, &resolved, point, Some(true));
+    let generation = p.generation;
+    let window = p.list.window(20);
+    for complete in [false, true] {
+        p.update_directory(&servers, &BTreeMap::from([(20, 10), (19, 40)]), complete)
+            .unwrap();
+        let panel = p.panel([960., 720.]);
+        input.sync(&panel, &mut edit);
+        assert_eq!(p.generation, generation);
+        assert_eq!(p.list.window(20), window);
+        assert_eq!(input.focus(), Some(target));
+        assert_eq!(input.capture(), Some(target));
+        assert_eq!(p.entries()[19].server.id, 20);
+        assert_eq!(p.entries()[19].ping, Some(10));
+    }
+    let panel = p.panel([960., 720.]);
+    let activation = input
+        .pointer(
+            &panel,
+            &panel.resolve([960., 720.]).unwrap(),
+            point,
+            Some(false),
+        )
+        .unwrap();
+    assert!(p.activate(activation));
+    assert_eq!(p.selection.0, Some(20));
+    p.open();
+    assert_eq!(p.rows[0].server.id, 20);
+    assert_eq!(p.rows[1].server.id, 19);
+    assert!(p.rows[2..].iter().all(|r| r.ping.is_none()));
+    assert!(!p.take_directory_request());
+}
+#[test]
+fn provisional_rows_do_not_suppress_retry_after_failure() {
+    let mut p = ServerPicker::default();
+    p.start_directory(true);
+    assert!(p.take_directory_request());
+    p.open();
+    p.update_directory(&[server(1, 1, true)], &BTreeMap::new(), false)
+        .unwrap();
+    p.directory_failed("Cancelled sweep");
+    assert!(p.rows.is_empty());
+    p.open();
+    assert!(!p.take_directory_request());
+    p.close();
+    p.open();
+    assert!(p.take_directory_request());
+    p.open();
+    assert!(!p.take_directory_request());
+}
+#[test]
+fn progress_defers_duplicate_membership_changes_and_invalidates_a_new_directory() {
+    let servers = [
+        server(7, 1, true),
+        server(7, 1001, false),
+        server(8, 2, true),
+    ];
+    let mut p = ServerPicker::default();
+    p.open();
+    p.update_directory(&servers, &BTreeMap::new(), false)
+        .unwrap();
+    assert_eq!(
+        p.entries().iter().map(|r| r.server.id).collect::<Vec<_>>(),
+        vec![8]
+    );
+    let generation = p.generation;
+    p.update_directory(&servers, &BTreeMap::from([(1, 10)]), true)
+        .unwrap();
+    assert_eq!(p.generation, generation);
+    assert_eq!(
+        p.entries().iter().map(|r| r.server.id).collect::<Vec<_>>(),
+        vec![8]
+    );
+    p.close();
+    p.open();
+    assert_eq!(p.entries()[0].server.id, 7);
+    assert!(p.entries()[0].server.active);
+    let old = intent(&p, ControlId(16));
+    p.update_directory(&[server(9, 1, true)], &BTreeMap::new(), false)
+        .unwrap();
+    assert!(!p.activate(old));
+}
+#[test]
 fn numeric_rule_exact_selection_and_inactive_id() {
     let mut p = picker();
     p.replace(

@@ -125,15 +125,28 @@ To see the tick rate and load, add `--stats 5` to the `host` command. Every five
 seconds the log gets a line like:
 
 ```text
-stats: ticks/s=142.86 deferred_ticks=0 simulation_load=41.2% players=40 bot_slots=0
+stats: ticks/s=142.86 deferred_ticks=0 lost_seconds=0.000000 simulation_load=41.2% players=40 bot_slots=0
 ```
 
 - `ticks/s`: physics ticks run per second; 142.86 is full speed (one per 7 ms).
 - `deferred_ticks`: ticks that fell behind schedule in the interval.
+- `lost_seconds`: wall time discarded above the optional `maxTick` in the interval;
+  zero in fixed mode. See [tick stretching](raw-server.md#vps-use).
 - `simulation_load`: share of one core used by the game loop, not counting
   sockets and bots.
 - `players`: connected players, including those waiting to spawn.
 - `bot_slots`: configured background bots.
+
+With `--stats`, failed admissions also produce cumulative counts, for example:
+
+```text
+admission_rejections: phase=reply reason="Invalid challenge reply" count=3
+```
+
+Phases are `http`, `hello`, `reply` and `login`. Reasons match WebSocket policy
+close text; HTTP failures use fixed labels (`Not found`, `HTTP timeout`, or
+`Invalid WebSocket handshake`). No client addresses or request data are logged.
+Normal disconnects and rejections after login do not increment these counts.
 
 ## Connect
 
@@ -223,6 +236,42 @@ guarantee; bots, TLS, larger snakes and longer sessions can add work.
 Playing counts exclude clients waiting to spawn. The study reports those waits
 separately, including unfinished requests. Measure your intended workload before
 choosing a player limit.
+
+## Large bot worlds
+
+Worlds with tens of thousands of bots behave differently from a normal server.
+These notes come from a [64,000-bot public session](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-31-64k-session/REPORT.md);
+measure your own workload before relying on them.
+
+- **Size the tick from an aged world.** Food builds up and snakes grow, so tick
+  cost keeps rising for at least 15 minutes. Choose the tick from the last
+  minutes of a 15-minute run with the players you expect, not from a fresh
+  start.
+- **Watch for a backlog.** When ticks take longer than the configured tick, the
+  host defers them, and players see their ping climb, by up to several hundred
+  milliseconds. `deferred_ticks` in `--stats` shows it. Raise the tick or lower
+  the bot count, or let the host stretch its ticks with `maxTick`
+  ([#384](https://github.com/NikitaMGrimm/slither-sim/pull/384)).
+- **Run one large world per machine.** A second world on other cores of the
+  same VM slowed the first by roughly a quarter, because they share cache and
+  memory.
+
+### Build and allocator
+
+On Linux with glibc 2.35 or newer, set `GLIBC_TUNABLES=glibc.malloc.hugetlb=1` in the host's
+environment (for systemd: `Environment=GLIBC_TUNABLES=glibc.malloc.hugetlb=1`).
+It asks the allocator to use transparent huge pages and needs no reserved
+hugepage pool. It cut world-step time by 6.9% in a replay of a 64k world.
+
+Building on the machine that runs the host with fat LTO, `-C target-cpu=native`
+and profile-guided optimization cut it by a further 10.9%, with identical
+output. Follow the [rustc PGO guide](https://doc.rust-lang.org/rustc/profile-guided-optimization.html):
+build with `-Cprofile-generate`, run a representative workload, merge the
+profiles with `llvm-profdata`, then build with `-Cprofile-use`. Use the same
+source, features and toolchain for every step, set
+`CARGO_PROFILE_RELEASE_LTO=fat` and `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1`,
+and retrain after any of them changes. A native build only runs on CPUs with
+the same features.
 
 ## Not included
 

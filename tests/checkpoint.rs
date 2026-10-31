@@ -53,6 +53,196 @@ fn world() -> Simulator {
 }
 
 #[test]
+fn variable_tick_duration_validates_atomically_and_survives_exact_restore() {
+    let mut saved = value(&world());
+    saved["config"]["boundaryMode"] = json!("hard");
+    let mut original = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    for invalid in [f64::NAN, f64::INFINITY, 0., -0.01, 1e100] {
+        assert!(original.set_dt(invalid).is_err());
+        assert_eq!(value(&original), saved);
+    }
+    let actions: Vec<_> = original
+        .snakes()
+        .iter()
+        .map(|s| {
+            Some(Action {
+                heading: s.heading,
+                boost: true,
+            })
+        })
+        .collect();
+    let mut elapsed = 0.;
+    for dt in [0.040, 0.057] {
+        original.set_dt(dt).unwrap();
+        original.step(&actions).unwrap();
+        elapsed += dt;
+    }
+    let saved = value(&original);
+    assert_eq!(saved["config"]["dt"], 0.057);
+    let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    for dt in [0.080, 0.043, 0.040, 0.057] {
+        original.set_dt(dt).unwrap();
+        restored.set_dt(dt).unwrap();
+        original.step(&actions).unwrap();
+        restored.step(&actions).unwrap();
+        elapsed += dt;
+        assert!((original.time() - elapsed).abs() < 1e-12);
+        assert_eq!(value(&original), value(&restored));
+    }
+}
+
+#[test]
+fn checkpoint_dt_changes_preserve_exhausted_boost_clock() {
+    for dt in [1e-300, 0.007, 0.040] {
+        let mut source = Simulator::new(slither_sim::WorldOptions {
+            config: Config {
+                dt: 1.,
+                boundary_mode: slither_sim::BoundaryMode::Hard,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        source
+            .spawn(
+                "a".into(),
+                vec![Point::default(), Point { x: -42., y: 0. }],
+                0.,
+            )
+            .unwrap();
+        source
+            .correct_mass(0, source.snakes()[0].body.clone(), 0.02)
+            .unwrap();
+        let actions = [Some(Action {
+            heading: 0.,
+            boost: true,
+        })];
+        source.step(&actions).unwrap();
+        let before = value(&source);
+        assert_eq!(before["state"]["slots"][0]["boost"]["exhausted"], true);
+        assert!(
+            before["state"]["slots"][0]["boost"]["clock"]
+                .as_f64()
+                .unwrap()
+                > 0.9
+        );
+        source.set_dt(dt).unwrap();
+        let saved = value(&source);
+        assert_eq!(saved["state"], before["state"]);
+        let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+        for next in [dt, 0.007, 0.057, 0.040] {
+            source.set_dt(next).unwrap();
+            restored.set_dt(next).unwrap();
+            source.step(&actions).unwrap();
+            restored.step(&actions).unwrap();
+            assert_eq!(value(&source), value(&restored));
+        }
+        let mut bad = saved;
+        bad["state"]["slots"][0]["boost"]["clock"] = json!(2.);
+        let error = rejects_atomic(&mut restored, &bad);
+        assert_eq!(error.field.as_deref(), Some("state.slots[0].boost.clock"));
+    }
+}
+
+#[test]
+fn checkpoint_dt_changes_preserve_batched_prey_roundoff() {
+    for dt in [
+        1e6,
+        1e10,
+        1e13,
+        physics::LOOP_SECONDS * 2f64.powi(53) * 0.999,
+    ] {
+        let mut source = Simulator::new(slither_sim::WorldOptions {
+            config: Config {
+                dt,
+                boundary_mode: slither_sim::BoundaryMode::Hard,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+            ..Default::default()
+        })
+        .unwrap();
+        source.step(&[]).unwrap();
+        let mut before = value(&source);
+        // Synthetic phase inside the existing batched-dt roundoff allowance.
+        // An accepted checkpoint must remain exportable after lowering dt,
+        // whether or not this platform's subtraction produces that phase.
+        before["state"]["preyMotionClock"] = json!(physics::LOOP_SECONDS + dt * f64::EPSILON * 2.);
+        let mut source = Simulator::from_checkpoint(&bytes(&before), options()).unwrap();
+        source.set_dt(1e-300).unwrap();
+        let saved = value(&source);
+        assert_eq!(saved["state"], before["state"]);
+        let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+        for next in [1e-300, 0.007, 0.080] {
+            source.set_dt(next).unwrap();
+            restored.set_dt(next).unwrap();
+            source.step(&[]).unwrap();
+            restored.step(&[]).unwrap();
+            assert_eq!(value(&source), value(&restored));
+        }
+        let mut bad = saved;
+        bad["state"]["preyMotionClock"] = json!(1.);
+        let error = rejects_atomic(&mut restored, &bad);
+        assert_eq!(error.field.as_deref(), Some("state.preyMotionClock"));
+    }
+}
+
+#[test]
+fn checkpoint_dt_changes_preserve_recorded_dynamic_radius() {
+    let mut source = Simulator::new(slither_sim::WorldOptions {
+        config: Config {
+            dynamic_radius: true,
+            boundary_mode: slither_sim::BoundaryMode::Hard,
+            radius_updates: vec![RadiusUpdate {
+                time: 0.007,
+                radius: 950.,
+            }],
+            food_count: 0,
+            ambient_replenish_per_second: 0.,
+            ..Config::sandbox()
+        },
+        ..Default::default()
+    })
+    .unwrap();
+    source.step(&[]).unwrap();
+    assert_eq!(source.radius(), 950.);
+    source.step(&[]).unwrap();
+    assert!(source.radius() < 950.);
+    let before = value(&source);
+    for dt in [0.028, 1e-300] {
+        let mut source = source.clone();
+        source.set_dt(dt).unwrap();
+        let saved = value(&source);
+        assert_eq!(saved["state"], before["state"]);
+        let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+        for next in [dt, 0.007, 0.040] {
+            source.set_dt(next).unwrap();
+            restored.set_dt(next).unwrap();
+            source.step(&[]).unwrap();
+            restored.step(&[]).unwrap();
+            assert_eq!(value(&source), value(&restored));
+        }
+    }
+}
+
+#[test]
+fn checkpoint_dt_changes_reject_unrepresentable_imported_travel_atomically() {
+    for field in ["snake", "speed"] {
+        let mut saved = value(&world());
+        saved["state"]["slots"][0][field]["speed"] = json!(1e152);
+        let mut source = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+        assert!(source.set_dt(0.014).is_err());
+        assert_eq!(value(&source), saved);
+        source.set_dt(1e-300).unwrap();
+        let lowered = value(&source);
+        Simulator::from_checkpoint(&bytes(&lowered), options()).unwrap();
+    }
+}
+
+#[test]
 fn radius_controller_and_population_sizing_settings_round_trip_and_continue() {
     for dynamic_radius in [false, true] {
         for size_to_population in [false, true] {

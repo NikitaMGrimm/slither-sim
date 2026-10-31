@@ -12,6 +12,9 @@ mod catalog_backend;
 #[path = "support/catalog_worlds.rs"]
 mod catalog_worlds;
 use catalog_worlds::EngineWorld;
+#[cfg(feature = "perf-internals")]
+#[path = "support/catalog_collision.rs"]
+mod catalog_collision;
 #[cfg(feature = "networking")]
 #[allow(dead_code)]
 #[path = "host_load.rs"]
@@ -350,6 +353,7 @@ static REGISTRATIONS: &[Registration] = &[
     Registration::Socket("host-official-500", 500, false, op(286, 1, Full)),
     Registration::Socket("host-battledome-80", 80, true, op(286, 1, Full)),
     Registration::Engine(EngineWorld::SpawnOverload, op(192, 4, Full)),
+    Registration::Engine(EngineWorld::CollisionGrid, op(512, 2, Full)),
 ];
 
 #[derive(Clone, Copy)]
@@ -395,6 +399,7 @@ impl Driver {
             self,
             Driver::Legacy(Legacy::StepDefault | Legacy::StepFood | Legacy::StepBody)
                 | Driver::Scenario { .. }
+                | Driver::Engine(EngineWorld::CollisionGrid)
         )
     }
 

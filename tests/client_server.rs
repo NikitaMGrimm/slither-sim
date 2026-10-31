@@ -54,6 +54,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
     HostConfig {
         bind: "127.0.0.1:0".parse().unwrap(),
         seed: 7,
+        max_tick: None,
         players: PlayerConfig {
             max: max_clients,
             ..Default::default()
@@ -75,6 +76,57 @@ fn network(url: String, nickname: &str, handshake: Handshake) -> NetworkBackend 
         ..NetworkConfig::default()
     })
     .unwrap()
+}
+
+#[test]
+fn adaptive_host_keeps_socket_time_and_ping_near_wall_time() {
+    let mut config = config(1, 0);
+    config.max_tick = Some(0.080);
+    config.simulation.world.dt = 0.040;
+    config.simulation.world.boundary_mode = slither_sim::BoundaryMode::Hard;
+    config.simulation.world.radius = 32000.;
+    let host = Running::start(config);
+    let mut bot = NetworkBackend::connect(NetworkConfig {
+        url: host.url(),
+        record_wire: true,
+        handshake: Handshake::Direct,
+        ..Default::default()
+    })
+    .unwrap();
+    until(&mut bot, "adaptive self", |f| {
+        f.status == ClientStatus::Playing
+    });
+    bot.drain_records().unwrap();
+    let started = Instant::now();
+    let mut elapsed_ms = 0u64;
+    let mut first_received = None;
+    let mut last_received = 0.;
+    let mut saw_ping = false;
+    while started.elapsed() < Duration::from_millis(800) {
+        let frame = bot.next_frame().unwrap();
+        assert_eq!(frame.status, ClientStatus::Playing);
+        saw_ping |= frame.timing.ping_seconds.is_some_and(|ping| ping < 0.3);
+        for record in bot.drain_records().unwrap() {
+            if record.event == slither_sim::client::WireEvent::Receive {
+                // Compare the same received-frame interval on both clocks.
+                // Quiet time after the final anchor has no elapsed header yet.
+                if first_received.is_some() {
+                    elapsed_ms += u64::from(u16::from_be_bytes([record.bytes[0], record.bytes[1]]));
+                } else {
+                    first_received = Some(record.time);
+                }
+                last_received = record.time;
+            }
+        }
+    }
+    let span = last_received - first_received.expect("received frames");
+    assert!(span > 0.2, "too few received frames");
+    let ratio = elapsed_ms as f64 / 1000. / span;
+    assert!((0.85..=1.15).contains(&ratio), "socket clock ratio {ratio}");
+    assert!(saw_ping);
+    assert_eq!(host.host.deferred_ticks(), 0);
+    bot.disconnect();
+    assert!(host.finish() > 0);
 }
 
 fn until(
@@ -741,6 +793,77 @@ fn short_modern_login_uses_protocol19_after_the_shared_challenge() {
     }
 }
 
+/// Client-derived synthetic bytes; no GPL implementation or live capture.
+#[test]
+fn vlither_challenge_reply_joins_with_and_without_custom_skin() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/browser-admission.json")).unwrap();
+    let fixture = &fixture["vlither"];
+    let bytes = |key: &str| -> Vec<u8> {
+        fixture[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect()
+    };
+    for custom in [vec![], bytes("customSkin")] {
+        let host = Running::start(config(1, 0));
+        let mut client = Raw::open(host.address);
+        client.write(
+            format!(
+                "GET /slither HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\n\
+                 Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\n\
+                 Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+                 Origin: https://slither.com\r\n\r\n",
+                host.address
+            )
+            .as_bytes(),
+        );
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        client.send(&bytes("framing"));
+        client.send(&bytes("request"));
+        let challenge = client.binary();
+        assert_eq!(challenge[0], b'6');
+        let reply = fixture["replyAscii"].as_str().unwrap().as_bytes();
+        assert_ne!(reply, solve_challenge(&challenge[1..]).unwrap());
+        client.send(reply);
+        let mut login = bytes("login");
+        login.extend(&custom);
+        client.send(&login);
+        let setup = packets(&client.binary()).remove(0);
+        assert_eq!(setup[0], b'a');
+        assert_eq!(setup[23], fixture["setupProtocol"].as_u64().unwrap() as u8);
+        let started = Instant::now();
+        loop {
+            if let Some(appearance) = packets(&client.binary())
+                .into_iter()
+                .find(|packet| packet[0] == b's' && packet.len() > 9)
+            {
+                let name = fixture["nickname"].as_str().unwrap().as_bytes();
+                assert_eq!(appearance[15], fixture["skin"].as_u64().unwrap() as u8);
+                assert_eq!(usize::from(appearance[22]), name.len());
+                assert_eq!(&appearance[23..23 + name.len()], name);
+                let at = 23 + name.len();
+                assert_eq!(usize::from(appearance[at]), custom.len());
+                assert_eq!(&appearance[at + 1..at + 1 + custom.len()], custom);
+                break;
+            }
+            assert!(started.elapsed() < WAIT, "Vlither login did not join");
+        }
+        host.finish();
+    }
+    let host = Running::start(config(1, 0));
+    let mut client = Raw::connect(host.address, "/slither");
+    assert!(client.status().starts_with("HTTP/1.1 101"));
+    client.send(&[1]);
+    client.send(&[99, 0]);
+    assert_eq!(client.binary()[0], b'6');
+    client.send(&[b'x'; 27]);
+    assert_eq!(client.closed(), "Invalid challenge reply");
+    host.finish();
+}
+
 #[test]
 fn dense_legacy_prey_burst_keeps_its_socket_and_the_host_alive() {
     let mut config = config(2, 0);
@@ -924,6 +1047,48 @@ fn session_ids_and_leaderboards_follow_self_in_all_framing_modes() {
         assert_eq!(session.is_some(), want_session);
         host.finish();
     }
+}
+
+#[test]
+fn admission_rejections_are_counted_by_phase_and_reason() {
+    let host = Running::start(config(1, 0));
+    assert!(host.host.admission_rejections().is_empty());
+    for (messages, reason) in [
+        (vec![vec![99, 0], vec![b'x'; 27]], "Invalid challenge reply"),
+        (vec![vec![99, 0], vec![b'x'; 27]], "Invalid challenge reply"),
+        (vec![vec![b's']], "Truncated login"),
+        (
+            vec![vec![99, 0], LITERAL.to_vec(), vec![0]],
+            "Expected a login",
+        ),
+    ] {
+        let mut client = Raw::connect(host.address, "/slither");
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        for message in messages {
+            client.send(&message);
+        }
+        assert_eq!(client.closed(), reason);
+    }
+    let mut wrong_path = Raw::connect(host.address, "/other");
+    assert!(wrong_path.status().starts_with("HTTP/1.1 404"));
+    // Closing an admitted player must not inflate the admission counters.
+    let mut player = Raw::connect(host.address, "/slither");
+    assert!(player.status().starts_with("HTTP/1.1 101"));
+    player.send(&stock_login(b"Player", 0, &[]));
+    assert_eq!(packets(&player.binary()[2..])[0][0], b'a');
+    player.send(&[255]);
+    assert_eq!(player.closed(), "Unsupported client message");
+    let counts = host.host.admission_rejections();
+    assert_eq!(counts.len(), 4);
+    for (phase, reason, count) in [
+        ("hello", "Truncated login", 1),
+        ("reply", "Invalid challenge reply", 2),
+        ("login", "Expected a login", 1),
+        ("http", "Not found", 1),
+    ] {
+        assert_eq!(counts.get(&(phase, reason.to_owned())), Some(&count));
+    }
+    host.finish();
 }
 
 #[test]

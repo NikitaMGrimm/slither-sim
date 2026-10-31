@@ -743,8 +743,11 @@ impl State {
             admission_growth && self.radius > radius && self.radius <= radius.max(admission_limit)
         };
         if let Some(update) = cursor.checked_sub(1).map(|i| &config.radius_updates[i]) {
-            let this_tick = self.time == 0. || update.time > (self.time - config.dt).max(0.) + 1e-9;
-            if !config.dynamic_radius || this_tick {
+            // config.dt is the next step, not necessarily the last one. Without
+            // a recorded previous dt, a dynamic controller may already have
+            // moved this sample's radius. Its cursor and bounds still validate.
+            // See checkpoint_dt_changes_preserve_recorded_dynamic_radius.
+            if !config.dynamic_radius || self.time == 0. {
                 require(
                     self.radius == update.radius || grew_after(update.radius),
                     Constraint::InconsistentState,
@@ -768,11 +771,12 @@ impl State {
         )?;
         finite(self.prey_clock + config.dt, "state.preyClock")?;
         nonnegative(self.prey_motion_clock, "state.preyMotionClock")?;
-        // At the largest supported batched dt, subtracting the rounded substep
-        // product can leave more than one period by a few ulps of dt. Keep the
-        // actual finite phase, including that roundoff; ordinary ticks remain
-        // strictly below a period. tests/checkpoint.rs pins the phase boundaries.
-        let roundoff = config.dt * f64::EPSILON * 4.;
+        // A batched step can leave a few ulps of its dt beyond one period.
+        // Elapsed time bounds every completed dt even after set_dt lowers it;
+        // cap that bound at the largest legal step rather than world age.
+        // See checkpoint_dt_changes_preserve_batched_prey_roundoff.
+        let producing_dt_bound = self.time.min(LOOP_SECONDS * max_tick_count());
+        let roundoff = producing_dt_bound * f64::EPSILON * 4.;
         let phase_valid = if roundoff <= 1e-12 {
             self.prey_motion_clock < LOOP_SECONDS
         } else {
@@ -1221,13 +1225,15 @@ impl Slot {
             Constraint::InconsistentState,
             "boost.exhausted",
         )?;
-        // Exhaustion can retain the undropped remainder of a batched tick,
-        // rather than a sub-period phase; advance() resets it on the next tick.
+        // Exhaustion retains a batched tick's undropped remainder until the
+        // next step resets it. Elapsed time bounds the producing dt; config.dt
+        // may have changed since then. Do not normalize fixed-path state.
+        // See checkpoint_dt_changes_preserve_exhausted_boost_clock.
         require(
             if b.active {
                 b.clock < BOOST_DROP_SECONDS
             } else if b.exhausted {
-                b.clock <= config.dt + BOOST_DROP_SECONDS
+                b.clock <= time + BOOST_DROP_SECONDS
             } else {
                 b.clock == 0.
             },

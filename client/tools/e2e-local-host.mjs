@@ -155,7 +155,8 @@ export async function runLocalHost(options) {
     // Host owns the port-0 listener throughout startup: no reserve/release race.
     host = launch(options.hostBin, ['host', '--config', config, '--bind', '127.0.0.1:0']);
     const endpoint = await readiness(host, controller.signal);
-    client = launch(options.clientBin, ['--endpoint', endpoint, '--seconds', String(options.seconds)]);
+    const server = endpoint.slice('ws://'.length, -'/slither'.length);
+    client = launch(options.clientBin, ['--server', server, '--seconds', String(options.seconds)]);
     const result = await bounded(Promise.race([client.done, host.done.then(result => {
       throw fail('host', `Host exited during client session: ${JSON.stringify(result)}`);
     })]), (options.seconds + 30) * 1000, 'client', controller.signal);

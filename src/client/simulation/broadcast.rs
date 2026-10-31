@@ -193,7 +193,11 @@ impl SimulatorBackend {
         // and pings return in as little as 4.9 ms; ingesting only arrivals
         // before the tick began added a full tick to both. See section 10 of
         // the scheduler study linked from `MOTION_REPORT_TICKS`.
-        let end = (self.tick + 1) as f64 * self.world.config().dt;
+        let end = if self.variable_dt {
+            self.time() + self.world.config().dt
+        } else {
+            (self.tick + 1) as f64 * self.world.config().dt
+        };
         // A drainable capacity failure must not leave an earlier slot's client
         // clock ahead of public time. Check every due departure and its earlier
         // receipts before any client advances into this tick.
@@ -497,6 +501,9 @@ impl SimulatorBackend {
 
     /// Open each living snake's shared report opportunities for this tick.
     fn update_reports(&mut self) -> Result<(), String> {
+        // Adaptive gates count wall time, including time discarded at maxTick.
+        // Keep the fixed path exact; see the variable-dt regressions in tests.rs.
+        let now = self.time() + self.wall_offset;
         for (slot, snake) in self.world.snakes().iter().enumerate() {
             let reports = &mut self.reports[slot];
             if !snake.alive {
@@ -511,6 +518,16 @@ impl SimulatorBackend {
                 encode::speed_byte(snake.speed)?,
             ];
             let fam = encode::fam_u24(snake.fam);
+            if self.variable_dt {
+                reports.update_timed(
+                    self.slots[slot].life,
+                    motion,
+                    fam,
+                    now,
+                    self.config.delivery,
+                );
+                continue;
+            }
             reports.update(
                 self.slots[slot].life,
                 motion,

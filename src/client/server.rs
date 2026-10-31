@@ -33,7 +33,7 @@ use super::{
 use crate::Action;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::VecDeque,
+    collections::{BTreeMap, VecDeque},
     io,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream},
     sync::{
@@ -123,6 +123,9 @@ pub struct HostConfig {
     pub players: PlayerConfig,
     pub bots: BotConfig,
     pub simulation: SimulationConfig,
+    /// Stretch overloaded ticks up to this many seconds; `None` keeps fixed ticks.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tick: Option<f64>,
 }
 
 impl Default for HostConfig {
@@ -133,6 +136,7 @@ impl Default for HostConfig {
             players: PlayerConfig::default(),
             bots: BotConfig::default(),
             simulation: SimulationConfig::default(),
+            max_tick: None,
         }
     }
 }
@@ -182,7 +186,11 @@ impl HostConfig {
 
     /// Valid settings outside measured behavior; see [`SimulationConfig::warnings`].
     pub fn warnings(&self) -> Vec<String> {
-        self.simulation.warnings()
+        let mut simulation = self.simulation.clone();
+        if let Some(max) = self.max_tick {
+            simulation.world.dt = max;
+        }
+        simulation.warnings()
     }
 
     fn world_config(&self) -> Result<SimulationConfig, String> {
@@ -224,6 +232,14 @@ impl HostConfig {
         };
         config.world.size_for_population(self.bots.count);
         config.validate_for_population(self.bots.count)?;
+        if let Some(max) = self.max_tick {
+            if !max.is_finite() || max < config.world.dt {
+                return Err("maxTick must be finite and at least simulation.world.dt".into());
+            }
+            let mut bounds = config.clone();
+            bounds.world.dt = max;
+            bounds.validate_for_population(self.bots.count)?;
+        }
         Ok(config)
     }
 }
@@ -234,6 +250,9 @@ impl HostConfig {
 struct Clock {
     epoch: Instant,
     dt: f64,
+    max_tick: Option<f64>,
+    /// Wall nanoseconds discarded by the adaptive maximum, never deferred.
+    lost: AtomicU64,
     /// Published copy of the simulation's deferred ticks, for reporting.
     deferred: AtomicU64,
 }
@@ -264,12 +283,40 @@ struct Shared {
     /// Nanoseconds the simulation thread spent running ticks.
     busy: AtomicU64,
     players: AtomicUsize,
+    admission_rejections: Mutex<BTreeMap<(&'static str, String), u64>>,
     /// Commands per socket slot sent to the simulation and not yet consumed.
     pending: Vec<AtomicUsize>,
     failure: Mutex<Option<String>>,
 }
 
 impl Shared {
+    fn reject_admission(&self, phase: &'static str, reason: &str) {
+        let mut counts = self
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let count = counts.entry((phase, reason.to_owned())).or_default();
+        *count = count.saturating_add(1);
+    }
+
+    fn reject_handshake(&self, error: &tungstenite::Error) {
+        // Handshake errors can contain peer input. Retain only host-owned labels,
+        // including the existing HTTP path rejection, never request data.
+        let reason = match error {
+            tungstenite::Error::Io(_)
+            | tungstenite::Error::ConnectionClosed
+            | tungstenite::Error::AlreadyClosed
+            | tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::HandshakeIncomplete,
+            ) => return,
+            tungstenite::Error::Http(response) if response.status() == StatusCode::NOT_FOUND => {
+                "Not found"
+            }
+            _ => "Invalid WebSocket handshake",
+        };
+        self.reject_admission("http", reason);
+    }
+
     fn wake_socket(&self) -> Result<(), String> {
         #[cfg(windows)]
         self.socket_wake.notify().map_err(|e| e.to_string())?;
@@ -375,6 +422,7 @@ pub struct Host {
     seed: u32,
     latency: LatencyConfig,
     decision_seconds: f64,
+    max_tick: Option<f64>,
 }
 
 impl Host {
@@ -400,6 +448,7 @@ impl Host {
             seed: config.seed,
             latency,
             decision_seconds,
+            max_tick: config.max_tick,
         })
     }
 
@@ -419,12 +468,15 @@ impl Host {
             clock: Clock {
                 epoch: Instant::now(),
                 dt: self.world.dt(),
+                max_tick: self.max_tick,
+                lost: AtomicU64::new(0),
                 deferred: AtomicU64::new(0),
             },
             stop: AtomicBool::new(false),
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..self.max_clients).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         });
@@ -482,7 +534,9 @@ impl Host {
             generations: vec![0; agents],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            next_spawn_at: 0.,
             last_spawn_tick: None,
+            last_spawn_at: None,
             shared,
             ticks: 0,
             deferred: 0,
@@ -515,6 +569,11 @@ impl RunningHost {
         self.shared.ticks.load(Ordering::Relaxed)
     }
 
+    /// Wall seconds discarded when adaptive tick intervals exceed `maxTick`.
+    pub fn lost_seconds(&self) -> f64 {
+        self.shared.clock.lost.load(Ordering::Relaxed) as f64 / 1e9
+    }
+
     /// Wall-clock ticks postponed because the simulation could not keep up.
     pub fn deferred_ticks(&self) -> u64 {
         self.shared.clock.deferred.load(Ordering::Relaxed)
@@ -529,6 +588,16 @@ impl RunningHost {
     /// Connected socket players in the shared world.
     pub fn players(&self) -> usize {
         self.shared.players.load(Ordering::Relaxed)
+    }
+
+    /// Cumulative server-initiated admission rejections by phase and reason.
+    /// Contains no peer addresses, names or raw handshake errors.
+    pub fn admission_rejections(&self) -> BTreeMap<(&'static str, String), u64> {
+        self.shared
+            .admission_rejections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Whether a host thread has stopped. Call [`Self::wait`] for its result.
@@ -610,9 +679,11 @@ struct Simulation {
     generations: Vec<u64>,
     waiting: VecDeque<PendingJoin>,
     next_spawn_tick: u64,
+    next_spawn_at: f64,
     /// Host queue state, not core checkpoint state. Expanding the pit must
     /// leave the last newborn its existing departure window before it moves.
     last_spawn_tick: Option<u64>,
+    last_spawn_at: Option<f64>,
     shared: Arc<Shared>,
     ticks: u64,
     deferred: u64,
@@ -627,12 +698,16 @@ struct PendingJoin {
     protocol13: bool,
     full_minimap: bool,
     requested_tick: u64,
+    requested_at: f64,
     /// A new socket connection replaces the previous player's rolling score.
     reset_kills: bool,
 }
 
 impl Simulation {
     fn run(&mut self) -> Result<(), String> {
+        if let Some(max) = self.shared.clock.max_tick {
+            return self.run_adaptive(max);
+        }
         let dt = self.shared.clock.dt;
         while !self.shared.stopped() {
             let due = self.due_ticks(Instant::now());
@@ -655,6 +730,45 @@ impl Simulation {
             let busy = started.elapsed().as_nanos().try_into().unwrap_or(u64::MAX);
             self.shared.busy.fetch_add(busy, Ordering::Relaxed);
         }
+        Ok(())
+    }
+
+    fn run_adaptive(&mut self, max: f64) -> Result<(), String> {
+        let floor = self.shared.clock.dt;
+        let mut previous = self.shared.clock.epoch;
+        let mut next = floor;
+        while !self.shared.stopped() {
+            if self.shared.clock.wall(Instant::now()) < next {
+                self.shared.clock.sleep_until(next, MAX_IDLE);
+                continue;
+            }
+            let started = Instant::now();
+            let elapsed = started.duration_since(previous).as_secs_f64();
+            previous = started;
+            // Host policy: stretch instead of accumulating catch-up work. The
+            // finite cap can still lose time; expose that loss rather than
+            // promise real time for every load. See docs/raw-server.md.
+            self.prepare_adaptive_tick(elapsed, self.shared.clock.wall(started), max)?;
+            self.apply_commands()?;
+            self.advance_tick()?;
+            self.ticks += 1;
+            self.shared.ticks.store(self.ticks, Ordering::Relaxed);
+            self.hand_over()?;
+            self.shared.busy.fetch_add(
+                started.elapsed().as_nanos().try_into().unwrap_or(u64::MAX),
+                Ordering::Relaxed,
+            );
+            next = self.shared.clock.wall(started) + floor;
+        }
+        Ok(())
+    }
+
+    fn prepare_adaptive_tick(&mut self, elapsed: f64, wall: f64, max: f64) -> Result<(), String> {
+        let dt = elapsed.clamp(self.shared.clock.dt, max);
+        self.world.set_dt(dt)?;
+        self.world.set_wall_offset(wall - self.world.time() - dt);
+        let lost = ((elapsed - dt).max(0.) * 1e9).round() as u64;
+        self.shared.clock.lost.fetch_add(lost, Ordering::Relaxed);
         Ok(())
     }
 
@@ -683,7 +797,15 @@ impl Simulation {
 
     /// World time of wall time `wall`, behind it by the deferred ticks.
     fn world_time(&self, wall: f64) -> f64 {
-        wall - self.deferred as f64 * self.shared.clock.dt
+        wall - self.clock_offset()
+    }
+
+    fn clock_offset(&self) -> f64 {
+        if self.shared.clock.max_tick.is_some() {
+            self.world.wall_offset()
+        } else {
+            self.deferred as f64 * self.shared.clock.dt
+        }
     }
 
     fn route(&self, slot: usize) -> usize {
@@ -708,7 +830,14 @@ impl Simulation {
     /// replacing per-bot refusal retries. Successful joins allow the next tick.
     /// research/battledome/2026-10-26-safe-spawn/REPORT.md
     fn admit_waiting(&mut self) -> Result<(), String> {
-        if self.ticks < self.next_spawn_tick || self.waiting.is_empty() {
+        let adaptive = self.shared.clock.max_tick.is_some();
+        let now = self.world.time();
+        let waiting_for_retry = if adaptive {
+            now + 1e-9 < self.next_spawn_at
+        } else {
+            self.ticks < self.next_spawn_tick
+        };
+        if waiting_for_retry || self.waiting.is_empty() {
             return Ok(());
         }
         let first = self
@@ -719,13 +848,21 @@ impl Simulation {
         let protected_until = self.last_spawn_tick.map_or(0, |tick| {
             tick.saturating_add((crate::spawn::DEPARTURE_SECONDS / self.world.dt()).ceil() as u64)
         });
-        if !self
-            .world
-            .grow_for_waiters(self.waiting.len(), self.ticks >= protected_until)
-        {
+        // These are simulation-time safety windows, unlike wall-time wire
+        // gates. Multiplying old tick counts by a new dt can admit too early.
+        let protected_at = self
+            .last_spawn_at
+            .map_or(0., |at| at + crate::spawn::DEPARTURE_SECONDS);
+        let permitted = if adaptive {
+            now + 1e-9 >= protected_at
+        } else {
+            self.ticks >= protected_until
+        };
+        if !self.world.grow_for_waiters(self.waiting.len(), permitted) {
             // Stop admissions too, so fresh births cannot postpone expansion
             // indefinitely. No search work is spent during this bounded hold.
             self.next_spawn_tick = protected_until;
+            self.next_spawn_at = protected_at;
             return Ok(());
         }
         let join = self.waiting.remove(first).unwrap();
@@ -733,13 +870,18 @@ impl Simulation {
             self.waiting.insert(first, join);
             self.next_spawn_tick =
                 self.ticks + (crate::spawn::RETRY_SECONDS / self.world.dt()).ceil() as u64;
+            self.next_spawn_at = now + crate::spawn::RETRY_SECONDS;
         }
         Ok(())
     }
 
     fn join(&mut self, join: &PendingJoin) -> Result<bool, String> {
         let slot = join.slot;
-        let waited = self.ticks.saturating_sub(join.requested_tick) as f64 * self.world.dt();
+        let waited = if self.shared.clock.max_tick.is_some() {
+            (self.world.time() - join.requested_at).max(0.)
+        } else {
+            self.ticks.saturating_sub(join.requested_tick) as f64 * self.world.dt()
+        };
         let admitted = if join.reset_kills {
             self.world
                 .connect_new_player_waited(slot, join.appearance.clone(), waited)
@@ -751,6 +893,7 @@ impl Simulation {
             Ok(false) => return Ok(false),
             Ok(true) => {
                 self.last_spawn_tick = Some(self.ticks);
+                self.last_spawn_at = Some(self.world.time());
                 if join.protocol13 {
                     self.world.protocol13(slot);
                     if join.full_minimap {
@@ -802,6 +945,7 @@ impl Simulation {
                     protocol13,
                     full_minimap,
                     requested_tick: self.ticks,
+                    requested_at: self.world.time(),
                     reset_kills,
                 };
                 if self.world.waits_for_spawn() {
@@ -878,7 +1022,11 @@ impl Simulation {
             max_clients,
             ..
         } = self;
-        let offset = *deferred as f64 * shared.clock.dt;
+        let offset = if shared.clock.max_tick.is_some() {
+            world.wall_offset()
+        } else {
+            *deferred as f64 * shared.clock.dt
+        };
         world.advance_tick_with(*max_clients, &mut |early| {
             for (slot, frames) in early {
                 // Socket slots share route 0.
@@ -893,7 +1041,7 @@ impl Simulation {
 
     /// Hand every queued frame to its slot's owner, which sends it on time.
     fn hand_over(&mut self) -> Result<(), String> {
-        let offset = self.deferred as f64 * self.shared.clock.dt;
+        let offset = self.clock_offset();
         for slot in 0..self.generations.len() {
             let frames = match self.world.take(slot) {
                 Ok(frames) => frames,
@@ -1017,8 +1165,8 @@ struct Gate {
     /// The `6` message with an elapsed header, transformed per connection.
     challenge: Vec<u8>,
     /// Exact accepted replies: the literal-copy compatibility profile and the
-    /// rotated reply observed from the native and tested stock clients.
-    replies: [Vec<u8>; 2],
+    /// rotated replies from the native/stock clients and Vlither.
+    replies: [Vec<u8>; 3],
     commands: Sender<Command>,
     shared: Arc<Shared>,
 }
@@ -1122,6 +1270,12 @@ struct Open<S = TcpStream> {
     /// Frames from the world waiting for their delivery time, in order.
     queued: VecDeque<(f64, Vec<u8>)>,
     queued_bytes: usize,
+}
+
+#[derive(Debug)]
+enum SendError {
+    Transport,
+    Policy(String),
 }
 
 enum Stage {
@@ -1308,7 +1462,10 @@ impl Gateway {
                     physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    self.gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             };
             self.sessions.push(Session {
                 accepted: now,
@@ -1341,14 +1498,20 @@ impl Session {
     ) -> Result<(), String> {
         let age = now.duration_since(self.accepted);
         self.stage = match std::mem::replace(&mut self.stage, Stage::Closed) {
-            Stage::Http(_) if age >= HTTP_TIMEOUT => Stage::Closed,
+            Stage::Http(_) if age >= HTTP_TIMEOUT => {
+                gate.shared.reject_admission("http", "HTTP timeout");
+                Stage::Closed
+            }
             Stage::Http(mid) => match mid.handshake() {
                 Ok(socket) => Stage::Open(Box::new(Open::new(
                     socket,
                     self.physical_food.load(Ordering::Relaxed),
                 ))),
                 Err(HandshakeError::Interrupted(mid)) => Stage::Http(Box::new(mid)),
-                Err(HandshakeError::Failure(_)) => Stage::Closed,
+                Err(HandshakeError::Failure(error)) => {
+                    gate.shared.reject_handshake(&error);
+                    Stage::Closed
+                }
             },
             Stage::Open(mut open) => {
                 if open.service(gate, now, wall, age, readable)? {
@@ -1421,12 +1584,17 @@ impl<S: io::Read + io::Write> Open<S> {
                 self.socket.get_mut().read_blocked = false;
             }
             match self.socket.read() {
-                Ok(Message::Binary(bytes)) => {
-                    if let Err(reason) = self.receive(gate, &bytes, wall) {
+                Ok(Message::Binary(bytes)) => match self.receive(gate, &bytes, wall) {
+                    Ok(()) => {}
+                    Err(SendError::Transport) => {
+                        self.release(gate);
+                        return Ok(false);
+                    }
+                    Err(SendError::Policy(reason)) => {
                         self.reject(gate, now, &reason);
                         return Ok(true);
                     }
-                }
+                },
                 Ok(Message::Text(_)) => {
                     self.reject(gate, now, "Expected binary messages");
                     return Ok(true);
@@ -1455,14 +1623,13 @@ impl<S: io::Read + io::Write> Open<S> {
                 }
             }
         }
-        self.send_due(gate, now, wall)?;
-        Ok(true)
+        self.send_due(gate, now, wall)
     }
 
     /// Apply one client message received at wall time `wall`. An error
     /// closes only this connection.
-    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), String> {
-        match (self.phase, bytes) {
+    fn receive(&mut self, gate: &mut Gate, bytes: &[u8], wall: f64) -> Result<(), SendError> {
+        let result = match (self.phase, bytes) {
             (Phase::Hello { framed: false }, [1]) => self.request(Framing::Bare),
             (Phase::Hello { framed: false }, [2]) => self.request(Framing::Sequence(1)),
             (Phase::Hello { .. }, [1 | 2]) => Err("Repeated framing request".into()),
@@ -1474,7 +1641,7 @@ impl<S: io::Read + io::Write> Open<S> {
             (Phase::Hello { .. }, [99, 0]) => {
                 self.phase = Phase::Reply;
                 let challenge = gate.challenge.clone();
-                self.send(challenge)
+                return self.send(challenge);
             }
             // Client-derived: NTL's protocol toggle uses [99], and disabling
             // its dynamic map uses [99,3]. All share the same reply solver.
@@ -1485,7 +1652,7 @@ impl<S: io::Read + io::Write> Open<S> {
                 let (challenge, reply) = legacy_challenge();
                 self.legacy_reply = Some(reply);
                 self.phase = Phase::Reply;
-                self.send(challenge)
+                return self.send(challenge);
             }
             (Phase::Hello { .. } | Phase::Login, [b's', ..]) => self.join(gate, bytes),
             (Phase::Hello { .. }, _) => Err("Expected a login request".into()),
@@ -1520,7 +1687,8 @@ impl<S: io::Read + io::Write> Open<S> {
             }
             (Phase::Playing(_), _) => Err("Unsupported client message".into()),
             (Phase::Closing(_), _) => Ok(()),
-        }
+        };
+        result.map_err(SendError::Policy)
     }
 
     fn request(&mut self, framing: Framing) -> Result<(), String> {
@@ -1551,23 +1719,30 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     /// Send queued frames due by wall time `wall`. Only host faults are errors.
-    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<(), String> {
+    fn send_due(&mut self, gate: &mut Gate, now: Instant, wall: f64) -> Result<bool, String> {
         while self.queued.front().is_some_and(|(at, _)| *at <= wall) {
             let (_, message) = self.queued.pop_front().unwrap();
             self.queued_bytes -= output_cost(&message);
             if message.len() < 3 {
                 return Err("Simulator emitted a message without a framed payload".into());
             }
-            if let Err(reason) = self.send(message) {
-                self.reject(gate, now, &reason);
-                break;
+            match self.send(message) {
+                Ok(()) => {}
+                Err(SendError::Transport) => {
+                    self.release(gate);
+                    return Ok(false);
+                }
+                Err(SendError::Policy(reason)) => {
+                    self.reject(gate, now, &reason);
+                    break;
+                }
             }
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Queue one elapsed-framed message with this connection's header.
-    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), String> {
+    fn send(&mut self, mut framed: Vec<u8>) -> Result<(), SendError> {
         if let Framing::Sequence(next) = &mut self.framing {
             framed[..2].copy_from_slice(&next.to_be_bytes());
             *next = next.wrapping_add(1);
@@ -1585,9 +1760,16 @@ impl<S: io::Read + io::Write> Open<S> {
                 Ok(())
             }
             Err(tungstenite::Error::WriteBufferFull(_)) => {
-                Err("Client is reading too slowly".into())
+                Err(SendError::Policy("Client is reading too slowly".into()))
             }
-            Err(error) => Err(error.to_string()),
+            // A peer disconnect is not an admission policy rejection. Preserve
+            // that distinction until the caller can release its slot.
+            Err(
+                tungstenite::Error::Io(_)
+                | tungstenite::Error::ConnectionClosed
+                | tungstenite::Error::AlreadyClosed,
+            ) => Err(SendError::Transport),
+            Err(error) => Err(SendError::Policy(error.to_string())),
         }
     }
 
@@ -1630,11 +1812,20 @@ impl<S: io::Read + io::Write> Open<S> {
     }
 
     fn reject(&mut self, gate: &mut Gate, now: Instant, reason: &str) {
+        let phase = match self.phase {
+            Phase::Hello { .. } => Some("hello"),
+            Phase::Reply => Some("reply"),
+            Phase::Login => Some("login"),
+            Phase::Playing(_) | Phase::Closing(_) => None,
+        };
         self.release(gate);
         self.phase = Phase::Closing(now + CLOSE_TIMEOUT);
         let mut end = reason.len().min(MAX_CLOSE_REASON);
         while !reason.is_char_boundary(end) {
             end -= 1;
+        }
+        if let Some(phase) = phase {
+            gate.shared.reject_admission(phase, &reason[..end]);
         }
         let _ = self.socket.close(Some(CloseFrame {
             code: CloseCode::Policy,
@@ -2015,8 +2206,8 @@ fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
     (framed, reply)
 }
 
-/// Encoded challenge source and its two accepted replies.
-fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
+/// Encoded challenge source and its three accepted replies.
+fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 3]), String> {
     let (first, second) = CHALLENGE_LITERAL;
     let mut source = b"var a = \"".to_vec();
     source.extend(first);
@@ -2034,7 +2225,12 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
     }
     let literal = [first.as_slice(), second.as_slice()].concat();
     let solved = challenge::solve_challenge(&encoded)?;
-    Ok((encoded, [literal, solved]))
+    // Client-derived compatibility: for-loop9/vlither 8612bc12,
+    // app/src/network/callback.c decode_secret advances by 2 + value, not 4.
+    // This challenge is not authentication; keep both existing replies.
+    let mut vlither = literal.clone();
+    challenge::rotate_reply(&mut vlither, 2);
+    Ok((encoded, [literal, solved, vlither]))
 }
 
 #[cfg(test)]
@@ -2175,6 +2371,78 @@ mod tests {
         }
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
+        }
+    }
+
+    #[test]
+    fn challenge_write_disconnect_does_not_count_as_admission_rejection() {
+        struct Disconnected {
+            input: Readable,
+            writes: usize,
+        }
+
+        impl io::Read for Disconnected {
+            fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+                self.input.read(bytes)
+            }
+        }
+
+        impl io::Write for Disconnected {
+            fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                Err(io::ErrorKind::ConnectionReset.into())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        for request in [&[99, 0][..], &[99][..]] {
+            for policy_limit in [false, true] {
+                let (mut gateway, _simulation) = pit_gateway();
+                let (encoded, _) = challenge_parts().unwrap();
+                gateway.gate.challenge = vec![0, 0, b'6'];
+                gateway.gate.challenge.extend(encoded);
+                // The peer's hello is already buffered when it disconnects.
+                let mut bytes = vec![130, 129, 0, 0, 0, 0, 1];
+                bytes.extend([130, 128 | request.len() as u8, 0, 0, 0, 0]);
+                bytes.extend(request);
+                let mut config = socket_config().write_buffer_size(0);
+                if policy_limit {
+                    config = config.max_write_buffer_size(8);
+                }
+                let socket = WebSocket::from_raw_socket(
+                    ReadBudget::new(Disconnected {
+                        input: Readable {
+                            bytes: bytes.into(),
+                            read: 0,
+                            first_read: None,
+                        },
+                        writes: 0,
+                    }),
+                    tungstenite::protocol::Role::Server,
+                    Some(config),
+                );
+                let mut open = Open::new(socket, false);
+                let active = open
+                    .service(&mut gateway.gate, Instant::now(), 0., Duration::ZERO, true)
+                    .unwrap();
+                let counts = gateway.gate.shared.admission_rejections.lock().unwrap();
+                if policy_limit {
+                    assert!(active);
+                    assert!(matches!(open.phase, Phase::Closing(_)));
+                    assert_eq!(counts.len(), 1);
+                    assert_eq!(
+                        counts.get(&("reply", "Client is reading too slowly".to_owned())),
+                        Some(&1)
+                    );
+                } else {
+                    assert!(counts.is_empty(), "transport failure counted: {counts:?}");
+                    assert!(!active, "transport failure must release the connection");
+                    assert!(open.socket.get_ref().inner.writes > 0);
+                }
+            }
         }
     }
 
@@ -2462,6 +2730,8 @@ mod tests {
         let clock = Clock {
             epoch: Instant::now(),
             dt: 0.007,
+            max_tick: None,
+            lost: AtomicU64::new(0),
             deferred: AtomicU64::new(0),
         };
         let started = Instant::now();
@@ -2650,15 +2920,83 @@ mod tests {
             clock: Clock {
                 epoch: Instant::now(),
                 dt,
+                max_tick: None,
+                lost: AtomicU64::new(0),
                 deferred: AtomicU64::new(0),
             },
             stop: AtomicBool::new(false),
             ticks: AtomicU64::new(0),
             busy: AtomicU64::new(0),
             players: AtomicUsize::new(0),
+            admission_rejections: Mutex::new(BTreeMap::new()),
             pending: (0..sockets).map(|_| AtomicUsize::new(0)).collect(),
             failure: Mutex::new(None),
         })
+    }
+
+    #[test]
+    fn max_tick_defaults_off_round_trips_and_validates_both_endpoints() {
+        let mut host: HostConfig = serde_json::from_str("{}").unwrap();
+        assert_eq!(host.max_tick, None);
+        assert!(
+            serde_json::to_value(&host)
+                .unwrap()
+                .get("maxTick")
+                .is_none()
+        );
+        let floor = host.simulation.world.dt;
+        for max in [f64::NAN, f64::INFINITY, 0., -0.01, floor / 2., 0.080, 1e100] {
+            host.max_tick = Some(max);
+            assert!(host.validate().is_err(), "max={max}");
+        }
+        host.simulation.world.boundary_mode = crate::BoundaryMode::Hard;
+        for max in [floor, 0.080, 0.100] {
+            host.max_tick = Some(max);
+            host.validate().unwrap();
+            let copy: HostConfig =
+                serde_json::from_value(serde_json::to_value(&host).unwrap()).unwrap();
+            assert_eq!(copy.max_tick, Some(max));
+        }
+        host.simulation.world.dt = 0.;
+        assert!(host.validate().is_err());
+    }
+
+    #[test]
+    fn adaptive_clock_clamps_intervals_and_counts_only_cap_loss() {
+        let (mut sim, _gate, _deliveries) = connected(LatencyConfig::default(), 0);
+        let mut config = SimulationConfig {
+            agents: 1,
+            world: crate::Config::sandbox(),
+            ..Default::default()
+        };
+        config.world.dt = 0.040;
+        config.world.boundary_mode = crate::BoundaryMode::Hard;
+        sim.world = RawSimulator::new(7, config, 1).unwrap();
+        sim.shared = shared(0.040, 1);
+        Arc::get_mut(&mut sim.shared).unwrap().clock.max_tick = Some(0.080);
+        let mut wall = 0.;
+        let mut time = 0.;
+        for (elapsed, dt) in [
+            (0.040, 0.040),
+            (0.057, 0.057),
+            (0.120, 0.080),
+            (0.043, 0.043),
+        ] {
+            wall += elapsed;
+            sim.prepare_adaptive_tick(elapsed, wall, 0.080).unwrap();
+            assert_eq!(sim.world.dt(), dt);
+            sim.advance_tick().unwrap();
+            time += dt;
+            assert!((sim.world.time() - time).abs() < 1e-12);
+            assert!((sim.world_time(wall) - time).abs() < 1e-12);
+        }
+        assert_eq!(sim.shared.clock.lost.load(Ordering::Relaxed), 40_000_000);
+        assert_eq!(sim.shared.clock.deferred.load(Ordering::Relaxed), 0);
+        // The floor also applies to an early wake (the loop normally sleeps).
+        sim.prepare_adaptive_tick(0.020, wall + 0.020, 0.080)
+            .unwrap();
+        assert_eq!(sim.world.dt(), 0.040);
+        assert_eq!(sim.shared.clock.lost.load(Ordering::Relaxed), 40_000_000);
     }
 
     /// A one-socket simulation already connected in slot 0, generation 1,
@@ -2686,7 +3024,9 @@ mod tests {
             generations: vec![0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            next_spawn_at: 0.,
             last_spawn_tick: None,
+            last_spawn_at: None,
             shared: shared(dt, 1),
             ticks: 0,
             deferred,
@@ -2695,7 +3035,7 @@ mod tests {
             occupied: vec![true],
             generations: vec![1],
             challenge: Vec::new(),
-            replies: [Vec::new(), Vec::new()],
+            replies: [Vec::new(), Vec::new(), Vec::new()],
             commands,
             shared: simulation.shared.clone(),
         };
@@ -2836,6 +3176,24 @@ mod tests {
     }
 
     #[test]
+    fn adaptive_cap_preserves_in_flight_ping_wall_deadlines() {
+        let (mut simulation, mut gate, deliveries) =
+            connected(LatencyConfig::one_way(0.040, 0.), 0);
+        let now = simulation.world.time();
+        // Queue an uplink before the cap changes the wall/world mapping.
+        gate.send(ping(now + 0.005));
+        simulation.apply_commands().unwrap();
+        simulation.shared = shared(simulation.world.dt(), 1);
+        Arc::get_mut(&mut simulation.shared).unwrap().clock.max_tick = Some(0.028);
+        gate.shared = simulation.shared.clone();
+        simulation
+            .prepare_adaptive_tick(0.050, now + 0.050, 0.028)
+            .unwrap();
+        let at = pong_after(&mut simulation, &deliveries, 1).expect("cap delayed an arrived ping");
+        assert!((at - (now + 0.050)).abs() < 1e-9, "{at}");
+    }
+
+    #[test]
     fn a_socket_slot_waiting_on_too_many_messages_is_refused() {
         let (mut simulation, gate, _deliveries) = connected(LatencyConfig::default(), 0);
         // A stalled simulation consumes nothing.
@@ -2883,7 +3241,9 @@ mod tests {
             generations: vec![0, 0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            next_spawn_at: 0.,
             last_spawn_tick: None,
+            last_spawn_at: None,
             shared: shared(dt, 1),
             ticks: 0,
             deferred: 0,
@@ -2992,6 +3352,8 @@ mod tests {
         simulation.generations = vec![0; 2];
         simulation.next_spawn_tick = 0;
         simulation.last_spawn_tick = None;
+        simulation.next_spawn_at = 0.;
+        simulation.last_spawn_at = None;
         place_spawn_fence(&mut simulation, gap);
         (simulation, gate, deliveries)
     }
@@ -3087,6 +3449,38 @@ mod tests {
     }
 
     #[test]
+    fn adaptive_fallback_wait_uses_accumulated_world_time() {
+        let (mut simulation, mut gate, _deliveries) = fenced_spawn(350.);
+        simulation.shared = shared(0.014, 1);
+        Arc::get_mut(&mut simulation.shared).unwrap().clock.max_tick = Some(0.028);
+        gate.shared = simulation.shared.clone();
+        simulation.world.set_dt(0.014).unwrap();
+        advance_fenced_spawn(&mut simulation, 3, 350.);
+        let ready = simulation.world.time() + 2.;
+        request_fenced_spawn(&mut simulation, &gate, 2);
+        for tick in 0..128 {
+            simulation
+                .world
+                .set_dt([0.014, 0.020, 0.028, 0.021][tick % 4])
+                .unwrap();
+            let next = simulation.ticks + 1;
+            advance_fenced_spawn(&mut simulation, next, 350.);
+            simulation.apply_commands().unwrap();
+            if simulation.world.time() + 1e-9 < ready {
+                assert_eq!(
+                    simulation.waiting.len(),
+                    1,
+                    "adaptive fallback admitted early"
+                );
+            } else if simulation.waiting.is_empty() {
+                assert!(simulation.world.fixture_world().snakes()[0].alive);
+                return;
+            }
+        }
+        panic!("adaptive fallback did not admit after two world seconds");
+    }
+
+    #[test]
     fn fallback_clock_restarts_when_a_waiting_socket_reconnects() {
         let (mut simulation, gate, _deliveries) = fenced_spawn(150.);
         advance_fenced_spawn(&mut simulation, 16, 150.);
@@ -3152,6 +3546,7 @@ mod tests {
         let request = |slot, requested_tick| PendingJoin {
             slot,
             requested_tick,
+            requested_at: 0.,
             generation: 1,
             appearance: PlayerAppearance::default(),
             session_id: false,
@@ -3379,12 +3774,13 @@ mod tests {
 
     #[test]
     fn challenge_round_trips_through_the_restricted_solver() {
-        let (encoded, [literal, solved]) = challenge_parts().unwrap();
+        let (encoded, [literal, solved, vlither]) = challenge_parts().unwrap();
         assert!(encoded.iter().all(u8::is_ascii_lowercase));
         assert_eq!(literal, b"SlitherSimLocalHostChalleng");
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+        assert_eq!(vlither, b"NakfounHrfSimobKaupTcerekzh");
     }
 
     /// Manually clocked socket gateway and world: no worker races or sleeps are
@@ -3415,7 +3811,7 @@ mod tests {
                 occupied: vec![false],
                 generations: vec![0],
                 challenge: Vec::new(),
-                replies: [Vec::new(), Vec::new()],
+                replies: [Vec::new(), Vec::new(), Vec::new()],
                 commands,
                 shared: shared.clone(),
             },
@@ -3430,7 +3826,9 @@ mod tests {
             generations: vec![0],
             waiting: VecDeque::new(),
             next_spawn_tick: 0,
+            next_spawn_at: 0.,
             last_spawn_tick: None,
+            last_spawn_at: None,
             shared,
             ticks: 0,
             deferred: 0,

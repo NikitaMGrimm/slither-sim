@@ -132,6 +132,8 @@ pub struct SimulatorBackend {
     coverage_bounds: BodyBounds,
     food_subscriptions: FoodSubscriptions,
     tick: u64,
+    variable_dt: bool,
+    wall_offset: f64,
     /// Leading slots owned by external clients; zero for the native backend.
     remote: usize,
     /// Profiles of the remote slots; native slots use `NATIVE_PROFILE`.
@@ -225,6 +227,8 @@ impl SimulatorBackend {
             world,
             config,
             tick: 0,
+            variable_dt: false,
+            wall_offset: 0.,
             remote,
             profiles: vec![PlayerAppearance::default(); remote],
             record: None,
@@ -279,7 +283,11 @@ impl SimulatorBackend {
     }
     /// Local and server virtual time in seconds.
     pub fn time(&self) -> f64 {
-        self.tick as f64 * self.world.config().dt
+        if self.variable_dt {
+            self.world.time()
+        } else {
+            self.tick as f64 * self.world.config().dt
+        }
     }
     pub fn slots(&self) -> usize {
         self.slots.len()

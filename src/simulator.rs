@@ -1534,6 +1534,33 @@ impl Simulator {
         self.advance_validated(actions)
             .map_err(CoreStepError::Stopped)
     }
+    /// Set the next tick duration, validating construction and live travel limits.
+    /// Rejection leaves the world and its configuration unchanged.
+    pub fn set_dt(&mut self, dt: f64) -> Result<(), SimError> {
+        let mut config = self.config.clone();
+        config.dt = dt;
+        config.validate()?;
+        // Imported states can carry speeds beyond the host's normal range.
+        // Increasing dt must preserve checkpoint's next-step travel bound;
+        // decreasing dt cannot violate it. Historical phases validate against
+        // elapsed time, so adaptive decreases never reject retained clocks.
+        if dt > self.config.dt
+            && self
+                .snakes
+                .iter()
+                .map(|s| s.speed)
+                .chain(self.speeds.iter().map(|s| s.speed))
+                .any(|speed| speed * dt > checkpoint::MAGNITUDE)
+        {
+            return Err(SimError::state(
+                Constraint::OutOfRange,
+                "dt",
+                "Tick duration exceeds the current state's one-step travel limit",
+            ));
+        }
+        self.config.dt = dt;
+        Ok(())
+    }
     /// Persistent terminal cause, including after later rejected retries.
     pub fn status(&self) -> WorldStatus<'_> {
         self.failure
@@ -1862,6 +1889,10 @@ impl Simulator {
         // Large dense worlds repay expanded body insertion by avoiding a merged,
         // sorted query for every head. The grid declines sparse or oversized
         // geometry, retaining the existing bounds index in those worlds.
+        // A single grown snake must not inflate every body's grid insertion.
+        // Larger heads query neighbouring cells and restore newest-first order;
+        // the original f64 pair predicate still decides every candidate.
+        const GRID_HEAD_SEGMENTS: usize = 32;
         let grid = (order.len() >= 4096)
             .then(|| {
                 let longest = order
@@ -1872,9 +1903,16 @@ impl Simulator {
                 let bounds: Vec<_> = order.iter().map(|&j| bodies[j].unwrap()).collect();
                 let reaches: Vec<_> = order
                     .iter()
-                    .map(|&j| 3.666 * collision_distance(longest, self.snakes[j].segments))
+                    .map(|&j| {
+                        3.666
+                            * collision_distance(
+                                longest.min(GRID_HEAD_SEGMENTS),
+                                self.snakes[j].segments,
+                            )
+                    })
                     .collect();
                 CollisionGrid::new(&bounds, &reaches)
+                    .map(|grid| (grid, 3.666 * collision_distance(longest, longest)))
             })
             .flatten();
         // Small worlds test every pair faster than they build an index.
@@ -1927,22 +1965,30 @@ impl Simulator {
                     .chain(other.body.iter().copied());
                 strikes_scaled(last_tips[i], tip, direction, head_scale, body_scale, line)
             };
+            let grid_candidates = grid.as_ref().and_then(|(grid, max_reach)| {
+                grid.candidates_for_head(
+                    tip,
+                    head_scale,
+                    scale(GRID_HEAD_SEGMENTS),
+                    *max_reach,
+                    candidates,
+                )
+            });
             // Both visit positions newest first; the index omits only snakes
             // whose bounds fail the test above.
-            let killer =
-                if let Some(candidates) = grid.as_ref().and_then(|grid| grid.candidates(tip)) {
-                    candidates
-                        .iter()
-                        .map(|&k| order[k as usize])
-                        .find(|&j| test(j, profile))
-                } else if indexed {
-                    candidates
-                        .iter()
-                        .map(|&k| order[k as usize])
-                        .find(|&j| test(j, profile))
-                } else {
-                    order.iter().rev().copied().find(|&j| test(j, profile))
-                };
+            let killer = if let Some(candidates) = grid_candidates {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else if indexed {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else {
+                order.iter().rev().copied().find(|&j| test(j, profile))
+            };
             if killer.is_some() {
                 dead.push((i, killer, DeathReason::Body));
                 fallen[i] = true;
