@@ -85,6 +85,7 @@ struct HostStats {
     at: Instant,
     ticks: u64,
     deferred: u64,
+    lost_seconds: f64,
     simulation_seconds: f64,
 }
 
@@ -94,6 +95,7 @@ impl HostStats {
             at: Instant::now(),
             ticks: host.ticks(),
             deferred: host.deferred_ticks(),
+            lost_seconds: host.lost_seconds(),
             simulation_seconds: host.simulation_seconds(),
         }
     }
@@ -108,9 +110,10 @@ impl HostStats {
         let elapsed = self.at.duration_since(previous.at).as_secs_f64();
         writeln!(
             output,
-            "stats: ticks/s={:.2} deferred_ticks={} simulation_load={:.1}% players={} bot_slots={}",
+            "stats: ticks/s={:.2} deferred_ticks={} lost_seconds={:.6} simulation_load={:.1}% players={} bot_slots={}",
             (self.ticks - previous.ticks) as f64 / elapsed,
             self.deferred - previous.deferred,
+            self.lost_seconds - previous.lost_seconds,
             100. * (self.simulation_seconds - previous.simulation_seconds) / elapsed,
             players,
             bot_slots,
@@ -287,19 +290,21 @@ mod tests {
             at: Instant::now(),
             ticks: 100,
             deferred: 7,
+            lost_seconds: 0.1,
             simulation_seconds: 5.,
         };
         let current = HostStats {
             at: previous.at + Duration::from_secs(2),
             ticks: 300,
             deferred: 10,
+            lost_seconds: 0.125,
             simulation_seconds: 5.824,
         };
         let mut output = Vec::new();
         current.write_since(&previous, 40, 4, &mut output).unwrap();
         assert_eq!(
             String::from_utf8(output).unwrap(),
-            "stats: ticks/s=100.00 deferred_ticks=3 simulation_load=41.2% players=40 bot_slots=4\n"
+            "stats: ticks/s=100.00 deferred_ticks=3 lost_seconds=0.025000 simulation_load=41.2% players=40 bot_slots=4\n"
         );
     }
 
