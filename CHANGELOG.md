@@ -10,6 +10,11 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
+- The hosting guide has a section on large bot worlds: size the tick from a
+  world that has run for 15 minutes, watch for a growing backlog, run one large
+  world per machine, and build with PGO and glibc's hugepage setting on Linux.
+  A dated report records what a public 64,000-bot session measured
+  ([report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-31-64k-session/REPORT.md)).
 - An optional `maxTick` host setting lets an overloaded world stretch its
   ticks instead of falling behind, which players see as a growing ping. Each
   tick then lasts the real time since the previous one, up to `maxTick`;
