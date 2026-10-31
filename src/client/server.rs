@@ -1126,8 +1126,8 @@ struct Gate {
     /// The `6` message with an elapsed header, transformed per connection.
     challenge: Vec<u8>,
     /// Exact accepted replies: the literal-copy compatibility profile and the
-    /// rotated reply observed from the native and tested stock clients.
-    replies: [Vec<u8>; 2],
+    /// rotated replies from the native/stock clients and Vlither.
+    replies: [Vec<u8>; 3],
     commands: Sender<Command>,
     shared: Arc<Shared>,
 }
@@ -2124,8 +2124,8 @@ fn legacy_challenge() -> (Vec<u8>, Vec<u8>) {
     (framed, reply)
 }
 
-/// Encoded challenge source and its two accepted replies.
-fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
+/// Encoded challenge source and its three accepted replies.
+fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 3]), String> {
     let (first, second) = CHALLENGE_LITERAL;
     let mut source = b"var a = \"".to_vec();
     source.extend(first);
@@ -2143,7 +2143,12 @@ fn challenge_parts() -> Result<(Vec<u8>, [Vec<u8>; 2]), String> {
     }
     let literal = [first.as_slice(), second.as_slice()].concat();
     let solved = challenge::solve_challenge(&encoded)?;
-    Ok((encoded, [literal, solved]))
+    // Client-derived compatibility: for-loop9/vlither 8612bc12,
+    // app/src/network/callback.c decode_secret advances by 2 + value, not 4.
+    // This challenge is not authentication; keep both existing replies.
+    let mut vlither = literal.clone();
+    challenge::rotate_reply(&mut vlither, 2);
+    Ok((encoded, [literal, solved, vlither]))
 }
 
 #[cfg(test)]
@@ -2875,7 +2880,7 @@ mod tests {
             occupied: vec![true],
             generations: vec![1],
             challenge: Vec::new(),
-            replies: [Vec::new(), Vec::new()],
+            replies: [Vec::new(), Vec::new(), Vec::new()],
             commands,
             shared: simulation.shared.clone(),
         };
@@ -3614,12 +3619,13 @@ mod tests {
 
     #[test]
     fn challenge_round_trips_through_the_restricted_solver() {
-        let (encoded, [literal, solved]) = challenge_parts().unwrap();
+        let (encoded, [literal, solved, vlither]) = challenge_parts().unwrap();
         assert!(encoded.iter().all(u8::is_ascii_lowercase));
         assert_eq!(literal, b"SlitherSimLocalHostChalleng");
         assert_eq!(solved.len(), 27);
         assert_ne!(literal, solved);
         assert!(solved.iter().all(u8::is_ascii_alphabetic));
+        assert_eq!(vlither, b"NakfounHrfSimobKaupTcerekzh");
     }
 
     /// Manually clocked socket gateway and world: no worker races or sleeps are
@@ -3650,7 +3656,7 @@ mod tests {
                 occupied: vec![false],
                 generations: vec![0],
                 challenge: Vec::new(),
-                replies: [Vec::new(), Vec::new()],
+                replies: [Vec::new(), Vec::new(), Vec::new()],
                 commands,
                 shared: shared.clone(),
             },
