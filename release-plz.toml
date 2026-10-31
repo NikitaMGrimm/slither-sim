@@ -48,8 +48,8 @@ release = false
 name = "slither-wgpu-slice"
 release = false
 
-# Owner-gated bootstrap: enable independent protocol release preparation only
-# after package-aware publication/identity checks and trusted publishing exist.
+# The owner manually publishes 0.1.0 after A0 merges. Keep version bumps and
+# publication disabled here; the simulator-switch PR will wire release.yml.
 [[package]]
 name = "slither-protocol"
 release = false

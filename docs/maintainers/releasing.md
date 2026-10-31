@@ -21,15 +21,20 @@ Neither changes release preparation or publication authorization.
 
 `crates/slither-protocol` has independent SemVer (initially 0.1.0), an MIT
 license file and publishable metadata. A0 adds the real reader without a root
-runtime dependency. The agreed order is A0, then B (client path dependency),
-then owner-approved protocol publication, then A (simulator dependency).
-Neither this plan nor A0 enables publication. `release-plz.toml` explicitly
-disables protocol release preparation until the following owner-gated TODOs
-are complete; the existing publisher still selects only slither-sim.
+runtime dependency. After A0 merges, the owner will manually publish 0.1.0
+using a crates.io token: Trusted Publishing cannot create a new crate.
+The owner's first publication is approved; A0 verification only runs
+`cargo publish -p slither-protocol --dry-run --locked` and does not upload.
+B uses a client path dependency without crates.io; A adds the simulator
+dependency after the protocol version is available in the registry.
+`release-plz.toml` explicitly disables protocol publication and version bumps.
+The existing publisher still selects only slither-sim; the simulator-switch
+PR will wire the protocol into `release.yml`.
 
-- TODO (owner): check crates.io name availability/ownership and register the
-  protocol's first publication and Trusted Publisher identity. Do not assume
-  the simulator's registration authorizes a new package or bootstrap a token.
+- TODO (owner, first publish): check crates.io name availability/ownership and
+  publish 0.1.0 from the merged A0 revision. Register its Trusted Publisher
+  identity after creation, before automated publication is enabled. The
+  simulator's registration does not authorize the new package.
 - TODO (owner-approved release work): register independent protocol version and
   changelog handling in release-plz; breaking changes before 1.0 bump its minor
   version. Preserve `[workspace.package]` for simulator/ABI/Python and the rolling
@@ -51,10 +56,9 @@ are complete; the existing publisher still selects only slither-sim.
   manifests, root CLI/library, C ABI and Python maturin sdist/wheel source
   closure. A working workspace is not proof that published consumers resolve.
 
-The client stays unpublished and B needs no crates.io release. First
-publication, trusted-publisher setup and any change to the release workflow
-require separate owner authorization. No protocol release workflow is enabled
-by A0; ordinary simulator releases keep their existing guards.
+The client stays unpublished and B needs no crates.io release. The manual
+first publication belongs to the owner; A0 adds no release automation and
+does not access a token. Ordinary simulator releases keep their existing guards.
 
 ## Manual releases
 

@@ -94,5 +94,6 @@ A0 introduces this independent package; neither consumer uses it yet. B adopts
 it from the client through a path dependency, preserving the direct-login pin
 at merged #391 (`8b36a91c`). A switches the simulator only after owner-approved
 publication. No performance, consumer-switch or visual acceptance is claimed.
-Publication is owner-gated; see the
+The owner will manually publish 0.1.0 after A0 merges; A0 only verifies a locked
+publish dry-run and adds no release automation. See the
 [release prerequisites](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md#shared-protocol-bootstrap-owner-gated).
