@@ -98,17 +98,11 @@ impl Cosmetics {
                 .take(MAX_ENCODED_BYTES as u64 + 1)
                 .read_to_end(&mut bytes)
                 .map_err(|e| e.to_string())?;
-            if bytes.is_empty() || bytes.len() > MAX_ENCODED_BYTES {
-                return Err("Cosmetic encoded image budget".into());
-            }
-            let reader = image::ImageReader::new(Cursor::new(&bytes))
-                .with_guessed_format()
-                .map_err(|e| e.to_string())?;
-            let (w, h) = reader.into_dimensions().map_err(|e| e.to_string())?;
-            if w > 1024
-                || h > 1024
-                || self.studio_pixel_bytes() + w as usize * h as usize * 4 + extra
-                    > COSMETIC_PIXEL_BUDGET
+            let (w, h) = bounded_reader(&bytes, 1024)?
+                .into_dimensions()
+                .map_err(image_error)?;
+            if self.studio_pixel_bytes() + w as usize * h as usize * 4 + extra
+                > COSMETIC_PIXEL_BUDGET
             {
                 return Err("Cosmetic pixel budget".into());
             }
@@ -367,6 +361,61 @@ mod tests {
                     .starts_with("studio-art-test-")
             );
             std::fs::remove_dir_all(path).unwrap();
+        }
+    }
+    #[test]
+    fn compressed_metadata_is_bounded_during_probe_and_world_decode() {
+        use std::io::Write;
+        for expanded in [1024, COSMETIC_PIXEL_BUDGET + 1] {
+            // Stream synthetic metadata; never allocate the expanded fixture.
+            let mut compressed =
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            let block = [b'x'; 4096];
+            let mut remaining = expanded;
+            while remaining > 0 {
+                let count = remaining.min(block.len());
+                compressed.write_all(&block[..count]).unwrap();
+                remaining -= count;
+            }
+            let compressed = compressed.finish().unwrap();
+            for kind in [png::chunk::iCCP, png::chunk::zTXt, png::chunk::iTXt] {
+                let mut profile = if kind == png::chunk::iTXt {
+                    b"Synthetic\0\x01\0\0\0".to_vec()
+                } else {
+                    b"Synthetic\0\0".to_vec()
+                };
+                profile.extend_from_slice(&compressed);
+                let mut bytes = Vec::new();
+                {
+                    let mut encoder = png::Encoder::new(&mut bytes, 1, 1);
+                    encoder.set_color(png::ColorType::Rgba);
+                    encoder.set_depth(png::BitDepth::Eight);
+                    let mut writer = encoder.write_header().unwrap();
+                    writer.write_chunk(kind, &profile).unwrap();
+                    writer.write_image_data(&[50, 100, 150, 255]).unwrap();
+                }
+                assert!(bytes.len() < MAX_ENCODED_BYTES);
+                let probe = bounded_reader(&bytes, 1024)
+                    .and_then(|reader| reader.into_dimensions().map_err(image_error));
+                let world = decode(&bytes);
+                let directory = Directory::new();
+                std::fs::write(directory.0.join("s/a_oakley.png"), &bytes).unwrap();
+                let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+                art.prepare_studio(&[0], Some(0)).unwrap();
+                if expanded > COSMETIC_PIXEL_BUDGET {
+                    assert!(probe.unwrap_err().contains("budget"));
+                    assert!(world.unwrap_err().contains("budget"));
+                    assert_eq!(art.studio_status(0), CosmeticArtStatus::OverBudget);
+                    assert!(art.studio.thumbnails.is_empty());
+                    assert!(art.preview_sources_for(Some(0)).accessory(true).is_none());
+                } else {
+                    assert_eq!(probe.unwrap(), (1, 1));
+                    assert_eq!(world.unwrap().pixels, [50, 100, 150, 255]);
+                    assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+                    assert_eq!(art.studio.thumbnails.len(), 1);
+                }
+                assert!(art.studio_pixel_bytes() <= COSMETIC_PIXEL_BUDGET);
+            }
         }
     }
     #[test]

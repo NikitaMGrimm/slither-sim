@@ -81,6 +81,64 @@ fn failed_storage_keeps_one_memory_commit_and_cancel_never_writes() {
 }
 
 #[test]
+fn cosmetic_art_refresh_preserves_save_errors_with_ready_missing_or_no_art() {
+    use slither_client::menu_controls::ControlId;
+    use slither_wgpu_slice::cosmetics::{Cosmetics, Images};
+    for source in 0..3 {
+        let mut images = Images::default();
+        if source == 2 {
+            let mut png = std::io::Cursor::new(Vec::new());
+            image::RgbaImage::from_pixel(2, 2, image::Rgba([50, 100, 150, 255]))
+                .write_to(&mut png, image::ImageFormat::Png)
+                .unwrap();
+            images.add("s/a_oakley.png", png.get_ref()).unwrap();
+        }
+        let mut art = (source > 0).then(|| Cosmetics::from_images(images, None).unwrap());
+        let mut studio =
+            SkinStudioNative::new(AppearanceRecord::default(), MenuStorage::at(None)).unwrap();
+        studio.open(true);
+        studio.step(230.);
+        studio.activate(COSMETICS_TAB, "Player");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        assert_eq!(studio.status, "No cosmetic");
+        studio.activate(ControlId(COSMETIC_BASE + 1), "Player");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        let expected = if source == 2 {
+            "Cosmetic 0"
+        } else {
+            "Cosmetic 0 - art unavailable"
+        };
+        assert_eq!(studio.status, expected);
+        // Art-owned status may refresh across availability changes without a new selection.
+        studio.sync_art([960., 540.], None).unwrap();
+        assert_eq!(studio.status, "Cosmetic 0 - art unavailable");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        assert_eq!(studio.status, expected);
+        studio.activate(SAVE, "Invalid\n");
+        assert_eq!(studio.status, "Invalid menu nickname");
+        assert!(studio.state.interactive());
+        for now in [246., 262.] {
+            studio.step(now);
+            studio.sync_art([960., 540.], art.as_mut()).unwrap();
+            assert_eq!(studio.status, "Invalid menu nickname");
+            studio.sync_art([960., 540.], None).unwrap();
+            assert_eq!(studio.status, "Invalid menu nickname");
+        }
+        studio.activate(ControlId(COSMETIC_BASE), "Player");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        assert_eq!(studio.status, "No cosmetic");
+        studio.activate(SAVE, "Invalid\n");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        studio.sync_art([960., 540.], None).unwrap();
+        assert_eq!(studio.status, "Invalid menu nickname");
+        studio.activate(SAVE, "Player");
+        studio.sync_art([960., 540.], art.as_mut()).unwrap();
+        assert_eq!(studio.state.committed().nickname, "Player");
+        assert_eq!(studio.status, "Saved for this run");
+    }
+}
+
+#[test]
 #[cfg(windows)]
 fn unreadable_v2_stays_protected_after_transient_sharing_violation_ends() {
     use std::os::windows::fs::OpenOptionsExt;

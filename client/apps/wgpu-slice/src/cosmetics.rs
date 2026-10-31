@@ -103,6 +103,25 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
     decode_bounded(bytes, 1024)
 }
 fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
+    let rgba = bounded_reader(bytes, max_extent)?
+        .decode()
+        .map_err(image_error)?
+        .into_rgba8();
+    let (width, height) = rgba.dimensions();
+    let mut pixels = rgba.into_raw();
+    for p in pixels.as_chunks_mut::<4>().0.iter_mut() {
+        for i in 0..3 {
+            p[i] = ((u16::from(p[i]) * u16::from(p[3]) + 127) / 255) as u8;
+        }
+    }
+    Ok(RgbaImage {
+        width,
+        height,
+        pixels,
+    })
+}
+// PNG decoder construction expands metadata even for a dimension-only probe.
+fn bounded_reader(bytes: &[u8], max_extent: u32) -> Result<image::ImageReader<Cursor<&[u8]>>> {
     if bytes.is_empty() || bytes.len() > MAX_ENCODED_BYTES {
         return Err("Cosmetic encoded image budget".into());
     }
@@ -118,21 +137,61 @@ fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(max_extent);
     limits.max_image_height = Some(max_extent);
-    limits.max_alloc = Some(16 * 1024 * 1024);
+    limits.max_alloc = Some(COSMETIC_PIXEL_BUDGET as u64);
     reader.limits(limits);
-    let rgba = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
-    let (width, height) = rgba.dimensions();
-    let mut pixels = rgba.into_raw();
-    for p in pixels.as_chunks_mut::<4>().0.iter_mut() {
-        for i in 0..3 {
-            p[i] = ((u16::from(p[i]) * u16::from(p[3]) + 127) / 255) as u8;
+    if reader.format() == Some(image::ImageFormat::Png) {
+        check_png_metadata_budget(bytes)?;
+    }
+    Ok(reader)
+}
+fn check_png_metadata_budget(bytes: &[u8]) -> Result<()> {
+    use std::io::Read;
+    fn after_null(bytes: &[u8]) -> Option<&[u8]> {
+        bytes.iter().position(|b| *b == 0).map(|i| &bytes[i + 1..])
+    }
+    let mut chunks = &bytes[8..];
+    let mut remaining = COSMETIC_PIXEL_BUDGET as u64;
+    while !chunks.is_empty() {
+        let header = chunks.get(..12).ok_or("Invalid PNG chunk")?;
+        let length = u32::from_be_bytes(header[..4].try_into().unwrap()) as usize;
+        if length > chunks.len() - 12 {
+            return Err("Invalid PNG chunk".into());
+        }
+        let kind = &header[4..8];
+        let data = &chunks[8..8 + length];
+        let compressed = match kind {
+            b"iCCP" | b"zTXt" => after_null(data).and_then(|v| v.strip_prefix(&[0])),
+            b"iTXt" => after_null(data)
+                .and_then(|v| v.strip_prefix(&[1, 0]))
+                .and_then(after_null)
+                .and_then(after_null),
+            _ => None,
+        };
+        if let Some(compressed) = compressed {
+            // png 0.18 ignores ICC limit errors. Count expanded metadata with a fixed
+            // streaming buffer before constructing its decoder, so those files fail closed.
+            let count = std::io::copy(
+                &mut flate2::read::ZlibDecoder::new(compressed).take(remaining + 1),
+                &mut std::io::sink(),
+            )
+            .map_err(|e| e.to_string())?;
+            remaining = remaining
+                .checked_sub(count)
+                .ok_or("Cosmetic metadata budget")?;
+        }
+        chunks = &chunks[12 + length..];
+        if kind == b"IEND" {
+            break;
         }
     }
-    Ok(RgbaImage {
-        width,
-        height,
-        pixels,
-    })
+    Ok(())
+}
+fn image_error(error: image::ImageError) -> String {
+    if matches!(error, image::ImageError::Limits(_)) {
+        format!("Cosmetic image budget: {error}")
+    } else {
+        error.to_string()
+    }
 }
 
 #[derive(Default)]

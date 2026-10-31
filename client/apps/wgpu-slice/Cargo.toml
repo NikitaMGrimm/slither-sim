@@ -27,6 +27,7 @@ path = "examples/feel_replay.rs"
 required-features = ["feel-trace"]
 
 [dependencies]
+flate2 = "=1.1.10"
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 slither-client = { path = "../.." }
 url = "=2.5.8"
@@ -60,6 +61,5 @@ js-sys = "=0.3.106"
 web-sys = { version = "=0.3.106", features = ["Window", "Document", "HtmlElement", "Node", "Element", "DomRect", "HtmlCanvasElement", "OffscreenCanvas", "OffscreenCanvasRenderingContext2d", "TextMetrics", "ImageData"] }
 
 [dev-dependencies]
-flate2 = "=1.1.10"
 png = "=0.18.1"
 serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }

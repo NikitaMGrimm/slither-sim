@@ -9,6 +9,7 @@ pub struct SkinStudioNative {
     pub state: StudioState,
     pub storage: MenuStorage,
     pub status: String,
+    art_status: Option<String>,
     pub now: f64,
     pub preview: AppearancePreview,
     pub wheel: f64,
@@ -24,6 +25,7 @@ impl SkinStudioNative {
             state: StudioState::new(record).map_err(str::to_owned)?,
             storage,
             status: String::new(),
+            art_status: None,
             now: 0.,
             preview: Default::default(),
             wheel: 0.,
@@ -47,6 +49,7 @@ impl SkinStudioNative {
         let opened = self.state.open(self.now, admitted);
         if opened {
             self.status.clear();
+            self.art_status = None;
             self.preview = Default::default();
             self.wheel = 0.;
         }
@@ -145,6 +148,12 @@ impl SkinStudioNative {
             }
         }
     }
+    fn set_art_status(&mut self, status: String) {
+        if self.status.is_empty() || self.art_status.as_ref() == Some(&self.status) {
+            self.art_status = Some(status.clone());
+            self.status = status;
+        }
+    }
     /// Decode local art serially before copying the active panel; it never commits a choice.
     pub fn sync_art(
         &mut self,
@@ -155,10 +164,10 @@ impl SkinStudioNative {
         self.thumbnails.clear();
         let Some(c) = cosmetics else {
             if self.state.interactive() && self.state.section == StudioSection::Cosmetics {
-                self.status = self.state.preview_cosmetic().map_or_else(
+                self.set_art_status(self.state.preview_cosmetic().map_or_else(
                     || "No cosmetic".into(),
                     |id| format!("Cosmetic {id} - art unavailable"),
-                );
+                ));
             }
             return Ok(());
         };
@@ -178,7 +187,7 @@ impl SkinStudioNative {
         c.prepare_studio(&visible, self.state.preview_cosmetic())?;
         self.thumbnails = c.studio_thumbnails();
         if self.state.interactive() && self.state.section == StudioSection::Cosmetics {
-            self.status = self.state.preview_cosmetic().map_or_else(
+            self.set_art_status(self.state.preview_cosmetic().map_or_else(
                 || "No cosmetic".into(),
                 |id| {
                     use crate::cosmetics::CosmeticArtStatus::*;
@@ -188,7 +197,7 @@ impl SkinStudioNative {
                         OverBudget => format!("Cosmetic {id} - art budget exceeded"),
                     }
                 },
-            );
+            ));
         }
         Ok(())
     }

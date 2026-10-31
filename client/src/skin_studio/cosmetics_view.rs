@@ -54,12 +54,15 @@ impl StudioState {
     /// Replacing a window invalidates a pressed cell without retargeting its release.
     pub fn scroll_cosmetics(&mut self, rows: isize, viewport: [f64; 2]) {
         if self.interactive() && self.section == StudioSection::Cosmetics {
+            let before = self.cosmetic_range(viewport);
             self.cosmetic_window = self.cosmetic_list(viewport);
             self.cosmetic_window.scroll(rows, 9);
             let rows = self.cosmetic_window.clone().window(9);
             let range = rows.start * 4..(rows.end * 4).min(33);
             self.cosmetic_focus = self.cosmetic_focus.clamp(range.start, range.end - 1);
-            self.generation += 1;
+            if range != before {
+                self.generation += 1;
+            }
         }
     }
     pub(super) fn navigate_cosmetic(
