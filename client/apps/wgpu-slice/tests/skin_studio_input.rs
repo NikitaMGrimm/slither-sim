@@ -194,6 +194,7 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
 #[test]
 fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eight() {
     let mut peak = 0;
+    let mut admitted_peak = 0;
     for (section, save) in [
         (StudioSection::BuiltIn, false),
         (StudioSection::BuiltIn, true),
@@ -229,6 +230,15 @@ fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eigh
                 }
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
                 let draws = menu.frame.draws.len() + usize::from(menu.backdrop.is_some());
+                let counts = menu.draw_counts(0);
+                assert_eq!(counts.components.total(), menu.frame.draws.len());
+                assert_eq!(counts.reported_menu(), draws);
+                assert_eq!(
+                    counts.admitted_menu(),
+                    draws + usize::from(menu.world_cover.is_some())
+                );
+                admitted_peak = admitted_peak.max(counts.admitted_menu());
+                assert!(counts.admitted_menu() <= 512);
                 peak = peak.max(draws);
                 assert!(
                     draws <= 512,
@@ -265,7 +275,9 @@ fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eigh
             }
         }
     }
-    println!("Studio entry/return with Settings: peak {peak}/512 menu draws, including backdrop");
+    println!(
+        "Studio entry/return with Settings: {peak}/512 reported; {admitted_peak}/512 admitted, including cover"
+    );
 }
 
 #[test]
