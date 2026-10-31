@@ -46,6 +46,10 @@ selection, skin, nickname and custom data; selectors 11/12 remain protocol 13.
 It was authored from client format facts, without third-party code or captures.
 The [client-derived compatibility note](../../research/fidelity/2026-10-27-browser-admission/REPORT.md)
 records source pins, solver differences and the minimap limitation.
+The additive `vlither` case pins the protocol-19 desktop client's step-2 challenge
+reply and stock-layout login, with and without custom-skin bytes. Its source
+revision is recorded in the fixture; bytes are synthetic format facts, not GPL
+code or a captured login. The loopback replay establishes admission only.
 
 [`client-legacy-login.json`](client-legacy-login.json) retains a bounded official
 `[99, 4]` / selector-12 login observation: the existing stock challenge format
