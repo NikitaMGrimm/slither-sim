@@ -980,3 +980,78 @@ fn quality_focus_keeps_the_existing_full_height_capsule() {
         }
     }
 }
+
+#[test]
+fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
+    use slither_client::{session_policy::Phase, start_page::MenuSession};
+    use slither_wgpu_slice::menu_input_native::KeyInput;
+    use winit::{
+        event::ElementState,
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+    };
+    for terminal in [false, true] {
+        let mut login = NativeLogin::new("Stored").unwrap();
+        login.step(0., true, false).unwrap();
+        login.activate(true);
+        login.step(16., true, false).unwrap();
+        login.step(32., true, true).unwrap();
+        assert!(login.state.accepted_game_over(Phase::Dead, None).unwrap());
+        let mut session = MenuSession {
+            phase: if terminal {
+                Phase::Disconnected
+            } else {
+                Phase::Dead
+            },
+            outcome: Some(Phase::Dead),
+            playing: false,
+            death_pending: true,
+            return_active: true,
+            return_fraction: 0.6,
+        };
+        login.state.observe_session(session, None).unwrap();
+        login.step(48., false, false).unwrap();
+        assert_eq!(login.input.state.focus(), None);
+        let key = Key::Named(NamedKey::Enter);
+        for (index, repeat) in [false, true, false].into_iter().enumerate() {
+            let result = login.key(
+                KeyInput {
+                    logical: &key,
+                    physical: PhysicalKey::Code(KeyCode::Enter),
+                    text: Some("\r"),
+                    state: ElementState::Pressed,
+                    repeat,
+                },
+                false,
+            );
+            if !repeat && (!terminal || index == 0) {
+                assert!(result.consumed);
+            }
+            assert!(
+                result
+                    .effects
+                    .iter()
+                    .all(|e| !matches!(e, HostEditEffect::Activate(_)))
+            );
+        }
+        assert_eq!(
+            login.state.view(false).phase,
+            if terminal {
+                MenuPhase::Connecting
+            } else {
+                MenuPhase::Returning
+            }
+        );
+        assert!(login.step(64., false, false).unwrap().0.is_empty());
+        if terminal {
+            session.death_pending = false;
+            session.return_active = false;
+            session.return_fraction = 0.;
+            login.state.observe_session(session, None).unwrap();
+            let intents = login.step(80., true, false).unwrap().0;
+            assert!(
+                matches!(intents.as_slice(), [StartMenuIntent::Play { nickname, .. }] if nickname == "Stored")
+            );
+            assert!(login.step(96., true, false).unwrap().0.is_empty());
+        }
+    }
+}
