@@ -13,6 +13,7 @@ pub mod gpu;
 pub mod hud;
 pub mod materials;
 pub mod menu;
+pub mod menu_counts;
 pub mod menu_specimen;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod menu_storage;
