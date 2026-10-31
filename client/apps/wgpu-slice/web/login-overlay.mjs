@@ -53,12 +53,12 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
   const measure = document.createElement('canvas').getContext('2d');
   const started = realm.performance.now();
   const activate = kind => {
-    if (!current()) return;
+    if (!current() || (kind==='play' && button.disabled)) return;
     if (!composing) input.value = policy.edit(input.value);
     policy.action(kind, composing || (kind==='enter' && imeEnter), available());
     // Immediate projection disables the DOM before a second click. step() alone
     // emits the frozen request on the next animation update.
-    if ((kind === 'play' || kind === 'enter') && !composing && (kind!=='enter' || !imeEnter) && available()) {
+    if ((kind === 'play' || kind === 'enter') && !composing && (kind!=='enter' || !imeEnter) && (kind==='play' || available())) {
       input.disabled = button.disabled = true;
     }
   };
@@ -75,7 +75,14 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
       else if (e.key==='Enter' && !imeEnter && !e.repeat) {e.preventDefault(); activate('enter');}
     }
   });
-  listen(realm,'keydown', e => {if(e.code==='Escape' && view?.disabled) cancel();});
+  listen(realm,'keydown', e => {
+    if(view?.disabled && !view.play_disabled && e.key==='Enter') {
+      // A focused native button must not turn a rejected Enter into a click.
+      e.preventDefault();
+      if(!e.repeat) activate('enter');
+    }
+    if(e.code==='Escape' && view?.disabled) {policy.cancel_pending_play();cancel();}
+  });
   listen(realm,'keyup', e => {if (e.code==='Enter' || e.code==='NumpadEnter') imeEnter=false;});
   listen(button,'click', () => {if (composing) pendingClick=true; else activate('play');});
   for (const [type,hover,press] of [['pointerenter',true,false],['pointerleave',false,false],['pointerdown',true,true],['pointerup',true,false],['pointercancel',false,false]]) {
@@ -134,7 +141,7 @@ export function mountLogin({ realm = globalThis, LoginMenu, parent = realm.docum
       button.style.fontSize=`${20*view.scale}px`;button.style.background=`linear-gradient(${view.busy?'#4b5b54,#32413a':'#56ac81,#366c51'})`;
       buttonLayers[0].style.opacity=view.hover;buttonLayers[1].style.opacity=view.press;buttonLabel.style.opacity=view.busy?.45:1;
       input.placeholder=view.placeholder;input.setAttribute('aria-label',view.placeholder);
-      input.disabled=button.disabled=view.disabled; quality.disabled=view.disabled;
+      input.disabled=quality.disabled=view.disabled; button.disabled=view.play_disabled;
       input.style.opacity=view.nickname_alpha*(view.busy?.5:1);
       if(!composing && input.value!==view.nickname) input.value=view.nickname;
       buttonLabel.textContent=view.play_label;tips.textContent=view.tip;

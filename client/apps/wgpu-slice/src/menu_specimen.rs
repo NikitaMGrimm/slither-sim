@@ -21,6 +21,7 @@ pub fn view(state: u8) -> Result<StartMenuView> {
     view.hover_alpha = f64::from(state == 1);
     view.press_alpha = f64::from(state == 2);
     view.disabled = state >= 3;
+    view.play_disabled = view.disabled;
     if state == 4 {
         view.spinner_visible = true;
         view.spinner_alpha = 1.;
