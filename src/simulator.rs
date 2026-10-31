@@ -1612,6 +1612,7 @@ impl Simulator {
             bodies,
             body_bounds,
             heads,
+            steering,
             order,
             candidates,
             dead,
@@ -1646,6 +1647,7 @@ impl Simulator {
         // Every living slot writes its current direction during movement below.
         // Retained values are never used for a new step or a dead slot.
         heads.resize(self.snakes.len(), (Point::default(), (0.0, 0.0), 0.0));
+        steering.resize(self.snakes.len(), SteeringCache::default());
         body_bounds.resize(self.snakes.len(), None);
         for &i in alive.iter() {
             let a = actions[i].expect("validated action");
@@ -1751,14 +1753,8 @@ impl Simulator {
             } else {
                 state.clock = 0.0;
             }
-            (s.head, s.heading, heads[i].1) = advance_directed(
-                s.head,
-                s.heading,
-                quantize_heading(a.heading),
-                s.speed,
-                turn_rate(s.segments),
-                c.dt,
-            );
+            (s.head, s.heading, heads[i].1) =
+                steering[i].advance(s.head, s.heading, a.heading, s.speed, s.segments, c.dt);
             let (head, lethal) =
                 crate::boundary::constrain(s.head, s.heading, sc, self.radius, c.boundary_mode);
             s.head = head;
@@ -2823,6 +2819,7 @@ struct StepBuffers {
     /// each tick. Public geometry replacements invalidate their slot too.
     body_bounds: Vec<Option<Bounds>>,
     heads: Vec<(Point, (f64, f64), f64)>,
+    steering: Vec<SteeringCache>,
     order: Vec<usize>,
     candidates: Vec<u32>,
     dead: Vec<(usize, Option<usize>, DeathReason)>,

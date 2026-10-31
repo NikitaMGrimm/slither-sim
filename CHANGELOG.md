@@ -30,6 +30,7 @@
 
 ### Changed
 
+- World ticks reuse steering calculations when their inputs are unchanged.
 - Food lists no longer keep the order in which food appeared. When food is
   eaten or removed by a shrinking wall, the last item in the list takes its
   place, so code that relied on that order, such as a bot breaking ties by

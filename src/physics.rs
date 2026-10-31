@@ -339,6 +339,75 @@ pub(crate) fn advance_directed(
         direction,
     )
 }
+
+/// Derived steering results only; position and speed still advance every tick.
+/// Bit keys preserve signed zero and invalidate after action, size or dt edits,
+/// including a new life in a reused slot. Nothing here belongs in a checkpoint.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct SteeringCache {
+    entry: Option<SteeringEntry>,
+}
+
+#[derive(Clone, Copy)]
+struct SteeringEntry {
+    heading: u64,
+    target: u64,
+    segments: usize,
+    dt: u64,
+    next: f64,
+    direction: (f64, f64),
+}
+
+impl SteeringCache {
+    pub(crate) fn advance(
+        &mut self,
+        head: Point,
+        heading: f64,
+        target: f64,
+        speed: f64,
+        segments: usize,
+        dt: f64,
+    ) -> (Point, f64, (f64, f64)) {
+        let entry = match self.entry {
+            Some(entry)
+                if entry.heading == heading.to_bits()
+                    && entry.target == target.to_bits()
+                    && entry.segments == segments
+                    && entry.dt == dt.to_bits() =>
+            {
+                entry
+            }
+            _ => {
+                let (_, next, direction) = advance_directed(
+                    Point::default(),
+                    heading,
+                    quantize_heading(target),
+                    0.0,
+                    turn_rate(segments),
+                    dt,
+                );
+                let entry = SteeringEntry {
+                    heading: heading.to_bits(),
+                    target: target.to_bits(),
+                    segments,
+                    dt: dt.to_bits(),
+                    next,
+                    direction,
+                };
+                self.entry = Some(entry);
+                entry
+            }
+        };
+        (
+            Point {
+                x: head.x + entry.direction.0 * speed * dt,
+                y: head.y + entry.direction.1 * speed * dt,
+            },
+            entry.next,
+            entry.direction,
+        )
+    }
+}
 pub fn append_anchor(body: &mut Vec<Point>, anchor: Point, grow: bool) {
     // Fresh server body snapshots match contraction of the existing body before
     // insertion. The stock client does the opposite; see docs/server-rules.md#movement-and-geometry.
@@ -655,6 +724,49 @@ mod directed_geometry_tests {
 
     fn point_bits(point: Point) -> (u64, u64) {
         (point.x.to_bits(), point.y.to_bits())
+    }
+
+    #[test]
+    fn cached_steering_matches_uncached_motion_across_input_changes() {
+        let mut cache = SteeringCache::default();
+        let angles = [0.0, -0.0, PI, -PI, TAU, -TAU, 1e6, -1e6, 1e100, -1e100];
+        let sizes = [2, 3, 106, 430, 512, usize::MAX];
+        let steps = [0.0, -0.0, LOOP_SECONDS, LOOP_SECONDS * 4.0, 1.0];
+        for i in 0..2048 {
+            let heading = angles[i % angles.len()];
+            let target = angles[(i / angles.len()) % angles.len()];
+            let segments = sizes[(i / 3) % sizes.len()];
+            let dt = steps[(i / 7) % steps.len()];
+            // The first call changes keys; subsequent calls reuse steering
+            // while varying the position and speed that must never be cached.
+            for j in 0..3 {
+                let head = Point {
+                    x: if j == 0 { -0.0 } else { i as f64 * 123.0 },
+                    y: -(j as f64) * 128.0,
+                };
+                let speed = [0.0, base_speed(segments), BOOST_SPEED][j];
+                let expected = advance(
+                    head,
+                    heading,
+                    quantize_heading(target),
+                    speed,
+                    turn_rate(segments),
+                    dt,
+                );
+                let actual = cache.advance(head, heading, target, speed, segments, dt);
+                assert_eq!(
+                    point_bits(actual.0),
+                    point_bits(expected.0),
+                    "position {i}/{j}"
+                );
+                assert_eq!(actual.1.to_bits(), expected.1.to_bits(), "heading {i}/{j}");
+                assert_eq!(
+                    (actual.2.0.to_bits(), actual.2.1.to_bits()),
+                    (expected.1.cos().to_bits(), expected.1.sin().to_bits()),
+                    "direction {i}/{j}"
+                );
+            }
+        }
     }
 
     #[test]
