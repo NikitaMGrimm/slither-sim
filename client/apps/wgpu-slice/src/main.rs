@@ -40,6 +40,7 @@ mod desktop {
         server: Option<String>,
         headless: Option<crate::headless::Options>,
         cosmetics_dir: Option<std::path::PathBuf>,
+        wordmark: bool,
         accessory: Option<u8>,
     }
     pub fn options() -> Result<Option<Options>> {
@@ -59,7 +60,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--wordmark] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -68,6 +69,7 @@ mod desktop {
                     slither_wgpu_slice::game::server_endpoint(&e)?;
                     o.endpoint = Some(e);
                 }
+                "--wordmark" => o.wordmark = true,
                 "--official" => o.official = true,
                 "--headless" => headless = true,
                 "--duration" | "--frame-every" => {
@@ -524,8 +526,10 @@ mod desktop {
                 "Actual adapter {:?}; MSAA{}; no transport until explicit Play",
                 host.renderer.adapter_info, host.renderer.sample_count
             );
+            let mut login = NativeLogin::new(&options.nickname)?;
+            login.set_wordmark(options.wordmark);
             Ok(Running {
-                login: NativeLogin::new(&options.nickname)?,
+                login,
                 endpoint: options.endpoint.clone(),
                 official: options.official,
                 server: options.server.clone(),
@@ -830,6 +834,15 @@ mod desktop {
             ] {
                 assert!(parse(&args).is_err());
             }
+        }
+        #[test]
+        fn wordmark_overrides_local_logo_only_when_requested() {
+            assert!(!parse(&[]).unwrap().unwrap().wordmark);
+            let options = parse(&["--wordmark", "--cosmetics-dir", "synthetic-artwork"])
+                .unwrap()
+                .unwrap();
+            assert!(options.wordmark);
+            assert!(options.cosmetics_dir.is_some());
         }
         #[test]
         fn headless_requires_an_endpoint_and_bounded_explicit_output() {

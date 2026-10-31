@@ -8,7 +8,7 @@ use crate::{
 };
 use slither_client::{
     menu_input::{EditIntent, HostEditEffect, TextField},
-    menu_layout::{MenuElement as E, MenuLayout},
+    menu_layout::{MenuElement as E, MenuLayout, single_line_field_placement},
     menu_preferences::MenuQuality,
     start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
 };
@@ -26,6 +26,9 @@ pub struct NativeLogin {
     pressed_quality: bool,
 }
 impl NativeLogin {
+    pub fn set_wordmark(&mut self, enabled: bool) {
+        self.menu.wordmark = enabled;
+    }
     pub fn blocks_gameplay(&self) -> bool {
         matches!(
             self.state.view(true).phase,
@@ -70,6 +73,7 @@ impl NativeLogin {
             .state
             .step_with_admission(now, false, admission)
             .map_err(str::to_owned)?;
+        self.input.state.step_caret(now);
         if playing {
             self.state.begin_outgoing();
         }
@@ -194,15 +198,28 @@ impl NativeLogin {
                         color: [224, 224, 255],
                     };
                     let mut selected = 0;
-                    let width = self
-                        .text
-                        .measure_panel(editor.text(), style)
-                        .map(|m| m.advance)
-                        .unwrap_or(0.);
-                    let fit = if width > r.width { r.width / width } else { 1. };
+                    let inset = crate::menu::FIELD_CONTENT_INSET.map(|v| v * self.layout.scale);
+                    let content_width = r.width - 2. * inset[0];
+                    let Ok(m) = self.text.measure_panel(editor.text(), style) else {
+                        return effects;
+                    };
+                    let origin_x = single_line_field_placement(
+                        r,
+                        inset,
+                        style.size,
+                        m.font_ascent,
+                        m.font_descent,
+                    )
+                    .origin[0];
+                    let width = m.advance;
+                    let fit = if width > content_width {
+                        content_width / width
+                    } else {
+                        1.
+                    };
                     for end in editor.text().char_indices().map(|(i, c)| i + c.len_utf8()) {
                         if let Ok(m) = self.text.measure_panel(&editor.text()[..end], style)
-                            && point[0] - r.x >= m.advance * fit
+                            && point[0] - origin_x >= m.advance * fit
                         {
                             selected = end;
                         }
@@ -264,35 +281,13 @@ impl NativeLogin {
         };
         let area = extent.map(|n| f64::from(n) / dpr);
         self.pixel_scale = dpr;
-        let fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
-        if self.area != area {
-            self.layout = fresh;
-            self.area = area;
-        } else {
+        let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
+        if self.area == area {
             // Keep resize-time top across fade updates.
-            let style = TextStyle {
-                size: 20.,
-                weight: Weight::Bold,
-                family: Family::Arial,
-                slant: Slant::Normal,
-                color: [255; 3],
-            };
-            self.layout
-                .update(
-                    view.transition,
-                    view.tips_visible,
-                    slither_client::menu_layout::MenuMetrics {
-                        last_length_line_height: 18.,
-                        nickname_baseline_space: 4.,
-                        padded_play_label_width: self
-                            .text
-                            .measure_panel(view.play_label, style)?
-                            .advance
-                            + 20.,
-                    },
-                )
-                .map_err(str::to_owned)?;
+            fresh.top = self.layout.top;
         }
+        self.layout = fresh;
+        self.area = area;
         view.nickname = self.displayed_nickname();
         self.menu.prepare_with_input(
             &mut self.text,
@@ -336,12 +331,27 @@ impl NativeLogin {
             slant: Slant::Normal,
             color: [224, 224, 255],
         };
+        let inset = crate::menu::FIELD_CONTENT_INSET.map(|v| v * self.layout.scale);
+        let content_width = r.width - 2. * inset[0];
         let width = self.text.measure_panel(&display, style)?.advance;
-        let fit = if width > r.width { r.width / width } else { 1. };
-        let x = (self.text.measure_panel(&prefix, style)?.advance * fit).min(r.width - 1.);
+        let fit = if width > content_width {
+            content_width / width
+        } else {
+            1.
+        };
+        let x = (self.text.measure_panel(&prefix, style)?.advance * fit).min(content_width - 1.);
+        let fitted = TextStyle {
+            size: style.size * fit,
+            ..style
+        };
+        let m = self.text.measure_panel("", fitted)?;
+        let placement =
+            single_line_field_placement(r, inset, fitted.size, m.font_ascent, m.font_descent);
         Ok(self.input.state.apply(EditIntent::CursorArea {
-            position: [r.x + x, r.y].map(|v| (v * self.pixel_scale).round() / self.pixel_scale),
-            size: [1., r.height].map(|v| (v * self.pixel_scale).round().max(1.) / self.pixel_scale),
+            position: [placement.origin[0] + x, placement.caret_top]
+                .map(|v| (v * self.pixel_scale).round() / self.pixel_scale),
+            size: [1., placement.caret_height]
+                .map(|v| (v * self.pixel_scale).round().max(1.) / self.pixel_scale),
         }))
     }
 }
