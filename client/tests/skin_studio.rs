@@ -34,7 +34,9 @@ fn cycle_wrap_skip_and_saved_65_are_exact() {
     );
     assert_eq!(
         studio
-            .save("", 230., UnlockSnapshot::default())
+            .save("", 230., UnlockSnapshot::default(), &mut || panic!(
+                "retained Save sampled entropy"
+            ))
             .unwrap()
             .unwrap()
             .selection()
@@ -74,14 +76,18 @@ fn save_is_one_commit_cancel_is_none_and_focus_waits_for_return() {
     studio.step(630.);
     studio.cycle(true, UnlockSnapshot::default());
     let saved = studio
-        .save("Current", 630., UnlockSnapshot::default())
+        .save("Current", 630., UnlockSnapshot::default(), &mut || {
+            panic!("built-in Save sampled entropy")
+        })
         .unwrap()
         .unwrap();
     assert_eq!(saved.builtin, 8);
     assert_eq!(saved.nickname, "Current");
     assert!(
         studio
-            .save("Other", 631., UnlockSnapshot::default())
+            .save("Other", 631., UnlockSnapshot::default(), &mut || panic!(
+                "repeated Save sampled entropy"
+            ))
             .unwrap()
             .is_none()
     );
@@ -186,7 +192,9 @@ fn every_existing_login_is_byte_identical_after_unchanged_save() {
             let mut studio = StudioState::new(record).unwrap();
             studio.open(0., true);
             let saved = studio
-                .save("Bytes", 230., UnlockSnapshot::default())
+                .save("Bytes", 230., UnlockSnapshot::default(), &mut || {
+                    panic!("retained Save sampled entropy")
+                })
                 .unwrap()
                 .unwrap();
             assert_eq!(saved.selection(), snapshot);

@@ -175,6 +175,10 @@ async fn run(output: &Path) -> Result<()> {
         return settings_specimens(output, &mut renderer).await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--builder") {
+        return builder::specimens(&mut renderer, output);
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--server-picker") {
         use slither_client::{server_directory::Server, server_picker::ServerPreference};
         use slither_wgpu_slice::login_native::NativeLogin;
@@ -1102,3 +1106,6 @@ mod tests {
         assert_eq!(pixels, copy);
     }
 }
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/builder.rs"]
+mod builder;

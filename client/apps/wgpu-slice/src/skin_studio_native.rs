@@ -11,6 +11,7 @@ pub struct SkinStudioNative {
     pub status: String,
     pub now: f64,
     pub preview: AppearancePreview,
+    pub wheel: f64,
     bank: Bank,
     fallback: Cosmetics,
     staged: Option<AppearancePreview>,
@@ -23,6 +24,7 @@ impl SkinStudioNative {
             status: String::new(),
             now: 0.,
             preview: Default::default(),
+            wheel: 0.,
             bank: Bank::new()?,
             fallback: Cosmetics::from_images(Default::default(), None)?,
             staged: None,
@@ -42,11 +44,52 @@ impl SkinStudioNative {
         if opened {
             self.status.clear();
             self.preview = Default::default();
+            self.wheel = 0.;
         }
         opened
     }
     pub fn activate(&mut self, control: slither_client::menu_controls::ControlId, nickname: &str) {
+        self.activate_with_random(control, nickname, &mut rand::random);
+    }
+    /// Entropy is injected at the single Save boundary; fixtures need no global random state.
+    pub fn activate_with_random(
+        &mut self,
+        control: slither_client::menu_controls::ControlId,
+        nickname: &str,
+        random_byte: &mut impl FnMut() -> u8,
+    ) {
+        use slither_client::skin_builder::PALETTES;
+        if !self.state.interactive() {
+            return;
+        }
+        if ![SAVE, CANCEL, BACKDROP].contains(&control) {
+            self.status.clear();
+        }
         match control {
+            BUILT_IN_TAB => self.state.set_section(StudioSection::BuiltIn, self.now),
+            BUILDER_TAB => self.state.set_section(StudioSection::Builder, self.now),
+            ADD => self.state.edit_builder(|b| {
+                b.append(PALETTES[b.palette]);
+            }),
+            REMOVE => self.state.edit_builder(|b| {
+                b.remove();
+            }),
+            RECOLOUR => {
+                let mut result = Ok(());
+                self.state.edit_builder(|b| {
+                    result = b.recolour(PALETTES[b.palette]);
+                });
+                if let Err(e) = result {
+                    self.status = e.into();
+                }
+            }
+            RESET => self.state.edit_builder(|b| b.reset()),
+            RUN_PREVIOUS => self
+                .state
+                .edit_builder(|b| b.selected = b.selected.saturating_sub(1)),
+            RUN_NEXT => self.state.edit_builder(|b| {
+                b.selected = (b.selected + 1).min(b.pattern().runs().len().saturating_sub(1))
+            }),
             PREVIOUS => {
                 self.state.cycle(false, UnlockSnapshot::default());
                 self.status.clear();
@@ -56,22 +99,37 @@ impl SkinStudioNative {
                 self.status.clear();
             }
             CANCEL | BACKDROP => self.state.cancel(self.now),
-            SAVE => match self
-                .state
-                .save(nickname, self.now, UnlockSnapshot::default())
-            {
-                Ok(Some(record)) => {
-                    self.status = if self.storage.save(&record).is_ok() {
-                        "Skin saved"
-                    } else {
-                        "Saved for this run"
+            SAVE => {
+                match self
+                    .state
+                    .save(nickname, self.now, UnlockSnapshot::default(), random_byte)
+                {
+                    Ok(Some(record)) => {
+                        self.status = if self.storage.save(&record).is_ok() {
+                            "Skin saved"
+                        } else {
+                            "Saved for this run"
+                        }
+                        .into()
                     }
-                    .into()
+                    Err(e) => self.status = e.into(),
+                    _ => {}
                 }
-                Err(e) => self.status = e.into(),
-                _ => {}
-            },
-            _ => {}
+            }
+            id if id.0 >= RUN_BASE => self.state.edit_builder(|b| {
+                let index = usize::from(id.0 - RUN_BASE);
+                if index < b.pattern().runs().len() {
+                    b.selected = index;
+                }
+            }),
+            id => {
+                if let Some(index) = PALETTES
+                    .iter()
+                    .position(|p| SWATCH_BASE + u16::from(*p) == id.0)
+                {
+                    self.state.edit_builder(|b| b.palette = index);
+                }
+            }
         }
     }
     /// Ready-only resolver is identical to gameplay's full-art fallback, without accessories.
@@ -86,9 +144,9 @@ impl SkinStudioNative {
             Some(c) => c.preview_sources(),
             None => self.fallback.preview_sources(),
         });
-        let record = &self.state.draft().ok_or("Studio draft unavailable")?.record;
-        let selection = record.selection();
+        let selection = self.state.preview_selection().map_err(str::to_owned)?;
         if selection != self.state.committed().selection()
+            && selection.custom_bytes.is_empty()
             && !UnlockSnapshot::default().skin_available(selection.skin)
         {
             return Err("Preview selection unavailable".into());

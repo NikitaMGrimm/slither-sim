@@ -262,8 +262,20 @@ fn all_skin_ready_and_fallback_poses_fit_caps_at_every_dpr_and_survive_retry() {
                             .iter()
                             .filter(|r| r.asset.handle >> 60 == namespace)
                             .collect();
-                        assert!(group.len() <= slots);
-                        assert!(group.iter().map(|r| r.image.pixels.len()).sum::<usize>() <= bytes);
+                        assert!(
+                            group.len() <= slots,
+                            "DPR {dpr}, skin {skin}, clock {now}, namespace {namespace}: {} slots",
+                            group.len()
+                        );
+                        let used = group.iter().map(|r| r.image.pixels.len()).sum::<usize>();
+                        assert!(
+                            used <= bytes,
+                            "DPR {dpr}, skin {skin}, clock {now}, namespace {namespace}: {used} bytes, limit {bytes}; {:?}",
+                            group
+                                .iter()
+                                .map(|r| (r.image.width, r.image.height))
+                                .collect::<Vec<_>>()
+                        );
                     }
                     assert!(
                         controls

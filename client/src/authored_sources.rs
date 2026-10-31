@@ -178,6 +178,11 @@ fn hexagon(commands: &mut Vec<PaintCommand>, x: f64, y: f64, radius: f64, color:
     ]);
 }
 
+/// Authored standard palette ink, shared by body sources and studio swatches.
+pub fn standard_palette_rgb(palette: u8) -> Option<[u8; 3]> {
+    standard::COLORS.get(usize::from(palette)).copied()
+}
+
 /// Plan standard body/entity source materials while preserving branded background sources.
 pub fn authored_source_recipes() -> AuthoredSourceRecipes {
     let palette_rgb = standard::COLORS.to_vec();

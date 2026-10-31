@@ -4,6 +4,7 @@ use crate::{
     menu_layout::MenuRect,
     menu_preferences::{MenuPreferences, hex, unhex},
     menu_theme::ControlStyle,
+    skin_builder::BuilderDraft,
 };
 
 /// Upper bound before decoding a v2 ASCII record.
@@ -20,6 +21,29 @@ pub const CANCEL: ControlId = ControlId(12);
 pub const SAVE: ControlId = ControlId(13);
 /// Shared modal backdrop cancels on a matching outside release.
 pub const BACKDROP: ControlId = ControlId(5);
+/// Roving section tabs.
+pub const BUILT_IN_TAB: ControlId = ControlId(6);
+/// Builder section tab.
+pub const BUILDER_TAB: ControlId = ControlId(7);
+/// Builder actions after the windowed run strip.
+pub const REMOVE: ControlId = ControlId(14);
+/// Recolour the selected run with the focused palette.
+pub const RECOLOUR: ControlId = ControlId(15);
+/// Clear builder colours only.
+pub const RESET: ControlId = ControlId(16);
+/// Append the selected palette when below the expanded-colour cap.
+pub const ADD: ControlId = ControlId(17);
+/// Pointer navigation for the windowed run strip.
+pub const RUN_PREVIOUS: ControlId = ControlId(18);
+/// Next run in the bounded strip.
+pub const RUN_NEXT: ControlId = ControlId(19);
+/// Stable palette IDs are added to this base.
+pub const SWATCH_BASE: u16 = 100;
+/// Stable run indices are added to this base.
+pub const RUN_BASE: u16 = 200;
+
+mod builder_view;
+pub use builder_view::Navigation;
 
 /// Owned snapshot taken at explicit Play, before asynchronous profile acquisition.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -66,7 +90,7 @@ impl AppearanceSelection {
 }
 
 /// Grants are not inferred from stored selection, asset readiness or CLI options.
-/// PR1 has no grant producer. A later explicit importer can extend this snapshot.
+/// No grant producer is mounted. A later explicit importer can extend this snapshot.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct UnlockSnapshot {
     _private: (),
@@ -261,17 +285,23 @@ impl RestoredAppearance {
         Ok(())
     }
 }
-/// PR1 mounts only built-ins; later sections add their own controls.
+/// Mounted studio sections; cosmetics remain a later delivery.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StudioSection {
-    /// Built-in selection is the only mounted section in PR1.
+    /// Built-in selection, including retained legacy choices.
     BuiltIn,
+    /// Bounded custom-pattern editor.
+    Builder,
 }
 /// Bounded draft; large imported custom runs remain opaque and unchanged.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SkinDraft {
     /// Complete transaction, retaining inactive custom bytes.
     pub record: AppearanceRecord,
+    /// Editor contents are separate from retained wire bytes.
+    pub builder: BuilderDraft,
+    builder_active: bool,
+    builder_base: u8,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Phase {
@@ -288,8 +318,12 @@ pub struct StudioState {
     alpha: f64,
     generation: u64,
     restore_focus: bool,
-    /// Active section, fixed in PR1.
+    /// Active section; switching retains all transaction contents.
     pub section: StudioSection,
+    section_started: Option<f64>,
+    section_alpha: f64,
+    editor_scroll: ScrollList,
+    run_window: ScrollList,
 }
 impl StudioState {
     /// Start closed with a validated committed appearance.
@@ -303,6 +337,10 @@ impl StudioState {
             generation: 0,
             restore_focus: false,
             section: StudioSection::BuiltIn,
+            section_started: None,
+            section_alpha: 1.,
+            editor_scroll: ScrollList::new(1),
+            run_window: ScrollList::new(4),
         })
     }
     /// The only source of the next Play snapshot.
@@ -332,7 +370,19 @@ impl StudioState {
         }
         self.draft = Some(SkinDraft {
             record: self.committed.clone(),
+            builder: BuilderDraft::new(&self.committed.custom_bytes),
+            builder_active: false,
+            builder_base: if self.committed.custom_bytes.is_empty() {
+                self.committed.builtin
+            } else {
+                self.committed.custom_base
+            },
         });
+        self.section = StudioSection::BuiltIn;
+        self.section_started = None;
+        self.section_alpha = 1.;
+        self.editor_scroll = ScrollList::new(1);
+        self.run_window = ScrollList::new(4);
         self.generation += 1;
         self.phase = Phase::Entering(now);
         self.alpha = 0.;
@@ -341,6 +391,9 @@ impl StudioState {
     }
     /// Sample both transitions from the caller clock, without intervals.
     pub fn step(&mut self, now: f64) {
+        if let Some(at) = self.section_started {
+            self.section_alpha = ((now - at) / 180.).clamp(0., 1.);
+        }
         match self.phase {
             Phase::Entering(at) => {
                 self.alpha = ((now - at) / TRANSITION_MS).clamp(0., 1.);
@@ -385,6 +438,61 @@ impl StudioState {
         }
         record.builtin = id;
         record.active_custom = false;
+        self.draft.as_mut().expect("mounted draft").builder_active = false;
+    }
+    /// Switch the mounted controls, cancelling capture through the panel generation.
+    pub fn set_section(&mut self, section: StudioSection, now: f64) {
+        if !self.interactive() || section == self.section || !now.is_finite() {
+            return;
+        }
+        self.section = section;
+        self.section_started = Some(now);
+        self.section_alpha = 0.;
+        self.generation += 1;
+        if section == StudioSection::Builder {
+            let draft = self.draft.as_mut().expect("mounted draft");
+            if draft.record.custom_bytes.is_empty() && draft.builder.pattern().colours() == 0 {
+                draft.builder_base = draft.record.builtin;
+            }
+            draft.builder_active = true;
+        }
+    }
+    /// Mutate only the bounded builder; record bytes remain untouched until Save.
+    pub fn edit_builder(&mut self, edit: impl FnOnce(&mut BuilderDraft)) {
+        if self.interactive() && self.section == StudioSection::Builder {
+            let draft = self.draft.as_mut().expect("mounted draft");
+            edit(&mut draft.builder);
+            draft.builder_active = true;
+            self.run_window
+                .reveal(draft.builder.selected, draft.builder.pattern().runs().len());
+        }
+    }
+    /// Preview uses no entropy and contains no serialized spacer or special palette.
+    pub fn preview_selection(&self) -> Result<AppearanceSelection, &'static str> {
+        Ok(self.draft_record()?.selection())
+    }
+    fn draft_record(&self) -> Result<AppearanceRecord, &'static str> {
+        let draft = self.draft.as_ref().ok_or("Studio draft unavailable")?;
+        let mut record = draft.record.clone();
+        // Save the whole transaction, even when a later built-in choice makes the new custom inactive.
+        if draft.builder.changed() && draft.builder.pattern().colours() > 0 {
+            record.custom_base = draft.builder_base;
+            record.custom_bytes = draft
+                .builder
+                .pattern()
+                .encode([255, 255, 255, 0, 0, 0, 0, 0])?;
+        }
+        if draft.builder_active {
+            if draft.builder.pattern().colours() == 0 {
+                record.active_custom = !self.committed.custom_bytes.is_empty();
+                record.builtin = self.committed.builtin;
+                record.custom_base = self.committed.custom_base;
+                record.custom_bytes = self.committed.custom_bytes.clone();
+            } else {
+                record.active_custom = true;
+            }
+        }
+        Ok(record)
     }
     /// Begin return without committing or requesting persistence.
     pub fn cancel(&mut self, now: f64) {
@@ -401,11 +509,12 @@ impl StudioState {
         nickname: &str,
         now: f64,
         grants: UnlockSnapshot,
+        random_byte: &mut impl FnMut() -> u8,
     ) -> Result<Option<AppearanceRecord>, &'static str> {
         if !self.interactive() {
             return Ok(None);
         }
-        let mut record = self.draft.as_ref().expect("mounted draft").record.clone();
+        let mut record = self.draft_record()?;
         record.nickname = nickname.into();
         record.validate()?;
         if record.custom_bytes != self.committed.custom_bytes {
@@ -418,9 +527,16 @@ impl StudioState {
         // A retained legacy choice remains byte-preserving. New selections
         // must still be available at commit, independently of ready artwork.
         if record.selection() != self.committed.selection()
+            && !record.active_custom
             && !grants.skin_available(record.selection().skin)
         {
             return Err("Skin unavailable");
+        }
+        let draft = self.draft.as_ref().expect("mounted draft");
+        if draft.builder.changed() && draft.builder.pattern().colours() > 0 {
+            // Sample only after every fallible validation; repaints and retained Saves use none.
+            record.custom_bytes[6] = random_byte();
+            record.custom_bytes[7] = random_byte();
         }
         self.committed = record.clone();
         self.cancel(now);
@@ -450,13 +566,13 @@ impl StudioState {
         } else {
             MenuRect {
                 x: b.x + 24.,
-                y: b.y + 88.,
+                y: b.y + 112.,
                 width: b.width - 48.,
-                height: b.height - 308.,
+                height: (b.height - 352.).max(12.),
             }
         }
     }
-    /// Existing buttons provide all focus stops; unavailable sections are omitted.
+    /// Concrete active-section controls share the preview, status band and footer.
     pub fn panel(&self, viewport: [f64; 2], status: &str) -> PanelView {
         let b = Self::bounds(viewport);
         let wide = b.width >= 640.;
@@ -568,7 +684,7 @@ impl StudioState {
                     12,
                     [b.width - 256., b.height - 64., 108., 40.],
                     "Cancel".into(),
-                    ControlStyle::SecondaryButton,
+                    ControlStyle::StudioCancel,
                     true,
                     Some(2),
                 ),
@@ -576,7 +692,7 @@ impl StudioState {
                     13,
                     [b.width - 132., b.height - 64., 108., 40.],
                     "Save".into(),
-                    ControlStyle::PrimaryButton,
+                    ControlStyle::StudioSave,
                     true,
                     Some(3),
                 ),
@@ -601,6 +717,17 @@ impl StudioState {
                 kind: ControlKind::Backdrop,
             },
         );
+        self.mount_sections(&mut panel, viewport);
+        // Paint and copied reading order follow the same section-first flow as Tab.
+        panel.controls.sort_by_key(|c| match c.id {
+            BACKDROP => 0,
+            ControlId(0) | ControlId(1) => 1,
+            BUILT_IN_TAB | BUILDER_TAB => 2,
+            ControlId(4) => 4,
+            CANCEL => 5,
+            SAVE => 6,
+            _ => 3,
+        });
         panel
     }
 }

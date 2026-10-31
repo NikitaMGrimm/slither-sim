@@ -4,6 +4,12 @@ use crate::presentation::{TextFamily, TextSlant, TextStyle, TextWeight};
 /// Roles shared by menu descriptions.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ControlStyle {
+    /// Compact studio tabs and builder actions using the existing purple capsule.
+    StudioAction,
+    /// Studio footer retains the existing green action ink and type.
+    StudioSave,
+    /// Studio footer retains the existing purple action ink and type.
+    StudioCancel,
     /// Main green action.
     PrimaryButton,
     /// Native login Play: admission disables input without dimming its return fade.
@@ -36,6 +42,8 @@ pub enum ControlStyle {
 /// Authored raster recipes already used by the native login.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum SurfaceRecipe {
+    /// Compact studio capsules stretch one uniform centre column.
+    StudioButton,
     /// Green/purple action capsule and its shadow.
     Button,
     /// Pointer/focus overlay without an extra shadow.
@@ -126,25 +134,37 @@ impl MenuTheme {
             size: match role {
                 Heading => 24.,
                 HelpText => 18.,
-                PrimaryButton | LoginPlay | SecondaryButton => 20.,
+                PrimaryButton | LoginPlay | SecondaryButton | StudioSave | StudioCancel => 20.,
                 QualityButton | MenuLink => 14.,
                 _ => 15.,
             },
-            weight: if matches!(role, Heading | PrimaryButton | LoginPlay | SecondaryButton) {
+            weight: if matches!(
+                role,
+                Heading | PrimaryButton | LoginPlay | SecondaryButton | StudioSave | StudioCancel
+            ) {
                 TextWeight::Bold
             } else {
                 TextWeight::Normal
             },
             family: if matches!(
                 role,
-                PrimaryButton | LoginPlay | SecondaryButton | QualityButton | MenuLink
+                PrimaryButton
+                    | LoginPlay
+                    | SecondaryButton
+                    | StudioSave
+                    | StudioCancel
+                    | QualityButton
+                    | MenuLink
             ) {
                 TextFamily::Arial
             } else {
                 TextFamily::Lucida
             },
             slant: TextSlant::Normal,
-            color: if matches!(role, PrimaryButton | LoginPlay | SecondaryButton) {
+            color: if matches!(
+                role,
+                PrimaryButton | LoginPlay | SecondaryButton | StudioSave | StudioCancel
+            ) {
                 [255; 3]
             } else {
                 self.text
@@ -184,14 +204,16 @@ impl MenuTheme {
         }
         SurfaceTokens {
             colors: match role {
-                PrimaryButton | LoginPlay => [[86, 172, 129], [54, 108, 81]],
-                SecondaryButton => [[150, 108, 213], [100, 70, 150]],
+                PrimaryButton | LoginPlay | StudioSave => [[86, 172, 129], [54, 108, 81]],
+                SecondaryButton | StudioAction | StudioCancel => [[150, 108, 213], [100, 70, 150]],
                 ListRow | MenuLink => [[51, 51, 102]; 2],
                 SelectedCell => [self.selection; 2],
                 _ => [self.field; 2],
             },
             radius: if role == QualityButton {
                 44
+            } else if matches!(role, StudioAction | StudioSave | StudioCancel) {
+                14
             } else if matches!(role, ListRow | MenuLink | SelectedCell) {
                 4
             } else if role == StudioSurface {
@@ -201,6 +223,8 @@ impl MenuTheme {
             },
             recipe: if matches!(role, ListRow | MenuLink | SelectedCell) {
                 SurfaceRecipe::Compact
+            } else if matches!(role, StudioAction | StudioSave | StudioCancel) {
+                SurfaceRecipe::StudioButton
             } else if role == StudioSurface {
                 SurfaceRecipe::StudioPanel
             } else if role == Surface {

@@ -49,6 +49,10 @@ fn login_change_skin_opens_without_endpoint_and_save_returns_focus_after_fade() 
             .iter()
             .any(|i| matches!(i, StartMenuIntent::Play { .. }))
     );
+    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
+    key(&mut login, NamedKey::Tab);
+    assert_eq!(login.controls.focus(), Some(PREVIOUS));
+    key(&mut login, NamedKey::Tab);
     assert_eq!(login.controls.focus(), Some(NEXT));
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
@@ -93,13 +97,13 @@ fn blur_resize_matching_release_outside_cancel_and_tab_trap_preserve_draft() {
     click(&mut login, NEXT, true);
     click(&mut login, NEXT, false);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
-    login.focus(PREVIOUS);
+    login.focus(BUILT_IN_TAB);
     login.input.modifiers(ModifiersState::SHIFT);
     key(&mut login, NamedKey::Tab);
     assert_eq!(login.controls.focus(), Some(SAVE));
     login.input.modifiers(ModifiersState::empty());
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(PREVIOUS));
+    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
     login.pointer([0., 0.], Some(true), false);
     login.pointer([0., 0.], Some(false), false);
     login.step(460., false, false).unwrap();

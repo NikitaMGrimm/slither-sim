@@ -1,22 +1,59 @@
 # Native skin studio
 
-Change Skin opens an offline, modal built-in chooser from ordinary idle login,
+Change Skin opens an offline, modal studio from ordinary idle login,
 including when no endpoint is configured. Previous/Next cycle 0–64 and skip 42
 in both directions. No unlock grants exist in this delivery: local art and
-`--accessory` cannot unlock studio choices. Builder and Cosmetics are deferred.
+`--accessory` cannot unlock studio choices. Built-in and Builder share one draft;
+Cosmetics remains deferred.
 Saved skin 65 and existing custom patterns remain usable unchanged; either arrow
 explicitly selects a built-in and retains the old custom bytes separately.
 
 Save validates the complete draft, commits memory once, requests one best-effort
 write and returns to login. Cancel, Escape and a matching outside press/release
 discard it. Blur and resize cancel capture without discarding the draft. Tab
-wraps Previous → Next → Cancel → Save; Enter/Space activates the focused button.
-Left/Right navigate when an arrow button has focus. Entry and return use 230 ms
+wraps the active section tab → section controls → Cancel → Save; Enter/Space
+activates the focused control. Left/Right on tabs switches sections, and on
+built-in arrows cycles skins. Section changes clear capture and fade their
+content over 180 ms without moving preview/footer. Entry and return use 230 ms
 sampled from the caller clock; focus returns to Change Skin after return finishes.
 Opening and saving have no profile, socket or send authority. Only explicit Play
 takes an owned `AppearanceSelection`, also retained across profile acquisition.
 The fixed endpoint and profile paths preserve the existing skin, marker order
 and every trailing custom byte. Old built-in library entry points are retained.
+
+## Builder
+
+The six-column grid has 39 palette IDs, in order: 0–35, 37, 39, 41. Choose a
+swatch, then Add to append one colour; adjacent equals form one run. Add is
+disabled at 47 expanded colours. Arrows/Home/End move the grid's single roving
+focus stop. The run strip shows four runs, with pointer arrows and keyboard
+Left/Right/Home/End navigation. Counts describe whole runs. Remove deletes the
+selected run; Recolour changes that run to the selected palette. Short/narrow
+windows scroll the active editor, with keyboard focus revealed automatically.
+All hit targets remain at least 28 logical pixels.
+
+Opening Builder selects its custom draft for preview/Save. Switching sections
+retains edits; explicitly choosing a built-in with Previous/Next turns custom
+use off, while Save still retains any edited custom pattern as inactive data.
+Reset clears only the builder colours. Empty builder Save restores the
+previously committed custom bytes if any (including inactive retained custom),
+otherwise the committed built-in. It never emits an empty custom override.
+
+Runs are bounded by the existing 123-pair wire domain and are never expanded
+for legacy editing. Long imported runs remain saveable unchanged; Remove and
+Recolour can edit them while Add stays disabled at 47 or more colours. Edited
+merged counts split at 255 and must fit the 255-byte wire limit. A changed,
+non-empty Save samples two injected random bytes once, after validation, for
+the header `[255,255,255,0,0,0,a,b]`, followed by positive count/palette pairs.
+New 47-colour patterns occupy at most 102 bytes. No length byte or preview
+spacer is appended. The preview uses the same normal palette mask and a
+synthetic pose, with no palette-40 padding or serialized preview geometry.
+
+Unchanged runs preserve every original byte, including zero/builder/opaque
+prefixes and noncanonical adjacent runs. Retained payloads that cannot be
+edited as complete normal runs still Save unchanged; their editor starts empty.
+Repaints, restoration, Cancel and unchanged/empty Save consume no entropy.
+The old three-palette development editor and Wasm preference API are unchanged.
 
 ## Storage
 
@@ -60,6 +97,13 @@ final picture admission retains 64 MiB / 2,048 textures and draw-record limits.
 Fixed sampling makes the command bound independent of DPR. These are resource
 limits, not GPU-memory or timing measurements.
 
+The studio enforces the 20-text-slot / 2 MiB and 8-surface-slot / 2 MiB working
+allocations at DPR1–5. Palette sprites, backdrop and focus ink share one small
+authored atlas. Compact capsule controls reuse mirrored ends and stretch a
+uniform centre column, with the existing theme gradient and compact shadow.
+Tabs/actions share a raster; hover/press opacity and focus ink need no separate
+surface textures. The landed menu raster-density cap remains `min(DPR, 5)`.
+
 Focused checks from `client/`: `cargo test --locked --test skin_studio` and
 `cargo test --locked --manifest-path apps/wgpu-slice/Cargo.toml --test skin_studio
 --test skin_studio_input --test login_native`. The Windows offscreen exporter is
@@ -67,8 +111,9 @@ Focused checks from `client/`: `cargo test --locked --test skin_studio` and
 menu_specimens -- <new-external-directory> --studio`, with `CARGO_BUILD_JOBS=2`.
 It produces 960×540 specimens at 1×/1.5×/2×, narrow layout, synthetic special-art
 poses, a fixed-clock entry/return strip and a DPR1–5 numeric resource ledger.
+Use `--builder` instead for the edit/reset/47-colour/save/restore strips at
+1×/1.5×/2×, responsive editor specimens and builder DPR1–5 resource ledger.
 
 All fixtures are authored and offline. Owner appearance/feel, real native
 keyboard/IME/accessibility, GPU/display pacing, outside-server operation and
-extension readiness are unverified. Builder editing and gated cosmetics remain
-later deliveries; this PR does not establish their acceptance.
+extension readiness are unverified. Gated cosmetics remains a later delivery.
