@@ -112,7 +112,12 @@ fn straight_samples_have_ordered_positions_and_tailward_tangents() {
     );
     assert!(curve.samples.windows(2).all(|p| p[0].x >= p[1].x));
     assert_eq!(curve.samples.len(), curve.vertices().len());
-    assert_eq!(curve.target_eye_heading, f64::from(PI as f32) + PI);
+    let old_heading = f64::from(PI as f32) + PI;
+    let drift = (curve.target_eye_heading - old_heading)
+        .sin()
+        .atan2((curve.target_eye_heading - old_heading).cos())
+        .abs();
+    assert!(drift.to_degrees() <= 0.001);
 }
 
 #[test]

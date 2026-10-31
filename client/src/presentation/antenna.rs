@@ -7,7 +7,7 @@ use std::{
 };
 
 use super::{BodyPaintView, BodyRect};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Maximum nodes in the represented ordinary topology.
 pub const MAX_ANTENNA_NODES: usize = 11;
@@ -378,8 +378,8 @@ impl AntennaState {
             b.validate()?;
         }
         let direction = Point {
-            x: math::cos(input.raw_heading),
-            y: math::sin(input.raw_heading),
+            x: input.raw_heading.cos(),
+            y: input.raw_heading.sin(),
         };
         let root = Point {
             x: input.corrected_head.x - direction.x * 8. * input.scale,
@@ -463,8 +463,8 @@ impl AntennaDrawRequest {
             qx += pair[0] * 2. - 1.;
             qy += pair[1] * 2. - 1.;
             let phi = link_angle(f64::from(s.x[j]) - qx, f64::from(s.y[j]) - qy)?;
-            qx += math::cos(phi) * 4. * scale;
-            qy += math::sin(phi) * 4. * scale;
+            qx += phi.cos() * 4. * scale;
+            qy += phi.sin() * 4. * scale;
             s.velocity_x[j] = (f64::from(s.velocity_x[j]) + (qx - f64::from(s.x[j])) * 0.1) as f32;
             s.velocity_y[j] = (f64::from(s.velocity_y[j]) + (qy - f64::from(s.y[j])) * 0.1) as f32;
             s.x[j] = (f64::from(s.x[j]) + f64::from(s.velocity_x[j])) as f32;
@@ -479,8 +479,8 @@ impl AntennaDrawRequest {
             }
             if distance > 4. * scale {
                 let phi = link_angle(dx, dy)?;
-                s.x[j] = (f64::from(s.x[j - 1]) + math::cos(phi) * 4. * scale) as f32;
-                s.y[j] = (f64::from(s.y[j - 1]) + math::sin(phi) * 4. * scale) as f32;
+                s.x[j] = (f64::from(s.x[j - 1]) + phi.cos() * 4. * scale) as f32;
+                s.y[j] = (f64::from(s.y[j - 1]) + phi.sin() * 4. * scale) as f32;
             }
         }
         if !s
@@ -543,10 +543,9 @@ impl AntennaDrawRequest {
         }
         let b = s.geometry.bulb;
         let (translation, rotation, x, y) = if s.geometry.rotate_bulb {
-            let mut delta = math::atan2(
-                f64::from(s.y[last]) - f64::from(s.y[last - 1]),
-                f64::from(s.x[last]) - f64::from(s.x[last - 1]),
-            ) - s.bulb_rotation;
+            let mut delta = (f64::from(s.y[last]) - f64::from(s.y[last - 1]))
+                .atan2(f64::from(s.x[last]) - f64::from(s.x[last - 1]))
+                - s.bulb_rotation;
             if !(0. ..TAU).contains(&delta) {
                 delta %= TAU;
             }

@@ -1,7 +1,7 @@
 //! Fixed double-precision arena-edge geometry, independent of update clocks.
 
 use super::{PI, PresentationError, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Retained arena center and draw-prepared camera polar coordinates.
 /// Angle and distance remain stale on draws without the original own object.
@@ -59,7 +59,7 @@ impl ArenaEdgeView {
     pub(super) fn prepare_draw(&mut self, camera: Point) -> Result<(), PresentationError> {
         let dx = camera.x - self.center;
         let dy = camera.y - self.center;
-        let angle = math::atan2(dy, dx);
+        let angle = dy.atan2(dx);
         let distance = (dx * dx + dy * dy).sqrt();
         *self = Self::new(self.center, angle, distance)?;
         Ok(())
@@ -111,10 +111,9 @@ pub fn plan_arena_edge(input: ArenaEdgeInput) -> Result<Option<ArenaEdgePlan>, P
         stroke: [Point::default(); 42],
         line_width,
     };
-    let project = |angle, radius| -> Result<Point, PresentationError> {
-        // Keep absolute center addition before camera subtraction; no Float32 boundary.
-        let ax = input.view.center + math::cos(angle) * radius;
-        let ay = input.view.center + math::sin(angle) * radius;
+    let project = |angle: f64, radius| -> Result<Point, PresentationError> {
+        let ax = input.view.center + angle.cos() * radius;
+        let ay = input.view.center + angle.sin() * radius;
         let x = f64::from(input.width) / 2. + (ax - input.camera.x) * input.zoom;
         let y = f64::from(input.height) / 2. + (ay - input.camera.y) * input.zoom;
         finite(&[ax, ay, x, y])?;

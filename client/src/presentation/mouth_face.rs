@@ -3,7 +3,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use super::{BodyRect, EyeLayoutInput, PresentationError, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Appearance-owned pupil travel; image sources belong to the draw caller.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,8 +84,8 @@ impl MouthFaceGeometry {
         // The half-unit biases follow entity scaling and must not be scaled again.
         let mark_distance = mark_forward + 0.5;
         let mouth_distance = mouth_forward + 0.5;
-        let forward_cos = math::cos(face_heading);
-        let forward_sin = math::sin(face_heading);
+        let forward_cos = face_heading.cos();
+        let forward_sin = face_heading.sin();
         let pupil_x = pupil.x * view.scale;
         let pupil_y = pupil.y * view.scale;
         let mark_x = forward_cos * mark_distance;
@@ -165,8 +165,8 @@ impl MouthFaceGeometry {
             })
         };
         let mark = |side: f64| -> Result<MouthImageLayout, PresentationError> {
-            let side_cos = math::cos(side);
-            let side_sin = math::sin(side);
+            let side_cos = side.cos();
+            let side_sin = side.sin();
             let side_x = side_cos * lateral;
             let side_y = side_sin * lateral;
             finite(&[side, side_cos, side_sin, side_x, side_y])?;

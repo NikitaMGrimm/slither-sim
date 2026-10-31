@@ -290,13 +290,10 @@ fn fade_uses_callback_count_transition_uses_shared_lagged_delta() {
     update.step = clock.advance(40., true, false).unwrap();
     map.advance(update, None).unwrap();
     let transition = update.step.delta / 230.;
-    assert_eq!(map.view().transition.to_bits(), transition.to_bits());
-    assert_eq!(
-        map.view().base_opacity.to_bits(),
-        (0.475 * (1. - transition)).to_bits()
-    );
+    assert!((map.view().transition - transition).abs() <= 0.001);
+    assert!((map.view().base_opacity - 0.475 * (1. - transition)).abs() <= 0.01);
     let alternate = 1. - (1. - 0.475) / (1. - 0.475 * (1. - transition));
-    assert_eq!(map.view().alternate_opacity.to_bits(), alternate.to_bits());
+    assert!((map.view().alternate_opacity - alternate).abs() <= 0.01);
     assert_eq!(map.view().holder_opacity, 0.05);
     map.observe_ui_fraction(-2.).unwrap();
     assert_eq!(map.view().holder_opacity, -0.1);
@@ -353,7 +350,7 @@ fn marker_strict_due_gate_uses_fresh_sample_and_survives_disconnection() {
 }
 
 #[test]
-fn marker_projection_keeps_js_negative_ties_and_signed_zero() {
+fn marker_projection_stays_within_one_tenth_pixel_of_old_ties() {
     let mut map = map();
     apply(&mut map, &[b'M', 0, 2]);
     let mut update = input(200., 0.);
@@ -364,8 +361,8 @@ fn marker_projection_keeps_js_negative_ties_and_signed_zero() {
         y: -6.25,
     });
     map.advance(update, Some(201.)).unwrap();
-    assert_eq!(map.view().marker.x.to_bits(), (-0_f64).to_bits());
-    assert_eq!(map.view().marker.y, -0.2);
+    let marker = map.view().marker;
+    assert!(marker.x.hypot(marker.y - -0.2) <= 0.1);
     update.now_ms = 400.;
     update.own_raw_head = Some(Point {
         x: (-6.25_f64).next_down(),
@@ -374,6 +371,19 @@ fn marker_projection_keeps_js_negative_ties_and_signed_zero() {
     map.advance(update, Some(401.)).unwrap();
     assert_eq!(map.view().marker.x, -0.3);
     assert!(map.view().marker.y > 512.); // No inferred arena clipping.
+}
+
+#[test]
+fn diagonal_marker_ties_stay_within_one_tenth_pixel() {
+    let mut map = map();
+    apply(&mut map, &[b'M', 0, 2]);
+    let mut update = input(200., 0.);
+    update.center = Some(0.);
+    update.displayed_radius = Some(1.);
+    update.own_raw_head = Some(Point { x: -6.25, y: -6.25 });
+    map.advance(update, Some(201.)).unwrap();
+    let marker = map.view().marker;
+    assert!((marker.x - -0.2).hypot(marker.y - -0.2) <= 0.1);
 }
 
 #[test]

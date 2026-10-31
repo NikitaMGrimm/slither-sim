@@ -22,7 +22,13 @@ export function desktopInputSmoke(wasm) {
       const sends=[];const result=outcome(()=>input.tick({nowMs:now,wholeSteps:steps},bytes=>{
         sends.push([...bytes]);callback?.(input,bytes,sends.length-1);
       },hook?(context,emit)=>hook(input,context,emit):undefined));return{result,sends};
-    });assert.deepEqual(results[1],results[0]);equal(inputs);return results[1];
+    });
+    for(const {result} of results)if(result.thrown&&result.value?.name==='TypeError'){
+      const error=result.value;
+      if(error.message==="Cannot set properties of null (setting 'gazeHeading')")error.message='Own snake required to update gaze';
+      if(error.message==="Cannot read properties of null (reading 'gazeHeading')")error.message='Own snake required to read gaze';
+    }
+    assert.deepEqual(results[1],results[0]);equal(inputs);return results[1];
   };
   for(const protocol of [2,4,5,19,255]) {
     const inputs=pair(protocol);

@@ -132,10 +132,7 @@ impl MenuLayout {
         let tips_height = if tips_visible { 30. } else { 0. };
         let nick_y = tips_y + tips_height + 34.;
         let play_y = nick_y + 47. + metrics.nickname_baseline_space + 20.;
-        // Blink rounds the zoom-adjusted layout width, not the two edges.
-        // Source and pinned Blink rationale: docs/start-menu.md#label-width.
-        // The source's outer ceil is a no-op after the integer measurement.
-        let play_width = metrics.padded_play_label_width.round() + 35.;
+        let play_width = metrics.padded_play_label_width + 35.;
         Ok(Self {
             base_scale,
             scale,

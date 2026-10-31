@@ -200,21 +200,13 @@ unverified. Native accessibility bridging remains later work; browser inputs are
 ## Label width
 
 The width metric is the padded label's untransformed, zoom-adjusted CSS layout
-width, not an ink or transformed bounding box. Before adding 35px, convert it to
-the integer `offsetWidth` that the source reads at button creation and relabeling
-(`source/03-buttons.js:441-442,491-492`). The source's subsequent ceiling is then
-redundant. Authored widths 52.2, 52.49, 52.5 and 52.51 yield button widths
-87, 87, 88 and 88; 90.01 yields 125, not 126.
-
-Blink is pinned to commit `4dfbf1c0f8e59669a8d578f02c258a759d5c0b70`:
-[`HTMLElement::offsetWidthForBinding` and `AdjustedOffsetForZoom`, lines4458-4462/4503-4511](https://chromium.googlesource.com/chromium/src/+/4dfbf1c0f8e59669a8d578f02c258a759d5c0b70/third_party/blink/renderer/core/html/html_element.cc#4458)
-read the layout width, adjust for zoom and round it.
-[`LayoutUnit::Round`, lines294-297](https://chromium.googlesource.com/chromium/src/+/4dfbf1c0f8e59669a8d578f02c258a759d5c0b70/third_party/blink/renderer/platform/geometry/layout_unit.h#294)
-rounds to nearest with positive half ties upward. This binding path neither
-floors the width nor snaps its two edges. Native metrics must already represent
-CSS layout units after zoom adjustment; browser adapters may pass the already
-integer `offsetWidth` directly. Font shaping and layout quantization remain the
-metric provider's responsibility. No browser execution is claimed by this audit.
+width. Add 35 CSS px of button padding directly, retaining fractional widths.
+The former integer `offsetWidth` emulation changes width by at most 0.5 CSS px;
+transformed control edges stay within the [perceptual budget](perceptual-parity.md).
+Font shaping remains the metric provider's responsibility.
+The source-rationale table below retains the historical integer checkpoints;
+the label-width test now compares them with tolerances instead of emulating Blink.
+Their historical Blink pin is `4dfbf1c0f8e59669a8d578f02c258a759d5c0b70`.
 
 ## Authored numeric fixtures and source rationale
 

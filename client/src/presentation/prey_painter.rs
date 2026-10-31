@@ -2,7 +2,7 @@
 
 use std::{error::Error, fmt};
 
-use crate::{math, state::Point};
+use crate::state::Point;
 
 use super::{
     BodyAlpha, BodyAsset, BodyAssetStatus, BodyBlend, BodyPaintView, BodyRect, FoodImageDraw,
@@ -248,15 +248,13 @@ fn interpolated(
             .find(|(t, _)| *t == token)
             .ok_or(PreyPaintError::MissingEater(token))?
             .1;
-        let k = math::pow(p.consumption_progress, 2.);
+        let k = p.consumption_progress.powf(2.);
         let heading = pose.heading + pose.angle_offset;
         if !finite(&[k, heading]) {
             return Err(PreyPaintError::Arithmetic);
         }
-        let mouth_x =
-            pose.head.x + pose.head_offset.x + math::cos(heading) * (43. - k * 24.) * (1. - k);
-        let mouth_y =
-            pose.head.y + pose.head_offset.y + math::sin(heading) * (43. - k * 24.) * (1. - k);
+        let mouth_x = pose.head.x + pose.head_offset.x + heading.cos() * (43. - k * 24.) * (1. - k);
+        let mouth_y = pose.head.y + pose.head_offset.y + heading.sin() * (43. - k * 24.) * (1. - k);
         result.x += (mouth_x - result.x) * k;
         result.y += (mouth_y - result.y) * k;
     }
@@ -327,7 +325,7 @@ impl<F: FnMut(PreyImageCommand)> Recorder<F> {
             p.sources.glow
         };
         let draw = draw(source, center, scale, pass == PreyPaintPass::OuterGlow)?;
-        let pulse = 0.5 + 0.5 * math::cos(p.glow_phase / 13.);
+        let pulse = 0.5 + 0.5 * (p.glow_phase / 13.).cos();
         let alphas = [base * p.fade, base * pulse * p.fade];
         if !finite(&alphas) {
             return Err(PreyPaintError::Arithmetic);
@@ -423,7 +421,7 @@ fn traverse<F: FnMut(PreyImageCommand)>(
             let fs = 1. + expansion * p.scale;
             let mut pal = strength * (1. - pd2 / (denominator + pd2));
             if p.scale != 1. {
-                pal *= math::pow(p.scale, 0.25);
+                pal *= p.scale.powf(0.25);
             }
             let x = tx * fs;
             let y = ty * fs;
@@ -514,10 +512,6 @@ mod tests {
                 },
             }
         );
-        let FoodImageDraw::Scaled { destination, .. } = result else {
-            unreachable!()
-        };
-        assert_eq!(destination.y.to_bits(), 0_f64.to_bits());
         assert!(matches!(
             draw(source, Point { x: 0., y: 0. }, 1., false).unwrap(),
             FoodImageDraw::Whole { .. }

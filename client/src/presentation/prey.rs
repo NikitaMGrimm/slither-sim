@@ -2,10 +2,7 @@
 
 use std::{error::Error, f64::consts::PI, fmt};
 
-use crate::{
-    math,
-    state::{Direction, Point, PreyMotionInput, PreySpawnInput},
-};
+use crate::state::{Direction, Point, PreyMotionInput, PreySpawnInput};
 
 use super::{CorrectionRing, FoodEaterPose, FoodSource, FrameStep, HEAD_SAMPLES, SnakeObjectToken};
 
@@ -427,8 +424,8 @@ impl PreyWorld {
             p.speed_per_32ms = v;
         }
         let position = Point {
-            x: input.absolute_position.x + math::cos(p.heading) * travel,
-            y: input.absolute_position.y + math::sin(p.heading) * travel,
+            x: input.absolute_position.x + p.heading.cos() * travel,
+            y: input.absolute_position.y + p.heading.sin() * travel,
         };
         if !finite(&[travel, position.x, position.y]) {
             return Err(PreyError::Arithmetic);
@@ -505,8 +502,8 @@ impl PreyWorld {
                     }
                 }
             }
-            p.position.x += math::cos(p.heading) * travel;
-            p.position.y += math::sin(p.heading) * travel;
+            p.position.x += p.heading.cos() * travel;
+            p.position.y += p.heading.sin() * travel;
             p.glow_phase += step.delta * p.glow_rate;
             if p.eaten {
                 p.fade += step.delta / 150.;
@@ -521,8 +518,8 @@ impl PreyWorld {
                     p.fade = 1.;
                     p.scale = 1.;
                 } else {
-                    p.scale = 0.5 * (1. - math::cos(PI * p.fade));
-                    p.scale += (0.5 * (1. - math::cos(PI * p.scale)) - p.scale) * 0.66;
+                    p.scale = 0.5 * (1. - (PI * p.fade).cos());
+                    p.scale += (0.5 * (1. - (PI * p.scale).cos()) - p.scale) * 0.66;
                 }
             }
             if !finite(&[
@@ -552,7 +549,7 @@ impl PreyWorld {
                 ]) {
                     return Err(PreyError::Arithmetic);
                 }
-                p.scale = 1. - math::pow(p.consumption_progress, 3.);
+                p.scale = 1. - p.consumption_progress.powf(3.);
             }
             if !p.scale.is_finite() {
                 return Err(PreyError::Arithmetic);
