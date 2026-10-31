@@ -44,6 +44,10 @@
 
 ### Performance
 
+- Large food worlds use compact cell heads for pickup lookups. The frozen
+  10,000-snake replay saves 0.56 ms of world CPU per tick in ten timing pairs
+  (eight faster), with unchanged food, snake state and ordered events.
+
 - Removing eaten food no longer shifts the rest of the food list. In a frozen
   10,000-snake world, world CPU per tick falls from about 11.7 to 7.7 ms, with
   all ten timing pairs faster, and the 500-player catalog step gets about 28%

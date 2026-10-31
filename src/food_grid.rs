@@ -259,7 +259,7 @@ impl FoodCache {
             return None;
         }
         if self.pellets.is_none() {
-            let mut index = PelletIndex::default();
+            let mut index = PelletIndex::new(&self.entries);
             for (i, &entry) in self.entries.iter().enumerate() {
                 index.push(entry, i);
             }
@@ -305,6 +305,86 @@ fn pellet_cell(entry: Entry) -> u32 {
 pub(crate) struct PelletIndex {
     cells: HashMap<u32, Vec<u32>, BuildHasherDefault<CellHasher>>,
     slots: Vec<PelletSlot>,
+    direct: Option<Box<DirectCells>>,
+}
+
+/// Large bounded worlds use one head index per cell, not one Vec header or
+/// hash entry. Links use dense food positions; outlying cells keep sparse heads.
+#[derive(Clone)]
+struct DirectCells {
+    lo_x: usize,
+    lo_y: usize,
+    width: usize,
+    height: usize,
+    heads: Vec<u32>,
+    next: Vec<u32>,
+    overflow: HashMap<u32, u32, BuildHasherDefault<CellHasher>>,
+}
+impl DirectCells {
+    fn new(entries: &[Entry]) -> Option<Self> {
+        let (mut lx, mut ly, mut hx, mut hy) = (usize::MAX, usize::MAX, 0, 0);
+        for &entry in entries {
+            let cell = pellet_cell(entry);
+            if cell == 0 {
+                continue;
+            }
+            let (x, y) = ((cell & 0xffff) as usize, (cell >> 16) as usize);
+            lx = lx.min(x);
+            ly = ly.min(y);
+            hx = hx.max(x);
+            hy = hy.max(y);
+        }
+        if lx == usize::MAX {
+            return None;
+        }
+        // Keep a small birth margin without growing the rectangle in live ticks.
+        lx = lx.saturating_sub(1);
+        ly = ly.saturating_sub(1);
+        hx = (hx + 1).min(0xffff);
+        hy = (hy + 1).min(0xffff);
+        let width = hx - lx + 1;
+        let height = hy - ly + 1;
+        let cells = width.checked_mul(height)?;
+        if cells > MAX_CELLS || cells > entries.len().saturating_mul(4) {
+            return None;
+        }
+        Some(Self {
+            lo_x: lx,
+            lo_y: ly,
+            width,
+            height,
+            heads: vec![NONE; cells],
+            next: Vec::new(),
+            overflow: HashMap::default(),
+        })
+    }
+
+    #[inline]
+    fn offset(&self, cell: u32) -> Option<usize> {
+        if cell == 0 {
+            return None;
+        }
+        let x = ((cell & 0xffff) as usize).wrapping_sub(self.lo_x);
+        let y = ((cell >> 16) as usize).wrapping_sub(self.lo_y);
+        (x < self.width && y < self.height).then(|| x + y * self.width)
+    }
+
+    fn head(&self, cell: u32) -> u32 {
+        match self.offset(cell) {
+            Some(i) => self.heads[i],
+            None => *self.overflow.get(&cell).unwrap_or(&NONE),
+        }
+    }
+
+    fn set_head(&mut self, cell: u32, head: u32) {
+        if let Some(i) = self.offset(cell) {
+            self.heads[i] = head;
+        } else if head == NONE {
+            self.overflow.remove(&cell);
+        } else {
+            self.overflow.insert(cell, head);
+        }
+    }
 }
 #[derive(Clone)]
 struct PelletSlot {
@@ -313,9 +393,39 @@ struct PelletSlot {
     offset: u32,
 }
 impl PelletIndex {
+    fn new(entries: &[Entry]) -> Self {
+        // Catalog worlds stay below 71k pellets; the frozen 10k world has
+        // 515k. Keep their original lists below this large-world threshold.
+        const DIRECT_PELLETS: usize = 1 << 18;
+        Self {
+            direct: (entries.len() >= DIRECT_PELLETS)
+                .then(|| DirectCells::new(entries).map(Box::new))
+                .flatten(),
+            ..Self::default()
+        }
+    }
+
     fn push(&mut self, entry: Entry, food: usize) {
         debug_assert_eq!(food, self.slots.len());
         let cell = pellet_cell(entry);
+        if let Some(direct) = &mut self.direct {
+            let head = direct.head(cell);
+            direct.next.push(head);
+            if head != NONE {
+                self.slots[head as usize].offset = food as u32;
+            }
+            direct.set_head(cell, food as u32);
+            self.slots.push(PelletSlot {
+                point: Point {
+                    x: f64::from_bits(entry.x),
+                    y: f64::from_bits(entry.y),
+                },
+                cell,
+                // In the direct layout this is the previous link, not a list offset.
+                offset: NONE,
+            });
+            return;
+        }
         let list = self.cells.entry(cell).or_default();
         self.slots.push(PelletSlot {
             point: Point {
@@ -328,6 +438,32 @@ impl PelletIndex {
         list.push(food as u32);
     }
     fn swap_remove(&mut self, food: usize) {
+        if let Some(direct) = &mut self.direct {
+            let value = &self.slots[food];
+            let (cell, previous, next) = (value.cell, value.offset, direct.next[food]);
+            if previous == NONE {
+                direct.set_head(cell, next);
+            } else {
+                direct.next[previous as usize] = next;
+            }
+            if next != NONE {
+                self.slots[next as usize].offset = previous;
+            }
+            self.slots.swap_remove(food);
+            direct.next.swap_remove(food);
+            if let Some(moved) = self.slots.get(food) {
+                let (cell, previous, next) = (moved.cell, moved.offset, direct.next[food]);
+                if previous == NONE {
+                    direct.set_head(cell, food as u32);
+                } else {
+                    direct.next[previous as usize] = food as u32;
+                }
+                if next != NONE {
+                    self.slots[next as usize].offset = food as u32;
+                }
+            }
+            return;
+        }
         let value = &self.slots[food];
         let cell = value.cell;
         let offset = value.offset as usize;
@@ -350,6 +486,39 @@ impl PelletIndex {
             .into_iter()
             .flatten()
             .map(|&slot| Pellet { index: self, slot })
+    }
+
+    pub(crate) fn is_direct(&self) -> bool {
+        self.direct.is_some()
+    }
+
+    pub(crate) fn direct_pellets(&self, cell: u32) -> DirectPellets<'_> {
+        let direct = self.direct.as_ref().unwrap();
+        DirectPellets {
+            index: self,
+            next: &direct.next,
+            node: direct.head(cell),
+        }
+    }
+}
+
+pub(crate) struct DirectPellets<'a> {
+    index: &'a PelletIndex,
+    next: &'a [u32],
+    node: u32,
+}
+impl<'a> Iterator for DirectPellets<'a> {
+    type Item = Pellet<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.node == NONE {
+            return None;
+        }
+        let slot = self.node;
+        self.node = self.next[slot as usize];
+        Some(Pellet {
+            index: self.index,
+            slot,
+        })
     }
 }
 pub(crate) struct Pellet<'a> {
@@ -759,6 +928,106 @@ mod tests {
         }
         assert_pellet_index(&cache, &food);
         assert_eq!(cache.ambient(&food), 0);
+    }
+
+    #[test]
+    fn direct_chains_match_linear_cells_through_tail_moves_and_outliers() {
+        let mut rng = Rng(7919);
+        let mut food: Vec<_> = (0..128).map(|_| pellet(&mut rng)).collect();
+        for f in &mut food {
+            f.x = (rng.unit() - 0.5) * 256.;
+            f.y = (rng.unit() - 0.5) * 256.;
+        }
+        let entries: Vec<_> = food.iter().map(Entry::of).collect();
+        let mut index = PelletIndex {
+            direct: Some(Box::new(DirectCells::new(&entries).unwrap())),
+            ..PelletIndex::default()
+        };
+        for (i, &entry) in entries.iter().enumerate() {
+            index.push(entry, i);
+        }
+        for round in 0..512 {
+            let i = [0, food.len() / 2, food.len() - 1, rng.below(food.len())][round % 4];
+            food.swap_remove(i);
+            index.swap_remove(i);
+            let mut f = pellet(&mut rng);
+            if round % 3 == 0 {
+                f.x = [f64::NAN, f64::INFINITY, 1e100, -10000., 10000.][round % 5];
+            }
+            index.push(Entry::of(&f), food.len());
+            food.push(f);
+            let mut expected = std::collections::BTreeMap::<u32, Vec<usize>>::new();
+            for (i, f) in food.iter().enumerate() {
+                expected
+                    .entry(pellet_cell(Entry::of(f)))
+                    .or_default()
+                    .push(i);
+                assert_eq!(index.slots[i].point.x.to_bits(), f.x.to_bits());
+                assert_eq!(index.slots[i].point.y.to_bits(), f.y.to_bits());
+            }
+            for key in expected.keys().copied().chain([
+                0,
+                pack_cell(-2, -2),
+                pack_cell(0, 0),
+                pack_cell(80, 0),
+            ]) {
+                let positions: Vec<_> = index
+                    .direct_pellets(key)
+                    .take(food.len() + 1)
+                    .map(|p| p.position())
+                    .collect();
+                let mut sorted = positions.clone();
+                sorted.sort_unstable();
+                assert_eq!(
+                    sorted,
+                    expected.get(&key).cloned().unwrap_or_default(),
+                    "round={round}, cell={key}"
+                );
+                let mut previous = NONE;
+                for i in positions {
+                    assert_eq!(index.slots[i].offset, previous);
+                    previous = i as u32;
+                }
+            }
+        }
+        while !food.is_empty() {
+            index.swap_remove(0);
+            food.swap_remove(0);
+        }
+        let direct = index.direct.unwrap();
+        assert!(direct.heads.iter().all(|&head| head == NONE));
+        assert!(direct.overflow.is_empty());
+        assert!(direct.next.is_empty());
+    }
+
+    #[test]
+    fn direct_chain_rectangles_are_bounded_and_small_worlds_keep_lists() {
+        let entry = Entry::of(&Food {
+            x: 0.,
+            y: 0.,
+            value: 1.,
+            size: None,
+            origin: None,
+        });
+        assert!(PelletIndex::new(&[entry; 128]).direct.is_none());
+        assert!(PelletIndex::new(&vec![entry; 1 << 18]).direct.is_some());
+        let far = Entry {
+            x: 1e6_f64.to_bits(),
+            y: 1e6_f64.to_bits(),
+            ..entry
+        };
+        assert!(DirectCells::new(&[entry, far]).is_none());
+        let invalid = Entry {
+            x: f64::NAN.to_bits(),
+            ..entry
+        };
+        assert!(DirectCells::new(&[invalid; 16]).is_none());
+        let rectangle = DirectCells::new(&[entry; 16]).unwrap();
+        assert!(rectangle.offset(0).is_none());
+        assert!(rectangle.offset(pack_cell(-1, -1)).is_some());
+        assert!(rectangle.offset(pack_cell(1, 1)).is_some());
+        assert!(rectangle.offset(pack_cell(-2, 0)).is_none());
+        assert!(rectangle.offset(pack_cell(0, 2)).is_none());
     }
 
     #[test]

@@ -2976,14 +2976,25 @@ fn indexed_hits<const PROFILE: bool>(
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
-    indexed_hits_by::<PROFILE, _>(
-        grid,
-        |cell| pellets.pellets(cell),
-        snakes,
-        eaters,
-        hits,
-        profile,
-    );
+    if pellets.is_direct() {
+        indexed_hits_by::<PROFILE, _>(
+            grid,
+            |cell| pellets.direct_pellets(cell),
+            snakes,
+            eaters,
+            hits,
+            profile,
+        );
+    } else {
+        indexed_hits_by::<PROFILE, _>(
+            grid,
+            |cell| pellets.pellets(cell),
+            snakes,
+            eaters,
+            hits,
+            profile,
+        );
+    }
 }
 
 fn indexed_hits_by<'a, const PROFILE: bool, I: Iterator<Item = crate::food_grid::Pellet<'a>>>(
