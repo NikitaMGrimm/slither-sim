@@ -26,7 +26,7 @@ mod desktop {
         application::ApplicationHandler,
         event::{ElementState, MouseButton, WindowEvent},
         event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy},
-        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+        keyboard::{KeyCode, PhysicalKey},
         window::{Window, WindowId},
     };
     #[derive(Debug)]
@@ -156,7 +156,6 @@ mod desktop {
         transport: Transport,
         started: Instant,
         cursor: [f64; 2],
-        shift: bool,
         preparation: Option<Preparation>,
         nickname: String,
         skin: u8,
@@ -600,7 +599,6 @@ mod desktop {
                 }),
                 started: Instant::now(),
                 cursor: [480., 270.],
-                shift: false,
                 preparation: None,
                 nickname: String::new(),
                 skin: options.skin,
@@ -638,55 +636,14 @@ mod desktop {
             }
             let result = (|| -> Result<()> {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
-                    r.shift = modifiers.state().shift_key();
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play()
                     && r.preparation.is_none()
                     && (r.official || r.endpoint.is_some());
-                if let WindowEvent::KeyboardInput { event, .. } = &event
-                    && event.state == ElementState::Pressed
-                    && !r.login.champion.policy.visible()
-                    && !event.repeat
-                    && event.logical_key == Key::Named(NamedKey::Enter)
-                    && r.login.state.view(admission).phase
-                        == slither_client::start_page::MenuPhase::Returning
-                    && !r.login.state.view(admission).play_disabled
-                {
-                    r.login.activate(admission);
-                    r.schedule.invalidate();
-                    return Ok(());
-                }
-                if let WindowEvent::KeyboardInput { event, .. } = &event
-                    && event.state == ElementState::Pressed
-                    && !r.login.champion.policy.visible()
-                    && !r.login.state.view(admission).disabled
-                {
-                    if event.logical_key == Key::Named(NamedKey::Tab) {
-                        let next = (r.login.focus + if r.shift { 2 } else { 1 }) % 3;
-                        let effects = r.login.focus(next);
-                        r.edit_effects(effects);
-                        r.schedule.invalidate();
-                        return Ok(());
-                    }
-                    if r.login.focus != 0
-                        && !event.repeat
-                        && matches!(
-                            event.logical_key,
-                            Key::Named(NamedKey::Enter | NamedKey::Space)
-                        )
-                    {
-                        r.login.activate(admission);
-                        r.schedule.invalidate();
-                        return Ok(());
-                    }
-                }
                 let champion = r.login.champion.policy.visible();
-                if let WindowEvent::Focused(focused) = &event {
-                    if !focused {
-                        r.shift = false;
-                    }
+                if let WindowEvent::Focused(_) = &event {
                     let inactive = if champion {
                         &mut r.login.input
                     } else {
@@ -698,7 +655,7 @@ mod desktop {
                 let mapped = if champion {
                     r.login.champion.event(&event)
                 } else {
-                    r.login.input.window_event(&event)
+                    r.login.event(&event, admission)
                 };
                 r.edit_effects(mapped.effects);
                 r.champion_submission()?;

@@ -4,11 +4,13 @@ use crate::{
     cosmetics::Cosmetics,
     menu::{Menu, MenuFrame},
     menu_input_native::NativeMenuInput,
-    text::{Family, Slant, TextCache, TextStyle, Weight},
+    text::TextCache,
 };
 use slither_client::{
+    login_controls::{self, NICKNAME, PLAY, QUALITY},
+    menu_controls::{ControlId, PanelInputState, PanelView},
     menu_input::{EditIntent, HostEditEffect, TextField},
-    menu_layout::{MenuElement as E, MenuLayout, single_line_field_placement},
+    menu_layout::{MenuElement as E, MenuLayout},
     menu_preferences::MenuQuality,
     start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
 };
@@ -18,13 +20,13 @@ pub struct NativeLogin {
     pub champion: crate::panel_native::NativePanel,
     pub state: StartMenuState,
     pub layout: MenuLayout,
-    pub focus: u8,
+    pub controls: PanelInputState,
+    pub panel: PanelView,
+    scroll: std::collections::BTreeMap<TextField, f64>,
     menu: Menu,
     text: TextCache,
     area: [f64; 2],
     pixel_scale: f64,
-    pressed: bool,
-    pressed_quality: bool,
     champion_session: slither_client::session_policy::View,
 }
 impl NativeLogin {
@@ -45,10 +47,11 @@ impl NativeLogin {
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
         self.blocks_gameplay()
+            || self.controls.capture().is_some()
             || (self.state.view(true).visible
-                && [E::Nickname, E::Play, E::Quality]
-                    .into_iter()
-                    .any(|e| self.layout.hit_test(e, point[0], point[1])))
+                && self.panel.resolve(self.area).is_ok_and(|controls| {
+                    controls.iter().any(|r| r.control.visible && r.hit(point))
+                }))
     }
     pub fn new(nickname: &str) -> Result<Self> {
         let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
@@ -57,6 +60,7 @@ impl NativeLogin {
         input.state.sync_menu(&state.view(true), &[]);
         let mut text = TextCache::menu();
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
+        let panel = login_controls::panel(&state.view(true), &layout, [960., 540.]);
         Ok(Self {
             input,
             champion: crate::panel_native::NativePanel::new(
@@ -64,13 +68,13 @@ impl NativeLogin {
             ),
             state,
             layout,
-            focus: 0,
+            panel,
+            controls: PanelInputState::default(),
+            scroll: std::collections::BTreeMap::new(),
             menu: Menu::default(),
             text,
             area: [960., 540.],
             pixel_scale: 1.,
-            pressed: false,
-            pressed_quality: false,
             champion_session: slither_client::session_policy::SessionPolicy::new().view(),
         })
     }
@@ -89,12 +93,20 @@ impl NativeLogin {
             self.state.begin_outgoing();
         }
         if intents.contains(&StartMenuIntent::FocusNickname) {
-            self.focus = 0;
+            self.controls.set_focus(NICKNAME);
         }
         let mut effects = self
             .input
             .state
             .sync_menu(&self.state.view(admission), &intents);
+        effects.extend(self.sync_controls(admission));
+        self.controls
+            .step(
+                &self.panel,
+                now,
+                slither_client::menu_theme::MenuTheme::default(),
+            )
+            .map_err(str::to_owned)?;
         if self.champion.policy.visible() || self.champion.policy.finished() {
             self.champion.step(
                 now,
@@ -131,57 +143,106 @@ impl NativeLogin {
         }
         let intents: Vec<_> = self.state.take_focus_intent().into_iter().collect();
         if !intents.is_empty() {
-            self.focus = 0;
+            self.controls.set_focus(NICKNAME);
         }
-        self.input
+        let mut effects = self
+            .input
             .state
-            .sync_menu(&self.state.view(admission), &intents)
-    }
-    pub fn focus(&mut self, focus: u8) -> Vec<HostEditEffect> {
-        self.focus = focus;
-        let mut effects = self.input.state.apply(EditIntent::Focus(if focus == 0 {
-            Some(TextField::Nickname)
-        } else {
-            None
-        }));
-        for key in [
-            slither_client::menu_input::GameplayKey::Left,
-            slither_client::menu_input::GameplayKey::Right,
-            slither_client::menu_input::GameplayKey::Up,
-            slither_client::menu_input::GameplayKey::Space,
-        ] {
-            effects.push(HostEditEffect::Gameplay {
-                key,
-                pressed: false,
-            });
-        }
-        effects.push(HostEditEffect::ReleasePointerBoost);
+            .sync_menu(&self.state.view(admission), &intents);
+        effects.extend(self.sync_controls(admission));
         effects
     }
+    fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
+        self.panel = login_controls::panel(&self.state.view(admission), &self.layout, self.area);
+        self.controls.sync(&self.panel, &mut self.input.state)
+    }
+    pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
+        self.controls.set_focus(focus);
+        self.controls.sync_focus(&self.panel, &mut self.input.state)
+    }
     pub fn activate(&mut self, admission: bool) {
-        if self.state.view(admission).phase == slither_client::start_page::MenuPhase::Returning
-            && !self.state.view(admission).play_disabled
-        {
-            self.state.action(
-                MenuAction::Enter {
-                    composing: self.input.state.editor(TextField::Nickname).composing(),
-                },
-                admission,
-            );
+        let composing = self.input.state.editor(TextField::Nickname).composing();
+        let view = self.state.view(admission);
+        if view.phase == slither_client::start_page::MenuPhase::Returning && !view.play_disabled {
+            self.state
+                .action(MenuAction::Enter { composing }, admission);
             return;
         }
-        match self.focus {
-            0 | 1 => {
-                if !self.input.state.editor(TextField::Nickname).composing() {
-                    self.state
-                        .action(MenuAction::Enter { composing: false }, admission);
-                }
+        if composing {
+            return;
+        }
+        match self.controls.focus().or(self.panel.initial_focus) {
+            Some(NICKNAME | PLAY) => {
+                self.state
+                    .action(MenuAction::Enter { composing: false }, admission);
             }
-            2 => {
+            Some(QUALITY) => {
                 self.state.action(MenuAction::Quality, admission);
             }
             _ => {}
         }
+    }
+    pub fn event(
+        &mut self,
+        event: &winit::event::WindowEvent,
+        admission: bool,
+    ) -> crate::menu_input_native::NativeInputResult {
+        use winit::event::WindowEvent;
+        if matches!(event, WindowEvent::Focused(false)) {
+            self.controls.blur();
+        }
+        if let WindowEvent::KeyboardInput { event, .. } = event {
+            return self.key(event.into(), admission);
+        }
+        self.input.window_event(event)
+    }
+    /// Real and authored key events share return gating and generic Tab focus.
+    pub fn key(
+        &mut self,
+        event: crate::menu_input_native::KeyInput<'_>,
+        admission: bool,
+    ) -> crate::menu_input_native::NativeInputResult {
+        use crate::menu_input_native::NativeInputResult;
+        use winit::{
+            event::ElementState,
+            keyboard::{Key, NamedKey},
+        };
+        let view = self.state.view(admission);
+        if event.state == ElementState::Pressed {
+            // #363: consume Enter through the existing terminal-session guard;
+            // it must not become a control packet on the old live connection.
+            if !event.repeat
+                && event.logical == &Key::Named(NamedKey::Enter)
+                && view.phase == slither_client::start_page::MenuPhase::Returning
+                && !view.play_disabled
+            {
+                self.activate(admission);
+                return NativeInputResult {
+                    consumed: true,
+                    effects: Vec::new(),
+                };
+            }
+            if !view.disabled && !self.input.state.editor(TextField::Nickname).composing() {
+                if event.logical == &Key::Named(NamedKey::Tab) {
+                    self.controls.tab(&self.panel, self.input.shift_key());
+                    return NativeInputResult {
+                        consumed: true,
+                        effects: self.controls.sync_focus(&self.panel, &mut self.input.state),
+                    };
+                }
+                if matches!(self.controls.focus(), Some(PLAY | QUALITY))
+                    && !event.repeat
+                    && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
+                {
+                    self.activate(admission);
+                    return NativeInputResult {
+                        consumed: true,
+                        effects: Vec::new(),
+                    };
+                }
+            }
+        }
+        self.input.key(event)
     }
     pub fn pointer(
         &mut self,
@@ -192,7 +253,7 @@ impl NativeLogin {
         if self.champion.policy.visible() {
             return self
                 .champion
-                .pointer(&mut self.text, point, down)
+                .pointer_scaled(&mut self.text, point, down, self.pixel_scale)
                 .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
         }
         let view = self.state.view(admission);
@@ -200,99 +261,45 @@ impl NativeLogin {
         if let Some(down) = down {
             self.menu.skin_pressed = down && self.menu.skin_hovered;
         }
-        if !view.visible || view.play_disabled {
-            self.pressed = false;
-            return Vec::new();
-        }
-        let hit = [E::Nickname, E::NicknameHolder, E::Play, E::Quality]
-            .into_iter()
-            .find(|e| {
-                (!view.disabled || *e == E::Play) && self.layout.hit_test(*e, point[0], point[1])
-            });
-        let hover = hit == Some(E::Play);
-        // Windows owns commit ordering. A pointer cannot cancel raw preedit and
-        // then submit the older committed name in the same gesture.
-        if self.input.state.editor(TextField::Nickname).composing() && hit != Some(E::Nickname) {
-            self.pressed = false;
-            return Vec::new();
-        }
-        if down == Some(true) {
-            self.pressed = hover;
-            self.pressed_quality = hit == Some(E::Quality);
-        }
-        self.state
-            .play_pointer(hover, self.pressed && hover, admission);
-        if down == Some(false) {
-            if self.pressed_quality && hit == Some(E::Quality) {
-                self.state.action(MenuAction::Quality, admission);
-            }
-            self.pressed_quality = false;
-            let clicked = self.pressed && hover;
-            self.pressed = false;
-            self.state.play_pointer(hover, false, admission);
-            if clicked {
-                self.activate_play(admission);
-            }
-        }
-        if down == Some(true) {
-            match hit {
-                Some(E::Nickname | E::NicknameHolder) => {
-                    let mut effects = self.focus(0);
-                    let r = self.layout.viewport_rect(E::Nickname);
-                    let editor = self.input.state.editor(TextField::Nickname);
-                    let style = TextStyle {
-                        size: 15. * self.layout.scale,
-                        weight: Weight::Normal,
-                        family: Family::Lucida,
-                        slant: Slant::Normal,
-                        color: [224, 224, 255],
-                    };
-                    let mut selected = 0;
-                    let inset = crate::menu::FIELD_CONTENT_INSET.map(|v| v * self.layout.scale);
-                    let content_width = r.width - 2. * inset[0];
-                    let Ok(m) = self.text.measure_panel(editor.text(), style) else {
-                        return effects;
-                    };
-                    let origin_x = single_line_field_placement(
-                        r,
-                        inset,
-                        style.size,
-                        m.font_ascent,
-                        m.font_descent,
-                    )
-                    .origin[0];
-                    let width = m.advance;
-                    let fit = if width > content_width {
-                        content_width / width
-                    } else {
-                        1.
-                    };
-                    for end in editor.text().char_indices().map(|(i, c)| i + c.len_utf8()) {
-                        if let Ok(m) = self.text.measure_panel(&editor.text()[..end], style)
-                            && point[0] - origin_x >= m.advance * fit
-                        {
-                            selected = end;
+        let mut effects = self.sync_controls(admission);
+        let result = self.input.panel_pointer(
+            &mut self.controls,
+            &self.panel,
+            &mut self.scroll,
+            &mut self.text,
+            self.area,
+            point,
+            down,
+            self.pixel_scale,
+        );
+        match result {
+            Ok((editing, intent)) => {
+                effects.extend(editing);
+                if let Some(intent) = intent {
+                    match intent.control {
+                        PLAY => {
+                            self.state.action(MenuAction::Play, admission);
                         }
+                        QUALITY => {
+                            self.state.action(MenuAction::Quality, admission);
+                        }
+                        _ => {}
                     }
-                    effects.extend(self.input.state.apply(EditIntent::Select {
-                        anchor: selected,
-                        caret: selected,
-                    }));
-                    return effects;
                 }
-                Some(E::Play) => return self.focus(1),
-                Some(E::Quality) => {
-                    return self.focus(2);
-                }
-                _ => {}
             }
+            Err(error) => effects.push(HostEditEffect::ClipboardFailed(error)),
         }
-        Vec::new()
-    }
-    fn activate_play(&mut self, admission: bool) {
-        if !self.input.state.editor(TextField::Nickname).composing() {
-            self.state.action(MenuAction::Play, admission);
-        }
+        let hovered = self.panel.resolve(self.area).is_ok_and(|controls| {
+            controls
+                .iter()
+                .any(|r| r.control.id == PLAY && r.hit(point))
+        });
+        self.state.play_pointer(
+            hovered,
+            self.controls.capture() == Some(PLAY) && hovered,
+            admission,
+        );
+        effects
     }
     pub fn prepare(
         &mut self,
@@ -326,15 +333,6 @@ impl NativeLogin {
             view.play_alpha *= alpha;
             view.skin_alpha *= alpha;
         }
-        self.menu.focus = if view.disabled {
-            None
-        } else {
-            match self.focus {
-                1 => Some(E::Play),
-                2 => Some(E::Quality),
-                _ => None,
-            }
-        };
         let area = extent.map(|n| f64::from(n) / dpr);
         self.pixel_scale = dpr;
         let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
@@ -345,6 +343,7 @@ impl NativeLogin {
         self.layout = fresh;
         self.area = area;
         view.nickname = self.displayed_nickname();
+        self.panel = login_controls::panel(&view, &self.layout, self.area);
         let panel = if self.champion.policy.visible() {
             self.champion.viewport = extent.map(|n| f64::from(n) / dpr);
             self.champion.panel = self
@@ -361,7 +360,13 @@ impl NativeLogin {
                 theme: slither_client::menu_theme::MenuTheme::default(),
             })
         } else {
-            None
+            Some(crate::menu::PanelPaint {
+                panel: &self.panel,
+                input: &self.controls,
+                edit: &self.input.state,
+                scroll: &mut self.scroll,
+                theme: slither_client::menu_theme::MenuTheme::default(),
+            })
         };
         self.menu.prepare_with_panel(
             &mut self.text,
@@ -388,48 +393,23 @@ impl NativeLogin {
         if self.champion.policy.visible() {
             return self.champion.cursor_area(&mut self.text, self.pixel_scale);
         }
-        let r = self.layout.viewport_rect(E::Nickname);
-        let editor = self.input.state.editor(TextField::Nickname);
-        let (anchor, caret) = editor.selection();
-        let prefix = if let Some(preedit) = editor.preedit() {
-            let end = preedit.selection.map_or(preedit.text.len(), |(_, end)| end);
-            format!(
-                "{}{}",
-                &editor.text()[..anchor.min(caret)],
-                &preedit.text[..end]
-            )
-        } else {
-            editor.text()[..caret].to_owned()
+        let resolved = self.panel.resolve(self.area).map_err(str::to_owned)?;
+        let Some(r) = resolved.iter().find(|r| r.control.id == NICKNAME) else {
+            return Ok(Vec::new());
         };
-        let display = self.displayed_nickname();
-        let style = TextStyle {
-            size: 15. * self.layout.scale,
-            weight: Weight::Normal,
-            family: Family::Lucida,
-            slant: Slant::Normal,
-            color: [224, 224, 255],
+        let Some((_, geometry)) = crate::editor_geometry::field_geometry(
+            &mut self.text,
+            r,
+            &self.input.state,
+            &mut self.scroll,
+        )?
+        else {
+            return Ok(Vec::new());
         };
-        let inset = crate::menu::FIELD_CONTENT_INSET.map(|v| v * self.layout.scale);
-        let content_width = r.width - 2. * inset[0];
-        let width = self.text.measure_panel(&display, style)?.advance;
-        let fit = if width > content_width {
-            content_width / width
-        } else {
-            1.
-        };
-        let x = (self.text.measure_panel(&prefix, style)?.advance * fit).min(content_width - 1.);
-        let fitted = TextStyle {
-            size: style.size * fit,
-            ..style
-        };
-        let m = self.text.measure_panel("", fitted)?;
-        let placement =
-            single_line_field_placement(r, inset, fitted.size, m.font_ascent, m.font_descent);
+        let r = geometry.snapped_cursor_rect(self.pixel_scale);
         Ok(self.input.state.apply(EditIntent::CursorArea {
-            position: [placement.origin[0] + x, placement.caret_top]
-                .map(|v| (v * self.pixel_scale).round() / self.pixel_scale),
-            size: [1., placement.caret_height]
-                .map(|v| (v * self.pixel_scale).round().max(1.) / self.pixel_scale),
+            position: [r.x, r.y],
+            size: [r.width, r.height],
         }))
     }
 }

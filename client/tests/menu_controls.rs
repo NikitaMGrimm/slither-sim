@@ -318,3 +318,214 @@ fn focused_generic_modal_field_uses_the_shared_caret_clock() {
     edit.step_caret(1000.);
     assert!(edit.caret_visible());
 }
+
+// Pointer hits below are byte offsets supplied by the platform's painted geometry.
+fn mouse_fixture() -> (PanelView, PanelInputState, MenuInputState) {
+    let panel = panel();
+    let mut controls = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    controls.sync(&panel, &mut edit);
+    edit.reset_editor(EditorId::Champion, "one two, three");
+    (panel, controls, edit)
+}
+#[allow(clippy::too_many_arguments)]
+fn gesture(
+    p: &PanelView,
+    c: &mut PanelInputState,
+    e: &mut MenuInputState,
+    hit: usize,
+    down: Option<bool>,
+    shift: bool,
+    now: f64,
+    delta: [f64; 2],
+) {
+    let r = p.resolve([960., 720.]).unwrap();
+    let point = [r[2].rect.x + 20. + delta[0], r[2].rect.y + 20. + delta[1]];
+    c.pointer(p, &r, point, down);
+    c.select_text(
+        e,
+        EditorId::Champion,
+        TextHit {
+            caret: hit,
+            character: hit,
+        },
+        point,
+        down == Some(true),
+        shift,
+        now,
+        ClickSettings::default(),
+    );
+}
+#[test]
+fn mouse_drag_and_shift_click_keep_the_anchor_and_replace_selection() {
+    for replacement in [
+        EditIntent::KeyText("X".into()),
+        EditIntent::Delete,
+        EditIntent::Backspace,
+    ] {
+        let (p, mut c, mut e) = mouse_fixture();
+        gesture(&p, &mut c, &mut e, 4, Some(true), false, 0., [0.; 2]);
+        gesture(&p, &mut c, &mut e, 7, None, false, 10., [12., 0.]);
+        assert_eq!(e.editor(EditorId::Champion).selection(), (4, 7));
+        gesture(&p, &mut c, &mut e, 7, Some(false), false, 20., [12., 0.]);
+        gesture(&p, &mut c, &mut e, 0, None, false, 30., [0.; 2]);
+        assert_eq!(
+            e.editor(EditorId::Champion).selection(),
+            (4, 7),
+            "release ends dragging"
+        );
+        e.apply(replacement.clone());
+        assert_eq!(
+            e.editor(EditorId::Champion).text(),
+            if matches!(replacement, EditIntent::KeyText(_)) {
+                "one X, three"
+            } else {
+                "one , three"
+            }
+        );
+    }
+    let (p, mut c, mut e) = mouse_fixture();
+    e.apply(EditIntent::Select {
+        anchor: 7,
+        caret: 7,
+    });
+    gesture(&p, &mut c, &mut e, 4, Some(true), true, 0., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (7, 4));
+    gesture(&p, &mut c, &mut e, 0, None, true, 10., [-10., 0.]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (7, 0));
+    gesture(&p, &mut c, &mut e, 12, None, true, 20., [20., 0.]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (7, 12));
+}
+#[test]
+fn double_word_and_triple_all_obey_time_distance_and_control_identity() {
+    for (time, delta, multi) in [
+        (500., [2., 2.], true),
+        (501., [0.; 2], false),
+        (100., [2.01, 0.], false),
+        (100., [0., 2.01], false),
+        (-1., [0.; 2], false),
+    ] {
+        let (p, mut c, mut e) = mouse_fixture();
+        gesture(&p, &mut c, &mut e, 5, Some(true), false, 0., [0.; 2]);
+        gesture(&p, &mut c, &mut e, 5, Some(false), false, 1., [0.; 2]);
+        gesture(&p, &mut c, &mut e, 5, Some(true), false, time, delta);
+        assert_eq!(
+            e.editor(EditorId::Champion).selection(),
+            if multi { (4, 7) } else { (5, 5) }
+        );
+        gesture(&p, &mut c, &mut e, 5, Some(false), false, time + 1., delta);
+        gesture(&p, &mut c, &mut e, 5, Some(true), false, time + 20., delta);
+        assert_eq!(
+            e.editor(EditorId::Champion).selection(),
+            if multi { (0, 14) } else { (4, 7) }
+        );
+    }
+    let (mut p, mut c, mut e) = mouse_fixture();
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 0., [0.; 2]);
+    gesture(&p, &mut c, &mut e, 5, Some(false), false, 1., [0.; 2]);
+    p.generation += 1;
+    c.sync(&p, &mut e);
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 20., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (5, 5));
+}
+#[test]
+fn mouse_word_classes_clamping_and_preedit_are_bounded() {
+    for (hit, expected) in [
+        (3, (3, 4)),
+        (7, (7, 8)),
+        (14, (9, 14)),
+        (usize::MAX, (9, 14)),
+    ] {
+        let (p, mut c, mut e) = mouse_fixture();
+        for time in [0., 10.] {
+            gesture(&p, &mut c, &mut e, hit, Some(true), false, time, [0.; 2]);
+            gesture(
+                &p,
+                &mut c,
+                &mut e,
+                hit,
+                Some(false),
+                false,
+                time + 1.,
+                [0.; 2],
+            );
+        }
+        assert_eq!(e.editor(EditorId::Champion).selection(), expected);
+    }
+    let (p, mut c, mut e) = mouse_fixture();
+    gesture(&p, &mut c, &mut e, 4, Some(true), false, 0., [0.; 2]);
+    gesture(&p, &mut c, &mut e, usize::MAX, None, false, 1., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (4, 14));
+    e.apply(EditIntent::Preedit("composing".into(), None));
+    gesture(&p, &mut c, &mut e, 0, None, false, 2., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (4, 14));
+    gesture(&p, &mut c, &mut e, 0, Some(false), false, 3., [0.; 2]);
+    assert_eq!(c.capture(), None);
+    e.apply(EditIntent::ImeCommit("X".into()));
+    gesture(&p, &mut c, &mut e, 0, None, false, 4., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (5, 5));
+}
+
+#[test]
+fn ordinary_panels_keep_blink_and_cancel_click_chains_on_other_targets() {
+    let (mut p, mut c, mut e) = mouse_fixture();
+    p.modal = false;
+    c.sync(&p, &mut e);
+    e.step_caret(0.);
+    assert!(e.caret_visible());
+    for now in [100., 300., 530.] {
+        e.step_caret(now);
+        c.sync(&p, &mut e);
+    }
+    assert!(
+        !e.caret_visible(),
+        "equal nonmodal sync must not restart blink"
+    );
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 1000., [0.; 2]);
+    gesture(&p, &mut c, &mut e, 5, Some(false), false, 1001., [0.; 2]);
+    let r = p.resolve([960., 720.]).unwrap();
+    c.pointer(&p, &r, center(r[3].rect), Some(true));
+    c.pointer(&p, &r, center(r[3].rect), Some(false));
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 1020., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (5, 5));
+}
+
+#[test]
+fn double_click_drag_preserves_the_word_until_crossing_its_boundary() {
+    let (p, mut c, mut e) = mouse_fixture();
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 0., [0.; 2]);
+    gesture(&p, &mut c, &mut e, 5, Some(false), false, 1., [0.; 2]);
+    gesture(&p, &mut c, &mut e, 5, Some(true), false, 20., [0.; 2]);
+    gesture(&p, &mut c, &mut e, 5, None, false, 21., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (4, 7));
+    gesture(&p, &mut c, &mut e, 11, None, false, 30., [20., 0.]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (4, 14));
+    gesture(&p, &mut c, &mut e, 1, None, false, 40., [-10., 0.]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (7, 0));
+}
+
+#[test]
+fn word_selection_uses_character_while_single_click_uses_nearest_caret() {
+    let (p, mut c, mut e) = mouse_fixture();
+    e.reset_editor(EditorId::Champion, "one_12 two");
+    gesture(&p, &mut c, &mut e, 6, Some(true), false, 0., [0.; 2]);
+    assert_eq!(e.editor(EditorId::Champion).selection(), (6, 6));
+    gesture(&p, &mut c, &mut e, 6, Some(false), false, 1., [0.; 2]);
+    let resolved = p.resolve([960., 720.]).unwrap();
+    let point = [resolved[2].rect.x + 20., resolved[2].rect.y + 20.];
+    c.pointer(&p, &resolved, point, Some(true));
+    c.select_text(
+        &mut e,
+        EditorId::Champion,
+        TextHit {
+            caret: 6,
+            character: 5,
+        },
+        point,
+        true,
+        false,
+        20.,
+        ClickSettings::default(),
+    );
+    assert_eq!(e.editor(EditorId::Champion).selection(), (0, 6));
+}

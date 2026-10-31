@@ -325,6 +325,7 @@ async fn run(output: &Path) -> Result<()> {
             ([1920, 1080], 1.),
             ([1280, 720], 1.),
             ([640, 360], 1.),
+            ([960, 540], 1.5),
             ([960, 540], 2.),
             ([1920, 1080], 2.),
         ] {
@@ -357,7 +358,7 @@ async fn run(output: &Path) -> Result<()> {
         }
         for (name, time) in [("on", 9600.), ("off", 10130.)] {
             if name == "on" {
-                login.focus(0);
+                login.focus(slither_client::login_controls::NICKNAME);
             }
             login.step(time, true, false)?;
             let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
@@ -367,7 +368,7 @@ async fn run(output: &Path) -> Result<()> {
                 &output.join(format!("caret-{name}.png")),
             )?;
         }
-        login.focus(1);
+        login.focus(slither_client::login_controls::PLAY);
         login.activate(true);
         for now in (10146..=10930).step_by(16) {
             login.step(f64::from(now), true, false)?;

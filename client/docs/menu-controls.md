@@ -1,9 +1,10 @@
 # Shared menu controls
 
-Native champion editing is the first adopter of `PanelView`, `Control` and the
-Label/Button/TextField painter. Login keeps its existing control/input path;
-logo, last-life line, page and spinner remain specialized producers in the same
-transaction. Browser development pages still compile and retain their existing
+Native login and champion editing share `PanelView`, `Control` and the
+Label/Button/TextField painter. `login_controls` copies nickname, Play and quality
+rectangles from `MenuLayout`, retaining its resize-time `top` and the existing
+admission/return projection. Logo, last-life line, page and spinner remain
+specialized producers in the same transaction. Browser development pages still compile and retain their existing
 login and pending-champion flow. This is not the extension input or GL port.
 
 The core resolves logical placements and clips with `MenuRect`, including
@@ -22,6 +23,17 @@ animation updates retain preedit. Unicode previews retain at most 256 UTF-16
 units, without splitting a scalar; native adapters bound their copy before
 measurement, and the core rechecks the limit and clamps byte selections. This
 preview-only cap does not change committed normalization or the Enter barrier.
+Fields declare left/top/right/bottom content padding and whether the value fits
+or scrolls. The nickname retains its fitted text; champion text scrolls. Native
+pointer hit-testing measures the same fitted font and uses the same content box
+as painting. Core mouse policy supports drag selection, Shift+click from the
+anchor, double-click word selection and triple-click Select All. A held drag
+past either content edge selects to the start/end; release, blur and replacement
+cancel capture. Composition suppresses selection and activation while release
+still clears capture. On Windows the native adapter copies `GetDoubleClickTime`
+and half of the `SM_CXDOUBLECLK`/`SM_CYDOUBLECLK` rectangle into logical units;
+other platforms use 500 ms and a 4x4 logical-pixel rectangle.
+
 The champion field scrolls horizontally and
 clips text, selection, caret and preedit underline. Painting, pointer selection
 and logical IME candidate placement share measured advances. Value, placeholder,

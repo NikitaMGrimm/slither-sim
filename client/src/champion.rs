@@ -152,7 +152,8 @@ impl ChampionState {
                         editor: EditorId::Champion,
                         placeholder: String::new(),
                         rule: TextRule::Champion,
-                        inset: [12., 12.],
+                        inset: [12.; 4],
+                        fit: false,
                     },
                 ),
                 control(

@@ -6,6 +6,12 @@ use crate::presentation::{TextFamily, TextSlant, TextStyle, TextWeight};
 pub enum ControlStyle {
     /// Main green action.
     PrimaryButton,
+    /// Native login Play: admission disables input without dimming its return fade.
+    LoginPlay,
+    /// Native nickname: fitted text and undimmed disabled surface.
+    Nickname,
+    /// Existing quality link, with only a keyboard focus surface.
+    QualityButton,
     /// Purple action.
     SecondaryButton,
     /// Single-line purple editor.
@@ -93,25 +99,40 @@ impl MenuTheme {
             size: match role {
                 Heading => 24.,
                 HelpText => 18.,
-                PrimaryButton | SecondaryButton => 20.,
+                PrimaryButton | LoginPlay | SecondaryButton => 20.,
+                QualityButton => 14.,
                 _ => 15.,
             },
-            weight: if matches!(role, Heading | PrimaryButton | SecondaryButton) {
+            weight: if matches!(role, Heading | PrimaryButton | LoginPlay | SecondaryButton) {
                 TextWeight::Bold
             } else {
                 TextWeight::Normal
             },
-            family: if matches!(role, PrimaryButton | SecondaryButton) {
+            family: if matches!(
+                role,
+                PrimaryButton | LoginPlay | SecondaryButton | QualityButton
+            ) {
                 TextFamily::Arial
             } else {
                 TextFamily::Lucida
             },
             slant: TextSlant::Normal,
-            color: if matches!(role, PrimaryButton | SecondaryButton) {
+            color: if matches!(role, PrimaryButton | LoginPlay | SecondaryButton) {
                 [255; 3]
             } else {
                 self.text
             },
+        }
+    }
+    /// Login's existing admission gate leaves field/link paint undimmed.
+    pub fn disabled_opacity(self, role: ControlStyle) -> f64 {
+        if matches!(
+            role,
+            ControlStyle::Nickname | ControlStyle::LoginPlay | ControlStyle::QualityButton
+        ) {
+            1.
+        } else {
+            self.disabled_alpha
         }
     }
     /// Complete raster identity for a surface and its pointer overlay.
@@ -133,13 +154,15 @@ impl MenuTheme {
         }
         SurfaceTokens {
             colors: match role {
-                PrimaryButton => [[86, 172, 129], [54, 108, 81]],
+                PrimaryButton | LoginPlay => [[86, 172, 129], [54, 108, 81]],
                 SecondaryButton => [[150, 108, 213], [100, 70, 150]],
                 _ => [self.field; 2],
             },
-            radius: 24,
-            recipe: if matches!(role, Field | Surface) {
+            radius: if role == QualityButton { 44 } else { 24 },
+            recipe: if matches!(role, Field | Nickname | Surface) {
                 SurfaceRecipe::Field
+            } else if role == QualityButton {
+                SurfaceRecipe::Compact
             } else {
                 SurfaceRecipe::Button
             },
