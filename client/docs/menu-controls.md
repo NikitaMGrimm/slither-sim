@@ -24,7 +24,10 @@ measurement, and the core rechecks the limit and clamps byte selections. This
 preview-only cap does not change committed normalization or the Enter barrier.
 The champion field scrolls horizontally and
 clips text, selection, caret and preedit underline. Painting, pointer selection
-and logical IME candidate placement share measured advances. Native Lucida bold
+and logical IME candidate placement share measured advances. Value, placeholder,
+selection, caret, preedit underline and the horizontal content clip use
+`menu_layout::single_line_field_placement`, including its font line-box centre.
+The native candidate rectangle and painted caret share one physical-pixel snap. Native Lucida bold
 still resolves to Arial Bold; synthetic checks do not establish OS IME feel or
 font parity.
 
@@ -63,8 +66,10 @@ tall uniform surfaces use nine-slice tiles. Published atlas tiles stay at most
 destinations land on whole physical pixels through the existing snapped overlay
 path, with one source pixel per physical destination pixel.
 
-The shared allowance remains 64 Menu slots / 4 MiB and 512 Menu draws, with
-aggregate caches at 386 slots / 22 MiB. Final picture admission remains
+The shared allowance is 64 Menu slots / 13 MiB and 512 Menu draws, with
+aggregate caches at 386 slots / 31 MiB. The shared ceiling comes from #358's
+full-growth 5x wordmark allowance on main. Isolated champion controls retain
+a separate 4 MiB compactness regression. Final picture admission remains
 64 MiB / 2,048 textures. Failed preparation publishes neither new caches nor
 scroll state; already prepared resources survive replacement/retirement.
 Field text is rasterized only across its visible horizontal window (plus one

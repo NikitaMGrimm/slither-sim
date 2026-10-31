@@ -436,7 +436,11 @@ impl PanelInputState {
                     None
                 }
             });
-        let mut effects = edit.apply(EditIntent::Focus(editor));
+        let mut effects = if edit.focus() != editor {
+            edit.apply(EditIntent::Focus(editor))
+        } else {
+            Vec::new()
+        };
         let focus = self.focus.map(|id| (panel.id, panel.generation, id));
         if focus != self.synced_focus && focus.is_some() {
             MenuInputState::releases(&mut effects);

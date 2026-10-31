@@ -43,8 +43,9 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
-// Sliced controls preserve exact high-DPI rasters within the original allowance.
-pub const MENU_CACHE_BYTES: usize = 4 * 1024 * 1024;
+// Shared ceiling inherited from #358: exact 5x controls and full-growth wordmark.
+// Champion controls retain their own compactness regression below this ceiling.
+pub const MENU_CACHE_BYTES: usize = 13 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
 pub const CACHE_RUNS: usize = 258;

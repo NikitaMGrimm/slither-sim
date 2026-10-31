@@ -431,6 +431,14 @@ fn high_dpr_fields_bound_text_rasters_and_slice_selection_ink() {
                 frame
                     .resources
                     .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+                    <= 4 * 1024 * 1024
+            );
+            assert!(
+                frame
+                    .resources
+                    .iter()
                     .all(|r| r.asset.width <= 512 && r.asset.height <= 2048)
             );
             let field = p.resolve([960., 720.]).unwrap()[2].rect;
@@ -575,6 +583,12 @@ fn menu_budget_failures_skip_overlay_and_preserve_picture() {
         1.,
     );
     assert!(failed.is_err());
+    let quota = failed.as_ref().err().unwrap().clone();
+    assert!(
+        MenuFrame::compose_optional(Err(quota), &picture)
+            .unwrap()
+            .is_none()
+    );
     assert!(!MenuFrame::append_optional(failed, &mut picture).unwrap());
     assert_eq!(picture.frame, base.frame);
     assert!(picture.resources.is_empty());
@@ -627,6 +641,11 @@ fn optional_menu_propagates_non_quota_preparation_errors() {
             1.,
         );
         assert_eq!(prepared.as_ref().err().map(String::as_str), Some(expected));
+        assert_eq!(
+            MenuFrame::compose_optional(Err(prepared.as_ref().err().unwrap().clone()), &picture)
+                .err(),
+            Some(expected.into())
+        );
         assert_eq!(
             MenuFrame::append_optional(prepared, &mut picture),
             Err(expected.into())

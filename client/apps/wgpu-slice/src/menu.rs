@@ -61,8 +61,18 @@ impl MenuFrame {
     /// A menu quota failure skips this overlay for the frame, preserving the
     /// world picture and editor/session state. Invalid geometry still surfaces.
     pub fn append_optional(menu: Result<Self>, picture: &mut PreparedFrame) -> Result<bool> {
-        match menu.and_then(|menu| menu.append_to(picture)) {
-            Ok(()) => Ok(true),
+        Self::admit_quota(menu.and_then(|menu| menu.append_to(picture))).map(|v| v.is_some())
+    }
+    /// Preserve the retry picture and #359's single-allocation composition.
+    pub fn compose_optional(
+        menu: Result<Self>,
+        picture: &PreparedFrame,
+    ) -> Result<Option<PreparedFrame>> {
+        Self::admit_quota(menu.and_then(|menu| menu.compose_over(picture)))
+    }
+    fn admit_quota<T>(result: Result<T>) -> Result<Option<T>> {
+        match result {
+            Ok(value) => Ok(Some(value)),
             Err(error)
                 if matches!(
                     error.as_str(),
@@ -86,7 +96,7 @@ impl MenuFrame {
                         | frame::DRAW_ALLOCATION_FAILED
                 ) =>
             {
-                Ok(false)
+                Ok(None)
             }
             Err(error) => Err(error),
         }
@@ -186,7 +196,7 @@ impl MenuFrame {
             let mut draws = Vec::new();
             draws
                 .try_reserve_exact(frame.draws.len() + extra)
-                .map_err(|_| "frame draw allocation failed")?;
+                .map_err(|_| frame::DRAW_ALLOCATION_FAILED)?;
             draws.extend_from_slice(&frame.draws);
             Ok(Frame {
                 identity: frame.identity,
@@ -538,48 +548,32 @@ impl Composition<'_> {
                             surface_clip,
                             r.scale,
                         )?;
-                        let field = MenuRect {
-                            x: r.rect.x + inset[0] * r.scale,
-                            y: r.rect.y + inset[1] * r.scale,
-                            width: r.rect.width - 2. * inset[0] * r.scale,
-                            height: r.rect.height - 2. * inset[1] * r.scale,
-                        };
-                        let clip = intersection(r.clip, field);
+                        let inset = inset.map(|n| n * r.scale);
                         let editor_state = edit
                             .registered_editor(*editor)
                             .ok_or("Unregistered panel editor")?;
                         let g = crate::editor_geometry::EditorGeometry::new(
                             text,
                             editor_state,
-                            field,
+                            r.rect,
+                            inset,
                             style,
                             scroll.get(editor).copied().unwrap_or(0.),
                         )?;
+                        let clip = intersection(r.clip, g.rect);
                         scroll.insert(*editor, g.scroll);
                         if input.focus() == Some(control.id) && enabled {
-                            self.ink(
-                                MenuRect {
-                                    x: field.x + g.selection[0] - g.scroll,
-                                    width: g.selection[1] - g.selection[0],
-                                    ..field
-                                },
-                                theme.selection,
-                                alpha * 0.45,
-                                clip,
-                            )?;
-                            self.ink(g.cursor_rect(), theme.text, alpha, clip)?;
-                            if let Some([left, right]) = g.preedit {
+                            self.ink(g.selection_rect(), theme.selection, alpha * 0.45, clip)?;
+                            if edit.caret_visible() {
                                 self.ink(
-                                    MenuRect {
-                                        x: field.x + left - g.scroll,
-                                        y: field.y + field.height - 1.,
-                                        width: right - left,
-                                        height: 1.,
-                                    },
+                                    g.snapped_cursor_rect(self.scale),
                                     theme.text,
                                     alpha,
                                     clip,
                                 )?;
+                            }
+                            if let Some(underline) = g.preedit_rect() {
+                                self.ink(underline, theme.text, alpha, clip)?;
                             }
                         }
                         let value = if g.display.is_empty() {
@@ -592,13 +586,14 @@ impl Composition<'_> {
                             self,
                             value,
                             MenuRect {
-                                x: field.x - g.scroll,
-                                ..field
+                                x: r.rect.x - g.scroll,
+                                ..r.rect
                             },
                             style,
                             Align::Left,
                             clip,
                         );
+                        self.labels.last_mut().unwrap().field_inset = Some(inset);
                     }
                 }
             }
@@ -631,7 +626,7 @@ impl Composition<'_> {
                     height: image.height,
                     status: BodyAssetStatus::Ready,
                 },
-                image,
+                image: image.into(),
             }
         };
         preflight_menu_totals(
@@ -1672,7 +1667,11 @@ impl Composition<'_> {
                     .collect();
                 for (group, label) in groups.into_iter().zip(&labels) {
                     for (mut draw, resource) in group {
-                        if let Some(clip) = label.clip && !clip_draw(&mut draw, clip, self.scale) { continue; }
+                        if let Some(clip) = label.clip
+                            && !clip_draw(&mut draw, clip, self.scale)
+                        {
+                            continue;
+                        }
                         for part in reveal_draw(draw, label.reveal, self.scale, label.reveal_span) {
                             self.push(part)?;
                         }

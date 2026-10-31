@@ -425,13 +425,18 @@ mod desktop {
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
-                    let picture = self
-                        .login
-                        .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                        .compose_over(&p)?;
+                    let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(
+                        self.login.prepare_host(
+                            physical,
+                            dpr,
+                            admission,
+                            self.game.menu_cosmetics(),
+                        ),
+                        &p,
+                    )?;
                     let effects = self.login.cursor_area()?;
                     self.edit_effects(effects);
-                    Some(picture)
+                    picture
                 } else {
                     None
                 })

@@ -54,10 +54,11 @@ use solid materials without capsule shadows.
 
 ## Bounds and publication
 
-- Menu has **64 replacing slots / 4 MiB**, shared by text and authored materials,
+- Menu has **64 replacing slots / 13 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
-  are **386 slots / 22 MiB**; these are ceilings, not eager allocations. The Menu
-  allowance includes exact 5x control/shadow rasters through bounded sliced tiles.
+  are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
+  allowance comes from main's #358 full-growth 5x wordmark bound. Champion
+  controls retain compact sliced tiles and a separate 4 MiB regression.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.

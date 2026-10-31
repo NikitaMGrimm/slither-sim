@@ -511,7 +511,6 @@ impl MenuInputState {
     /// A focus/edit starts a solid 530ms interval, followed by 530ms off.
     pub fn caret_visible(&self) -> bool {
         self.window_focused
-            && !self.modal
             && self.focus.is_some()
             && (self.caret_clock - self.caret_restart) % 1060. < 530.
     }

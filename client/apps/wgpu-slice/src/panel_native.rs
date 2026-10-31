@@ -64,6 +64,7 @@ impl NativePanel {
         session: &slither_client::session_policy::View,
     ) -> Result<()> {
         self.policy.step(now, alpha).map_err(str::to_owned)?;
+        self.input.state.step_caret(now);
         self.panel = self.policy.panel(session, self.viewport);
         self.effects
             .extend(self.controls.sync(&self.panel, &mut self.input.state));
@@ -151,16 +152,11 @@ impl NativePanel {
         };
         let mut style = MenuTheme::default().text_style(r.control.style);
         style.size *= r.scale;
-        let rect = slither_client::menu_layout::MenuRect {
-            x: r.rect.x + inset[0] * r.scale,
-            y: r.rect.y + inset[1] * r.scale,
-            width: r.rect.width - 2. * inset[0] * r.scale,
-            height: r.rect.height - 2. * inset[1] * r.scale,
-        };
         let g = EditorGeometry::new(
             text,
             self.input.state.editor(editor),
-            rect,
+            r.rect,
+            inset.map(|n| n * r.scale),
             style,
             self.scroll.get(&editor).copied().unwrap_or(0.),
         )?;
@@ -198,12 +194,12 @@ impl NativePanel {
         self.activate(intent);
         Ok(effects)
     }
-    pub fn cursor_area(&mut self, text: &mut TextCache) -> Result<Vec<HostEditEffect>> {
+    pub fn cursor_area(&mut self, text: &mut TextCache, dpr: f64) -> Result<Vec<HostEditEffect>> {
         if self.input.state.focus().is_none() {
             return Ok(Vec::new());
         }
         if let Some(g) = self.geometry(text)? {
-            let r = g.cursor_rect();
+            let r = g.snapped_cursor_rect(dpr);
             return Ok(self.input.state.apply(EditIntent::CursorArea {
                 position: [r.x, r.y],
                 size: [r.width, r.height],

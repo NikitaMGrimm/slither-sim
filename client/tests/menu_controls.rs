@@ -300,3 +300,21 @@ fn modal_restores_surviving_parent_focus_and_semantics_exclude_raw_preedit() {
     input.sync(&parent, &mut edit);
     assert_eq!(input.focus(), None);
 }
+
+#[test]
+fn focused_generic_modal_field_uses_the_shared_caret_clock() {
+    let p = panel();
+    assert!(p.modal);
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&p, &mut edit);
+    edit.step_caret(0.);
+    assert!(edit.caret_visible());
+    edit.step_caret(530.);
+    input.sync(&p, &mut edit);
+    assert!(!edit.caret_visible());
+    edit.apply(EditIntent::Preedit("日".into(), None));
+    assert!(edit.caret_visible());
+    edit.step_caret(1000.);
+    assert!(edit.caret_visible());
+}

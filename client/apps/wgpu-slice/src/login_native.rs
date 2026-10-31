@@ -372,7 +372,7 @@ impl NativeLogin {
     }
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
         if self.champion.policy.visible() {
-            return self.champion.cursor_area(&mut self.text);
+            return self.champion.cursor_area(&mut self.text, self.pixel_scale);
         }
         let r = self.layout.viewport_rect(E::Nickname);
         let editor = self.input.state.editor(TextField::Nickname);
