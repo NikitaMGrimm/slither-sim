@@ -541,7 +541,8 @@ impl Composition<'_> {
                         width: size[0],
                         height: size[1],
                         pixels,
-                    },
+                    }
+                    .into(),
                 }
             };
             let bytes: usize = self.art.values().map(|r| r.image.pixels.len()).sum();
