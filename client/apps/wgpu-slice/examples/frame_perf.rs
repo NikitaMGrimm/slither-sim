@@ -213,12 +213,6 @@ fn run(output: &Path) -> Result<()> {
                     if mode == "login" {
                         // Match native retained-picture composition, including its clone.
                         let mut composed = p.clone();
-                        for d in &mut composed.frame.draws {
-                            d.effective_alpha *= 0.25;
-                        }
-                        for d in &mut composed.overlay.as_mut().unwrap().draws {
-                            d.effective_alpha *= 0.25;
-                        }
                         login
                             .prepare_host([960, 540], 1., true, None)?
                             .append_to(&mut composed)?;

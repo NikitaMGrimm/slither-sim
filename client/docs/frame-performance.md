@@ -9,7 +9,7 @@ target/release/examples/frame_perf.exe C:/new/external/output
 ```
 
 It enumerates one DX12 adapter per vendor/device pair, excluding CPU adapters.
-Each adapter runs world, world plus physical HUD, and fading world/HUD plus
+Each adapter runs world, world plus physical HUD, and world/HUD plus
 native login at 960x540, using the renderer's normal sample count. The authored
 synthetic fixture adds 24 straight 120-point snakes and 2,400 food to the offline
 packet fixture. It exercises about 29,800 draw records; this is a density stress
