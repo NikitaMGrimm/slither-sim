@@ -231,7 +231,12 @@ pub fn geometric_reply(
 ) -> Result<Vec<u8>, String> {
     let mut value: serde_json::Value = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     match value["protocol"].as_str() {
-        Some("slither-sim-json-v3" | "slither-sim-json-v4" | "slither-sim-json-v5") => {}
+        Some(
+            "slither-sim-json-v3"
+            | "slither-sim-json-v4"
+            | "slither-sim-json-v5"
+            | "slither-sim-json-v6",
+        ) => {}
         _ => return Err("Unknown geometric comparison contract".into()),
     }
     value["protocol"] = serde_json::json!("slither-sim-json-v3");

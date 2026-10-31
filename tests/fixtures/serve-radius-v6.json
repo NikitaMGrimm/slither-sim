@@ -1,0 +1,30 @@
+{
+  "description": "Synthetic geometric v6 radius split regression, not server evidence. Config radius stays initial; snapshot and frame radius stay live.",
+  "protocol": "slither-sim-json-v6",
+  "reset": {
+    "op": "reset",
+    "agents": 1,
+    "decisionTicks": 1,
+    "config": {
+      "preset": "sandbox",
+      "radius": 1000,
+      "foodCount": 0,
+      "ambientReplenishPerSecond": 0,
+      "radiusUpdates": [
+        {
+          "time": 0,
+          "radius": 900
+        },
+        {
+          "time": 0.007,
+          "radius": 800
+        }
+      ]
+    }
+  },
+  "initialRadius": 1000.0,
+  "liveRadii": [
+    900.0,
+    800.0
+  ]
+}

@@ -104,7 +104,7 @@ fn raw_context_keeps_own_rolling_score_across_lives_and_expires_it() {
 #[test]
 fn every_frame_has_custom_rules_and_absent_values_are_null() {
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-rules-v5.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-rules-v6.json")).unwrap();
     let mut session = transport::Session::new();
     let reset: Value =
         serde_json::from_slice(&session.request(&serde_json::to_vec(&fixture["reset"]).unwrap()))
@@ -130,7 +130,7 @@ fn every_frame_has_custom_rules_and_absent_values_are_null() {
         json!({"boundaryMode":"sliding","pitRadius":null,"minScore":null,"killScoreSeconds":null,"freeBoostAtFloor":false})
     );
     let info: Value = serde_json::from_slice(&session.request(br#"{"op":"info"}"#)).unwrap();
-    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v5");
+    assert_eq!(info["result"]["rulesRevision"], "slither-sim-rules-v6");
 }
 
 #[test]

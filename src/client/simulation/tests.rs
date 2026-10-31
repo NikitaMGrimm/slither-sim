@@ -17,6 +17,49 @@ use super::{
 };
 
 #[test]
+fn food_rebuild_keeps_birth_colors_and_wire_cell_representatives() {
+    let config: SimulationConfig = serde_json::from_value(serde_json::json!({
+        "agents": 1,
+        "world": {"preset": "sandbox", "foodCount": 0, "ambientReplenishPerSecond": 0}
+    }))
+    .unwrap();
+    let mut backend = SimulatorBackend::new(7, config).unwrap();
+    let food: Vec<_> = [(0., 1.), (100., 2.), (0., 9.), (0.1, 7.)]
+        .into_iter()
+        .map(|(x, size)| Food {
+            x,
+            y: 0.,
+            value: 1.,
+            size: Some(size),
+            origin: Some(Origin::Ambient),
+        })
+        .collect();
+    backend.world.replace_food(food.clone()).unwrap();
+    backend.broadcast().unwrap();
+    let sector = food::FoodIndex::sector(&food[0]).unwrap().0;
+    let expected = backend.food_index.listing(sector);
+    let mut saved = serde_json::to_value(backend.world.checkpoint().unwrap()).unwrap();
+    saved["state"]["food"].as_array_mut().unwrap().reverse();
+    saved["state"]["foodBirthOrder"]
+        .as_array_mut()
+        .unwrap()
+        .reverse();
+    backend
+        .world
+        .restore(&serde_json::to_vec(&saved).unwrap(), Default::default())
+        .unwrap();
+    backend.food_presentation = FoodPresentation::new(7, 1);
+    backend.food_index.stale = true;
+    backend.broadcast().unwrap();
+    assert_eq!(backend.food_index.listing(sector), expected);
+    assert_eq!(
+        backend.world.food()[0],
+        food[3],
+        "the test must retain unordered storage"
+    );
+}
+
+#[test]
 fn population_sized_backends_hold_across_death_and_respawn() {
     let radius = 670. * 40_f64.sqrt();
     for world in [

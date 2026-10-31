@@ -329,9 +329,9 @@ impl SimulatorBackend {
         }
         // Food edited outside physics (fixtures) leaves the index behind.
         if self.food_index.stale || self.food_index.count != self.world.food().len() {
-            self.food_presentation.sync(self.world.food())?;
-            self.food_index
-                .rebuild(self.world.food(), &self.food_presentation);
+            let food = self.world.food_in_birth_order();
+            self.food_presentation.sync(&food)?;
+            self.food_index.rebuild(&food, &self.food_presentation);
         }
         self.update_reports()?;
         // HUD clocks run even without recipients, so a join meets their phase.

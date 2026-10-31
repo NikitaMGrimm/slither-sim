@@ -623,7 +623,7 @@ fn terminal_failure_is_distinct_from_rejection_and_reset_recovers() {
     assert_eq!(unsafe { slither_worlds(handle.0) }, 0);
     assert_eq!(
         handle.request(step),
-        br#"{"error":{"code":11,"field":null,"message":"Reset first","rule":null,"slot":null,"world":null},"protocol":"slither-sim-json-v5","sessionEnded":false}"#
+        br#"{"error":{"code":11,"field":null,"message":"Reset first","rule":null,"slot":null,"world":null},"protocol":"slither-sim-json-v6","sessionEnded":false}"#
     );
     handle.request(r#"{"op":"reset","agents":1}"#);
     assert_eq!(handle.step(&[0.0], &[0]), SLITHER_OK);
@@ -753,7 +753,7 @@ fn sessions_run_on_separate_threads() {
 #[test]
 fn c_frame_and_snapshot_expose_live_radius_without_changing_initial_config() {
     let fixture: serde_json::Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/serve-radius-v5.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-radius-v6.json")).unwrap();
     let session = Handle::new();
     session.request(&serde_json::to_string(&fixture["reset"]).unwrap());
     for radius in fixture["liveRadii"].as_array().unwrap() {
@@ -834,7 +834,7 @@ fn c_error_inspection_matches_json_rust_and_preserves_rejected_ended() {
     assert!(handle.frame(17).is_err());
     assert_cause_matches(&handle, &serde_json::to_value(cause.details()).unwrap());
     let fixture: serde_json::Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/serve-errors-v5.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-errors-v6.json")).unwrap();
     let reset = serde_json::to_string(&fixture["reset"]).unwrap();
     handle.request(&reset);
     oracle.request(reset.as_bytes());
@@ -859,7 +859,7 @@ fn c_error_inspection_matches_json_rust_and_preserves_rejected_ended() {
 fn inline_c_rules_match_json_and_absent_fields_use_flags() {
     let handle = Handle::new();
     let fixture: serde_json::Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/serve-rules-v5.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/serve-rules-v6.json")).unwrap();
     handle.request(&serde_json::to_string(&fixture["reset"]).unwrap());
     for _ in 0..3 {
         let rules = handle.frame(0).unwrap().rules;

@@ -119,7 +119,7 @@ struct Source {
 pub(super) struct FoodPresentation {
     random: Random,
     sources: Vec<Source>,
-    // Physics keeps insertion order and can admit several pellets at one point.
+    // Physics tracks birth identity and can admit several pellets at one point.
     // The wire exposes the first; later births must not recolor that lifetime.
     colors: BitsMap<VecDeque<u8>>,
     /// Reused pellet counts per position for `sync`.
@@ -205,7 +205,7 @@ impl FoodPresentation {
                 short = true;
             }
         }
-        // Walk food order, not hash iteration order, to keep seeded assignment
+        // Callers supply birth order, not dense storage or hash order, to keep seeded assignment
         // reproducible. Reconciliation also supports injected ambient fixtures.
         for item in food.iter().filter(|_| short) {
             let key = identity(item);
@@ -258,7 +258,7 @@ impl FoodPresentation {
         self.colors.get(&identity(food)).map_or(0, VecDeque::len)
     }
 
-    /// Color of the `lifetime`-th pellet, in food order, at this food's
+    /// Color of the `lifetime`-th pellet, in birth order, at this food's
     /// position. Call after births and a successful sync of the world food.
     pub(super) fn color(&self, food: &Food, lifetime: usize) -> u8 {
         self.colors[&identity(food)][lifetime]

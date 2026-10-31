@@ -1,5 +1,5 @@
 /*
- * slither-sim-abi-v3: a C ABI over slither-sim transport sessions.
+ * slither-sim-abi-v4: a C ABI over slither-sim transport sessions.
  *
  * Guide: https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/c-api.md
  * Written by hand from ffi/src/lib.rs; ffi/tests/abi.rs checks that this
@@ -18,7 +18,7 @@
 extern "C" {
 #endif
 
-#define SLITHER_ABI_VERSION 3u
+#define SLITHER_ABI_VERSION 4u
 
 /* Status codes. */
 #define SLITHER_OK 0
@@ -186,7 +186,7 @@ slither_session *slither_session_new(void);
 void slither_session_free(slither_session *session);
 
 /*
- * Answers one slither-sim-json-v5 request line of line_len bytes, without its
+ * Answers one slither-sim-json-v6 request line of line_len bytes, without its
  * newline, as `slither-sim serve` would. Rejected requests still succeed with
  * an error reply. *reply receives line bytes without a newline, followed by a
  * NUL that *reply_len excludes, valid until the next call that takes the

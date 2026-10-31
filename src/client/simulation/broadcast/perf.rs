@@ -16,7 +16,7 @@ impl RawWorld {
         raw.backend.world = world;
         raw.backend
             .food_presentation
-            .sync(raw.backend.world.food())?;
+            .sync(&raw.backend.world.food_in_birth_order())?;
         for slot in 0..count {
             if raw.backend.world.snakes()[slot].alive {
                 raw.backend.slots[slot].control = Action {

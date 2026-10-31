@@ -13,8 +13,8 @@ import os
 from pathlib import Path
 import sys
 
-ABI_VERSION = 3
-PROTOCOL = "slither-sim-json-v5"
+ABI_VERSION = 4
+PROTOCOL = "slither-sim-json-v6"
 NONE = 0xFFFFFFFF
 
 F64, U32, U8 = ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint8)

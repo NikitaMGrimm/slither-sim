@@ -206,7 +206,7 @@ impl std::ops::Index<&[u8; 2]> for KnownSectors {
     }
 }
 
-/// World food by wire sector, in world order, kept current from birth and
+/// World food by wire sector, in birth order, kept current from birth and
 /// pickup events so a broadcast never scans every pellet.
 ///
 /// Ordinary (ambient) births stay off the wire until the next shared food
@@ -279,7 +279,7 @@ impl FoodIndex {
         }
     }
 
-    /// Physics visits pickups in reverse food order, so of several pellets at
+    /// Physics visits pickups in reverse birth order, so of several pellets at
     /// one position the newest goes first.
     pub(super) fn remove(&mut self, food: &Food) {
         self.count = self.count.wrapping_sub(1);

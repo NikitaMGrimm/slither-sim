@@ -179,6 +179,22 @@ class FixtureVersionsTest(unittest.TestCase):
         self.assertEqual(rules["protocol"], "slither-sim-json-v5")
         self.assertEqual(set(rules["rules"]), {"boundaryMode", "pitRadius", "minScore", "killScoreSeconds", "freeBoostAtFloor"})
 
+    def test_serve_v6_copies_change_only_protocol(self):
+        for name in ("serve-errors", "serve-rules", "serve-radius"):
+            old = json.loads((ROOT / f"tests/fixtures/{name}-v5.json").read_text())
+            new = json.loads((ROOT / f"tests/fixtures/{name}-v6.json").read_text())
+            def migrate(value):
+                if isinstance(value, dict):
+                    return {k: migrate(v) for k, v in value.items()}
+                if isinstance(value, list):
+                    return [migrate(v) for v in value]
+                return "slither-sim-json-v6" if value == "slither-sim-json-v5" else value
+            # Descriptions name their own contract version; compare the data.
+            self.assertTrue(new.pop("description"))
+            migrated = migrate(old)
+            migrated.pop("description")
+            self.assertEqual(new, migrated, name)
+
     def test_protocol19_food_interest_receipts(self):
         entry, fixture = self.fixture("tests/fixtures/client-food-interest.json")
         self.assertEqual(entry["wireProtocol"], 19)

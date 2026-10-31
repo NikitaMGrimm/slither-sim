@@ -330,7 +330,7 @@ class ErrorTests(unittest.TestCase):
         self.assert_cause(caught.exception, encoded.request({"op":"snapshot", "world":17}))
 
     def test_rules_are_one_frozen_object_per_owned_frame(self):
-        fixture = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/serve-rules-v5.json").read_text())
+        fixture = json.loads((Path(__file__).resolve().parents[2] / "tests/fixtures/serve-rules-v6.json").read_text())
         session = Session()
         request = dict(fixture["reset"])
         del request["op"]
@@ -353,7 +353,7 @@ class ErrorTests(unittest.TestCase):
 
 
     def test_initial_config_and_live_radius_match_json_and_typed_frames(self):
-        path = Path(__file__).resolve().parents[2] / "tests/fixtures/serve-radius-v5.json"
+        path = Path(__file__).resolve().parents[2] / "tests/fixtures/serve-radius-v6.json"
         fixture = json.loads(path.read_text(encoding="utf-8"))
         session = Session()
         options = dict(fixture["reset"])
@@ -535,7 +535,7 @@ class ErrorTests(unittest.TestCase):
 
     def test_terminal_steps_clear_worlds_and_reset_recovers(self):
         fixture = json.loads((Path(__file__).resolve().parents[2]
-                              / "tests/fixtures/serve-errors-v5.json").read_text(encoding="utf-8"))
+                              / "tests/fixtures/serve-errors-v6.json").read_text(encoding="utf-8"))
         typed, encoded = Session(), Session()
         options = fixture["reset"]
         typed.reset(worlds=options["worlds"], agents=options["agents"],

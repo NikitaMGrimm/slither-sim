@@ -1,4 +1,4 @@
-# C ABI: slither-sim-abi-v3
+# C ABI: slither-sim-abi-v4
 
 `slither-sim-ffi` wraps Rust [`transport::Session`](bot-api.md#in-process-sessions)
 for C callers, with the worlds, requests and frame values of [`serve`](bot-api.md).
@@ -28,9 +28,9 @@ an extracted library or another build with `--library PATH` or `SLITHER_SIM_FFI`
 
 | Function | Purpose |
 | --- | --- |
-| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 3 for `slither-sim-abi-v3`. Check it first. |
+| `slither_abi_version()` | `SLITHER_ABI_VERSION` of the loaded library: 4 for `slither-sim-abi-v4`. Check it first. |
 | `slither_session_new()`, `slither_session_free(s)` | Create and free a session; free ignores null. |
-| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v5` request line as `serve` would. |
+| `slither_request(s, line, len, &reply, &reply_len)` | Answers one `slither-sim-json-v6` request line as `serve` would. |
 | `slither_step(s, headings, n, boosts, n)` | Steps every world like a JSON `step`, without JSON. |
 | `slither_read_frame(s, world, &frame)` | Fills a `slither_frame` with one world's current frame. |
 | `slither_worlds(s)`, `slither_agents(s)` | Worlds and slots per world; 0 before reset. |
@@ -115,8 +115,8 @@ separate threads. Steps advance several worlds in parallel on the library's
 
 ## Compatibility
 
-`slither-sim-abi-v3` covers function signatures, `slither_frame`/rules/error layouts, codes
+`slither-sim-abi-v4` covers function signatures, `slither_frame`/rules/error layouts, codes
 and column meanings. Incompatible changes need a new identifier and
-`SLITHER_ABI_VERSION`. Rebuild v1/v2 callers; see [migration notes](../CHANGELOG.md#unreleased).
-Requests and replies follow `slither-sim-json-v5`; check `protocol` and record
+`SLITHER_ABI_VERSION`. Rebuild v1/v2/v3 callers; see [migration notes](../CHANGELOG.md#unreleased).
+Requests and replies follow `slither-sim-json-v6`; check `protocol` and record
 the commit for reproducibility.
