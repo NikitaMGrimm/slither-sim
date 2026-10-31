@@ -14,7 +14,7 @@ npm run dev:desktop
 If slither-sim is not on PATH, set SLITHER_SIM or run
 `npm run dev:desktop -- --simulator <path>`.
 Enter starts Play, Escape stops; pointer/arrows/Space and mouse boost feed the
-shared input policy. No connection starts until Play, and reconnect is explicit.
+shared input policy. Game sessions start only on Play, and reconnect is explicit.
 Use `--server host:port` for a simulator elsewhere (IPv6: `[address]:port`).
 The client builds `ws://host:port/slither` internally.
 
@@ -22,6 +22,11 @@ Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
 that copied the official login. Without `--official`, it never fetches the
 official website or performs discovery.
+
+With no flags, Servers accepts and saves custom `host:port` entries offline.
+Choose a Custom row for direct Play, or Load official to opt into discovery.
+Restoring an official ID does not make a no-flag launch contact the website.
+See [server picker](../../docs/server-picker.md) for bounds and record formats.
 
 ## Official servers
 

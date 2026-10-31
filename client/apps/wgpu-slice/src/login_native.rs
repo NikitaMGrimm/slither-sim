@@ -574,7 +574,7 @@ impl NativeLogin {
         if self.picker.policy.visible() {
             return self
                 .picker
-                .pointer(&mut self.text, point, down)
+                .pointer_scaled(&mut self.text, point, down, self.pixel_scale)
                 .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
         }
         if self.champion.policy.visible() {

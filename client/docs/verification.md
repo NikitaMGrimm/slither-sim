@@ -37,6 +37,12 @@ node tools/wasm-smoke.mjs
 cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
 ```
 
+The app `custom_servers` integration test uses synthetic documentation addresses,
+injected official acquisition callbacks and isolated temporary preference files.
+It covers direct selection without fetching, input/focus and malformed storage.
+The `menu_specimens --picker-panel` mode captures only the shared modal, without
+art, a game session, a window or network work.
+
 The ABI smoke helpers are shared regression coverage, not standalone network
 probes. Tests use explicit authored doubles or real generated Wasm as labelled.
 Run the ABI suite again after changing Rust/browser boundaries. For wgpu, the
