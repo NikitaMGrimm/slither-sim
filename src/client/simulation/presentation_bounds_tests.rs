@@ -276,3 +276,42 @@ fn partial_presentation_failure_keeps_the_serial_prefix() {
         })).unwrap()).unwrap();
     }
 }
+
+#[test]
+fn later_recipient_failure_keeps_earlier_emission() {
+    let mut backend = SimulatorBackend::new(
+        7,
+        SimulationConfig {
+            agents: 2,
+            world: Config {
+                radius: 6000.,
+                food_count: 0,
+                ambient_replenish_per_second: 0.,
+                ..Config::sandbox()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    backend.advance_ticks(4).unwrap();
+    backend.slots[0].connection.take_downlink();
+    backend.slots[0].connection.pongs = 1;
+    backend.slots[1].connection.pongs = 1;
+    backend.slots[1]
+        .connection
+        .downlink
+        .resize(connection::MAX_IN_FLIGHT, (f64::MAX, vec![0]));
+    assert_eq!(backend.broadcast().unwrap_err(), "Downlink queue is full");
+    let earlier = &backend.slots[0].connection.downlink;
+    assert!(!earlier.is_empty());
+    let packets = crate::client::protocol::split_frame(&earlier.front().unwrap().1).unwrap();
+    assert_eq!(packets[0], crate::client::encode::pong());
+    if let Some(path) = std::env::var_os("SLITHER_PRESENTATION_LATE_FAILURE_TRACE") {
+        std::fs::write(path, serde_json::to_vec(&serde_json::json!({
+            "world": backend.world.checkpoint().unwrap(),
+            "random": format!("{:?}", backend.random),
+            "connections": backend.slots.iter().map(|s| format!("{:?}", s.connection)).collect::<Vec<_>>(),
+            "reports": format!("{:?}", backend.reports_for_trace()),
+        })).unwrap()).unwrap();
+    }
+}
