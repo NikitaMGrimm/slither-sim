@@ -64,6 +64,10 @@
 
 ### Performance
 
+- The host reuses each snake's body bounds from physics when it decides who
+  can see whom, instead of rescanning every body each tick. On a frozen
+  64,000-bot world this shared step is about 33% faster and the whole tick about
+  3%, with identical frames and world state.
 - Collision tests compare squared distances first and take the slower exact
   distance only near the boundary. The 32-snake Battledome step gets about 1.3%
   faster, with all ten timing pairs faster, and a live 64,000-bot world about
