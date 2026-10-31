@@ -44,6 +44,8 @@
 
 ### Performance
 
+- Host visibility preparation reuses the engine's exact body-anchor bounds;
+  cold or invalidated bounds still use the original full-body scan.
 - Keep collision join order between ticks instead of sorting every living snake.
   The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
   timing pairs, with identical events and final state.

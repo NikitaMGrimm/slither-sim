@@ -66,6 +66,8 @@ mod minimap;
 mod pit_tests;
 mod prey_visibility;
 #[cfg(test)]
+mod presentation_bounds_tests;
+#[cfg(test)]
 mod protocol13_tests;
 mod remote;
 #[cfg(test)]
