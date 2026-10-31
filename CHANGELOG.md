@@ -4,9 +4,10 @@
 
 ### Fixed
 
-- Accept Vlither's client-derived challenge reply so its protocol-19 login can
-  join the host, including custom-skin logins.
-
+- Vlither players can join. Vlither answers the login challenge with its own
+  built-in formula, which differs from the stock client's, so the host used to
+  close every Vlither connection with "Invalid challenge reply". The host now
+  accepts that answer too, with or without a custom skin.
 ### Added
 
 - The README and Linux hosting guide state the measured one-core capacity:
