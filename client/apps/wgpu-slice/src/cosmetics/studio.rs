@@ -4,6 +4,7 @@ use std::{path::PathBuf, time::SystemTime};
 
 pub const THUMBNAIL_PIXEL_BUDGET: usize = 4 * 1024 * 1024;
 const THUMBNAIL_EXTENT: u32 = 128;
+const SOURCE_IO: &str = "Cosmetic read: ";
 const ART_CAPACITY: &str = "Cosmetic pixel budget";
 const THUMBNAIL_CAPACITY: &str = "Thumbnail pixel budget";
 
@@ -69,6 +70,8 @@ pub(super) struct StudioArt {
     thumbnail_failures: BTreeMap<u8, FailedArt>,
     #[cfg(test)]
     source_reads: std::cell::Cell<usize>,
+    #[cfg(test)]
+    source_read_error: std::cell::Cell<bool>,
     revisions: [u64; 32],
     status: [CosmeticArtStatus; 32],
 }
@@ -146,22 +149,35 @@ impl Cosmetics {
                 .sum(),
         }
     }
-    fn decoded_source(&self, id: u8, file: Option<PathBuf>, extra: usize) -> Result<RgbaImage> {
-        if let Some(file) = file {
-            use std::io::Read;
-            if file.metadata().map_err(|e| e.to_string())?.len() > MAX_ENCODED_BYTES as u64 {
-                return Err("Cosmetic encoded image budget".into());
-            }
-            #[cfg(test)]
+    fn read_source(&self, file: PathBuf, bytes: &mut Vec<u8>) -> std::io::Result<()> {
+        use std::io::Read;
+        #[cfg(test)]
+        {
             self.studio
                 .source_reads
                 .set(self.studio.source_reads.get() + 1);
+            if self.studio.source_read_error.get() {
+                return Err(std::io::Error::other("synthetic transient read failure"));
+            }
+        }
+        std::fs::File::open(file)?
+            .take(MAX_ENCODED_BYTES as u64 + 1)
+            .read_to_end(bytes)?;
+        Ok(())
+    }
+    fn decoded_source(&self, id: u8, file: Option<PathBuf>, extra: usize) -> Result<RgbaImage> {
+        if let Some(file) = file {
+            if file
+                .metadata()
+                .map_err(|e| format!("{SOURCE_IO}{e}"))?
+                .len()
+                > MAX_ENCODED_BYTES as u64
+            {
+                return Err("Cosmetic encoded image budget".into());
+            }
             let mut bytes = Vec::new();
-            std::fs::File::open(file)
-                .map_err(|e| e.to_string())?
-                .take(MAX_ENCODED_BYTES as u64 + 1)
-                .read_to_end(&mut bytes)
-                .map_err(|e| e.to_string())?;
+            self.read_source(file, &mut bytes)
+                .map_err(|e| format!("{SOURCE_IO}{e}"))?;
             let (w, h) = bounded_reader(&bytes, 1024)?
                 .into_dimensions()
                 .map_err(image_error)?;
@@ -232,9 +248,12 @@ impl Cosmetics {
         let resource = match loaded {
             Ok(resource) => resource,
             Err(error) => {
-                self.studio
-                    .selected_failures
-                    .insert(id, FailedArt::new(stamp, &error, capacity));
+                // Readability can recover without changing file metadata.
+                if !error.starts_with(SOURCE_IO) {
+                    self.studio
+                        .selected_failures
+                        .insert(id, FailedArt::new(stamp, &error, capacity));
+                }
                 return Err(error);
             }
         };
@@ -255,9 +274,11 @@ impl Cosmetics {
                 self.studio.thumbnail_failures.remove(&id);
             }
             Err(error) => {
-                self.studio
-                    .thumbnail_failures
-                    .insert(id, FailedArt::new(stamp, error, capacity));
+                if !error.starts_with(SOURCE_IO) {
+                    self.studio
+                        .thumbnail_failures
+                        .insert(id, FailedArt::new(stamp, error, capacity));
+                }
             }
         }
         result
@@ -478,6 +499,30 @@ mod tests {
                     .starts_with("studio-art-test-")
             );
             std::fs::remove_dir_all(path).unwrap();
+        }
+    }
+    #[test]
+    fn transient_read_failure_recovers_without_a_stamp_change() {
+        for selected in [None, Some(0)] {
+            let directory = Directory::new();
+            directory.accessory(0, [32, 24]);
+            let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+            let (_, stamp) = art.source(0).unwrap();
+            art.studio.source_read_error.set(true);
+            art.prepare_studio(&[0], selected).unwrap();
+            assert_eq!(art.studio_status(0), CosmeticArtStatus::Missing);
+            assert!(art.studio.selected_failures.is_empty());
+            assert!(art.studio.thumbnail_failures.is_empty());
+            let reads = art.studio.source_reads.get();
+            art.studio.source_read_error.set(false);
+            assert!(art.source(0).unwrap().1 == stamp);
+            art.prepare_studio(&[0], selected).unwrap();
+            assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+            assert!(art.studio_thumbnails().contains_key(&0));
+            assert!(art.studio.source_reads.get() > reads);
+            if selected.is_some() {
+                assert!(art.studio.selected.is_some());
+            }
         }
     }
     #[test]
