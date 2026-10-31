@@ -41,9 +41,11 @@ final frame settles once and then keeps a static key.
 Cached atlases retain shared immutable `Arc<RgbaImage>` images; preparing another
 frame clones their handles rather than copying pixels. No idle rasterization or
 logo texture upload occurs. Size or centring-phase changes produce a new
-exact-DPR raster. Premultiplied CPU pixels are cropped to
+raster at the common capped menu density. Premultiplied CPU pixels are cropped to
 nonempty bounds including the shadow and tiled horizontally at 2048px. Each
-tile is one snapped 1:1 draw, with no texture minification. The transient RGBA
+tile shares one snapped raster origin. Up to DPR 5 this is a 1:1 draw; above
+that, the menu-wide density cap samples the same 5x texels at the real viewport
+scale, keeping CSS layout and hit targets unchanged. The transient RGBA
 canvas is capped at 10 MiB; retained tiles share the existing 64-slot/13 MiB
 Menu allowance with controls and text. At extreme physical sizes, the stroke
 layout shrinks uniformly to the transient raster bound while keeping its centre
@@ -54,11 +56,13 @@ Font colour runs are admitted
 only after the controls and spinner are known: adjacent equal-colour words share
 a label, and an over-budget suffix becomes an ellipsis. The whole font line fits
 the holder. Final slot/byte admission stays in the shared menu composition.
-Atlas admission reserves the existing materials and label slots. The final
-transaction checks the actual text bytes as well; an aggregate quota failure
+Atlas admission reserves existing materials, label slots and draw capacity,
+including the spinner/backdrop. The final transaction checks actual text bytes
+and draws before inserting modal underlays or foreground labels; an aggregate quota failure
 retries only the logo with bounded font runs. That retry publishes only if the
-same full-menu admission succeeds. Menus that cannot fit even then retain the
-existing quota skip. These are ceilings, not eager allocations.
+same full-menu admission succeeds, with failed staged draws restored first. Menus that cannot fit even then retain the
+existing quota skip. This also covers #366's picker limit at DPR 7-8. These are ceilings,
+not eager allocations.
 
 The standalone Canvas/WebGPU DOM development pages retain their separate
 plain-text/art logo. This is a known reference-host difference; the future

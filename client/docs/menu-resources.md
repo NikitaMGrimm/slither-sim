@@ -15,8 +15,11 @@ A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
 Overlay image origins round to whole physical pixels after text baseline and
-alignment offsets. Controls and text rasterize at the window DPR and draw one
-source pixel per physical pixel. Clipping keeps whole texels inside the CSS clip;
+alignment offsets. Menu texel density is `min(window DPR, 5)` through one
+`MAX_MENU_RASTER_DENSITY` constant. Windows scaling tops out at 500%; above that,
+the 13 MiB menu allowance cannot hold the picker at 1:1. Higher DPR keeps CSS
+layout, the real viewport scale and hit/IME coordinates, while sampling the
+5x textures. Up to DPR 5, one source pixel remains one physical pixel. Clipping keeps whole texels inside the CSS clip;
 world nicknames retain their canvas placement. Pointer hit targets keep the core
 CSS layout; caret and IME candidate rectangles share physical-pixel rounding.
 Menu art is CPU-filtered on premultiplied pixels with Catmull-Rom once per source
@@ -38,8 +41,8 @@ two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
 scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
 into one premultiplied antialiased raster at 128 CSS pixels times its animated
-scale and DPR, rounded to a physical pixel (at most 2048 pixels per side).
-One 1:1 quad applies alpha to the complete canvas,
+scale and capped menu density, rounded to a physical pixel (at most 2048 pixels per side).
+One quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
@@ -64,8 +67,8 @@ use solid materials without capsule shadows.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Menu/HUD text uses exact DPR within the 2048px texture bound and its byte
-  budgets; world nicknames retain the 128px font guard and backing-space
+- Menu text uses the capped density and HUD text uses exact DPR, within the
+  2048px texture bound and their byte budgets; world nicknames retain the 128px font guard and backing-space
   diagnostics retain their 3x raster bound. Control atlas tiles stay within 512px;
   decoded menu art allows up to 2048px per axis. Menu decoding alone admits that
   density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics

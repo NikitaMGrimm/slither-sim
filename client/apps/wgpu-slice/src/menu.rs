@@ -20,6 +20,9 @@ use slither_client::{
 use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
+// Windows scaling tops out at 500%. Above that, the picker cannot fit the
+// 13 MiB menu allowance at 1:1; capping texel density is visually negligible.
+pub const MAX_MENU_RASTER_DENSITY: f64 = 5.;
 pub(crate) const MENU_DRAW_QUOTA: &str = "Menu producer draw budget";
 pub(crate) const MENU_PICTURE_QUOTA: &str = "Menu whole-picture pixel budget";
 pub(crate) const MENU_RASTER_AXIS_QUOTA: &str = "Sliced menu raster axis budget";
@@ -345,6 +348,7 @@ struct Composition<'a> {
     next_handle: u64,
     spinner_revision: u64,
     scale: f64,
+    viewport_scale: f64,
     draws: Vec<Draw>,
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
@@ -730,7 +734,7 @@ impl Composition<'_> {
                             self.ink(g.selection_rect(), theme.selection, alpha * 0.45, clip)?;
                             if edit.caret_visible() {
                                 self.ink(
-                                    g.snapped_cursor_rect(self.scale),
+                                    g.snapped_cursor_rect(self.viewport_scale),
                                     theme.text,
                                     alpha,
                                     clip,
@@ -972,9 +976,35 @@ impl Composition<'_> {
         Ok(())
     }
     fn ink(&mut self, r: MenuRect, rgb: [u8; 3], alpha: f64, clip: MenuRect) -> Result<()> {
-        let r = intersection(r, clip);
+        // Avoid changing a real-DPR caret's exact size through subtracting its
+        // large absolute coordinates when clipping is a no-op.
+        let r = if self.viewport_scale > self.scale
+            && r.x >= clip.x
+            && r.y >= clip.y
+            && r.x + r.width <= clip.x + clip.width
+            && r.y + r.height <= clip.y + clip.height
+        {
+            r
+        } else {
+            intersection(r, clip)
+        };
         if alpha == 0. || r.width <= 0. || r.height <= 0. {
             return Ok(());
+        }
+        if self.viewport_scale > self.scale {
+            // Solid editor ink needs no high-density texture. Preserve its real
+            // DPR caret/selection geometry so painting and IME bounds still agree.
+            let resource = self.cached_material(MaterialKey::Solid([1, 1], rgb), || {
+                Ok(materials::RgbaImage {
+                    width: 1,
+                    height: 1,
+                    pixels: vec![rgb[0], rgb[1], rgb[2], 255],
+                })
+            })?;
+            let mut draw = image(&resource, r, alpha);
+            draw.snap_overlay(self.viewport_scale);
+            check_menu_draws(self.draws.len() + 1)?;
+            return frame::push_draw(&mut self.draws, draw);
         }
         let scale = self.scale;
         let size = [
@@ -1052,6 +1082,7 @@ impl Composition<'_> {
         text: &mut TextCache,
         font_slots: usize,
         font_only: bool,
+        reserved_draws: usize,
     ) -> Result<()> {
         let unit = holder.height / 16.;
         let mut style = TextStyle {
@@ -1169,7 +1200,12 @@ impl Composition<'_> {
                             ]);
                         }
                     }
-                    check_menu_draws(self.draws.len() + regions.len())?;
+                    check_menu_draws(
+                        self.draws.len()
+                            + regions.len()
+                            + reserved_draws
+                            + layout.words.iter().filter(|w| w.fallback).count(),
+                    )?;
                     let mut pieces = Vec::new();
                     let mut sizes: Vec<[u32; 2]> = vec![[0, 0]];
                     regions.sort_by_key(|r| std::cmp::Reverse(r[2]));
@@ -1262,6 +1298,12 @@ impl Composition<'_> {
                         pieces,
                     }
                 };
+                check_menu_draws(
+                    self.draws.len()
+                        + cache.pieces.len()
+                        + reserved_draws
+                        + layout.words.iter().filter(|w| w.fallback).count(),
+                )?;
                 let origin = layout.origin_pixels(self.scale);
                 for piece in &cache.pieces {
                     let resource = &cache.resources[piece.atlas];
@@ -1489,7 +1531,8 @@ impl Menu {
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
-            scale: dpr,
+            scale: dpr.min(MAX_MENU_RASTER_DENSITY),
+            viewport_scale: dpr,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
@@ -1564,7 +1607,8 @@ impl Menu {
             materials: BTreeMap::new(),
             next_handle: self.next_handle.max(PAGE_HANDLE),
             spinner_revision: self.spinner_revision,
-            scale: dpr,
+            scale: dpr.min(MAX_MENU_RASTER_DENSITY),
+            viewport_scale: dpr,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
@@ -1848,17 +1892,20 @@ impl Composition<'_> {
         spinner_draws: Vec<Draw>,
     ) -> Result<Published> {
         let request = self.wordmark.take();
+        let reserved_draws = spinner_draws.len()
+            + usize::from(backdrop.is_some())
+            + usize::from(world_cover.is_some());
         let checkpoint = (self.draws.len(), self.labels.len(), self.next_handle);
         let mut added = (0, 0);
         if let Some(request) = &request {
-            match self.place_wordmark(text, request, false) {
+            match self.place_wordmark(text, request, false, reserved_draws) {
                 Ok(counts) => added = counts,
-                Err(error) if error == MENU_CACHE_QUOTA => {
+                Err(error) if matches!(error.as_str(), MENU_CACHE_QUOTA | MENU_DRAW_QUOTA) => {
                     self.draws.truncate(checkpoint.0);
                     self.labels.truncate(checkpoint.1);
                     self.stroke = None;
                     self.next_handle = checkpoint.2;
-                    added = self.place_wordmark(text, request, true)?;
+                    added = self.place_wordmark(text, request, true, reserved_draws)?;
                 }
                 Err(error) => return Err(error),
             }
@@ -1874,20 +1921,28 @@ impl Composition<'_> {
         if result
             .as_ref()
             .err()
-            .is_some_and(|error| error == MENU_CACHE_QUOTA)
+            .is_some_and(|error| matches!(error.as_str(), MENU_CACHE_QUOTA | MENU_DRAW_QUOTA))
             && self.stroke.is_some()
             && let Some(request) = &request
         {
             // TextCache's failed transaction has not published. Retry the logo
-            // only, using actual full-menu text bytes rather than a guessed
-            // allowance. The fallback must pass the same aggregate check.
+            // only, using actual text bytes/draws rather than a guessed
+            // allowance. compose_labels restores staged draws before this retry;
+            // the fallback must pass the same aggregate checks.
             self.draws
                 .drain(request.draw_index..request.draw_index + added.0);
             self.labels
                 .drain(request.label_index..request.label_index + added.1);
+            for label in &mut self.labels {
+                if let Some(index) = &mut label.before
+                    && *index >= request.draw_index + added.0
+                {
+                    *index -= added.0;
+                }
+            }
             self.stroke = None;
             self.next_handle = checkpoint.2;
-            self.place_wordmark(text, request, true)?;
+            self.place_wordmark(text, request, true, reserved_draws)?;
             result = self.compose_labels(text, extent, dpr, backdrop, world_cover, &spinner_draws);
         }
         Ok((
@@ -1904,6 +1959,7 @@ impl Composition<'_> {
         text: &mut TextCache,
         request: &WordmarkRequest,
         font_only: bool,
+        reserved_draws: usize,
     ) -> Result<(usize, usize)> {
         let font_slots = MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
         let draws = self.draws.len();
@@ -1917,8 +1973,22 @@ impl Composition<'_> {
             text,
             font_slots,
             font_only,
+            reserved_draws + self.labels.len(),
         )?;
         let added = (self.draws.len() - draws, self.labels.len() - labels);
+        // Deferred logo text belongs below the first modal, just like the
+        // labels that existed when that modal was composed.
+        let before = self.labels[..labels].iter().filter_map(|l| l.before).min();
+        for label in &mut self.labels[labels..] {
+            label.before = before;
+        }
+        for label in &mut self.labels {
+            if let Some(index) = &mut label.before
+                && *index >= request.draw_index
+            {
+                *index += added.0;
+            }
+        }
         self.draws[request.draw_index..].rotate_right(added.0);
         self.labels[request.label_index..].rotate_right(added.1);
         Ok(added)
@@ -2016,6 +2086,7 @@ impl Composition<'_> {
                     })
             })
             .collect();
+        let draw_start = self.draws.len();
         let result = text.compose_menu(
             &runs,
             &clips,
@@ -2024,6 +2095,10 @@ impl Composition<'_> {
             |groups| {
                 let mut underlays = BTreeMap::<usize, Vec<Draw>>::new();
                 let mut underlay_count = 0;
+                let mut foreground = Vec::new();
+                let reserved = spinner_draws.len()
+                    + usize::from(backdrop.is_some())
+                    + usize::from(world_cover.is_some());
                 let mut resources: BTreeMap<_, _> = self
                     .materials
                     .values()
@@ -2038,20 +2113,30 @@ impl Composition<'_> {
                         {
                             continue;
                         }
+                        check_menu_draws(
+                            self.draws.len() + underlay_count + foreground.len() + 1 + reserved,
+                        )?;
+                        draw.snap_overlay(self.scale);
                         if let Some(index) = label.before {
-                            check_menu_draws(self.draws.len() + underlay_count + 1)?;
                             underlays.entry(index).or_default().push(draw);
                             underlay_count += 1;
                         } else {
-                            self.push(draw)?;
+                            foreground.push(draw);
                         }
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
-                frame::reserve_draws(&mut self.draws, underlay_count)?;
+                // Admit all text/modal/spinner draws before changing the material
+                // sequence, so a failed attempt leaves its retry baseline intact.
+                check_menu_draws(self.draws.len() + underlay_count + foreground.len() + reserved)?;
+                frame::reserve_draws(
+                    &mut self.draws,
+                    underlay_count + foreground.len() + spinner_draws.len(),
+                )?;
                 for (index, draws) in underlays.into_iter().rev() {
                     self.draws.splice(index..index, draws);
                 }
+                self.draws.extend(foreground);
                 // The spinner is above the login's text, including the fading tips.
                 check_menu_draws(
                     self.draws.len()
@@ -2069,7 +2154,12 @@ impl Composition<'_> {
                     draws: std::mem::take(&mut self.draws),
                     snakes: Vec::new(),
                 };
-                frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;
+                if let Err(error) =
+                    frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())
+                {
+                    self.draws = frame.draws;
+                    return Err(error);
+                }
                 Ok(MenuFrame {
                     frame,
                     backdrop,
@@ -2079,6 +2169,11 @@ impl Composition<'_> {
             },
         );
         self.labels = labels;
+        if result.is_err() {
+            // TextCache rolls back its staged resources. Match that transaction
+            // for text/spinner draws before retrying with a smaller logo.
+            self.draws.truncate(draw_start);
+        }
         result
     }
 }
@@ -2126,6 +2221,49 @@ mod quota_tests {
     use super::*;
 
     #[test]
+    fn failed_text_draw_admission_preserves_material_order_and_cache() {
+        let mut c = Composition {
+            old: &BTreeMap::new(),
+            old_art: &BTreeMap::new(),
+            materials: BTreeMap::new(),
+            next_handle: PAGE_HANDLE,
+            spinner_revision: 0,
+            scale: 1.,
+            viewport_scale: 1.,
+            draws: Vec::new(),
+            art: BTreeMap::new(),
+            labels: Vec::new(),
+            quality_art: false,
+            wordmark: None,
+            old_stroke: None,
+            stroke: None,
+        };
+        let rect = MenuRect {
+            x: 0.,
+            y: 0.,
+            width: 100.,
+            height: 30.,
+        };
+        let draw = c.solid_draw(rect, [80; 3], 1., [1, 1]).unwrap();
+        c.draws = vec![draw; 510];
+        for value in ["one", "two", "three"] {
+            c.label(value, rect, 15., false, 1.);
+        }
+        c.labels[0].before = Some(0);
+        let before = c.draws.clone();
+        let mut text = TextCache::menu();
+        let result = c.compose_labels(&mut text, [960, 720], 1., None, None, &[]);
+        assert_eq!(result.err().as_deref(), Some(MENU_DRAW_QUOTA));
+        assert_eq!(c.draws, before);
+        assert_eq!(text.cached_runs(), 0);
+        c.draws.truncate(509);
+        assert!(
+            c.compose_labels(&mut text, [960, 720], 1., None, None, &[])
+                .is_ok()
+        );
+    }
+
+    #[test]
     fn solid_texture_axis_exhaustion_still_degrades() {
         let mut c = Composition {
             old: &BTreeMap::new(),
@@ -2134,6 +2272,7 @@ mod quota_tests {
             next_handle: PAGE_HANDLE,
             spinner_revision: 0,
             scale: 1.,
+            viewport_scale: 1.,
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),

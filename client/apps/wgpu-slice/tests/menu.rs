@@ -1060,8 +1060,20 @@ fn wordmark_raster_limits_fit_strokes_and_preserve_menu_and_errors() {
         assert!(p.frame.draws.iter().any(|d| is_stroke_draw(d, holder)));
         for draw in p.frame.draws.iter().filter(|d| is_stroke_draw(d, holder)) {
             let source = draw.source.unwrap();
-            assert!((draw.destination.width * dpr - source.width).abs() < 1e-8);
-            assert!((draw.destination.height * dpr - source.height).abs() < 1e-8);
+            assert!(
+                (draw.destination.width
+                    * dpr.min(slither_wgpu_slice::menu::MAX_MENU_RASTER_DENSITY)
+                    - source.width)
+                    .abs()
+                    < 1e-8
+            );
+            assert!(
+                (draw.destination.height
+                    * dpr.min(slither_wgpu_slice::menu::MAX_MENU_RASTER_DENSITY)
+                    - source.height)
+                    .abs()
+                    < 1e-8
+            );
         }
         assert!(
             p.frame

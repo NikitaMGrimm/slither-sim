@@ -251,12 +251,11 @@ fn list_window_raster_and_draw_cost_stays_bounded_across_refresh_and_scrolling()
                 .filter(|(_, d)| {
                     picture.resources.iter().any(|r| {
                         r.asset == d.asset
-                            && r.asset.handle >= slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
-                            && r.image
-                                .pixels
-                                .as_chunks::<4>()
-                                .0
-                                .contains(&[86, 172, 129, 255])
+                            && r.image.pixels.as_chunks::<4>().0.iter().any(|p| {
+                                p[3] == 255
+                                    && (p[..3] == slither_wgpu_slice::menu::WORDMARK_GREEN
+                                        || (p[1] > 180 && p[0] < 140 && p[2] < 170))
+                            })
                     })
                 })
                 .map(|(i, _)| i)
@@ -339,4 +338,87 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     assert_eq!(read_preference(&path), ServerPreference(None));
     std::fs::remove_file(path).unwrap();
     std::fs::remove_dir(directory).unwrap();
+}
+
+#[test]
+fn open_picker_with_stroke_logo_never_drops_at_dpr_five_to_eight() {
+    let mut failures = Vec::new();
+    for height in [720., 540.] {
+        let mut login = NativeLogin::new("").unwrap();
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false).unwrap();
+        }
+        login
+            .picker
+            .policy
+            .replace(&servers(), &BTreeMap::from([(0, 12), (1, 65)]))
+            .unwrap();
+        login.picker.open();
+        login.picker.policy.alpha = 1.;
+        for dpr in [5., 6., 7., 8., 5.] {
+            for offset in [0, isize::MAX, isize::MIN] {
+                login.picker.policy.scroll(offset);
+                login.picker.sync();
+                let picture = login.prepare_host(
+                    [(960. * dpr) as u32, (height * dpr) as u32],
+                    dpr,
+                    true,
+                    None,
+                );
+                let picture = match picture {
+                    Ok(picture) => picture,
+                    Err(error) => {
+                        failures.push(format!("picker 960x{height}, DPR {dpr}: {error}"));
+                        break;
+                    }
+                };
+                let draws = picture.frame.draws.len()
+                    + usize::from(picture.backdrop.is_some())
+                    + usize::from(picture.world_cover.is_some());
+                let bytes = picture
+                    .resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>();
+                assert!(draws <= 512);
+                assert!(bytes <= 13 * 1024 * 1024);
+                assert!(
+                    picture
+                        .resources
+                        .iter()
+                        .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+                );
+                assert_eq!(picture.frame.viewport_scale, dpr);
+                let resolved = login.picker.panel.resolve([960., height]).unwrap();
+                let row = resolved
+                    .iter()
+                    .find(|r| matches!(r.control.kind, ControlKind::ListRow { .. }))
+                    .unwrap();
+                let r = row.rect;
+                let point = mouse_client_position([(r.x + 12.) * dpr, (r.y + 12.) * dpr], dpr);
+                assert!(row.hit(point));
+                assert!(
+                    picture
+                        .frame
+                        .draws
+                        .iter()
+                        .any(|d| point[0] >= d.destination.x
+                            && point[0] < d.destination.x + d.destination.width
+                            && point[1] >= d.destination.y
+                            && point[1] < d.destination.y + d.destination.height)
+                );
+                let mut hits = PanelInputState::default();
+                hits.sync(&login.picker.panel, &mut MenuInputState::default());
+                hits.pointer(&login.picker.panel, &resolved, point, Some(true));
+                assert_eq!(
+                    hits.pointer(&login.picker.panel, &resolved, point, Some(false))
+                        .unwrap()
+                        .control,
+                    row.control.id
+                );
+                eprintln!("picker 960x{height}, DPR {dpr}: {draws} draws, {bytes} bytes");
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

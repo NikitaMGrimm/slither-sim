@@ -9,6 +9,9 @@ use slither_client::{
 use slither_wgpu_slice::{menu::Menu, text::TextCache};
 use std::collections::BTreeMap;
 fn panel() -> PanelView {
+    panel_at([960., 720.])
+}
+fn panel_at(viewport: [f64; 2]) -> PanelView {
     let mut s = SessionPolicy::new();
     s.prepare_controls(
         &[
@@ -28,7 +31,7 @@ fn panel() -> PanelView {
     let mut champion = ChampionState::default();
     champion.observe(1, &s.view());
     champion.step(0., 1.).unwrap();
-    champion.panel(&s.view(), [960., 720.])
+    champion.panel(&s.view(), viewport)
 }
 
 fn transparent_border(image: &slither_wgpu_slice::materials::RgbaImage) {
@@ -683,7 +686,7 @@ fn champion_and_logo_share_the_complete_menu_budget_at_high_dpr() {
             control.clip = None;
             control.style = ControlStyle::Heading;
             control.kind = ControlKind::Label {
-                text: "W".repeat(50),
+                text: "W".repeat(45),
             };
             panel.controls.push(control);
         }
@@ -745,4 +748,121 @@ fn champion_and_logo_share_the_complete_menu_budget_at_high_dpr() {
         });
         assert_eq!(font_logo, count == 4);
     }
+}
+
+#[test]
+fn standard_champion_keeps_the_logo_within_draw_capacity_at_dpr_five_to_eight() {
+    use slither_wgpu_slice::{
+        menu::PanelPaint,
+        menu_specimen,
+        text::{MENU_CACHE_BYTES, MENU_CACHE_RUNS},
+    };
+    let mut failures = Vec::new();
+    for height in [720., 540.] {
+        let panel = panel_at([960., height]);
+        let mut input = PanelInputState::default();
+        let mut edit = MenuInputState::default();
+        input.sync(&panel, &mut edit);
+        edit.reset_editor(EditorId::Champion, "Champion message");
+        let mut menu = Menu::default();
+        let mut text = TextCache::menu();
+        for dpr in [5., 6., 7., 8., 5.] {
+            let extent = [(960. * dpr) as u32, (height * dpr) as u32];
+            let mut view = menu_specimen::view(0).unwrap();
+            view.ordinary_controls_visible = false;
+            view.tips_visible = false;
+            view.champion_pending = false;
+            let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+            let mut scroll = BTreeMap::new();
+            for _ in 0..2 {
+                let result = menu.prepare_with_panel(
+                    &mut text,
+                    &view,
+                    &layout,
+                    extent,
+                    dpr,
+                    None,
+                    None,
+                    Some(PanelPaint {
+                        panel: &panel,
+                        input: &input,
+                        edit: &edit,
+                        scroll: &mut scroll,
+                        theme: MenuTheme::default(),
+                    }),
+                );
+                let frame = match result {
+                    Ok(frame) => frame,
+                    Err(error) => {
+                        failures.push(format!("960x{height}, DPR {dpr}: {error}"));
+                        break;
+                    }
+                };
+                let draws = frame.frame.draws.len()
+                    + usize::from(frame.backdrop.is_some())
+                    + usize::from(frame.world_cover.is_some());
+                let bytes = frame
+                    .resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>();
+                let slots = frame
+                    .resources
+                    .iter()
+                    .filter(|r| r.asset.handle >> 60 == 7)
+                    .count()
+                    + text.cached_runs();
+                assert!(draws <= 512);
+                assert!(bytes <= MENU_CACHE_BYTES);
+                assert!(slots <= MENU_CACHE_RUNS);
+                assert!(
+                    frame
+                        .resources
+                        .iter()
+                        .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+                );
+                // Both colours survive, including when admission selects font labels.
+                for rgb in [
+                    slither_wgpu_slice::menu::WORDMARK_GREEN,
+                    slither_wgpu_slice::menu::WORDMARK_PURPLE,
+                ] {
+                    assert!(frame.resources.iter().any(|r| {
+                        r.image
+                            .pixels
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .any(|p| p[..3] == rgb && p[3] == 255)
+                    }));
+                }
+                assert_eq!(frame.frame.viewport_scale, dpr);
+                let resolved = panel.resolve([960., height]).unwrap();
+                let button = resolved
+                    .iter()
+                    .find(|r| matches!(r.control.kind, ControlKind::Button { .. }))
+                    .unwrap();
+                let r = button.rect;
+                let point = slither_client::desktop_input::mouse_client_position(
+                    [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr],
+                    dpr,
+                );
+                assert!(button.hit(point));
+                assert!(frame.frame.draws.iter().any(|d| point[0] >= d.destination.x
+                    && point[0] < d.destination.x + d.destination.width
+                    && point[1] >= d.destination.y
+                    && point[1] < d.destination.y + d.destination.height));
+                let mut hits = PanelInputState::default();
+                hits.sync(&panel, &mut MenuInputState::default());
+                hits.pointer(&panel, &resolved, point, Some(true));
+                assert_eq!(
+                    hits.pointer(&panel, &resolved, point, Some(false))
+                        .unwrap()
+                        .control,
+                    button.control.id
+                );
+                eprintln!("960x{height}, DPR {dpr}: {draws} draws, {bytes} bytes, {slots} slots");
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

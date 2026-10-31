@@ -524,7 +524,6 @@ impl NativeLogin {
                 extent,
                 dpr,
                 cosmetics,
-                0,
                 Some(&self.input.state),
                 Some(crate::menu::PanelPaint {
                     panel: &self.panel,
