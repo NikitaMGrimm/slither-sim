@@ -53,6 +53,7 @@ pub struct Bank {
     draw_storage: [Vec<Draw>; 2],
     pub(crate) body_commands: Vec<BodyImageCommand>,
     pub(crate) food_commands: [Vec<FoodImageCommand>; 2],
+    pub(crate) food_asset_index: FoodAssetIndex,
 }
 fn use_at(i: usize) -> BodyAssetUse {
     BodyAssetUse {
@@ -117,6 +118,7 @@ impl Bank {
             draw_storage: [Vec::new(), Vec::new()],
             body_commands: Vec::new(),
             food_commands: [Vec::new(), Vec::new()],
+            food_asset_index: FoodAssetIndex::default(),
         };
         for p in r.body_sources.palettes {
             let variants = p.variants.into_iter().map(|r| b.add(r)).collect();
