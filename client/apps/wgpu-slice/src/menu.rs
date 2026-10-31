@@ -1,4 +1,5 @@
 //! Opt-in menu resources. No adapter, input, session or independent animation clock.
+use crate::menu_counts::{MenuAttribution, MenuComponent, MenuDrawCounts};
 use crate::{
     Result,
     cosmetics::{Cosmetics, MenuArt},
@@ -18,6 +19,7 @@ use slither_client::{
     start_page::StartMenuView,
 };
 use std::collections::BTreeMap;
+mod studio_surface;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 // Windows scaling tops out at 500%. Above that, the picker cannot fit the
@@ -54,6 +56,7 @@ pub fn check_menu_draws(count: usize) -> Result<()> {
 }
 /// Immutable prepared resources survive subsequent resize, retirement and art replacement.
 pub struct MenuFrame {
+    pub attribution: MenuAttribution,
     pub frame: Frame,
     /// Page colour below the world, in the frame's coordinate space; absent when login is hidden.
     pub backdrop: Option<Draw>,
@@ -62,6 +65,15 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
+    /// Preview is prepared separately and never charged to the 512-record menu cap.
+    pub fn draw_counts(&self, preview: usize) -> MenuDrawCounts {
+        MenuDrawCounts {
+            components: self.attribution,
+            page: usize::from(self.backdrop.is_some()),
+            cover: usize::from(self.world_cover.is_some()),
+            preview,
+        }
+    }
     /// A menu quota failure skips this overlay for the frame, preserving the
     /// world picture and editor/session state. Invalid geometry still surfaces.
     pub fn append_optional(menu: Result<Self>, picture: &mut PreparedFrame) -> Result<bool> {
@@ -140,6 +152,7 @@ impl MenuFrame {
         let mut cover = backdrop.clone();
         cover.effective_alpha = 1. - world_alpha;
         Ok(Self {
+            attribution: Default::default(),
             frame: Frame {
                 identity: 0,
                 tick: 0,
@@ -323,6 +336,7 @@ struct StrokePiece {
     source: [u32; 4],
 }
 struct Label {
+    component: MenuComponent,
     /// Material boundary for content below a later modal backdrop.
     before: Option<usize>,
     text: String,
@@ -383,6 +397,8 @@ fn toggle_indicator(size: u32, fill: [u8; 3], ink: [u8; 3], checked: bool) -> ma
 }
 
 struct Composition<'a> {
+    component: MenuComponent,
+    attribution: MenuAttribution,
     old: &'a BTreeMap<MaterialKey, Resource>,
     old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     materials: BTreeMap<MaterialKey, Resource>,
@@ -467,6 +483,30 @@ impl Composition<'_> {
             }
             for r in resolved.iter().filter(|r| r.control.visible) {
                 let control = &r.control;
+                self.component = if panel.id == 0 {
+                    MenuComponent::LoginControls
+                } else if panel.id == 3 {
+                    use slither_client::skin_studio::{BUILDER_TAB, BUILT_IN_TAB, CANCEL, SAVE};
+                    match control.kind {
+                        ControlKind::Backdrop => MenuComponent::StudioShade,
+                        ControlKind::Surface => MenuComponent::StudioSurface,
+                        _ if [
+                            slither_client::menu_controls::ControlId(1),
+                            slither_client::menu_controls::ControlId(4),
+                            BUILT_IN_TAB,
+                            BUILDER_TAB,
+                            CANCEL,
+                            SAVE,
+                        ]
+                        .contains(&control.id) =>
+                        {
+                            MenuComponent::StudioChrome
+                        }
+                        _ => MenuComponent::StudioSection,
+                    }
+                } else {
+                    MenuComponent::Other
+                };
                 let enabled = panel.enabled && control.enabled;
                 let alpha = panel.alpha
                     * control.alpha
@@ -496,6 +536,11 @@ impl Composition<'_> {
                                  align: Align,
                                  clip: MenuRect| {
                     c.labels.push(Label {
+                        component: if panel.id == 0 {
+                            MenuComponent::LoginText
+                        } else {
+                            c.component
+                        },
                         before: None,
                         text: value,
                         rect,
@@ -677,6 +722,13 @@ impl Composition<'_> {
                         self.studio_solid(r.rect, alpha, theme, true)?
                     }
                     ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
+                    ControlKind::Surface if panel.id == 3 => self.studio_panel(
+                        r.rect,
+                        theme.surface(control.style, ControlState::Idle),
+                        alpha,
+                        surface_clip,
+                        r.scale,
+                    )?,
                     ControlKind::Surface => self.sliced(
                         r.rect,
                         theme.surface(control.style, ControlState::Idle),
@@ -1608,7 +1660,9 @@ impl Composition<'_> {
             let mut draw = image(&resource, r, alpha);
             draw.snap_overlay(self.viewport_scale);
             check_menu_draws(self.draws.len() + 1)?;
-            return frame::push_draw(&mut self.draws, draw);
+            frame::push_draw(&mut self.draws, draw)?;
+            self.attribution.add(self.component, 1);
+            return Ok(());
         }
         let scale = self.scale;
         let size = [
@@ -1721,6 +1775,7 @@ impl Composition<'_> {
             })?;
         }
         let stroke_start = self.draws.len();
+        let stroke_counts = self.attribution;
         if reveal > 0. && layout.words.iter().any(|w| !w.fallback) {
             let key = (
                 value.to_owned(),
@@ -1940,6 +1995,7 @@ impl Composition<'_> {
             > font_slots
         {
             self.draws.truncate(stroke_start);
+            self.attribution = stroke_counts;
             self.stroke = None;
             layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
                 Ok(text.measure_panel(s, style)?.advance / unit)
@@ -1969,7 +2025,9 @@ impl Composition<'_> {
     fn push(&mut self, mut draw: Draw) -> Result<()> {
         draw.snap_overlay(self.scale);
         check_menu_draws(self.draws.len() + 1)?;
-        frame::push_draw(&mut self.draws, draw)
+        frame::push_draw(&mut self.draws, draw)?;
+        self.attribution.add(self.component, 1);
+        Ok(())
     }
     fn control(&mut self, r: MenuRect, mut tokens: SurfaceTokens, alpha: f64) -> Result<()> {
         tokens.radius = (r.height / 2.).ceil() as u16;
@@ -1982,6 +2040,7 @@ impl Composition<'_> {
     }
     fn label(&mut self, text: &str, r: MenuRect, size: f64, bold: bool, alpha: f64) {
         self.labels.push(Label {
+            component: self.component,
             before: None,
             text: text.into(),
             rect: r,
@@ -2130,6 +2189,8 @@ impl Menu {
         let resolved = panel.resolve(viewport).map_err(str::to_owned)?;
         let mut staged_scroll = scroll.clone();
         let mut c = Composition {
+            component: Default::default(),
+            attribution: Default::default(),
             old: &self.materials,
             old_art: &self.art,
             materials: BTreeMap::new(),
@@ -2205,6 +2266,8 @@ impl Menu {
     ) -> Result<MenuFrame> {
         crate::render::dimensions(extent, dpr)?;
         let mut c = Composition {
+            component: Default::default(),
+            attribution: Default::default(),
             old: &self.materials,
             old_art: &self.art,
             materials: BTreeMap::new(),
@@ -2219,6 +2282,7 @@ impl Menu {
             old_stroke: self.stroke.as_ref(),
             stroke: None,
         };
+        c.component = MenuComponent::LoginText;
         let a = view.login_alpha;
         let backdrop = if view.visible {
             Some(c.solid_draw(
@@ -2340,6 +2404,7 @@ impl Menu {
                 );
             }
             if view.ordinary_controls_visible {
+                c.component = MenuComponent::LoginControls;
                 let r = layout.viewport_rect(E::Skin);
                 let skin_alpha = a
                     * view.skin_alpha
@@ -2364,6 +2429,7 @@ impl Menu {
                             .surface(ControlStyle::PrimaryButton, ControlState::Idle),
                         skin_alpha,
                     )?;
+                    c.component = MenuComponent::LoginText;
                     c.label(
                         view.wording.change_skin,
                         MenuRect {
@@ -2425,6 +2491,7 @@ impl Menu {
             )?;
         }
         let spinner_start = c.draws.len();
+        c.component = MenuComponent::Other;
         if view.spinner_visible {
             c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
@@ -2489,12 +2556,14 @@ impl Composition<'_> {
             + usize::from(backdrop.is_some())
             + usize::from(world_cover.is_some());
         let checkpoint = (self.draws.len(), self.labels.len(), self.next_handle);
+        let checkpoint_counts = self.attribution;
         let mut added = (0, 0);
         if let Some(request) = &request {
             match self.place_wordmark(text, request, false, reserved_draws) {
                 Ok(counts) => added = counts,
                 Err(error) if matches!(error.as_str(), MENU_CACHE_QUOTA | MENU_DRAW_QUOTA) => {
                     self.draws.truncate(checkpoint.0);
+                    self.attribution = checkpoint_counts;
                     self.labels.truncate(checkpoint.1);
                     self.stroke = None;
                     self.next_handle = checkpoint.2;
@@ -2524,6 +2593,8 @@ impl Composition<'_> {
             // the fallback must pass the same aggregate checks.
             self.draws
                 .drain(request.draw_index..request.draw_index + added.0);
+            self.attribution
+                .remove(MenuComponent::LoginWordmark, added.0);
             self.labels
                 .drain(request.label_index..request.label_index + added.1);
             for label in &mut self.labels {
@@ -2557,6 +2628,7 @@ impl Composition<'_> {
         let font_slots = MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
         let draws = self.draws.len();
         let labels = self.labels.len();
+        self.component = MenuComponent::LoginWordmark;
         self.stroke_wordmark(
             &request.value,
             request.holder,
@@ -2621,6 +2693,7 @@ impl Composition<'_> {
             }
         }
         let labels = std::mem::take(&mut self.labels);
+        let base_attribution = self.attribution;
         let measurements = labels
             .iter()
             .map(|l| text.measure_panel(&l.text, l.style))
@@ -2686,6 +2759,7 @@ impl Composition<'_> {
             self.scale,
             (material_slots, material_bytes),
             |groups| {
+                let mut attribution = base_attribution;
                 let mut underlays = BTreeMap::<usize, Vec<Draw>>::new();
                 let mut underlay_count = 0;
                 let mut foreground = Vec::new();
@@ -2717,6 +2791,7 @@ impl Composition<'_> {
                             foreground.push(draw);
                         }
                         resources.insert(resource.asset.into(), resource);
+                        attribution.add(label.component, 1);
                     }
                 }
                 // Admit all text/modal/spinner draws before changing the material
@@ -2754,6 +2829,7 @@ impl Composition<'_> {
                     return Err(error);
                 }
                 Ok(MenuFrame {
+                    attribution,
                     frame,
                     backdrop,
                     world_cover,
@@ -2854,6 +2930,8 @@ mod quota_tests {
                 [100., 35.],
             ] {
                 let mut c = Composition {
+                    component: Default::default(),
+                    attribution: Default::default(),
                     old: &BTreeMap::new(),
                     old_art: &BTreeMap::new(),
                     materials: BTreeMap::new(),
@@ -2883,6 +2961,7 @@ mod quota_tests {
                 .unwrap();
                 let base = MenuFrame::world_crossfade([960, 540], scale, 0.).unwrap();
                 let menu = MenuFrame {
+                    attribution: c.attribution,
                     frame: Frame {
                         draws: c.draws,
                         ..base.frame.clone()
@@ -2920,6 +2999,8 @@ mod quota_tests {
     #[test]
     fn failed_text_draw_admission_preserves_material_order_and_cache() {
         let mut c = Composition {
+            component: Default::default(),
+            attribution: Default::default(),
             old: &BTreeMap::new(),
             old_art: &BTreeMap::new(),
             materials: BTreeMap::new(),
@@ -2942,6 +3023,7 @@ mod quota_tests {
         };
         let draw = c.solid_draw(rect, [80; 3], 1., [1, 1]).unwrap();
         c.draws = vec![draw; 510];
+        c.attribution.add(MenuComponent::Other, 510);
         for value in ["one", "two", "three"] {
             c.label(value, rect, 15., false, 1.);
         }
@@ -2953,10 +3035,12 @@ mod quota_tests {
         assert_eq!(c.draws, before);
         assert_eq!(text.cached_runs(), 0);
         c.draws.truncate(509);
-        assert!(
-            c.compose_labels(&mut text, [960, 720], 1., None, None, &[])
-                .is_ok()
-        );
+        c.attribution.remove(MenuComponent::Other, 1);
+        let retried = c
+            .compose_labels(&mut text, [960, 720], 1., None, None, &[])
+            .unwrap();
+        assert_eq!(retried.attribution.total(), retried.frame.draws.len());
+        assert_eq!(retried.draw_counts(0).admitted_menu(), 512);
     }
 
     #[test]
@@ -2994,6 +3078,8 @@ mod quota_tests {
     #[test]
     fn solid_texture_axis_exhaustion_still_degrades() {
         let mut c = Composition {
+            component: Default::default(),
+            attribution: Default::default(),
             old: &BTreeMap::new(),
             old_art: &BTreeMap::new(),
             materials: BTreeMap::new(),
