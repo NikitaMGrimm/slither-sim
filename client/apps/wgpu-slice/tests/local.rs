@@ -224,6 +224,7 @@ fn pump(g: &mut LocalGame, t: f64) -> Vec<Vec<u8>> {
 }
 fn negotiating() -> LocalGame {
     let mut g = LocalGame::new(0.).unwrap();
+    g.draw_diagnostics.strict_validation = true;
     g.play("ws://127.0.0.1:19491/slither", "Player", 44)
         .unwrap();
     pump(&mut g, 1.);
