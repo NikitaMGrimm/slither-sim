@@ -80,7 +80,12 @@ canonical user-entered authority per following line. Reads are capped at 16,418
 bytes; malformed, oversized, duplicate or unsupported records leave the current
 in-memory list intact. Each explicit Add/Remove re-reads that bounded record,
 merges the operation (deduplicated Add or addressed Remove), keeps the 32-entry
-cap and atomically writes it back. The picker refreshes from the merged list,
+cap and atomically writes it back. An exclusive interprocess lock on the adjacent
+`custom-servers.lock` covers that whole read–apply–replace. The empty sidecar stays
+on disk; the operation releases its lock on return. Lock contention retries for
+at most 200 ms. If locking fails or times out, the edit stays in memory only and
+the picker shows a status; it never waits indefinitely for the lock.
+The picker refreshes from the merged list,
 preserving edits saved by other instances since startup. Failed or malformed
 reads use the current in-memory list instead. Official endpoints and all historical pings never persist;
 the user's own custom authorities and custom choice are user data and may

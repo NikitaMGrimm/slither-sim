@@ -322,6 +322,7 @@ fn separate_storage_handles_merge_operations_from_stale_instance_lists() {
     assert!(first.apply(&add(34), &mut a).is_err());
     assert_eq!(a, ["192.0.2.2:80", "192.0.2.34:80"]);
     std::fs::remove_dir(path).unwrap();
+    std::fs::remove_file(root.join("custom-servers.lock")).unwrap();
     std::fs::remove_dir(root).unwrap();
 }
 #[test]

@@ -13,8 +13,10 @@ use slither_client::{
 };
 use std::{
     collections::BTreeMap,
+    fs::{File, OpenOptions, TryLockError},
     io::Read,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 use winit::{
     event::{ElementState, MouseScrollDelta, WindowEvent},
@@ -311,6 +313,12 @@ pub fn normalize_custom_server(value: &str) -> Result<String> {
     result.map_err(|_: String| "Enter a valid host:port".into())
 }
 const CUSTOM_FILE_LIMIT: usize = MAX_CUSTOM_SERVERS * (MAX_CUSTOM_ADDRESS + 1) + 2;
+const CUSTOM_LOCK_WAIT: Duration = Duration::from_millis(200);
+const CUSTOM_MEMORY_ONLY: &str = "Storage busy or unavailable; saved for this run only";
+enum SaveStep {
+    Read,
+    Contended,
+}
 pub struct CustomServerStorage {
     path: PathBuf,
 }
@@ -320,29 +328,83 @@ impl CustomServerStorage {
     }
     /// Merge user operations with the latest bounded record, not a startup snapshot.
     /// Unreadable/malformed storage retains the caller's in-memory fallback.
+    /// Lock failure edits memory only and returns a status for the picker.
     pub fn apply(
         &self,
         operation: &CustomServerOperation,
         current: &mut Vec<String>,
     ) -> Result<()> {
+        self.apply_with(operation, current, |_| {})
+    }
+    // Observe actual read/contention boundaries for the deterministic overlap regression.
+    fn apply_with(
+        &self,
+        operation: &CustomServerOperation,
+        current: &mut Vec<String>,
+        mut observe: impl FnMut(SaveStep),
+    ) -> Result<()> {
+        let _lock = match self.lock(|| observe(SaveStep::Contended)) {
+            Ok(lock) => lock,
+            Err(_) => {
+                apply_custom_operation(operation, current)?;
+                return Err(CUSTOM_MEMORY_ONLY.into());
+            }
+        };
         let mut servers = current.clone();
         read_custom(&self.path, &mut servers);
-        match operation {
-            CustomServerOperation::Add(address) => {
-                let address = normalize_custom_server(address)?;
-                if !servers.contains(&address) {
-                    if servers.len() == MAX_CUSTOM_SERVERS {
-                        *current = servers;
-                        return Err("Custom server limit: 32".into());
-                    }
-                    servers.push(address);
-                }
-            }
-            CustomServerOperation::Remove(address) => servers.retain(|s| s != address),
-        }
+        observe(SaveStep::Read);
+        let result = apply_custom_operation(operation, &mut servers);
         *current = servers;
+        result?;
         write_custom(&self.path, current)
     }
+    fn lock(&self, mut contended: impl FnMut()) -> std::io::Result<File> {
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| std::io::Error::other("Missing store directory"))?;
+        std::fs::create_dir_all(parent)?;
+        // Keep the sidecar: deleting/replacing it could let instances lock different files.
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(self.path.with_extension("lock"))?;
+        let started = Instant::now();
+        loop {
+            match file.try_lock() {
+                Ok(()) => return Ok(file),
+                Err(TryLockError::Error(error)) => return Err(error),
+                Err(TryLockError::WouldBlock) => {
+                    contended();
+                    let remaining = CUSTOM_LOCK_WAIT.saturating_sub(started.elapsed());
+                    if remaining.is_zero() {
+                        return Err(std::io::ErrorKind::TimedOut.into());
+                    }
+                    std::thread::sleep(remaining.min(Duration::from_millis(10)));
+                }
+            }
+        }
+    }
+}
+fn apply_custom_operation(
+    operation: &CustomServerOperation,
+    servers: &mut Vec<String>,
+) -> Result<()> {
+    match operation {
+        CustomServerOperation::Add(address) => {
+            let address = normalize_custom_server(address)?;
+            if !servers.contains(&address) {
+                if servers.len() >= MAX_CUSTOM_SERVERS {
+                    return Err("Custom server limit: 32".into());
+                }
+                servers.push(address);
+            }
+        }
+        CustomServerOperation::Remove(address) => servers.retain(|s| s != address),
+    }
+    Ok(())
 }
 /// Invalid/missing/oversized data never replaces the caller's in-memory list.
 pub fn read_custom(path: &Path, current: &mut Vec<String>) -> bool {
@@ -392,4 +454,136 @@ pub fn write_custom(path: &Path, servers: &[String]) -> Result<()> {
         value.push('\n');
     }
     write_record(path, &value)
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use super::*;
+    use std::sync::{
+        Arc, Barrier,
+        atomic::{AtomicU64, Ordering},
+        mpsc,
+    };
+
+    fn store_path() -> PathBuf {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "custom-lock-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        root.join("custom-servers.txt")
+    }
+    fn remove_store(path: &Path) {
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_file(path.with_extension("lock")).unwrap();
+        std::fs::remove_dir(path.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn overlapping_saves_lock_the_entire_read_apply_replace() {
+        let path = store_path();
+        write_custom(&path, &[]).unwrap();
+        let read = Arc::new(Barrier::new(2));
+        let (contended, observed) = mpsc::channel();
+        let first_path = path.clone();
+        let first_read = read.clone();
+        let first = std::thread::spawn(move || {
+            let storage = CustomServerStorage::new(first_path);
+            let mut current = Vec::new();
+            storage
+                .apply_with(
+                    &CustomServerOperation::Add("192.0.2.1:80".into()),
+                    &mut current,
+                    |step| {
+                        if matches!(step, SaveStep::Read) {
+                            first_read.wait();
+                            // Do not finish the first save until the second save really tries its lock.
+                            observed.recv_timeout(Duration::from_secs(2)).unwrap();
+                        }
+                    },
+                )
+                .unwrap();
+        });
+        let second_path = path.clone();
+        let second = std::thread::spawn(move || {
+            let storage = CustomServerStorage::new(second_path);
+            let mut current = Vec::new();
+            let mut contended = Some(contended);
+            read.wait();
+            storage
+                .apply_with(
+                    &CustomServerOperation::Add("192.0.2.2:80".into()),
+                    &mut current,
+                    |step| {
+                        if matches!(step, SaveStep::Contended)
+                            && let Some(sender) = contended.take()
+                        {
+                            sender.send(()).unwrap();
+                        }
+                    },
+                )
+                .unwrap();
+        });
+        first.join().unwrap();
+        second.join().unwrap();
+        let mut saved = Vec::new();
+        assert!(read_custom(&path, &mut saved));
+        assert_eq!(saved.len(), 2);
+        assert!(saved.contains(&"192.0.2.1:80".into()));
+        assert!(saved.contains(&"192.0.2.2:80".into()));
+        // Both operations release the sidecar without deleting it.
+        drop(CustomServerStorage::new(path.clone()).lock(|| {}).unwrap());
+        remove_store(&path);
+    }
+
+    #[test]
+    fn contended_lock_times_out_and_edits_only_memory() {
+        let path = store_path();
+        let original = vec!["192.0.2.1:80".to_owned()];
+        write_custom(&path, &original).unwrap();
+        let held = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path.with_extension("lock"))
+            .unwrap();
+        held.lock().unwrap();
+        for (operation, expected) in [
+            (
+                CustomServerOperation::Add("192.0.2.2:80".into()),
+                vec!["192.0.2.1:80", "192.0.2.2:80"],
+            ),
+            (CustomServerOperation::Remove("192.0.2.1:80".into()), vec![]),
+        ] {
+            let storage = CustomServerStorage::new(path.clone());
+            let mut current = original.clone();
+            let (sender, receiver) = mpsc::channel();
+            let worker = std::thread::spawn(move || {
+                let started = Instant::now();
+                let mut contended = false;
+                let result = storage.apply_with(&operation, &mut current, |step| {
+                    contended |= matches!(step, SaveStep::Contended);
+                });
+                sender
+                    .send((result, current, started.elapsed(), contended))
+                    .unwrap();
+            });
+            let (result, current, elapsed, contended) =
+                receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            worker.join().unwrap();
+            assert!(!result.unwrap_err().is_empty());
+            assert_eq!(current, expected);
+            assert!(contended);
+            assert!(elapsed >= CUSTOM_LOCK_WAIT);
+            assert!(elapsed < Duration::from_secs(2));
+            let mut saved = Vec::new();
+            assert!(read_custom(&path, &mut saved));
+            assert_eq!(saved, original);
+        }
+        drop(held);
+        remove_store(&path);
+    }
 }
