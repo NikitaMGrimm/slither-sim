@@ -53,11 +53,7 @@ impl WorldPresenter {
                 return Err("overlay/surface extent mismatch".into());
             }
             renderer.validate_frame(overlay)?;
-            crate::world_resolution::validate_target(
-                physical,
-                1,
-                renderer.device.limits().max_texture_dimension_2d,
-            )?;
+            crate::world_resolution::validate_target(physical, 1, crate::frame::MAX_EXTENT)?;
         }
         let plan = WorldTargetPlan::new(
             requested,

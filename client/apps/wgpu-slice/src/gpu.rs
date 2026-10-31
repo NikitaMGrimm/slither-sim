@@ -494,7 +494,13 @@ impl Renderer {
         crate::world_resolution::validate_target(
             attachment,
             samples,
-            self.device.limits().max_texture_dimension_2d,
+            if overlay {
+                // Preserve the existing physical surface overlay guard. Native
+                // world allocation separately checks negotiated texture limits.
+                crate::frame::MAX_EXTENT
+            } else {
+                self.device.limits().max_texture_dimension_2d
+            },
         )?;
         let chunk_count = frame.draws.len().div_ceil(VERTEX_CHUNK_QUADS);
         self.vertices

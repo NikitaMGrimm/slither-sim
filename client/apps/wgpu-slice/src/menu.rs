@@ -1222,9 +1222,17 @@ impl Composition<'_> {
             (0., edge, 0., edge),
             (edge, width / 2. - edge, edge, f64::from(half) - edge),
         ];
+        // Compact's shadow is shifted down 3px. Keep that transition in the
+        // fixed top corner rather than stretching it along the straight edge.
+        let top_edge = edge + (3. * raster_scale).ceil();
         let ys = [
-            (0., edge, 0., edge),
-            (edge, height - 2. * edge, edge, f64::from(middle)),
+            (0., top_edge, 0., top_edge),
+            (
+                top_edge,
+                height - top_edge - edge,
+                top_edge,
+                f64::from(padded[1]) - top_edge - edge,
+            ),
             (height - edge, edge, f64::from(padded[1]) - edge, edge),
         ];
         for mirrored in [false, true] {

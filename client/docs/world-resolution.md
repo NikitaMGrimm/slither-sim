@@ -59,7 +59,10 @@ WebGL2 downlevel limits retain adapter resolution via `using_resolution`; the
 2048 baseline is not a universal target ceiling. Uploaded/sample assets keep their
 independent 2048-per-axis cap. With only the 2048 negotiated baseline, Native at
 2560×1440 falls back to Original; it never labels a capped raster Native or changes
-the view area. Browser development/reference hosts keep their existing UI and
+the view area.
+The existing physical overlay keeps its original MAX_EXTENT/128 MiB guard;
+it does not allocate a sampled or multisample texture at the surface size.
+Browser development/reference hosts keep their existing UI and
 presentation, while the shared copied parser preserves/migrates v2 preferences.
 Future WebGL2 extension work must query drawing-buffer, texture/renderbuffer,
 MSAA/resolve support and handle context loss; this PR supplies no GL acceptance.
