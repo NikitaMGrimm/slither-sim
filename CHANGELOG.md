@@ -37,6 +37,11 @@
 
 ### Performance
 
+- Bot observations in large worlds find nearby snakes through a bounds tree
+  instead of checking every snake, and skip empty stretches of the food list
+  when restoring food order. In a fresh 10,000-snake official-density world,
+  observation CPU per decision falls from about 123 to 42 µs, and the 500-bot
+  catalog step gets about 13% faster. Observations are unchanged.
 - Food pickup reads pellet coordinates straight from its index and looks up a
   pellet's list position only when it is eaten. In a frozen 10,000-snake
   world, world CPU per tick falls from about 11.7 to 11.1 ms. Pickup results
@@ -65,10 +70,6 @@
   failed search there costs 0.1 ms more; it was adopted anyway after the
   results, since that is about 1.5% of a 7 ms tick
   ([study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-29-spawn-obstacle-index/REPORT.md)).
-- Bot vision finds nearby snakes without scanning the whole population and
-  restores visible food order without walking the entire food list. In a fresh
-  10,000-snake official-density world, observation CPU falls from 123.2 to
-  42.1 microseconds per decision. Every observation and its ordering are unchanged.
 
 ## [0.8.2](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.1...v0.8.2) - 2026-10-29
 
