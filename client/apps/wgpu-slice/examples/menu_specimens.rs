@@ -879,7 +879,7 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
         }
         state.step(f64::from(ms), false).map_err(str::to_owned)?;
         let view = state.view(true);
-        let progress = (view.logo_reveal * 200.).floor() / 200.;
+        let progress = view.logo_reveal;
         let mut raster = wordmark::raster(&geometry, 1., progress)?;
         let opacity = view.login_alpha * view.logo_alpha;
         for p in raster.pixels.as_chunks_mut::<4>().0 {

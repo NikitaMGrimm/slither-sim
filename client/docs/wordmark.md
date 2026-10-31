@@ -27,7 +27,10 @@ A traveling perpendicular sine displacement grows along each stroke and decays
 smoothly to exactly zero at completion. Most stroke volume arrives in the first
 2.5 seconds; settling uses the full roughly 6.7-second clock. Opacity remains
 the independent `login_alpha * logo_alpha`. The soft shadow follows the current
-drawn mask. Bitmap logo art now uses a plain fade instead of the earlier wipe.
+drawn mask. During motion at DPR 1-3 its coverage and blur run at half resolution;
+higher densities retain the full shadow to keep packed atlas bounds. The exact
+settled frame always uses the original full-resolution pen and shadow. Bitmap
+logo art uses a plain fade instead of the earlier wipe.
 
 Reveal rasters are capped at 40 Hz: a new raster requires at least 25 ms of
 the retained reveal clock. Intervening frames keep the same shared image.
@@ -59,3 +62,22 @@ times, full settled menus at DPR 1/2, arbitrary strings, alphabet sheets, and
 seven raster runs per DPR/progress pair (first warmup omitted in the JSON).
 It opens no window, browser or game socket. Specimens are synthetic product
 output, not owner perceptual acceptance or original pixel parity.
+
+## CPU reveal workload
+
+`wordmark_perf <new-output-dir> [samples=60] [progress=0.5]` is a finite,
+CPU-only release workload. It measures uncached production rasters at DPR 1/2/5
+and complete menu preparation across 40 ms reveal advances, excluding file I/O
+and output validation from timings. Four warmups precede each 16-128-sample
+series. `times.csv` retains every sample; raw RGBA settled/reveal pixels provide
+byte comparisons. No GPU, window, browser or network is created. Build with
+`cargo build --release --locked -p slither-wgpu-slice --example wordmark_perf`.
+Retain both binaries and alternate at least five runs per side for comparisons.
+
+Active rasters stamp antialiased discs. Fully grown strokes use eighth-pixel
+radius/centre buckets; swelling samples use half-pixel radii and quarter-pixel
+centres to avoid constructing hundreds of one-use sprites. Radii that round to
+zero are omitted. Disc data has a 2 MiB per-raster cap; uncommon uncached discs use
+the analytic pen. The settled raster bypasses all disc quantization. Row-cached
+colours and contiguous integer shadow passes preserve the settled bytes;
+regressions compare them with the prior scalar raster at DPR 1/2/5.

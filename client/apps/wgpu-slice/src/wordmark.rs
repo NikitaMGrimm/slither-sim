@@ -2,6 +2,7 @@
 //! each stroke; the retained reveal clock also damps the ripple to exact rest.
 use crate::{Result, materials::RgbaImage};
 use slither_client::menu_layout::MenuRect;
+use std::collections::btree_map::Entry;
 
 #[path = "wordmark_glyphs.rs"]
 mod alphabet;
@@ -284,33 +285,130 @@ fn circle(
     }
 }
 
-fn blur(mask: &mut Vec<u8>, size: [u32; 2], radius: usize) {
-    let [width, height] = size.map(|n| n as usize);
-    let mut tmp = vec![0; mask.len()];
-    for _ in 0..3 {
-        for (w, h, horizontal) in [(width, height, true), (height, width, false)] {
-            for row in 0..h {
-                let at = |x: usize| {
-                    if horizontal {
-                        row * width + x
-                    } else {
-                        x * width + row
-                    }
-                };
-                let mut sum: u32 = (0..=radius.min(w - 1))
-                    .map(|x| u32::from(mask[at(x)]))
-                    .sum();
-                for x in 0..w {
-                    tmp[at(x)] = (sum / (radius as u32 * 2 + 1)) as u8;
-                    if x >= radius {
-                        sum -= u32::from(mask[at(x - radius)]);
-                    }
-                    if x + radius + 1 < w {
-                        sum += u32::from(mask[at(x + radius + 1)]);
+// Reveal-only sprites quantize radius/centre to eighths of a physical pixel.
+// The settled frame still uses the original analytic pen at exact coordinates.
+struct Disc {
+    side: usize,
+    pixels: Vec<u8>,
+    rows: Vec<[u16; 4]>,
+}
+impl Disc {
+    fn new(radius: f64, phase: [u8; 2]) -> Self {
+        let pad = radius.ceil() as usize + 1;
+        let side = pad * 2 + 2;
+        let center = phase.map(|v| pad as f64 + f64::from(v) / 8.);
+        let mut pixels = vec![0; side * side];
+        let mut rows = Vec::with_capacity(side);
+        for (y, row) in pixels.chunks_exact_mut(side).enumerate() {
+            for (x, p) in row.iter_mut().enumerate() {
+                let distance = (x as f64 + 0.5 - center[0]).hypot(y as f64 + 0.5 - center[1]);
+                *p = ((radius + 0.5 - distance).clamp(0., 1.) * 255.).round() as u8;
+            }
+            let left = row.iter().position(|v| *v > 0).unwrap_or(side);
+            let right = row.iter().rposition(|v| *v > 0).map_or(side, |x| x + 1);
+            let solid_left = row.iter().position(|v| *v == 255).unwrap_or(right);
+            let solid_right = row.iter().rposition(|v| *v == 255).map_or(right, |x| x + 1);
+            rows.push([
+                left as u16,
+                right as u16,
+                solid_left as u16,
+                solid_right as u16,
+            ]);
+        }
+        Self { side, pixels, rows }
+    }
+    fn stamp(
+        &self,
+        mask: &mut [u8],
+        owners: &mut [u8],
+        word: u8,
+        size: [u32; 2],
+        center: [i32; 2],
+    ) {
+        let pad = (self.side - 2) as i32 / 2;
+        let base = center.map(|v| v - pad);
+        for (y, bounds) in self.rows.iter().enumerate() {
+            let dy = base[1] + y as i32;
+            if dy < 0 || dy >= size[1] as i32 {
+                continue;
+            }
+            let [left, right, solid_left, solid_right] = bounds.map(i32::from);
+            let left = left.max(-base[0]);
+            let right = right.min(size[0] as i32 - base[0]);
+            if left >= right {
+                continue;
+            }
+            let solid_left = solid_left.clamp(left, right);
+            let solid_right = solid_right.clamp(solid_left, right);
+            let at = dy as usize * size[0] as usize;
+            let row = &mut mask[at..at + size[0] as usize];
+            let owner = &mut owners[at..at + size[0] as usize];
+            for (start, end) in [(left, solid_left), (solid_right, right)] {
+                for x in start..end {
+                    let dx = (base[0] + x) as usize;
+                    let a = self.pixels[y * self.side + x as usize];
+                    if a >= row[dx] {
+                        row[dx] = a;
+                        owner[dx] = word;
                     }
                 }
             }
-            std::mem::swap(mask, &mut tmp);
+            let start = (base[0] + solid_left) as usize;
+            let end = (base[0] + solid_right) as usize;
+            row[start..end].fill(255);
+            owner[start..end].fill(word);
+        }
+    }
+}
+
+fn blur(mask: &mut [u8], size: [u32; 2], radius: usize) {
+    let [width, height] = size.map(|n| n as usize);
+    let mut tmp = vec![0; mask.len()];
+    let mut columns = vec![0_u32; width];
+    let divisor = radius * 2 + 1;
+    // The sum is bounded by 255 * the kernel width. Preserve the old integer
+    // truncation without performing a variable integer division at every pixel.
+    let quotient: Vec<_> = (0..=255 * divisor).map(|v| (v / divisor) as u8).collect();
+    for _ in 0..3 {
+        for (src, dst) in mask.chunks_exact(width).zip(tmp.chunks_exact_mut(width)) {
+            let mut sum: u32 = src[..=radius.min(width - 1)]
+                .iter()
+                .map(|v| u32::from(*v))
+                .sum();
+            for x in 0..width {
+                dst[x] = quotient[sum as usize];
+                if x >= radius {
+                    sum -= u32::from(src[x - radius]);
+                }
+                if x + radius + 1 < width {
+                    sum += u32::from(src[x + radius + 1]);
+                }
+            }
+        }
+        columns.fill(0);
+        for row in tmp.chunks_exact(width).take(radius.min(height - 1) + 1) {
+            for (sum, value) in columns.iter_mut().zip(row) {
+                *sum += u32::from(*value);
+            }
+        }
+        // Advance all columns together: source, destination and running sums
+        // stay contiguous instead of walking a full-height strided column.
+        for (y, dst) in mask.chunks_exact_mut(width).enumerate() {
+            for (pixel, sum) in dst.iter_mut().zip(&columns) {
+                *pixel = quotient[*sum as usize];
+            }
+            if y >= radius {
+                let row = &tmp[(y - radius) * width..][..width];
+                for (sum, value) in columns.iter_mut().zip(row) {
+                    *sum -= u32::from(*value);
+                }
+            }
+            if y + radius + 1 < height {
+                let row = &tmp[(y + radius + 1) * width..][..width];
+                for (sum, value) in columns.iter_mut().zip(row) {
+                    *sum += u32::from(*value);
+                }
+            }
         }
     }
 }
@@ -327,44 +425,304 @@ pub fn raster(layout: &Layout, dpr: f64, progress: f64) -> Result<RgbaImage> {
     // Colour belongs to the circle, including its round end and displaced
     // edge. A vertical colour cut would tint the neighbouring word's pen.
     let mut owners = vec![0; mask.len()];
+    let mut discs = std::collections::BTreeMap::new();
+    let mut disc_bytes = 0;
+    const DISC_BYTES: usize = 2 * 1024 * 1024;
     for sample in samples(&physical, progress)? {
+        let center = sample.center.map(|n| n * dpr);
+        let radius = sample.radius * dpr;
+        if progress < 1. {
+            // Growing samples otherwise create hundreds of one-use sprites.
+            // Half-pixel radius / quarter-pixel centre buckets bound that
+            // construction cost; full-width strokes retain eighth-pixel coverage.
+            let growing = sample.radius < PEN * layout.unit;
+            let grid = if growing { 4. } else { 8. };
+            let multiplier = if growing { 2 } else { 1 };
+            let radius_grid = if growing { 2. } else { 8. };
+            let radius_multiplier = if growing { 4 } else { 1 };
+            let bucket = (radius * radius_grid).round() as u32 * radius_multiplier;
+            if bucket == 0 {
+                continue;
+            }
+            let quantized = center.map(|n| (n * grid).round() as i32 * multiplier as i32);
+            let phase = quantized.map(|n| n.rem_euclid(8) as u8);
+            let key = (bucket, phase);
+            let side = (f64::from(bucket) / 8.).ceil() as usize * 2 + 4;
+            let disc = match discs.entry(key) {
+                Entry::Occupied(entry) => Some(entry.into_mut()),
+                Entry::Vacant(entry) if disc_bytes + side * side + side * 8 <= DISC_BYTES => {
+                    disc_bytes += side * side + side * 8;
+                    Some(entry.insert(Disc::new(f64::from(bucket) / 8., phase)))
+                }
+                Entry::Vacant(_) => None,
+            };
+            if let Some(disc) = disc {
+                disc.stamp(
+                    &mut mask,
+                    &mut owners,
+                    sample.word as u8,
+                    size,
+                    quantized.map(|n| n.div_euclid(8)),
+                );
+                continue;
+            }
+        }
         circle(
             &mut mask,
             &mut owners,
             sample.word as u8,
             size,
-            sample.center.map(|n| n * dpr),
-            sample.radius * dpr,
+            center,
+            radius,
         );
     }
-    let mut shadow = mask.clone();
+    // At ordinary DPR the moving shadow uses half-resolution coverage. Higher
+    // densities keep the full shadow so the existing packed atlas byte proof
+    // remains valid (tests/menu.rs outgoing DPR5 case). Rest is always exact.
+    let shadow_scale = if progress < 1. && dpr <= 3. { 2 } else { 1 };
+    let shadow_size = size.map(|n| n.div_ceil(shadow_scale));
+    let mut shadow = if shadow_scale == 1 {
+        mask.clone()
+    } else {
+        let mut small = vec![0; shadow_size[0] as usize * shadow_size[1] as usize];
+        for y in 0..shadow_size[1] {
+            for x in 0..shadow_size[0] {
+                let mut sum = 0_u16;
+                for row in y * 2..(y * 2 + 2).min(size[1]) {
+                    for col in x * 2..(x * 2 + 2).min(size[0]) {
+                        sum += u16::from(mask[(row * size[0] + col) as usize]);
+                    }
+                }
+                small[(y * shadow_size[0] + x) as usize] = ((sum + 2) / 4) as u8;
+            }
+        }
+        small
+    };
+    let radius = (1.3 * layout.unit / 7. * dpr).ceil() as usize;
     blur(
         &mut shadow,
-        size,
-        (1.3 * layout.unit / 7. * dpr).ceil() as usize,
+        shadow_size,
+        if shadow_scale == 1 {
+            radius
+        } else {
+            (radius / 2).max(1)
+        },
     );
     let mut pixels = vec![0; mask.len() * 4];
-    let offset = (2. * layout.unit / 7. * dpr).round() as usize * size[0] as usize;
-    for (i, p) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-        let y = (i / size[0] as usize) as f64 / dpr / layout.unit;
-        let word = layout.words.get(usize::from(owners[i]));
-        let colors = COLORS[word.map_or(0, |w| w.color)];
-        let t = ((y - 2.) / 10.).clamp(0., 1.);
-        let alpha = f64::from(mask[i]) / 255.;
-        let shade = if i >= offset {
-            f64::from(shadow[i - offset]) / 255. * 0.45
+    let width = size[0] as usize;
+    let shift = (2. * layout.unit / 7. * dpr).round() as usize;
+    let shadow_width = shadow_size[0] as usize;
+    let empty = vec![0; shadow_width];
+    let shadow_only: [u8; 256] =
+        std::array::from_fn(|v| ((v as f64 / 255. * 0.45) * 255.).round() as u8);
+    for (y, row) in pixels.chunks_exact_mut(width * 4).enumerate() {
+        let t = ((y as f64 / dpr / layout.unit - 2.) / 10.).clamp(0., 1.);
+        let gradients = COLORS.map(|colors| {
+            std::array::from_fn::<_, 3, _>(|k| {
+                f64::from(colors[0][k]) * (1. - t) + f64::from(colors[1][k]) * t
+            })
+        });
+        let opaque = gradients.map(|rgb| {
+            [
+                rgb[0].round() as u8,
+                rgb[1].round() as u8,
+                rgb[2].round() as u8,
+                255,
+            ]
+        });
+        let shade = if y >= shift {
+            &shadow[(y - shift) / shadow_scale as usize * shadow_width..][..shadow_width]
         } else {
-            0.
+            &empty
         };
-        for (k, channel) in p.iter_mut().take(3).enumerate() {
-            *channel = ((f64::from(colors[0][k]) * (1. - t) + f64::from(colors[1][k]) * t) * alpha)
-                .round() as u8;
+        let coverage = &mask[y * width..][..width];
+        let owners = &owners[y * width..][..width];
+        for (x, ((pixel, alpha), owner)) in row
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .zip(coverage)
+            .zip(owners)
+            .enumerate()
+        {
+            let shade = shade[x / shadow_scale as usize];
+            if *alpha == 0 {
+                pixel[3] = shadow_only[usize::from(shade)];
+                continue;
+            }
+            let color = layout.words.get(usize::from(*owner)).map_or(0, |w| w.color);
+            if *alpha == 255 {
+                *pixel = opaque[color];
+                continue;
+            }
+            let alpha = f64::from(*alpha) / 255.;
+            for (channel, value) in pixel[..3].iter_mut().zip(gradients[color]) {
+                *channel = (value * alpha).round() as u8;
+            }
+            let shade = f64::from(shade) / 255. * 0.45;
+            pixel[3] = ((alpha + shade * (1. - alpha)) * 255.).round() as u8;
         }
-        p[3] = ((alpha + shade * (1. - alpha)) * 255.).round() as u8;
     }
     Ok(RgbaImage {
         width: size[0],
         height: size[1],
         pixels,
     })
+}
+
+#[cfg(test)]
+mod raster_tests {
+    use super::*;
+
+    #[test]
+    fn disc_sprites_match_analytic_coverage_and_word_ownership_on_their_grid() {
+        let size = [37, 29];
+        for radius in [0.5, 0.875, 1.25, 3.125, 6.25, 12.375] {
+            for phase in [[0, 0], [1, 7], [4, 4], [7, 2]] {
+                for integer in [[-8, -5], [0, 0], [12, 14], [36, 28], [43, 35]] {
+                    let disc = Disc::new(radius, phase);
+                    let mut actual = vec![0; 37 * 29];
+                    let mut owners = actual.clone();
+                    let mut expected = actual.clone();
+                    let mut expected_owners = actual.clone();
+                    for word in 0..3 {
+                        let integer = [integer[0] + i32::from(word), integer[1]];
+                        let center = std::array::from_fn(|i| {
+                            f64::from(integer[i]) + f64::from(phase[i]) / 8.
+                        });
+                        disc.stamp(&mut actual, &mut owners, word, size, integer);
+                        circle(
+                            &mut expected,
+                            &mut expected_owners,
+                            word,
+                            size,
+                            center,
+                            radius,
+                        );
+                    }
+                    assert_eq!(actual, expected);
+                    for (i, alpha) in actual.iter().enumerate().filter(|(_, a)| **a > 0) {
+                        assert_eq!(
+                            owners[i], expected_owners[i],
+                            "visible coverage {alpha} at {i}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn contiguous_blur_preserves_zero_edges_and_integer_truncation() {
+        for size in [[1, 1], [1, 9], [7, 3], [37, 29]] {
+            for radius in [0, 1, 2, 7, 32] {
+                let width = size[0] as usize;
+                let height = size[1] as usize;
+                let mut expected: Vec<_> = (0..width * height)
+                    .map(|i| ((i * 31 + 17) % 256) as u8)
+                    .collect();
+                let mut actual = expected.clone();
+                // Independent direct convolution of the previous three box passes.
+                for _ in 0..3 {
+                    let old = expected.clone();
+                    for y in 0..height {
+                        for x in 0..width {
+                            let sum: usize = (x.saturating_sub(radius)
+                                ..=(x + radius).min(width - 1))
+                                .map(|i| usize::from(old[y * width + i]))
+                                .sum();
+                            expected[y * width + x] = (sum / (radius * 2 + 1)) as u8;
+                        }
+                    }
+                    let old = expected.clone();
+                    for y in 0..height {
+                        for x in 0..width {
+                            let sum: usize = (y.saturating_sub(radius)
+                                ..=(y + radius).min(height - 1))
+                                .map(|i| usize::from(old[i * width + x]))
+                                .sum();
+                            expected[y * width + x] = (sum / (radius * 2 + 1)) as u8;
+                        }
+                    }
+                }
+                blur(&mut actual, size, radius);
+                assert_eq!(actual, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn settled_pixels_equal_the_prior_scalar_raster_at_every_density() {
+        let holder = MenuRect {
+            x: 735.,
+            y: 50.,
+            width: 450.,
+            height: 115.,
+        };
+        for value in [DEFAULT_TEXT, "Hello World 123"] {
+            let layout = layout(value, holder, 1920., |_| unreachable!()).unwrap();
+            for dpr in [1., 2., 5.] {
+                let actual = raster(&layout, dpr, 1.).unwrap();
+                let expected = scalar_reference(&layout, dpr, 1.).unwrap();
+                assert_eq!(actual.pixels, expected.pixels);
+            }
+        }
+    }
+
+    // b71b68ae's scalar colour/shadow composition is retained only as a
+    // regression oracle. Pen geometry is shared; blur has a separate direct oracle.
+    fn scalar_reference(layout: &Layout, dpr: f64, progress: f64) -> Result<RgbaImage> {
+        let size = raster_size(layout, dpr)?;
+        let mut physical = layout.clone();
+        let origin_x = layout.origin_pixels(dpr)[0];
+        for (word, original) in physical.words.iter_mut().zip(&layout.words) {
+            // Relative advances are rounded once from the same canvas origin.
+            word.x = (layout.word_x_pixels(original, dpr) - origin_x) / (layout.unit * dpr);
+        }
+        let mut mask = vec![0; size[0] as usize * size[1] as usize];
+        // Colour belongs to the circle, including its round end and displaced
+        // edge. A vertical colour cut would tint the neighbouring word's pen.
+        let mut owners = vec![0; mask.len()];
+        for sample in samples(&physical, progress)? {
+            circle(
+                &mut mask,
+                &mut owners,
+                sample.word as u8,
+                size,
+                sample.center.map(|n| n * dpr),
+                sample.radius * dpr,
+            );
+        }
+        let mut shadow = mask.clone();
+        blur(
+            &mut shadow,
+            size,
+            (1.3 * layout.unit / 7. * dpr).ceil() as usize,
+        );
+        let mut pixels = vec![0; mask.len() * 4];
+        let offset = (2. * layout.unit / 7. * dpr).round() as usize * size[0] as usize;
+        for (i, p) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let y = (i / size[0] as usize) as f64 / dpr / layout.unit;
+            let word = layout.words.get(usize::from(owners[i]));
+            let colors = COLORS[word.map_or(0, |w| w.color)];
+            let t = ((y - 2.) / 10.).clamp(0., 1.);
+            let alpha = f64::from(mask[i]) / 255.;
+            let shade = if i >= offset {
+                f64::from(shadow[i - offset]) / 255. * 0.45
+            } else {
+                0.
+            };
+            for (k, channel) in p.iter_mut().take(3).enumerate() {
+                *channel = ((f64::from(colors[0][k]) * (1. - t) + f64::from(colors[1][k]) * t)
+                    * alpha)
+                    .round() as u8;
+            }
+            p[3] = ((alpha + shade * (1. - alpha)) * 255.).round() as u8;
+        }
+        Ok(RgbaImage {
+            width: size[0],
+            height: size[1],
+            pixels,
+        })
+    }
 }
