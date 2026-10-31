@@ -321,7 +321,15 @@ pub fn abandoned() {
 }
 /// A normal shutdown can discard accepted bytes. This is terminal, not delivery.
 pub fn closed_unflushed() {
-    retire_writes("closed_unflushed");
+    let boundary = next();
+    STATE.with_borrow_mut(|s| {
+        push(s, "normal_close", boundary, 0, 0);
+        for index in 0..s.pending_writes.len() {
+            let id = s.pending_writes[index];
+            push(s, "closed_unflushed", id, boundary, 0);
+        }
+        s.pending_writes.clear();
+    });
 }
 fn retire_writes(stage: &'static str) {
     STATE.with_borrow_mut(|s| {
@@ -650,11 +658,15 @@ mod tests {
             let _buffer = recorder.attach();
             accepted(7);
             closed_unflushed();
-            closed_unflushed();
             abandoned();
         }
         let (rows, dropped) = recorder.snapshot();
         assert_eq!(dropped, 0);
+        let boundary = rows.iter().find(|r| r.stage == "normal_close").unwrap();
+        assert!(
+            rows.iter()
+                .any(|r| r.stage == "closed_unflushed" && r.related == boundary.id)
+        );
         assert_eq!(
             rows.iter()
                 .filter(|r| r.stage == "closed_unflushed" && r.id == 7)

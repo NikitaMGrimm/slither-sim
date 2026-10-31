@@ -2033,7 +2033,7 @@ impl AnimatedClient {
             self.face_presentation_enabled |= enable_face_presentation;
             self.accessory_presentation_enabled |= enable_accessory_presentation;
             #[cfg(feature = "feel-trace")]
-            self.trace_boundary("update", None, None, None);
+            self.trace_boundary("update", None, None, None, None);
             return Ok((applied.report, None));
         }
         let mut next = self.clone();
@@ -2475,7 +2475,7 @@ impl AnimatedClient {
         }
         next.received = received;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", None, None, None);
+        next.trace_boundary("update", None, None, None, None);
         *self = next;
         Ok((applied.report, journal))
     }
@@ -2541,7 +2541,7 @@ impl AnimatedClient {
         }
         next.advance_entities(step, now_ms)?;
         #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", Some(step), None, None);
+        next.trace_boundary("update", Some(step), None, None, None);
         *self = next;
         Ok(step)
     }
@@ -3254,11 +3254,8 @@ impl AnimatedClient {
                 .find(|p| p.snake.own)
                 .and_then(|p| p.snake.body_geometry.as_ref())
                 .map(|body| body.samples.as_slice()),
+            Some(&prepared),
         );
-        #[cfg(feature = "feel-trace")]
-        if let Some(recorder) = &next.trace {
-            recorder.observe_geometry(next, &prepared);
-        }
         Ok(prepared)
     }
 
@@ -3289,9 +3286,10 @@ impl AnimatedClient {
         step: Option<FrameStep>,
         extent: Option<[u32; 2]>,
         body: Option<&[BodyPaintSample]>,
+        prepared: Option<&[PreparedAccessorySnake]>,
     ) {
         if let Some(recorder) = &self.trace {
-            recorder.observe(self, phase, step, extent, body);
+            recorder.observe(self, phase, step, extent, body, prepared);
         }
     }
 
@@ -4268,7 +4266,14 @@ mod resolved_draw_tests {
         let anchors = client.own_snake().unwrap().body().points().to_vec();
         let mut shifted = body.clone();
         shifted[4].x += 16.;
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&shifted));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&shifted),
+            None,
+        );
         let mutant = recorder.take().pop().unwrap();
         assert_eq!(client.own_snake().unwrap().body().points(), anchors);
         assert_eq!(&baseline.values[..38], &mutant.values[..38]);
@@ -4289,7 +4294,14 @@ mod resolved_draw_tests {
         // The entire bounded output is retained; an oversized draw fails loudly.
         let mut bounded = vec![body[0]; MAX_BODY_TRACE_POINTS];
         bounded.last_mut().unwrap().x += 32.;
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&bounded),
+            None,
+        );
         let row = recorder.take().pop().unwrap();
         assert_eq!(row.values[37] as usize, MAX_BODY_TRACE_POINTS);
         let tail = bounded.last().unwrap();
@@ -4298,7 +4310,14 @@ mod resolved_draw_tests {
             750. + (f64::from(tail.x) - client.camera().position().x) * client.camera().zoom()
         );
         bounded.push(body[0]);
-        recorder.observe(&client, "draw", None, Some([1500, 845]), Some(&bounded));
+        recorder.observe(
+            &client,
+            "draw",
+            None,
+            Some([1500, 845]),
+            Some(&bounded),
+            None,
+        );
         assert!(recorder.has_failed());
         assert!(recorder.last_draw().is_none());
         assert!(recorder.take().is_empty());

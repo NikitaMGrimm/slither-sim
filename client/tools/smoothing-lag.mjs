@@ -101,6 +101,13 @@ export function analyzeProbe(run) {
   const maximumGap=Math.max(...run.rows.slice(1).map((r,i)=>r.atMs-run.rows[i].atMs));
   check(measured[0].atMs-run.originMs-run.warmupMs<=maximumGap+1e-6 && run.originMs+run.durationMs-measured.at(-1).atMs<=maximumGap+1e-6,'truncated measured interval');
   const summaries={};
+  const camera = {
+    worldError:distribution(measured.map(r=>norm(sub(r.camera,r.snakes.find(s=>s.own).truth)))),
+    smoothness:{
+      world:smoothness(measured.map(r=>({t:r.atMs,q:r.camera}))),
+      residualWorld:smoothness(measured.map(r=>({t:r.atMs,q:sub(r.camera,r.snakes.find(s=>s.own).truth)}))),
+    },
+  };
   for(const own of [true,false]) {
     const role=own?'own':'enemy', channels={}, metrics={}, series={}; const failures=[];
     const add=(name,x)=>{(metrics[name]??=[]).push(x);};
@@ -118,9 +125,6 @@ export function analyzeProbe(run) {
       const screen=p=>sub(p,r.camera).map(x=>x*r.zoom);
       point('headWorld',r.atMs,s.drawn); point('headScreen',r.atMs,screen(s.drawn));
       point('headResidualWorld',r.atMs,sub(s.drawn,s.truth));point('headResidualScreen',r.atMs,sub(s.drawn,s.truth).map(x=>x*r.zoom));
-      point('cameraWorld',r.atMs,r.camera);
-      const ownTruth=r.snakes.find(s=>s.own).truth;
-      point('cameraResidualWorld',r.atMs,sub(r.camera,ownTruth)); add('cameraWorldError',norm(sub(r.camera,ownTruth)));
       let bodyLength=0;for(let i=1;i<s.body.length;i++) bodyLength+=norm(sub(s.body[i],s.body[i-1]));
       add('bodyLength',bodyLength);
       const spacing=s.body.slice(1).map((p,i)=>norm(sub(p,s.body[i]))); for(const length of spacing)add('bodySpacing',length);
@@ -137,10 +141,6 @@ export function analyzeProbe(run) {
         point(`body${distance}ResidualWorld`,r.atMs,sub(q,s.truthBody[i]));
         point(`body${distance}ResidualScreen`,r.atMs,sub(q,s.truthBody[i]).map(x=>x*r.zoom));
       }
-      const trueClearance=norm(sub(s.truth,other.truth))-reach;
-      const drawnClearance=norm(sub(s.drawn,other.drawn))-reach;
-      add('pairedHeadClearanceError',drawnClearance-trueClearance);
-      add('pairedHeadClearanceSignDisagreement',Number((trueClearance<0)!==(drawnClearance<0)));
       if(previous) {
         const dt=r.atMs-previous.r.atMs;add('ackGapMs',dt);
         const step=norm(sub(screen(s.drawn),previous.screen));
@@ -159,10 +159,16 @@ export function analyzeProbe(run) {
     summaries[role]={metrics:channels,smoothness:Object.fromEntries(Object.entries(series).map(([name,x])=>[name,smoothness(x)])),
       longestStaleMs:longestStale,timeAboveHalfReachMs:aboveHalfR,timeAboveReachMs:aboveR,
       directionReversals:(metrics.directionReversal??[]).reduce((s,v)=>s+v,0),
-      geometricClearanceSignDisagreements:(metrics.pairedHeadClearanceSignDisagreement??[]).reduce((s,v)=>s+v,0),
       baselineSafetyTargets:{p95BelowQuarterReach:channels.errorOverReach.p95<=.25,p99BelowHalfReach:channels.errorOverReach.p99<=.5},failures};
   }
-  return {config:run.config,frames:run.rows.length,measuredFrames:measured.length,maximumGapMs:maximumGap,skipped:0,duplicates:0,summaries};
+  return {config:run.config,frames:run.rows.length,measuredFrames:measured.length,maximumGapMs:maximumGap,skipped:0,duplicates:0,camera,summaries};
+}
+// The producer retains station failures; every accepted matrix run AND control
+// must pass this gate before it can contribute to a completed calibration.
+export function completeProbe(run) {
+  const summary=analyzeProbe(run);
+  for(const role of ['own','enemy']) check(summary.summaries[role].failures.length===0,'missing body stations');
+  return summary;
 }
 export function pairedResponse(base,impulse) {
   check(base.rows.length===impulse.rows.length,'paired frame count mismatch'); const out={};
@@ -216,9 +222,8 @@ function runMatrix(binary,out) {
     }
     const result={config};
     try {
-      check(runs.every(Boolean),'missing run');result.baseline=analyzeProbe(runs[0]);result.impulse=analyzeProbe(runs[1]);result.response=pairedResponse(...runs);
+      check(runs.every(Boolean),'missing run');result.baseline=completeProbe(runs[0]);result.impulse=completeProbe(runs[1]);result.response=pairedResponse(...runs);
       for(const role of ['own','enemy']) {
-        check(result.baseline.summaries[role].failures.length===0 && result.impulse.summaries[role].failures.length===0,'missing body stations');
         for(const kind of ['position','heading'])check(result.response[role][kind].levels.t90 && result.response[role][kind].sustainedLevels.t90,'unresolved correction detector');
       }
     }catch(e){result.failure=String(e);receipt.failures.push({id,error:String(e)});}
@@ -231,7 +236,7 @@ function runMatrix(binary,out) {
     const config={rate:'170',speed:anchors?'normal':'stationary',motion:'straight',jitterMs:0,delayMs,anchors,impulse:false};
     const p=spawnSync(binary,['--smoothing-lag-probe'],{input:JSON.stringify(config),encoding:'utf8',maxBuffer:128*1024*1024});
     fs.writeFileSync(path.join(out,`control-${label}.json`),p.stdout??'');fs.writeFileSync(path.join(out,`control-${label}.stderr.txt`),p.stderr??'');
-    try {check(p.status===0,'production control failed');const s=analyzeProbe(JSON.parse(p.stdout));
+    try {check(p.status===0,'production control failed');const s=completeProbe(JSON.parse(p.stdout));
       if(!anchors) for(const role of ['own','enemy']) {
         check(s.summaries[role].metrics.euclidean.max<1e-6 && s.summaries[role].metrics.lagEquivalentMs.count===0,'stationary zero-correction head control');
         check(s.summaries[role].metrics.correctionMagnitude.max<1e-6,'unexpected correction in zero-correction control');

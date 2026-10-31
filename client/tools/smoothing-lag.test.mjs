@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { error, station, smoothness, response, distribution, analyzeProbe } from './smoothing-lag.mjs';
+import { error, station, smoothness, response, distribution, analyzeProbe, completeProbe } from './smoothing-lag.mjs';
 
 test('truth minus draw has signed millisecond units, with undefined stationary lag',()=>{
   assert.equal(error([10,0],[9,0],0,20).lagEquivalentMs,50);
@@ -61,6 +61,17 @@ test('complete authored rows retain world lag, normalized body errors and screen
   assert.equal(r.summaries.enemy.metrics.body252OverReach.max,0);
   assert.ok(Math.abs(r.summaries.own.smoothness.headWorld.velocity.rms-20)<1e-9);
   assert.equal(r.summaries.own.smoothness.headScreen.velocity.max,0);
+  assert.equal(r.camera.worldError.max,0);
+  assert.equal(r.summaries.own.smoothness.cameraWorld,undefined);
+});
+test('every production control requires complete own and enemy body stations',()=>{
+  for(const anchors of [false,true]) for(const own of [true,false]) {
+    const r=fixture();r.config.anchors=anchors;
+    r.rows[200].snakes.find(s=>s.own===own).body=[[0,0]];
+    assert.ok(analyzeProbe(r).summaries[own?'own':'enemy'].failures.length>0);
+    assert.throws(()=>completeProbe(r),/missing body stations/);
+  }
+  assert.equal(completeProbe(fixture()).summaries.own.failures.length,0);
 });
 test('missing frames, duplicates, missing geometry and orphan packet provenance fail completeness',()=>{
   for(const change of [r=>r.rows.splice(20,1),r=>r.rows[20].sequence='0',r=>r.rows[20].snakes.pop(),r=>r.rows[20].snakes[0].anchorId=99]) {

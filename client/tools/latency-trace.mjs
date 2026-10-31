@@ -9,14 +9,15 @@ const groups = Object.fromEntries(Object.entries({
     backpressure flush_blocked last_ingress decision_input coalesced`,
   boundary: 'retried superseded skipped presented',
   dependency: 'decision_input coalesced',
-  failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed',
+  failed: 'apply_failed build_failed picture_failed failed_effect send_abandoned game_failed transport_failed',
   effect: 'accepted flushed closed_unflushed ack_effect host_close decision backpressure',
   send: 'accepted flushed closed_unflushed decision backpressure',
+  sendActivity: 'accepted flushed decision decision_input backpressure write write_blocked flush_blocked',
   optionalEffect: 'write write_blocked flush_blocked',
   optionalPoll: 'write write_blocked flush_blocked backpressure handshake_read',
   packet: 'apply_begin apply_end deferred',
   watermark: 'build_begin build_end superseded retried last_ingress',
-  plain: 'thread_end ready poll poll_ready read handshake_read message callback admitted suppressed effect acquire_begin acquire_end',
+  plain: 'thread_end ready poll poll_ready read handshake_read message callback admitted suppressed effect acquire_begin acquire_end normal_close',
 }).map(([name, names]) => [name, new Set(names.split(/\s+/))]));
 const stages = new Set(Object.values(groups).flatMap(group => [...group]));
 const integer = x => Number.isSafeInteger(x) && x >= 0;
@@ -130,8 +131,19 @@ export function analyze(text, { cpu = false } = {}) {
   }
   for (const r of classified('effect')) one('effect', r);
   for (const r of classified('send')) check(one('effect', r).detail === '1', 'send stage on non-send effect');
+  const closedGenerations = new Set();
+  for (const r of each('normal_close')) {
+    const generation = `${r.thread}/${r.generation}`;
+    check(r.id !== '0' && r.related === '0' && r.detail === '0' && !closedGenerations.has(generation), 'duplicate/invalid normal close');
+    closedGenerations.add(generation);
+    check(!lines.some(e => e.thread === r.thread && e.generation === r.generation && e.event > r.event
+      && (groups.sendActivity.has(e.stage) || (e.stage === 'effect' && e.detail === '1')
+        || (e.stage === 'ack_effect' && one('effect', e).detail === '1'))), 'send after terminal close');
+  }
   for (const r of each('closed_unflushed')) {
-    check(!each('effect').some(e => e.thread === r.thread && e.generation === r.generation && e.detail === '1' && e.t > r.t), 'send after terminal close');
+    check(r.related !== '0', 'terminal loss missing normal-close witness');
+    const boundary = one('normal_close', r, r.related), accepted = one('accepted', r);
+    check(accepted.event < boundary.event && boundary.event < r.event, 'invalid terminal loss order');
   }
   for (const r of classified('optionalEffect')) if (r.id !== '0') {
     check(one('effect', r).t <= r.t, 'write precedes effect');

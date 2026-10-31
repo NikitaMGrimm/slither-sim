@@ -109,7 +109,11 @@ connector thread across the HTTP upgrade. They never enter the game protocol.
   always requires its own acknowledgement and flush. `game_failed` invalidates
   analysis.
   A normal session shutdown can instead retire an accepted send as
-  `closed_unflushed`. The analyzer accepts and counts this terminal loss without
+  `closed_unflushed`, whose `related` references an explicit `normal_close.id`
+  boundary. Accepted sends must precede that boundary; all later send activity
+  in the same generation is rejected by thread-local event order, including
+  timestamp ties. Non-`WouldBlock` close/flush errors emit `transport_failed`
+  before retirement and invalidate analysis. The analyzer counts normal terminal loss without
   including it in any flush distribution. Missing both terminal states, duplicate
   flush/close completion, and transport failures still fail validation.
 
