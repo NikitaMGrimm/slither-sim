@@ -840,7 +840,10 @@ fn wordmark_runs_abut_and_override_only_logo_art() {
             let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
             let holder = layout.viewport_rect(E::Logo);
             let [(left, green), (right, purple)] = wordmark_runs(&mut text, holder, dpr).unwrap();
-            assert_eq!(left.x + left.width, right.x);
+            assert_eq!(
+                (right.x * dpr).round() - (left.x * dpr).round(),
+                (left.width * dpr).round()
+            );
             assert_eq!(green.color, WORDMARK_GREEN);
             assert_eq!(purple.color, WORDMARK_PURPLE);
             assert!((left.width + right.width - holder.width).abs() < 0.01);
@@ -872,4 +875,63 @@ fn wordmark_runs_abut_and_override_only_logo_art() {
             view.logo_reveal = 1.;
         }
     }
+}
+
+#[test]
+fn wordmark_composed_origins_share_one_snapped_advance_boundary() {
+    use slither_client::menu_layout::MenuElement as E;
+    use slither_wgpu_slice::{
+        menu::{WORDMARK_GREEN, WORDMARK_PURPLE, wordmark_runs},
+        menu_specimen,
+    };
+    let mut text = TextCache::menu();
+    let view = menu_specimen::view(0).unwrap();
+    let mut adjacent = true;
+    for dpr in [1., 1.25, 1.5, 1.75, 2.] {
+        let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+        let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+        let logo = layout.viewport_rect(E::Logo);
+        let [(_, mut style), _] = wordmark_runs(&mut text, logo, dpr).unwrap();
+        style.size *= dpr;
+        let advance = text.measure_panel("Slither", style).unwrap().advance;
+        let picture = Menu::default()
+            .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+            .unwrap();
+        let origin = |rgb: [u8; 3]| {
+            picture
+                .frame
+                .draws
+                .iter()
+                .filter(|d| {
+                    d.destination.y >= logo.y
+                        && d.destination.y < logo.y + logo.height
+                        && picture.resources.iter().any(|r| {
+                            r.asset == d.asset
+                                && r.image
+                                    .pixels
+                                    .as_chunks::<4>()
+                                    .0
+                                    .iter()
+                                    .any(|p| *p == [rgb[0], rgb[1], rgb[2], 255])
+                        })
+                })
+                .map(|d| {
+                    let x = (d.destination.x + d.translation[0]) * dpr;
+                    assert!((x - x.round()).abs() < 1e-8);
+                    x
+                })
+                .min_by(f64::total_cmp)
+                .unwrap()
+        };
+        let painted_advance = origin(WORDMARK_PURPLE) - origin(WORDMARK_GREEN);
+        println!(
+            "DPR {dpr}: advance={advance:.6}, rounded={}, painted={painted_advance:.0}",
+            advance.round()
+        );
+        adjacent &= (painted_advance - advance.round()).abs() < 1e-8;
+    }
+    assert!(
+        adjacent,
+        "composed wordmark origins must meet at the rounded physical advance"
+    );
 }

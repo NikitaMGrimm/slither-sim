@@ -233,22 +233,25 @@ pub fn wordmark_runs(
     style.size *= (logo.width / width).min(1.);
     let mut physical = style;
     physical.size *= dpr;
-    let left = text.measure_panel("Slither", physical)?.advance / dpr;
-    let right = text.measure_panel("Client", physical)?.advance / dpr;
-    let x = logo.x + (logo.width - left - right) / 2.;
+    let left_px = text.measure_panel("Slither", physical)?.advance;
+    let right_px = text.measure_panel("Client", physical)?.advance;
+    // Snap the common origin and advance once. Rounding each run's origin
+    // independently can move the join one physical pixel in either direction.
+    let origin_px = ((logo.x + logo.width / 2.) * dpr - (left_px + right_px) / 2.).round();
+    let boundary_px = origin_px + left_px.round();
     Ok([
         (
             MenuRect {
-                x,
-                width: left,
+                x: origin_px / dpr,
+                width: left_px / dpr,
                 ..logo
             },
             style,
         ),
         (
             MenuRect {
-                x: x + left,
-                width: right,
+                x: boundary_px / dpr,
+                width: right_px / dpr,
                 ..logo
             },
             TextStyle {

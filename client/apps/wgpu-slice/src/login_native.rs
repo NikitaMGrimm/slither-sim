@@ -281,20 +281,13 @@ impl NativeLogin {
         };
         let area = extent.map(|n| f64::from(n) / dpr);
         self.pixel_scale = dpr;
-        let fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
-        if self.area != area {
-            self.layout = fresh;
-            self.area = area;
-        } else {
+        let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
+        if self.area == area {
             // Keep resize-time top across fade updates.
-            self.layout
-                .update(
-                    view.transition,
-                    view.tips_visible,
-                    crate::menu_specimen::metrics(&mut self.text, &view)?,
-                )
-                .map_err(str::to_owned)?;
+            fresh.top = self.layout.top;
         }
+        self.layout = fresh;
+        self.area = area;
         view.nickname = self.displayed_nickname();
         self.menu.prepare_with_input(
             &mut self.text,
