@@ -561,7 +561,7 @@ def build_all(snapshots, targets, examples, *, logs, bins, hook=None, timeout=60
             hashes = {path.name: digest(path) for path in binaries.values()}
             record = {"schema": "slither-perf-build-v1", "utc": utc(), **snapshot.record(),
                       "runtime_adapter": "private-state" if (snapshot.checkout / "src/simulator/initialization.rs").is_file() else "public-state",
-                      "state_adapter": ("checkpoint-v2" if 'slither-sim-checkpoint-v2' in (snapshot.checkout / "src/simulator/checkpoint.rs").read_text(encoding="utf-8") else "checkpoint-v1") if (snapshot.checkout / "src/simulator/checkpoint.rs").is_file() else "legacy-serde",
+                      "state_adapter": ("checkpoint-v3" if 'slither-sim-checkpoint-v3' in (snapshot.checkout / "src/simulator/checkpoint.rs").read_text(encoding="utf-8") else ("checkpoint-v2" if 'slither-sim-checkpoint-v2' in (snapshot.checkout / "src/simulator/checkpoint.rs").read_text(encoding="utf-8") else "checkpoint-v1")) if (snapshot.checkout / "src/simulator/checkpoint.rs").is_file() else "legacy-serde",
                       "radius_adapter": "runtime-state" if (snapshot.checkout / "src/simulator.rs").is_file() and "\n    radius: f64," in (snapshot.checkout / "src/simulator.rs").read_text(encoding="utf-8").split("pub struct Simulator {", 1)[-1].split("}", 1)[0] else "config-live",
                       "state_adapter_sources": {name: digest(snapshot.checkout / name) for name in ("build.rs", "examples/support/state.rs", "examples/support/runtime.rs") if (snapshot.checkout / name).is_file()},
                       "runtime_sources": {path.relative_to(snapshot.checkout).as_posix(): digest(path) for path in sorted((snapshot.checkout / "src").rglob("*.rs"))},

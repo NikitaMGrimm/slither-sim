@@ -80,7 +80,7 @@ Advancement or frame-collection failure makes `step` raise `SessionEndedError`
 `frame` raises `ValueError` ("Reset first"). Reset to continue. `request` instead
 returns an error reply with `sessionEnded: true` (false for unchanged-state errors).
 
-The module also exports `PROTOCOL` (`slither-sim-json-v5`), `NONE`, `NO_ORIGIN`,
+The module also exports `PROTOCOL` (`slither-sim-json-v6`), `NONE`, `NO_ORIGIN`,
 `ORIGINS` and `REASONS`, with the meanings of the [Rust
 constants](bot-api.md#in-process-sessions). Type stubs ship with the package.
 
@@ -150,5 +150,5 @@ the same wall time as one.
 ## Compatibility
 
 The package inherits the workspace's `slither-sim` crate version. Check
-`PROTOCOL` (`slither-sim-json-v5`) and record the commit for reproducibility.
+`PROTOCOL` (`slither-sim-json-v6`) and record the commit for reproducibility.
 The Python API is experimental and may change between `0.x` versions.

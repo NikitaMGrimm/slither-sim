@@ -1,4 +1,4 @@
-//! `slither-sim-abi-v3`: a C ABI over [`slither_sim::transport::Session`].
+//! `slither-sim-abi-v4`: a C ABI over [`slither_sim::transport::Session`].
 //!
 //! `include/slither_sim.h` declares the API, and `tests/abi.rs` checks it
 //! against this crate. A panicking call returns [`SLITHER_PANICKED`] instead of unwinding;
@@ -14,7 +14,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::{ptr, slice};
 
 /// Increments with every incompatible change of this interface.
-pub const SLITHER_ABI_VERSION: u32 = 3;
+pub const SLITHER_ABI_VERSION: u32 = 4;
 
 pub const SLITHER_OK: i32 = 0;
 /// The session rejected the call and changed nothing.

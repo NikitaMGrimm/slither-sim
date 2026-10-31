@@ -7,8 +7,8 @@ use std::{
     mem::size_of,
 };
 
-pub const FORMAT: &str = "slither-sim-checkpoint-v2";
-pub const RULES_REVISION: &str = "slither-sim-rules-v5";
+pub const FORMAT: &str = "slither-sim-checkpoint-v3";
+pub const RULES_REVISION: &str = "slither-sim-rules-v6";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EventRecording {
@@ -110,6 +110,8 @@ struct State {
     failure: Option<SimError>,
     slots: Vec<Slot>,
     food: Vec<FoodRecord>,
+    food_birth_order: Vec<u64>,
+    next_food_birth: u64,
     prey: Vec<PreyRecord>,
     deaths: Vec<DeathRecord>,
 }
@@ -181,6 +183,8 @@ fn state_schema(raw: &Value) -> Result<(), SimError> {
             "failure",
             "slots",
             "food",
+            "foodBirthOrder",
+            "nextFoodBirth",
             "prey",
             "deaths",
         ],
@@ -594,6 +598,8 @@ impl Simulator {
             }),
             failure: self.failure.clone(),
             slots,
+            food_birth_order: self.food_birth_order.clone(),
+            next_food_birth: self.next_food_birth,
             food: collect(&self.food, "state.food", |f| FoodRecord {
                 x: f.x,
                 y: f.y,
@@ -877,6 +883,24 @@ impl State {
                 )?;
             }
         }
+        require(
+            self.food_birth_order.len() == self.food.len(),
+            Constraint::LengthMismatch,
+            "state.foodBirthOrder",
+        )?;
+        let mut births = HashSet::new();
+        for &birth in &self.food_birth_order {
+            require(
+                birth < self.next_food_birth,
+                Constraint::OutOfRange,
+                "state.foodBirthOrder",
+            )?;
+            require(
+                births.insert(birth),
+                Constraint::Duplicate,
+                "state.foodBirthOrder",
+            )?;
+        }
         for (i, food) in self.food.iter().enumerate() {
             let path = format!("state.food[{i}]");
             bounded(food.x, DEAD, &format!("{path}.x"))?;
@@ -1056,6 +1080,8 @@ impl State {
             radius: self.radius,
             snakes,
             food,
+            food_birth_order: self.food_birth_order,
+            next_food_birth: self.next_food_birth,
             prey,
             deaths,
             time: self.time,

@@ -631,6 +631,11 @@ impl Simulator {
         for value in &values {
             food(value)?;
         }
+        let mut births = Vec::new();
+        reserve(&mut births, values.len())?;
+        births.extend(0..values.len() as u64);
+        self.food_birth_order = births;
+        self.next_food_birth = values.len() as u64;
         self.food = values;
         self.food_cache = FoodCache::default();
         Ok(())
@@ -638,7 +643,9 @@ impl Simulator {
     pub fn insert_food(&mut self, value: Food) -> Result<usize, SimError> {
         food(&value)?;
         reserve(&mut self.food, 1)?;
+        reserve(&mut self.food_birth_order, 1)?;
         let index = self.food.len();
+        push_food_birth(&mut self.food_birth_order, &mut self.next_food_birth);
         self.food.push(value);
         self.food_cache = FoodCache::default();
         Ok(index)
@@ -650,6 +657,7 @@ impl Simulator {
             );
         }
         let food = self.food.remove(index);
+        self.food_birth_order.remove(index);
         self.food_cache = FoodCache::default();
         Ok(food)
     }

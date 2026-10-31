@@ -577,7 +577,7 @@ fn rejected_typed_steps_change_nothing() {
 fn terminal_steps_clear_all_worlds_and_allow_reset() {
     use slither_sim::transport::StepError;
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-errors-v5.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-errors-v6.json")).unwrap();
     let reset = serde_json::to_vec(&fixture["reset"]).unwrap();
     let step = serde_json::to_vec(&fixture["step"]).unwrap();
     let mut session = transport::Session::new();
@@ -776,7 +776,7 @@ fn resolved_dynamic_radius_reset_replays_the_initial_frame() {
 #[test]
 fn initial_config_and_live_radius_survive_reset_replay_and_samples() {
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/serve-radius-v5.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/serve-radius-v6.json")).unwrap();
     let mut session = transport::Session::new();
     let first = result(&session.request(&serde_json::to_vec(&fixture["reset"]).unwrap()));
     assert_eq!(first["config"]["radius"], fixture["initialRadius"]);

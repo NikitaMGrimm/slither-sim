@@ -822,6 +822,10 @@ pub struct Simulator {
     /// Stable slots: checked operations never remove or reorder snakes.
     snakes: Vec<Snake>,
     food: Vec<Food>,
+    /// Birth identity survives unordered pickup removal. Nutrition depends on
+    /// prior gains, so pickups still apply newest first, independently of rows.
+    food_birth_order: Vec<u64>,
+    next_food_birth: u64,
     prey: Vec<Prey>,
     deaths: Vec<DeathEvent>,
     /// Latest step only. None avoids event allocation/copying.
@@ -908,6 +912,8 @@ impl Simulator {
             config,
             snakes: vec![],
             food: vec![],
+            food_birth_order: vec![],
+            next_food_birth: 0,
             prey: vec![],
             deaths: vec![],
             pickup_events: None,
@@ -974,6 +980,13 @@ impl Simulator {
             )
             .at_field("foodCount")
         })?;
+        world.food_birth_order.try_reserve(startup).map_err(|_| {
+            SimError::new(
+                ErrorKind::AllocationFailed,
+                "Food birth identities do not fit in memory",
+            )
+            .at_field("foodCount")
+        })?;
         world.food_cache.begin();
         // food_count is a target number of attempts at startup. A rejected
         // candidate is not retried, so crowded small worlds can start below it.
@@ -988,6 +1001,7 @@ impl Simulator {
                 )
             {
                 world.food_cache.push(&f);
+                push_food_birth(&mut world.food_birth_order, &mut world.next_food_birth);
                 world.food.push(f);
             }
         }
@@ -1604,7 +1618,7 @@ impl Simulator {
             fallen,
             eaters,
             hits,
-            retained_food: _,
+            retained_food: removal_indices,
             prey: prey_buffers,
         } = &mut buffers;
         let c = &self.config;
@@ -1716,6 +1730,10 @@ impl Simulator {
                                     });
                                 }
                                 self.food_cache.push(&pellet);
+                                push_food_birth(
+                                    &mut self.food_birth_order,
+                                    &mut self.next_food_birth,
+                                );
                                 self.food.push(pellet);
                             }
                         }
@@ -2053,6 +2071,13 @@ impl Simulator {
                 }
             }
         }
+        // Every query path returns descending storage positions. Save them
+        // before restoring chronological nutrition order, avoiding a second sort.
+        removal_indices.clear();
+        removal_indices.extend(hits.iter().map(|&(i, _)| i));
+        // Storage order may change after a pickup. Preserve the old mathematical
+        // nutrition order, not merely its rounding: nutrition reads current mass.
+        hits.sort_unstable_by_key(|&(i, _)| std::cmp::Reverse(self.food_birth_order[i]));
         for &(findex, i) in hits.iter() {
             let f = &self.food[findex];
             if let Some(events) = &mut self.pickup_events {
@@ -2068,13 +2093,12 @@ impl Simulator {
             gain_mass(s, i, gain, "food", &mut self.failure);
         }
         if !hits.is_empty() {
-            // Both pickup paths append hits in reverse food order. Reversing them
-            // lets the cache compact survivor ranges without changing that order.
-            self.food_cache.remove(
-                self.food.len(),
-                hits.iter().rev().map(|&(findex, _)| findex),
-            );
-            compact_food(&mut self.food, hits.iter().rev().map(|&(findex, _)| findex));
+            // Descending original positions remain valid as the tail moves.
+            for &i in removal_indices.iter() {
+                self.food_cache.swap_remove(self.food.len(), i);
+                self.food.swap_remove(i);
+                self.food_birth_order.swap_remove(i);
+            }
         }
         if PROFILE {
             profile.food_seconds += clock.unwrap().elapsed().as_secs_f64();
@@ -2157,6 +2181,7 @@ impl Simulator {
                                 });
                             }
                             self.food_cache.push(&f);
+                            push_food_birth(&mut self.food_birth_order, &mut self.next_food_birth);
                             self.food.push(f);
                             refill_count += 1;
                         }
@@ -2174,6 +2199,15 @@ impl Simulator {
         }
         self.buffers = buffers;
     }
+    /// Only presentation rebuilds need a chronological listing. Ordinary host
+    /// ticks use birth/pickup events and never copy or sort the world food.
+    #[cfg(feature = "networking")]
+    pub(crate) fn food_in_birth_order(&self) -> Vec<Food> {
+        let mut rows: Vec<_> = (0..self.food.len()).collect();
+        rows.sort_unstable_by_key(|&i| self.food_birth_order[i]);
+        rows.into_iter().map(|i| self.food[i]).collect()
+    }
+
     fn update_radius(&mut self, time: f64) {
         // Product/feel model, not an identified official law. Occupied seats
         // avoid death/respawn jitter; the stateless dead zone absorbs small churn.
@@ -2217,15 +2251,14 @@ impl Simulator {
                 (!f.point().distance_lt(Point::default(), radius)).then_some(i)
             }),
         );
-        if !removed.is_empty() {
-            // Keep retain's strict boundary and survivor order, but mirror the
-            // ascending original indices before compaction. Warm counts and
-            // stable pellet handles then survive a moving wall; cold/reset
-            // caches still undergo their normal verification on the next use.
-            // research/performance/2026-10-27-mirrored-food-retention/REPORT.md
-            self.food_cache
-                .remove(self.food.len(), removed.iter().copied());
-            compact_food(&mut self.food, removed.iter().copied());
+        // The wall predicate is independent of age. Use the same descending
+        // tail swaps as pickup so moving walls retain the warm dense index;
+        // birth identity keeps nutrition and host lifetime ordering unchanged.
+        // research/performance/2026-10-27-mirrored-food-retention/REPORT.md
+        for &i in removed.iter().rev() {
+            self.food_cache.swap_remove(self.food.len(), i);
+            self.food.swap_remove(i);
+            self.food_birth_order.swap_remove(i);
         }
         removed.clear();
     }
@@ -2763,6 +2796,7 @@ impl Simulator {
                 });
             }
             self.food_cache.push(&pellet);
+            push_food_birth(&mut self.food_birth_order, &mut self.next_food_birth);
             self.food.push(pellet);
             count += 1;
         }
@@ -2898,8 +2932,24 @@ fn snake_body_bounds(body: &[Point]) -> Option<Bounds> {
     Some(bounds)
 }
 
-/// Remove strictly ascending original food indices, preserving survivor order.
-fn compact_food(food: &mut Vec<Food>, removed: impl Iterator<Item = usize>) {
+/// Compact only at sequence exhaustion; normal births are O(1). Absolute IDs
+/// are private: retaining their relative order preserves all chronological work.
+fn push_food_birth(order: &mut Vec<u64>, next: &mut u64) {
+    if *next == u64::MAX {
+        let mut rows: Vec<_> = (0..order.len()).collect();
+        rows.sort_unstable_by_key(|&i| order[i]);
+        for (birth, i) in rows.into_iter().enumerate() {
+            order[i] = birth as u64;
+        }
+        *next = order.len() as u64;
+    }
+    order.push(*next);
+    *next += 1;
+}
+
+/// Frozen ordered-compaction reference, retained only for the oracle tests.
+#[cfg(test)]
+fn compact_food<T: Copy>(food: &mut Vec<T>, removed: impl Iterator<Item = usize>) {
     let len = food.len();
     let (mut read, mut write) = (0, 0);
     for end in removed.chain(std::iter::once(len)) {
@@ -2926,28 +2976,14 @@ fn indexed_hits<const PROFILE: bool>(
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
-    // Keep the original single-index iterator in ordinary ticks. Dispatch
-    // once per pickup phase, so a dormant migration adds no per-pellet union
-    // iterator work. Both paths use the same exact tests and final ordering.
-    if pellets.rebuilding() {
-        indexed_hits_by::<PROFILE, _>(
-            grid,
-            |cell| pellets.pellets(cell),
-            snakes,
-            eaters,
-            hits,
-            profile,
-        );
-    } else {
-        indexed_hits_by::<PROFILE, _>(
-            grid,
-            |cell| pellets.own_pellets(cell),
-            snakes,
-            eaters,
-            hits,
-            profile,
-        );
-    }
+    indexed_hits_by::<PROFILE, _>(
+        grid,
+        |cell| pellets.pellets(cell),
+        snakes,
+        eaters,
+        hits,
+        profile,
+    );
 }
 
 fn indexed_hits_by<'a, const PROFILE: bool, I: Iterator<Item = crate::food_grid::Pellet<'a>>>(
@@ -3254,7 +3290,7 @@ mod food_pickup_order_tests {
     }
 
     #[test]
-    fn radius_retention_preserves_warm_handles_and_matches_recounts() {
+    fn radius_retention_preserves_counts_and_matches_recounts() {
         for pit_only in [false, true] {
             let mut config = if pit_only {
                 Config::battledome()
@@ -3317,7 +3353,8 @@ mod food_pickup_order_tests {
             for tick in 0..radii.len() {
                 let before = world.food.clone();
                 let previous = world.radius;
-                let (matched, handles, free, grids) = world.food_cache.retention_state();
+                let (matched, entries, grids) = world.food_cache.retention_state();
+                assert_eq!(entries, before.len());
                 assert!(matched);
                 assert_eq!(grids, 3);
                 let mut cold = world.clone();
@@ -3330,15 +3367,33 @@ mod food_pickup_order_tests {
                     let radius = world.food_radius();
                     expected.retain(|f| f.point().distance_lt(Point::default(), radius));
                 }
-                assert_eq!(
-                    serde_json::to_vec(&world.food).unwrap(),
-                    serde_json::to_vec(&expected).unwrap()
+                let food_bits = |food: &[Food]| {
+                    let mut values: Vec<_> = food
+                        .iter()
+                        .map(|f| {
+                            (
+                                f.x.to_bits(),
+                                f.y.to_bits(),
+                                f.value.to_bits(),
+                                f.size.map(f64::to_bits),
+                                f.origin.map(|o| o as u8),
+                            )
+                        })
+                        .collect();
+                    values.sort_unstable();
+                    values
+                };
+                // Only physical survivor order is relaxed. Every pellet's bits
+                // and strict boundary verdict still equal the original retain.
+                assert_eq!(food_bits(&world.food), food_bits(&expected));
+                assert!(
+                    world.food_cache.has_pellets(),
+                    "wall culls must not rebuild the warm index"
                 );
                 assert_eq!(world.food, cold.food);
-                let removed = before.len() - expected.len();
                 assert_eq!(
                     world.food_cache.retention_state(),
-                    (true, handles, free + removed, 3)
+                    (true, world.food.len(), 3)
                 );
                 world.food_cache.begin_mirrored(&world.food);
                 world.food_cache.pellets(&world.food).unwrap();
@@ -3366,25 +3421,20 @@ mod food_pickup_order_tests {
                         }
                     }
                 }
-                // Verification, occupancy grids and freed handles survive the
-                // next access; rebuilding would lose the old free-list holes.
+                // Verification, occupancy grids and dense positions survive
+                // wall culls without a whole-world rebuild.
                 assert_eq!(
                     world.food_cache.retention_state(),
-                    (true, handles, free + removed, 3)
+                    (true, world.food.len(), 3)
                 );
                 world.food_cache.end();
             }
-            let (_, handles, free, _) = world.food_cache.retention_state();
-            let remaining = world.food.len();
             world.retain_food(0.);
             assert!(world.food.is_empty());
             world.food_cache.begin_mirrored(&world.food);
             assert_eq!(world.food_cache.ambient(&world.food), 0);
             world.food_cache.pellets(&world.food).unwrap();
-            assert_eq!(
-                world.food_cache.retention_state(),
-                (true, handles, free + remaining, 3)
-            );
+            assert_eq!(world.food_cache.retention_state(), (true, 0, 3));
             world.food_cache.end();
         }
     }
@@ -3693,14 +3743,14 @@ mod death_food_density_tests {
                 1 => Origin::Boost,
                 _ => Origin::Death,
             };
-            world.food.push(existing(20.0, 20.0, origin));
+            world.insert_food(existing(20.0, 20.0, origin)).unwrap();
         }
         assert_eq!(world.death_food(0), 12);
         add_corpse(&mut world, "b", Point { x: 37.5, y: 37.5 });
         assert_eq!(world.death_food(1), 0);
         assert_eq!(world.food.len(), 22);
         // Food is publicly mutable; occupancy must be rebuilt for a later death.
-        world.food.pop();
+        world.remove_food(world.food.len() - 1).unwrap();
         assert_eq!(world.death_food(1), 1);
     }
 
@@ -3719,7 +3769,9 @@ mod death_food_density_tests {
         let negative = Point { x: -37.5, y: -37.5 };
         world.snakes[0].head = negative;
         world.snakes[0].body.fill(negative);
-        world.food = vec![existing(2.0, 2.0, Origin::Ambient); 22];
+        world
+            .replace_food(vec![existing(2.0, 2.0, Origin::Ambient); 22])
+            .unwrap();
         assert_eq!(
             food_cell(-37.5, -37.5, 75.0),
             (Axis::Index(-1), Axis::Index(-1))
@@ -3957,3 +4009,6 @@ mod slot_tests {
         assert_eq!(ring.snakes[65_534].id, "65534");
     }
 }
+
+#[cfg(test)]
+mod food_order_tests;

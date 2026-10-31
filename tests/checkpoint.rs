@@ -1062,7 +1062,7 @@ fn checkpoint_slots_have_no_500_agent_policy_cap() {
 fn old_checkpoint_format_is_rejected_atomically() {
     let mut incumbent = world();
     let mut old = value(&incumbent);
-    assert_eq!(old["format"], "slither-sim-checkpoint-v2");
+    assert_eq!(old["format"], "slither-sim-checkpoint-v3");
     old["format"] = json!("slither-sim-checkpoint-v1");
     let error = rejects_atomic(&mut incumbent, &old);
     assert!(matches!(
@@ -1076,13 +1076,14 @@ fn old_checkpoint_format_is_rejected_atomically() {
 fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
     let mut incumbent = world();
     let mut old = value(&incumbent);
-    assert_eq!(old["format"], "slither-sim-checkpoint-v2");
-    assert_eq!(old["rulesRevision"], "slither-sim-rules-v5");
+    assert_eq!(old["format"], "slither-sim-checkpoint-v3");
+    assert_eq!(old["rulesRevision"], "slither-sim-rules-v6");
     for revision in [
         "slither-sim-rules-v1",
         "slither-sim-rules-v2",
         "slither-sim-rules-v3",
         "slither-sim-rules-v4",
+        "slither-sim-rules-v5",
     ] {
         old["rulesRevision"] = json!(revision);
         let error = rejects_atomic(&mut incumbent, &old);

@@ -229,7 +229,9 @@ impl SimulatorBackend {
             connections: 0,
             session_key: seed.rotate_left(16) ^ 0x5e55_1d00,
         };
-        backend.food_presentation.sync(backend.world.food())?;
+        backend
+            .food_presentation
+            .sync(&backend.world.food_in_birth_order())?;
         for slot in 0..backend.config.agents {
             let heading = backend.world.snakes()[slot].heading;
             let remote = slot < remote;

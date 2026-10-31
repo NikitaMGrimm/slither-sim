@@ -62,7 +62,9 @@ fn project(value: Value) -> Result<Value, String> {
     let format = take(&mut envelope, "format")?;
     if !matches!(
         format.as_str(),
-        Some("slither-sim-checkpoint-v1" | "slither-sim-checkpoint-v2")
+        Some(
+            "slither-sim-checkpoint-v1" | "slither-sim-checkpoint-v2" | "slither-sim-checkpoint-v3"
+        )
     ) {
         return Err("Unknown checkpoint comparison format".into());
     }
@@ -94,13 +96,20 @@ fn project(value: Value) -> Result<Value, String> {
     let radius = take(&mut state, "radius")?;
     // The v2 initial/live split is intentional; compare live physics in the
     // historical flat shape. Ordered radius traces separately retain both configs.
-    if format == "slither-sim-checkpoint-v2" {
+    if format != "slither-sim-checkpoint-v1" {
         config.insert("radius".into(), radius.clone());
     }
     if config.get("radius") != Some(&radius) {
         return Err("Flat runtime Config radius differs from checkpoint live radius".into());
     }
     let mut result = Map::new();
+    if format == "slither-sim-checkpoint-v3" {
+        result.insert(
+            "food_birth_order".into(),
+            take(&mut state, "foodBirthOrder")?,
+        );
+        result.insert("next_food_birth".into(), take(&mut state, "nextFoodBirth")?);
+    }
     result.insert("config".into(), Value::Object(config));
     for (new, old) in [
         ("time", "time"),

@@ -40,7 +40,7 @@ const RESET: &[u8] = br#"{"op":"reset","seed":7,"agents":1,"config":{"radius":10
 /// `twin`'s. `worlds_reply` reserves its members plus 64 bytes and one per
 /// frame: for one world, 8 bytes more than the reply minus its fixed wrapper.
 fn failing_reply(session: &mut Session, request: &[u8], twin: &[u8]) -> String {
-    let wrapper = br#"{"protocol":"slither-sim-json-v5","result":{"worlds":[]}}"#.len();
+    let wrapper = br#"{"protocol":"slither-sim-json-v6","result":{"worlds":[]}}"#.len();
     FAILED.store(0, Ordering::SeqCst);
     FAIL_SIZE.store(twin.len() - wrapper + 65, Ordering::SeqCst);
     let reply = session.request(request);

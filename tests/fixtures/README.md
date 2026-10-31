@@ -14,14 +14,22 @@ not `login-challenges.json`; the new legacy-login selection is described below.
 `clientContract` (`slither-client-v2` for the synthetic frame, otherwise `null`).
 The frame ID differs from the `slither-client-json-v2` request/reply
 envelope (also pinned with removed-field requests in `client-contract-v2.json`)
-and the geometric `slither-sim-json-v5` controller; see
+and the geometric `slither-sim-json-v6` controller; see
 [interface versions](../../docs/client-api.md#interface-versions).
 
 [`serve-errors-v5.json`](serve-errors-v5.json) pins the geometric controller's
-`slither-sim-json-v5` error envelope and a synthetic overflow reproducer for
+historical `slither-sim-json-v5` error envelope and a synthetic overflow reproducer for
 Rust/Python lifecycle tests. Without a wire protocol or client-frame contract,
 it stays outside this inventory. Error text is illustrative; tests check literal
 protocol and `sessionEnded` independently of runtime defaults.
+
+
+The corresponding `serve-errors-v6.json`, `serve-rules-v6.json` and
+`serve-radius-v6.json` keep those mechanics and error/radius expectations,
+changing only the current geometric protocol label. The v5 files remain
+historical. Version 6 permits unordered food rows after pickup; stable birth
+identity preserves nutrition and host lifetime selection. No captured wire,
+recorded nutrition or frozen Forager expectation is changed by these copies.
 
 `dataOrigin: captured` labels retained packet bytes;
 `expectedOrigin: reference-decoder` labels decoded expectations. Each fixture

@@ -1,4 +1,4 @@
-# Geometric controller: slither-sim-json-v5
+# Geometric controller: slither-sim-json-v6
 
 Run `slither-sim serve` from a [release archive](../README.md#download-a-release)
 without Rust, or `cargo run --release --locked -- serve` from a checkout. One
@@ -8,12 +8,14 @@ process. Rust callers can use [in-process sessions](#in-process-sessions) or the
 library directly.
 
 ```json
-{"protocol":"slither-sim-json-v5","result":{}}
-{"protocol":"slither-sim-json-v5","error":{"code":11,"rule":null,"world":null,"slot":null,"field":null,"message":"Reset first"},"sessionEnded":false}
+{"protocol":"slither-sim-json-v6","result":{}}
+{"protocol":"slither-sim-json-v6","error":{"code":11,"rule":null,"world":null,"slot":null,"field":null,"message":"Reset first"},"sessionEnded":false}
 ```
 
 Check `protocol`. Requests, configs and actions reject unknown fields; response
-readers ignore additional fields. Error `message` is descriptive; numeric `code`, optional `rule` and locations are stable.
+readers ignore additional fields. Version 6 removes the former spawn-order
+food guarantee; list-order tie breaks and floating-point reductions in bot
+policies may therefore choose different actions. Error `message` is descriptive; numeric `code`, optional `rule` and locations are stable.
 I/O failures stop the stream. Use trusted local controllers.
 
 Every error reply includes `sessionEnded`. When false, no world advanced and
@@ -33,7 +35,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v5`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v6`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -195,9 +197,10 @@ window. Death `reason` is `body`, `boundary` or `pit` (only with `config.pit`).
 
 Row `r`'s body anchors are `bodyX[bodyStart[r]:bodyStart[r+1]]` and the same
 range of `bodyY`, head to tail; `bodyStart` has one more entry than there are rows.
-Rows and view lists follow world order, so a slot's view lists opponents by
-slot and food in spawn order. Coordinates use world units; speeds use world
-units per second.
+Rows and view lists follow current world storage order. Opponents follow slots;
+food has no chronological order and pickup removal may move a tail item into
+an earlier row. Row indices remain positions, not persistent identities.
+Coordinates use world units; speeds use world units per second.
 
 Food and prey are filtered by the vision circle. If an opponent's head or any
 anchor is visible, **its entire stored snake record is included**, even outside
@@ -278,7 +281,8 @@ spawn limit is not a replay cap.
 generated ecology or placement draws. It labels supplied state; exact historical
 continuation uses checkpoints. Checked `replace_food`, `insert_food` and
 `remove_food` preserve order and invalidate occupancy caches; indices are immediate
-positions, not durable identities. The corresponding prey operations enforce
+positions, not durable identities. Replacement and scenario food establish birth
+order from the supplied list; checkpoints retain existing birth identity. The corresponding prey operations enforce
 unique IDs and synchronize modes/decision state. `record_events(EventRecording)`
 enables step-local pickup/birth telemetry, retaining capacity when already enabled.
 `deaths()` remains cumulative history for cursor-based consumers.
@@ -395,16 +399,22 @@ Use `serde_json::to_vec(&world.checkpoint()?)` for exact core continuation;
 the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
-The envelope is `slither-sim-checkpoint-v2`, with
-`rulesRevision: "slither-sim-rules-v5"`, producer provenance, today's flat Config
-and ordered slot/entity records. `config.radius` is the initial radius and
+The envelope is `slither-sim-checkpoint-v3`, with
+`rulesRevision: "slither-sim-rules-v6"`, producer provenance, today's flat Config
+and ordered slot/entity records, including food storage rows, their private
+birth-sequence identities and the next birth sequence. `config.radius` is the
+initial radius and
 `state.radius` is the live radius; loading preserves both. Config must pass the
 same validation as a new world's, and the live radius must equal `config.radius`
 until the dynamic controller, circular host admission or a recorded update
 could have moved it. Circular host admission may grow it before the first tick.
-Version 1 is rejected because it stored the live radius in Config and cannot recover the initial value.
-Rules v1/v2/v3/v4 are rejected: seat-following, live circular pit/spawn scaling,
-pit-only food and constant-density arena sizing change tick behavior.
+Versions 1 and 2 are rejected. Version 1 stored the live radius in Config;
+version 2 lacks the birth identities required after unordered pickup removal.
+Rules v1/v2/v3/v4/v5 are rejected: seat-following, live circular pit/spawn scaling,
+pit-only food, constant-density arena sizing and unordered food rows change tick
+behavior. Nutrition and pickup events still use reverse birth order: each gain
+is valued at the mass after the preceding gain. Host color/lifetime selection
+also retains chronological birth order.
 The host queue clock is not core checkpoint state. No
 controller state is added; occupancy uses living state and death timestamps,
 and refill retains fractional credit in initial-area seconds.

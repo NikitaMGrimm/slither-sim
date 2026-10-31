@@ -13,9 +13,9 @@ import sys
 import time
 
 
-# Protocol slither-sim-json-v5: reply decoding and the decision step. Another
+# Protocol slither-sim-json-v6: reply decoding and the decision step. Another
 # protocol replaces these two functions and leaves the timing loop unchanged.
-PROTOCOL = "slither-sim-json-v5"
+PROTOCOL = "slither-sim-json-v6"
 
 
 def decode_reply(line):

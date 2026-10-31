@@ -21,7 +21,7 @@ mod frame;
 #[cfg(test)]
 mod tests;
 
-pub const PROTOCOL: &str = "slither-sim-json-v5";
+pub const PROTOCOL: &str = "slither-sim-json-v6";
 
 /// A step rejected before advancement, or a failure after advancement began.
 #[derive(Debug, PartialEq, Eq)]
