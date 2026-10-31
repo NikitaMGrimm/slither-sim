@@ -66,7 +66,8 @@ the offline [skin studio](docs/skin-studio.md); Save commits the draft and Cance
 discards it. Click Play or press Enter to acquire the profile/server and connect
 once. The native login always uses the authored green/purple SlitherClient stroke
 wordmark. `--cosmetics-dir` still supplies backgrounds, skins, accessories and menu
-icons. Quality selects the requested mode for that Play.
+icons. [Settings](docs/settings.md) on the login selects and remembers Quality
+for the next Play.
 
 
 Browser (Canvas2D):

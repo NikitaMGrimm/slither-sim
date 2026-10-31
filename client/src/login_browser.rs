@@ -25,6 +25,17 @@ fn set(object: &js_sys::Object, name: &str, value: impl Into<JsValue>) -> Result
 
 #[wasm_bindgen]
 impl LoginMenu {
+    /// Browser storage migration uses the same bounded record parser as native.
+    /// The dev/reference host keeps its existing controls and legacy key.
+    pub fn restore_settings(&mut self, record: Option<String>, legacy: Option<String>) {
+        self.state.settings = crate::settings::SettingsState::new(
+            crate::settings::SettingsPreferences::restore(record.as_deref(), legacy.as_deref()),
+        );
+    }
+    /// Copied canonical record for an explicit dev/reference quality change.
+    pub fn settings_record(&self) -> String {
+        self.state.settings.preferences().serialize().into()
+    }
     /// Start an animated login with the supported locale and stored quality.
     #[wasm_bindgen(constructor)]
     pub fn new(locale: &str, quality: &str) -> Self {

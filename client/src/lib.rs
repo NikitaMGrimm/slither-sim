@@ -39,6 +39,7 @@ pub mod presentation;
 pub mod profile_literals;
 pub mod protocol;
 pub mod session_policy;
+pub mod settings;
 pub mod start_page;
 pub mod state;
 pub mod stock_controller_policy;

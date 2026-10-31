@@ -696,6 +696,7 @@ mod desktop {
                 .map_err(str::to_owned)?;
             let play_appearance = restored.record.selection();
             let mut login = NativeLogin::with_preferences(restored.record, storage)?;
+            login.restore_settings(slither_wgpu_slice::menu_storage::SettingsStorage::native());
             if let Some(path) = slither_wgpu_slice::server_picker_native::preference_path() {
                 login.picker.policy.selection =
                     slither_wgpu_slice::server_picker_native::read_preference(&path);

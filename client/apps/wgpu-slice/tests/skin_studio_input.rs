@@ -131,7 +131,7 @@ fn pending_play_cannot_open_studio_and_preview_clock_pauses_without_catch_up() {
 
 #[test]
 fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
-    use slither_client::login_controls::{NICKNAME, PLAY, QUALITY, SERVER};
+    use slither_client::login_controls::{NICKNAME, PLAY, SERVER, SETTINGS};
     let mut login = NativeLogin::new("").unwrap();
     for now in (0..=9600).step_by(16) {
         login.step(f64::from(now), true, false).unwrap();
@@ -151,12 +151,12 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
         server.rect.y + server.rect.height / 2.
     ]));
     login.focus(NICKNAME);
-    for id in [PLAY, QUALITY, CHANGE_SKIN, SERVER, NICKNAME] {
+    for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
         key(&mut login, NamedKey::Tab);
         assert_eq!(login.controls.focus(), Some(id));
     }
     login.input.modifiers(ModifiersState::SHIFT);
-    for id in [SERVER, CHANGE_SKIN, QUALITY, PLAY, NICKNAME] {
+    for id in [SETTINGS, SERVER, CHANGE_SKIN, PLAY, NICKNAME] {
         key(&mut login, NamedKey::Tab);
         assert_eq!(login.controls.focus(), Some(id));
     }

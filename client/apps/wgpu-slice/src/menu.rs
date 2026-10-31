@@ -36,6 +36,7 @@ const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
+    Indicator(u32, SurfaceTokens, [u8; 3], bool),
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
@@ -341,6 +342,45 @@ struct WordmarkRequest {
     draw_index: usize,
     label_index: usize,
 }
+// One bounded indicator tile includes both the rounded fill and authored tick.
+fn toggle_indicator(size: u32, fill: [u8; 3], ink: [u8; 3], checked: bool) -> materials::RgbaImage {
+    let scale = f64::from(size) / 24.;
+    let mut pixels = Vec::with_capacity(size as usize * size as usize * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let p = [(f64::from(x) + 0.5) / scale, (f64::from(y) + 0.5) / scale];
+            let q = [(p[0] - 12.).abs() - 8., (p[1] - 12.).abs() - 8.];
+            let distance = q[0].max(0.).hypot(q[1].max(0.)) + q[0].max(q[1]).min(0.) - 4.;
+            let alpha = (0.5 - distance * scale).clamp(0., 1.);
+            let mut tick = 0_f64;
+            if checked {
+                for (a, b) in [([6., 12.], [10., 16.]), ([10., 16.], [18., 7.])] {
+                    let v = [b[0] - a[0], b[1] - a[1]];
+                    let t = (((p[0] - a[0]) * v[0] + (p[1] - a[1]) * v[1])
+                        / (v[0] * v[0] + v[1] * v[1]))
+                        .clamp(0., 1.);
+                    let d = (p[0] - a[0] - t * v[0]).hypot(p[1] - a[1] - t * v[1]);
+                    tick = tick.max((0.5 + (1.5 - d) * scale).clamp(0., 1.));
+                }
+            }
+            pixels.extend(
+                fill.into_iter()
+                    .zip(ink)
+                    // Menu textures use premultiplied production pixels, including edge coverage.
+                    .map(|(a, b)| {
+                        ((f64::from(a) * (1. - tick) + f64::from(b) * tick) * alpha).round() as u8
+                    }),
+            );
+            pixels.push((alpha * 255.).round() as u8);
+        }
+    }
+    materials::RgbaImage {
+        width: size,
+        height: size,
+        pixels,
+    }
+}
+
 struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
@@ -352,7 +392,6 @@ struct Composition<'a> {
     draws: Vec<Draw>,
     art: BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
     labels: Vec<Label>,
-    quality_art: bool,
     wordmark: Option<WordmarkRequest>,
     old_stroke: Option<&'a StrokeCache>,
     stroke: Option<StrokeCache>,
@@ -468,7 +507,7 @@ impl Composition<'_> {
                     });
                 };
                 match &control.kind {
-                    ControlKind::IconLink { label } => {
+                    ControlKind::IconLink { label } | ControlKind::SettingsLink { label } => {
                         let [hover, press] = input.progress(control.id);
                         let link_alpha = if press > 0. {
                             0.5
@@ -483,24 +522,51 @@ impl Composition<'_> {
                             width: 48.,
                             height: 22.,
                         };
-                        for row in 0..3 {
-                            let bar = MenuRect {
-                                y: icon.y + f64::from(row) * 8.,
-                                height: 6.,
-                                ..icon
-                            };
-                            self.ink(bar, theme.field, alpha * link_alpha, r.clip)?;
-                            self.ink(
-                                MenuRect {
-                                    x: bar.x + 4.,
-                                    y: bar.y + 2.,
-                                    width: 2.,
-                                    height: 2.,
-                                },
-                                theme.selection,
-                                alpha * link_alpha,
-                                r.clip,
-                            )?;
+                        if matches!(control.kind, ControlKind::SettingsLink { .. }) {
+                            // Authored sliders glyph, using the link's existing palette.
+                            for (row, knob) in [(0, 12.), (1, 32.), (2, 22.)] {
+                                self.ink(
+                                    MenuRect {
+                                        y: icon.y + f64::from(row) * 8.,
+                                        height: 2.,
+                                        ..icon
+                                    },
+                                    theme.field,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                                self.ink(
+                                    MenuRect {
+                                        x: icon.x + knob,
+                                        y: icon.y + f64::from(row) * 8. - 2.,
+                                        width: 5.,
+                                        height: 6.,
+                                    },
+                                    theme.selection,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                            }
+                        } else {
+                            for row in 0..3 {
+                                let bar = MenuRect {
+                                    y: icon.y + f64::from(row) * 8.,
+                                    height: 6.,
+                                    ..icon
+                                };
+                                self.ink(bar, theme.field, alpha * link_alpha, r.clip)?;
+                                self.ink(
+                                    MenuRect {
+                                        x: bar.x + 4.,
+                                        y: bar.y + 2.,
+                                        width: 2.,
+                                        height: 2.,
+                                    },
+                                    theme.selection,
+                                    alpha * link_alpha,
+                                    r.clip,
+                                )?;
+                            }
                         }
                         if input.focus() == Some(control.id) && enabled {
                             for border in [
@@ -647,6 +713,74 @@ impl Composition<'_> {
                     ControlKind::Label { text: value } => {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
+                    ControlKind::Toggle { label, checked } => {
+                        let [hover, press] = input.progress(control.id);
+                        let indicator = MenuRect {
+                            x: r.rect.x + 16. * r.scale,
+                            y: r.rect.y + (r.rect.height - 24. * r.scale) / 2.,
+                            width: 24. * r.scale,
+                            height: 24. * r.scale,
+                        };
+                        let feedback = MenuRect {
+                            x: indicator.x - 8. * r.scale,
+                            y: indicator.y - 8. * r.scale,
+                            width: 40. * r.scale,
+                            height: 40. * r.scale,
+                        };
+                        // Checkboxes keep hover/focus/press paint beside the indicator;
+                        // a wide row needs no additional full-width capsule textures.
+                        for (state, opacity) in [
+                            (
+                                ControlState::Hovered,
+                                if enabled {
+                                    hover.max(if input.focus() == Some(control.id) {
+                                        0.33
+                                    } else {
+                                        0.
+                                    })
+                                } else {
+                                    0.
+                                },
+                            ),
+                            (ControlState::Pressed, if enabled { press } else { 0. }),
+                        ] {
+                            let mut tokens = theme.surface(control.style, state);
+                            tokens.recipe = SurfaceRecipe::Compact;
+                            self.sliced(feedback, tokens, alpha * opacity, surface_clip, r.scale)?;
+                        }
+                        let tokens = theme.toggle_indicator(*checked);
+                        let size = (indicator.width * self.scale).round().max(1.) as u32;
+                        if size > 512 {
+                            return Err(MENU_RASTER_AXIS_QUOTA.into());
+                        }
+                        let resource = self.cached_material(
+                            MaterialKey::Indicator(size, tokens, theme.text, *checked),
+                            || {
+                                Ok(toggle_indicator(
+                                    size,
+                                    tokens.colors[0],
+                                    theme.text,
+                                    *checked,
+                                ))
+                            },
+                        )?;
+                        let mut draw = image(&resource, indicator, alpha);
+                        if clip_draw(&mut draw, r.clip, self.scale) {
+                            self.push(draw)?;
+                        }
+                        add_label(
+                            self,
+                            label.clone(),
+                            MenuRect {
+                                x: r.rect.x + 54. * r.scale,
+                                width: r.rect.width - 70. * r.scale,
+                                ..r.rect
+                            },
+                            style,
+                            Align::Left,
+                            r.clip,
+                        );
+                    }
                     ControlKind::Button { label } => {
                         if control.style == ControlStyle::ChangeSkin {
                             if input.focus() == Some(control.id) {
@@ -693,7 +827,7 @@ impl Composition<'_> {
                                 r.scale,
                             )?;
                         }
-                        if !quality || !self.quality_art {
+                        {
                             add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
                             let l = self.labels.last_mut().unwrap();
                             l.line_box = control.style == ControlStyle::LoginPlay;
@@ -1536,7 +1670,6 @@ impl Menu {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
             wordmark: None,
             old_stroke: self.stroke.as_ref(),
             stroke: None,
@@ -1612,7 +1745,6 @@ impl Menu {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
             wordmark: None,
             old_stroke: self.stroke.as_ref(),
             stroke: None,
@@ -1640,15 +1772,6 @@ impl Menu {
             draw
         });
         if view.visible {
-            let qr = layout.viewport_rect(E::Quality);
-            let role = match view.quality {
-                slither_client::menu_preferences::MenuQuality::High => MenuArt::QualityHigh,
-                slither_client::menu_preferences::MenuQuality::Low => MenuArt::QualityLow,
-            };
-            if let Some(art) = cosmetics.and_then(|p| p.menu_art(role)) {
-                c.quality_art = true;
-                c.art(art, qr, a)?;
-            }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha;
             c.wordmark = Some(WordmarkRequest {
@@ -1791,7 +1914,7 @@ impl Menu {
             let mut controls = PanelInputState::default();
             if let Some(id) = match self.focus {
                 Some(E::Play) => Some(slither_client::login_controls::PLAY),
-                Some(E::Quality) => Some(slither_client::login_controls::QUALITY),
+                Some(E::Settings) => Some(slither_client::login_controls::SETTINGS),
                 _ => input
                     .filter(|i| i.focus() == Some(EditorId::Nickname))
                     .map(|_| slither_client::login_controls::NICKNAME),
@@ -2233,7 +2356,6 @@ mod quota_tests {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
             wordmark: None,
             old_stroke: None,
             stroke: None,
@@ -2264,6 +2386,38 @@ mod quota_tests {
     }
 
     #[test]
+    fn toggle_indicator_corners_and_edges_are_premultiplied() {
+        let theme = MenuTheme::default();
+        for size in [24, 36, 48, 120] {
+            for checked in [false, true] {
+                let indicator = toggle_indicator(
+                    size,
+                    theme.toggle_indicator(checked).colors[0],
+                    theme.text,
+                    checked,
+                );
+                for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
+                    let offset = ((y * size + x) * 4) as usize;
+                    assert_eq!(
+                        &indicator.pixels[offset..offset + 4],
+                        &[0; 4],
+                        "{size} {checked} corner {x},{y}"
+                    );
+                }
+                assert!(
+                    indicator
+                        .pixels
+                        .as_chunks::<4>()
+                        .0
+                        .iter()
+                        .all(|p| p[..3].iter().all(|c| *c <= p[3])),
+                    "{size} {checked}: RGB must not exceed alpha"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn solid_texture_axis_exhaustion_still_degrades() {
         let mut c = Composition {
             old: &BTreeMap::new(),
@@ -2276,7 +2430,6 @@ mod quota_tests {
             draws: Vec::new(),
             art: BTreeMap::new(),
             labels: Vec::new(),
-            quality_art: false,
             wordmark: None,
             old_stroke: None,
             stroke: None,

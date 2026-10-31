@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mountLogin } from '../apps/wgpu-slice/web/login-overlay.mjs';
 
 // Authored DOM seam; exact policy is exercised by login-abi.mjs in both Wasm builds.
-function fixture(extra = {}, adapter = {}) {
+function fixture(extra = {}, adapter = {}, storage) {
   class Node extends EventTarget {
     style={};dataset={};children=[];textContent='';value='';disabled=false;
     appendChild(n){this.children.push(n);n.parentNode=this;return n;}setAttribute(k,v){this[k]=v;}
@@ -12,8 +12,11 @@ function fixture(extra = {}, adapter = {}) {
   }
   const realm=new EventTarget();Object.assign(realm,{AbortController,navigator:{language:'en'},performance:{now:()=>0},innerWidth:960,innerHeight:540,location:{href:'http://127.0.0.1:19090/'},localStorage:{getItem(){return null;},setItem(){throw Error('Unavailable');}}});
   realm.document={body:new Node(),createElement:()=>{const n=new Node();n.ownerDocument=realm.document;return n;}};
+  if(storage) realm.localStorage=storage;
   const actions=[],calls=[];let alive=true, composingValue='';
   class Policy {
+    restore_settings(...args){calls.push(['restore_settings',...args]);}
+    settings_record(){return '1:0';}
     edit(value){composingValue=value;return value;}
     action(...args){actions.push(args);return args[0]==='quality'?'0':undefined;}
     play_label(){return 'Play';}
@@ -46,6 +49,19 @@ test('quality survives unavailable storage and focus releases held input',()=>{
   const f=fixture();f.emit(f.ui.quality,'click');f.emit(f.ui.root,'focusin');f.emit(f.ui.root,'focusout');
   assert.deepEqual(f.actions,[['quality',false,true]]);assert.equal(f.calls.filter(x=>x==='release').length,2);
   f.ui.frame(16);assert.equal(f.ui.quality['aria-pressed'],'true');f.ui.dispose();
+});
+
+test('settings storage migration reads without repair and writes only on explicit quality change',()=>{
+  const writes=[];
+  const f=fixture({}, {}, {getItem:key=>key==='slither-client-settings-v1'?'1:0':'1',setItem:(...args)=>writes.push(args)});
+  assert.deepEqual(f.calls.find(x=>x[0]==='restore_settings'),['restore_settings','1:0','1']);
+  f.ui.frame(0); assert.deepEqual(writes,[]);
+  f.emit(f.ui.quality,'click');
+  assert.deepEqual(writes,[['slither-client-settings-v1','1:0'],['slither-client-quality-v1','0']]);
+  f.ui.dispose();
+  const failed=fixture({}, {}, {getItem(){throw Error('unreadable');},setItem(){throw Error('unwritable');}});
+  assert.deepEqual(failed.calls.find(x=>x[0]==='restore_settings'),['restore_settings',undefined,'1']);
+  assert.doesNotThrow(()=>failed.emit(failed.ui.quality,'click')); failed.ui.dispose();
 });
 test('retirement preserves adopted nodes and always frees policy after a DOM cleanup failure',()=>{
   const adopted=fixture();adopted.ui.root.ownerDocument={};adopted.ui.dispose();

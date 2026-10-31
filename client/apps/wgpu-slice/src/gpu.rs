@@ -408,6 +408,13 @@ impl Renderer {
     pub fn render(&mut self, frame: &Frame, target: &wgpu::TextureView) -> RenderResult<()> {
         self.render_inner(frame, target, false)
     }
+    /// Adjacent draw runs in prepared vertex chunks; read after a successful render.
+    pub fn draw_call_count(&self) -> usize {
+        self.vertices
+            .iter()
+            .map(|chunk| draw_runs(chunk.states.iter().copied()).count())
+            .sum()
+    }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
     pub fn render_overlay(
         &mut self,

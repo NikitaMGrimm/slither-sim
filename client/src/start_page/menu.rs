@@ -178,7 +178,8 @@ pub struct StartMenuState {
     locale: MenuLocale,
     phase: MenuPhase,
     nickname: String,
-    quality: MenuQuality,
+    /// Single requested Quality authority, independent of runtime adaptation.
+    pub settings: crate::settings::SettingsState,
     last_capture: Option<HudFinal>,
     replay: bool,
     champion: bool,
@@ -216,7 +217,9 @@ impl StartMenuState {
             locale,
             phase: MenuPhase::Login,
             nickname: String::new(),
-            quality,
+            settings: crate::settings::SettingsState::new(crate::settings::SettingsPreferences {
+                quality,
+            }),
             last_capture: None,
             replay: false,
             champion: false,
@@ -267,7 +270,8 @@ impl StartMenuState {
     }
 
     fn play_enabled(&self, admission_available: bool) -> bool {
-        !self.champion
+        !self.settings.visible()
+            && !self.champion
             && (self.phase == MenuPhase::Returning
                 || (self.phase == MenuPhase::Login && admission_available))
     }
@@ -288,18 +292,20 @@ impl StartMenuState {
             self.return_play = returning;
             self.phase = MenuPhase::Connecting;
             self.focus_pending = false;
-            self.pending_play = Some((self.nickname.clone(), self.quality));
+            self.pending_play = Some((self.nickname.clone(), self.settings.preferences().quality));
             self.spinner_visible = true;
             return None;
         }
-        if self.phase != MenuPhase::Login || self.champion {
+        if self.phase != MenuPhase::Login || self.champion || self.settings.visible() {
             return None;
         }
         match action {
             MenuAction::FocusNickname => Some(StartMenuIntent::FocusNickname),
             MenuAction::Skin => Some(StartMenuIntent::OpenSkinChooser),
             MenuAction::Server => Some(StartMenuIntent::OpenServerPicker),
-            MenuAction::Quality => Some(StartMenuIntent::PersistQuality(self.quality.toggle())),
+            MenuAction::Quality => Some(StartMenuIntent::PersistQuality(
+                self.settings.legacy_toggle(),
+            )),
             _ => None,
         }
     }
@@ -681,7 +687,7 @@ impl StartMenuState {
                     * 100_000.)
                 .round()
                 / 100_000.,
-            quality: self.quality,
+            quality: self.settings.preferences().quality,
         }
     }
 }

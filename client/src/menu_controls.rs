@@ -108,6 +108,18 @@ impl Placement {
 /// Concrete controls used by the mounted menu screens.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControlKind {
+    /// Settings icon above the same unboxed caption as the server link.
+    SettingsLink {
+        /// Visible caption.
+        label: String,
+    },
+    /// Binary preference with matching-release button interaction.
+    Toggle {
+        /// Visible caption and semantic name.
+        label: String,
+        /// Committed requested value.
+        checked: bool,
+    },
     /// One login link: server icon above an unboxed caption.
     IconLink {
         /// Visible caption and accessible name.
@@ -247,6 +259,8 @@ pub fn intersection(a: MenuRect, b: MenuRect) -> MenuRect {
 /// Actions exposed by the copied semantic view; bridges use the same input path.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PanelAction {
+    /// Set the checked state through the same generation-bound activation path.
+    SetChecked,
     /// Focus a control.
     Focus,
     /// Activate a button.
@@ -257,6 +271,8 @@ pub enum PanelAction {
 /// Copied semantic node. Publishing it does not install a native OS bridge.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PanelNode {
+    /// Committed checked state, present only for checkable controls.
+    pub checked: Option<bool>,
     /// Stable ID within the panel generation.
     pub id: ControlId,
     /// Shared existing role vocabulary.
@@ -292,7 +308,16 @@ impl PanelView {
             .filter(|r| r.control.visible)
             .map(|r| {
                 let enabled = self.enabled && r.control.enabled;
+                let checked = match r.control.kind {
+                    ControlKind::Toggle { checked, .. } => Some(checked),
+                    _ => None,
+                };
                 let (role, value, actions) = match r.control.kind {
+                    ControlKind::Toggle { checked, .. } => (
+                        AccessibleRole::Checkbox,
+                        checked.to_string(),
+                        vec![PanelAction::Focus, PanelAction::SetChecked],
+                    ),
                     ControlKind::Backdrop => (
                         AccessibleRole::Button,
                         String::new(),
@@ -305,7 +330,9 @@ impl PanelView {
                         vec![PanelAction::Focus, PanelAction::Activate],
                     ),
                     ControlKind::Label { text } => (AccessibleRole::Status, text, vec![]),
-                    ControlKind::Button { .. } | ControlKind::IconLink { .. } => (
+                    ControlKind::Button { .. }
+                    | ControlKind::IconLink { .. }
+                    | ControlKind::SettingsLink { .. } => (
                         AccessibleRole::Button,
                         String::new(),
                         vec![PanelAction::Focus, PanelAction::Activate],
@@ -318,6 +345,7 @@ impl PanelView {
                     ),
                 };
                 PanelNode {
+                    checked,
                     id: r.control.id,
                     role,
                     name: r.control.name,
@@ -401,6 +429,8 @@ pub enum Activation {
 /// Intent envelope; owners revalidate current generation and authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ControlIntent {
+    /// Explicit next checked value from the activated description, for toggles only.
+    pub checked: Option<bool>,
     /// Panel ID.
     pub panel: u16,
     /// Description generation.
@@ -628,6 +658,17 @@ impl PanelInputState {
             let captured = self.capture.take();
             if let Some(control) = captured.filter(|id| Some(*id) == hit) {
                 return Some(ControlIntent {
+                    checked: panel
+                        .controls
+                        .iter()
+                        .find(|c| c.id == control)
+                        .and_then(|c| {
+                            if let ControlKind::Toggle { checked, .. } = c.kind {
+                                Some(!checked)
+                            } else {
+                                None
+                            }
+                        }),
                     panel: panel.id,
                     generation: panel.generation,
                     control,
@@ -645,6 +686,13 @@ impl PanelInputState {
             .iter()
             .any(|c| c.id == id && Self::available(panel, c))
             .then_some(ControlIntent {
+                checked: panel.controls.iter().find(|c| c.id == id).and_then(|c| {
+                    if let ControlKind::Toggle { checked, .. } = c.kind {
+                        Some(!checked)
+                    } else {
+                        None
+                    }
+                }),
                 panel: panel.id,
                 generation: panel.generation,
                 control: id,
