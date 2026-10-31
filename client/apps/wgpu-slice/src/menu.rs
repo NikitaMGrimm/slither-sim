@@ -1320,8 +1320,12 @@ impl Composition<'_> {
         let padded = atlas.map(|n| n + 2 * pad);
         let half = padded[0].div_ceil(2);
         let edge = f64::from(radius + pad);
-        let width = r.width * scale + f64::from(2 * pad);
-        let height = r.height * scale + f64::from(2 * pad);
+        // All slices share one pixel grid. Independent origin snapping overlaps
+        // fractional middles and makes their shared edges brighter during a fade.
+        let origin = [r.x, r.y].map(|v| (v * scale).round() / scale);
+        let width = (r.width * scale).round() + f64::from(2 * pad);
+        let height = (r.height * scale).round() + f64::from(2 * pad);
+        let split = (width / 2.).round();
         // Compact's shadow is shifted down 3px. Keep that transition in the
         // fixed top corner rather than stretching it along the straight edge.
         let top_edge = edge + (3. * raster_scale).ceil();
@@ -1351,10 +1355,6 @@ impl Composition<'_> {
                 })
             },
         )?;
-        let xs = [
-            (0., edge, 0., edge),
-            (edge, width / 2. - edge, edge, f64::from(half) - edge),
-        ];
         let ys = [
             (0., top_edge, 0., top_edge),
             (
@@ -1366,15 +1366,20 @@ impl Composition<'_> {
             (height - edge, edge, f64::from(padded[1]) - edge, edge),
         ];
         for mirrored in [false, true] {
+            let half_width = if mirrored { width - split } else { split };
+            let xs = [
+                (0., edge, 0., edge),
+                (edge, half_width - edge, edge, f64::from(half) - edge),
+            ];
             for (dx, dw, sx, sw) in xs {
                 for (dy, dh, sy, sh) in ys {
                     let mut draw = image(
                         &resource,
                         MenuRect {
-                            x: r.x
+                            x: origin[0]
                                 + (if mirrored { width - dx - dw } else { dx } - f64::from(pad))
                                     / scale,
-                            y: r.y + (dy - f64::from(pad)) / scale,
+                            y: origin[1] + (dy - f64::from(pad)) / scale,
                             width: dw / scale,
                             height: dh / scale,
                         },
@@ -3007,6 +3012,89 @@ fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
 mod quota_tests {
     use super::*;
 
+    #[test]
+    fn animated_settings_slices_share_pixel_edges_without_intersection() {
+        for scale in [1_f64, 1.25, 1.5, 2., 3., 5.] {
+            for factor in [0.9, 0.93, 0.98, 1.] {
+                for (width, height) in [(560.3, 400.7), (328.75, 512.25)] {
+                    let mut c = Composition {
+                        component: Default::default(),
+                        attribution: Default::default(),
+                        old: &BTreeMap::new(),
+                        old_art: &BTreeMap::new(),
+                        materials: BTreeMap::new(),
+                        next_handle: PAGE_HANDLE,
+                        spinner_revision: 0,
+                        scale,
+                        viewport_scale: scale,
+                        draws: Vec::new(),
+                        art: BTreeMap::new(),
+                        labels: Vec::new(),
+                        wordmark: None,
+                        old_stroke: None,
+                        stroke: None,
+                    };
+                    c.sliced(
+                        MenuRect {
+                            x: 17.3,
+                            y: 21.7,
+                            width: width * factor,
+                            height: height * factor,
+                        },
+                        MenuTheme::default()
+                            .surface(ControlStyle::SettingsSurface, ControlState::Idle),
+                        0.6,
+                        None,
+                        factor,
+                    )
+                    .unwrap();
+                    assert!(!c.draws.is_empty());
+                    let bounds: Vec<_> = c
+                        .draws
+                        .iter()
+                        .map(|d| {
+                            let corners = d.corners.unwrap_or([
+                                [d.destination.x, d.destination.y],
+                                [d.destination.x + d.destination.width, d.destination.y],
+                                [
+                                    d.destination.x + d.destination.width,
+                                    d.destination.y + d.destination.height,
+                                ],
+                                [d.destination.x, d.destination.y + d.destination.height],
+                            ]);
+                            assert!(
+                                corners
+                                    .iter()
+                                    .flatten()
+                                    .all(|v| (v * scale - (v * scale).round()).abs() < 1e-7)
+                            );
+                            let x = corners.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min);
+                            let y = corners.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min);
+                            let right = corners
+                                .iter()
+                                .map(|v| v[0])
+                                .fold(f64::NEG_INFINITY, f64::max);
+                            let bottom = corners
+                                .iter()
+                                .map(|v| v[1])
+                                .fold(f64::NEG_INFINITY, f64::max);
+                            [x, y, right, bottom]
+                        })
+                        .collect();
+                    for (i, a) in bounds.iter().enumerate() {
+                        for b in &bounds[i + 1..] {
+                            assert!(
+                                a[2] <= b[0] + 1e-7
+                                    || b[2] <= a[0] + 1e-7
+                                    || a[3] <= b[1] + 1e-7
+                                    || b[3] <= a[1] + 1e-7
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn settings_panel_skips_negative_middle_strips_but_accepts_zero() {
         for scale in [1., 1.5, 5.] {
