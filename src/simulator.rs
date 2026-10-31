@@ -13,7 +13,7 @@ mod pit_food_tests;
 mod spawn_bounds;
 #[cfg(test)]
 mod spawn_bounds_tests;
-use crate::bounds_index::{BoundsIndex, CollisionGrid};
+use crate::bounds_index::{BoundsIndex, CollisionGrid, collision_grid_margin};
 use crate::food_grid::{EaterGrid, FoodCache, PelletIndex};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
@@ -1860,6 +1860,10 @@ impl Simulator {
         // Large dense worlds repay expanded body insertion by avoiding a merged,
         // sorted query for every head. The grid declines sparse or oversized
         // geometry, retaining the existing bounds index in those worlds.
+        // A single grown snake must not inflate every body's grid insertion.
+        // Larger heads query neighbouring cells and restore newest-first order;
+        // the original f64 pair predicate still decides every candidate.
+        const GRID_HEAD_SEGMENTS: usize = 32;
         let grid = (order.len() >= 4096)
             .then(|| {
                 let longest = order
@@ -1870,9 +1874,16 @@ impl Simulator {
                 let bounds: Vec<_> = order.iter().map(|&j| bodies[j].unwrap()).collect();
                 let reaches: Vec<_> = order
                     .iter()
-                    .map(|&j| 3.666 * collision_distance(longest, self.snakes[j].segments))
+                    .map(|&j| {
+                        3.666
+                            * collision_distance(
+                                longest.min(GRID_HEAD_SEGMENTS),
+                                self.snakes[j].segments,
+                            )
+                    })
                     .collect();
                 CollisionGrid::new(&bounds, &reaches)
+                    .map(|grid| (grid, 3.666 * collision_distance(longest, longest)))
             })
             .flatten();
         // Small worlds test every pair faster than they build an index.
@@ -1925,22 +1936,33 @@ impl Simulator {
                     .chain(other.body.iter().copied());
                 strikes_scaled(last_tips[i], tip, direction, head_scale, body_scale, line)
             };
+            let grid_candidates = if let Some((grid, max_reach)) = grid.as_ref() {
+                if s.segments <= GRID_HEAD_SEGMENTS {
+                    grid.candidates(tip)
+                } else {
+                    let reach =
+                        collision_grid_margin(head_scale, scale(GRID_HEAD_SEGMENTS), *max_reach);
+                    grid.candidates_near(tip, reach, candidates)
+                        .then_some(candidates.as_slice())
+                }
+            } else {
+                None
+            };
             // Both visit positions newest first; the index omits only snakes
             // whose bounds fail the test above.
-            let killer =
-                if let Some(candidates) = grid.as_ref().and_then(|grid| grid.candidates(tip)) {
-                    candidates
-                        .iter()
-                        .map(|&k| order[k as usize])
-                        .find(|&j| test(j, profile))
-                } else if indexed {
-                    candidates
-                        .iter()
-                        .map(|&k| order[k as usize])
-                        .find(|&j| test(j, profile))
-                } else {
-                    order.iter().rev().copied().find(|&j| test(j, profile))
-                };
+            let killer = if let Some(candidates) = grid_candidates {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else if indexed {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else {
+                order.iter().rev().copied().find(|&j| test(j, profile))
+            };
             if killer.is_some() {
                 dead.push((i, killer, DeathReason::Body));
                 fallen[i] = true;

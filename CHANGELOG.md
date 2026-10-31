@@ -44,6 +44,8 @@
 
 ### Performance
 
+- Capped collision-grid reach makes the frozen 64,000-bot L64-600 world about
+  5% faster (77.1 to 73.0 ms per tick).
 - Keep collision join order between ticks instead of sorting every living snake.
   The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
   timing pairs, with identical events and final state.
