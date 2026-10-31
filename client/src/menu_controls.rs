@@ -120,6 +120,22 @@ pub enum ControlKind {
         /// Committed requested value.
         checked: bool,
     },
+    /// One section in a roving tab set.
+    SectionTab {
+        /// Visible section title.
+        label: String,
+        /// Currently mounted section.
+        selected: bool,
+    },
+    /// One palette or windowed pattern-run cell; its colour comes from authored sources.
+    Swatch {
+        /// Normal palette ID.
+        palette: u8,
+        /// Expanded run count; absent for palette cells.
+        count: Option<usize>,
+        /// Roving selected item.
+        selected: bool,
+    },
     /// One login link: server icon above an unboxed caption.
     IconLink {
         /// Visible caption and accessible name.
@@ -287,6 +303,8 @@ pub struct PanelNode {
     pub focused: bool,
     /// Current admission gate.
     pub enabled: bool,
+    /// Selected tab/grid state, absent for other controls.
+    pub selected: Option<bool>,
     /// Supported actions.
     pub actions: Vec<PanelAction>,
 }
@@ -312,11 +330,29 @@ impl PanelView {
                     ControlKind::Toggle { checked, .. } => Some(checked),
                     _ => None,
                 };
+                let selected = match r.control.kind {
+                    ControlKind::SectionTab { selected, .. }
+                    | ControlKind::Swatch { selected, .. } => Some(selected),
+                    _ => None,
+                };
                 let (role, value, actions) = match r.control.kind {
                     ControlKind::Toggle { checked, .. } => (
                         AccessibleRole::Checkbox,
                         checked.to_string(),
                         vec![PanelAction::Focus, PanelAction::SetChecked],
+                    ),
+                    ControlKind::SectionTab { label, .. } => (
+                        AccessibleRole::Tab,
+                        label,
+                        vec![PanelAction::Focus, PanelAction::Activate],
+                    ),
+                    ControlKind::Swatch { palette, count, .. } => (
+                        AccessibleRole::GridCell,
+                        format!(
+                            "Palette {palette}{}",
+                            count.map_or_else(String::new, |n| format!(", {n} colours"))
+                        ),
+                        vec![PanelAction::Focus, PanelAction::Activate],
                     ),
                     ControlKind::Backdrop => (
                         AccessibleRole::Button,
@@ -353,6 +389,7 @@ impl PanelView {
                     bounds: intersection(r.rect, r.clip),
                     focused: enabled && input.focus() == Some(r.control.id),
                     enabled,
+                    selected,
                     actions: if enabled { actions } else { vec![] },
                 }
             })

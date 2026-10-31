@@ -116,6 +116,7 @@ pub enum MenuSurface {
     Nickname,
     Overlay,
     Compact,
+    StudioCapsule,
 }
 impl MenuSurface {
     pub fn padding(self) -> f64 {
@@ -123,7 +124,7 @@ impl MenuSurface {
             Self::Nickname => 40.,
             Self::Play => 20.,
             Self::Overlay => 0.,
-            Self::Compact => 12.,
+            Self::Compact | Self::StudioCapsule => 12.,
         }
     }
 }
@@ -170,9 +171,11 @@ pub fn menu_control(
             let (offset, sigma, opacity) = match surface {
                 MenuSurface::Nickname => (6., 20., 1.),
                 MenuSurface::Play => (3., 8., 0.75),
-                MenuSurface::Overlay | MenuSurface::Compact => (0., 1., 0.),
+                MenuSurface::Overlay | MenuSurface::Compact | MenuSurface::StudioCapsule => {
+                    (0., 1., 0.)
+                }
             };
-            let shadow = if matches!(surface, MenuSurface::Compact) {
+            let shadow = if matches!(surface, MenuSurface::Compact | MenuSurface::StudioCapsule) {
                 (-distance(px, py - 3. * scale).max(0.).powi(2) / (18. * scale * scale)).exp() * 0.6
             } else {
                 0.5 * (1. - (distance(px, py - offset * scale) / (sigma * scale)).tanh()) * opacity
@@ -183,7 +186,10 @@ pub fn menu_control(
             let t = (f64::from(edge) / (f64::from(pad) / 4.).max(1.)).min(1.);
             let shadow = shadow * t * t * (3. - 2. * t);
             let t = (py / f64::from(h)).clamp(0., 1.);
-            let t = if matches!(surface, MenuSurface::Play | MenuSurface::Overlay) {
+            let t = if matches!(
+                surface,
+                MenuSurface::Play | MenuSurface::Overlay | MenuSurface::StudioCapsule
+            ) {
                 (1. - (std::f64::consts::PI * t).cos()) / 2.
             } else {
                 t

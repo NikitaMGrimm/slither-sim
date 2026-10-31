@@ -58,7 +58,9 @@ fn opaque_prefix_repro() {
     studio.open(0., true);
     studio.step(230.);
     let committed = studio
-        .save("Bytes", 230., UnlockSnapshot::default())
+        .save("Bytes", 230., UnlockSnapshot::default(), &mut || {
+            panic!("retained Save sampled entropy")
+        })
         .unwrap()
         .unwrap();
     assert_eq!(committed.selection(), selection);

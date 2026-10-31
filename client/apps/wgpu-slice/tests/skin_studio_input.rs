@@ -49,6 +49,10 @@ fn login_change_skin_opens_without_endpoint_and_save_returns_focus_after_fade() 
             .iter()
             .any(|i| matches!(i, StartMenuIntent::Play { .. }))
     );
+    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
+    key(&mut login, NamedKey::Tab);
+    assert_eq!(login.controls.focus(), Some(PREVIOUS));
+    key(&mut login, NamedKey::Tab);
     assert_eq!(login.controls.focus(), Some(NEXT));
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
@@ -93,13 +97,13 @@ fn blur_resize_matching_release_outside_cancel_and_tab_trap_preserve_draft() {
     click(&mut login, NEXT, true);
     click(&mut login, NEXT, false);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
-    login.focus(PREVIOUS);
+    login.focus(BUILT_IN_TAB);
     login.input.modifiers(ModifiersState::SHIFT);
     key(&mut login, NamedKey::Tab);
     assert_eq!(login.controls.focus(), Some(SAVE));
     login.input.modifiers(ModifiersState::empty());
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(PREVIOUS));
+    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
     login.pointer([0., 0.], Some(true), false);
     login.pointer([0., 0.], Some(false), false);
     login.step(460., false, false).unwrap();
@@ -143,9 +147,12 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
         .find(|r| r.control.id == CHANGE_SKIN)
         .unwrap();
     let server = resolved.iter().find(|r| r.control.id == SERVER).unwrap();
+    let settings = resolved.iter().find(|r| r.control.id == SETTINGS).unwrap();
     assert!(skin.control.visible && skin.control.enabled);
     assert!(server.control.visible && server.control.enabled);
     assert_eq!(skin.rect.y, server.rect.y);
+    assert!(settings.control.visible && settings.control.enabled);
+    assert_eq!(skin.rect.y, settings.rect.y);
     assert!(!skin.hit([
         server.rect.x + server.rect.width / 2.,
         server.rect.y + server.rect.height / 2.
@@ -186,52 +193,79 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
 
 #[test]
 fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eight() {
-    for dpr in 1..=8 {
-        let dpr = f64::from(dpr);
-        let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
-        let mut login = NativeLogin::new("Player").unwrap();
-        for time in (0..=9600).step_by(16) {
-            login.step(f64::from(time), false, false).unwrap();
-        }
-        login.prepare_host(extent, dpr, false, None).unwrap();
-        login.open_studio();
-        for time in [0., 115., 230., 345., 459., 460.] {
-            if time == 345. {
-                login.studio.state.cancel(9830.);
+    let mut peak = 0;
+    for (section, save) in [
+        (StudioSection::BuiltIn, false),
+        (StudioSection::BuiltIn, true),
+        (StudioSection::Builder, false),
+        (StudioSection::Builder, true),
+    ] {
+        for dpr in 1..=8 {
+            let dpr = f64::from(dpr);
+            let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+            let mut login = NativeLogin::new("Player").unwrap();
+            for time in (0..=9600).step_by(16) {
+                login.step(f64::from(time), false, false).unwrap();
             }
-            login.step(9600. + time, false, false).unwrap();
-            let menu = login.prepare_host(extent, dpr, false, None).unwrap();
-            assert!(menu.frame.draws.len() <= 512);
-            assert!(menu.resources.len() <= 64);
-            assert!(
-                menu.resources
-                    .iter()
-                    .map(|r| r.image.pixels.len())
-                    .sum::<usize>()
-                    <= 13 * 1024 * 1024
-            );
-            let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                frame: menu.frame,
-                overlay: None,
-                resources: menu.resources,
-            };
-            if login.studio.state.visible() {
-                login.studio.append_preview(&mut picture, None).unwrap();
-            }
-            picture
-                .frame
-                .validate(
-                    &picture
-                        .resources
+            login.prepare_host(extent, dpr, false, None).unwrap();
+            login.open_studio();
+            for time in [0., 115., 230., 320., 410., 525., 639., 640.] {
+                login.step(9600. + time, false, false).unwrap();
+                if time == 230. && section == StudioSection::Builder {
+                    login.studio.activate(BUILDER_TAB, "Player");
+                    for n in 0..47 {
+                        login.studio.state.edit_builder(|b| {
+                            b.append(slither_client::skin_builder::PALETTES[n % 39]);
+                        });
+                    }
+                }
+                if time == 410. {
+                    if save {
+                        login.studio.activate_with_random(SAVE, "Player", &mut || 0);
+                    } else {
+                        login.studio.state.cancel(9600. + time);
+                    }
+                    login.step(9600. + time, false, false).unwrap();
+                }
+                let menu = login.prepare_host(extent, dpr, false, None).unwrap();
+                let draws = menu.frame.draws.len() + usize::from(menu.backdrop.is_some());
+                peak = peak.max(draws);
+                assert!(
+                    draws <= 512,
+                    "{section:?}, Save {save}, DPR {dpr}, t {time}: {draws}"
+                );
+                assert!(menu.resources.len() <= 64);
+                assert!(
+                    menu.resources
                         .iter()
-                        .map(|r| (r.asset.into(), r.asset))
-                        .collect(),
-                )
-                .unwrap();
-            assert!(picture.draw_count() <= 1536);
-            login.studio.presented();
+                        .map(|r| r.image.pixels.len())
+                        .sum::<usize>()
+                        <= 13 * 1024 * 1024
+                );
+                let mut picture = slither_wgpu_slice::render::PreparedFrame {
+                    frame: menu.frame,
+                    overlay: None,
+                    resources: menu.resources,
+                };
+                if login.studio.state.visible() {
+                    login.studio.append_preview(&mut picture, None).unwrap();
+                }
+                picture
+                    .frame
+                    .validate(
+                        &picture
+                            .resources
+                            .iter()
+                            .map(|r| (r.asset.into(), r.asset))
+                            .collect(),
+                    )
+                    .unwrap();
+                assert!(picture.draw_count() <= 1536);
+                login.studio.presented();
+            }
         }
     }
+    println!("Studio entry/return with Settings: peak {peak}/512 menu draws, including backdrop");
 }
 
 #[test]

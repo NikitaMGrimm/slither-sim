@@ -40,6 +40,7 @@ enum MaterialKey {
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
+    Swatches([u8; 3], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 pub const WORDMARK_GREEN: [u8; 3] = wordmark::COLORS[0][1];
@@ -507,6 +508,66 @@ impl Composition<'_> {
                     });
                 };
                 match &control.kind {
+                    ControlKind::Swatch {
+                        palette,
+                        count,
+                        selected,
+                    } => {
+                        self.swatch(r, *palette, count.is_some(), alpha, theme)?;
+                        if *selected || input.focus() == Some(control.id) {
+                            for border in [
+                                MenuRect {
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    y: r.rect.y + r.rect.height - 1.,
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width - 1.,
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                            ] {
+                                self.studio_solid(
+                                    intersection(border, r.clip),
+                                    alpha,
+                                    theme,
+                                    false,
+                                )?;
+                            }
+                        }
+                        if let Some(count) = count {
+                            style.size = 12. * r.scale;
+                            let rgb =
+                                slither_client::authored_sources::standard_palette_rgb(*palette)
+                                    .ok_or("Invalid swatch")?;
+                            style.color = if u32::from(rgb[0])
+                                + u32::from(rgb[1])
+                                + u32::from(rgb[2])
+                                > 480
+                            {
+                                theme.backdrop
+                            } else {
+                                [255; 3]
+                            };
+                            add_label(
+                                self,
+                                count.to_string(),
+                                r.rect,
+                                style,
+                                Align::Center,
+                                r.clip,
+                            );
+                            self.labels.last_mut().expect("run count").fit = true;
+                        }
+                    }
                     ControlKind::IconLink { label } | ControlKind::SettingsLink { label } => {
                         let [hover, press] = input.progress(control.id);
                         let link_alpha = if press > 0. {
@@ -611,6 +672,9 @@ impl Composition<'_> {
                             r.clip,
                         );
                         self.labels.last_mut().unwrap().alpha *= link_alpha;
+                    }
+                    ControlKind::Backdrop if control.style == ControlStyle::StudioSurface => {
+                        self.studio_solid(r.rect, alpha, theme, true)?
                     }
                     ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
                     ControlKind::Surface => self.sliced(
@@ -781,7 +845,7 @@ impl Composition<'_> {
                             r.clip,
                         );
                     }
-                    ControlKind::Button { label } => {
+                    ControlKind::Button { label } | ControlKind::SectionTab { label, .. } => {
                         if control.style == ControlStyle::ChangeSkin {
                             if input.focus() == Some(control.id) {
                                 self.sliced(
@@ -795,18 +859,31 @@ impl Composition<'_> {
                             continue;
                         }
                         let quality = control.style == ControlStyle::QualityButton;
+                        let compact = matches!(
+                            control.style,
+                            ControlStyle::StudioAction
+                                | ControlStyle::StudioSave
+                                | ControlStyle::StudioCancel
+                        );
                         let focused = input.focus() == Some(control.id);
+                        let [hover, press] = input.progress(control.id);
                         if !quality || focused {
                             self.sliced(
                                 r.rect,
                                 theme.surface(control.style, ControlState::Idle),
-                                alpha * if quality { 0.35 } else { 1. },
+                                alpha
+                                    * if quality {
+                                        0.35
+                                    } else if compact {
+                                        1. - 0.25 * press
+                                    } else {
+                                        1.
+                                    },
                                 surface_clip,
                                 r.scale,
                             )?;
                         }
-                        let [hover, press] = input.progress(control.id);
-                        if enabled && !quality {
+                        if enabled && !quality && !compact {
                             self.sliced(
                                 r.rect,
                                 theme.surface(control.style, ControlState::Hovered),
@@ -831,7 +908,52 @@ impl Composition<'_> {
                             add_label(self, label.clone(), r.rect, style, Align::Center, r.clip);
                             let l = self.labels.last_mut().unwrap();
                             l.line_box = control.style == ControlStyle::LoginPlay;
-                            l.fit = true;
+                            l.fit = control.style != ControlStyle::StudioAction;
+                        }
+                        if matches!(control.kind, ControlKind::SectionTab { selected: true, .. }) {
+                            self.studio_solid(
+                                intersection(
+                                    MenuRect {
+                                        x: r.rect.x + 16.,
+                                        y: r.rect.y + r.rect.height - 3.,
+                                        width: r.rect.width - 32.,
+                                        height: 2.,
+                                    },
+                                    r.clip,
+                                ),
+                                alpha,
+                                theme,
+                                false,
+                            )?;
+                        }
+                        if compact && (focused || hover > 0.) && enabled {
+                            for border in [
+                                MenuRect {
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    y: r.rect.y + r.rect.height - 1.,
+                                    height: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width - 1.,
+                                    width: 1.,
+                                    ..r.rect
+                                },
+                            ] {
+                                self.studio_solid(
+                                    intersection(border, r.clip),
+                                    alpha * if focused { 1. } else { hover * 0.33 },
+                                    theme,
+                                    false,
+                                )?;
+                            }
                         }
                     }
                     ControlKind::TextField {
@@ -916,6 +1038,106 @@ impl Composition<'_> {
         })?;
         self.push(image(&resource, rect, alpha))
     }
+    /// Fixed authored colour sprites and two padded solids share one small atlas.
+    /// Like body-source sprites, these do not retain a new copy for every DPR.
+    fn studio_atlas(&mut self, theme: MenuTheme) -> Result<Resource> {
+        use slither_client::{authored_sources::standard_palette_rgb, skin_builder::PALETTES};
+        self.cached_material(MaterialKey::Swatches(theme.text, theme.backdrop), || {
+            let mut atlas = materials::RgbaImage {
+                width: 144,
+                height: 176,
+                pixels: vec![0; 144 * 176 * 4],
+            };
+            for (index, palette) in PALETTES.iter().enumerate() {
+                let rgb = standard_palette_rgb(*palette).ok_or("Invalid swatch")?;
+                let tile = materials::menu_control(
+                    [20; 2],
+                    4.,
+                    [rgb, rgb.map(|c| (u16::from(c) * 4 / 5) as u8)],
+                    1.,
+                    materials::MenuSurface::Overlay,
+                )?;
+                let x = index % 6 * 24 + 2;
+                let y = index / 6 * 24 + 2;
+                for row in 0..20 {
+                    let to = ((y + row) * 144 + x) * 4;
+                    atlas.pixels[to..to + 80]
+                        .copy_from_slice(&tile.pixels[row * 80..row * 80 + 80]);
+                }
+            }
+            // Crop inside each solid block so linear sampling cannot mix neighbouring colours.
+            for (x, rgb) in [(0, theme.text), (8, theme.backdrop)] {
+                for y in 168..176 {
+                    for column in x..x + 8 {
+                        let offset = (y * 144 + column) * 4;
+                        atlas.pixels[offset..offset + 4]
+                            .copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
+                    }
+                }
+            }
+            Ok(atlas)
+        })
+    }
+    fn studio_solid(
+        &mut self,
+        rect: MenuRect,
+        alpha: f64,
+        theme: MenuTheme,
+        backdrop: bool,
+    ) -> Result<()> {
+        if alpha == 0. || rect.width <= 0. || rect.height <= 0. {
+            return Ok(());
+        }
+        let resource = self.studio_atlas(theme)?;
+        let mut draw = image(&resource, rect, alpha);
+        draw.source = Some(BodyRect {
+            x: if backdrop { 10. } else { 2. },
+            y: 170.,
+            width: 4.,
+            height: 4.,
+        });
+        self.push(draw)
+    }
+    fn swatch(
+        &mut self,
+        r: &ResolvedControl,
+        palette: u8,
+        run: bool,
+        alpha: f64,
+        theme: MenuTheme,
+    ) -> Result<()> {
+        use slither_client::skin_builder::PALETTES;
+        let visible = intersection(r.rect, r.clip);
+        if alpha == 0. || visible.width <= 0. || visible.height <= 0. {
+            return Ok(());
+        }
+        let index = PALETTES
+            .iter()
+            .position(|p| *p == palette)
+            .ok_or("Invalid swatch")?;
+        let resource = self.studio_atlas(theme)?;
+        let width = if run { r.rect.width - 4. } else { 22. };
+        let mut draw = image(
+            &resource,
+            MenuRect {
+                x: r.rect.x + (r.rect.width - width) / 2.,
+                y: r.rect.y + 3.,
+                width,
+                height: 22.,
+            },
+            alpha,
+        );
+        draw.source = Some(BodyRect {
+            x: (index % 6 * 24 + 1) as f64,
+            y: (index / 6 * 24 + 1) as f64,
+            width: 22.,
+            height: 22.,
+        });
+        if clip_scaled_draw(&mut draw, r.clip, self.scale) {
+            self.push(draw)?;
+        }
+        Ok(())
+    }
     fn cached_material(
         &mut self,
         key: MaterialKey,
@@ -973,8 +1195,11 @@ impl Composition<'_> {
         if !raster_scale.is_finite() || !(0. ..=16.).contains(&raster_scale) || raster_scale == 0. {
             return Err("Sliced menu scale budget".into());
         }
+        if tokens.recipe == SurfaceRecipe::StudioButton {
+            return self.studio_capsule(r, tokens, alpha, clip, control_scale);
+        }
         let surface = match tokens.recipe {
-            SurfaceRecipe::Button => materials::MenuSurface::Play,
+            SurfaceRecipe::Button | SurfaceRecipe::StudioButton => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
             SurfaceRecipe::Field | SurfaceRecipe::Panel => materials::MenuSurface::Nickname,
             SurfaceRecipe::Compact | SurfaceRecipe::StudioPanel => materials::MenuSurface::Compact,
@@ -1105,6 +1330,112 @@ impl Composition<'_> {
                         }
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+    /// Small studio capsules share a compact theme shadow and stretch one uniform
+    /// centre column. Retaining a wide centre would exceed the studio's 2 MiB
+    /// surface allocation at DPR5; repeating a one-pixel column would exceed draws.
+    fn studio_capsule(
+        &mut self,
+        r: MenuRect,
+        tokens: SurfaceTokens,
+        alpha: f64,
+        clip: Option<MenuRect>,
+        control_scale: f64,
+    ) -> Result<()> {
+        let density = self.scale * control_scale;
+        let radius = (f64::from(tokens.radius) * density).ceil() as u32;
+        // Tabs and actions share the same capsule; only its destination height differs.
+        let height = (28. * density).round().max(1.) as u32;
+        if height > 512 {
+            return Err(MENU_RASTER_AXIS_QUOTA.into());
+        }
+        let pad = (12. * density).ceil() as u32;
+        let atlas = [2 * radius + 1, height];
+        let cap = radius + pad;
+        let half = cap + 1;
+        let full_height = height + 2 * pad;
+        if half > 512 || full_height > 512 {
+            return Err(MENU_RASTER_AXIS_QUOTA.into());
+        }
+        let resource = self.cached_material(
+            MaterialKey::Control(atlas, density.to_bits(), tokens, [0, 0]),
+            || {
+                let raster = materials::menu_control(
+                    atlas,
+                    f64::from(radius),
+                    tokens.colors,
+                    density,
+                    materials::MenuSurface::StudioCapsule,
+                )?;
+                let mut pixels = Vec::with_capacity((half * full_height * 4) as usize);
+                for row in 0..full_height {
+                    let start = (row * raster.width * 4) as usize;
+                    pixels.extend_from_slice(&raster.pixels[start..start + (half * 4) as usize]);
+                }
+                Ok(materials::RgbaImage {
+                    width: half,
+                    height: full_height,
+                    pixels,
+                })
+            },
+        )?;
+        let scale = self.scale;
+        let vertical = r.height / f64::from(height);
+        let cap_width = f64::from(cap) * vertical;
+        let inner = f64::from(radius) * vertical;
+        for (x, width, source_x, source_width, mirrored) in [
+            (
+                r.x - f64::from(pad) * vertical,
+                cap_width,
+                0.,
+                f64::from(cap),
+                false,
+            ),
+            (
+                r.x + inner,
+                (r.width - 2. * inner).max(0.),
+                f64::from(cap),
+                1.,
+                false,
+            ),
+            (r.x + r.width - inner, cap_width, 0., f64::from(cap), true),
+        ] {
+            if width == 0. {
+                continue;
+            }
+            let mut draw = image(
+                &resource,
+                MenuRect {
+                    x,
+                    y: r.y - f64::from(pad) * vertical,
+                    width,
+                    height: f64::from(full_height) * vertical,
+                },
+                alpha,
+            );
+            draw.source = Some(BodyRect {
+                x: source_x,
+                y: 0.,
+                width: source_width,
+                height: f64::from(full_height),
+            });
+            draw.snap_overlay(scale);
+            if clip.is_none_or(|clip| clip_scaled_draw(&mut draw, clip, scale)) {
+                if mirrored {
+                    let source = draw.source.as_mut().expect("capsule crop");
+                    source.x = 2. * source_x + source_width - source.x - source.width;
+                    let d = draw.destination;
+                    draw.corners = Some([
+                        [d.x + d.width, d.y],
+                        [d.x, d.y],
+                        [d.x, d.y + d.height],
+                        [d.x + d.width, d.y + d.height],
+                    ]);
+                }
+                self.push(draw)?;
             }
         }
         Ok(())
@@ -2301,6 +2632,35 @@ impl Composition<'_> {
     }
 }
 
+// Scaled swatches and compact capsule centres do not have 1:1 source/destination pixels.
+fn clip_scaled_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
+    draw.snap_overlay(scale);
+    let original = draw.destination;
+    let clipped = intersection(
+        MenuRect {
+            x: original.x,
+            y: original.y,
+            width: original.width,
+            height: original.height,
+        },
+        clip,
+    );
+    if clipped.width <= 0. || clipped.height <= 0. {
+        return false;
+    }
+    let source = draw.source.expect("scaled menu crop");
+    let x = source.x + (clipped.x - original.x) / original.width * source.width;
+    let y = source.y + (clipped.y - original.y) / original.height * source.height;
+    draw.source = Some(BodyRect {
+        x,
+        y,
+        width: (clipped.width / original.width * source.width).min(f64::from(draw.asset.width) - x),
+        height: (clipped.height / original.height * source.height)
+            .min(f64::from(draw.asset.height) - y),
+    });
+    draw.destination = body(clipped);
+    true
+}
 fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
     let r = draw.destination;
     let x = (r.x + draw.translation[0]).max((clip.x * scale).ceil() / scale);

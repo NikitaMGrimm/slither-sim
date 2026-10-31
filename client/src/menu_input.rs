@@ -863,6 +863,10 @@ impl MenuInputState {
 pub enum AccessibleRole {
     /// Binary control exposing a committed checked state.
     Checkbox,
+    /// Roving section tab.
+    Tab,
+    /// Roving palette or run cell.
+    GridCell,
     /// Editable field.
     TextInput,
     /// Activatable control.

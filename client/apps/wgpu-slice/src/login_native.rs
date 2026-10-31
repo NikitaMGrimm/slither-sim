@@ -355,6 +355,23 @@ impl NativeLogin {
         if let WindowEvent::KeyboardInput { event, .. } = event {
             return self.key(event.into(), admission);
         }
+        if self.studio.state.visible()
+            && let WindowEvent::MouseWheel { delta, .. } = event
+        {
+            use winit::event::MouseScrollDelta;
+            self.studio.wheel += match delta {
+                MouseScrollDelta::LineDelta(_, y) => -f64::from(*y),
+                MouseScrollDelta::PixelDelta(p) => -p.y / 28.,
+            };
+            let rows = self.studio.wheel.trunc() as isize;
+            self.studio.wheel -= rows as f64;
+            self.studio.state.scroll_editor(rows, self.area);
+            self.controls.blur();
+            return crate::menu_input_native::NativeInputResult {
+                consumed: true,
+                effects: self.sync_controls(admission),
+            };
+        }
         self.input.window_event(event)
     }
     /// Real and authored key events share return gating and generic Tab focus.
@@ -397,6 +414,7 @@ impl NativeLogin {
             };
         }
         if self.studio.state.visible() {
+            use slither_client::skin_studio::Navigation;
             let mut effects = Vec::new();
             if event.state == ElementState::Pressed && !event.repeat {
                 match event.logical {
@@ -429,9 +447,38 @@ impl NativeLogin {
                             .activate(slither_client::skin_studio::NEXT, &view.nickname)
                     }
                     Key::Named(NamedKey::Enter | NamedKey::Space) => self.activate(admission),
+                    Key::Named(
+                        named @ (NamedKey::ArrowLeft
+                        | NamedKey::ArrowRight
+                        | NamedKey::ArrowUp
+                        | NamedKey::ArrowDown
+                        | NamedKey::Home
+                        | NamedKey::End),
+                    ) => {
+                        if let Some(focus) = self.controls.focus() {
+                            let direction = match named {
+                                NamedKey::ArrowLeft => Navigation::Left,
+                                NamedKey::ArrowRight => Navigation::Right,
+                                NamedKey::ArrowUp => Navigation::Up,
+                                NamedKey::ArrowDown => Navigation::Down,
+                                NamedKey::Home => Navigation::Home,
+                                _ => Navigation::End,
+                            };
+                            let next =
+                                self.studio
+                                    .state
+                                    .navigate(focus, direction, self.studio.now);
+                            self.studio.state.reveal_control(next, self.area);
+                            effects.extend(self.sync_controls(admission));
+                            self.controls.set_focus(next);
+                        }
+                    }
                     _ => {}
                 }
-                effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
+                if let Some(focus) = self.controls.focus() {
+                    self.studio.state.reveal_control(focus, self.area);
+                }
+                effects.extend(self.sync_controls(admission));
             }
             return NativeInputResult {
                 consumed: true,
@@ -517,6 +564,8 @@ impl NativeLogin {
             if let Some(intent) = self.controls.pointer(&self.panel, &resolved, point, down) {
                 self.studio
                     .activate(intent.control, &self.state.view(true).nickname);
+                self.studio.state.reveal_control(intent.control, self.area);
+                effects.extend(self.sync_controls(admission));
             }
             effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
             return effects;
@@ -602,7 +651,8 @@ impl NativeLogin {
             view.skin_alpha *= alpha;
         }
         let area = extent.map(|n| f64::from(n) / dpr);
-        if area != self.area || dpr != self.pixel_scale {
+        let resized = area != self.area || dpr != self.pixel_scale;
+        if resized {
             self.controls.blur();
         }
         self.pixel_scale = dpr;
@@ -632,6 +682,9 @@ impl NativeLogin {
             return Ok(picture);
         }
         if self.studio.state.visible() {
+            if resized && let Some(focus) = self.controls.focus() {
+                self.studio.state.reveal_control(focus, area);
+            }
             self.sync_controls(admission);
             view.login_alpha *= 1. - self.studio.state.alpha();
             view.visible = view.login_alpha > 0.;
