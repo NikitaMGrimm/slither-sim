@@ -32,9 +32,6 @@ pub struct NativeLogin {
     champion_session: slither_client::session_policy::View,
 }
 impl NativeLogin {
-    pub fn set_wordmark(&mut self, enabled: bool) {
-        self.menu.wordmark = enabled;
-    }
     pub fn needs_redraw(&self) -> bool {
         // A terminal socket must not idle the host during the hidden death hold.
         self.state.view(true).visible || self.champion_session.death_pending
@@ -527,7 +524,6 @@ impl NativeLogin {
                 extent,
                 dpr,
                 cosmetics,
-                0,
                 Some(&self.input.state),
                 Some(crate::menu::PanelPaint {
                     panel: &self.panel,
@@ -594,7 +590,6 @@ impl NativeLogin {
             extent,
             dpr,
             cosmetics,
-            0,
             Some(&self.input.state),
             panel,
         )

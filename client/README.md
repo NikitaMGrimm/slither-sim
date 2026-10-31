@@ -64,9 +64,9 @@ The window opens on login, restoring saved appearance preferences. Explicit
 `--nickname` and `--skin` override restored values for that run. Change Skin opens
 the offline [skin studio](docs/skin-studio.md); Save commits the draft and Cancel
 discards it. Click Play or press Enter to acquire the profile/server and connect
-once. Add `--wordmark` to show the authored green/purple
-SlitherClient wordmark even with local `--cosmetics-dir` logo art. Without local
-logo art the wordmark is the default. Quality selects the requested mode for that Play.
+once. The native login always uses the authored green/purple SlitherClient stroke
+wordmark. `--cosmetics-dir` still supplies backgrounds, skins, accessories and menu
+icons. Quality selects the requested mode for that Play.
 
 
 Browser (Canvas2D):

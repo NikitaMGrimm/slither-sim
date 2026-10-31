@@ -154,6 +154,9 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
         ([1200, 675], 1.25),
         ([1920, 1080], 2.),
         ([3840, 2160], 1.5),
+        ([5760, 3240], 6.),
+        ([6720, 3780], 7.),
+        ([7680, 4320], 8.),
     ] {
         for element in [E::Play, E::NicknameHolder, E::Quality] {
             let mut login = NativeLogin::new("Test").unwrap();
@@ -225,11 +228,15 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                             })
                         })
                         .unwrap();
-                    assert!(effects.iter().any(
-                        |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
+                    assert!(
+                        effects.iter().any(
+                            |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
                         if *position == [caret.destination.x,caret.destination.y]
                         && *size == [caret.destination.width,caret.destination.height])
-                    ));
+                        ),
+                        "DPR {dpr}: IME {effects:?}, caret {:?}",
+                        caret.destination
+                    );
                 }
                 E::Quality => assert_eq!(login.state.view(true).quality, MenuQuality::Low),
                 _ => unreachable!(),
@@ -1052,6 +1059,63 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
                 matches!(intents.as_slice(), [StartMenuIntent::Play { nickname, .. }] if nickname == "Stored")
             );
             assert!(login.step(96., true, false).unwrap().0.is_empty());
+        }
+    }
+}
+
+#[test]
+fn settled_login_density_cap_keeps_real_viewport_layout_and_hits() {
+    use slither_client::desktop_input::mouse_client_position;
+    for height in [540., 720.] {
+        let mut login = NativeLogin::new("Player").unwrap();
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false).unwrap();
+        }
+        let mut previous = None;
+        for dpr in [5., 6., 7., 8., 5.] {
+            let extent = [(960. * dpr) as u32, (height * dpr) as u32];
+            let frame = login.prepare_host(extent, dpr, true, None).unwrap();
+            assert_eq!(frame.frame.extent, extent);
+            assert_eq!(frame.frame.viewport_scale, dpr);
+            assert!(
+                frame.frame.draws.len()
+                    + usize::from(frame.backdrop.is_some())
+                    + usize::from(frame.world_cover.is_some())
+                    <= 512
+            );
+            assert!(
+                frame
+                    .resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+                    <= 13 * 1024 * 1024
+            );
+            let rects = [E::Logo, E::NicknameHolder, E::Play, E::Quality, E::Server]
+                .map(|e| login.layout.viewport_rect(e));
+            if let Some(old) = previous {
+                assert_eq!(rects, old);
+            }
+            previous = Some(rects);
+            let rect = login.layout.viewport_rect(E::Quality);
+            let point = mouse_client_position(
+                [
+                    (rect.x + rect.width / 2.) * dpr,
+                    (rect.y + rect.height / 2.) * dpr,
+                ],
+                dpr,
+            );
+            assert!(frame.frame.draws.iter().any(|draw| {
+                let r = draw.destination;
+                point[0] >= r.x
+                    && point[0] < r.x + r.width
+                    && point[1] >= r.y
+                    && point[1] < r.y + r.height
+            }));
+            let quality = login.state.view(true).quality;
+            login.pointer(point, Some(true), true);
+            login.pointer(point, Some(false), true);
+            assert_ne!(login.state.view(true).quality, quality);
         }
     }
 }

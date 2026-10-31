@@ -151,19 +151,10 @@ impl Images {
         Ok(())
     }
     pub fn menu_paths(&self) -> Vec<String> {
-        let mut logos = 0;
         self.menu
             .manifest
             .0
             .iter()
-            .filter(|e| {
-                if matches!(e.art, MenuArt::Logo(_)) {
-                    logos += 1;
-                    logos <= 2
-                } else {
-                    true
-                }
-            })
             .map(|e| e.path.clone())
             .collect()
     }

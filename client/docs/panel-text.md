@@ -99,7 +99,7 @@ The earlier plan predates the minimap change. The base has 258 text entries /
 shadow each 1 MiB). These remain unchanged. Panels add 64 lazy slots / 12 MiB;
 total ceilings are 322 entries / 18 MiB. Nickname accounting is explicit and
 cannot borrow from panels. All pixel allowances are maxima, not eager allocation.
-The native menu adds 64 replacing slots / 13 MiB for controls and the two-run
+The native menu adds 64 replacing slots / 13 MiB for controls and the stroke
 wordmark through outgoing growth. Current aggregate text/menu ceilings are
 386 slots / 31 MiB; the whole-picture guard remains 64 MiB. See
 [menu resource bounds](menu-resources.md#bounds-and-publication).

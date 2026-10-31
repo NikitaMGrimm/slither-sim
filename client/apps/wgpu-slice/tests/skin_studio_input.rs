@@ -185,8 +185,8 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
 }
 
 #[test]
-fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_five() {
-    for dpr in 1..=5 {
+fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eight() {
+    for dpr in 1..=8 {
         let dpr = f64::from(dpr);
         let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
         let mut login = NativeLogin::new("Player").unwrap();
@@ -270,5 +270,75 @@ fn login_constructor_and_champion_return_retain_their_existing_normalization_and
                 .alpha,
             0.
         );
+    }
+}
+
+#[test]
+fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
+    use slither_client::{desktop_input::mouse_client_position, menu_controls::*, menu_input::*};
+    for height in [540., 720.] {
+        for dpr in [5., 6., 7., 8.] {
+            let mut login = NativeLogin::new("Player").unwrap();
+            for time in (0..=9600).step_by(16) {
+                login.step(time as f64, false, false).unwrap();
+            }
+            let extent = [(960. * dpr) as u32, (height * dpr) as u32];
+            login.prepare_host(extent, dpr, false, None).unwrap();
+            login.open_studio();
+            for time in [9715., 9830.] {
+                login.step(time, false, false).unwrap();
+                let menu = login.prepare_host(extent, dpr, false, None).unwrap();
+                assert_eq!(menu.frame.viewport_scale, dpr);
+                assert_eq!(menu.frame.extent, extent);
+                assert!(menu.frame.draws.len() + usize::from(menu.backdrop.is_some()) <= 512);
+                assert!(
+                    menu.resources
+                        .iter()
+                        .map(|r| r.image.pixels.len())
+                        .sum::<usize>()
+                        <= 13 * 1024 * 1024
+                );
+                let resolved = login.panel.resolve([960., height]).unwrap();
+                let next = resolved.iter().find(|r| r.control.id == NEXT).unwrap();
+                let r = next.rect;
+                let point = mouse_client_position(
+                    [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr],
+                    dpr,
+                );
+                assert!(next.hit(point));
+                assert!(menu.frame.draws.iter().any(|d| point[0] >= d.destination.x
+                    && point[0] < d.destination.x + d.destination.width
+                    && point[1] >= d.destination.y
+                    && point[1] < d.destination.y + d.destination.height));
+                let mut hit = PanelInputState::default();
+                hit.sync(&login.panel, &mut MenuInputState::default());
+                hit.pointer(&login.panel, &resolved, point, Some(true));
+                assert_eq!(
+                    hit.pointer(&login.panel, &resolved, point, Some(false))
+                        .unwrap()
+                        .control,
+                    NEXT
+                );
+                let mut picture = slither_wgpu_slice::render::PreparedFrame {
+                    frame: menu.frame,
+                    overlay: None,
+                    resources: menu.resources,
+                };
+                login.studio.append_preview(&mut picture, None).unwrap();
+                assert!(picture.draw_count() <= 1536);
+                assert_eq!(picture.ui_frame().viewport_scale, dpr);
+                picture
+                    .frame
+                    .validate(
+                        &picture
+                            .resources
+                            .iter()
+                            .map(|r| (r.asset.into(), r.asset))
+                            .collect(),
+                    )
+                    .unwrap();
+                login.studio.presented();
+            }
+        }
     }
 }

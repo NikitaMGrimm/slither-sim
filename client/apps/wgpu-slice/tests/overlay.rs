@@ -327,13 +327,24 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
         .map(|r| (r.asset.into(), r.asset))
         .collect();
     menu.frame.validate(&resident).unwrap();
+    let logo = login
+        .layout
+        .viewport_rect(slither_client::menu_layout::MenuElement::Logo);
     let widest = menu
         .resources
         .iter()
-        .filter(|r| r.asset.handle >> 60 == 7)
+        .filter(|r| {
+            r.asset.handle >> 60 == 7
+                && menu.frame.draws.iter().any(|d| {
+                    d.asset == r.asset
+                        && (d.destination.y < logo.y - 1.
+                            || d.destination.y + d.destination.height > logo.y + logo.height + 1.)
+                })
+        })
         .max_by_key(|r| r.asset.width)
         .unwrap();
-    // Material storage is sliced; exact physical source/destination sizes above remain unchanged.
+    // Controls use sliced 512px storage; stroke atlases share the 2048px
+    // all-resource limit below. Physical source/destination sizes stay exact.
     assert!(widest.asset.width <= 512);
     assert!(
         menu.resources

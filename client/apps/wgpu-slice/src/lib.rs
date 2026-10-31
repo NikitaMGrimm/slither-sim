@@ -35,6 +35,7 @@ pub mod scene;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod server_picker_native;
 pub mod text;
+pub mod wordmark;
 
 #[cfg(target_arch = "wasm32")]
 mod web;

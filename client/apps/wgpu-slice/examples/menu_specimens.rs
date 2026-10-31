@@ -141,7 +141,21 @@ fn capture_scaled(
     );
     Ok(())
 }
-fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
+/// PNG stores straight alpha; production textures retain premultiplied pixels.
+fn straight_alpha(premultiplied: &[u8]) -> Vec<u8> {
+    let mut pixels = premultiplied.to_vec();
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel[..3] {
+            *channel = (u32::from(*channel) * 255 + alpha / 2)
+                .checked_div(alpha)
+                .unwrap_or(0)
+                .min(255) as u8;
+        }
+    }
+    pixels
+}
+fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
     let mut bytes = Cursor::new(Vec::new());
     // Deliberately synthetic icon; no external reference/brand artwork.
     let image = image::RgbaImage::from_fn(320, 80, |x, y| {
@@ -308,7 +322,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -333,7 +346,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -350,7 +362,7 @@ async fn run(output: &Path) -> Result<()> {
             )?;
             view.ordinary_controls_visible = true;
             let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
-            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None, 0)?;
+            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None)?;
             capture(
                 &mut renderer,
                 &login,
@@ -367,6 +379,9 @@ async fn run(output: &Path) -> Result<()> {
         }
         return Ok(());
     }
+    if std::env::args().nth(2).as_deref() == Some("--stroke") {
+        return stroke_specimens(output, &mut renderer);
+    }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--login") {
         use slither_client::menu_layout::MenuElement as E;
@@ -375,9 +390,7 @@ async fn run(output: &Path) -> Result<()> {
             .nth(3)
             .map(|dir| Cosmetics::directory(Path::new(&dir), None))
             .transpose()?;
-        let wordmark = std::env::args().any(|a| a == "--wordmark");
         let mut login = NativeLogin::new("")?;
-        login.set_wordmark(wordmark);
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
         }
@@ -465,12 +478,11 @@ async fn run(output: &Path) -> Result<()> {
         }
         let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
         capture(&mut renderer, &picture, &output.join("native-spinner.png"))?;
-        for fallback in [false, true] {
+        for without_icons in [false, true] {
             // Each independent producer starts its own material revision sequence.
             let mut intro_renderer =
                 Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
             let mut intro = NativeLogin::new("")?;
-            intro.set_wordmark(wordmark);
             for now in (0..=768).step_by(16) {
                 intro.step(f64::from(now), true, false)?;
                 if [128, 256, 512, 768].contains(&now) {
@@ -478,12 +490,12 @@ async fn run(output: &Path) -> Result<()> {
                         [960, 540],
                         1.,
                         true,
-                        if fallback { None } else { art.as_ref() },
+                        if without_icons { None } else { art.as_ref() },
                     )?;
                     capture(
                         &mut intro_renderer,
                         &picture,
-                        &output.join(format!("reveal-{now}-fallback-{fallback}.png")),
+                        &output.join(format!("reveal-{now}-without-icons-{without_icons}.png")),
                     )?;
                 }
             }
@@ -512,7 +524,7 @@ async fn run(output: &Path) -> Result<()> {
             let extent = [(1280. * dpr) as u32, (720. * dpr) as u32];
             let view = menu_specimen::view(state as u8)?;
             let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
-            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)?;
+            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
             capture(
                 &mut renderer,
                 &p,
@@ -522,24 +534,24 @@ async fn run(output: &Path) -> Result<()> {
     }
     let view = menu_specimen::view(0)?;
     let mut images = Images::default();
-    images.add("menu/logo.png", &synthetic_logo([90, 180, 120, 255])?)?;
+    images.add("menu/skin.png", &synthetic_icon([90, 180, 120, 255])?)?;
     let mut art = Cosmetics::from_images(images, None)?;
     let layout = menu_specimen::layout(&mut text, &view, [1280, 720], 1.)?;
-    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &old,
         &output.join("native-synthetic-art.png"),
     )?;
-    art.replace_menu_art(MenuArt::Logo(0), &synthetic_logo([170, 90, 180, 255])?)?;
-    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    art.replace_menu_art(MenuArt::Skin, &synthetic_icon([170, 90, 180, 255])?)?;
+    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &replacement,
         &output.join("native-replacement.png"),
     )?;
     let layout = menu_specimen::layout(&mut text, &view, [960, 540], 1.)?;
-    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None, 0)?;
+    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None)?;
     capture(
         &mut renderer,
         &resized,
@@ -556,7 +568,7 @@ async fn run(output: &Path) -> Result<()> {
     let layout = menu_specimen::layout(&mut text, &view, [640, 360], 1.)?;
     capture(
         &mut renderer,
-        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None, 0)?,
+        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None)?,
         &output.join("native-short-640x360.png"),
     )?;
     if let Some(error) = validation.pop().await {
@@ -573,7 +585,7 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     use slither_wgpu_slice::{
         login_native::NativeLogin, menu_storage::MenuStorage, skin_studio_native::SkinStudioNative,
     };
-    let png = synthetic_logo([180, 100, 210, 255])?;
+    let png = synthetic_icon([180, 100, 210, 255])?;
     let full = Cosmetics::load(
         |path| {
             if slither_wgpu_slice::cosmetics::BackgroundArt::ALL
@@ -738,6 +750,171 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
     Ok(())
 }
+/// Authored string/raster probes and the production menu at frozen core times.
+/// Output stays external; optional private reference composition is a separate
+/// local operation and never part of this example's inputs or repository data.
+fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_client::{
+        menu_layout::MenuRect,
+        menu_preferences::MenuQuality,
+        start_page::{MenuLocale, StartMenuState},
+    };
+    use slither_wgpu_slice::wordmark;
+    let holder = MenuRect {
+        x: 735.,
+        y: 50.,
+        width: 450.,
+        height: 115.,
+    };
+    let mut timings = Vec::new();
+    for dpr in [1., 2., 5.] {
+        let layout = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| {
+            Err("unexpected fallback".into())
+        })?;
+        for progress in [0.15, 0.5, 1.] {
+            let mut runs = Vec::new();
+            for index in 0..7 {
+                let now = std::time::Instant::now();
+                let raster = wordmark::raster(&layout, dpr, progress)?;
+                let ms = now.elapsed().as_secs_f64() * 1000.;
+                let nonzero = raster
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .filter(|p| p[3] > 0)
+                    .count();
+                if nonzero == 0 {
+                    return Err("empty timed raster".into());
+                }
+                if index > 0 {
+                    runs.push(ms);
+                }
+            }
+            timings.push(serde_json::json!({"dpr": dpr, "progress": progress,
+                "milliseconds": runs, "size": wordmark::raster_size(&layout, dpr)?,
+                "profile": if cfg!(debug_assertions) { "dev" } else { "release" }}));
+        }
+    }
+    for (index, value) in [
+        wordmark::DEFAULT_TEXT,
+        "Slither",
+        "Hello World 123",
+        "AnExtremelyLongSnakeClientName",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "abcdefghijklmnopqrstuvwxyz",
+        "0123456789 !?.,:;+-_()[]{}@#$%&*=<>/\\|~^`\"'",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let layout = wordmark::layout(value, holder, 1920., |_| Err("unexpected fallback".into()))?;
+        let raster = wordmark::raster(&layout, 1., 1.)?;
+        image::save_buffer(
+            output.join(format!("string-{index}.png")),
+            &straight_alpha(&raster.pixels),
+            raster.width,
+            raster.height,
+            image::ColorType::Rgba8,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
+    let mut last_ms = 0;
+    for ms in [0, 512, 1025, 2048, 2050, 3075, 4100, 5125, 6150, 7175] {
+        for now in ((last_ms + 16)..ms).step_by(16) {
+            state.step(f64::from(now), false).map_err(str::to_owned)?;
+        }
+        state.step(f64::from(ms), false).map_err(str::to_owned)?;
+        last_ms = ms;
+        let view = state.view(true);
+        let layout = menu_specimen::layout(&mut text, &view, [1920, 1080], 1.)?;
+        let p = menu.prepare(&mut text, &view, &layout, [1920, 1080], 1., None)?;
+        capture(renderer, &p, &output.join(format!("reveal-{ms:05}ms.png")))?;
+    }
+    for dpr in [1., 2.] {
+        let extent = [(1920. * dpr) as u32, (1080. * dpr) as u32];
+        let view = state.view(true);
+        let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
+        let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
+        capture(
+            renderer,
+            &p,
+            &output.join(format!("settled-1920x1080-dpr-{dpr}.png")),
+        )?;
+        let mut cached_ms = Vec::new();
+        for _ in 0..6 {
+            let now = std::time::Instant::now();
+            let cached = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
+            cached_ms.push(now.elapsed().as_secs_f64() * 1000.);
+            if cached
+                .frame
+                .draws
+                .iter()
+                .map(|d| d.asset)
+                .collect::<Vec<_>>()
+                != p.frame.draws.iter().map(|d| d.asset).collect::<Vec<_>>()
+            {
+                return Err("settled resources changed".into());
+            }
+            for resource in &p.resources {
+                let retained = cached
+                    .resources
+                    .iter()
+                    .find(|r| r.asset == resource.asset)
+                    .ok_or("settled resource missing")?;
+                if !std::sync::Arc::ptr_eq(&resource.image, &retained.image) {
+                    return Err("settled raster was copied".into());
+                }
+            }
+        }
+        timings.push(serde_json::json!({"dpr":dpr, "cachedMenuMilliseconds":cached_ms,
+            "draws":p.frame.draws.len(), "pixelBytes":p.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+    }
+    // A ten-fps CPU raster sequence preserves the shared clock's timing for an
+    // external motion strip/video. Full GPU menus above remain separate proof.
+    let motion = output.join("motion");
+    std::fs::create_dir(&motion).map_err(|e| e.to_string())?;
+    let geometry = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| unreachable!())?;
+    let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
+    for frame in 0..=72 {
+        let ms = frame * 100;
+        if ms > 0 {
+            for now in ((ms - 100 + 16)..ms).step_by(16) {
+                state.step(f64::from(now), false).map_err(str::to_owned)?;
+            }
+        }
+        state.step(f64::from(ms), false).map_err(str::to_owned)?;
+        let view = state.view(true);
+        let progress = view.logo_reveal;
+        let mut raster = wordmark::raster(&geometry, 1., progress)?;
+        let opacity = view.login_alpha * view.logo_alpha;
+        for p in raster.pixels.as_chunks_mut::<4>().0 {
+            let alpha = f64::from(p[3]) / 255. * opacity;
+            for (channel, background) in p[..3].iter_mut().zip([22., 28., 34.]) {
+                *channel =
+                    (f64::from(*channel) * opacity + background * (1. - alpha)).round() as u8;
+            }
+            p[3] = 255;
+        }
+        image::save_buffer(
+            motion.join(format!("{frame:03}.png")),
+            &raster.pixels,
+            raster.width,
+            raster.height,
+            image::ColorType::Rgba8,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    std::fs::write(
+        output.join("raster-timings.json"),
+        serde_json::to_vec_pretty(&timings).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
 fn main() {
     let result = std::env::args_os()
         .nth(1)
@@ -746,5 +923,20 @@ fn main() {
     if let Err(e) = result {
         eprintln!("{e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn png_conversion_preserves_the_production_raster() {
+        let pixels = [40, 20, 10, 128, 5, 6, 7, 255, 0, 0, 0, 0];
+        let copy = pixels;
+        assert_eq!(
+            straight_alpha(&pixels),
+            [80, 40, 20, 128, 5, 6, 7, 255, 0, 0, 0, 0]
+        );
+        assert_eq!(pixels, copy);
     }
 }
