@@ -299,6 +299,7 @@ mod desktop {
                     &mut self.directory_snapshot,
                     &result,
                     cancelled,
+                    self.directory.is_some(),
                 )?;
                 if cancelled {
                     self.game.stop();
@@ -452,15 +453,21 @@ mod desktop {
                         } else {
                             self.server.clone()
                         };
+                        let pending = DirectoryPreparation::take_for_play(
+                            explicit.as_deref(),
+                            &mut self.directory,
+                        );
                         match Preparation::start_with_directory(
                             explicit,
                             self.login.picker.policy.selection.0,
                             self.directory_snapshot.clone(),
-                            self.directory.take(),
+                            pending,
                         ) {
                             Ok(preparation) => self.preparation = Some(preparation),
                             Err(error) => {
-                                self.login.picker.policy.directory_failed(&error);
+                                if self.directory.is_none() {
+                                    self.login.picker.policy.directory_failed(&error);
+                                }
                                 self.game.fail(&error);
                             }
                         }

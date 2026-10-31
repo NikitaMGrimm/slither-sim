@@ -38,6 +38,8 @@ playing elsewhere. Directory fetches and pings remain bounded, cancellable
 native effects. Cold Play retains its directory/pings for later opens and Plays;
 a Play racing picker acquisition waits for that same worker. Only the profile
 page and script are reacquired per Play. The picker does not execute downloaded scripts.
+An explicit or forced endpoint leaves pending discovery with the picker; Play
+does not wait on it, and its success or failure is handled independently.
 
 The shared `ScrollList` admits six rows per window, independent of directory
 size. Only these `ListRow` controls have text rasters and draws. Wheel, arrows,
