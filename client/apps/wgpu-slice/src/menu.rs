@@ -548,7 +548,7 @@ impl Composition<'_> {
                 style.size *= r.scale;
                 // A fully visible control keeps its shadow outside the content window.
                 // Partly scrolled controls still crop both body and decoration.
-                let surface_clip = decoration_clip(r);
+                let surface_clip = decoration_clip(r, panel.id == 3);
                 let add_label = |c: &mut Composition<'_>,
                                  value: String,
                                  rect: MenuRect,
@@ -642,12 +642,15 @@ impl Composition<'_> {
                         }
                         if *selected {
                             self.studio_solid(
-                                MenuRect {
-                                    x: inner.x,
-                                    y: inner.y,
-                                    width: 4. * r.scale,
-                                    height: 4. * r.scale,
-                                },
+                                intersection(
+                                    MenuRect {
+                                        x: inner.x,
+                                        y: inner.y,
+                                        width: 4. * r.scale,
+                                        height: 4. * r.scale,
+                                    },
+                                    r.clip,
+                                ),
                                 alpha,
                                 theme,
                                 false,
@@ -2590,10 +2593,10 @@ type Published = (
     Option<StrokeCache>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
-fn decoration_clip(r: &ResolvedControl) -> Option<MenuRect> {
+fn decoration_clip(r: &ResolvedControl, studio: bool) -> Option<MenuRect> {
     r.control
         .clip
-        .and_then(|_| (!contains_rect(r.clip, r.rect)).then_some(r.clip))
+        .and_then(|_| (!studio || !contains_rect(r.clip, r.rect)).then_some(r.clip))
 }
 
 fn contains_rect(outer: MenuRect, inner: MenuRect) -> bool {

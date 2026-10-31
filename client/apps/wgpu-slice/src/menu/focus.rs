@@ -248,6 +248,81 @@ mod tests {
         }
     }
     #[test]
+    fn mouse_focus_and_selection_do_not_emit_keyboard_outlines_but_tab_does() {
+        use slither_client::menu_controls::{ControlId, Placement};
+        for kind in [
+            ControlKind::Button {
+                label: "Focus".into(),
+            },
+            ControlKind::SectionTab {
+                label: "Focus".into(),
+                selected: true,
+            },
+            ControlKind::Swatch {
+                palette: 1,
+                count: None,
+                selected: true,
+            },
+            ControlKind::CosmeticCell {
+                cosmetic: None,
+                selected: true,
+            },
+            ControlKind::Toggle {
+                label: "Focus".into(),
+                checked: true,
+            },
+        ] {
+            for keyboard in [false, true] {
+                let mut target = control().control;
+                target.kind = kind.clone();
+                let panel = PanelView {
+                    id: 3,
+                    generation: 1,
+                    placement: Placement::rect(0., 0., 960., 540.),
+                    visible: true,
+                    enabled: true,
+                    alpha: 1.,
+                    modal: true,
+                    initial_focus: Some(ControlId(1)),
+                    restore_focus: None,
+                    controls: vec![target],
+                };
+                let resolved = panel.resolve([960., 540.]).unwrap();
+                let r = &resolved[0];
+                let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+                let mut input = PanelInputState::default();
+                let mut edit = MenuInputState::default();
+                input.sync(&panel, &mut edit);
+                input.pointer(&panel, &resolved, point, Some(true));
+                input.pointer(&panel, &resolved, point, Some(false));
+                if keyboard {
+                    input.tab(&panel, false);
+                }
+                let empty = BTreeMap::new();
+                let art = BTreeMap::new();
+                let mut c = composition(&empty, &art, 1.5);
+                c.panel(
+                    &mut TextCache::menu(),
+                    &panel,
+                    &input,
+                    &edit,
+                    &mut BTreeMap::new(),
+                    MenuTheme::default(),
+                    &resolved,
+                    None,
+                )
+                .unwrap();
+                let outlined = c.materials.keys().any(|key| {
+                    matches!(
+                        key,
+                        MaterialKey::Focus(..) | MaterialKey::Indicator(_, _, _, _, true)
+                    )
+                });
+                assert_eq!(outlined, keyboard);
+            }
+        }
+    }
+    #[test]
     fn adjacent_focus_paint_stays_inside_each_control_and_does_not_intersect() {
         for density in [1_f64, 1.25, 1.5, 2., 3., 5.] {
             let empty = BTreeMap::new();
@@ -302,7 +377,7 @@ mod tests {
                 full.sliced(r.rect, tokens, 1., None, r.scale).unwrap();
                 let mut windowed = composition(&empty, &art, density);
                 windowed
-                    .sliced(r.rect, tokens, 1., decoration_clip(&r), r.scale)
+                    .sliced(r.rect, tokens, 1., decoration_clip(&r, true), r.scale)
                     .unwrap();
                 assert_eq!(full.draws.len(), windowed.draws.len());
                 for (a, b) in full.draws.iter().zip(&windowed.draws) {
@@ -310,8 +385,9 @@ mod tests {
                     assert_eq!(a.source, b.source);
                 }
                 assert!(full.draws.iter().any(|d| d.destination.y < r.rect.y));
+                assert!(decoration_clip(&r, false).is_some());
                 r.clip.height /= 2.;
-                assert!(decoration_clip(&r).is_some());
+                assert!(decoration_clip(&r, true).is_some());
             }
         }
     }
