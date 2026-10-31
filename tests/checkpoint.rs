@@ -53,6 +53,45 @@ fn world() -> Simulator {
 }
 
 #[test]
+fn variable_tick_duration_validates_atomically_and_survives_exact_restore() {
+    let mut saved = value(&world());
+    saved["config"]["boundaryMode"] = json!("hard");
+    let mut original = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    for invalid in [f64::NAN, f64::INFINITY, 0., -0.01, 1e100] {
+        assert!(original.set_dt(invalid).is_err());
+        assert_eq!(value(&original), saved);
+    }
+    let actions: Vec<_> = original
+        .snakes()
+        .iter()
+        .map(|s| {
+            Some(Action {
+                heading: s.heading,
+                boost: true,
+            })
+        })
+        .collect();
+    let mut elapsed = 0.;
+    for dt in [0.040, 0.057] {
+        original.set_dt(dt).unwrap();
+        original.step(&actions).unwrap();
+        elapsed += dt;
+    }
+    let saved = value(&original);
+    assert_eq!(saved["config"]["dt"], 0.057);
+    let mut restored = Simulator::from_checkpoint(&bytes(&saved), options()).unwrap();
+    for dt in [0.080, 0.043, 0.040, 0.057] {
+        original.set_dt(dt).unwrap();
+        restored.set_dt(dt).unwrap();
+        original.step(&actions).unwrap();
+        restored.step(&actions).unwrap();
+        elapsed += dt;
+        assert!((original.time() - elapsed).abs() < 1e-12);
+        assert_eq!(value(&original), value(&restored));
+    }
+}
+
+#[test]
 fn radius_controller_and_population_sizing_settings_round_trip_and_continue() {
     for dynamic_radius in [false, true] {
         for size_to_population in [false, true] {
@@ -1077,13 +1116,14 @@ fn old_rules_revision_is_rejected_atomically_without_changing_the_format() {
     let mut incumbent = world();
     let mut old = value(&incumbent);
     assert_eq!(old["format"], "slither-sim-checkpoint-v3");
-    assert_eq!(old["rulesRevision"], "slither-sim-rules-v6");
+    assert_eq!(old["rulesRevision"], "slither-sim-rules-v7");
     for revision in [
         "slither-sim-rules-v1",
         "slither-sim-rules-v2",
         "slither-sim-rules-v3",
         "slither-sim-rules-v4",
         "slither-sim-rules-v5",
+        "slither-sim-rules-v6",
     ] {
         old["rulesRevision"] = json!(revision);
         let error = rejects_atomic(&mut incumbent, &old);

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Optional host `maxTick` stretches overloaded ticks using elapsed time, with
+  time-based motion/mass reports and a lost-time counter. Fixed scheduling stays
+  the default. Validated `Simulator::set_dt` supports per-tick durations;
+  checkpoints use rules v7 and reject older rules revisions.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind

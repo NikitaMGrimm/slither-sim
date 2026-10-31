@@ -35,7 +35,7 @@ Worlds step in parallel, one task per world, using every core;
 {"op":"info"}
 ```
 
-Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v6`), `defaultConfig`, `defaultDecisionTicks`,
+Works before reset. Returns `version`, `rulesRevision` (`slither-sim-rules-v7`), `defaultConfig`, `defaultDecisionTicks`,
 `maxAgents`, `maxWorlds`, `maxDecisionTicks`, the food `origins` codes and the
 observation `precision`. Representation limits: `maxAgents` and
 `maxDecisionTicks` are 4294967295 (`u32` slot indices and tick counts;
@@ -400,7 +400,7 @@ the current world. Export also validates the complete state. Load errors carry
 `UnsupportedCheckpoint` or `InvalidCheckpoint` causes and field locations.
 
 The envelope is `slither-sim-checkpoint-v3`, with
-`rulesRevision: "slither-sim-rules-v6"`, producer provenance, today's flat Config
+`rulesRevision: "slither-sim-rules-v7"`, producer provenance, today's flat Config
 and ordered slot/entity records, including food storage rows, their private
 birth-sequence identities and the next birth sequence. `config.radius` is the
 initial radius and

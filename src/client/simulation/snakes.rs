@@ -211,6 +211,8 @@ pub(super) struct SnakeReports {
     pub(super) motion_at: u64,
     pub(super) fam: u32,
     pub(super) fam_at: u64,
+    motion_seconds: f64,
+    fam_seconds: f64,
     /// Reported in the current tick.
     pub(super) motion_due: bool,
     pub(super) fam_due: bool,
@@ -277,6 +279,45 @@ impl SnakeReports {
         if self.fam_due {
             self.fam = fam;
             self.fam_at = tick + FAM_REPORT_TICKS;
+            self.fam_stale = false;
+        }
+    }
+
+    /// Variable ticks use elapsed time, retaining the fixed path's
+    /// changed-value, stale-recipient and responsive-delivery rules.
+    pub(super) fn update_timed(
+        &mut self,
+        life: u64,
+        motion: [u8; 3],
+        fam: u32,
+        now: f64,
+        delivery: DeliveryProfile,
+    ) {
+        if self.life != life {
+            *self = Self {
+                life,
+                motion,
+                fam,
+                motion_seconds: now,
+                fam_seconds: now,
+                ..Self::default()
+            };
+            return;
+        }
+        let responsive = delivery == DeliveryProfile::Responsive;
+        let urgent = responsive && motion[1..] != self.motion[1..];
+        self.motion_due = (motion != self.motion || self.motion_stale)
+            && (urgent || now + 1e-9 >= self.motion_seconds);
+        if self.motion_due {
+            self.motion = motion;
+            self.motion_seconds = now + MOTION_REPORT_TICKS as f64 * 0.007;
+            self.motion_stale = false;
+        }
+        self.fam_due =
+            (fam != self.fam || self.fam_stale) && (responsive || now + 1e-9 >= self.fam_seconds);
+        if self.fam_due {
+            self.fam = fam;
+            self.fam_seconds = now + FAM_REPORT_TICKS as f64 * 0.007;
             self.fam_stale = false;
         }
     }

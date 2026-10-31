@@ -54,6 +54,7 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
     HostConfig {
         bind: "127.0.0.1:0".parse().unwrap(),
         seed: 7,
+        max_tick: None,
         players: PlayerConfig {
             max: max_clients,
             ..Default::default()
@@ -75,6 +76,57 @@ fn network(url: String, nickname: &str, handshake: Handshake) -> NetworkBackend 
         ..NetworkConfig::default()
     })
     .unwrap()
+}
+
+#[test]
+fn adaptive_host_keeps_socket_time_and_ping_near_wall_time() {
+    let mut config = config(1, 0);
+    config.max_tick = Some(0.080);
+    config.simulation.world.dt = 0.040;
+    config.simulation.world.boundary_mode = slither_sim::BoundaryMode::Hard;
+    config.simulation.world.radius = 32000.;
+    let host = Running::start(config);
+    let mut bot = NetworkBackend::connect(NetworkConfig {
+        url: host.url(),
+        record_wire: true,
+        handshake: Handshake::Direct,
+        ..Default::default()
+    })
+    .unwrap();
+    until(&mut bot, "adaptive self", |f| {
+        f.status == ClientStatus::Playing
+    });
+    bot.drain_records().unwrap();
+    let started = Instant::now();
+    let mut elapsed_ms = 0u64;
+    let mut first_received = None;
+    let mut last_received = 0.;
+    let mut saw_ping = false;
+    while started.elapsed() < Duration::from_millis(800) {
+        let frame = bot.next_frame().unwrap();
+        assert_eq!(frame.status, ClientStatus::Playing);
+        saw_ping |= frame.timing.ping_seconds.is_some_and(|ping| ping < 0.3);
+        for record in bot.drain_records().unwrap() {
+            if record.event == slither_sim::client::WireEvent::Receive {
+                // Compare the same received-frame interval on both clocks.
+                // Quiet time after the final anchor has no elapsed header yet.
+                if first_received.is_some() {
+                    elapsed_ms += u64::from(u16::from_be_bytes([record.bytes[0], record.bytes[1]]));
+                } else {
+                    first_received = Some(record.time);
+                }
+                last_received = record.time;
+            }
+        }
+    }
+    let span = last_received - first_received.expect("received frames");
+    assert!(span > 0.2, "too few received frames");
+    let ratio = elapsed_ms as f64 / 1000. / span;
+    assert!((0.85..=1.15).contains(&ratio), "socket clock ratio {ratio}");
+    assert!(saw_ping);
+    assert_eq!(host.host.deferred_ticks(), 0);
+    bot.disconnect();
+    assert!(host.finish() > 0);
 }
 
 fn until(

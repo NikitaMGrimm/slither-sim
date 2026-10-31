@@ -1532,6 +1532,15 @@ impl Simulator {
         self.advance_validated(actions)
             .map_err(CoreStepError::Stopped)
     }
+    /// Set the next tick duration, validating the same limits as construction.
+    /// Rejection leaves the world and its configuration unchanged.
+    pub fn set_dt(&mut self, dt: f64) -> Result<(), SimError> {
+        let mut config = self.config.clone();
+        config.dt = dt;
+        config.validate()?;
+        self.config.dt = dt;
+        Ok(())
+    }
     /// Persistent terminal cause, including after later rejected retries.
     pub fn status(&self) -> WorldStatus<'_> {
         self.failure
