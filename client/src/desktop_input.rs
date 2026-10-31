@@ -406,7 +406,7 @@ impl DesktopInput {
             self.view.own.as_mut().expect("retained own").gaze_heading = gaze;
             Ok(if self.view.protocol >= 5 {
                 slither_protocol::v19::client::turn(increasing, count as u8)
-                    .expect("bounded turn count")
+                    .unwrap_or_else(|_| panic!("bounded turn count"))
                     .to_vec()
             } else {
                 vec![if increasing { 114 } else { 108 }, count as u8]
@@ -478,7 +478,7 @@ impl DesktopInput {
                         slither_protocol::v19::client::PING.to_vec()
                     } else {
                         slither_protocol::v19::client::heading_byte(q as u8)
-                            .expect("ordinary pointer heading is in 0..=250")
+                            .unwrap_or_else(|_| panic!("ordinary pointer heading is in 0..=250"))
                             .to_vec()
                     }
                 } else {

@@ -755,7 +755,7 @@ impl ClientState {
             if error.kind == ErrorKind::UnsupportedVersion {
                 StateError::UnsupportedProtocol(
                     v19::setup_protocol_version(p, admission)
-                        .expect("decoder validated setup boundaries"),
+                        .unwrap_or_else(|_| panic!("decoder validated setup boundaries")),
                 )
             } else {
                 StateError::InvalidPacket(code)

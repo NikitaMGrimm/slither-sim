@@ -86,7 +86,9 @@ pub fn encode_login(
         },
         &mut bytes,
     )
-    .expect("validated login and exact output capacity");
+    // The local checks prove the encoder preconditions. Keep invariant failures
+    // static so this adapter does not retain the shared error's Debug formatter.
+    .unwrap_or_else(|_| panic!("validated login and exact output capacity"));
     Ok(bytes)
 }
 
@@ -97,7 +99,7 @@ pub fn encode_champion(units: &[u16]) -> Vec<u8> {
     let text = crate::menu_input::TextRule::Champion.normalize_units(units);
     let mut bytes = vec![0; 2 + text.len()];
     v19::client::write_champion(text.as_bytes(), &mut bytes)
-        .expect("normalized champion text and exact output capacity");
+        .unwrap_or_else(|_| panic!("normalized champion text and exact output capacity"));
     bytes
 }
 
