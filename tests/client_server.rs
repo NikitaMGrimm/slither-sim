@@ -741,6 +741,77 @@ fn short_modern_login_uses_protocol19_after_the_shared_challenge() {
     }
 }
 
+/// Client-derived synthetic bytes; no GPL implementation or live capture.
+#[test]
+fn vlither_challenge_reply_joins_with_and_without_custom_skin() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/browser-admission.json")).unwrap();
+    let fixture = &fixture["vlither"];
+    let bytes = |key: &str| -> Vec<u8> {
+        fixture[key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_u64().unwrap() as u8)
+            .collect()
+    };
+    for custom in [vec![], bytes("customSkin")] {
+        let host = Running::start(config(1, 0));
+        let mut client = Raw::open(host.address);
+        client.write(
+            format!(
+                "GET /slither HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\n\
+                 Connection: Upgrade\r\nSec-WebSocket-Version: 13\r\n\
+                 Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\
+                 Origin: https://slither.com\r\n\r\n",
+                host.address
+            )
+            .as_bytes(),
+        );
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        client.send(&bytes("framing"));
+        client.send(&bytes("request"));
+        let challenge = client.binary();
+        assert_eq!(challenge[0], b'6');
+        let reply = fixture["replyAscii"].as_str().unwrap().as_bytes();
+        assert_ne!(reply, solve_challenge(&challenge[1..]).unwrap());
+        client.send(reply);
+        let mut login = bytes("login");
+        login.extend(&custom);
+        client.send(&login);
+        let setup = packets(&client.binary()).remove(0);
+        assert_eq!(setup[0], b'a');
+        assert_eq!(setup[23], fixture["setupProtocol"].as_u64().unwrap() as u8);
+        let started = Instant::now();
+        loop {
+            if let Some(appearance) = packets(&client.binary())
+                .into_iter()
+                .find(|packet| packet[0] == b's' && packet.len() > 9)
+            {
+                let name = fixture["nickname"].as_str().unwrap().as_bytes();
+                assert_eq!(appearance[15], fixture["skin"].as_u64().unwrap() as u8);
+                assert_eq!(usize::from(appearance[22]), name.len());
+                assert_eq!(&appearance[23..23 + name.len()], name);
+                let at = 23 + name.len();
+                assert_eq!(usize::from(appearance[at]), custom.len());
+                assert_eq!(&appearance[at + 1..at + 1 + custom.len()], custom);
+                break;
+            }
+            assert!(started.elapsed() < WAIT, "Vlither login did not join");
+        }
+        host.finish();
+    }
+    let host = Running::start(config(1, 0));
+    let mut client = Raw::connect(host.address, "/slither");
+    assert!(client.status().starts_with("HTTP/1.1 101"));
+    client.send(&[1]);
+    client.send(&[99, 0]);
+    assert_eq!(client.binary()[0], b'6');
+    client.send(&[b'x'; 27]);
+    assert_eq!(client.closed(), "Invalid challenge reply");
+    host.finish();
+}
+
 #[test]
 fn dense_legacy_prey_burst_keeps_its_socket_and_the_host_alive() {
     let mut config = config(2, 0);

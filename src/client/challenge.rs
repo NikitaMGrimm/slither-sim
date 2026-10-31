@@ -49,6 +49,11 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, String> {
         return Err("Unsupported challenge syntax".into());
     }
 
+    rotate_reply(&mut reply, 4);
+    Ok(reply.to_vec())
+}
+
+pub(super) fn rotate_reply(reply: &mut [u8], step: i32) {
     let mut rotation = 0_i32;
     for (index, byte) in reply.iter_mut().enumerate() {
         let mut base = i32::from(b'A');
@@ -64,9 +69,8 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, String> {
         // JS remainder keeps the dividend's sign. Punctuation can make it
         // negative; Euclidean modulo changes real captured handshake replies.
         *byte = ((value + rotation) % 26 + base) as u8;
-        rotation += 4 + value;
+        rotation += step + value;
     }
-    Ok(reply.to_vec())
 }
 
 fn copy_literal(cursor: &mut &[u8], output: &mut [u8]) -> Result<(), String> {

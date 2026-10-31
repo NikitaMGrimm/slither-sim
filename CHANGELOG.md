@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- Accept Vlither's client-derived challenge reply so its protocol-19 login can
+  join the host, including custom-skin logins.
+
 ### Added
 
 - The README and Linux hosting guide state the measured one-core capacity:
