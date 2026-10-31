@@ -371,7 +371,25 @@ fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
             assert!(pixel((d.destination.x + d.translation[0]) * scale));
             assert!(pixel((d.destination.y + d.translation[1]) * scale));
             if let Some(src) = d.source {
-                assert!((d.destination.width * scale - src.width).abs() < 1e-7);
+                if (d.destination.width * scale - src.width).abs() >= 1e-7 {
+                    // Rounded focus stretches only a uniform centre column; corners remain 1:1.
+                    assert_eq!(src.width, 1.);
+                    assert_eq!(src.x + src.width, f64::from(d.asset.width));
+                    assert!(d.asset.width > 1);
+                    let image = &frame
+                        .resources
+                        .iter()
+                        .find(|r| r.asset == d.asset)
+                        .unwrap()
+                        .image;
+                    let column = src.x as usize;
+                    for row in image.pixels.chunks_exact(image.width as usize * 4) {
+                        assert_eq!(
+                            &row[column * 4..column * 4 + 4],
+                            &row[(column - 1) * 4..column * 4]
+                        );
+                    }
+                }
             }
         }
     }
