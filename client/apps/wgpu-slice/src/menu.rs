@@ -425,6 +425,9 @@ impl Composition<'_> {
                     };
                 let mut style = theme.text_style(control.style);
                 style.size *= r.scale;
+                // The panel's layout box still bounds text/hits. Decoration may
+                // use its complete padding unless the description explicitly clips it.
+                let surface_clip = control.clip.map(|_| r.clip);
                 let add_label = |c: &mut Composition<'_>,
                                  value: String,
                                  rect: MenuRect,
@@ -454,7 +457,7 @@ impl Composition<'_> {
                             r.rect,
                             theme.surface(control.style, ControlState::Idle),
                             alpha,
-                            r.clip,
+                            surface_clip,
                             r.scale,
                         )?;
                         let [hover, press] = input.progress(control.id);
@@ -468,14 +471,14 @@ impl Composition<'_> {
                                     } else {
                                         0.
                                     }),
-                                r.clip,
+                                surface_clip,
                                 r.scale,
                             )?;
                             self.sliced(
                                 r.rect,
                                 theme.surface(control.style, ControlState::Pressed),
                                 alpha * press,
-                                r.clip,
+                                surface_clip,
                                 r.scale,
                             )?;
                         }
@@ -491,7 +494,7 @@ impl Composition<'_> {
                             r.rect,
                             theme.surface(control.style, ControlState::Idle),
                             alpha,
-                            r.clip,
+                            surface_clip,
                             r.scale,
                         )?;
                         let field = MenuRect {
@@ -608,7 +611,7 @@ impl Composition<'_> {
         r: MenuRect,
         tokens: SurfaceTokens,
         alpha: f64,
-        clip: MenuRect,
+        clip: Option<MenuRect>,
         control_scale: f64,
     ) -> Result<()> {
         if alpha == 0. {
@@ -701,7 +704,7 @@ impl Composition<'_> {
                         height: f64::from(bottom - top),
                     });
                     draw.snap_overlay(scale);
-                    if clip_draw(&mut draw, clip, scale) {
+                    if clip.is_none_or(|clip| clip_draw(&mut draw, clip, scale)) {
                         self.push(draw)?;
                     }
                 }
@@ -731,7 +734,7 @@ impl Composition<'_> {
                     recipe: SurfaceRecipe::Overlay,
                 },
                 alpha,
-                clip,
+                Some(clip),
                 1.,
             );
         }
@@ -847,13 +850,7 @@ impl Composition<'_> {
             height: (r.height * self.scale).ceil() / self.scale,
             ..r
         };
-        let clip = MenuRect {
-            x: r.x - 2048. / self.scale,
-            y: r.y - 2048. / self.scale,
-            width: r.width + 4096. / self.scale,
-            height: r.height + 4096. / self.scale,
-        };
-        self.sliced(r, tokens, alpha, clip, 1.)
+        self.sliced(r, tokens, alpha, None, 1.)
     }
     fn label(&mut self, text: &str, r: MenuRect, size: f64, bold: bool, alpha: f64) {
         self.labels.push(Label {

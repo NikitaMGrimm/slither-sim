@@ -176,6 +176,11 @@ pub fn menu_control(
             } else {
                 0.5 * (1. - (distance(px, py - offset * scale) / (sigma * scale)).tanh()) * opacity
             };
+            // Analytic shadows have infinite tails. Fade the last quarter of
+            // their padding to zero so a sliced atlas never ends in visible ink.
+            let edge = x.min(width - 1 - x).min(y).min(height - 1 - y);
+            let t = (f64::from(edge) / (f64::from(pad) / 4.).max(1.)).min(1.);
+            let shadow = shadow * t * t * (3. - 2. * t);
             let t = (py / f64::from(h)).clamp(0., 1.);
             let t = if matches!(surface, MenuSurface::Play | MenuSurface::Overlay) {
                 (1. - (std::f64::consts::PI * t).cos()) / 2.
