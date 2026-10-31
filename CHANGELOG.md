@@ -10,6 +10,9 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
+- Linux hosting guidance for large bot worlds: aged-run sizing, one world per
+  machine, a PGO build recipe and glibc transparent hugepage advice, with links
+  to the scoped 64k-session measurements.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind

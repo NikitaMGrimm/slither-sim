@@ -52,6 +52,86 @@ deferred 126 ticks
 Keep other work off that core while players are on, for example by scheduling
 package updates for quiet hours.
 
+## Large bot worlds
+
+Run one large world per machine and size its tick from a **15-minute or longer
+aged run** with the intended player load. Food, snake growth and presentation
+work can make a fresh two-minute window misleading. Watch deferred ticks and
+application ping as well as CPU: a measured 48k/40 ms world accumulated roughly
+350 ms of start lateness alongside reported 350 ms ping. A second 45k world on
+separate cores raised a 64k world's mean work from 66.8 to about 84–86 ms;
+aging and player counts confound that comparison, but stopping it recovered
+75.9 ms work and 80.06 ms median dt.
+
+Optional host `maxTick` is **proposed in
+[#384](https://github.com/NikitaMGrimm/slither-sim/pull/384)**, not available on the
+main revision checked for this guide. It would stretch overloaded ticks from
+`simulation.world.dt` up to that maximum to preserve real-time progress within
+the cap. Work above the cap still loses time; size for the aged workload and
+monitor `lost_seconds` when using a version that supports it. On current fixed
+scheduling, increase the configured dt or reduce load if the world falls behind.
+
+### Build and allocator options
+
+On Linux/glibc, test `GLIBC_TUNABLES=glibc.malloc.hugetlb=1` in the host process
+environment (for systemd, add `Environment=GLIBC_TUNABLES=glibc.malloc.hugetlb=1`
+to the service). Value 1 requests transparent hugepage advice; it does not need
+an explicit HugeTLB pool. One same-binary L64 replay measured 6.9% lower world-step
+CPU p50, with system THP settings left at `madvise`. Verify on your workload.
+
+For a source build, fat LTO, native CPU targeting and profile-guided optimization
+(PGO) measured 10.9% lower world-step CPU p50 than portable release in a separate
+L64 replay, with byte-identical final world/controller output. That comparison
+already used hugetlb advice on every arm; the percentages are not additive.
+It trained on a different frozen world, not the measured L64 world. The replay
+used `bot,parallel`; a networking host needs its own same-feature training.
+
+Use this generate/train/merge/use sequence on the destination CPU, from one
+fixed source revision and toolchain. Prepare a finite, representative `serve`
+JSONL input tape using the [direct API](bot-api.md); it trains simulator work,
+not the socket path. For network-heavy hosts, use a finite host-API training
+driver with loopback clients instead. Let the instrumented process exit normally
+so LLVM writes its profiles. Keep generation/use features, target, optimization
+and panic options aligned; use a fresh profile directory for every revision.
+
+```sh
+rustup component add llvm-tools-preview
+TARGET=$(rustc -vV | sed -n 's/^host: //p')
+PROFDATA="$(rustc --print sysroot)/lib/rustlib/$TARGET/bin/llvm-profdata"
+PGO_DIR=$(mktemp -d "${TMPDIR:-/tmp}/slither-pgo.XXXXXX")
+mkdir "$PGO_DIR/raw"
+export CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2
+export CARGO_PROFILE_RELEASE_LTO=fat CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+export CARGO_PROFILE_RELEASE_PANIC=abort
+unset CARGO_ENCODED_RUSTFLAGS
+
+# Generate: the same default features include networking and parallel support.
+CARGO_TARGET_DIR="$PGO_DIR/generate" \
+RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PGO_DIR/raw" \
+cargo build --release --locked --target "$TARGET" --bin slither-sim
+
+# Train with your prepared finite workload; EOF returns normally.
+LLVM_PROFILE_FILE="$PGO_DIR/raw/train-%m-%p.profraw" \
+"$PGO_DIR/generate/$TARGET/release/slither-sim" serve \
+  < /path/to/training.jsonl > /dev/null
+"$PROFDATA" merge -o "$PGO_DIR/merged.profdata" "$PGO_DIR/raw/"*.profraw
+
+# Use: build the host from the same source and features.
+CARGO_TARGET_DIR="$PGO_DIR/use" \
+RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PGO_DIR/merged.profdata -Cllvm-args=-pgo-warn-missing-function" \
+cargo build --release --locked --target "$TARGET" --bin slither-sim
+```
+
+Install `$PGO_DIR/use/$TARGET/release/slither-sim` after checking output parity
+and an aged workload not used for training. Inspect missing-profile diagnostics;
+retrain after source, feature, toolchain or CPU changes. Native builds need the
+same CPU features, and `panic=abort` terminates the process on panic.
+
+These are operator options, not a 64k product capacity promise. The public session
+also used approximate collisions that stay out of the product. The
+[dated report](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/performance/2026-10-31-64k-session/REPORT.md)
+records each measurement's windows, conditions, failures and limits.
+
 ## Configure
 
 Save one of these as `/etc/slither-sim.json`. Both listen on port 444 and run
