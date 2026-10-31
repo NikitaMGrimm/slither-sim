@@ -68,7 +68,7 @@ struct Multisample {
 }
 pub struct Renderer {
     pub sample_count: u32,
-    format: wgpu::TextureFormat,
+    pub(crate) format: wgpu::TextureFormat,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub adapter_info: wgpu::AdapterInfo,
@@ -83,8 +83,31 @@ pub struct Renderer {
     lost: Arc<AtomicBool>,
     multisample: Option<Multisample>,
     vertices: Vec<VertexChunk>,
+    draw_calls: usize,
 }
 impl Renderer {
+    pub fn supports_native(&self, physical: [u32; 2]) -> bool {
+        crate::world_resolution::validate_target(
+            physical,
+            self.sample_count,
+            self.device.limits().max_texture_dimension_2d,
+        )
+        .is_ok()
+    }
+    pub fn multisample_extent(&self) -> Option<([u32; 2], u32)> {
+        self.multisample.as_ref().map(|m| (m.extent, m.samples))
+    }
+    pub fn validate_frame(&self, frame: &Frame) -> RenderResult<()> {
+        frame
+            .validate(
+                &self
+                    .textures
+                    .iter()
+                    .map(|(key, t)| (*key, t.asset))
+                    .collect(),
+            )
+            .map_err(Into::into)
+    }
     pub async fn new(
         instance: &wgpu::Instance,
         surface: Option<&wgpu::Surface<'_>>,
@@ -102,12 +125,24 @@ impl Renderer {
         Self::from_adapter(adapter, format).await
     }
     pub async fn from_adapter(adapter: wgpu::Adapter, format: wgpu::TextureFormat) -> Result<Self> {
+        Self::from_adapter_with_max_samples(adapter, format, 4).await
+    }
+    /// Sample-one adapters and finite diagnostics use the same presentation path.
+    pub async fn from_adapter_with_max_samples(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+    ) -> Result<Self> {
+        if !matches!(max_samples, 1 | 4) {
+            return Err("Unsupported sample count".into());
+        }
         let info = adapter.get_info();
         let supported = adapter.get_texture_format_features(format).flags;
-        let sample_count = if supported.contains(
-            wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4
-                | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE,
-        ) {
+        let sample_count = if max_samples == 4
+            && supported.contains(
+                wgpu::TextureFormatFeatureFlags::MULTISAMPLE_X4
+                    | wgpu::TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE,
+            ) {
             4
         } else {
             1
@@ -249,6 +284,7 @@ impl Renderer {
             lost,
             multisample: None,
             vertices: Vec::new(),
+            draw_calls: 0,
         })
     }
     pub fn upload(&mut self, r: &Resource) -> RenderResult<()> {
@@ -406,14 +442,24 @@ impl Renderer {
         Ok(())
     }
     pub fn render(&mut self, frame: &Frame, target: &wgpu::TextureView) -> RenderResult<()> {
-        self.render_inner(frame, target, false)
+        self.render_world_at(frame, target, frame.extent, self.sample_count)
+    }
+    /// Change attachment pixels only; Frame::quad_iter still uses the original projection.
+    pub fn render_world_at(
+        &mut self,
+        frame: &Frame,
+        target: &wgpu::TextureView,
+        attachment: [u32; 2],
+        samples: u32,
+    ) -> RenderResult<()> {
+        if samples != 1 && samples != self.sample_count {
+            return Err("Unsupported world sample count".into());
+        }
+        self.render_inner(frame, target, false, attachment, samples)
     }
     /// Adjacent draw runs in prepared vertex chunks; read after a successful render.
     pub fn draw_call_count(&self) -> usize {
-        self.vertices
-            .iter()
-            .map(|chunk| draw_runs(chunk.states.iter().copied()).count())
-            .sum()
+        self.draw_calls
     }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
     pub fn render_overlay(
@@ -421,13 +467,15 @@ impl Renderer {
         frame: &Frame,
         target: &wgpu::TextureView,
     ) -> RenderResult<()> {
-        self.render_inner(frame, target, true)
+        self.render_inner(frame, target, true, frame.extent, 1)
     }
     fn render_inner(
         &mut self,
         frame: &Frame,
         target: &wgpu::TextureView,
         overlay: bool,
+        attachment: [u32; 2],
+        samples: u32,
     ) -> RenderResult<()> {
         if self.lost.load(Ordering::SeqCst) {
             return Err(RenderError::Host(
@@ -443,12 +491,17 @@ impl Renderer {
         if frame.extent.contains(&0) {
             return Ok(());
         }
-        let samples = if overlay { 1 } else { self.sample_count };
-        if u64::from(frame.extent[0]) * u64::from(frame.extent[1]) * 4 * u64::from(samples)
-            > 128 * 1024 * 1024
-        {
-            return Err("Render attachment budget".into());
-        }
+        crate::world_resolution::validate_target(
+            attachment,
+            samples,
+            if overlay {
+                // Preserve the existing physical surface overlay guard. Native
+                // world allocation separately checks negotiated texture limits.
+                crate::frame::MAX_EXTENT
+            } else {
+                self.device.limits().max_texture_dimension_2d
+            },
+        )?;
         let chunk_count = frame.draws.len().div_ceil(VERTEX_CHUNK_QUADS);
         self.vertices
             .resize_with(chunk_count.max(self.vertices.len()), VertexChunk::default);
@@ -499,17 +552,17 @@ impl Renderer {
                 &chunk.bytes,
             );
         }
-        if samples > 1
+        let replacement = if samples > 1
             && self
                 .multisample
                 .as_ref()
-                .is_none_or(|m| m.extent != frame.extent || m.samples != samples)
+                .is_none_or(|m| m.extent != attachment || m.samples != samples)
         {
             let texture = self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("quad edge coverage"),
                 size: wgpu::Extent3d {
-                    width: frame.extent[0],
-                    height: frame.extent[1],
+                    width: attachment[0],
+                    height: attachment[1],
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
@@ -519,14 +572,22 @@ impl Renderer {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             });
-            self.multisample = Some(Multisample {
-                extent: frame.extent,
+            Some(Multisample {
+                extent: attachment,
                 samples,
                 view: texture.create_view(&Default::default()),
-            });
-        }
-        let msaa_view =
-            (samples > 1).then(|| &self.multisample.as_ref().expect("MSAA target").view);
+            })
+        } else {
+            None
+        };
+        let msaa_view = (samples > 1).then(|| {
+            &replacement
+                .as_ref()
+                .or(self.multisample.as_ref())
+                .expect("MSAA target")
+                .view
+        });
+        let mut draw_calls = 0;
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -558,21 +619,21 @@ impl Renderer {
                     if previous.is_none_or(|p| p.pipeline != state.pipeline) {
                         pass.set_pipeline(match state.pipeline {
                             Pipeline::BlackOver => {
-                                if overlay {
+                                if overlay || samples != self.sample_count {
                                     &self.overlay_black_over
                                 } else {
                                     &self.black_over
                                 }
                             }
                             Pipeline::Lighter => {
-                                if overlay {
+                                if overlay || samples != self.sample_count {
                                     &self.overlay_lighter
                                 } else {
                                     &self.lighter
                                 }
                             }
                             Pipeline::Over => {
-                                if overlay {
+                                if overlay || samples != self.sample_count {
                                     &self.overlay_over
                                 } else {
                                     &self.over
@@ -593,11 +654,21 @@ impl Renderer {
                         );
                     }
                     pass.draw(vertices, 0..1);
+                    draw_calls += 1;
                     previous = Some(state);
                 }
             }
         }
         self.queue.submit([encoder.finish()]);
+        self.draw_calls = draw_calls;
+        // Allocation precedes publication; wgpu retains submitted attachment references
+        // after the old host handles are dropped, without a CPU/GPU idle wait.
+        if let Some(replacement) = replacement {
+            self.multisample = Some(replacement);
+        }
+        if !overlay && samples == 1 {
+            self.multisample = None;
+        }
         Ok(())
     }
 }
@@ -641,8 +712,7 @@ pub struct SurfaceHost {
     surface: wgpu::Surface<'static>,
     config: wgpu::SurfaceConfiguration,
     extent: [u32; 2],
-    backing: Option<wgpu::Texture>,
-    blitter: wgpu::util::TextureBlitter,
+    world: crate::world_presenter::WorldPresenter,
     acquired: Option<wgpu::SurfaceTexture>,
     occluded: bool,
 }
@@ -693,16 +763,13 @@ impl SurfaceHost {
             alpha_mode: wgpu::CompositeAlphaMode::Opaque,
             view_formats: vec![],
         };
-        let blitter = wgpu::util::TextureBlitterBuilder::new(&renderer.device, format)
-            .sample_type(wgpu::FilterMode::Linear)
-            .build();
+        let world = crate::world_presenter::WorldPresenter::new(&renderer);
         let mut host = Self {
             renderer,
             surface,
             config,
             extent: [0, 0],
-            backing: None,
-            blitter,
+            world,
             acquired: None,
             occluded: false,
         };
@@ -726,18 +793,43 @@ impl SurfaceHost {
         Ok(())
     }
     pub fn present(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, false, None).map_err(Into::into)
+        self.present_inner(
+            frame,
+            false,
+            None,
+            slither_client::settings::WorldResolution::Original,
+        )
+        .map_err(Into::into)
     }
     /// Render at the desktop policy size, then scale the complete image like a CSS canvas.
     pub fn present_scaled(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, true, None).map_err(Into::into)
+        self.present_inner(
+            frame,
+            true,
+            None,
+            slither_client::settings::WorldResolution::Original,
+        )
+        .map_err(Into::into)
     }
     pub fn present_scaled_with_overlay(
         &mut self,
         frame: &Frame,
         overlay: Option<&Frame>,
     ) -> RenderResult<bool> {
-        self.present_inner(frame, true, overlay)
+        self.present_inner(
+            frame,
+            true,
+            overlay,
+            slither_client::settings::WorldResolution::Original,
+        )
+    }
+    pub fn present_world_with_overlay(
+        &mut self,
+        frame: &Frame,
+        overlay: Option<&Frame>,
+        requested: slither_client::settings::WorldResolution,
+    ) -> RenderResult<bool> {
+        self.present_inner(frame, true, overlay, requested)
     }
     /// Native waits for FIFO capacity before sampling the next model timestamp
     /// and draining ingress, rather than staging an update ahead of that wait.
@@ -782,6 +874,7 @@ impl SurfaceHost {
         frame: &Frame,
         scale: bool,
         overlay: Option<&Frame>,
+        requested: slither_client::settings::WorldResolution,
     ) -> RenderResult<bool> {
         if overlay.is_some_and(|f| f.extent != self.extent) {
             return Err("overlay/surface extent mismatch".into());
@@ -793,59 +886,26 @@ impl SurfaceHost {
         if self.extent.contains(&0) || frame.extent.contains(&0) {
             return Ok(false);
         }
-        if scaled {
-            if frame.extent.iter().any(|n| *n > 1500) {
-                return Err("Desktop backing limit".into());
-            }
-            if self
-                .backing
-                .as_ref()
-                .is_none_or(|t| [t.width(), t.height()] != frame.extent)
-            {
-                self.backing = Some(self.renderer.device.create_texture(
-                    &wgpu::TextureDescriptor {
-                        label: Some("desktop policy backing"),
-                        size: wgpu::Extent3d {
-                            width: frame.extent[0],
-                            height: frame.extent[1],
-                            depth_or_array_layers: 1,
-                        },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format: self.config.format,
-                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT
-                            | wgpu::TextureUsages::TEXTURE_BINDING,
-                        view_formats: &[],
-                    },
-                ));
-            }
-        }
+        crate::world_resolution::WorldTargetPlan::new(
+            requested,
+            frame.extent,
+            self.extent,
+            self.renderer.sample_count,
+            self.renderer.device.limits().max_texture_dimension_2d,
+        )?;
         if !self.acquire().map_err(RenderError::Host)? {
             return Ok(false);
         }
         let texture = self.acquired.take().expect("acquired surface");
         let view = texture.texture.create_view(&Default::default());
-        if scaled {
-            let backing = self
-                .backing
-                .as_ref()
-                .expect("backing")
-                .create_view(&Default::default());
-            self.renderer.render(frame, &backing)?;
-            let mut encoder = self
-                .renderer
-                .device
-                .create_command_encoder(&Default::default());
-            self.blitter
-                .copy(&self.renderer.device, &mut encoder, &backing, &view);
-            self.renderer.queue.submit([encoder.finish()]);
-        } else {
-            self.renderer.render(frame, &view)?;
-        }
-        if let Some(overlay) = overlay {
-            self.renderer.render_overlay(overlay, &view)?;
-        }
+        self.world.render(
+            &mut self.renderer,
+            frame,
+            overlay,
+            &view,
+            self.extent,
+            requested,
+        )?;
         self.renderer.queue.present(texture);
         Ok(true)
     }

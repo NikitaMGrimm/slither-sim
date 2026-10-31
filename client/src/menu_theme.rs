@@ -31,6 +31,10 @@ pub enum ControlStyle {
     Heading,
     /// Muted instructions.
     HelpText,
+    /// Compact settings instructions; headings, labels and toggles keep their sizes.
+    SettingsHelp,
+    /// Uniform modal centre with the existing rounded compact shadow.
+    SettingsSurface,
     /// Purple panel background.
     Surface,
     /// Compact-shadow studio panel, with its own bounded physical repeat.
@@ -55,6 +59,8 @@ pub enum SurfaceRecipe {
     Field,
     /// Studio panel with a repeat kept within one physical tile.
     StudioPanel,
+    /// Settings panel: stretch only the uniform centre/edge strips.
+    SettingsPanel,
     /// Existing compact link/focus capsule.
     Compact,
     /// Large modal surface with a wider uniform centre tile.
@@ -124,7 +130,9 @@ impl MenuTheme {
             colors: if checked {
                 [self.selection; 2]
             } else {
-                [self.field; 2]
+                // Two-row settings leaves one toggle unfocused; its empty box
+                // must remain visible against the panel's field colour.
+                [self.backdrop; 2]
             },
             radius: 4,
             recipe: SurfaceRecipe::Compact,
@@ -137,6 +145,7 @@ impl MenuTheme {
             size: match role {
                 Heading => 24.,
                 HelpText => 18.,
+                SettingsHelp => 16.,
                 PrimaryButton | LoginPlay | SecondaryButton | StudioSave | StudioCancel => 20.,
                 QualityButton | MenuLink => 14.,
                 _ => 15.,
@@ -219,7 +228,7 @@ impl MenuTheme {
                 14
             } else if matches!(role, ListRow | MenuLink | SelectedCell) {
                 4
-            } else if role == StudioSurface {
+            } else if matches!(role, StudioSurface | SettingsSurface) {
                 16
             } else {
                 24
@@ -228,6 +237,8 @@ impl MenuTheme {
                 SurfaceRecipe::Compact
             } else if matches!(role, StudioAction | StudioSave | StudioCancel) {
                 SurfaceRecipe::StudioButton
+            } else if role == SettingsSurface {
+                SurfaceRecipe::SettingsPanel
             } else if role == StudioSurface {
                 SurfaceRecipe::StudioPanel
             } else if role == Surface {

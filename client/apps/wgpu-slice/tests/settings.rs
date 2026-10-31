@@ -5,7 +5,7 @@ use slither_client::{
     menu_controls::ControlKind,
     menu_input::EditorId,
     menu_preferences::MenuQuality as Q,
-    settings::{DONE, QUALITY},
+    settings::{DONE, QUALITY, RESOLUTION},
     start_page::StartMenuIntent,
 };
 use slither_wgpu_slice::{
@@ -98,6 +98,8 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert!(login.step(9616., true, false).unwrap().0.is_empty());
     assert!(!login.state.view(true).spinner_visible);
     assert!(key(&mut login, NamedKey::Tab));
+    assert_eq!(login.controls.focus(), Some(RESOLUTION));
+    assert!(key(&mut login, NamedKey::Tab));
     assert_eq!(login.controls.focus(), Some(DONE));
     assert!(key(&mut login, NamedKey::Tab));
     assert_eq!(login.controls.focus(), Some(QUALITY));
@@ -144,6 +146,21 @@ fn pointer_blur_resize_and_mutually_exclusive_entry() {
     login.pointer(p, Some(true), true);
     login.pointer(p, Some(false), true);
     assert_eq!(login.state.view(true).quality, Q::Low);
+    let p = point(&login, RESOLUTION, [960., 540.]);
+    login.pointer(p, Some(true), true);
+    login.event(&winit::event::WindowEvent::Focused(false), true);
+    login.pointer(p, Some(false), true);
+    assert_eq!(
+        login.state.settings.preferences().resolution,
+        slither_client::settings::WorldResolution::Original
+    );
+    login.pointer(p, Some(true), true);
+    login.pointer(p, Some(false), true);
+    assert_eq!(
+        login.state.settings.preferences().resolution,
+        slither_client::settings::WorldResolution::Native
+    );
+    assert_eq!(login.state.view(true).quality, Q::Low);
     login.close_settings(true);
     login.open_studio();
     login.open_settings(true);
@@ -183,7 +200,7 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
     for (bytes, quality) in [
         (b"1:0".as_slice(), Q::Low),
         (b"1:1", Q::High),
-        (b"2:0:native", Q::High),
+        (b"2:0:native", Q::Low),
         (b"1:0\n", Q::High),
         (&[255; 65], Q::High),
     ] {
@@ -193,15 +210,22 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
     }
     std::fs::write(&path, "1:1").unwrap();
     storage.save("1:0").unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:0");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
     assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 1);
+    storage.save("2:0:native").unwrap();
+    assert_eq!(
+        storage.restore().resolution,
+        slither_client::settings::WorldResolution::Native
+    );
+    assert_eq!(storage.restore().quality, Q::Low);
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:native");
     std::fs::remove_file(&path).unwrap();
     std::fs::create_dir(&path).unwrap();
     assert_eq!(storage.restore().quality, Q::High);
     std::fs::remove_dir(&path).unwrap();
     std::fs::write(&path, "1:0").unwrap();
     storage.save("1:1").unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:1:original");
     storage.save("1:0").unwrap();
     let mut login = settled();
     login.restore_settings(SettingsStorage::at(Some(temp.0.clone())));
@@ -222,7 +246,7 @@ fn native_storage_bounded_read_no_startup_write_atomic_replace_and_later_retry()
                 }
             ))
     );
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:0");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
 }
 
 #[test]
@@ -246,7 +270,7 @@ fn failed_replace_keeps_old_data_and_memory_and_does_not_retry_each_frame() {
     assert!(!path.exists());
     key(&mut login, NamedKey::Space);
     login.step(9648., true, false).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:1");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:1:original");
 }
 
 #[cfg(windows)]
@@ -269,7 +293,7 @@ fn startup_read_failure_does_not_block_later_explicit_save() {
     login.open_settings(true);
     key(&mut login, NamedKey::Space);
     login.step(9616., true, false).unwrap();
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), "1:0");
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "2:0:original");
 }
 
 #[test]
@@ -282,14 +306,25 @@ fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
         .map(|r| (r.asset, r.image.pixels.clone()))
         .collect::<Vec<_>>();
     login.open_settings(true);
-    for dpr in [1., 1.25, 1.5, 2., 3., 4., 5.] {
+    for dpr in [1., 1.25, 1.5, 2., 3., 4., 5., 6., 7., 8.] {
         for area in [[960., 540.], [360., 640.]] {
-            for state in 0..7 {
+            for state in 0..9 {
+                login.focus(RESOLUTION);
+                if (login.state.settings.preferences().resolution
+                    == slither_client::settings::WorldResolution::Native)
+                    != (state >= 7)
+                {
+                    key(&mut login, NamedKey::Space);
+                }
+                login.state.settings.native_available(state != 8);
                 if state == 1 {
                     login.focus(QUALITY);
                     key(&mut login, NamedKey::Space);
                 }
-                login.state.settings.storage_result(!matches!(state, 4 | 6));
+                login
+                    .state
+                    .settings
+                    .storage_result(!matches!(state, 4 | 6 | 8));
                 login
                     .prepare_host(area.map(|v| (v * dpr) as u32), dpr, true, None)
                     .unwrap();
@@ -306,6 +341,9 @@ fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
                         [0., 0.]
                     },
                 );
+                login
+                    .controls
+                    .set_progress(RESOLUTION, if state == 8 { [1., 1.] } else { [0., 0.] });
                 let mut picture = login
                     .prepare_host(area.map(|v| (v * dpr) as u32), dpr, true, None)
                     .unwrap();
@@ -345,8 +383,13 @@ fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
                     .sum::<usize>();
                 assert!(
                     picture.resources.len() <= 32,
-                    "{dpr} {state}: {} slots",
-                    picture.resources.len()
+                    "{area:?} {dpr} {state}: {} slots {:?}",
+                    picture.resources.len(),
+                    picture
+                        .resources
+                        .iter()
+                        .map(|r| [r.asset.width, r.asset.height])
+                        .collect::<Vec<_>>()
                 );
                 assert!(
                     bytes <= 4 * 1024 * 1024,

@@ -219,6 +219,7 @@ impl StartMenuState {
             nickname: String::new(),
             settings: crate::settings::SettingsState::new(crate::settings::SettingsPreferences {
                 quality,
+                ..Default::default()
             }),
             last_capture: None,
             replay: false,

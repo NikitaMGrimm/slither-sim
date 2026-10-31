@@ -109,13 +109,13 @@ impl SettingsStorage {
         }
     }
     pub fn save(&self, record: &str) -> Result<(), String> {
-        slither_client::settings::SettingsPreferences::parse(record)
+        let preferences = slither_client::settings::SettingsPreferences::parse(record)
             .ok_or("Invalid settings record")?;
         let directory = self
             .directory
             .as_ref()
             .ok_or("Settings storage unavailable")?;
-        atomic_write(directory, "settings.txt", record)
+        atomic_write(directory, "settings.txt", preferences.serialize())
     }
 }
 

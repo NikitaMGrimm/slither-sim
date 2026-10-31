@@ -43,7 +43,7 @@ fn strict_record_and_exact_legacy_precedence_never_schedule_startup_writes() {
         for record in [
             None,
             Some(""),
-            Some("2:0:original"),
+            Some("3:0:original"),
             Some("1:0:extra"),
             Some("1:2"),
             Some("1:0\n"),
@@ -56,10 +56,90 @@ fn strict_record_and_exact_legacy_precedence_never_schedule_startup_writes() {
         for (record, quality) in [("1:0", Q::Low), ("1:1", Q::High)] {
             let restored = SettingsPreferences::restore(Some(record), legacy);
             assert_eq!(restored.quality, quality);
-            assert_eq!(restored.serialize(), record);
+            assert_eq!(
+                restored.serialize(),
+                if quality == Q::Low {
+                    "2:0:original"
+                } else {
+                    "2:1:original"
+                }
+            );
         }
     }
     assert!(SettingsPreferences::parse(&"1".repeat(MAX_SETTINGS_BYTES + 1)).is_none());
+}
+
+#[test]
+fn v2_roundtrips_strictly_and_resolution_is_independent_of_quality_and_capability() {
+    for quality in [Q::Low, Q::High] {
+        for resolution in [WorldResolution::Original, WorldResolution::Native] {
+            let p = SettingsPreferences {
+                quality,
+                resolution,
+            };
+            assert_eq!(SettingsPreferences::parse(p.serialize()), Some(p));
+            assert_eq!(
+                SettingsPreferences::restore(Some(p.serialize()), Some("0")),
+                p
+            );
+            let mut state = SettingsState::new(p);
+            assert_eq!(state.take_write(), None);
+            state.legacy_toggle();
+            assert_ne!(state.preferences().quality, quality);
+            assert_eq!(state.preferences().resolution, resolution);
+        }
+    }
+    for invalid in [
+        "2:0",
+        "2:0:Native",
+        "2:0:sharp",
+        "2:0:native:",
+        "2:2:original",
+        "2:1:native\n",
+        " 2:0:original",
+        "3:1:native",
+    ] {
+        assert!(SettingsPreferences::parse(invalid).is_none(), "{invalid}");
+        assert_eq!(
+            SettingsPreferences::restore(Some(invalid), Some("0")).resolution,
+            WorldResolution::Original
+        );
+    }
+    let mut m = menu(Q::Low);
+    m.settings.open(&m.view(true));
+    let panel = m.settings.panel([960., 540.]);
+    let mut input = PanelInputState::default();
+    input.sync(&panel, &mut MenuInputState::default());
+    input.focus_control(&panel, RESOLUTION);
+    let intent = input.activate(&panel, Activation::Enter).unwrap();
+    assert_eq!(intent.checked, Some(true));
+    m.settings.activate(intent);
+    m.settings.activate(intent);
+    assert_eq!(m.settings.take_write(), Some("2:0:native"));
+    m.settings.native_available(false);
+    m.settings.storage_result(false);
+    assert_eq!(m.settings.preferences().quality, Q::Low);
+    assert_eq!(m.settings.preferences().resolution, WorldResolution::Native);
+    assert!(
+        m.settings
+            .panel([960., 540.])
+            .controls
+            .iter()
+            .any(|c| c.name == "Native unavailable at this size")
+    );
+    assert_eq!(m.settings.take_write(), None);
+    m.settings.native_available(true);
+    assert!(
+        !m.settings
+            .panel([960., 540.])
+            .controls
+            .iter()
+            .any(|c| c.name == "Native unavailable at this size")
+    );
+    input.focus_control(&panel, QUALITY);
+    m.settings
+        .activate(input.activate(&panel, Activation::Space).unwrap());
+    assert_eq!(m.settings.take_write(), Some("2:1:native"));
 }
 
 #[test]
@@ -107,8 +187,10 @@ fn toggle_shared_capture_semantics_focus_and_explicit_set() {
         m.settings.activate(intent); // repeated Set cannot invert or queue a second write.
         assert_eq!(m.settings.preferences().quality, Q::Low);
     }
-    assert_eq!(m.settings.take_write(), Some("1:0"));
+    assert_eq!(m.settings.take_write(), Some("2:0:original"));
     assert_eq!(m.settings.take_write(), None);
+    input.tab(&panel, false);
+    assert_eq!(input.focus(), Some(RESOLUTION));
     input.tab(&panel, false);
     assert_eq!(input.focus(), Some(DONE));
     input.tab(&panel, false);
@@ -141,7 +223,7 @@ fn storage_failure_and_done_preserve_quality_next_play_and_generation() {
     m.settings.activate(toggle);
     m.action(MenuAction::Play, true);
     assert!(!m.view(true).spinner_visible);
-    assert_eq!(m.settings.take_write(), Some("1:0"));
+    assert_eq!(m.settings.take_write(), Some("2:0:original"));
     m.settings.storage_result(false);
     let panel = m.settings.panel([360., 640.]);
     assert!(

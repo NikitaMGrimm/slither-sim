@@ -423,7 +423,16 @@ mod desktop {
             let physical = [size.width, size.height];
             let dpr = self.window.scale_factor();
             self.host.resize(physical)?;
-            let extent = self.game.window_viewport(physical, dpr)?;
+            self.login
+                .state
+                .settings
+                .native_available(self.host.renderer.supports_native(physical));
+            let window = slither_wgpu_slice::world_resolution::WorldWindow {
+                physical,
+                dpr,
+                requested: self.login.state.settings.preferences().resolution,
+            };
+            let extent = window.viewport(&mut self.game)?;
             if !self.host.prepare_present()? {
                 if self.host.is_occluded() {
                     self.surface_occluded = true;
@@ -552,10 +561,11 @@ mod desktop {
                 };
             }
             self.window.pre_present_notify();
-            match self
-                .host
-                .present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
-            {
+            match self.host.present_world_with_overlay(
+                &picture.frame,
+                picture.overlay.as_ref(),
+                window.requested,
+            ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {
                         self.login.studio.presented();
@@ -625,17 +635,12 @@ mod desktop {
         }
         fn pointer(&mut self, down: bool) -> Result<()> {
             let s = self.window.inner_size();
-            let d = self.window.scale_factor();
-            if s.width == 0 || s.height == 0 {
-                return Ok(());
+            slither_wgpu_slice::world_resolution::WorldWindow {
+                physical: [s.width, s.height],
+                dpr: self.window.scale_factor(),
+                requested: self.login.state.settings.preferences().resolution,
             }
-            self.game.pointer(
-                self.cursor[0],
-                self.cursor[1],
-                f64::from(s.width) / d,
-                f64::from(s.height) / d,
-                down,
-            )
+            .pointer(&mut self.game, self.cursor, down)
         }
     }
     pub struct App {

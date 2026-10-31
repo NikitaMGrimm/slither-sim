@@ -36,6 +36,16 @@ impl LoginMenu {
     pub fn settings_record(&self) -> String {
         self.state.settings.preferences().serialize().into()
     }
+    /// Requested world raster policy, independent of next-Play Quality.
+    pub fn world_resolution(&self) -> String {
+        if self.state.settings.preferences().resolution == crate::settings::WorldResolution::Native
+        {
+            "native"
+        } else {
+            "original"
+        }
+        .into()
+    }
     /// Start an animated login with the supported locale and stored quality.
     #[wasm_bindgen(constructor)]
     pub fn new(locale: &str, quality: &str) -> Self {

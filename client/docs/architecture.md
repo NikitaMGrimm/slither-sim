@@ -73,3 +73,6 @@ the same Rust state, clocks and layout; world renderers draw the world only.
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
+
+[World resolution](world-resolution.md) keeps projection and input in the shared
+core while the presenter selects Original backing/blit or Native direct resolve.

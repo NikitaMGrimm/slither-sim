@@ -4,6 +4,98 @@
 mod tape;
 use slither_wgpu_slice::{game::LocalGame, render};
 
+#[test]
+fn resolution_policy_preserves_projection_camera_vertices_and_control_bytes() {
+    use slither_client::settings::WorldResolution::{Native, Original};
+    use slither_wgpu_slice::world_resolution::WorldWindow;
+    for dpr in [1., 1.25, 1.5, 2.] {
+        let physical = [1920, 1080];
+        let windows = [Original, Native].map(|requested| WorldWindow {
+            physical,
+            dpr,
+            requested,
+        });
+        let mut games = [tape::playing(), tape::playing()];
+        for (window, game) in windows.iter().zip(&mut games) {
+            window.viewport(game).unwrap();
+            let css = window.css_size();
+            assert_eq!(css, physical.map(|n| f64::from(n) / dpr));
+            window
+                .pointer(game, [css[0] * 0.86, css[1] * 0.76], false)
+                .unwrap();
+            game.key("Space", true);
+        }
+        let mut packets = [Vec::new(), Vec::new()];
+        for (i, game) in games.iter_mut().enumerate() {
+            let backing = windows[i].viewport(game).unwrap();
+            game.begin_redraw(300., backing, 1.).unwrap();
+            packets[i] = tape::effects(game);
+        }
+        assert_eq!(packets[0], packets[1]);
+        let angles = |packets: &Vec<Vec<u8>>| {
+            packets
+                .iter()
+                .filter(|p| p.len() == 1 && p[0] < 251)
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            !angles(&packets[0]).is_empty(),
+            "steering-angle packet required at DPR {dpr}"
+        );
+        assert_eq!(angles(&packets[0]), angles(&packets[1]));
+        assert!(packets[0].iter().any(|p| p == &[253]));
+        let a = games[0].take_frame().unwrap();
+        let b = games[1].take_frame().unwrap();
+        let size = slither_client::desktop_layout::desktop_backing_size(
+            f64::from(physical[0]) / dpr,
+            f64::from(physical[1]) / dpr,
+        )
+        .unwrap();
+        let expected = [size.width, size.height];
+        assert_eq!(a.frame.extent, expected);
+        assert_eq!(a.frame, b.frame); // camera, sampling, order, UVs and destinations
+        assert_eq!(a.overlay, b.overlay);
+        let resident = a
+            .resources
+            .iter()
+            .map(|r| (r.asset.into(), r.asset))
+            .collect();
+        let original = a.frame.quads(&resident).unwrap();
+        let native = b.frame.quads(&resident).unwrap();
+        assert_eq!(original.len(), native.len());
+        for (x, y) in original.iter().zip(native) {
+            assert_eq!(x.key, y.key);
+            assert_eq!(
+                x.vertices.map(|v| v.map(f32::to_bits)),
+                y.vertices.map(|v| v.map(f32::to_bits))
+            );
+        }
+        games[0].retry_frame(a.clone()).unwrap();
+
+        let retry = games[0].take_frame().unwrap();
+        assert_eq!(retry.frame, a.frame);
+        assert_eq!(retry.overlay, a.overlay);
+        assert_eq!(
+            games[0].client().control_view().own.unwrap().raw_head,
+            games[1].client().control_view().own.unwrap().raw_head
+        );
+        games[0].presented(true).unwrap();
+        games[1].presented(true).unwrap();
+        for game in &mut games {
+            game.key("Space", false);
+        }
+        // Next picture/input uses the same viewport, independent of the prior mode.
+        for (i, game) in games.iter_mut().enumerate() {
+            let backing = windows[i].viewport(game).unwrap();
+            game.begin_redraw(360., backing, 1.).unwrap();
+            packets[i] = tape::effects(game);
+        }
+        assert_eq!(packets[0], packets[1]);
+        assert!(packets[0].contains(&vec![254]));
+    }
+}
+
 fn snapshot(game: &mut LocalGame, identity: u64) -> render::PreparedFrame {
     let mut world = game.client().clone();
     let quality = game.quality();
