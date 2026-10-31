@@ -581,6 +581,7 @@ impl Simulator {
         self.kiosks[slot].finish_score(snake);
         self.refresh_spawn_bounds(slot);
         self.buffers.invalidate_body_bounds(slot);
+        self.buffers.order.invalidate();
         Ok(())
     }
     pub fn correct_pose(
@@ -625,6 +626,7 @@ impl Simulator {
         snake.heading = heading;
         self.refresh_spawn_bounds(slot);
         self.buffers.invalidate_body_bounds(slot);
+        self.buffers.order.invalidate();
         Ok(())
     }
     pub fn replace_food(&mut self, values: Vec<Food>) -> Result<(), SimError> {

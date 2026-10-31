@@ -44,6 +44,9 @@
 
 ### Performance
 
+- Keep collision join order between ticks instead of sorting every living snake.
+  The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
+  timing pairs, with identical events and final state.
 - Dense worlds find collision candidates through a grid of snake bodies built
   once per tick, instead of the bounds index. In a frozen world of 64,000 bots
   steering toward the center of a radius-32,000 arena, world CPU per tick
