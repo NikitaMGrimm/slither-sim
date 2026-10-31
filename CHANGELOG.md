@@ -45,6 +45,7 @@
 
 ### Performance
 
+- Dense-world collision indexing saves 26% per tick in the 64,000-bot storm.
 - Large food indexes use compact cell heads sooner.
 - Large food worlds use compact cell heads for pickup lookups. The frozen
   10,000-snake replay saves 0.56 ms of world CPU per tick in ten timing pairs
