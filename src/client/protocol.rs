@@ -112,13 +112,16 @@ pub fn split_frame(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
 
 /// Both timed and header-free connections use the same packet bundling.
 pub(crate) fn split_payload(bytes: &[u8]) -> Result<Vec<&[u8]>, String> {
+    decode_payload(bytes).map(|frame| frame.commands().map(|command| command.bytes).collect())
+}
+
+fn decode_payload(bytes: &[u8]) -> Result<frame::DecodedFrame<'_>, String> {
     frame::decode_frame(
         bytes,
         frame::Header::Absent,
         frame::Limits::UNBOUNDED,
         frame::FrameAdmission::Historical,
     )
-    .map(|frame| frame.commands().map(|command| command.bytes).collect())
     .map_err(|error| {
         match error.kind {
             ErrorKind::Empty => "Empty packet payload",
@@ -246,7 +249,7 @@ enum Packet<'a> {
     Fam(u16, f64),
     Tail(u16, Option<f64>),
     Credit(u8),
-    Sector(u8, u8, Vec<(u8, u8, f64)>),
+    Sector(v19::FoodSectorRef<'a>),
     Pellet(Option<(u8, u8)>, u8, u8, f64),
     Eaten(Option<(u8, u8)>, u8, u8),
     ClearSector(u8, u8),
@@ -333,6 +336,7 @@ fn target(value: v19::Target) -> Target {
     }
 }
 
+#[inline]
 fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
     // Minimap syntax is deliberately deferred to validation after setup/budgets,
     // as before extraction. Eager decoding would change error precedence.
@@ -417,13 +421,7 @@ fn parse(p: &[u8]) -> Result<Packet<'_>, String> {
                 Packet::Tail(id, fraction.map(scalar::fraction24))
             }
             v19::Message::ScoreAdjustment(credit) => Packet::Credit(credit),
-            v19::Message::FoodSector(s) => Packet::Sector(
-                s.sector[0],
-                s.sector[1],
-                s.foods()
-                    .map(|f| (f.offset[0], f.offset[1], f64::from(f.size) / 5.))
-                    .collect(),
-            ),
+            v19::Message::FoodSector(s) => Packet::Sector(s),
             v19::Message::FoodSpawn(f) => Packet::Pellet(
                 f.sector.map(|[x, y]| (x, y)),
                 f.offset[0],
@@ -653,12 +651,15 @@ impl ClientState {
         } else {
             self.session.raw_framing
         };
-        let packets = if raw {
-            split_payload(bytes)?
+        let frame = if raw {
+            decode_payload(bytes)?
         } else {
-            split_frame(bytes)?
+            if bytes.len() < 3 {
+                return Err("Short timing frame".into());
+            }
+            decode_payload(&bytes[2..])?
         };
-        let setup = packets.iter().any(|p| p[0] == b'a');
+        let setup = frame.commands().any(|command| command.bytes[0] == b'a');
         let (server, header_ms) = if raw {
             let start = if setup {
                 Some(receipt_seconds)
@@ -676,7 +677,11 @@ impl ClientState {
             };
             (ms as f64 / 1000., Some(ms))
         };
-        self.apply(&packets, server, receipt_seconds)?;
+        self.apply(
+            frame.commands().map(|command| command.bytes),
+            server,
+            receipt_seconds,
+        )?;
         self.session.frames += 1;
         self.session.raw_framing = raw;
         if raw && setup {
@@ -697,14 +702,16 @@ impl ClientState {
     ) -> Result<(), String> {
         self.require_connection()?;
         self.local_clock(receipt_seconds)?;
-        self.apply(&[packet], server_seconds, receipt_seconds)
+        self.apply(std::iter::once(packet), server_seconds, receipt_seconds)
     }
 
-    fn apply(&mut self, packets: &[&[u8]], server: f64, receipt: f64) -> Result<(), String> {
-        let parsed = packets
-            .iter()
-            .map(|packet| parse(packet))
-            .collect::<Result<Vec<_>, _>>()?;
+    fn apply<'a>(
+        &mut self,
+        packets: impl Iterator<Item = &'a [u8]> + Clone,
+        server: f64,
+        receipt: f64,
+    ) -> Result<(), String> {
+        let parsed = packets.clone().map(parse).collect::<Result<Vec<_>, _>>()?;
         let setup = parsed.iter().any(|p| matches!(p, Packet::Setup(_)));
         if !server.is_finite()
             || server < 0.
@@ -717,13 +724,14 @@ impl ClientState {
         // Cloned only for frames carrying a minimap packet, then committed whole.
         let mut minimap: Option<MinimapDecoder> = None;
         let mut minimap_cells = MAX_FRAME_MINIMAP_CELLS;
-        for (packet, raw) in parsed.iter().zip(packets) {
+        for (index, packet) in parsed.iter().enumerate() {
             match packet {
                 Packet::Setup(_) if has_setup => {
                     return Err("Repeated setup on one connection".into());
                 }
                 Packet::Setup(_) => has_setup = true,
                 _ if packet.needs_setup() && !has_setup => {
+                    let raw = packets.clone().nth(index).expect("parsed command index");
                     return Err(format!("'{}' packet before setup", char::from(raw[0])));
                 }
                 Packet::Minimap(payload) => {
@@ -875,9 +883,17 @@ impl ClientState {
                         body.segments = body.segments.saturating_sub(1);
                     }
                 }
-                Packet::Sector(sx, sy, pellets) => {
-                    for &(rx, ry, _) in pellets {
-                        food.set(food_id(*sx, *sy, rx, ry), true)?;
+                Packet::Sector(sector) => {
+                    for pellet in sector.foods() {
+                        food.set(
+                            food_id(
+                                sector.sector[0],
+                                sector.sector[1],
+                                pellet.offset[0],
+                                pellet.offset[1],
+                            ),
+                            true,
+                        )?;
                     }
                 }
                 Packet::Pellet(sector, rx, ry, _) => {
@@ -1035,10 +1051,15 @@ impl ClientState {
                     self.own_score(id)?;
                 }
             }
-            Packet::Sector(sx, sy, pellets) => {
+            Packet::Sector(sector) => {
                 session.food_at = Some(receipt);
-                for (rx, ry, size) in pellets {
-                    self.add_food((sx, sy), rx, ry, size);
+                for pellet in sector.foods() {
+                    self.add_food(
+                        (sector.sector[0], sector.sector[1]),
+                        pellet.offset[0],
+                        pellet.offset[1],
+                        f64::from(pellet.size) / 5.,
+                    );
                 }
             }
             Packet::Pellet(sector, rx, ry, size) => {

@@ -189,7 +189,7 @@ fn differential_receive_cost() {
                     let mut states = vec![$state.clone(); seats];
                     let start = Instant::now();
                     let allocations = crate::bot::oracle_allocations(|| {
-                        for step in 1..=16 { for state in &mut states {
+                        for step in 1..=256 { for state in &mut states {
                             state.receive_frame(black_box(&bytes),0.01 + step as f64 * 0.001).unwrap();
                         } }
                     });
@@ -200,7 +200,7 @@ fn differential_receive_cost() {
                 let (old,new) = if round % 2 == 0 { (run!(a),run!(b)) }
                                 else { let new = run!(b); (run!(a),new) };
                 assert!(new.1 <= old.1, "receive allocations increased");
-                println!("receive-cost {density} seats={seats} snakes={snakes} foods={foods} bytes={} commands={} frames={} pair={round} old_s={:.9} new_s={:.9} old_alloc={} new_alloc={}", bytes.len(), updates.len(), seats*16, old.0,new.0,old.1,new.1);
+                println!("receive-cost {density} seats={seats} snakes={snakes} foods={foods} bytes={} commands={} frames={} pair={round} old_s={:.9} new_s={:.9} old_alloc={} new_alloc={}", bytes.len(), updates.len(), seats*256, old.0,new.0,old.1,new.1);
             }
         }
     }
@@ -235,7 +235,18 @@ def main():
         # accepted packet scalars are finite. Comparing the full representation
         # therefore checks exact numeric bits as well as options/order/errors.
         with (client / "protocol.rs").open("a") as output:
-            output.write('\n#[cfg(test)]\npub(super) fn oracle_packet(p: &[u8]) -> String { format!("{:?}", parse(p)) }\n')
+            output.write('''
+#[cfg(test)]
+pub(super) fn oracle_packet(p: &[u8]) -> String {
+    // Canonicalize only the internal borrowed sector representation; compare
+    // the exact old projection, including each converted f64's round-trip bits.
+    match parse(p) {
+        Ok(Packet::Sector(s)) => format!("Ok(Sector({}, {}, {:?}))", s.sector[0], s.sector[1],
+            s.foods().map(|f| (f.offset[0], f.offset[1], f64::from(f.size) / 5.)).collect::<Vec<_>>()),
+        other => format!("{other:?}"),
+    }
+}
+''')
         fixtures = client / "oracle_fixtures.json"
         fixtures.write_text(json.dumps(fixture_bytes()))
         created.append(fixtures)
