@@ -28,6 +28,13 @@ test('known delay/ramp verifies t10/t50/t90 and zero detector false positives',(
   assert.equal(response(samples.map(s=>({...s,y:0})),0,24).levels.t10,null);
   assert.equal(response(samples.map(s=>({...s,y:-s.y})),0,-24).levels.t50.estimateMs,90);
 });
+test('a transient first crossing cannot masquerade as sustained response',()=>{
+  const samples=Array.from({length:102},(_,i)=>{const t=(i-1)*5;return {t,y:t===0?1:Math.min(1,Math.max(0,(t-40)/100))};});
+  const r=response(samples,0,1);
+  assert.equal(r.levels.t50.estimateMs,0);
+  assert.equal(r.recrossings.t50,1);
+  assert.equal(r.sustainedLevels.t50.estimateMs,90);
+});
 test('p99 under 1000 samples is descriptive and incomplete runs fail closed',()=>{
   assert.equal(distribution([1,2,3]).p99DescriptiveOnly,true);
   assert.equal(distribution(Array(1000).fill(1)).p99DescriptiveOnly,false);

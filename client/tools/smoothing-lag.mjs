@@ -46,16 +46,25 @@ export function smoothness(series) {
 // Crossings are retained as intervals; a linear estimate is diagnostic only.
 export function response(samples, trigger, amplitude) {
   check(Number.isFinite(trigger) && Number.isFinite(amplitude) && amplitude!==0,'invalid detector calibration');
-  const out={triggerMs:trigger,amplitude,samples:samples.length,levels:{}};
+  const out={triggerMs:trigger,amplitude,samples:samples.length,levels:{},sustainedLevels:{},recrossings:{}};
+  const bracket=(a,b,level)=>({lowerMs:Math.max(0,a.t-trigger),upperMs:b.t-trigger,
+    estimateMs:Math.max(0,a.t-trigger+(b.t-a.t)*(level*amplitude-a.y)/(b.y-a.y))});
   for(const level of [.1,.5,.9]) {
     let crossing=null;
     for(let i=1;i<samples.length;i++) {
       const a=samples[i-1],b=samples[i];
       if(b.t<trigger || a.y/amplitude>=level || b.y/amplitude<level) continue;
-      crossing={lowerMs:Math.max(0,a.t-trigger),upperMs:b.t-trigger,
-        estimateMs:Math.max(0,a.t-trigger+(b.t-a.t)*(level*amplitude-a.y)/(b.y-a.y))}; break;
+      crossing=bracket(a,b,level); break;
     }
     out.levels[`t${Math.round(level*100)}`]=crossing;
+    const name=`t${Math.round(level*100)}`;
+    // A brief packet-boundary flash can cross a threshold then fall below it.
+    // Keep the first crossing, and separately measure the last such recovery.
+    const lastBelow=samples.findLastIndex(s=>s.t>=trigger && s.y/amplitude<level);
+    const next=lastBelow<0?samples.findIndex(s=>s.t>=trigger):lastBelow+1;
+    out.sustainedLevels[name]=next>0 && next<samples.length && samples[next].y/amplitude>=level
+      ? bracket(samples[next-1],samples[next],level) : null;
+    out.recrossings[name]=samples.slice(1).filter((b,i)=>b.t>=trigger && samples[i].y/amplitude>=level && b.y/amplitude<level).length;
   }
   const active=samples.filter(r=>r.t>=trigger && r.t<=trigger+1000);
   out.overshoot=Math.max(0,...active.map(r=>r.y/amplitude-1));
@@ -178,14 +187,15 @@ function controls() {
   return {passed:true,knownLagMs:50,knownDetectorT50Ms:90,zeroFalsePositives:0};
 }
 export function markdown(results) {
-  const lines=['| Rate | Speed / motion | Jitter ±ms | Own lag p50/p95 ms | Enemy lag p50/p95 ms | Position t50 own/enemy ms | Heading t50 own/enemy ms | Status |',
+  const lines=['| Rate | Speed / motion | Jitter ±ms | Own lag p50/p95 ms | Enemy lag p50/p95 ms | Position t50 own/enemy ms | Heading first→sustained t50 own/enemy ms | Status |',
     '|---|---|---:|---:|---:|---:|---:|---|'];
   const f=x=>x===null||x===undefined?'unresolved':x.toFixed(2);
   for(const r of results) {
     if(!r.baseline){lines.push(`| ${r.config.rate} | ${r.config.speed}/${r.config.motion} | ${r.config.jitterMs} | FAILED | FAILED | FAILED | FAILED | FAILED |`);continue;}
     const m=role=>r.baseline.summaries[role].metrics.lagEquivalentMs;
     const t=(role,kind)=>r.response?.[role]?.[kind]?.levels.t50?.estimateMs;
-    lines.push(`| ${r.config.rate} | ${r.config.speed}/${r.config.motion} | ${r.config.jitterMs} | ${f(m('own').p50)} / ${f(m('own').p95)} | ${f(m('enemy').p50)} / ${f(m('enemy').p95)} | ${f(t('own','position'))} / ${f(t('enemy','position'))} | ${f(t('own','heading'))} / ${f(t('enemy','heading'))} | ${r.failure?'FAILED':'complete'} |`);
+    const h=role=>`${f(t(role,'heading'))}→${f(r.response?.[role]?.heading?.sustainedLevels.t50?.estimateMs)}`;
+    lines.push(`| ${r.config.rate} | ${r.config.speed}/${r.config.motion} | ${r.config.jitterMs} | ${f(m('own').p50)} / ${f(m('own').p95)} | ${f(m('enemy').p50)} / ${f(m('enemy').p95)} | ${f(t('own','position'))} / ${f(t('enemy','position'))} | ${h('own')} / ${h('enemy')} | ${r.failure?'FAILED':'complete'} |`);
   }
   return lines.join('\n')+'\n';
 }
@@ -209,7 +219,7 @@ function runMatrix(binary,out) {
       check(runs.every(Boolean),'missing run');result.baseline=analyzeProbe(runs[0]);result.impulse=analyzeProbe(runs[1]);result.response=pairedResponse(...runs);
       for(const role of ['own','enemy']) {
         check(result.baseline.summaries[role].failures.length===0 && result.impulse.summaries[role].failures.length===0,'missing body stations');
-        for(const kind of ['position','heading'])check(result.response[role][kind].levels.t90,'unresolved correction detector');
+        for(const kind of ['position','heading'])check(result.response[role][kind].levels.t90 && result.response[role][kind].sustainedLevels.t90,'unresolved correction detector');
       }
     }catch(e){result.failure=String(e);receipt.failures.push({id,error:String(e)});}
     receipt.results.push(result);fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify(receipt,null,2));

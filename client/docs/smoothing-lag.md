@@ -88,6 +88,12 @@ step amplitude, relative to the first changed packet's admission. Every crossing
 retains the last-below / first-above interval and a linear estimate inside it.
 Missing response levels remain unresolved failures. Overshoot and all impulse
 frames are retained. Response duration is not a steady-state positional delay.
+First crossings, sustained crossings (no later fall below the level within the
+one-second response window) and recrossing counts are separate. Some 170/240 Hz
+heading impulses briefly show the full change before easing back: the production
+angle offset refreshes on a positive integer animation advance. A near-zero
+first t50 in that case is a transient, not immediate settling. The probe retains
+both timings and does not change that production behavior.
 
 ## Controls and provenance
 
