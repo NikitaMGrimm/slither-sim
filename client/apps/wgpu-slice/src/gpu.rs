@@ -56,7 +56,7 @@ impl Renderer {
             .map_err(|e| format!("GPU unavailable: {e}"))?;
         Self::from_adapter(adapter, format).await
     }
-    async fn from_adapter(adapter: wgpu::Adapter, format: wgpu::TextureFormat) -> Result<Self> {
+    pub async fn from_adapter(adapter: wgpu::Adapter, format: wgpu::TextureFormat) -> Result<Self> {
         let info = adapter.get_info();
         let supported = adapter.get_texture_format_features(format).flags;
         let sample_count = if supported.contains(
