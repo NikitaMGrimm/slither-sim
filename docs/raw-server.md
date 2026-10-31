@@ -68,6 +68,10 @@ zero. `bots.latency` independently models bot links and processing.
 
 `--stats SECONDS` prints periodic [tick rate, load and population](hosting.md#run-as-a-service)
 to stderr; the interval must be positive and may include fractional seconds.
+It also prints cumulative admission rejection counts by phase and the close
+reason sent to the client. HTTP failures use fixed labels because there is no
+WebSocket close frame. Counts contain no addresses, nicknames or request data;
+client-initiated disconnects and rejections after login are excluded.
 
 ### Presets
 
@@ -139,6 +143,7 @@ Keep the handle alive while serving.
 | `ticks()` / `deferred_ticks()` | Executed physics ticks / wall-clock ticks postponed under load. |
 | `simulation_seconds()` | Wall seconds spent running simulation ticks; divide its increase by elapsed wall time for simulation-thread load. |
 | `players()` | Connected socket players, excluding background bots. |
+| `admission_rejections()` | Cumulative admission rejection counts keyed by phase and reason. |
 | `is_finished()` | Whether a host thread has stopped; call `wait()` for its result. |
 | `wait()` | Consume the handle and block until a host thread fails; return its error. |
 | `stop()` | Consume the handle, stop and join all threads; report any earlier failure. |
