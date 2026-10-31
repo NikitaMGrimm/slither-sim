@@ -210,15 +210,52 @@ fn menu_art_shares_existing_cosmetic_pixel_allowance() {
     }
     let menu_bytes = png(512, [1, 2, 3, 255]);
     images.add("menu/logo.png", &menu_bytes).unwrap();
-    for path in ["menu/skin.png", "menu/builder.png", "menu/cosmetic.png"] {
+    for path in ["menu/skin.png", "menu/builder.png"] {
         images.add(path, &menu_bytes).unwrap();
     }
-    assert!(images.add("s/a_visor.png", &png(1, [0; 4])).is_err());
+    assert!(images.add("menu/cosmetic.png", &menu_bytes).is_err());
     // The failed insert cannot consume the last frame's pixels.
     let art = Cosmetics::from_images(images, None).unwrap();
     assert!(art.menu_art(MenuArt::Logo(0)).is_some());
     assert!(art.menu_art(MenuArt::Skin).is_some());
     assert_eq!(art.menu_art(MenuArt::Logo(0)).unwrap().asset.width, 512);
+}
+#[test]
+fn maximum_menu_image_cannot_displace_procedural_skin_roles() {
+    use slither_client::presentation::SkinSourceRole::*;
+    let mut images = Images::default();
+    assert_eq!(
+        images
+            .add("menu/logo.png", &png(2048, [80, 180, 60, 255]))
+            .unwrap_err(),
+        "Cosmetic pixel budget"
+    );
+    let art = Cosmetics::from_images(images, None).unwrap();
+    let roles = [SingleEyeBase, SingleEyePupil, MouthEyeMarks, AcBulb, CdBulb];
+    for role in roles {
+        assert!(art.role(role).is_some(), "{role:?}");
+    }
+    assert_eq!(
+        art.resources().map(|r| r.image.pixels.len()).sum::<usize>(),
+        79_424
+    );
+    let mut images = Images::default();
+    images
+        .manifest(b"menu-art-v1\nlogo:0 1 menu/logo.png\nlogo:1 1 menu/reveal.png\n")
+        .unwrap();
+    let frame = png_rect(1350, 405, [80, 180, 60, 255]);
+    images.add("menu/logo.png", &frame).unwrap();
+    images.add("menu/reveal.png", &frame).unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    for role in roles {
+        assert!(art.role(role).is_some(), "{role:?}");
+    }
+    assert!(art.menu_art(MenuArt::Logo(0)).is_some());
+    assert!(art.menu_art(MenuArt::Logo(1)).is_some());
+    assert!(
+        art.resources().map(|r| r.image.pixels.len()).sum::<usize>()
+            <= slither_wgpu_slice::cosmetics::COSMETIC_PIXEL_BUDGET
+    );
 }
 #[test]
 fn full_cosmetics_bank_keeps_essential_menu_and_authored_fallbacks() {

@@ -32,7 +32,8 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 // regression: https://github.com/NikitaMGrimm/slither-sim/blob/main/client/apps/wgpu-slice/tests/panel_text.rs#L20
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
-pub const MENU_CACHE_BYTES: usize = 4 * 1024 * 1024;
+// Exact 5x login controls (including shadows) and text fit within 8 MiB.
+pub const MENU_CACHE_BYTES: usize = 8 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;
 pub const CACHE_BYTES: usize = 4 * 1024 * 1024 + MINIMAP_CACHE_BYTES + MINIMAP_SHADOW_CACHE_BYTES;
 pub const CACHE_RUNS: usize = 258;
@@ -49,6 +50,9 @@ pub const HUD_CACHE_BYTES: usize = 2 * 1024 * 1024;
 // Backing-space diagnostics retain their bounded high-scale fallback. Native
 // physical overlays bypass it and rasterize at the exact window DPR.
 pub const MAX_HUD_RASTER_SCALE: f64 = 3.;
+// Matches the renderer's WebGL2 downlevel texture bound. Menu/HUD text keeps
+// exact DPR; their byte quotas still admit each raster and its tiles.
+pub(super) const MAX_OVERLAY_TEXT_EXTENT: u32 = 2048;
 const NICKNAME_CACHE_RUNS: usize = 216;
 pub const MAX_NICKNAME_RUNS_PER_FRAME: usize = 128;
 
@@ -540,10 +544,9 @@ impl TextCache {
         clip: Option<BodyRect>,
     ) -> Result<(f64, Vec<(Draw, Resource)>)> {
         let px = run.style.size * backing_scale;
-        // The 40px fallback logo grows during outgoing login: at DPR 3 its
-        // exact raster exceeds 128px. Keep the Menu byte budget authoritative.
-        let font_limit = if matches!(slot, Some(Key::Menu(_))) {
-            256.
+        let overlay_text = matches!(slot, Some(Key::Menu(_) | Key::Hud(_)));
+        let font_limit = if overlay_text {
+            f64::from(MAX_OVERLAY_TEXT_EXTENT)
         } else {
             128.
         };
@@ -611,7 +614,11 @@ impl TextCache {
             if w == 0
                 || h == 0
                 || w > 8192
-                || h > 512
+                || h > if overlay_text {
+                    MAX_OVERLAY_TEXT_EXTENT
+                } else {
+                    512
+                }
                 || raster.image.pixels.len() != w as usize * h as usize * 4
                 || !raster
                     .offset

@@ -54,18 +54,22 @@ use solid materials without capsule shadows.
 
 ## Bounds and publication
 
-- Menu has **64 replacing slots / 4 MiB**, shared by text and authored materials,
+- Menu has **64 replacing slots / 8 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
-  are **386 slots / 22 MiB**; these are ceilings, not eager allocations.
+  are **386 slots / 26 MiB**; these are ceilings, not eager allocations. The Menu
+  allowance includes exact 5x control/shadow rasters.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Overlay text uses the exact DPR, within 256px Menu / 128px other font and cache
-  budgets; backing-space diagnostics retain their 3x raster bound. Controls and
+- Menu/HUD text uses exact DPR within the 2048px texture bound and its byte
+  budgets; world nicknames retain the 128px font guard and backing-space
+  diagnostics retain their 3x raster bound. Controls and
   decoded menu art allow up to 2048px per axis. Menu decoding alone admits that
-  density; world cosmetic decoding keeps its 1024px bound. All existing aggregate
+  density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
   pixel budgets and the two-resident-logo-frame limit still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
+  menu art admission reserves the five procedural skin roles' 79,424 RGBA bytes;
+  those mandatory roles also precede optional images at construction. Authored
   controls use the Menu group's own allowance, so a full cosmetics bank cannot
   block essential controls; unadmitted art uses authored fallbacks.
   Prepared pictures and staged replacements own additional bounded

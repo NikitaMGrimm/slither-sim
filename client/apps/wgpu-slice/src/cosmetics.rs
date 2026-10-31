@@ -6,6 +6,9 @@ use std::{collections::BTreeMap, io::Cursor};
 
 pub const MAX_ENCODED_BYTES: usize = 4 * 1024 * 1024;
 pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
+// The five procedural faces/bulbs below must survive optional menu art. These
+// are their RGBA dimensions in procedural(); no eager rasterization is needed.
+const PROCEDURAL_PIXEL_BYTES: usize = (2 * 64 * 64 + 2 * 48 * 48 + 84 * 84) * 4;
 mod menu_art;
 pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
 
@@ -169,7 +172,7 @@ impl Images {
             return self.menu.insert(
                 entry.art,
                 decode_bounded(bytes, menu_art::MAX_EXTENT)?,
-                self.bytes,
+                self.bytes + PROCEDURAL_PIXEL_BYTES,
             );
         }
         if !paths().iter().any(|p| p == path) || self.images.contains_key(path) {
@@ -268,13 +271,8 @@ impl Cosmetics {
             })
         };
         let mut roles = BTreeMap::new();
-        for (role, path, w, h, inset) in IMAGES {
-            if let Some(image) = images.images.remove(path)
-                && let Some(source) = resource(canvas_image(image, w, h, inset, inset != 0), path)
-            {
-                roles.insert(role.as_str(), source);
-            }
-        }
+        // Mandatory procedural roles precede optional external images, including
+        // images added after menu art consumed part of the shared allowance.
         for role in [
             SkinSourceRole::SingleEyeBase,
             SkinSourceRole::SingleEyePupil,
@@ -289,6 +287,13 @@ impl Cosmetics {
                     }
                 }
                 Err(error) => eprintln!("Cosmetic {} unavailable: {error}", role.as_str()),
+            }
+        }
+        for (role, path, w, h, inset) in IMAGES {
+            if let Some(image) = images.images.remove(path)
+                && let Some(source) = resource(canvas_image(image, w, h, inset, inset != 0), path)
+            {
+                roles.insert(role.as_str(), source);
             }
         }
         let accessories = ACCESSORIES

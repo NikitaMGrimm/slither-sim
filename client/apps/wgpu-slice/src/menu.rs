@@ -820,8 +820,8 @@ impl Menu {
                 l.style.size *= l.rect.width / width;
             }
         }
-        let runs: Vec<_> = c
-            .labels
+        let labels = std::mem::take(&mut c.labels);
+        let runs: Vec<_> = labels
             .iter()
             .map(|l| TextRun {
                 text: &l.text,
@@ -871,7 +871,7 @@ impl Menu {
                     extent,
                     viewport_scale: dpr,
                     tick: 0,
-                    draws: c.draws,
+                    draws: std::mem::take(&mut c.draws),
                     snakes: Vec::new(),
                 };
                 frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;
