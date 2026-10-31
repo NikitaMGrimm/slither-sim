@@ -36,26 +36,37 @@ pub fn layout(
     dpr: f64,
 ) -> Result<MenuLayout> {
     crate::render::dimensions(extent, dpr)?;
-    let style = TextStyle {
+    MenuLayout::new(
+        f64::from(extent[0]) / dpr,
+        f64::from(extent[1]) / dpr,
+        view.transition,
+        view.tips_visible,
+        metrics(text, view)?,
+    )
+    .map_err(str::to_owned)
+}
+pub fn metrics(text: &mut TextCache, view: &StartMenuView) -> Result<MenuMetrics> {
+    let mut style = TextStyle {
         size: 20.,
         weight: Weight::Bold,
         family: Family::Arial,
         slant: Slant::Normal,
         color: [255; 3],
     };
-    let width = text.measure_panel(view.play_label, style)?.advance;
-    MenuLayout::new(
-        f64::from(extent[0]) / dpr,
-        f64::from(extent[1]) / dpr,
-        view.transition,
-        view.tips_visible,
-        MenuMetrics {
-            last_length_line_height: 18.,
-            nickname_baseline_space: 4.,
-            padded_play_label_width: width + 20.,
-        },
-    )
-    .map_err(str::to_owned)
+    let padded_play_label_width = text
+        .measure_panel(&format!("\u{a0}{}\u{a0}", view.play_label), style)?
+        .advance;
+    style.size = 15.;
+    style.weight = Weight::Normal;
+    style.family = Family::Lucida;
+    let line = text.measure_panel("\u{a0}", style)?;
+    Ok(MenuMetrics {
+        last_length_line_height: (line.font_ascent + line.font_descent).round(),
+        // The nickname row already includes its border box; Play's 20px
+        // margin follows it directly, without an extra synthetic descender.
+        nickname_baseline_space: 0.,
+        padded_play_label_width,
+    })
 }
 pub fn prepare(extent: [u32; 2], dpr: f64, state: u8) -> Result<MenuFrame> {
     let mut text = TextCache::menu();

@@ -859,3 +859,59 @@ fn portuguese_accessible_button_names_and_quality_values() {
         ["Conectando", "Envio da mensagem do campeão pendente"],
     );
 }
+#[test]
+fn caret_clock_restarts_on_focus_edit_move_and_preedit() {
+    use slither_client::menu_input::{EditIntent as I, MenuInputState, Movement, TextField};
+    let mut input = MenuInputState::default();
+    input.apply(I::Focus(Some(TextField::Nickname)));
+    for (now, visible) in [
+        (0., true),
+        (529., true),
+        (530., false),
+        (1059., false),
+        (1060., true),
+    ] {
+        input.step_caret(now);
+        assert_eq!(input.caret_visible(), visible);
+    }
+    input.step_caret(1600.);
+    assert!(!input.caret_visible());
+    for intent in [
+        I::KeyText("Player".into()),
+        I::Move {
+            movement: Movement::Left,
+            extend: false,
+        },
+        I::Preedit("é".into(), Some((0, 2))),
+    ] {
+        input.apply(intent);
+        assert!(input.caret_visible());
+        input.step_caret(2140.);
+    }
+    input.apply(I::WindowFocused(false));
+    assert!(!input.caret_visible());
+    input.apply(I::WindowFocused(true));
+    assert!(input.caret_visible());
+    input.step_caret(f64::NAN);
+    input.step_caret(0.);
+    assert!(input.caret_visible());
+    input.apply(I::Focus(None));
+    assert!(!input.caret_visible());
+}
+
+#[test]
+fn caret_edit_after_idle_uses_the_next_menu_clock_seam() {
+    let mut input = MenuInputState::default();
+    input.apply(EditIntent::Focus(Some(TextField::Nickname)));
+    input.step_caret(0.);
+    input.step_caret(600.);
+    assert!(!input.caret_visible());
+    input.apply(EditIntent::KeyText("Player".into()));
+    assert!(input.caret_visible());
+    input.step_caret(10_000.);
+    assert!(input.caret_visible());
+    input.step_caret(10_529.);
+    assert!(input.caret_visible());
+    input.step_caret(10_530.);
+    assert!(!input.caret_visible());
+}

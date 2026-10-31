@@ -72,7 +72,7 @@ fn capture_scaled(
         );
         renderer.queue.submit([encoder.finish()]);
     } else {
-        renderer.render(&frame, &texture.create_view(&Default::default()))?;
+        renderer.render_overlay(&frame, &texture.create_view(&Default::default()))?;
     }
     let row = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
@@ -164,7 +164,9 @@ async fn run(output: &Path) -> Result<()> {
             .nth(3)
             .map(|dir| Cosmetics::directory(Path::new(&dir), None))
             .transpose()?;
+        let wordmark = std::env::args().any(|a| a == "--wordmark");
         let mut login = NativeLogin::new("")?;
+        login.set_wordmark(wordmark);
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
         }
@@ -197,13 +199,23 @@ async fn run(output: &Path) -> Result<()> {
             serde_json::to_vec_pretty(&text_widths).map_err(|e| e.to_string())?,
         )
         .map_err(|e| e.to_string())?;
-        for extent in [[960, 540], [1280, 720], [640, 360]] {
-            let picture = login.prepare_host(extent, 1., true, art.as_ref())?;
-            capture_scaled(
+        for (logical, dpr) in [
+            ([960, 540], 1.),
+            ([1920, 1080], 1.),
+            ([1280, 720], 1.),
+            ([640, 360], 1.),
+            ([960, 540], 2.),
+            ([1920, 1080], 2.),
+        ] {
+            let extent = logical.map(|n| (f64::from(n) * dpr) as u32);
+            let picture = login.prepare_host(extent, dpr, true, art.as_ref())?;
+            capture(
                 &mut renderer,
                 &picture,
-                &output.join(format!("native-{}x{}.png", extent[0], extent[1])),
-                Some(extent),
+                &output.join(format!(
+                    "native-{}x{}-dpr-{dpr}.png",
+                    logical[0], logical[1]
+                )),
             )?;
             let rects: Vec<_> = [
                 E::Logo,
@@ -220,21 +232,50 @@ async fn run(output: &Path) -> Result<()> {
                 vec![r.x, r.y, r.width, r.height]
             })
             .collect();
-            measurements.push(serde_json::json!({"extent":extent,"logical":extent,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len() + usize::from(picture.backdrop.is_some()),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+            measurements.push(serde_json::json!({"extent":extent,"logical":logical,"dpr":dpr,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len() + usize::from(picture.backdrop.is_some()),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+        }
+        for (name, time) in [("on", 9600.), ("off", 10130.)] {
+            if name == "on" {
+                login.focus(0);
+            }
+            login.step(time, true, false)?;
+            let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!("caret-{name}.png")),
+            )?;
         }
         login.focus(1);
         login.activate(true);
-        login.step(9616., true, false)?;
-        for now in (9632..=10400).step_by(16) {
-            login.step(now as f64, true, false)?;
+        for now in (10146..=10930).step_by(16) {
+            login.step(f64::from(now), true, false)?;
         }
         let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
-        capture_scaled(
-            &mut renderer,
-            &picture,
-            &output.join("native-spinner.png"),
-            Some([960, 540]),
-        )?;
+        capture(&mut renderer, &picture, &output.join("native-spinner.png"))?;
+        for fallback in [false, true] {
+            // Each independent producer starts its own material revision sequence.
+            let mut intro_renderer =
+                Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+            let mut intro = NativeLogin::new("")?;
+            intro.set_wordmark(wordmark);
+            for now in (0..=768).step_by(16) {
+                intro.step(f64::from(now), true, false)?;
+                if [128, 256, 512, 768].contains(&now) {
+                    let picture = intro.prepare_host(
+                        [960, 540],
+                        1.,
+                        true,
+                        if fallback { None } else { art.as_ref() },
+                    )?;
+                    capture(
+                        &mut intro_renderer,
+                        &picture,
+                        &output.join(format!("reveal-{now}-fallback-{fallback}.png")),
+                    )?;
+                }
+            }
+        }
         std::fs::write(
             output.join("native.json"),
             serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
