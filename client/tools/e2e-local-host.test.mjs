@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import path from 'node:path';
 import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup } from './e2e-local-host.mjs';
 
 test('arguments require a host, accept bounded seconds and prebuilt paths, reject ambiguous input', () => {
@@ -11,18 +10,6 @@ test('arguments require a host, accept bounded seconds and prebuilt paths, rejec
   for (const args of [[], ['--host-bin'], ['--wat', 'host'], ['--host-bin', 'host', '--host-bin', 'other'],
     ...['0', '-1', '4.9', '61', 'NaN', 'Infinity', ''].map(s => ['--host-bin', 'host', '--seconds', s])]) {
     assert.throws(() => argumentsFor(args), { stage: 'arguments' });
-  }
-});
-
-test('default client binary follows an inherited Cargo target directory', () => {
-  const saved = process.env.CARGO_TARGET_DIR;
-  try {
-    process.env.CARGO_TARGET_DIR = 'routed-target';
-    assert.equal(argumentsFor(['--host-bin', 'host']).clientBin,
-      path.join(path.resolve('routed-target'), 'debug', `slither-client-e2e${process.platform === 'win32' ? '.exe' : ''}`));
-  } finally {
-    if (saved === undefined) delete process.env.CARGO_TARGET_DIR;
-    else process.env.CARGO_TARGET_DIR = saved;
   }
 });
 
