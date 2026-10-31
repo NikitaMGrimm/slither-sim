@@ -402,6 +402,16 @@ impl StartMenuState {
         }
     }
 
+    /// The champion owner calls this only after its committed acknowledgement
+    /// and sampled fade have completed.
+    pub fn champion_finished(&mut self) {
+        if self.champion {
+            self.champion = false;
+            if self.phase == MenuPhase::Login {
+                self.focus_pending = true;
+            }
+        }
+    }
     /// Consume focus at the host's post-session seam, including return completion.
     pub fn take_focus_intent(&mut self) -> Option<StartMenuIntent> {
         std::mem::take(&mut self.focus_pending).then_some(StartMenuIntent::FocusNickname)

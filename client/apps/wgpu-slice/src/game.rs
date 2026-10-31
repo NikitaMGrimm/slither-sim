@@ -299,6 +299,29 @@ impl LocalGame {
     pub fn login_session(&self) -> slither_client::start_page::MenuSession {
         (&self.session.view()).into()
     }
+    /// Copied committed authority/status for the native victory editor.
+    pub fn champion_session(&self) -> slither_client::session_policy::View {
+        self.session.view()
+    }
+    /// One small, auditable send seam: current generation, committed victory,
+    /// existing transport. Enqueue before locking; failure never claims a send.
+    pub fn save_champion(
+        &mut self,
+        generation: u32,
+        units: &[u16],
+        activation: slither_client::menu_controls::Activation,
+    ) -> Result<bool> {
+        if generation != self.generation || !self.has_socket || !self.session.can_send_champion() {
+            return Ok(false);
+        }
+        let bytes = protocol::encode_champion(units);
+        if activation == slither_client::menu_controls::Activation::Enter && bytes.len() == 2 {
+            return Ok(false);
+        }
+        self.enqueue(EffectKind::Send(bytes), After::None)?;
+        self.session.champion_enqueued();
+        Ok(true)
+    }
     pub fn login_final(&self) -> Option<slither_client::presentation::HudFinal> {
         self.hud.final_capture
     }

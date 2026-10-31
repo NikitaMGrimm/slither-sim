@@ -5,13 +5,54 @@ use crate::menu_preferences::MenuQuality;
 use crate::start_page::{MenuAction, StartMenuIntent, StartMenuState, StartMenuView};
 use std::ops::Range;
 
-/// The two single-line editor policies.
+/// Stable editor identity, independent of its normalization rule.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct EditorId(pub u16);
+#[allow(non_upper_case_globals)]
+impl EditorId {
+    /// Existing login editor.
+    pub const Nickname: Self = Self(0);
+    /// Victory editor.
+    pub const Champion: Self = Self(1);
+}
+/// Existing login facade's editor identities.
+pub type TextField = EditorId;
+
+/// Normalization applied only to committed single-line text.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TextField {
-    /// Official UTF-16 ASCII substitution, limited to 24 units.
+pub enum TextRule {
+    /// ASCII substitution, at most 24 UTF-16 units.
     Nickname,
-    /// Official UTF-16 ASCII substitution, limited to 140 units; no wire encoding.
+    /// ASCII substitution, at most 140 UTF-16 units.
     Champion,
+    /// At most four decimal digits.
+    NumericServer,
+}
+impl TextRule {
+    /// Normalize raw units, including isolated surrogate halves.
+    pub fn normalize_units(self, units: &[u16]) -> String {
+        let limit = match self {
+            Self::Nickname => 24,
+            Self::Champion => 140,
+            Self::NumericServer => 4,
+        };
+        units
+            .iter()
+            .copied()
+            .filter(|u| self != Self::NumericServer || (48..=57).contains(u))
+            .take(limit)
+            .map(|u| {
+                if (32..=127).contains(&u) {
+                    char::from(u as u8)
+                } else {
+                    ' '
+                }
+            })
+            .collect()
+    }
+    fn normalize(self, text: &str) -> String {
+        self.normalize_units(&text.encode_utf16().collect::<Vec<_>>())
+    }
 }
 
 /// Convert a UTF-8 boundary to a UTF-16 offset. Interior bytes are rejected.
@@ -39,28 +80,6 @@ fn boundary(text: &str, byte: usize) -> usize {
     byte
 }
 
-fn normalize(field: TextField, text: &str) -> String {
-    // Nickname input: source/20b-skins-and-cosmetics.js:513-527.
-    // Champion input: source/20b-skins-and-cosmetics.js:528-537; Save repeats
-    // substitution/truncation in source/06-login-and-hud.js:321-323.
-    // Retaining raw preedit until commit approximates Chromium's input-event
-    // timing during composition; it does not establish real OS timing parity.
-    match field {
-        TextField::Nickname => crate::start_page::normalize_nickname(text),
-        TextField::Champion => text
-            .encode_utf16()
-            .take(140)
-            .map(|unit| {
-                if (32..=127).contains(&unit) {
-                    char::from(unit as u8)
-                } else {
-                    ' '
-                }
-            })
-            .collect(),
-    }
-}
-
 /// A raw IME preview; selection offsets are UTF-8 bytes, as supplied by winit.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Preedit {
@@ -80,7 +99,7 @@ struct Snapshot {
 /// Committed text and directional selection. All offsets are UTF-8 boundaries.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TextEditState {
-    field: TextField,
+    rule: TextRule,
     current: Snapshot,
     preedit: Option<Preedit>,
     composing: bool,
@@ -108,10 +127,21 @@ pub enum Movement {
 impl TextEditState {
     /// Create an editor from a normalized committed value.
     pub fn new(field: TextField, text: &str) -> Self {
-        let text = normalize(field, text);
+        Self::with_rule(
+            if field == EditorId::Nickname {
+                TextRule::Nickname
+            } else {
+                TextRule::Champion
+            },
+            text,
+        )
+    }
+    /// Create an editor with a registered rule.
+    pub fn with_rule(rule: TextRule, text: &str) -> Self {
+        let text = rule.normalize(text);
         let caret = text.len();
         Self {
-            field,
+            rule,
             current: Snapshot {
                 text,
                 anchor: caret,
@@ -159,8 +189,11 @@ impl TextEditState {
         let range = self.range();
         let mut text = self.current.text.clone();
         text.replace_range(range.clone(), inserted);
-        let caret = normalize(self.field, &text[..range.start + inserted.len()]).len();
-        let text = normalize(self.field, &text);
+        let caret = self
+            .rule
+            .normalize(&text[..range.start + inserted.len()])
+            .len();
+        let text = self.rule.normalize(&text);
         let caret = boundary(&text, caret);
         if text != self.current.text {
             self.checkpoint();
@@ -407,8 +440,7 @@ pub enum HostEditEffect {
 /// Focus, modality and editing owner for the opt-in menu.
 #[derive(Clone, Debug)]
 pub struct MenuInputState {
-    nickname: TextEditState,
-    champion: TextEditState,
+    editors: std::collections::BTreeMap<EditorId, TextEditState>,
     focus: Option<TextField>,
     window_focused: bool,
     modal: bool,
@@ -423,8 +455,17 @@ pub struct MenuInputState {
 impl Default for MenuInputState {
     fn default() -> Self {
         Self {
-            nickname: TextEditState::new(TextField::Nickname, ""),
-            champion: TextEditState::new(TextField::Champion, ""),
+            editors: [
+                (
+                    EditorId::Nickname,
+                    TextEditState::with_rule(TextRule::Nickname, ""),
+                ),
+                (
+                    EditorId::Champion,
+                    TextEditState::with_rule(TextRule::Champion, ""),
+                ),
+            ]
+            .into(),
             focus: None,
             window_focused: true,
             modal: false,
@@ -456,18 +497,40 @@ impl MenuInputState {
             && self.focus.is_some()
             && (self.caret_clock - self.caret_restart) % 1060. < 530.
     }
+    /// Register up to eight real editors. Equal rules preserve composition/history.
+    pub fn register(&mut self, id: EditorId, rule: TextRule, value: &str) -> bool {
+        if let Some(editor) = self.editors.get(&id)
+            && editor.rule == rule
+        {
+            return true;
+        }
+        if self.editors.len() >= 8 && !self.editors.contains_key(&id) {
+            return false;
+        }
+        self.clear_composition();
+        self.editors
+            .insert(id, TextEditState::with_rule(rule, value));
+        true
+    }
     /// Read an editor's copied state.
     pub fn editor(&self, field: TextField) -> &TextEditState {
-        match field {
-            TextField::Nickname => &self.nickname,
-            TextField::Champion => &self.champion,
+        &self.editors[&field]
+    }
+    /// Fallible lookup for copied generic descriptions; registry exhaustion
+    /// rejects preparation instead of indexing an unregistered editor.
+    pub fn registered_editor(&self, id: EditorId) -> Option<&TextEditState> {
+        self.editors.get(&id)
+    }
+    /// Start a new policy generation without changing host focus/modifier state.
+    pub fn reset_editor(&mut self, id: EditorId, value: &str) {
+        if let Some(rule) = self.editors.get(&id).map(|e| e.rule) {
+            self.clear_composition();
+            self.editors
+                .insert(id, TextEditState::with_rule(rule, value));
         }
     }
     fn editor_mut(&mut self, field: TextField) -> &mut TextEditState {
-        match field {
-            TextField::Nickname => &mut self.nickname,
-            TextField::Champion => &mut self.champion,
-        }
+        self.editors.get_mut(&field).expect("registered editor")
     }
     /// Active field, if any. Window blur retains logical focus for restoration.
     pub fn focus(&self) -> Option<TextField> {
@@ -478,12 +541,13 @@ impl MenuInputState {
         !self.window_focused || self.modal || self.focus.is_some()
     }
     fn clear_composition(&mut self) {
-        self.nickname.cancel();
-        self.champion.cancel();
+        for editor in self.editors.values_mut() {
+            editor.cancel();
+        }
         self.composition_enter = false;
         self.pending = None;
     }
-    fn releases(effects: &mut Vec<HostEditEffect>) {
+    pub(crate) fn releases(effects: &mut Vec<HostEditEffect>) {
         for key in [
             GameplayKey::Left,
             GameplayKey::Right,
@@ -535,7 +599,7 @@ impl MenuInputState {
             EditIntent::Focus(focus) => {
                 if self.focus != focus {
                     self.clear_composition();
-                    self.focus = focus;
+                    self.focus = focus.filter(|id| self.editors.contains_key(id));
                     if focus.is_some() {
                         Self::releases(&mut effects);
                     }
@@ -717,8 +781,11 @@ impl MenuInputState {
         if self.modal {
             return Vec::new();
         }
-        if self.nickname.text() != view.nickname {
-            self.nickname = TextEditState::new(TextField::Nickname, &view.nickname);
+        if self.editor(EditorId::Nickname).text() != view.nickname {
+            self.editors.insert(
+                EditorId::Nickname,
+                TextEditState::new(TextField::Nickname, &view.nickname),
+            );
             self.pending = None;
         }
         if intents.contains(&StartMenuIntent::FocusNickname) {
@@ -751,7 +818,13 @@ impl MenuInputState {
         menu: &mut StartMenuState,
         admission: bool,
     ) -> Vec<HostEditEffect> {
-        menu.edit_nickname(&self.nickname.text().encode_utf16().collect::<Vec<_>>());
+        menu.edit_nickname(
+            &self
+                .editor(EditorId::Nickname)
+                .text()
+                .encode_utf16()
+                .collect::<Vec<_>>(),
+        );
         let mut remaining = Vec::new();
         for effect in effects {
             if effect == HostEditEffect::Activate(TextField::Nickname) {
@@ -806,8 +879,8 @@ pub struct AccessibleNode {
     pub actions: Vec<AccessibleAction>,
 }
 
-/// Project only mounted ordinary login controls. Champion handoff stays explicitly
-/// incomplete, with no fake working message/Save control or AccessKit dependency.
+/// Project mounted ordinary login controls. Native champion controls publish
+/// their separate copied PanelView semantics, without an AccessKit dependency.
 pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<AccessibleNode> {
     if !view.visible {
         return Vec::new();

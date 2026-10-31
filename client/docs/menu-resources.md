@@ -148,3 +148,12 @@ WebGPU host loads world cosmetics first, then gives DOM art the remaining bytes,
 without decoding unused menu art into the GPU bank. Native retains the existing
 shared bank. Object URLs retire on generation teardown; stale async reads cannot
 publish into a replacement document. Missing images use authored controls.
+
+## Shared control adopter
+
+The native [champion editor](menu-controls.md) paints through the same transaction
+and physical overlay. Its 444px holder uses a bounded sliced atlas instead of a
+wide texture. Uniform tall surfaces tile in both axes. Each tile charges the
+existing producer cap; all material/text slots share the same Menu allowance.
+Theme raster content enters cache keys, while position, sampled alpha and
+horizontal text scroll do not. Login control migration remains a follow-up.
