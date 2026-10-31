@@ -5,11 +5,22 @@
 //! unchanged. Items are hashed into coarse cells by their bounds; a hash
 //! collision adds candidates and never removes one.
 use crate::Point;
-use crate::physics::Bounds;
+use crate::physics::{BODY_RADIUS, Bounds};
 
 const CELL: f64 = 512.0;
 /// Bounds spanning more cells than this per axis stay in an always-tested list.
 const MAX_SPAN: i64 = 16;
+
+/// Conservative difference between the exact head/body reaches used by `near`.
+pub(crate) fn collision_grid_margin(head_scale: f64, cap_scale: f64, max_reach: f64) -> f64 {
+    let delta = (head_scale - cap_scale).next_up();
+    let coefficient = (3.666 * BODY_RADIUS).next_up();
+    let ideal_difference = (delta * coefficient).next_up();
+    // Each reach has three rounded operations. Eight epsilons of the largest
+    // pair reach bound both errors; this only adds broad-phase candidates.
+    // The scale-pair regression checks every distinct supported scale.
+    (ideal_difference + 8.0 * f64::EPSILON * max_reach).next_up()
+}
 
 /// Reverse broad phase for large populations: insert each expanded body box
 /// once per covered cell, then read one already-ordered list per head. This
@@ -104,6 +115,64 @@ impl CollisionGrid {
             starts,
             entries,
         })
+    }
+
+    /// Collect cells touched by an outward-rounded head rectangle. The caller
+    /// bounds the extra reach over insertion; exact `near` still decides pairs.
+    pub(crate) fn candidates_near(&self, point: Point, reach: f64, out: &mut Vec<u32>) -> bool {
+        out.clear();
+        if !point.finite() || !reach.is_finite() || reach < 0.0 {
+            return false;
+        }
+        let Some(x0) =
+            (((point.x - reach).next_down() / Self::CELL) as i64).checked_sub(self.low.0)
+        else {
+            return false;
+        };
+        let Some(x1) = (((point.x + reach).next_up() / Self::CELL) as i64).checked_sub(self.low.0)
+        else {
+            return false;
+        };
+        let Some(y0) =
+            (((point.y - reach).next_down() / Self::CELL) as i64).checked_sub(self.low.1)
+        else {
+            return false;
+        };
+        let Some(y1) = (((point.y + reach).next_up() / Self::CELL) as i64).checked_sub(self.low.1)
+        else {
+            return false;
+        };
+        for y in y0.max(0)..=y1.min(self.height as i64 - 1) {
+            for x in x0.max(0)..=x1.min(self.width as i64 - 1) {
+                let bucket = y as usize * self.width + x as usize;
+                out.extend_from_slice(
+                    &self.entries[self.starts[bucket] as usize..self.starts[bucket + 1] as usize],
+                );
+            }
+        }
+        out.sort_unstable_by(|a, b| b.cmp(a));
+        out.dedup();
+        true
+    }
+
+    // Keep multi-cell collection and its rounding arithmetic outside advance's
+    // scalar path: small worlds never query this grid.
+    #[inline(never)]
+    pub(crate) fn candidates_for_head<'a>(
+        &'a self,
+        point: Point,
+        head_scale: f64,
+        cap_scale: f64,
+        max_reach: f64,
+        out: &'a mut Vec<u32>,
+    ) -> Option<&'a [u32]> {
+        if head_scale <= cap_scale {
+            self.candidates(point)
+        } else {
+            let reach = collision_grid_margin(head_scale, cap_scale, max_reach);
+            self.candidates_near(point, reach, out)
+                .then_some(out.as_slice())
+        }
     }
 
     /// None requests the original broad phase for unusual query coordinates.
@@ -233,7 +302,7 @@ impl BoundsIndex {
 mod tests {
     use super::*;
     use crate::Point;
-    use crate::physics::{collision_distance, head_tip, strikes};
+    use crate::physics::{collision_distance, head_tip, scale, strikes};
 
     #[test]
     fn reverse_grid_matches_bounds_scan_at_rounding_boundaries() {
@@ -305,6 +374,91 @@ mod tests {
                     })
                     .is_none()
             );
+        }
+    }
+
+    #[test]
+    fn extra_margin_bounds_every_distinct_head_body_scale_pair() {
+        for cap in [2, 32, 128, 531] {
+            for head in cap + 1..=532 {
+                for body in 2..=532 {
+                    let longest = head.max(body);
+                    let maximum = 3.666 * collision_distance(longest, longest);
+                    let margin = collision_grid_margin(scale(head), scale(cap), maximum);
+                    let actual = 3.666 * collision_distance(head, body);
+                    let inserted = 3.666 * collision_distance(cap, body);
+                    assert!(
+                        margin >= (actual - inserted).next_up(),
+                        "head={head} body={body} cap={cap}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn capped_grid_keeps_large_head_and_body_near_calls_in_order() {
+        let mut bounds =
+            vec![Bounds::between(Point { x: 600.0, y: 0.0 }, Point { x: 642.0, y: 0.0 }); 128];
+        bounds[127] = Bounds::between(Point { x: 850.0, y: 0.0 }, Point { x: 892.0, y: 0.0 });
+        let mut segments = vec![2; 128];
+        segments[127] = 4096;
+        let reaches: Vec<_> = segments
+            .iter()
+            .map(|&body| 3.666 * collision_distance(32, body))
+            .collect();
+        let grid = CollisionGrid::new(&bounds, &reaches).unwrap();
+        let mut candidates = Vec::new();
+        for head in [2, 532, 4096] {
+            for x in [
+                255.0f64.next_down(),
+                255.0,
+                255.0f64.next_up(),
+                -256.0,
+                0.0,
+                256.0,
+            ] {
+                let tip = Point { x, y: 0.0 };
+                let probe = Bounds::between(tip, tip);
+                assert!(grid.candidates_near(
+                    tip,
+                    if head > 32 {
+                        collision_grid_margin(
+                            scale(head),
+                            scale(32),
+                            3.666 * collision_distance(4096, 4096),
+                        )
+                    } else {
+                        0.0
+                    },
+                    &mut candidates
+                ));
+                assert!(candidates.windows(2).all(|w| w[0] > w[1]));
+                let actual: Vec<_> = candidates
+                    .iter()
+                    .copied()
+                    .filter(|&k| {
+                        bounds[k as usize].near(
+                            probe,
+                            3.666 * collision_distance(head, segments[k as usize]),
+                        )
+                    })
+                    .collect();
+                let expected: Vec<_> = (0..128u32)
+                    .rev()
+                    .filter(|&k| {
+                        bounds[k as usize].near(
+                            probe,
+                            3.666 * collision_distance(head, segments[k as usize]),
+                        )
+                    })
+                    .collect();
+                assert_eq!(actual, expected);
+                if head >= 532 && x == 255.0 {
+                    assert_eq!(actual.len(), 128);
+                    assert!(grid.candidates(tip).unwrap().is_empty());
+                }
+            }
         }
     }
 
