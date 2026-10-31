@@ -73,5 +73,5 @@ pub fn prepare(extent: [u32; 2], dpr: f64, state: u8) -> Result<MenuFrame> {
     let mut text = TextCache::menu();
     let view = view(state)?;
     let layout = layout(&mut text, &view, extent, dpr)?;
-    Menu::default().prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+    Menu::default().prepare(&mut text, &view, &layout, extent, dpr, None)
 }

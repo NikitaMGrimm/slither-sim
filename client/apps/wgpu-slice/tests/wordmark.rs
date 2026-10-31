@@ -177,3 +177,28 @@ fn raster_budget_premultiplication_and_reveal_endpoints_at_dpr_1_2_5() {
     assert!(raster_size(&l, 0.).is_err());
     assert!(raster_size(&l, f64::INFINITY).is_err());
 }
+
+#[test]
+fn extreme_dpr_fits_strokes_without_changing_ordinary_layouts() {
+    let original = make(DEFAULT_TEXT, 1920.);
+    let center = [
+        original.rect.x + original.rect.width / 2.,
+        original.rect.y + original.rect.height / 2.,
+    ];
+    for dpr in [1., 2., 5., 6., 8.] {
+        let mut layout = original.clone();
+        layout.fit_raster(dpr).unwrap();
+        let size = raster_size(&layout, dpr).unwrap();
+        assert!(size[0] as usize * size[1] as usize * 4 <= MAX_RASTER_BYTES);
+        assert!(size[1] <= 2048);
+        assert!(layout.words.iter().all(|w| !w.fallback));
+        assert!((layout.rect.x + layout.rect.width / 2. - center[0]).abs() < 1e-9);
+        assert!((layout.rect.y + layout.rect.height / 2. - center[1]).abs() < 1e-9);
+        if dpr <= 5. {
+            assert_eq!(layout, original);
+        }
+    }
+    for dpr in [0., f64::NAN, f64::INFINITY] {
+        assert!(original.clone().fit_raster(dpr).is_err());
+    }
+}

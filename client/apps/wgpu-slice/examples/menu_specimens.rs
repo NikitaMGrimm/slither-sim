@@ -141,7 +141,21 @@ fn capture_scaled(
     );
     Ok(())
 }
-fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
+/// PNG stores straight alpha; production textures retain premultiplied pixels.
+fn straight_alpha(premultiplied: &[u8]) -> Vec<u8> {
+    let mut pixels = premultiplied.to_vec();
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        let alpha = u32::from(pixel[3]);
+        for channel in &mut pixel[..3] {
+            *channel = (u32::from(*channel) * 255 + alpha / 2)
+                .checked_div(alpha)
+                .unwrap_or(0)
+                .min(255) as u8;
+        }
+    }
+    pixels
+}
+fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
     let mut bytes = Cursor::new(Vec::new());
     // Deliberately synthetic icon; no external reference/brand artwork.
     let image = image::RgbaImage::from_fn(320, 80, |x, y| {
@@ -308,7 +322,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -333,7 +346,6 @@ async fn run(output: &Path) -> Result<()> {
                 extent,
                 scale,
                 None,
-                0,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
                     panel: &panel,
@@ -350,7 +362,7 @@ async fn run(output: &Path) -> Result<()> {
             )?;
             view.ordinary_controls_visible = true;
             let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
-            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None, 0)?;
+            let login = menu.prepare(&mut text, &view, &layout, extent, scale, None)?;
             capture(
                 &mut renderer,
                 &login,
@@ -378,9 +390,7 @@ async fn run(output: &Path) -> Result<()> {
             .nth(3)
             .map(|dir| Cosmetics::directory(Path::new(&dir), None))
             .transpose()?;
-        let wordmark = std::env::args().any(|a| a == "--wordmark");
         let mut login = NativeLogin::new("")?;
-        login.set_wordmark(wordmark);
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
         }
@@ -468,12 +478,11 @@ async fn run(output: &Path) -> Result<()> {
         }
         let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
         capture(&mut renderer, &picture, &output.join("native-spinner.png"))?;
-        for fallback in [false, true] {
+        for without_icons in [false, true] {
             // Each independent producer starts its own material revision sequence.
             let mut intro_renderer =
                 Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
             let mut intro = NativeLogin::new("")?;
-            intro.set_wordmark(wordmark);
             for now in (0..=768).step_by(16) {
                 intro.step(f64::from(now), true, false)?;
                 if [128, 256, 512, 768].contains(&now) {
@@ -481,12 +490,12 @@ async fn run(output: &Path) -> Result<()> {
                         [960, 540],
                         1.,
                         true,
-                        if fallback { None } else { art.as_ref() },
+                        if without_icons { None } else { art.as_ref() },
                     )?;
                     capture(
                         &mut intro_renderer,
                         &picture,
-                        &output.join(format!("reveal-{now}-fallback-{fallback}.png")),
+                        &output.join(format!("reveal-{now}-without-icons-{without_icons}.png")),
                     )?;
                 }
             }
@@ -515,7 +524,7 @@ async fn run(output: &Path) -> Result<()> {
             let extent = [(1280. * dpr) as u32, (720. * dpr) as u32];
             let view = menu_specimen::view(state as u8)?;
             let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
-            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)?;
+            let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
             capture(
                 &mut renderer,
                 &p,
@@ -525,24 +534,24 @@ async fn run(output: &Path) -> Result<()> {
     }
     let view = menu_specimen::view(0)?;
     let mut images = Images::default();
-    images.add("menu/logo.png", &synthetic_logo([90, 180, 120, 255])?)?;
+    images.add("menu/skin.png", &synthetic_icon([90, 180, 120, 255])?)?;
     let mut art = Cosmetics::from_images(images, None)?;
     let layout = menu_specimen::layout(&mut text, &view, [1280, 720], 1.)?;
-    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    let old = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &old,
         &output.join("native-synthetic-art.png"),
     )?;
-    art.replace_menu_art(MenuArt::Logo(0), &synthetic_logo([170, 90, 180, 255])?)?;
-    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art), 0)?;
+    art.replace_menu_art(MenuArt::Skin, &synthetic_icon([170, 90, 180, 255])?)?;
+    let replacement = menu.prepare(&mut text, &view, &layout, [1280, 720], 1., Some(&art))?;
     capture(
         &mut renderer,
         &replacement,
         &output.join("native-replacement.png"),
     )?;
     let layout = menu_specimen::layout(&mut text, &view, [960, 540], 1.)?;
-    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None, 0)?;
+    let resized = menu.prepare(&mut text, &view, &layout, [960, 540], 1., None)?;
     capture(
         &mut renderer,
         &resized,
@@ -559,7 +568,7 @@ async fn run(output: &Path) -> Result<()> {
     let layout = menu_specimen::layout(&mut text, &view, [640, 360], 1.)?;
     capture(
         &mut renderer,
-        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None, 0)?,
+        &menu.prepare(&mut text, &view, &layout, [640, 360], 1., None)?,
         &output.join("native-short-640x360.png"),
     )?;
     if let Some(error) = validation.pop().await {
@@ -576,7 +585,7 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     use slither_wgpu_slice::{
         login_native::NativeLogin, menu_storage::MenuStorage, skin_studio_native::SkinStudioNative,
     };
-    let png = synthetic_logo([180, 100, 210, 255])?;
+    let png = synthetic_icon([180, 100, 210, 255])?;
     let full = Cosmetics::load(
         |path| {
             if slither_wgpu_slice::cosmetics::BackgroundArt::ALL
@@ -803,7 +812,7 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
         let raster = wordmark::raster(&layout, 1., 1.)?;
         image::save_buffer(
             output.join(format!("string-{index}.png")),
-            &raster.pixels,
+            &straight_alpha(&raster.pixels),
             raster.width,
             raster.height,
             image::ColorType::Rgba8,
@@ -822,14 +831,14 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
         last_ms = ms;
         let view = state.view(true);
         let layout = menu_specimen::layout(&mut text, &view, [1920, 1080], 1.)?;
-        let p = menu.prepare(&mut text, &view, &layout, [1920, 1080], 1., None, 0)?;
+        let p = menu.prepare(&mut text, &view, &layout, [1920, 1080], 1., None)?;
         capture(renderer, &p, &output.join(format!("reveal-{ms:05}ms.png")))?;
     }
     for dpr in [1., 2.] {
         let extent = [(1920. * dpr) as u32, (1080. * dpr) as u32];
         let view = state.view(true);
         let layout = menu_specimen::layout(&mut text, &view, extent, dpr)?;
-        let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)?;
+        let p = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
         capture(
             renderer,
             &p,
@@ -838,7 +847,7 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
         let mut cached_ms = Vec::new();
         for _ in 0..6 {
             let now = std::time::Instant::now();
-            let cached = menu.prepare(&mut text, &view, &layout, extent, dpr, None, 0)?;
+            let cached = menu.prepare(&mut text, &view, &layout, extent, dpr, None)?;
             cached_ms.push(now.elapsed().as_secs_f64() * 1000.);
             if cached
                 .frame
@@ -914,5 +923,20 @@ fn main() {
     if let Err(e) = result {
         eprintln!("{e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn png_conversion_preserves_the_production_raster() {
+        let pixels = [40, 20, 10, 128, 5, 6, 7, 255, 0, 0, 0, 0];
+        let copy = pixels;
+        assert_eq!(
+            straight_alpha(&pixels),
+            [80, 40, 20, 128, 5, 6, 7, 255, 0, 0, 0, 0]
+        );
+        assert_eq!(pixels, copy);
     }
 }

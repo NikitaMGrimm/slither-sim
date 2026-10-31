@@ -47,9 +47,7 @@ call this same API without depending on the login renderer.
 The caret uses a 530ms on/off clock from the menu
 callback, restarted by focus/edit/movement; raw IME preedit stays separate.
 
-Native local logo art keeps its aspect ratio and independent opacity, with a
-feathered reveal from #358. Without local logo art, or with desktop `--wordmark`,
-the authored
+The native login always uses the authored
 [stroke wordmark](wordmark.md) swells and ripples into place on the retained
 reveal clock, then stops. Its natural letter height follows the same holder;
 longer text extends horizontally and fits uniformly only at the viewport margin.

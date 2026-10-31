@@ -37,6 +37,33 @@ pub struct Layout {
     pub words: Vec<Word>,
 }
 impl Layout {
+    /// Keep extreme physical sizes within the transient raster bound without
+    /// switching supported glyphs to a different font or scaling texture pixels.
+    /// Normal DPR/layouts remain byte-for-byte unchanged.
+    pub fn fit_raster(&mut self, dpr: f64) -> Result<()> {
+        if !dpr.is_finite() || dpr <= 0. {
+            return Err(RASTER_SCALE_QUOTA.into());
+        }
+        if raster_size(self, dpr).is_ok() {
+            return Ok(());
+        }
+        let width = self.rect.width * dpr;
+        let height = self.rect.height * dpr;
+        let fit = (2047. / height)
+            .min((MAX_RASTER_BYTES as f64 / (4. * (width + 1.) * (height + 1.))).sqrt())
+            .min(1.)
+            * 0.99;
+        let center = [
+            self.rect.x + self.rect.width / 2.,
+            self.rect.y + self.rect.height / 2.,
+        ];
+        self.unit *= fit;
+        self.rect.width *= fit;
+        self.rect.height *= fit;
+        self.rect.x = center[0] - self.rect.width / 2.;
+        self.rect.y = center[1] - self.rect.height / 2.;
+        raster_size(self, dpr).map(|_| ())
+    }
     /// Snapped raster origin; atlas pieces use integer offsets from this grid.
     pub fn origin_pixels(&self, dpr: f64) -> [f64; 2] {
         [self.rect.x * dpr, self.rect.y * dpr].map(f64::round)
@@ -354,7 +381,7 @@ pub fn samples(layout: &Layout, progress: f64) -> Result<Vec<Sample>> {
 /// Physical dimensions stay exact: wide rasters are tiled for WebGL2, never
 /// downsampled or enlarged by the snapped overlay. Admission precedes allocation.
 pub fn raster_size(layout: &Layout, dpr: f64) -> Result<[u32; 2]> {
-    if !dpr.is_finite() || dpr <= 0. || dpr > 5.5 {
+    if !dpr.is_finite() || dpr <= 0. {
         return Err(RASTER_SCALE_QUOTA.into());
     }
     let size = [

@@ -31,8 +31,8 @@ menu controls, retaining its texture in the menu resources. `append_to` places
 it below every world draw, mapped to the capped world viewport when controls
 use the physical overlay. A hidden login emits no backdrop, even while the
 spinner remains. Hosts can take it for a separate world layer before composing
-a physical-resolution menu overlay. Logo art keeps its image aspect inside the
-unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
+a physical-resolution menu overlay. The stroke wordmark keeps the 450x115 flow
+holder as its vertical anchor. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
 and a stroke wordmark approximate the controls at gameplay size. The spinner uses
 two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
@@ -43,8 +43,8 @@ One 1:1 quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-Bitmap logo art retains #358's feathered reveal, separate from shared opacity. The no-art/`--wordmark`
-path uses the [authored swelling stroke alphabet](wordmark.md), settles to a cached
+The native logo always uses the [authored swelling stroke alphabet](wordmark.md),
+settles to a cached
 raster, and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
@@ -69,7 +69,7 @@ use solid materials without capsule shadows.
   diagnostics retain their 3x raster bound. Control atlas tiles stay within 512px;
   decoded menu art allows up to 2048px per axis. Menu decoding alone admits that
   density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
-  pixel budgets and the two-resident-logo-frame limit still apply.
+  pixel budgets still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
   menu art admission reserves the five procedural skin roles' 79,424 RGBA bytes;
   those mandatory roles also precede optional images at construction. Authored
@@ -87,7 +87,7 @@ use solid materials without capsule shadows.
 
 Native `--cosmetics-dir` and browser `/cosmetics/` use the same `Cosmetics`
 semantic manifest and decoder. Without a manifest, optional paths are
-`menu/logo.png`, `menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`,
+`menu/skin.png`, `menu/builder.png`, `menu/cosmetic.png`,
 `menu/quality-high.png` and `menu/quality-low.png`.
 Missing/malformed art keeps layout and hit targets with authored fallbacks.
 Builder/cosmetic entries are available for future chooser composition.
@@ -96,8 +96,6 @@ An optional **4,096-byte** UTF-8 `menu/manifest.txt` has this authored format:
 
 ```text
 menu-art-v1
-logo:0 1 menu/logo.png
-logo:1 2 menu/logo-next.png
 skin 1 menu/skin.png
 builder 1 menu/builder.png
 cosmetic 1 menu/cosmetic.png
@@ -106,8 +104,11 @@ quality-low 1 menu/quality-low.png
 ```
 
 Rows are role, positive u32 source revision and relative PNG/JPEG path. At most
-37 distinct rows: `logo:0` through `logo:31`, `skin`, `builder`, `cosmetic`,
-`quality-high`, `quality-low`. No server role is admitted yet.
+five native roles: `skin`, `builder`, `cosmetic`, `quality-high`, `quality-low`.
+The shared manifest still validates up to 37 rows for the standalone browser
+reference, including its legacy logo roles. Native ignores those rows rather
+than loading their image bytes; the remaining icons in existing packs still work.
+No server role is admitted yet.
 Paths are at most 128 ASCII characters (letters, digits, `_`, `-`, `.`, `/`).
 Empty, `.` and `..` components, absolute paths, URLs and duplicate roles/paths
 are rejected. Native/served reads check canonical containment, including links.
@@ -117,15 +118,16 @@ Images retain 4 MiB/file and 1,024px decode limits. Browser streaming reads cap
 manifest/image bytes before Rust decode; redirects/credentials are disabled and
 the source must have the page's origin. No official art or pack is included.
 
-Only the first two declared logos load at startup. `replace_menu_art` admits
-resolved bytes atomically and evicts the oldest other logo if needed: **at most
-two frames** reside. GPU revisions increase across replacement/eviction; older
-prepared pictures retain earlier pixels. Callers select semantic frame numbers.
+`replace_menu_art` admits the remaining icon bytes atomically; GPU revisions
+increase across replacement, and prepared pictures retain earlier pixels.
+Native has no bitmap logo role, frame selector or reveal helper. The standalone
+DOM pages retain their existing plain-text/art logo as a known reference-host
+difference; the future extension will reuse the native painter through WebGL2.
 
 ## Offline specimens
 
 Authored Rust/Node tests cover quotas, rejection/rollback, malformed/escaping
-manifests, contained serving, two-frame residency and prepared retention. With
+manifests, contained serving, icon replacement and prepared retention. With
 `CARGO_BUILD_JOBS=2` and a task-local target directory, from the repository root:
 
 ```sh
@@ -144,7 +146,8 @@ owner perceptual acceptance, physical IME/accessibility or real display pacing.
 
 The browser DOM loader uses the same role/path grammar, bounded same-origin
 streaming reads and PNG/JPEG dimensions checked before browser decode. Only
-logo:0, skin and the two quality roles mount in login (at most four images and
+skin and the two quality roles mount natively. The standalone DOM reference also
+mounts its legacy logo (at most four images and
 16 spinner dots). Its art shares the 16 MiB decoded cosmetics allowance: the
 WebGPU host loads world cosmetics first, then gives DOM art the remaining bytes,
 without decoding unused menu art into the GPU bank. Native retains the existing

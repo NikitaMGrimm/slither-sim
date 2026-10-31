@@ -492,7 +492,7 @@ fn champion_keeps_returning_login_last_length_geometry_and_fade() {
         let rect = layout.viewport_rect(MenuElement::LastLength);
         let mut menu = Menu::default();
         let login = menu
-            .prepare(&mut text, &view, &layout, [960, 720], 1., None, 0)
+            .prepare(&mut text, &view, &layout, [960, 720], 1., None)
             .unwrap();
         view.ordinary_controls_visible = false;
         let champion = menu
@@ -503,7 +503,6 @@ fn champion_keeps_returning_login_last_length_geometry_and_fade() {
                 [960, 720],
                 1.,
                 None,
-                0,
                 None,
                 Some(PanelPaint {
                     panel: &p,
@@ -652,5 +651,98 @@ fn optional_menu_propagates_non_quota_preparation_errors() {
         );
         assert_eq!(picture.frame, base.frame);
         assert!(picture.resources.is_empty());
+    }
+}
+
+#[test]
+fn champion_and_logo_share_the_complete_menu_budget_at_high_dpr() {
+    use slither_wgpu_slice::{
+        menu::{MenuFrame, PanelPaint},
+        menu_specimen,
+        render::PreparedFrame,
+        text::MENU_CACHE_BYTES,
+    };
+    let extent = [8000, 5400];
+    let dpr = 5.;
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let mut view = menu_specimen::view(0).unwrap();
+    view.ordinary_controls_visible = false;
+    view.tips_visible = false;
+    view.champion_pending = true;
+    let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+    // Move from fitting stroke -> fitting font -> neither fits -> stroke again.
+    for count in [0, 4, 8, 0] {
+        let mut panel = panel();
+        panel.placement = Placement::rect(0., 0., 1600., 1080.);
+        // Synthetic picker instructions share the champion painter/text bank.
+        for index in 0..count {
+            let mut control = panel.controls[0].clone();
+            control.id = ControlId(40 + index);
+            control.placement = Placement::rect(10., 100. + f64::from(index) * 60., 900., 40.);
+            control.clip = None;
+            control.style = ControlStyle::Heading;
+            control.kind = ControlKind::Label {
+                text: "W".repeat(50),
+            };
+            panel.controls.push(control);
+        }
+        let mut input = PanelInputState::default();
+        let mut edit = MenuInputState::default();
+        input.sync(&panel, &mut edit);
+        let cached = text.cached_runs();
+        let prepared = menu.prepare_with_panel(
+            &mut text,
+            &view,
+            &layout,
+            extent,
+            dpr,
+            None,
+            None,
+            Some(PanelPaint {
+                panel: &panel,
+                input: &input,
+                edit: &edit,
+                scroll: &mut BTreeMap::new(),
+                theme: MenuTheme::default(),
+            }),
+        );
+        if count == 8 {
+            assert!(prepared.is_err());
+            assert_eq!(text.cached_runs(), cached);
+            let base = MenuFrame::world_crossfade(extent, dpr, 1.).unwrap();
+            let picture = PreparedFrame {
+                frame: base.frame,
+                resources: base.resources,
+                overlay: None,
+            };
+            assert!(
+                MenuFrame::compose_optional(prepared, &picture)
+                    .unwrap()
+                    .is_none()
+            );
+            continue;
+        }
+        let frame = prepared.unwrap_or_else(|e| panic!("champion DPR {dpr}, {count} labels: {e}"));
+        let bytes = frame
+            .resources
+            .iter()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>();
+        eprintln!("champion DPR {dpr}, {count} picker labels: {bytes} bytes");
+        assert!(bytes <= MENU_CACHE_BYTES);
+        assert!(!frame.frame.draws.is_empty());
+        assert!(frame.frame.draws.len() <= 512);
+        let green = slither_wgpu_slice::menu::WORDMARK_GREEN;
+        let font_logo = frame.resources.iter().any(|r| {
+            r.asset.handle >> 60 == 8
+                && r.image
+                    .pixels
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .any(|p| p[..3] == green && p[3] == 255)
+        });
+        assert_eq!(font_logo, count == 4);
     }
 }

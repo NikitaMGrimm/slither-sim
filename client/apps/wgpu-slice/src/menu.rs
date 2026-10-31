@@ -293,7 +293,6 @@ impl MenuFrame {
 }
 #[derive(Default)]
 pub struct Menu {
-    pub wordmark: bool,
     /// Change only the string to use another wordmark; None uses DEFAULT_TEXT.
     pub wordmark_text: Option<String>,
     pub focus: Option<E>,
@@ -330,53 +329,6 @@ struct Label {
     clip: Option<MenuRect>,
     fit: bool,
 }
-// Authored wipe: one opaque crop plus at most 32 one-pixel feather strips.
-// Source crops and destinations remain 1:1 on the snapped overlay path.
-fn reveal_draw(mut draw: Draw, reveal: f64, scale: f64, span: Option<[f64; 2]>) -> Vec<Draw> {
-    draw.snap_overlay(scale);
-    if reveal >= 1. {
-        return vec![draw];
-    }
-    if reveal <= 0. {
-        return Vec::new();
-    }
-    let source = draw.source.unwrap_or(BodyRect {
-        x: 0.,
-        y: 0.,
-        width: f64::from(draw.asset.width),
-        height: f64::from(draw.asset.height),
-    });
-    let feather = (12. * scale).round().clamp(1., 32.);
-    let span = span.unwrap_or([draw.destination.x, source.width / scale]);
-    let end = ((span[1] * scale + feather) * reveal).round()
-        - ((draw.destination.x - span[0]) * scale).round();
-    let solid = (end - feather).max(0.).min(source.width);
-    let mut result = Vec::new();
-    let mut crop = |x: f64, width: f64, alpha: f64| {
-        let mut part = draw.clone();
-        part.source = Some(BodyRect {
-            x: source.x + x,
-            width,
-            ..source
-        });
-        part.destination.x += x / scale;
-        part.destination.width = width / scale;
-        part.effective_alpha *= alpha;
-        result.push(part);
-    };
-    if solid > 0. {
-        crop(0., solid, 1.);
-    }
-    for x in solid as u32..(end.min(source.width) as u32) {
-        crop(
-            f64::from(x),
-            1.,
-            ((end - f64::from(x) - 0.5) / feather).clamp(0., 1.),
-        );
-    }
-    result
-}
-
 struct WordmarkRequest {
     value: String,
     holder: MenuRect,
@@ -1099,6 +1051,7 @@ impl Composition<'_> {
         reveal: f64,
         text: &mut TextCache,
         font_slots: usize,
+        font_only: bool,
     ) -> Result<()> {
         let unit = holder.height / 16.;
         let mut style = TextStyle {
@@ -1110,28 +1063,20 @@ impl Composition<'_> {
         };
         let ascent = text.measure_panel("H", style)?.ascent;
         style.size *= 10. * unit / ascent;
-        let mut layout = wordmark::layout(value, holder, viewport_width, |s| {
-            Ok(text.measure_panel(s, style)?.advance / unit)
-        })?;
+        let mut layout = if font_only {
+            wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?
+        } else {
+            wordmark::layout(value, holder, viewport_width, |s| {
+                Ok(text.measure_panel(s, style)?.advance / unit)
+            })?
+        };
         if !reveal.is_finite() {
             return Err("Wordmark reveal bounds".into());
         }
         let reveal = reveal.clamp(0., 1.);
-        if layout.words.iter().any(|w| !w.fallback)
-            && let Err(error) = wordmark::raster_size(&layout, self.scale)
-        {
-            // Only raster admission limits select the installed-font path.
-            // Invalid input and unexpected raster/logic errors still propagate.
-            if !matches!(
-                error.as_str(),
-                wordmark::RASTER_SCALE_QUOTA | wordmark::RASTER_PIXEL_QUOTA
-            ) {
-                return Err(error);
-            }
-            layout = wordmark::fallback_layout(value, holder, viewport_width, font_slots, |s| {
-                Ok(text.measure_panel(s, style)?.advance / unit)
-            })?;
-        }
+        layout.fit_raster(self.scale)?;
         if layout.words.iter().filter(|w| w.fallback).count()
             + usize::from(layout.words.iter().any(|w| !w.fallback))
             > font_slots
@@ -1259,7 +1204,17 @@ impl Composition<'_> {
                         .iter()
                         .map(|s| s[0] as usize * s[1] as usize * 4)
                         .sum::<usize>();
-                    preflight_menu_totals(sizes.len(), bytes)?;
+                    preflight_menu_totals(
+                        self.materials.len()
+                            + sizes.len()
+                            + self.labels.len()
+                            + layout.words.iter().filter(|w| w.fallback).count(),
+                        self.materials
+                            .values()
+                            .map(|r| r.image.pixels.len())
+                            .sum::<usize>()
+                            + bytes,
+                    )?;
                     let mut images: Vec<_> = sizes
                         .into_iter()
                         .map(|[width, height]| materials::RgbaImage {
@@ -1399,15 +1354,6 @@ impl Composition<'_> {
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
-        self.art_revealed(resource, r, alpha, 1.)
-    }
-    fn art_revealed(
-        &mut self,
-        resource: &Resource,
-        r: MenuRect,
-        alpha: f64,
-        reveal: f64,
-    ) -> Result<()> {
         let size = [
             (r.width * self.scale).round().max(1.) as u32,
             (r.height * self.scale).round().max(1.) as u32,
@@ -1474,9 +1420,7 @@ impl Composition<'_> {
             height: f64::from(size[1]) / self.scale,
             ..r
         };
-        for draw in reveal_draw(image(&self.art[&key], r, alpha), reveal, self.scale, None) {
-            self.push(draw)?;
-        }
+        self.push(image(&self.art[&key], r, alpha))?;
         Ok(())
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
@@ -1574,7 +1518,7 @@ impl Menu {
         Ok(result)
     }
     /// Rasterize at the physical overlay scale. Geometry comes from the core layout;
-    /// a caller supplies the selected logo frame, never a filesystem path.
+    /// optional local icons never replace the authored stroke logo.
     #[allow(clippy::too_many_arguments)]
     pub fn prepare(
         &mut self,
@@ -1584,9 +1528,8 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
     ) -> Result<MenuFrame> {
-        self.prepare_with_input(text, view, layout, extent, dpr, cosmetics, logo_frame, None)
+        self.prepare_with_input(text, view, layout, extent, dpr, cosmetics, None)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1598,12 +1541,9 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
         input: Option<&MenuInputState>,
     ) -> Result<MenuFrame> {
-        self.prepare_with_panel(
-            text, view, layout, extent, dpr, cosmetics, logo_frame, input, None,
-        )
+        self.prepare_with_panel(text, view, layout, extent, dpr, cosmetics, input, None)
     }
     #[allow(clippy::too_many_arguments)]
     pub fn prepare_with_panel(
@@ -1614,7 +1554,6 @@ impl Menu {
         extent: [u32; 2],
         dpr: f64,
         cosmetics: Option<&Cosmetics>,
-        logo_frame: u8,
         input: Option<&MenuInputState>,
         panel: Option<PanelPaint<'_>>,
     ) -> Result<MenuFrame> {
@@ -1668,41 +1607,19 @@ impl Menu {
             }
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha;
-            if let Some(art) = cosmetics
-                .filter(|_| !self.wordmark)
-                .and_then(|p| p.menu_art(MenuArt::Logo(logo_frame)))
-            {
-                // Local art may be taller than the 450x135 original; it must
-                // not paint over the rows below the holder.
-                let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
-                let room = layout.viewport_rect(E::LastLength).y - logo.y;
-                let fit = (room / natural).min(1.);
-                c.art_revealed(
-                    art,
-                    MenuRect {
-                        x: logo.x + logo.width * (1. - fit) / 2.,
-                        width: logo.width * fit,
-                        height: natural * fit,
-                        ..logo
-                    },
-                    logo_alpha,
-                    (4. * view.logo_reveal).clamp(0., 1.),
-                )?;
-            } else {
-                c.wordmark = Some(WordmarkRequest {
-                    value: self
-                        .wordmark_text
-                        .as_deref()
-                        .unwrap_or(wordmark::DEFAULT_TEXT)
-                        .to_owned(),
-                    holder: logo,
-                    viewport_width: f64::from(extent[0]) / dpr,
-                    alpha: logo_alpha,
-                    reveal: view.logo_reveal,
-                    draw_index: c.draws.len(),
-                    label_index: c.labels.len(),
-                });
-            }
+            c.wordmark = Some(WordmarkRequest {
+                value: self
+                    .wordmark_text
+                    .as_deref()
+                    .unwrap_or(wordmark::DEFAULT_TEXT)
+                    .to_owned(),
+                holder: logo,
+                viewport_width: f64::from(extent[0]) / dpr,
+                alpha: logo_alpha,
+                reveal: view.logo_reveal,
+                draw_index: c.draws.len(),
+                label_index: c.labels.len(),
+            });
             if view.tips_visible {
                 c.label(
                     view.tip,
@@ -1930,27 +1847,92 @@ impl Composition<'_> {
         world_cover: Option<Draw>,
         spinner_draws: Vec<Draw>,
     ) -> Result<Published> {
-        if let Some(request) = self.wordmark.take() {
-            // All controls and the fading spinner are known here. Keep menu
-            // accounting in this final composition, before admitting logo text.
-            let font_slots =
-                MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
-            let draws = self.draws.len();
-            let labels = self.labels.len();
-            self.stroke_wordmark(
-                &request.value,
-                request.holder,
-                request.viewport_width,
-                request.alpha,
-                request.reveal,
-                text,
-                font_slots,
-            )?;
-            let added_draws = self.draws.len() - draws;
-            let added_labels = self.labels.len() - labels;
-            self.draws[request.draw_index..].rotate_right(added_draws);
-            self.labels[request.label_index..].rotate_right(added_labels);
+        let request = self.wordmark.take();
+        let checkpoint = (self.draws.len(), self.labels.len(), self.next_handle);
+        let mut added = (0, 0);
+        if let Some(request) = &request {
+            match self.place_wordmark(text, request, false) {
+                Ok(counts) => added = counts,
+                Err(error) if error == MENU_CACHE_QUOTA => {
+                    self.draws.truncate(checkpoint.0);
+                    self.labels.truncate(checkpoint.1);
+                    self.stroke = None;
+                    self.next_handle = checkpoint.2;
+                    added = self.place_wordmark(text, request, true)?;
+                }
+                Err(error) => return Err(error),
+            }
         }
+        let mut result = self.compose_labels(
+            text,
+            extent,
+            dpr,
+            backdrop.clone(),
+            world_cover.clone(),
+            &spinner_draws,
+        );
+        if result
+            .as_ref()
+            .err()
+            .is_some_and(|error| error == MENU_CACHE_QUOTA)
+            && self.stroke.is_some()
+            && let Some(request) = &request
+        {
+            // TextCache's failed transaction has not published. Retry the logo
+            // only, using actual full-menu text bytes rather than a guessed
+            // allowance. The fallback must pass the same aggregate check.
+            self.draws
+                .drain(request.draw_index..request.draw_index + added.0);
+            self.labels
+                .drain(request.label_index..request.label_index + added.1);
+            self.stroke = None;
+            self.next_handle = checkpoint.2;
+            self.place_wordmark(text, request, true)?;
+            result = self.compose_labels(text, extent, dpr, backdrop, world_cover, &spinner_draws);
+        }
+        Ok((
+            result?,
+            self.next_handle,
+            self.spinner_revision,
+            self.materials,
+            self.art,
+            self.stroke,
+        ))
+    }
+    fn place_wordmark(
+        &mut self,
+        text: &mut TextCache,
+        request: &WordmarkRequest,
+        font_only: bool,
+    ) -> Result<(usize, usize)> {
+        let font_slots = MENU_CACHE_RUNS.saturating_sub(self.materials.len() + self.labels.len());
+        let draws = self.draws.len();
+        let labels = self.labels.len();
+        self.stroke_wordmark(
+            &request.value,
+            request.holder,
+            request.viewport_width,
+            request.alpha,
+            request.reveal,
+            text,
+            font_slots,
+            font_only,
+        )?;
+        let added = (self.draws.len() - draws, self.labels.len() - labels);
+        self.draws[request.draw_index..].rotate_right(added.0);
+        self.labels[request.label_index..].rotate_right(added.1);
+        Ok(added)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn compose_labels(
+        &mut self,
+        text: &mut TextCache,
+        extent: [u32; 2],
+        dpr: f64,
+        backdrop: Option<Draw>,
+        world_cover: Option<Draw>,
+        spinner_draws: &[Draw],
+    ) -> Result<MenuFrame> {
         let material_bytes = self
             .materials
             .values()
@@ -2078,7 +2060,7 @@ impl Composition<'_> {
                         + usize::from(world_cover.is_some()),
                 )?;
                 frame::reserve_draws(&mut self.draws, spinner_draws.len())?;
-                self.draws.extend(spinner_draws);
+                self.draws.extend_from_slice(spinner_draws);
                 let frame = Frame {
                     identity: 0,
                     extent,
@@ -2095,15 +2077,9 @@ impl Composition<'_> {
                     resources: resources.into_values().collect(),
                 })
             },
-        )?;
-        Ok((
-            result,
-            self.next_handle,
-            self.spinner_revision,
-            self.materials,
-            self.art,
-            self.stroke,
-        ))
+        );
+        self.labels = labels;
+        result
     }
 }
 

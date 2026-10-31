@@ -44,7 +44,7 @@ pub const MINIMAP_SHADOW_CACHE_BYTES: usize = 1024 * 1024;
 pub const PANEL_CACHE_BYTES: usize = 12 * 1024 * 1024;
 pub const PANEL_CACHE_RUNS: usize = 64;
 // Exact 5x controls, last-life/Play Again and cropped stroke-logo tiles through
-// 1.1x outgoing growth: tests/menu.rs::stroke_wordmark_overrides_only_logo_art_with_bounded_tiled_rasters.
+// 1.1x outgoing growth: tests/menu.rs::stroke_wordmark_is_default_with_local_icons_and_bounded_tiled_rasters.
 // The aggregate 13 MiB admission and 64 MiB whole-picture guard both apply.
 pub const MENU_CACHE_BYTES: usize = 13 * 1024 * 1024;
 pub const MENU_CACHE_RUNS: usize = 64;

@@ -3,14 +3,12 @@ use super::*;
 
 pub const MANIFEST_PATH: &str = "menu/manifest.txt";
 pub const MANIFEST_LIMIT: usize = 4096;
-pub const MAX_LOGO_FRAMES: u8 = 32;
-// 450 CSS px at 3x fits without losing density; the shared cosmetics byte
-// allowance and two-frame logo residency still bound allocations.
+// Retain high-density menu icons; the shared cosmetics byte allowance still
+// bounds allocations independently of this decode extent.
 pub(super) const MAX_EXTENT: u32 = 2048;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MenuArt {
-    Logo(u8),
     Skin,
     Builder,
     Cosmetic,
@@ -20,7 +18,6 @@ pub enum MenuArt {
 impl MenuArt {
     fn ordinal(self) -> u64 {
         match self {
-            Self::Logo(n) => u64::from(n),
             Self::Skin => 32,
             Self::Builder => 33,
             Self::Cosmetic => 34,
@@ -40,11 +37,6 @@ pub struct MenuManifest(pub Vec<MenuArtEntry>);
 impl Default for MenuManifest {
     fn default() -> Self {
         Self(vec![
-            MenuArtEntry {
-                art: MenuArt::Logo(0),
-                revision: 1,
-                path: "menu/logo.png".into(),
-            },
             MenuArtEntry {
                 art: MenuArt::Skin,
                 revision: 1,
@@ -75,7 +67,8 @@ impl Default for MenuManifest {
 }
 impl MenuManifest {
     /// UTF-8 lines: `menu-art-v1`, then `role revision relative-path`.
-    /// Roles are logo:0..31, skin, builder, cosmetic, quality-high/low.
+    /// Native roles are skin, builder, cosmetic and quality-high/low.
+    /// Legacy browser-reference logo rows validate but never load natively.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MANIFEST_LIMIT {
             return Err("Menu manifest byte budget".into());
@@ -88,8 +81,10 @@ impl MenuManifest {
         }
         let mut entries: Vec<MenuArtEntry> = Vec::new();
         let cosmetic_paths = paths();
+        let mut roles = std::collections::BTreeSet::new();
+        let mut sources = std::collections::BTreeSet::new();
         for line in lines.filter(|s| !s.is_empty()) {
-            if entries.len() == 37 {
+            if roles.len() == 37 {
                 return Err("Menu manifest entry budget".into());
             }
             let fields: Vec<_> = line.split_ascii_whitespace().collect();
@@ -97,17 +92,22 @@ impl MenuManifest {
                 return Err("Menu manifest fields".into());
             }
             let art = match fields[0] {
-                "skin" => MenuArt::Skin,
-                "builder" => MenuArt::Builder,
-                "cosmetic" => MenuArt::Cosmetic,
-                "quality-high" => MenuArt::QualityHigh,
-                "quality-low" => MenuArt::QualityLow,
-                s => MenuArt::Logo(
-                    s.strip_prefix("logo:")
-                        .and_then(|n| n.parse::<u8>().ok())
-                        .filter(|n| *n < MAX_LOGO_FRAMES && format!("logo:{n}") == s)
-                        .ok_or("Menu logo frame")?,
-                ),
+                "skin" => Some(MenuArt::Skin),
+                "builder" => Some(MenuArt::Builder),
+                "cosmetic" => Some(MenuArt::Cosmetic),
+                "quality-high" => Some(MenuArt::QualityHigh),
+                "quality-low" => Some(MenuArt::QualityLow),
+                // The standalone DOM reference still consumes these shared
+                // manifest rows. Keep its existing packs usable without decoding
+                // or retaining native logo images.
+                s if s
+                    .strip_prefix("logo:")
+                    .and_then(|n| n.parse::<u8>().ok())
+                    .is_some_and(|n| n < 32 && format!("logo:{n}") == s) =>
+                {
+                    None
+                }
+                _ => return Err("Unknown menu art role".into()),
             };
             let revision = fields[1]
                 .parse::<u32>()
@@ -119,14 +119,16 @@ impl MenuManifest {
             if cosmetic_paths.iter().any(|p| p == path) {
                 return Err("Menu manifest path collides with cosmetic".into());
             }
-            if !safe_path(path) || entries.iter().any(|e| e.art == art || e.path == path) {
+            if !safe_path(path) || !roles.insert(fields[0]) || !sources.insert(path) {
                 return Err("Menu manifest duplicate or unsafe path".into());
             }
-            entries.push(MenuArtEntry {
-                art,
-                revision,
-                path: path.into(),
-            });
+            if let Some(art) = art {
+                entries.push(MenuArtEntry {
+                    art,
+                    revision,
+                    path: path.into(),
+                });
+            }
         }
         Ok(Self(entries))
     }
@@ -147,7 +149,6 @@ pub(super) struct MenuArtCache {
     pub manifest: MenuManifest,
     pub resident: BTreeMap<MenuArt, Resource>,
     versions: BTreeMap<MenuArt, u64>,
-    order: Vec<MenuArt>,
 }
 impl MenuArtCache {
     pub fn bytes(&self) -> usize {
@@ -182,28 +183,10 @@ impl MenuArtCache {
         } else {
             image
         };
-        let mut retire = vec![art];
-        if matches!(art, MenuArt::Logo(_))
-            && !self.resident.contains_key(&art)
-            && self
-                .order
-                .iter()
-                .filter(|a| matches!(a, MenuArt::Logo(_)))
-                .count()
-                == 2
-        {
-            retire.push(
-                *self
-                    .order
-                    .iter()
-                    .find(|a| matches!(a, MenuArt::Logo(_)))
-                    .unwrap(),
-            );
-        }
         let kept: usize = self
             .resident
             .iter()
-            .filter(|(a, _)| !retire.contains(a))
+            .filter(|(a, _)| **a != art)
             .map(|(_, r)| r.image.pixels.len())
             .sum();
         if other_bytes + kept + image.pixels.len() > COSMETIC_PIXEL_BUDGET {
@@ -218,12 +201,7 @@ impl MenuArtCache {
             .checked_add(1)
             .ok_or("Menu revision overflow")?
             .max(u64::from(entry.revision));
-        for key in retire {
-            self.resident.remove(&key);
-            self.order.retain(|a| *a != key);
-        }
         self.versions.insert(art, revision);
-        self.order.push(art);
         self.resident.insert(
             art,
             Resource {

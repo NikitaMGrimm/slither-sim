@@ -1,7 +1,6 @@
 # Stroke wordmark
 
-Native `--wordmark`, or missing local logo art, selects `wordmark::DEFAULT_TEXT`
-(SlitherClient). Change that string, or set `Menu::wordmark_text`, to use other
+The native login always selects `wordmark::DEFAULT_TEXT` (SlitherClient). Change that string, or set `Menu::wordmark_text`, to use other
 text. All 95 printable ASCII characters have authored round-pen paths in
 `apps/wgpu-slice/src/wordmark_glyphs.rs`. This is an original alphabet under the
 repository MIT licence: no Hershey distribution, third-party glyph data, bundled
@@ -32,8 +31,7 @@ smoothly to exactly zero at completion. Most stroke volume arrives in the first
 the independent `login_alpha * logo_alpha`. The soft shadow follows the current
 drawn mask. During motion at DPR 1-3 its coverage and blur run at half resolution;
 higher densities retain the full shadow to keep packed atlas bounds. The exact
-settled frame always uses the original full-resolution pen and shadow. Bitmap
-logo art retains #358's feathered reveal on its separate four-times reveal clock.
+settled frame always uses the original full-resolution pen and shadow.
 
 Reveal rasters are capped at 40 Hz: a new raster requires at least 25 ms of
 the retained reveal clock. Intervening frames keep the same shared image.
@@ -47,14 +45,24 @@ exact-DPR raster. Premultiplied CPU pixels are cropped to
 nonempty bounds including the shadow and tiled horizontally at 2048px. Each
 tile is one snapped 1:1 draw, with no texture minification. The transient RGBA
 canvas is capped at 10 MiB; retained tiles share the existing 64-slot/13 MiB
-Menu allowance with controls and text. Stroke rasters are bounded to DPR 5.5.
-Scale/pixel admission limits select a whole-word installed-font layout fitted
-to the legacy holder; invalid input and other errors still propagate. Other
-admission failures preserve the previous cache. Font colour runs are admitted
+Menu allowance with controls and text. At extreme physical sizes, the stroke
+layout shrinks uniformly to the transient raster bound while keeping its centre
+and 1:1 texels; DPR alone never selects a different font. The installed-font
+path remains reachable for unsupported configurable text and the aggregate
+budget retry described below. Invalid input and other errors still propagate.
+Font colour runs are admitted
 only after the controls and spinner are known: adjacent equal-colour words share
 a label, and an over-budget suffix becomes an ellipsis. The whole font line fits
 the holder. Final slot/byte admission stays in the shared menu composition.
-These are ceilings, not eager allocations.
+Atlas admission reserves the existing materials and label slots. The final
+transaction checks the actual text bytes as well; an aggregate quota failure
+retries only the logo with bounded font runs. That retry publishes only if the
+same full-menu admission succeeds. Menus that cannot fit even then retain the
+existing quota skip. These are ceilings, not eager allocations.
+
+The standalone Canvas/WebGPU DOM development pages retain their separate
+plain-text/art logo. This is a known reference-host difference; the future
+extension will reuse this native painter through WebGL2.
 
 Every word (including a font fallback) uses one snapped physical canvas origin
 plus its rounded relative advance. Absolute word origins never round separately;
@@ -75,7 +83,8 @@ Offline authored tests: `cargo test -p slither-wgpu-slice --locked --test wordma
 --test menu`. `menu_specimens <new-output-dir> --stroke` renders frozen reveal
 times, full settled menus at DPR 1/2, arbitrary strings, alphabet sheets, and
 seven raster runs per DPR/progress pair (first warmup omitted in the JSON).
-It opens no window, browser or game socket. Specimens are synthetic product
+Transparent string PNGs unpremultiply a copy; production texture pixels stay
+premultiplied. It opens no window, browser or game socket. Specimens are synthetic product
 output, not owner perceptual acceptance or original pixel parity.
 
 ## CPU reveal workload

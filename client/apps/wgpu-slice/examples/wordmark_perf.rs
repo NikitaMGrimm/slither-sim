@@ -52,7 +52,7 @@ fn run(output: &Path, count: usize, progress: f64) -> Result<()> {
             // cadence and the 25 ms gate. This times the complete CPU menu path.
             view.logo_reveal = 0.2 + i as f64 * 0.006;
             let now = Instant::now();
-            let picture = menu.prepare(&mut text, &view, &geometry, extent, dpr, None, 0)?;
+            let picture = menu.prepare(&mut text, &view, &geometry, extent, dpr, None)?;
             let elapsed = now.elapsed().as_secs_f64() * 1000.;
             if picture.frame.draws.is_empty() {
                 return Err("empty timed menu".into());
