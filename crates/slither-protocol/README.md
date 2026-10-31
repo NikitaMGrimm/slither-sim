@@ -1,9 +1,20 @@
 # slither-protocol
 
-Borrowed, allocation-free Slither framing and protocol-19 wire views, bounded
-challenge algorithms, and fixed-array/caller-buffer client-message builders.
-MIT, Rust 1.99, edition 2024, `no_std`, no dependencies or features. Works on
-`wasm32-unknown-unknown`; contains no clocks, threads, I/O, sockets or bindings.
+Reads and writes the slither.io wire protocol (version 19) without allocating.
+
+- `frame` splits a WebSocket message into commands and checks the whole
+  envelope before it returns any of them.
+- `v19` gives borrowed, typed views of server messages: snakes, food, prey, HUD
+  rows, the minimap, and the extra messages slither-sim servers send.
+- `scalar` turns wire integers into positions, angles and speeds with the same
+  floating-point steps as the desktop client.
+- `challenge` answers the login challenge.
+- `v19::client` builds client messages (login, input, ping) into a fixed array
+  or a buffer you provide.
+
+The crate is `no_std`, has no dependencies or features, needs Rust 1.99 and
+builds for `wasm32-unknown-unknown`. It has no clocks, threads, I/O or sockets:
+your code owns the connection and the game state.
 
 ```rust
 use slither_protocol::{frame::*, v19, DecodeAdmission};
@@ -17,96 +28,84 @@ for command in frame.commands() {
 # Ok::<(), slither_protocol::DecodeError>(())
 ```
 
-`decode_frame` validates the complete envelope before exposing any commands.
-`commands()` rescans immutable lengths with constant storage; every pass returns
-the same command count, index and original message offset (including prefix).
-The two-byte prefix is raw: a consumer decides whether it represents elapsed
-time or sequence. Message/receipt IDs, atomic state application and setup
-notifications belong to the consumer.
+## Reading messages
 
-Use `Limits::CLIENT` (exactly 1 MiB / 4096 commands) and `FrameAdmission::Bounded`
-for client ingress (command IDs >=32 plus setup boundaries). Historical sim
-splitters use `Historical` with explicit limits, including `UNBOUNDED` for direct
-callers. Both modes honor the supplied limits. Bare commands begin with >=32;
-the first short-looking high byte never denotes a bundle length.
+`commands()` can be called any number of times. Every pass yields the same
+commands, indices and offsets. The two-byte prefix is returned raw, because a
+server may use it for elapsed time or for a sequence number.
 
-`v19::decode` parses one bare command; `decode_command` additionally translates
-errors to message-relative offsets. `DecodeAdmission::{Sim, ClientReceived,
-ClientPresentation}` preserve observed length/scalar/direction differences.
-Generic framing keeps other bodies opaque; consumers must continue to select
-which gameplay, session, HUD and minimap lanes they enable. Parsing a view does
-not authorize a phase transition or change the consumer's unsupported count.
-Errors are small `Copy` kind/opcode/offset records, without formatted strings.
-Challenge error offsets refer to encoded payload bytes (decoded syntax offsets
-are multiplied by two), excluding the `6` opcode.
+Choose limits and admission for your role:
 
-Output enums (`Message`, `ErrorKind`, `Target`, `Direction`, `BodyDelta`,
-`Eater` and `MinimapFormat`) are `#[non_exhaustive]`. Downstream matches must
-include a wildcard arm: preserve the input/diagnostic and report or ignore an
-unhandled output according to the consumer's policy. `Message::Unknown` is a
-wire value, not a substitute for that Rust wildcard. Caller-selected `Header`,
-`FrameAdmission`, `DecodeAdmission` and challenge `Grammar` remain closed.
+- A client uses `Limits::CLIENT` (1 MiB, 4,096 commands) with
+  `FrameAdmission::Bounded`, which requires command IDs of 32 or more outside
+  setup.
+- Simulator tooling uses `FrameAdmission::Historical` with explicit limits, or
+  `Limits::UNBOUNDED` for direct callers.
 
-Raw integers, optional fields, names/custom bytes, direction/color/eater
-metadata and opaque setup extensions are retained. Body, food, HUD, team-score
-and minimap traversals are concrete iterators. `BodyDelta::FinalDirection` is
-distinct from half-unit offsets. Cache omissions are explicit; no missing
-sector, eater, anchor or direction is invented. `scalar` retains the client's
-exact operation order, including distinct prey and snake angle expressions.
-Consumers retain centering, geometry, trig, score tables and state mutation.
+`v19::decode` parses one bare command. `decode_command` also reports errors
+relative to the whole message. Before this crate existed, the simulator and the
+client each accepted slightly different lengths, values and directions;
+`DecodeAdmission::{Sim, ClientReceived, ClientPresentation}` keeps each of those
+behaviors instead of picking one. Errors are small `Copy` values holding a
+kind, an opcode and an offset.
 
-Minimap headers expose advertised/capped dimensions and layer count.
-`selected(dimension)` prevalidates reachable runs before yielding selected cells
-and reports visited layers for work accounting. V requires the retained
-dimension from the caller; header parsing alone does not validate those runs.
-Zero dimensions, short grids and unreachable tails preserve client admission;
-sim admission rejects zero U/L/M and oversized M. Bitmap retention, V baselines
-and aggregate cell budgets remain caller policy.
+Views keep every transmitted field, raw integers included, and never fill in a
+missing value. Bodies, food, HUD rows, team scores and minimap cells come
+through iterators. Applying them to your game state, geometry and trigonometry
+is up to you.
 
-`challenge::stock` explicitly selects `Grammar::TokenWhitespace` (client) or
-`ExactTemplate` (sim solver and framing probe). `literal_27`, `vlither_27` and
-`ntl_legacy_24` are separate simulator compatibility entrypoints, never fallback
-selection. Legacy admits only the simulator's fixed authored source, not a
-general JavaScript grammar. See the retained
-[browser-admission evidence](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-browser-admission/REPORT.md).
+A minimap header reports the advertised size, the capped size and the layer
+count. `selected(dimension)` checks every run it can reach before it yields any
+cells. For a `V` (delta) map, pass the size you kept from the last full map.
 
-`v19::client::write_login` has no profile defaults: version, 20-byte page echo,
-nickname bytes, skin and custom tail are required caller inputs. Nickname
-ASCII/Latin-1 policy stays outside; the builder only bounds lengths. Champion
-normalization/truncation stays outside `write_champion`. All variable builders
-validate input and capacity before writing. Input quantization/cadence stays
-outside, except explicitly named `sim_heading` preserving simulator arithmetic.
-Negotiation/ping constants supply bytes, without choosing when to send them.
+`extensions::slither_sim` returns the raw fields of the simulator's rules
+message. The simulator still checks its score range itself.
 
-The local `~` extension exposes raw fields/bits; its physics-owned supported
-mass-floor score range must still be checked by the simulator adapter.
-Protocol 13 is not implemented or silently aliased to 19.
+## Matching on results
 
-## Validation and adoption
+`Message`, `ErrorKind`, `Target`, `Direction`, `BodyDelta`, `Eater` and
+`MinimapFormat` are `#[non_exhaustive]`: later versions may add variants, so a
+`match` needs a wildcard arm. That is separate from `Message::Unknown`, which
+stands for an unknown opcode on the wire. The enums you pass in (`Header`,
+`FrameAdmission`, `DecodeAdmission` and `Grammar`) are closed.
 
-Run `cargo +1.99.0 test --locked -p slither-protocol`, strict package Clippy, fmt
-and a wasm32 check. Synthetic tests pin consumer admission differences,
-independent outgoing/challenge bytes, f64 bits and zero allocations for complete
-bare/bundled frames, messages, HUD rows, food/body iterators and invalid inputs.
-The allocator test first verifies its counter detects allocations.
+## Login challenge
 
-`tools/protocol_client_oracle.py` in the Git checkout feeds the same synthetic
-inputs through the actual client and shared scalar functions, compares
-`to_bits()` and prints fixed expectations. `tests/numerics.rs` records the
-client pin and generation method; do not regenerate its bits to accept drift.
-After B adopts the shared numerics, run the oracle with `--client-root` pointing
-to an independent client checkout at `8b36a91cafe6878ccedf0d7da70a4008ae7ef108`.
-Using the delegating client would make regeneration circular. Body direction
-and prey coordinates come from actual client events; the private anchor helper
-is copied unchanged into a temporary module whose math seam exposes its angle
-before trigonometry. Neither consumer's source is edited for this measurement.
-The oracle also checks the eleven retained historical stock challenges without
-copying their captures into this package. Only authored synthetic data ships here.
+`challenge::stock` solves the standard challenge. Use
+`Grammar::TokenWhitespace` to parse it the way the desktop client does, or
+`Grammar::ExactTemplate` to check it the way slither-sim's server does.
+`literal_27`, `vlither_27` and `ntl_legacy_24` compute the different replies
+that some other clients send, so a server can accept them too. The crate never
+falls back to them on its own. Challenge error offsets count bytes of the
+encoded payload after the `6` opcode. See the
+[browser admission study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-27-browser-admission/REPORT.md)
+for where these replies come from.
 
-A0 introduces this independent package; neither consumer uses it yet. B adopts
-it from the client through a path dependency, preserving the direct-login pin
-at merged #391 (`8b36a91c`). A switches the simulator only after owner-approved
-publication. No performance, consumer-switch or visual acceptance is claimed.
-The owner will manually publish 0.1.0 after A0 merges; A0 only verifies a locked
-publish dry-run and adds no release automation. See the
-[release prerequisites](https://github.com/NikitaMGrimm/slither-sim/blob/main/docs/maintainers/releasing.md#shared-protocol-bootstrap-owner-gated).
+## Client messages
+
+`v19::client::write_login` has no defaults. You pass the version, the 20-byte
+page value, the nickname bytes, the skin and the custom tail. It checks lengths,
+not character sets. The other builders also check their input and the buffer
+size before writing anything, and leave quantization and send timing to you.
+`sim_heading` reproduces slither-sim's own heading arithmetic.
+
+Protocol 13 is not implemented yet.
+
+## Testing
+
+Run `cargo test -p slither-protocol`. The tests cover each consumer's admission
+rules, the exact bytes of client messages and challenge replies, the bits of
+every numeric conversion, and zero allocations while reading frames, messages,
+HUD rows and iterators.
+
+The numeric expectations come from the desktop client itself.
+`tools/protocol_client_oracle.py` in the repository feeds the same inputs
+through the client and this crate and compares `f64` bits. Don't regenerate the
+expectations to accept a change. Once the client uses this crate, run the
+oracle with `--client-root` on a client checkout at
+`8b36a91cafe6878ccedf0d7da70a4008ae7ef108`, the last commit before the switch;
+otherwise it compares the crate with itself.
+
+## License
+
+MIT
