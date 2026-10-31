@@ -13,6 +13,7 @@ use std::{
 
 static EPOCH: OnceLock<(Instant, u128)> = OnceLock::new();
 const CAPACITY: usize = 262_144;
+const RETAINED_RECORD_LIMIT: usize = 1_048_576;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Debug)]
@@ -44,9 +45,17 @@ struct Buffer {
     rows: Vec<Record>,
     dropped: u64,
     shared: Shared,
-    slot: usize,
+    slot: Option<usize>,
 }
-type Shared = Arc<Mutex<Vec<(Vec<Record>, u64, bool)>>>;
+#[derive(Default)]
+struct RunBuffers {
+    rows: Vec<Box<[Record]>>,
+    retained: usize,
+    dropped: u64,
+    active: usize,
+    limit: usize,
+}
+type Shared = Arc<Mutex<RunBuffers>>;
 thread_local! { static STATE: RefCell<State> = RefCell::new(State::default()); }
 
 /// Each participating thread allocates once, before observing any hot path.
@@ -57,6 +66,9 @@ pub struct Recorder {
 }
 impl Recorder {
     pub fn new(capacity: usize) -> Self {
+        Self::with_limit(capacity, RETAINED_RECORD_LIMIT)
+    }
+    fn with_limit(capacity: usize, limit: usize) -> Self {
         EPOCH.get_or_init(|| {
             (
                 Instant::now(),
@@ -67,16 +79,27 @@ impl Recorder {
             )
         });
         Self {
-            shared: Arc::default(),
+            shared: Arc::new(Mutex::new(RunBuffers {
+                limit,
+                ..RunBuffers::default()
+            })),
             capacity,
         }
     }
     pub fn attach(&self) -> ThreadBuffer {
-        let slot = {
+        let (slot, capacity) = {
             let mut buffers = self.shared.lock().expect("buffers");
-            let slot = buffers.len();
-            buffers.push((Vec::new(), 0, false));
-            slot
+            buffers.active += 1;
+            let remaining = buffers.limit - buffers.retained;
+            // Bound registration metadata too, including zero-capacity buffers.
+            // Once full, count every attempted record without allocating another slot.
+            if remaining != 0 && buffers.rows.len() < buffers.limit {
+                let slot = buffers.rows.len();
+                buffers.rows.push(Box::default());
+                (Some(slot), self.capacity.min(remaining))
+            } else {
+                (None, 0)
+            }
         };
         // Commit/touch the reserved pages before the first hot-path append. Merely
         // reserving address space can defer page faults into measured frames.
@@ -89,7 +112,7 @@ impl Recorder {
                 related: 0,
                 detail: 0
             };
-            self.capacity
+            capacity
         ];
         std::hint::black_box(&mut rows);
         rows.clear();
@@ -111,16 +134,20 @@ impl Recorder {
     pub fn snapshot(&self) -> (Vec<Record>, u64) {
         let buffers = self.shared.lock().expect("latency buffers");
         (
-            buffers.iter().flat_map(|b| b.0.clone()).collect(),
-            buffers.iter().map(|b| b.1).sum(),
+            buffers
+                .rows
+                .iter()
+                .flat_map(|b| b.iter().cloned())
+                .collect(),
+            buffers.dropped,
         )
     }
     /// Only after all thread guards have retired. No serialization on hot paths.
     pub fn write(&self, path: &Path, revision: &str, completed: bool) -> std::io::Result<()> {
         let buffers = self.shared.lock().expect("buffers");
-        let count: usize = buffers.iter().map(|b| b.0.len()).sum();
-        let dropped: u64 = buffers.iter().map(|b| b.1).sum();
-        let retired = buffers.iter().all(|b| b.2);
+        let count = buffers.retained;
+        let dropped = buffers.dropped;
+        let retired = buffers.active == 0;
         let mut out = std::io::BufWriter::new(
             std::fs::OpenOptions::new()
                 .write(true)
@@ -144,9 +171,9 @@ impl Recorder {
             revision,
             completed && retired && dropped == 0,
             dropped,
-            buffers.len()
+            buffers.rows.len()
         )?;
-        for (thread, (buffer, _, _)) in buffers.iter().enumerate() {
+        for (thread, buffer) in buffers.rows.iter().enumerate() {
             for (seq, r) in buffer.iter().enumerate() {
                 writeln!(
                     out,
@@ -164,8 +191,18 @@ impl Drop for ThreadBuffer {
     fn drop(&mut self) {
         STATE.with_borrow_mut(|s| {
             push(s, "thread_end", 0, 0, 0);
-            if let Some(b) = s.buffer.take() {
-                b.shared.lock().expect("latency buffers")[b.slot] = (b.rows, b.dropped, true);
+            if let Some(mut b) = s.buffer.take() {
+                let mut buffers = b.shared.lock().expect("latency buffers");
+                let keep = b.rows.len().min(buffers.limit - buffers.retained);
+                buffers.dropped += b.dropped + (b.rows.len() - keep) as u64;
+                b.rows.truncate(keep);
+                if let Some(slot) = b.slot {
+                    // Compaction and the run-wide budget are retirement work, never
+                    // hot-path work. Retain a prefix, not a sample, and reject any loss.
+                    buffers.rows[slot] = b.rows.into_boxed_slice();
+                    buffers.retained += keep;
+                }
+                buffers.active -= 1;
             }
         });
     }
@@ -584,6 +621,64 @@ mod tests {
             crate::game::LocalGame::new(0.).unwrap();
             println!("startup continued");
         }
+    }
+    #[test]
+    fn sparse_retired_buffers_keep_only_recorded_rows() {
+        let recorder = Recorder::with_limit(4096, 512);
+        for id in 0..128 {
+            let _buffer = recorder.attach();
+            event("test", id, 0, 0);
+        }
+        let buffers = recorder.shared.lock().unwrap();
+        assert_eq!(buffers.retained, 256); // event + thread_end per worker lifetime
+        assert_eq!(buffers.rows.len(), 128);
+        assert!(buffers.rows.iter().all(|rows| rows.len() == 2));
+        assert_eq!(buffers.active, 0);
+        assert_eq!(buffers.dropped, 0);
+    }
+    #[test]
+    fn run_budget_counts_loss_and_stops_registration_growth() {
+        let recorder = Recorder::with_limit(8, 5);
+        let barrier = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            for _ in 0..2 {
+                scope.spawn(|| {
+                    let _buffer = recorder.attach();
+                    for id in 0..3 {
+                        event("test", id, 0, 0);
+                    }
+                    // Both buffers are live before either claims the retirement budget.
+                    barrier.wait();
+                });
+            }
+        });
+        assert_eq!(recorder.snapshot().0.len(), 5);
+        assert_eq!(recorder.snapshot().1, 3); // eight attempted rows, five retained
+        for _ in 0..100 {
+            let _buffer = recorder.attach();
+            event("test", 0, 0, 0);
+        }
+        {
+            let buffers = recorder.shared.lock().unwrap();
+            assert_eq!(buffers.rows.len(), 2);
+            assert_eq!(buffers.retained, 5);
+            assert_eq!(buffers.active, 0);
+            assert_eq!(buffers.dropped, 203);
+        }
+        let path = std::env::temp_dir().join(format!(
+            "latency-run-budget-{}-{}.jsonl",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        recorder.write(&path, "2f34a000", true).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let header: serde_json::Value = serde_json::from_str(text.lines().next().unwrap()).unwrap();
+        assert_eq!(header["complete"], false);
+        assert_eq!(header["dropped"], 203);
+        std::fs::remove_file(path).unwrap();
     }
     #[test]
     fn bounded_full_records_without_subsampling() {

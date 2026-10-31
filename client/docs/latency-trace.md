@@ -27,12 +27,20 @@ Disabled recording does no clock reads, atomic ID allocation, readiness atomic
 exchange, record writes, recorder mutex work, formatting or file I/O. The native
 poll's readiness exchange is guarded by a nonzero trace poll ID.
 
-The UI, readiness worker and connector each preallocate and touch 262,144
+The UI, readiness worker and connector each preallocate and touch up to 262,144
 scalar records. Recording does no formatting, file I/O, buffer growth, or
 locking. The pending send join queue is separately bounded to 32 effects.
-Full buffers count every
-dropped record and continue normal gameplay; there is no subsampling. Shutdown
-joins the native workers before writing. Abnormal host returns write an
+Full buffers count every dropped record and continue normal gameplay; there is
+no subsampling. Retired
+buffers release spare capacity and retain only their recorded rows. Across all
+connections, a run retains at most **1,048,576 retired records** (56 MiB of record
+payload on 64-bit). Live buffers are separately bounded to 262,144 records each;
+the native host has the UI, readiness and connector participants. Registration
+metadata is also bounded to 1,048,576 slots. Retirement keeps the prefix that fits
+the remaining run budget, counts every discarded tail record, and marks the run
+incomplete. After exhaustion, new workers allocate no record buffer or registry
+slot; every attempted record is counted as dropped. No sampling is performed.
+Shutdown joins the native workers before writing. Abnormal host returns write an
 incomplete sidecar; process termination may leave no file. Overflow, outstanding
 work, missing completions and failed sends invalidate analysis. Long sessions
 should be bounded to fit the buffers; a full buffer never changes client policy.
@@ -73,6 +81,9 @@ connector thread across the HTTP upgrade. They never enter the game protocol.
   picture. `issued.related/detail` link the acquisition ID/generation (which may
   precede a Play in that redraw). Resource sync, every submit bracket, pre-present notification and
   present bracket join that issued picture; submission IDs are `related`.
+  Original backing/blit and Native direct surface resolve share the acquire,
+  renderer submit and present brackets; Original's additional blit is bracketed
+  in `WorldPresenter` too.
 - `callback` precedes routing; each gets `admitted` or `suppressed`. Replaced
   pending intents get `coalesced` (pointer/turning-key/boost channel in `detail`).
   Focus loss is suppressed because existing blur policy changes no held state.
@@ -211,16 +222,17 @@ Medians of the five pair summaries:
 | Run p95 difference | -0.0086 | -0.0032 | -0.0634 to 0.0199 |
 
 The paired p95 is about 0.13 ms even with both recorders off. Every A/B run-p95
-shift lies inside the observed A/A range. No positive p95 recorder cost is
-resolved: it is below this experiment's empirical **0.0634 ms/frame measurement
-floor**, defined as the maximum absolute A/A run-p95 shift over these five
-pairs. The corresponding p50 floor is 0.0008 ms. One A/B run-p50 shift of
-0.0010 ms exceeds that p50 envelope, without a consistent excess across the
-other summaries; a blanket claim that every statistic is below noise is not
-supported. These empirical floors are not confidence bounds or zero-cost claims.
+shift lies inside the observed A/A range. This experiment did not resolve a
+p95 recorder cost. A/A run-p95 shifts reach **0.0634 ms/frame** in absolute value,
+so the measurement cannot separate smaller effects from noise. This does not
+establish an upper bound on recorder cost: noise could offset a larger positive
+cost. The maximum absolute A/A run-p50 shift is 0.0008 ms. One A/B run-p50 shift
+of 0.0010 ms exceeds that p50 envelope, without a consistent excess across the
+other summaries. These observations are not confidence bounds or zero-cost claims.
 
-The 0.1 ms target is unchanged. The former 0.1297 ms paired p95 did not isolate
-recorder overhead and cannot establish a target failure. This control does not
+The **0.1 ms target remains unverified** and is unchanged. The former 0.1297 ms
+paired p95 did not isolate recorder overhead and cannot establish a target
+failure. This control does not
 certify the native surface/transport path either. No frame-loop recorder
 allocation, mutex or string formatting was found in source; current evidence
 does not justify attributing the noisy tails to one or making a speculative
