@@ -10,6 +10,9 @@ use crate::presentation::{
 use crate::state::Point;
 use std::sync::{Arc, Mutex};
 
+mod geometry;
+pub use geometry::{GeometryObservation, GeometrySnake};
+
 /// Trace capacity for the complete prepared centerline, in original sample order.
 /// Larger production draws fail the measuring run; no point may be omitted.
 pub const MAX_BODY_TRACE_POINTS: usize = 8193;
@@ -29,6 +32,7 @@ pub struct Observation {
 
 #[derive(Debug, Default)]
 struct Journal {
+    geometry: Option<geometry::Journal>,
     next_sequence: u64,
     rows: Vec<Observation>,
     errors: Vec<String>,
@@ -50,6 +54,37 @@ impl PartialEq for Recorder {
     }
 }
 impl Recorder {
+    /// Enable a separate bounded own/enemy geometry journal; v3 cells are unchanged.
+    pub fn record_geometry(&self, ids: [u16; 2]) {
+        self.0.lock().expect("trace journal").geometry = Some(geometry::Journal::new(ids));
+    }
+
+    /// Drain prepared geometry, joined by the existing immutable observation ID.
+    pub fn take_geometry(&self) -> Vec<GeometryObservation> {
+        self.0
+            .lock()
+            .expect("trace journal")
+            .geometry
+            .as_mut()
+            .map_or_else(Vec::new, |g| std::mem::take(&mut g.rows))
+    }
+
+    pub(crate) fn observe_geometry(
+        &self,
+        client: &AnimatedClient,
+        prepared: &[crate::presentation::PreparedAccessorySnake],
+    ) {
+        let mut journal = self.0.lock().expect("trace journal");
+        let sequence = journal.last_draw.as_ref().map(|r| r.sequence);
+        if let Some(geometry) = journal.geometry.as_mut()
+            && !geometry.observe(sequence, client, prepared)
+        {
+            journal.failed = true;
+            journal
+                .errors
+                .push("Incomplete/overflow prepared geometry".into());
+        }
+    }
     /// Explicit observation failures; draining them never clears the failure gate.
     pub fn take_errors(&self) -> Vec<String> {
         std::mem::take(&mut self.0.lock().expect("trace journal").errors)

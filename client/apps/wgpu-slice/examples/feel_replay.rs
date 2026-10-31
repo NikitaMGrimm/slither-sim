@@ -5,6 +5,8 @@ mod driver;
 mod latency;
 #[path = "feel_replay/observation.rs"]
 mod observation;
+#[path = "feel_replay/smoothing.rs"]
+mod smoothing;
 #[path = "../tests/support/announcement_tape.rs"]
 mod synthetic_tape;
 use serde_json::{Value, json};
@@ -311,6 +313,11 @@ fn run() -> Result<()> {
     io::stdin()
         .read_to_string(&mut input)
         .map_err(|e| e.to_string())?;
+    if args == ["--smoothing-lag-probe"] {
+        let request = serde_json::from_str(&input).map_err(|e| e.to_string())?;
+        println!("{}", smoothing::run(request)?);
+        return Ok(());
+    }
     if !args.is_empty() {
         return Err("Expected no arguments".into());
     }

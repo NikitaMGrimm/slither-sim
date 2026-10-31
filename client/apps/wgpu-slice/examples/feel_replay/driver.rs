@@ -371,4 +371,36 @@ mod tests {
         assert!(d.recorder.take().is_empty());
         assert!(d.game.presented(true).is_err());
     }
+    #[test]
+    fn separate_geometry_keeps_the_issued_picture_identity_through_retry() {
+        let mut d = playing();
+        let id = d.game.client().own_snake().unwrap().metrics().id;
+        d.recorder.record_geometry([id, id.wrapping_add(1)]);
+        d.game.begin_redraw(40., d.extent, 1.).unwrap();
+        d.drain_effects(40.).unwrap();
+        let picture = d.game.take_frame().unwrap();
+        let observation = d.game.issued_feel_observation().unwrap();
+        let geometry = d.recorder.take_geometry();
+        assert_eq!(geometry.len(), 1);
+        assert_eq!(geometry[0].sequence, observation.sequence);
+        assert_eq!(geometry[0].snakes.len(), 1);
+        assert!(!geometry[0].snakes[0].body.is_empty());
+        d.game.retry_frame(picture).unwrap();
+        d.game.take_frame().unwrap();
+        assert_eq!(
+            d.game.issued_feel_observation().unwrap().sequence,
+            geometry[0].sequence
+        );
+        assert!(d.recorder.take_geometry().is_empty());
+        d.game.presented(true).unwrap();
+        assert_eq!(
+            d.game
+                .client()
+                .own_snake()
+                .unwrap()
+                .metrics()
+                .corrected_head,
+            geometry[0].snakes[0].metrics.corrected_head
+        );
+    }
 }

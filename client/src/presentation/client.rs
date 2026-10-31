@@ -3255,6 +3255,10 @@ impl AnimatedClient {
                 .and_then(|p| p.snake.body_geometry.as_ref())
                 .map(|body| body.samples.as_slice()),
         );
+        #[cfg(feature = "feel-trace")]
+        if let Some(recorder) = &next.trace {
+            recorder.observe_geometry(next, &prepared);
+        }
         Ok(prepared)
     }
 
