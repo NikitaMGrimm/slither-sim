@@ -2,11 +2,106 @@
 #![cfg(not(target_arch = "wasm32"))]
 #[path = "../examples/support/offscreen.rs"]
 mod offscreen;
+#[cfg(windows)]
+#[path = "support/announcement_tape.rs"]
+mod tape;
 use slither_client::settings::WorldResolution::{Native, Original};
 use slither_wgpu_slice::{
     gpu::{Renderer, instance},
     world_presenter::WorldPresenter,
 };
+
+#[cfg(windows)]
+#[test]
+#[ignore = "explicit finite offscreen GPU check"]
+fn production_window_modes_preserve_generated_frames_vertices_and_input_packets() {
+    use slither_wgpu_slice::world_resolution::WorldWindow;
+    let mut renderer = pollster::block_on(Renderer::new(
+        &instance(),
+        None,
+        wgpu::TextureFormat::Rgba8Unorm,
+    ))
+    .unwrap();
+    let scope = renderer
+        .device
+        .push_error_scope(wgpu::ErrorFilter::Validation);
+    let mut presenter = WorldPresenter::new(&renderer);
+    for dpr in [1., 1.25, 1.5, 2.] {
+        let mut original = None;
+        for requested in [Original, Native] {
+            let window = WorldWindow {
+                physical: [1920, 1080],
+                dpr,
+                requested,
+            };
+            let mut game = tape::playing();
+            let extent = window.viewport(&mut game).unwrap();
+            let css = window.css_size();
+            assert_eq!(css, window.physical.map(|n| f64::from(n) / dpr));
+            window
+                .pointer(&mut game, [css[0] * 0.86, css[1] * 0.76], false)
+                .unwrap();
+            game.key("Space", true);
+            game.begin_redraw(300., extent, 1.).unwrap();
+            let on = tape::effects(&mut game);
+            assert!(on.contains(&vec![253]));
+            assert!(
+                on.iter().any(|p| p.len() == 1 && p[0] < 251),
+                "steering angle required"
+            );
+            let picture = game.take_frame().unwrap();
+            assert_eq!(
+                picture.frame.extent,
+                slither_wgpu_slice::render::backing_size(css).unwrap(),
+                "{requested:?} projection at DPR {dpr}"
+            );
+            // Each independent game fixture owns a fresh resource-handle namespace.
+            renderer.sync_resources(&[]).unwrap();
+            renderer.sync_resources(&picture.resources).unwrap();
+            let target = offscreen::target(&renderer, window.physical);
+            let report = presenter
+                .render(
+                    &mut renderer,
+                    &picture.frame,
+                    picture.overlay.as_ref(),
+                    &target.create_view(&Default::default()),
+                    window.physical,
+                    window.requested,
+                )
+                .unwrap();
+            assert_eq!(report.plan.effective, requested);
+            assert!(report.world_draws > 0);
+            assert_eq!(report.plan.blit, requested == Original);
+            assert_eq!(presenter.backing_extent().is_some(), requested == Original);
+            let resident = picture
+                .resources
+                .iter()
+                .map(|r| (r.asset.into(), r.asset))
+                .collect();
+            let bits = picture
+                .frame
+                .quads(&resident)
+                .unwrap()
+                .into_iter()
+                .map(|q| q.vertices.map(|v| v.map(f32::to_bits)))
+                .collect::<Vec<_>>();
+            game.presented(true).unwrap();
+            game.key("Space", false);
+            let extent = window.viewport(&mut game).unwrap();
+            game.begin_redraw(360., extent, 1.).unwrap();
+            let off = tape::effects(&mut game);
+            assert!(off.contains(&vec![254]));
+            let snapshot = (picture.frame, picture.overlay, bits, on, off);
+            if let Some(original) = &original {
+                assert_eq!(&snapshot, original, "mode parity at DPR {dpr}");
+            } else {
+                original = Some(snapshot);
+            }
+            offscreen::pixels(&renderer, &target).unwrap();
+        }
+    }
+    assert!(pollster::block_on(scope.pop()).is_none());
+}
 
 #[test]
 #[ignore = "explicit finite offscreen GPU check"]

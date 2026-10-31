@@ -5,6 +5,35 @@ use slither_client::settings::WorldResolution;
 /// Existing renderer attachment guard, independent of uploaded-image limits.
 pub const ATTACHMENT_BYTES: u64 = 128 * 1024 * 1024;
 
+/// Native host window/input boundary, carrying the requested presentation mode.
+/// Projection and CSS pointer dimensions remain independent of that request.
+#[derive(Clone, Copy)]
+pub struct WorldWindow {
+    pub physical: [u32; 2],
+    pub dpr: f64,
+    pub requested: WorldResolution,
+}
+impl WorldWindow {
+    pub fn css_size(self) -> [f64; 2] {
+        self.physical.map(|n| f64::from(n) / self.dpr)
+    }
+    pub fn viewport(self, game: &mut crate::game::LocalGame) -> Result<[u32; 2]> {
+        game.window_viewport(self.physical, self.dpr)
+    }
+    pub fn pointer(
+        self,
+        game: &mut crate::game::LocalGame,
+        cursor: [f64; 2],
+        down: bool,
+    ) -> Result<()> {
+        if self.physical.contains(&0) {
+            return Ok(());
+        }
+        let [width, height] = self.css_size();
+        game.pointer(cursor[0], cursor[1], width, height, down)
+    }
+}
+
 /// Validate actual attachment pixels, including downlevel negotiated limits.
 pub fn validate_target(extent: [u32; 2], samples: u32, max_dimension: u32) -> Result<()> {
     if !matches!(samples, 1 | 4)

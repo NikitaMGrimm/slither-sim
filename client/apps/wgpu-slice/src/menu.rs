@@ -1194,6 +1194,17 @@ impl Composition<'_> {
         let atlas = [radius * 2 + middle; 2];
         let padded = atlas.map(|n| n + 2 * pad);
         let half = padded[0].div_ceil(2);
+        let edge = f64::from(radius + pad);
+        let width = r.width * scale + f64::from(2 * pad);
+        let height = r.height * scale + f64::from(2 * pad);
+        // Compact's shadow is shifted down 3px. Keep that transition in the
+        // fixed top corner rather than stretching it along the straight edge.
+        let top_edge = edge + (3. * raster_scale).ceil();
+        // Tiny surfaces cannot hold the fixed corners. Omit their chrome before
+        // allocating or emitting invalid geometry; zero-sized middles are valid.
+        if width / 2. - edge < 0. || height - top_edge - edge < 0. {
+            return Ok(());
+        }
         let resource = self.cached_material(
             MaterialKey::Control(atlas, raster_scale.to_bits(), tokens, [0, 0]),
             || {
@@ -1215,16 +1226,10 @@ impl Composition<'_> {
                 })
             },
         )?;
-        let edge = f64::from(radius + pad);
-        let width = r.width * scale + f64::from(2 * pad);
-        let height = r.height * scale + f64::from(2 * pad);
         let xs = [
             (0., edge, 0., edge),
             (edge, width / 2. - edge, edge, f64::from(half) - edge),
         ];
-        // Compact's shadow is shifted down 3px. Keep that transition in the
-        // fixed top corner rather than stretching it along the straight edge.
-        let top_edge = edge + (3. * raster_scale).ceil();
         let ys = [
             (0., top_edge, 0., top_edge),
             (
@@ -2836,6 +2841,81 @@ fn clip_draw(draw: &mut Draw, clip: MenuRect, scale: f64) -> bool {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod quota_tests {
     use super::*;
+
+    #[test]
+    fn settings_panel_skips_negative_middle_strips_but_accepts_zero() {
+        for scale in [1., 1.5, 5.] {
+            for [width, height] in [
+                [1., 100.],
+                [100., 1.],
+                [1., 1.],
+                [32., 36.],
+                [32., 100.],
+                [100., 35.],
+            ] {
+                let mut c = Composition {
+                    old: &BTreeMap::new(),
+                    old_art: &BTreeMap::new(),
+                    materials: BTreeMap::new(),
+                    next_handle: PAGE_HANDLE,
+                    spinner_revision: 0,
+                    scale,
+                    viewport_scale: scale,
+                    draws: Vec::new(),
+                    art: BTreeMap::new(),
+                    labels: Vec::new(),
+                    wordmark: None,
+                    old_stroke: None,
+                    stroke: None,
+                };
+                c.sliced(
+                    MenuRect {
+                        x: 100.,
+                        y: 100.,
+                        width,
+                        height,
+                    },
+                    MenuTheme::default().surface(ControlStyle::SettingsSurface, ControlState::Idle),
+                    1.,
+                    None,
+                    1.,
+                )
+                .unwrap();
+                let base = MenuFrame::world_crossfade([960, 540], scale, 0.).unwrap();
+                let menu = MenuFrame {
+                    frame: Frame {
+                        draws: c.draws,
+                        ..base.frame.clone()
+                    },
+                    backdrop: None,
+                    world_cover: None,
+                    resources: c.materials.values().cloned().collect(),
+                };
+                let resident = menu
+                    .resources
+                    .iter()
+                    .map(|r| (r.asset.into(), r.asset))
+                    .collect();
+                menu.frame.validate(&resident).unwrap();
+                if width == 1. || height == 1. {
+                    assert!(menu.frame.draws.is_empty());
+                    assert!(menu.resources.is_empty());
+                } else if scale == 1. {
+                    assert!(!menu.frame.draws.is_empty()); // exact zero-width/height middles are valid
+                }
+                let picture = PreparedFrame {
+                    frame: base.frame,
+                    overlay: None,
+                    resources: base.resources,
+                };
+                assert!(
+                    MenuFrame::compose_optional(Ok(menu), &picture)
+                        .unwrap()
+                        .is_some()
+                );
+            }
+        }
+    }
 
     #[test]
     fn failed_text_draw_admission_preserves_material_order_and_cache() {

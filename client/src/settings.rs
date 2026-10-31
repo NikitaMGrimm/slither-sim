@@ -251,7 +251,7 @@ impl SettingsState {
                 },
             );
             let lines = if row == 0 {
-                ["Off: Low. High adapts.", "Quality applies next game"]
+                ["Off: Low. High adapts to load.", "Next game."]
             } else {
                 ["Sharper world; higher GPU use.", "Same view area."]
             };

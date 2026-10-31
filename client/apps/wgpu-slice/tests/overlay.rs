@@ -7,23 +7,43 @@ use slither_wgpu_slice::{game::LocalGame, render};
 #[test]
 fn resolution_policy_preserves_projection_camera_vertices_and_control_bytes() {
     use slither_client::settings::WorldResolution::{Native, Original};
-    use slither_wgpu_slice::world_resolution::WorldTargetPlan;
+    use slither_wgpu_slice::world_resolution::WorldWindow;
     for dpr in [1., 1.25, 1.5, 2.] {
         let physical = [1920, 1080];
+        let windows = [Original, Native].map(|requested| WorldWindow {
+            physical,
+            dpr,
+            requested,
+        });
         let mut games = [tape::playing(), tape::playing()];
-        for game in &mut games {
-            game.window_viewport(physical, dpr).unwrap();
-            game.pointer(830., 410., 960., 540., false).unwrap();
+        for (window, game) in windows.iter().zip(&mut games) {
+            window.viewport(game).unwrap();
+            let css = window.css_size();
+            assert_eq!(css, physical.map(|n| f64::from(n) / dpr));
+            window
+                .pointer(game, [css[0] * 0.86, css[1] * 0.76], false)
+                .unwrap();
             game.key("Space", true);
-            game.key("ArrowLeft", true);
         }
         let mut packets = [Vec::new(), Vec::new()];
         for (i, game) in games.iter_mut().enumerate() {
-            let backing = game.window_viewport(physical, dpr).unwrap();
+            let backing = windows[i].viewport(game).unwrap();
             game.begin_redraw(300., backing, 1.).unwrap();
             packets[i] = tape::effects(game);
         }
         assert_eq!(packets[0], packets[1]);
+        let angles = |packets: &Vec<Vec<u8>>| {
+            packets
+                .iter()
+                .filter(|p| p.len() == 1 && p[0] < 251)
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert!(
+            !angles(&packets[0]).is_empty(),
+            "steering-angle packet required at DPR {dpr}"
+        );
+        assert_eq!(angles(&packets[0]), angles(&packets[1]));
         assert!(packets[0].iter().any(|p| p == &[253]));
         let a = games[0].take_frame().unwrap();
         let b = games[1].take_frame().unwrap();
@@ -41,21 +61,15 @@ fn resolution_policy_preserves_projection_camera_vertices_and_control_bytes() {
             .iter()
             .map(|r| (r.asset.into(), r.asset))
             .collect();
-        let before = a.frame.quads(&resident).unwrap();
-        for mode in [Original, Native] {
-            let plan = WorldTargetPlan::new(mode, a.frame.extent, physical, 4, 8192).unwrap();
+        let original = a.frame.quads(&resident).unwrap();
+        let native = b.frame.quads(&resident).unwrap();
+        assert_eq!(original.len(), native.len());
+        for (x, y) in original.iter().zip(native) {
+            assert_eq!(x.key, y.key);
             assert_eq!(
-                plan.attachment,
-                if mode == Native { physical } else { expected }
+                x.vertices.map(|v| v.map(f32::to_bits)),
+                y.vertices.map(|v| v.map(f32::to_bits))
             );
-            let after = a.frame.quads(&resident).unwrap();
-            for (x, y) in before.iter().zip(after) {
-                assert_eq!(x.key, y.key);
-                assert_eq!(
-                    x.vertices.map(|v| v.map(f32::to_bits)),
-                    y.vertices.map(|v| v.map(f32::to_bits))
-                );
-            }
         }
         games[0].retry_frame(a.clone()).unwrap();
 
@@ -72,9 +86,8 @@ fn resolution_policy_preserves_projection_camera_vertices_and_control_bytes() {
             game.key("Space", false);
         }
         // Next picture/input uses the same viewport, independent of the prior mode.
-        games[0].window_viewport(physical, dpr).unwrap();
         for (i, game) in games.iter_mut().enumerate() {
-            let backing = game.window_viewport(physical, dpr).unwrap();
+            let backing = windows[i].viewport(game).unwrap();
             game.begin_redraw(360., backing, 1.).unwrap();
             packets[i] = tape::effects(game);
         }
