@@ -50,7 +50,7 @@ fn transparent_border(image: &slither_wgpu_slice::materials::RgbaImage) {
 #[test]
 fn every_shadow_recipe_reaches_transparent_outer_texels() {
     use slither_wgpu_slice::materials::{MenuSurface, menu_control};
-    for scale in [1., 1.5, 2.] {
+    for scale in [1., 1.5, 2., 4., 5.] {
         for surface in [
             MenuSurface::Nickname,
             MenuSurface::Play,
@@ -133,7 +133,11 @@ fn sliced_champion_shadow_keeps_full_padding_and_respects_explicit_clips() {
                     covered[target] = true;
                     let src = ((source.y as usize + y) * resource.image.width as usize
                         + source.x as usize
-                        + x)
+                        + if draw.corners.is_some() {
+                            source.width as usize - 1 - x
+                        } else {
+                            x
+                        })
                         * 4;
                     stitched.pixels[target * 4..][..4]
                         .copy_from_slice(&resource.image.pixels[src..][..4]);
@@ -393,4 +397,199 @@ fn tall_surface_uses_nine_slice_and_charges_each_draw() {
             .is_err(),
         "all tiles charge producer cap"
     );
+}
+
+#[test]
+fn high_dpr_fields_bound_text_rasters_and_slice_selection_ink() {
+    let p = panel();
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&p, &mut edit);
+    for dpr in [4., 5.] {
+        let mut menu = Menu::default();
+        let mut text = TextCache::menu();
+        let mut scroll = BTreeMap::new();
+        for n in [0, 140, 50] {
+            edit.reset_editor(EditorId::Champion, &"W".repeat(n));
+            if n == 50 {
+                edit.apply(EditIntent::SelectAll);
+            }
+            let frame = menu
+                .prepare_panel(
+                    &mut text,
+                    &p,
+                    &input,
+                    &edit,
+                    &mut scroll,
+                    MenuTheme::default(),
+                    [(960. * dpr) as u32, (720. * dpr) as u32],
+                    dpr,
+                )
+                .unwrap();
+            assert!(frame.frame.draws.len() <= 512);
+            assert!(
+                frame
+                    .resources
+                    .iter()
+                    .all(|r| r.asset.width <= 512 && r.asset.height <= 2048)
+            );
+            let field = p.resolve([960., 720.]).unwrap()[2].rect;
+            let field_text: Vec<_> = frame
+                .frame
+                .draws
+                .iter()
+                .filter(|d| {
+                    d.asset.handle >= slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+                        && d.destination.y >= field.y
+                        && d.destination.y < field.y + field.height
+                })
+                .collect();
+            let raster_width: u32 = field_text.iter().map(|d| d.asset.width).sum();
+            assert!(
+                raster_width <= (420. * dpr) as u32 + 2 * field_text.len() as u32 + 2,
+                "field raster must cover only the visible window, including tile overlap"
+            );
+            println!(
+                "panel DPR {dpr}, {n} units: {} bytes",
+                frame
+                    .resources
+                    .iter()
+                    .map(|r| r.image.pixels.len())
+                    .sum::<usize>()
+            );
+        }
+    }
+}
+
+#[test]
+fn champion_keeps_returning_login_last_length_geometry_and_fade() {
+    use slither_client::{menu_layout::MenuElement, start_page::LastLifeView};
+    use slither_wgpu_slice::{menu::PanelPaint, menu_specimen};
+    let p = panel();
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&p, &mut edit);
+    for alpha in [0.35, 1.] {
+        let mut view = menu_specimen::view(0).unwrap();
+        view.tips_visible = false;
+        view.login_alpha = alpha;
+        view.last_life = LastLifeView {
+            label: view.wording.final_length,
+            number: "1234".into(),
+            suffix: "!",
+            label_alpha: 0.45,
+        };
+        let mut text = TextCache::menu();
+        let layout = menu_specimen::layout(&mut text, &view, [960, 720], 1.).unwrap();
+        let rect = layout.viewport_rect(MenuElement::LastLength);
+        let mut menu = Menu::default();
+        let login = menu
+            .prepare(&mut text, &view, &layout, [960, 720], 1., None, 0)
+            .unwrap();
+        view.ordinary_controls_visible = false;
+        let champion = menu
+            .prepare_with_panel(
+                &mut text,
+                &view,
+                &layout,
+                [960, 720],
+                1.,
+                None,
+                0,
+                None,
+                Some(PanelPaint {
+                    panel: &p,
+                    input: &input,
+                    edit: &edit,
+                    scroll: &mut BTreeMap::new(),
+                    theme: MenuTheme::default(),
+                }),
+            )
+            .unwrap();
+        let line = |frame: &slither_wgpu_slice::menu::MenuFrame| {
+            frame
+                .frame
+                .draws
+                .iter()
+                .filter(|d| {
+                    d.asset.handle >= slither_wgpu_slice::bank::MENU_TEXT_HANDLE_BASE
+                        && d.destination.y + d.destination.height > rect.y
+                        && d.destination.y < rect.y + rect.height
+                })
+                .map(|d| {
+                    (
+                        d.destination,
+                        d.translation,
+                        d.effective_alpha,
+                        frame
+                            .resources
+                            .iter()
+                            .find(|r| r.asset == d.asset)
+                            .unwrap()
+                            .image
+                            .pixels
+                            .clone(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let expected = line(&login);
+        assert_eq!(expected.len(), 3);
+        assert_eq!(expected[0].2, alpha * 0.45);
+        assert_eq!(expected[1].2, alpha);
+        assert_eq!(line(&champion), expected);
+    }
+}
+
+#[test]
+fn menu_budget_failures_skip_overlay_and_preserve_picture() {
+    use slither_wgpu_slice::{menu::MenuFrame, render::PreparedFrame};
+    let mut p = panel();
+    let mut input = PanelInputState::default();
+    let mut edit = MenuInputState::default();
+    input.sync(&p, &mut edit);
+    let mut menu = Menu::default();
+    let mut text = TextCache::menu();
+    let base = MenuFrame::world_crossfade([960, 720], 1., 0.).unwrap();
+    let mut picture = PreparedFrame {
+        frame: base.frame.clone(),
+        overlay: None,
+        resources: vec![],
+    };
+    let template = p.controls[3].clone();
+    p.controls = (0..64)
+        .map(|id| {
+            let mut c = template.clone();
+            c.id = ControlId(id);
+            c
+        })
+        .collect();
+    let failed = menu.prepare_panel(
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut BTreeMap::new(),
+        MenuTheme::default(),
+        [960, 720],
+        1.,
+    );
+    assert!(failed.is_err());
+    assert!(!MenuFrame::append_optional(failed, &mut picture).unwrap());
+    assert_eq!(picture.frame, base.frame);
+    assert!(picture.resources.is_empty());
+    // Whole-picture admission is equally recoverable and atomic.
+    let resource = base.resources[0].clone();
+    picture.resources = (0..2048)
+        .map(|i| {
+            let mut r = resource.clone();
+            r.asset.handle = i + 1;
+            r
+        })
+        .collect();
+    assert!(!MenuFrame::append_optional(Ok(base), &mut picture).unwrap());
+    assert_eq!(picture.resources.len(), 2048);
+    assert!(picture.frame.draws.is_empty());
+    let invalid = MenuFrame::world_crossfade([800, 600], 1., 0.).unwrap();
+    assert!(MenuFrame::append_optional(Ok(invalid), &mut picture).is_err());
 }

@@ -158,12 +158,14 @@ impl LocalGameplay {
                     };
                     let composed = if world_alpha < 1. {
                         let mut picture = p.clone();
-                        crate::menu::MenuFrame::world_crossfade(
-                            p.ui_frame().extent,
-                            p.ui_frame().viewport_scale,
-                            world_alpha,
-                        )?
-                        .append_to(&mut picture)?;
+                        crate::menu::MenuFrame::append_optional(
+                            crate::menu::MenuFrame::world_crossfade(
+                                p.ui_frame().extent,
+                                p.ui_frame().viewport_scale,
+                                world_alpha,
+                            ),
+                            &mut picture,
+                        )?;
                         Some(picture)
                     } else {
                         None

@@ -51,7 +51,8 @@ champion handoff; it cannot claim that a message was saved.
 `Menu::prepare_with_panel` combines specialized login producers and generic
 controls in one material/text transaction. `prepare_panel` also supports isolated
 headless specimens. Typed theme content enters material/text keys; sampled
-position, alpha and scrolling do not. The holder uses tiled three-slice strips;
+position and alpha do not; field text keys include their visible scroll window.
+The holder uses tiled three-slice strips;
 tall uniform surfaces use nine-slice tiles. Published atlas tiles stay at most
 512 pixels per axis, and each tile charges the menu draw cap. Sources and
 destinations land on whole physical pixels through the existing snapped overlay
@@ -61,7 +62,14 @@ The shared allowance remains 64 Menu slots / 4 MiB and 512 Menu draws, with
 aggregate caches at 386 slots / 22 MiB. Final picture admission remains
 64 MiB / 2,048 textures. Failed preparation publishes neither new caches nor
 scroll state; already prepared resources survive replacement/retirement.
-No GPU feature, shader, texture-storage or compute requirement is added.
+Field text is rasterized only across its visible horizontal window (plus one
+physical pixel at either edge). Symmetric material atlases retain one half and
+mirror their quads. Large selection rectangles reuse 128-pixel uniform tiles.
+If menu preparation or whole-picture admission still exceeds a quota, native and
+WebGPU game hosts skip that frame's menu overlay and retry on the next frame;
+the world picture and editor/session state remain intact. Invalid geometry and
+handle collisions still surface as errors. No GPU feature, shader,
+texture-storage or compute requirement is added.
 
 ## Offline checks
 

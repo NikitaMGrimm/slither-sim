@@ -124,7 +124,7 @@ struct Content {
     line_height: Option<u64>,
 }
 impl Content {
-    fn menu(run: &TextRun<'_>, scale: f64) -> Self {
+    fn menu(run: &TextRun<'_>, scale: f64, clip: Option<BodyRect>) -> Self {
         Self {
             text: run.text.into(),
             max_width: None,
@@ -132,7 +132,7 @@ impl Content {
             weight: run.style.weight,
             family: run.style.family,
             slant: run.style.slant,
-            clip: None,
+            clip: clip.map(|c| [c.x, c.y, c.width, c.height].map(f64::to_bits)),
             color: run.style.color,
             shadow: None,
             line_height: None,
@@ -246,6 +246,7 @@ impl TextCache {
     pub(crate) fn compose_menu<T>(
         &mut self,
         runs: &[TextRun<'_>],
+        clips: &[Option<BodyRect>],
         scale: f64,
         materials: (usize, usize),
         finish: impl FnOnce(Vec<Vec<(Draw, Resource)>>) -> Result<T>,
@@ -262,7 +263,7 @@ impl TextCache {
         for (i, run) in runs.iter().enumerate() {
             let key = Key::Menu(i as u8);
             if let Some(entry) = self.entries.get(&key)
-                && entry.content == Content::menu(run, scale)
+                && entry.content == Content::menu(run, scale, clips.get(i).copied().flatten())
             {
                 staged.entries.insert(key, entry.clone());
                 staged.bytes += entry.bytes;
@@ -279,7 +280,7 @@ impl TextCache {
                             Some(Key::Menu(i as u8)),
                             None,
                             None,
-                            None,
+                            clips.get(i).copied().flatten(),
                         )?
                         .1,
                 );
@@ -603,11 +604,23 @@ impl TextCache {
                     });
                 }
                 compose_shadow(glyphs, &self.minimap_shadow.as_ref().unwrap().raster)?
+            } else if matches!(key, Key::Menu(_))
+                && let Some(c) = clip
+            {
+                self.rasterizer.rasterize_window(
+                    run.text,
+                    px,
+                    run.style,
+                    max_width,
+                    Some([c.x * backing_scale, (c.x + c.width) * backing_scale]),
+                )?
             } else {
                 self.rasterizer
                     .rasterize_styled(run.text, px, run.style, max_width)?
             };
-            if let Some(clip) = clip {
+            if let Some(clip) = clip
+                && !matches!(key, Key::Menu(_))
+            {
                 raster = crop_panel(raster, clip, backing_scale)?;
             }
             let [w, h] = [raster.image.width, raster.image.height];
@@ -1093,20 +1106,54 @@ mod menu_budget_tests {
         }
     }
     #[test]
+    fn visible_window_preserves_full_raster_pixels_and_metrics() {
+        let mut rasterizer = platform::Rasterizer::new();
+        let value = "AV Wfi ".repeat(12);
+        let style = run(&value, 20.).style;
+        for px in [20., 30., 100.] {
+            let full = rasterizer
+                .rasterize_styled(&value, px, style, None)
+                .unwrap();
+            for start in [0.25, full.advance * 0.7] {
+                let part = rasterizer
+                    .rasterize_window(&value, px, style, None, Some([start, start + 100.]))
+                    .unwrap();
+                assert!(part.image.width <= 104);
+                assert_eq!(
+                    (part.advance, part.middle, part.offset[1]),
+                    (full.advance, full.middle, full.offset[1])
+                );
+                let x = (part.offset[0] - full.offset[0]) as usize * 4;
+                for (a, b) in part
+                    .image
+                    .pixels
+                    .chunks_exact(part.image.width as usize * 4)
+                    .zip(
+                        full.image
+                            .pixels
+                            .chunks_exact(full.image.width as usize * 4),
+                    )
+                {
+                    assert_eq!(a, &b[x..x + a.len()]);
+                }
+            }
+        }
+    }
+    #[test]
     fn menu_composition_admits_exact_byte_boundary_and_rolls_back_one_more() {
         let mut cache = TextCache::default();
         let runs = [run("Play", 20.)];
-        let first = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let first = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         let text_bytes = cache.cached_bytes();
         let material_bytes = MENU_CACHE_BYTES - text_bytes;
         cache
-            .compose_menu(&runs, 1., (0, material_bytes), Ok)
+            .compose_menu(&runs, &[], 1., (0, material_bytes), Ok)
             .unwrap();
         let next_handle = cache.next_handle;
         let mut published = false;
         assert!(
             cache
-                .compose_menu(&runs, 1., (0, material_bytes + 1), |_| {
+                .compose_menu(&runs, &[], 1., (0, material_bytes + 1), |_| {
                     published = true;
                     Ok(())
                 })
@@ -1115,7 +1162,7 @@ mod menu_budget_tests {
         assert!(!published);
         assert_eq!(cache.next_handle, next_handle);
         assert_eq!(cache.cached_bytes(), text_bytes);
-        let retained = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let retained = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         assert_eq!(first[0][0].0.asset, retained[0][0].0.asset);
     }
     #[test]
@@ -1129,7 +1176,7 @@ mod menu_budget_tests {
             .0
             .asset;
         let runs: Vec<_> = (0..64).map(|_| run("Play", 20.)).collect();
-        let old = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let old = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         let bytes = cache.cached_bytes();
         let handles: Vec<_> = old.iter().flatten().map(|(d, _)| d.asset).collect();
         assert_eq!(
@@ -1140,19 +1187,23 @@ mod menu_budget_tests {
                 .count(),
             64
         );
-        assert!(cache.compose_menu(&runs, 1., (1, 0), Ok).is_err());
+        assert!(cache.compose_menu(&runs, &[], 1., (1, 0), Ok).is_err());
         assert!(
             cache
-                .compose_menu(&[run("replacement", 20.)], 1., (0, 0), |_| -> Result<()> {
-                    Err("frame rejected".into())
-                })
+                .compose_menu(
+                    &[run("replacement", 20.)],
+                    &[],
+                    1.,
+                    (0, 0),
+                    |_| -> Result<()> { Err("frame rejected".into()) }
+                )
                 .is_err()
         );
         let large = "M".repeat(100);
         let big: Vec<_> = (0..16).map(|_| run(&large, 64.)).collect();
-        assert!(cache.compose_menu(&big, 1., (0, 0), Ok).is_err());
+        assert!(cache.compose_menu(&big, &[], 1., (0, 0), Ok).is_err());
         assert_eq!(cache.cached_bytes(), bytes);
-        let after = cache.compose_menu(&runs, 1., (0, 0), Ok).unwrap();
+        let after = cache.compose_menu(&runs, &[], 1., (0, 0), Ok).unwrap();
         assert_eq!(
             handles,
             after
@@ -1161,7 +1212,7 @@ mod menu_budget_tests {
                 .map(|(d, _)| d.asset)
                 .collect::<Vec<_>>()
         );
-        cache.compose_menu(&[], 1., (0, 0), Ok).unwrap();
+        cache.compose_menu(&[], &[], 1., (0, 0), Ok).unwrap();
         let assets: Vec<_> = cache
             .entries
             .values()

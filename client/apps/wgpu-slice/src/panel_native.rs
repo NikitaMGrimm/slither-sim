@@ -174,14 +174,15 @@ impl NativePanel {
         down: Option<bool>,
     ) -> Result<Vec<HostEditEffect>> {
         if self.input.state.editor(EditorId::Champion).composing() {
+            if down == Some(false) {
+                self.controls.blur();
+            }
             return Ok(Vec::new());
         }
         let resolved = self.panel.resolve(self.viewport).map_err(str::to_owned)?;
-        let dragging = self.controls.capture() == Some(MESSAGE);
         let intent = self.controls.pointer(&self.panel, &resolved, point, down);
         let mut effects = self.controls.sync_focus(&self.panel, &mut self.input.state);
-        if self.controls.focus() == Some(MESSAGE)
-            && (down == Some(true) || dragging)
+        if self.controls.capture() == Some(MESSAGE)
             && let Some(g) = self.geometry(text)?
         {
             let editor = self.input.state.editor(EditorId::Champion);

@@ -179,9 +179,17 @@ mod desktop {
                     .execute(effects, &mut WindowEditHost(&self.window));
                 self.login.champion.commit_effects(effects)
             } else {
+                let effects = self
+                    .login
+                    .input
+                    .execute(effects, &mut WindowEditHost(&self.window));
+                let admission = self.game.can_play()
+                    && self.preparation.is_none()
+                    && (self.official || self.endpoint.is_some());
                 self.login
                     .input
-                    .execute(effects, &mut WindowEditHost(&self.window))
+                    .state
+                    .commit_menu(effects, &mut self.login.state, admission)
             };
             for effect in effects {
                 match effect {
@@ -671,24 +679,7 @@ mod desktop {
                 } else {
                     r.login.input.window_event(&event)
                 };
-                let effects = if champion {
-                    let effects = r
-                        .login
-                        .champion
-                        .input
-                        .execute(mapped.effects, &mut WindowEditHost(&r.window));
-                    r.login.champion.commit_effects(effects)
-                } else {
-                    let effects = r
-                        .login
-                        .input
-                        .execute(mapped.effects, &mut WindowEditHost(&r.window));
-                    r.login
-                        .input
-                        .state
-                        .commit_menu(effects, &mut r.login.state, admission)
-                };
-                r.edit_effects(effects);
+                r.edit_effects(mapped.effects);
                 r.champion_submission()?;
                 if mapped.consumed {
                     r.schedule.invalidate();

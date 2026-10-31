@@ -200,6 +200,13 @@ async fn run(output: &Path) -> Result<()> {
 
             let mut scroll = std::collections::BTreeMap::new();
             let mut view = menu_specimen::view(0)?;
+            // Authored returned-score data; the fresh-login specimen has none.
+            view.last_life = slither_client::start_page::LastLifeView {
+                label: view.wording.final_length,
+                number: "1234".into(),
+                suffix: "!",
+                label_alpha: 0.45,
+            };
             view.ordinary_controls_visible = false;
             view.champion_pending = false;
             view.tips_visible = false;
@@ -251,7 +258,7 @@ async fn run(output: &Path) -> Result<()> {
                 &long,
                 &output.join(format!("champion-scroll-scale-{scale}.png")),
             )?;
-            let view = menu_specimen::view(0)?;
+            view.ordinary_controls_visible = true;
             let layout = menu_specimen::layout(&mut text, &view, extent, scale)?;
             let login = menu.prepare(&mut text, &view, &layout, extent, scale, None, 0)?;
             capture(

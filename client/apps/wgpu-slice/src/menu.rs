@@ -12,7 +12,7 @@ use slither_client::{
     menu_controls::{ControlKind, PanelInputState, PanelView, ResolvedControl, intersection},
     menu_input::{EditorId, MenuInputState},
     menu_layout::{MenuElement as E, MenuLayout, MenuRect, single_line_field_placement},
-    menu_theme::{ControlState, MenuTheme, SurfaceRecipe, SurfaceTokens},
+    menu_theme::{ControlState, ControlStyle, MenuTheme, SurfaceRecipe, SurfaceTokens},
     presentation::*,
     start_page::StartMenuView,
 };
@@ -51,6 +51,22 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
+    /// A menu quota failure skips this overlay for the frame, preserving the
+    /// world picture and editor/session state. Invalid geometry still surfaces.
+    pub fn append_optional(menu: Result<Self>, picture: &mut PreparedFrame) -> Result<bool> {
+        match menu.and_then(|menu| menu.append_to(picture)) {
+            Ok(()) => Ok(true),
+            Err(error)
+                if error.contains("budget")
+                    || error == frame::DRAW_MEMORY_LIMIT
+                    || error == "frame draw allocation failed" =>
+            {
+                Ok(false)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     /// DOM login hosts need the same page/world composition without native controls.
     pub fn world_crossfade(extent: [u32; 2], scale: f64, world_alpha: f64) -> Result<Self> {
         crate::render::dimensions(extent, scale)?;
@@ -640,11 +656,15 @@ impl Composition<'_> {
         if padded.iter().any(|n| *n > 2048) {
             return Err("Sliced menu raster axis budget".into());
         }
+        // Every current surface is symmetric in X. Retain one half of the
+        // padded atlas and mirror its quads; high-DPR shadows keep full padding
+        // without retaining the same pixels twice.
+        let half = padded[0].div_ceil(2);
         let mut raster = None;
         let mut tiles = Vec::new();
         for y in (0..padded[1]).step_by(512) {
-            for x in (0..padded[0]).step_by(512) {
-                let w = 512.min(padded[0] - x);
+            for x in (0..half).step_by(512) {
+                let w = 512.min(half - x);
                 let h = 512.min(padded[1] - y);
                 let resource = self.cached_material(
                     MaterialKey::Control(atlas, raster_scale.to_bits(), tokens, [x, y]),
@@ -680,32 +700,60 @@ impl Composition<'_> {
         for &(dy, sy, h) in &ys {
             for &(dx, sx, w) in &xs {
                 for (tx, ty, resource) in &tiles {
-                    let left = sx.max(*tx);
-                    let top = sy.max(*ty);
-                    let right = (sx + w).min(tx + resource.asset.width);
-                    let bottom = (sy + h).min(ty + resource.asset.height);
-                    if right <= left || bottom <= top {
-                        continue;
-                    }
-                    let mut draw = image(
-                        resource,
-                        MenuRect {
-                            x: r.x + (f64::from(dx + left - sx) - f64::from(pad)) / scale,
-                            y: r.y + (f64::from(dy + top - sy) - f64::from(pad)) / scale,
-                            width: f64::from(right - left) / scale,
-                            height: f64::from(bottom - top) / scale,
-                        },
-                        alpha,
-                    );
-                    draw.source = Some(BodyRect {
-                        x: f64::from(left - tx),
-                        y: f64::from(top - ty),
-                        width: f64::from(right - left),
-                        height: f64::from(bottom - top),
-                    });
-                    draw.snap_overlay(scale);
-                    if clip.is_none_or(|clip| clip_draw(&mut draw, clip, scale)) {
-                        self.push(draw)?;
+                    for mirrored in [false, true] {
+                        let tile_left = if mirrored {
+                            padded[0] - tx - resource.asset.width
+                        } else {
+                            *tx
+                        };
+                        let tile_right = tile_left + resource.asset.width;
+                        let left = sx.max(tile_left).max(if mirrored { half } else { 0 });
+                        let top = sy.max(*ty);
+                        let right =
+                            (sx + w)
+                                .min(tile_right)
+                                .min(if mirrored { padded[0] } else { half });
+                        let bottom = (sy + h).min(ty + resource.asset.height);
+                        if right <= left || bottom <= top {
+                            continue;
+                        }
+                        let mut draw = image(
+                            resource,
+                            MenuRect {
+                                x: r.x + (f64::from(dx + left - sx) - f64::from(pad)) / scale,
+                                y: r.y + (f64::from(dy + top - sy) - f64::from(pad)) / scale,
+                                width: f64::from(right - left) / scale,
+                                height: f64::from(bottom - top) / scale,
+                            },
+                            alpha,
+                        );
+                        draw.source = Some(BodyRect {
+                            x: f64::from(if mirrored {
+                                tile_right - right
+                            } else {
+                                left - tx
+                            }),
+                            y: f64::from(top - ty),
+                            width: f64::from(right - left),
+                            height: f64::from(bottom - top),
+                        });
+                        draw.snap_overlay(scale);
+                        let source = draw.source.unwrap();
+                        if clip.is_none_or(|clip| clip_draw(&mut draw, clip, scale)) {
+                            if mirrored {
+                                // Clip in destination order, then reflect the source crop.
+                                let crop = draw.source.as_mut().unwrap();
+                                crop.x = 2. * source.x + source.width - crop.x - crop.width;
+                                let d = draw.destination;
+                                draw.corners = Some([
+                                    [d.x + d.width, d.y],
+                                    [d.x, d.y],
+                                    [d.x, d.y + d.height],
+                                    [d.x + d.width, d.y + d.height],
+                                ]);
+                            }
+                            self.push(draw)?;
+                        }
                     }
                 }
             }
@@ -722,21 +770,29 @@ impl Composition<'_> {
             (r.width * scale).round().max(1.) as u32,
             (r.height * scale).round().max(1.) as u32,
         ];
-        if size.iter().any(|n| *n > 2048) {
-            return Err("Menu ink axis budget".into());
-        }
         if size.iter().any(|n| *n > 512) {
-            return self.sliced(
-                r,
-                SurfaceTokens {
-                    colors: [rgb; 2],
-                    radius: 0,
-                    recipe: SurfaceRecipe::Overlay,
-                },
-                alpha,
-                Some(clip),
-                1.,
-            );
+            // Reuse small uniform tiles instead of retaining a full-width
+            // selection. The remainder shares the same per-resource limits.
+            const TILE: u32 = 128;
+            check_menu_draws(
+                self.draws.len() + (size[0].div_ceil(TILE) * size[1].div_ceil(TILE)) as usize,
+            )?;
+            for y in (0..size[1]).step_by(TILE as usize) {
+                for x in (0..size[0]).step_by(TILE as usize) {
+                    self.ink(
+                        MenuRect {
+                            x: r.x + f64::from(x) / scale,
+                            y: r.y + f64::from(y) / scale,
+                            width: f64::from(TILE.min(size[0] - x)) / scale,
+                            height: f64::from(TILE.min(size[1] - y)) / scale,
+                        },
+                        rgb,
+                        alpha,
+                        clip,
+                    )?;
+                }
+            }
+            return Ok(());
         }
         let resource = self.cached_material(MaterialKey::Solid(size, rgb), || {
             Ok(materials::RgbaImage {
@@ -826,25 +882,19 @@ impl Composition<'_> {
     // Login keeps its policy/input path; its existing recipes share the bounded
     // material implementation so exact high-DPI rasters need no larger quota.
     fn control(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        let recipe = match kind {
-            0 => SurfaceRecipe::Button,
-            1..=2 => SurfaceRecipe::Overlay,
-            5 => SurfaceRecipe::Field,
-            _ => SurfaceRecipe::Compact,
+        let theme = MenuTheme::default();
+        let mut tokens = match kind {
+            0 => theme.surface(ControlStyle::PrimaryButton, ControlState::Idle),
+            1 => theme.surface(ControlStyle::PrimaryButton, ControlState::Hovered),
+            2 => theme.surface(ControlStyle::PrimaryButton, ControlState::Pressed),
+            4 => theme.surface(ControlStyle::Surface, ControlState::Idle),
+            5 => theme.surface(ControlStyle::Field, ControlState::Idle),
+            _ => return Err("Unknown login surface".into()),
         };
-        let colors = match kind {
-            0 => [[86, 172, 129], [54, 108, 81]],
-            1 => [[117, 240, 202], [72, 171, 132]],
-            2 => [[12, 20, 18], [40, 59, 54]],
-            4 | 5 => [[76, 68, 124]; 2],
-            6 => [[108, 215, 128], [80, 160, 100]],
-            _ => [[150, 108, 213], [100, 70, 150]],
-        };
-        let tokens = SurfaceTokens {
-            colors,
-            radius: (r.height / 2.).ceil() as u16,
-            recipe,
-        };
+        if kind == 4 {
+            tokens.recipe = SurfaceRecipe::Compact;
+        }
+        tokens.radius = (r.height / 2.).ceil() as u16;
         let r = MenuRect {
             width: (r.width * self.scale).ceil() / self.scale,
             height: (r.height * self.scale).ceil() / self.scale,
@@ -1567,8 +1617,25 @@ impl Composition<'_> {
                 }
             })
             .collect();
+        // Only fields use a scrolled raster window. Position/baseline policy
+        // stays in the existing host geometry; the backend bounds allocation.
+        let clips: Vec<_> = labels
+            .iter()
+            .zip(&runs)
+            .map(|(l, r)| {
+                l.clip
+                    .filter(|_| l.align == Align::Left && !l.fit)
+                    .map(|c| BodyRect {
+                        x: c.x - r.position[0],
+                        y: c.y - r.position[1],
+                        width: c.width,
+                        height: c.height,
+                    })
+            })
+            .collect();
         let result = text.compose_menu(
             &runs,
+            &clips,
             self.scale,
             (self.materials.len(), material_bytes),
             |groups| {
