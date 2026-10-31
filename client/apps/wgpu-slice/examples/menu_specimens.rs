@@ -207,6 +207,10 @@ async fn run(output: &Path) -> Result<()> {
             .await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--settings-fade") {
+        return settings_fade::specimens(&mut renderer, output).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--settings") {
         return settings_specimens(output, &mut renderer).await;
     }
@@ -996,6 +1000,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
     ] {
         let extent = logical.map(|v| (v * dpr) as u32);
         login.close_settings(true);
+        while login.state.settings.visible() {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         login.focus(NICKNAME);
         assert_eq!(login.controls.focus(), Some(NICKNAME));
         let outgoing = login.prepare_host(extent, dpr, true, None)?;
@@ -1006,6 +1014,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
         )?;
         login.focus(SETTINGS);
         login.open_settings(true);
+        while login.state.settings.alpha() < 1. {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         for state in [
             "high-focus",
             "high-pressed",
@@ -1130,6 +1142,10 @@ async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()
                 .collect(),
         )?;
         login.close_settings(true);
+        while login.state.settings.visible() {
+            now += 16.;
+            login.step(now, true, false)?;
+        }
         assert_eq!(login.controls.focus(), Some(SETTINGS));
         let returned = login.prepare_host(extent, dpr, true, None)?;
         capture(
@@ -1199,3 +1215,7 @@ mod focus;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/picker_panel.rs"]
 mod picker_panel;
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "menu_specimens/settings_fade.rs"]
+mod settings_fade;

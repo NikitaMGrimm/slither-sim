@@ -34,6 +34,7 @@ pub mod menu_layout;
 pub mod menu_loading;
 pub mod menu_preferences;
 pub mod menu_theme;
+mod menu_transition;
 pub mod play_admission;
 pub mod presentation;
 pub mod profile_literals;

@@ -43,6 +43,19 @@ fn settled() -> NativeLogin {
     }
     login
 }
+fn finish_transition(login: &mut NativeLogin, now: &mut f64) {
+    for _ in 0..256 {
+        if !login.state.settings.visible()
+            || (login.state.settings.is_open() && login.state.settings.alpha() == 1.)
+        {
+            return;
+        }
+        *now += 16.;
+        login.step(*now, true, false).unwrap();
+    }
+    panic!("Settings transition did not finish");
+}
+
 fn point(
     login: &NativeLogin,
     id: slither_client::menu_controls::ControlId,
@@ -56,6 +69,7 @@ fn point(
 #[test]
 fn entry_order_modality_escape_done_and_play_snapshot() {
     let mut login = settled();
+    let mut now = 9600.;
     login.prepare([960, 540], true, None).unwrap();
     let appearance = login.studio.state.committed().clone();
     login.picker.policy.selection = slither_client::server_picker::ServerPreference::Official(7);
@@ -89,13 +103,11 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert!(!login.studio.state.visible());
     assert!(!login.picker.policy.visible());
     login.prepare([960, 540], true, None).unwrap();
-    login.pointer([0., 0.], Some(true), true);
-    login.pointer([0., 0.], Some(false), true);
-    assert!(login.state.settings.visible()); // no outside-click dismissal.
     login.focus(QUALITY);
     assert!(key(&mut login, NamedKey::Space));
     assert_eq!(login.state.view(true).quality, Q::Low);
-    assert!(login.step(9616., true, false).unwrap().0.is_empty());
+    now += 16.;
+    assert!(login.step(now, true, false).unwrap().0.is_empty());
     assert!(!login.state.view(true).spinner_visible);
     assert!(key(&mut login, NamedKey::Tab));
     assert_eq!(login.controls.focus(), Some(RESOLUTION));
@@ -104,6 +116,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert!(key(&mut login, NamedKey::Tab));
     assert_eq!(login.controls.focus(), Some(QUALITY));
     assert!(key(&mut login, NamedKey::Escape));
+    finish_transition(&mut login, &mut now);
     assert!(!login.state.settings.visible());
     assert_eq!(login.controls.focus(), Some(SETTINGS));
     assert!(key(&mut login, NamedKey::Enter));
@@ -119,8 +132,9 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     key(&mut login, NamedKey::Enter);
     login.open_settings(true);
     assert!(!login.state.settings.visible());
+    now += 16.;
     assert_eq!(
-        login.step(9632., true, false).unwrap().0,
+        login.step(now, true, false).unwrap().0,
         vec![StartMenuIntent::Play {
             nickname: "Player".into(),
             quality: Q::Low
@@ -306,6 +320,7 @@ fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
         .map(|r| (r.asset, r.image.pixels.clone()))
         .collect::<Vec<_>>();
     login.open_settings(true);
+    finish_transition(&mut login, &mut 9600.);
     for dpr in [1., 1.25, 1.5, 2., 3., 4., 5., 6., 7., 8.] {
         for area in [[960., 540.], [360., 640.]] {
             for state in 0..9 {
@@ -446,4 +461,154 @@ fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
             .iter()
             .all(|c| c.id != login_controls::CHANGE_SKIN || c.name != "Change Skin")
     );
+}
+
+#[test]
+fn entry_and_exit_keep_focus_until_finished_and_reject_closed_activation() {
+    for keyboard in [false, true] {
+        for backdrop in [false, true] {
+            let mut login = settled();
+            let mut now = 9600.;
+            login.prepare([960, 540], true, None).unwrap();
+            if keyboard {
+                while login.controls.focus() != Some(SETTINGS) {
+                    key(&mut login, NamedKey::Tab);
+                }
+                key(&mut login, NamedKey::Enter);
+            } else {
+                let p = point(&login, SETTINGS, [960., 540.]);
+                login.pointer(p, Some(true), true);
+                login.pointer(p, Some(false), true);
+            }
+            assert!(login.state.settings.is_open());
+            now += 16.;
+            login.step(now, true, false).unwrap();
+            assert!(login.state.settings.alpha() > 0. && login.state.settings.alpha() < 1.);
+            login.prepare_host([1440, 810], 1.5, true, None).unwrap();
+            let prefs = login.state.settings.preferences();
+            let p = point(&login, QUALITY, [960., 540.]);
+            login.pointer(p, Some(true), true);
+            if backdrop {
+                login.pointer([0., 0.], Some(true), true);
+                login.pointer([0., 0.], Some(false), true);
+            } else {
+                key(&mut login, NamedKey::Escape);
+            }
+            assert!(!login.state.settings.is_open());
+            assert!(login.state.settings.visible());
+            assert_eq!(login.panel.id, slither_client::settings::PANEL);
+            login.pointer(p, Some(false), true);
+            login.focus(QUALITY);
+            key(&mut login, NamedKey::Space);
+            key(&mut login, NamedKey::Escape);
+            assert_eq!(login.state.settings.preferences(), prefs);
+            assert!(login.state.settings.take_write().is_none());
+            let mut alpha = login.state.settings.alpha();
+            for _ in 0..256 {
+                now += 16.;
+                let (intents, _) = login.step(now, true, false).unwrap();
+                assert!(
+                    !intents
+                        .iter()
+                        .any(|i| matches!(i, StartMenuIntent::Play { .. }))
+                );
+                assert!(login.state.settings.alpha() <= alpha);
+                alpha = login.state.settings.alpha();
+                if !login.state.settings.visible() {
+                    break;
+                }
+                assert_eq!(login.panel.id, slither_client::settings::PANEL);
+            }
+            assert!(!login.state.settings.visible());
+            assert_eq!(login.controls.focus(), Some(SETTINGS));
+            assert!(login.controls.capture().is_none());
+            assert!(
+                login.panel.controls.iter().all(|c| login
+                    .controls
+                    .progress(c.id)
+                    .into_iter()
+                    .all(|p| p == 0.))
+            );
+            now += 16.;
+            login.step(now, true, false).unwrap();
+            assert_eq!(login.controls.focus(), Some(SETTINGS));
+            assert_eq!(login.state.settings.preferences(), prefs);
+            assert!(!login.state.view(true).spinner_visible);
+        }
+    }
+}
+
+#[test]
+fn fade_frames_fit_menu_limits_and_retained_pictures_survive() {
+    let mut peak = 0;
+    for logical in [[960., 540.], [360., 640.], [960., 360.]] {
+        for dpr in [1_f64, 1.25, 1.5, 1.75, 2., 3., 4., 5., 6., 7., 8.] {
+            let extent = logical.map(|v| (v * dpr).round() as u32);
+            let mut login = settled();
+            login.state.settings = slither_client::settings::SettingsState::new(
+                slither_client::settings::SettingsPreferences {
+                    quality: Q::Low,
+                    resolution: slither_client::settings::WorldResolution::Native,
+                },
+            );
+            login.state.settings.step(9600.).unwrap();
+            login.state.settings.storage_result(false);
+            login.state.settings.native_available(false);
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            login.open_settings(true);
+            let mut now = 9600.;
+            let mut retained = None;
+            for open in [true, false] {
+                if !open {
+                    login.close_settings(true);
+                }
+                let mut finished = false;
+                for _ in 0..256 {
+                    now += 16.;
+                    login.step(now, true, false).unwrap();
+                    for c in &login.panel.controls {
+                        if c.enabled {
+                            login.controls.set_progress(c.id, [1., 1.]);
+                        }
+                    }
+                    let picture = login.prepare_host(extent, dpr, true, None).unwrap();
+                    let count = picture.draw_counts(0).admitted_menu();
+                    peak = peak.max(count);
+                    assert!(count <= 512, "{logical:?} {dpr}: {count}");
+                    assert!(picture.resources.len() <= 64);
+                    assert!(
+                        picture
+                            .resources
+                            .iter()
+                            .map(|r| r.image.pixels.len())
+                            .sum::<usize>()
+                            <= 13 * 1024 * 1024
+                    );
+                    if open && login.state.settings.alpha() == 1. {
+                        retained = Some(picture);
+                        finished = true;
+                        break;
+                    }
+                    if !open && !login.state.settings.visible() {
+                        finished = true;
+                        break;
+                    }
+                }
+                assert!(finished);
+            }
+            let retained = retained.unwrap();
+            retained
+                .frame
+                .validate(
+                    &retained
+                        .resources
+                        .iter()
+                        .map(|r| (r.asset.into(), r.asset))
+                        .collect(),
+                )
+                .unwrap();
+            assert_eq!(login.controls.focus(), Some(SETTINGS));
+        }
+    }
+    println!("Settings fade peak: {peak}/512 menu records");
 }
