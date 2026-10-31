@@ -11,34 +11,38 @@ use slither_wgpu_slice::{frame::MAX_DRAWS, game::LocalGame, render};
 // the cross-revision feel comparator separately checks numeric presentation.
 #[cfg(windows)]
 #[test]
-fn factor_one_matches_pinned_main_pictures_and_command_bytes() {
+fn factor_one_stationary_and_repeated_cursor_match_pinned_main_pictures_and_commands() {
     let pin: serde_json::Value =
         serde_json::from_str(include_str!("fixtures/zoom-stock-main.json")).unwrap();
-    let mut game = tape::playing();
-    assert!(!game.wheel_zoom(0.));
-    assert!(!game.wheel_zoom(f64::NAN));
-    for row in pin["rows"].as_array().unwrap() {
-        let time = row["timeMs"].as_f64().unwrap();
-        game.pointer(850., 130., 960., 540., false).unwrap();
-        game.begin_frame(time, [960, 540], 1.).unwrap();
-        assert_eq!(
-            serde_json::to_value(tape::effects(&mut game)).unwrap(),
-            row["packets"]
-        );
-        let picture = game.take_frame().unwrap();
-        assert_eq!(
-            picture.draw_count(),
-            row["draws"].as_u64().unwrap() as usize
-        );
-        let debug = format!("{:?}\n{:?}", picture.frame, picture.overlay);
-        let hash = debug.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-            (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
-        });
-        assert_eq!(
-            format!("{hash:016x}"),
-            row["frameFnv1a64"].as_str().unwrap()
-        );
-        game.presented(true).unwrap();
+    for stationary in [false, true] {
+        let mut game = tape::playing();
+        assert!(!game.wheel_zoom(0.));
+        assert!(!game.wheel_zoom(f64::NAN));
+        for (index, row) in pin["rows"].as_array().unwrap().iter().enumerate() {
+            let time = row["timeMs"].as_f64().unwrap();
+            if !stationary || index == 0 {
+                game.pointer(850., 130., 960., 540., false).unwrap();
+            }
+            game.begin_frame(time, [960, 540], 1.).unwrap();
+            assert_eq!(
+                serde_json::to_value(tape::effects(&mut game)).unwrap(),
+                row["packets"]
+            );
+            let picture = game.take_frame().unwrap();
+            assert_eq!(
+                picture.draw_count(),
+                row["draws"].as_u64().unwrap() as usize
+            );
+            let debug = format!("{:?}\n{:?}", picture.frame, picture.overlay);
+            let hash = debug.bytes().fold(0xcbf29ce484222325u64, |h, b| {
+                (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
+            });
+            assert_eq!(
+                format!("{hash:016x}"),
+                row["frameFnv1a64"].as_str().unwrap()
+            );
+            game.presented(true).unwrap();
+        }
     }
 }
 
@@ -135,6 +139,100 @@ fn displayed_head(game: &LocalGame, css: [f64; 2], extent: [u32; 2]) -> [f64; 2]
     ]
 }
 
+fn inject_camera_corrections(game: &mut LocalGame, extent: [u32; 2]) {
+    // Separate head/camera rings advance between the two absolute anchors.
+    for (received, x, y, drawn) in [(40., 1200u16, 1100u16, 60.), (80., 1240, 1140, 90.)] {
+        let mut anchor = vec![b'=', 0, 7, 0, 0];
+        anchor.extend(x.to_be_bytes());
+        anchor.extend(y.to_be_bytes());
+        game.receive(game.generation(), &tape::bundle(&[anchor]), received)
+            .unwrap();
+        game.begin_frame(drawn, extent, 1.).unwrap();
+        tape::effects(game);
+        tape::pictures(game);
+    }
+}
+
+#[test]
+fn stationary_cursor_tracks_wheel_camera_and_zoom_smoothing_through_the_heading_gate() {
+    use std::f64::consts::{PI, TAU};
+    for notches in [-8., -3., 2.] {
+        let mut game = tape::playing();
+        inject_camera_corrections(&mut game, [960, 540]);
+        let cursor = [505., 270.];
+        game.pointer(cursor[0], cursor[1], 960., 540., false)
+            .unwrap();
+        assert!(game.wheel_zoom(notches));
+        let mut previous_send: Option<f64> = None;
+        let mut corrected_heading_sent = false;
+        let mut held_heading = 0.;
+        for index in 0..90 {
+            let now = 100. + f64::from(index) * 10.;
+            let head = displayed_head(&game, [960., 540.], [960, 540]);
+            let dx = cursor[0] - head[0];
+            let dy = cursor[1] - head[1];
+            assert!(
+                dx.hypot(dy) > 16.,
+                "fixture must stay outside the CSS dead zone"
+            );
+            let expected = dy.atan2(dx);
+            game.begin_frame(now, [960, 540], 1.).unwrap();
+            let packets = tape::effects(&mut game);
+            let headings: Vec<_> = packets
+                .iter()
+                .filter(|p| p.len() == 1 && p[0] < 251)
+                .collect();
+            assert!(headings.len() <= 1);
+            for packet in headings {
+                if let Some(previous) = previous_send {
+                    assert!(now - previous > 33., "heading cadence changed");
+                }
+                previous_send = Some(now);
+                let sent = f64::from(packet[0]) * TAU / 251.;
+                held_heading = sent;
+                let error = (sent - expected + PI).rem_euclid(TAU) - PI;
+                assert!(
+                    error.abs() <= TAU / 251. + 1e-10,
+                    "stale stationary projection: {packet:?}, error {error}"
+                );
+                corrected_heading_sent |= packet[0] != 0;
+            }
+            tape::pictures(&mut game);
+        }
+        assert!(
+            corrected_heading_sent,
+            "wheel/camera changes must steer without a pointer callback"
+        );
+        let head = displayed_head(&game, [960., 540.], [960, 540]);
+        let settled = (cursor[1] - head[1]).atan2(cursor[0] - head[0]);
+        let error = (held_heading - settled + PI).rem_euclid(TAU) - PI;
+        assert!(
+            error.abs() <= TAU / 251. + 1e-10,
+            "held heading must converge after smoothing"
+        );
+        // Stock retains the originally admitted CSS displacement even across a
+        // resize. Returning to one must restore that cache, not reproject it.
+        let extent = game.window_viewport([800, 800], 1.).unwrap();
+        let factor = game.client().camera().user_zoom_factor();
+        assert!(game.wheel_zoom(-factor.ln() / 1.12_f64.ln()));
+        for index in 0..130 {
+            game.begin_frame(1000. + f64::from(index) * 10., extent, 1.)
+                .unwrap();
+            for packet in tape::effects(&mut game) {
+                if packet.len() == 1 && packet[0] < 251 {
+                    held_heading = f64::from(packet[0]) * TAU / 251.;
+                }
+            }
+            tape::pictures(&mut game);
+        }
+        assert_eq!(game.client().camera().user_zoom_factor(), 1.);
+        assert_eq!(
+            held_heading, 0.,
+            "factor one restores the stock rightward command"
+        );
+    }
+}
+
 fn heading(packets: &[Vec<u8>]) -> u8 {
     packets.iter().find(|p| p.len() == 1 && p[0] < 251).unwrap()[0]
 }
@@ -147,24 +245,7 @@ fn zoomed_steering_starts_at_the_corrected_displayed_head_without_changing_caden
             let mut game = tape::playing();
             assert!(game.wheel_zoom(notches));
             let extent = game.window_viewport(physical, dpr).unwrap();
-            // Absolute anchor jump installs independent head/camera correction
-            // rings. The displayed head is then measurably off centre.
-            let mut anchor = vec![b'=', 0, 7, 0, 0];
-            anchor.extend(1200u16.to_be_bytes());
-            anchor.extend(1100u16.to_be_bytes());
-            game.receive(game.generation(), &tape::bundle(&[anchor]), 40.)
-                .unwrap();
-            game.begin_frame(60., extent, 1.).unwrap();
-            tape::effects(&mut game);
-            tape::pictures(&mut game);
-            let mut anchor = vec![b'=', 0, 7, 0, 0];
-            anchor.extend(1240u16.to_be_bytes());
-            anchor.extend(1140u16.to_be_bytes());
-            game.receive(game.generation(), &tape::bundle(&[anchor]), 80.)
-                .unwrap();
-            game.begin_frame(90., extent, 1.).unwrap();
-            tape::effects(&mut game);
-            tape::pictures(&mut game);
+            inject_camera_corrections(&mut game, extent);
             let css = physical.map(|n| f64::from(n) / dpr);
             assert_ne!(game.client().camera().user_zoom_factor(), 1.);
             let head = displayed_head(&game, css, extent);
@@ -182,14 +263,9 @@ fn zoomed_steering_starts_at_the_corrected_displayed_head_without_changing_caden
             for (index, angle) in [0_f64, -1.3, 2.1].into_iter().enumerate() {
                 let now = 110. + index as f64 * 50.;
                 let head = displayed_head(&game, css, extent);
-                game.pointer(
-                    head[0] + 25. * angle.cos(),
-                    head[1] + 25. * angle.sin(),
-                    css[0],
-                    css[1],
-                    false,
-                )
-                .unwrap();
+                let cursor = [head[0] + 25. * angle.cos(), head[1] + 25. * angle.sin()];
+                game.pointer(cursor[0], cursor[1], css[0], css[1], false)
+                    .unwrap();
                 game.begin_frame(now + 10., extent, 1.).unwrap();
                 let early = tape::effects(&mut game);
                 assert!(
@@ -197,10 +273,12 @@ fn zoomed_steering_starts_at_the_corrected_displayed_head_without_changing_caden
                     "cadence changed: {early:?}"
                 );
                 tape::pictures(&mut game);
+                let head = displayed_head(&game, css, extent);
+                let expected = (cursor[1] - head[1]).atan2(cursor[0] - head[0]);
                 game.begin_frame(now + 34., extent, 1.).unwrap();
                 let packets = tape::effects(&mut game);
                 let sent = f64::from(heading(&packets)) * TAU / 251.;
-                let error = (sent - angle + PI).rem_euclid(TAU) - PI;
+                let error = (sent - expected + PI).rem_euclid(TAU) - PI;
                 assert!(
                     error.abs() <= TAU / 251. + 1e-10,
                     "{packets:?}: {error} at factor {}",

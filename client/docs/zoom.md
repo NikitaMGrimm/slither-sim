@@ -41,6 +41,11 @@ allocating without a limit. Default zoom retains the exact stock path. HUD, mini
 leaderboard stay in screen space. At nondefault zoom, steering starts at the
 corrected displayed head, including camera smoothing offsets and the backing to
 CSS transform. Factor one preserves the stock centre/raw-head policy exactly.
+The client retains admitted cursor coordinates and refreshes their nondefault
+projection before each existing heading phase, so a stationary cursor follows
+wheel interpolation, camera corrections and viewport changes. It emits no
+synthetic input event or direct send. Returning to factor one restores the stock
+projection once; otherwise factor one never reprojects a stationary cursor.
 The CSS dead zone and command cadence are unchanged. No wheel event
 emits a command.
 

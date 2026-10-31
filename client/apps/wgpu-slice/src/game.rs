@@ -145,6 +145,12 @@ impl Drop for LoginProfile {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Cursor {
+    source: [f64; 4],
+    stock: [f64; 11],
+}
+
 pub struct LocalGame {
     #[cfg(feature = "feel-trace")]
     trace: Option<slither_client::feel_trace::Recorder>,
@@ -156,6 +162,8 @@ pub struct LocalGame {
     pub bank: Bank,
     session: SessionPolicy,
     input: DesktopInput,
+    cursor: Option<Cursor>,
+    zoom_pointer_projected: bool,
     policy: GameplayPolicy,
     hud: HudHistory,
     rows: LeaderboardHistory,
@@ -207,6 +215,8 @@ impl LocalGame {
             bank: Bank::new()?,
             session,
             input: DesktopInput::new(19.).map_err(|e| e.to_string())?,
+            cursor: None,
+            zoom_pointer_projected: false,
             policy: GameplayPolicy::new(true, true, true, true, true, false),
             hud: HudHistory::default(),
             rows: LeaderboardHistory::default(),
@@ -1147,6 +1157,7 @@ impl LocalGame {
                 }
                 3 => {
                     if self.input.view().own.is_some() {
+                        self.refresh_zoom_pointer()?;
                         self.input.heading_phase(now).map_err(|e| e.to_string())?
                     } else {
                         Vec::new()
@@ -1328,6 +1339,10 @@ impl LocalGame {
         }
         let backing = render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
         self.viewport(backing, 1.)?;
+        if let Some(cursor) = &mut self.cursor {
+            cursor.source[2] = f64::from(physical[0]) / dpr;
+            cursor.source[3] = f64::from(physical[1]) / dpr;
+        }
         Ok(backing)
     }
     /// Resize supersedes queued intermediate Setup pictures, never their admitted packet state.
@@ -1430,8 +1445,7 @@ impl LocalGame {
         }
         true
     }
-    pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
-        latency::generation(self.generation);
+    fn pointer_args(&self, [x, y, width, height]: [f64; 4]) -> Result<([f64; 11], [f64; 11])> {
         let v = self.client.control_view();
         let head = v.own.map(|o| o.raw_head).unwrap_or_default();
         let mut args = [
@@ -1447,6 +1461,7 @@ impl LocalGame {
             head.y,
             v.zoom,
         ];
+        let stock = args;
         if self.client.camera().user_zoom_factor() != 1.
             && let Some(own) = self.client.own_snake()
         {
@@ -1460,12 +1475,42 @@ impl LocalGame {
             args[1] -= (head.y - v.camera.y) * v.zoom * height / f64::from(logical[1]);
             args[4] = 1.; // Offset already projected, including non-following views.
         }
+        Ok((stock, args))
+    }
+    fn refresh_zoom_pointer(&mut self) -> Result<()> {
+        let zoomed = self.client.camera().user_zoom_factor() != 1.;
+        // Restore the admitted stock input once after zoom, including its old
+        // viewport/centre quirks. Factor one never reprojects from a new view.
+        if (zoomed || self.zoom_pointer_projected)
+            && let Some(cursor) = self.cursor
+        {
+            let args = if zoomed {
+                self.pointer_args(cursor.source)?.1
+            } else {
+                cursor.stock
+            };
+            // This updates displacement only: the existing heading phase owns
+            // comparison, dead zone, quantization and cadence (docs/zoom.md).
+            self.input.pointer(&args).map_err(|e| e.to_string())?;
+            self.zoom_pointer_projected = zoomed;
+        }
+        Ok(())
+    }
+    pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
+        latency::generation(self.generation);
+        let cursor = [x, y, width, height];
+        let (stock, args) = self.pointer_args(cursor)?;
         if down {
             self.input.mouse_down(&args).map_err(|e| e.to_string())?;
         } else {
             self.input.pointer(&args).map_err(|e| e.to_string())?;
         }
         if !down || self.input.view().own.is_some() {
+            self.cursor = Some(Cursor {
+                source: cursor,
+                stock,
+            });
+            self.zoom_pointer_projected = self.client.camera().user_zoom_factor() != 1.;
             latency::admitted(0);
         }
         if down && self.input.view().own.is_some() {
