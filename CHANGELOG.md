@@ -10,9 +10,12 @@
   accepts that answer too, with or without a custom skin.
 ### Added
 
-- Optional host `maxTick` stretches overloaded ticks using elapsed time, with
-  time-based motion/mass reports and a lost-time counter. Fixed scheduling stays
-  the default. Validated `Simulator::set_dt` supports per-tick durations.
+- An optional `maxTick` host setting lets an overloaded world stretch its
+  ticks instead of falling behind, which players see as a growing ping. Each
+  tick then lasts the real time since the previous one, up to `maxTick`;
+  `--stats` reports any time lost above that cap as `lost_seconds`. Fixed ticks
+  stay the default, with identical output. `Simulator::set_dt` changes the tick
+  length between steps.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind
