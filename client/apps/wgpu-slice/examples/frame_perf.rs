@@ -1,5 +1,7 @@
 //! Bounded synthetic native frame workload: no windows, sockets or external assets.
+#[cfg(windows)]
 use slither_wgpu_slice::{Result, gpu, login_native::NativeLogin, render};
+#[cfg(windows)]
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     cell::Cell,
@@ -7,15 +9,19 @@ use std::{
     sync::mpsc,
     time::{Duration, Instant},
 };
+#[cfg(windows)]
 #[path = "../tests/support/announcement_tape.rs"]
 mod tape;
 
+#[cfg(windows)]
 struct Counting;
+#[cfg(windows)]
 thread_local! {
     static COUNT: Cell<Option<u64>> = const { Cell::new(None) };
 }
 // Delegate unchanged layouts/pointers to System; count requested bytes only on
 // the measuring thread, excluding driver heaps and asynchronous GPU workers.
+#[cfg(windows)]
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         COUNT.with(|c| c.set(c.get().map(|n| n + layout.size() as u64)));
@@ -33,9 +39,11 @@ unsafe impl GlobalAlloc for Counting {
         unsafe { System.realloc(ptr, layout, size) }
     }
 }
+#[cfg(windows)]
 #[global_allocator]
 static ALLOC: Counting = Counting;
 
+#[cfg(windows)]
 fn measure<T>(f: impl FnOnce() -> Result<T>) -> Result<(T, u128, u64)> {
     COUNT.with(|c| c.set(Some(0)));
     let start = Instant::now();
@@ -44,6 +52,7 @@ fn measure<T>(f: impl FnOnce() -> Result<T>) -> Result<(T, u128, u64)> {
     let bytes = COUNT.with(|c| c.replace(None).unwrap());
     result.map(|v| (v, ns, bytes))
 }
+#[cfg(windows)]
 fn wait(r: &gpu::Renderer) -> Result<()> {
     r.device
         .poll(wgpu::PollType::Wait {
@@ -53,6 +62,7 @@ fn wait(r: &gpu::Renderer) -> Result<()> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+#[cfg(windows)]
 fn target(r: &gpu::Renderer) -> wgpu::Texture {
     r.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("frame-perf target"),
@@ -69,6 +79,7 @@ fn target(r: &gpu::Renderer) -> wgpu::Texture {
         view_formats: &[],
     })
 }
+#[cfg(windows)]
 fn capture(r: &gpu::Renderer, texture: &wgpu::Texture, path: &Path) -> Result<()> {
     let buffer = r.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("frame-perf readback"),
@@ -113,6 +124,7 @@ fn capture(r: &gpu::Renderer, texture: &wgpu::Texture, path: &Path) -> Result<()
     buffer.unmap();
     Ok(())
 }
+#[cfg(windows)]
 fn world() -> Result<slither_wgpu_slice::game::LocalGame> {
     let mut g = tape::playing();
     let mut packets = Vec::new();
@@ -160,6 +172,7 @@ fn world() -> Result<slither_wgpu_slice::game::LocalGame> {
     g.window_viewport([960, 540], 1.)?;
     Ok(g)
 }
+#[cfg(windows)]
 fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let instance = gpu::instance();
@@ -212,11 +225,9 @@ fn run(output: &Path) -> Result<()> {
                     }
                     if mode == "login" {
                         // Match native retained-picture composition, including its clone.
-                        let mut composed = p.clone();
-                        login
+                        p = login
                             .prepare_host([960, 540], 1., true, None)?
-                            .append_to(&mut composed)?;
-                        p = composed;
+                            .compose_over(&p)?;
                     }
                     Ok(p)
                 })?;
@@ -259,6 +270,7 @@ fn run(output: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(windows)]
 fn main() {
     let output = std::env::args_os()
         .nth(1)
@@ -267,4 +279,10 @@ fn main() {
         eprintln!("FRAME_PERF_FAILED: {e}");
         std::process::exit(1);
     }
+}
+
+#[cfg(not(windows))]
+fn main() {
+    eprintln!("frame_perf requires Windows: the workload uses DX12 and native login.");
+    std::process::exit(1);
 }

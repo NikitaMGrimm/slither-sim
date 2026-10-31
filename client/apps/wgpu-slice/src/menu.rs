@@ -127,6 +127,47 @@ impl MenuFrame {
         self.frame.viewport_scale = 1.;
         Ok(self)
     }
+    /// Keep the retry picture intact and allocate its composed draw storage once.
+    pub fn compose_over(self, picture: &PreparedFrame) -> Result<PreparedFrame> {
+        let world_extra = usize::from(self.backdrop.is_some());
+        let ui_extra = self.frame.draws.len() + usize::from(self.world_cover.is_some());
+        check_menu_draws(world_extra + ui_extra)?;
+        frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
+        let copy = |frame: &Frame, extra: usize| -> Result<Frame> {
+            let mut draws = Vec::new();
+            draws
+                .try_reserve_exact(frame.draws.len() + extra)
+                .map_err(|_| "frame draw allocation failed")?;
+            draws.extend_from_slice(&frame.draws);
+            Ok(Frame {
+                identity: frame.identity,
+                extent: frame.extent,
+                viewport_scale: frame.viewport_scale,
+                tick: frame.tick,
+                draws,
+                snakes: frame.snakes.clone(),
+            })
+        };
+        let mut composed = PreparedFrame {
+            frame: copy(
+                &picture.frame,
+                world_extra
+                    + if picture.overlay.is_none() {
+                        ui_extra
+                    } else {
+                        0
+                    },
+            )?,
+            overlay: picture
+                .overlay
+                .as_ref()
+                .map(|f| copy(f, ui_extra))
+                .transpose()?,
+            resources: picture.resources.clone(),
+        };
+        self.append_to(&mut composed)?;
+        Ok(composed)
+    }
     /// Put the page below every world draw and menu controls above them.
     /// A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
@@ -1118,7 +1159,8 @@ mod reveal_tests {
                 width: 900,
                 height: 270,
                 pixels: vec![],
-            },
+            }
+            .into(),
         };
         let draw = image(
             &resource,

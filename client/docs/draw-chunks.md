@@ -1,10 +1,10 @@
 # Crowded wgpu frames
 
 The renderer preserves every eligible world quad and its original paint order.
-It serializes directly into an 8,192-quad scratch buffer, uploads fixed-size
-vertex chunks, then binds those chunks in one render pass. Only adjacent equal
-pipeline/texture/sampler states batch together, including across the same
-texture's repeat/clamp states. A run crossing a chunk boundary splits without
+It serializes into retained, growable 8,192-quad vertex chunks, bounded at
+30 MiB of CPU vertex bytes, then uploads and binds them in one render pass. Only
+adjacent equal pipeline/texture/sampler states batch together, including across
+the same texture's repeat/clamp states. A run crossing a chunk boundary splits without
 changing primitive order. MSAA is cleared and resolved once for the whole frame.
 Canvas output and core painter traversal/quality semantics are unchanged.
 

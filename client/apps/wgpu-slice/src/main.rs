@@ -398,10 +398,10 @@ mod desktop {
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
-                    let mut picture = p.clone();
-                    self.login
+                    let picture = self
+                        .login
                         .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                        .append_to(&mut picture)?;
+                        .compose_over(&p)?;
                     let effects = self.login.cursor_area()?;
                     self.edit_effects(effects);
                     Some(picture)

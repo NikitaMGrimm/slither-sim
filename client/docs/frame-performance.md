@@ -17,9 +17,9 @@ case, not a measurement of official-server populations.
 
 Each scene warms for 40 frames, then records 60 frames in `frames.csv` and three
 premultiplied RGBA8 readbacks. Preparation calls production world, HUD and login
-composition, including the native retained-picture clone. Client state is frozen
-to isolate frame preparation. Resource synchronization and render submission
-(world plus overlay) are timed separately. GPU completion waits, readbacks and
+composition, including the native retained-picture clone. Simulation and ingress
+are frozen to isolate frame preparation. Resource synchronization and render
+submission (world plus overlay) are timed separately. GPU completion waits, readbacks and
 logging are outside those CPU phase timings. This does not measure simulation,
 networking, desktop pacing, scanout or gameplay FPS.
 
