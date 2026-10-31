@@ -7,7 +7,7 @@ use slither_sim::client::{Host, HostConfig, RunningHost};
 const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS]\n\n\
     Binary protocol-19 WebSocket server at /slither. Defaults bind loopback.\n\
     FILE is a HostConfig JSON object with players and bots sections; --bind overrides bind.\n\
-    --stats prints tick rate, deferred ticks, simulation load and population to stderr every SECONDS.\n\
+    --stats prints tick rate, deferred ticks, load, population and admission rejections every SECONDS.\n\
     See docs/raw-server.md for limits and VPS configuration.";
 
 fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
@@ -141,6 +141,12 @@ fn report_host_stats(
         if previous.at.elapsed() >= interval {
             let current = HostStats::sample(host);
             current.write_since(&previous, host.players(), bot_slots, output)?;
+            for ((phase, reason), count) in host.admission_rejections() {
+                writeln!(
+                    output,
+                    "admission_rejections: phase={phase} reason={reason:?} count={count}"
+                )?;
+            }
             previous = current;
         }
     }

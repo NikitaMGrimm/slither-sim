@@ -1050,6 +1050,48 @@ fn session_ids_and_leaderboards_follow_self_in_all_framing_modes() {
 }
 
 #[test]
+fn admission_rejections_are_counted_by_phase_and_reason() {
+    let host = Running::start(config(1, 0));
+    assert!(host.host.admission_rejections().is_empty());
+    for (messages, reason) in [
+        (vec![vec![99, 0], vec![b'x'; 27]], "Invalid challenge reply"),
+        (vec![vec![99, 0], vec![b'x'; 27]], "Invalid challenge reply"),
+        (vec![vec![b's']], "Truncated login"),
+        (
+            vec![vec![99, 0], LITERAL.to_vec(), vec![0]],
+            "Expected a login",
+        ),
+    ] {
+        let mut client = Raw::connect(host.address, "/slither");
+        assert!(client.status().starts_with("HTTP/1.1 101"));
+        for message in messages {
+            client.send(&message);
+        }
+        assert_eq!(client.closed(), reason);
+    }
+    let mut wrong_path = Raw::connect(host.address, "/other");
+    assert!(wrong_path.status().starts_with("HTTP/1.1 404"));
+    // Closing an admitted player must not inflate the admission counters.
+    let mut player = Raw::connect(host.address, "/slither");
+    assert!(player.status().starts_with("HTTP/1.1 101"));
+    player.send(&stock_login(b"Player", 0, &[]));
+    assert_eq!(packets(&player.binary()[2..])[0][0], b'a');
+    player.send(&[255]);
+    assert_eq!(player.closed(), "Unsupported client message");
+    let counts = host.host.admission_rejections();
+    assert_eq!(counts.len(), 4);
+    for (phase, reason, count) in [
+        ("hello", "Truncated login", 1),
+        ("reply", "Invalid challenge reply", 2),
+        ("login", "Expected a login", 1),
+        ("http", "Not found", 1),
+    ] {
+        assert_eq!(counts.get(&(phase, reason.to_owned())), Some(&count));
+    }
+    host.finish();
+}
+
+#[test]
 fn malformed_and_unsupported_clients_are_closed_alone() {
     let host = Running::start(config(2, 0));
     let mut bot = network(host.url(), "Steady", Handshake::Challenge);
