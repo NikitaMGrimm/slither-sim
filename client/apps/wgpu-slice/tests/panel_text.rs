@@ -38,7 +38,7 @@ fn aggregate_clipped_allocation_envelope_includes_overhang_rounding_and_tiles() 
     assert!(preflight_panel_totals(0, [89, 0]).is_err());
     assert_eq!(
         (PANEL_CACHE_RUNS, TOTAL_CACHE_RUNS, TOTAL_CACHE_BYTES),
-        (64, 386, 22 * 1024 * 1024)
+        (64, 386, 26 * 1024 * 1024)
     );
     assert_eq!((PANEL_PRODUCER_DRAWS, PANEL_CONTROL_DRAWS), (96, 8));
 }

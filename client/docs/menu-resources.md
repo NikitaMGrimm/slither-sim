@@ -14,6 +14,14 @@ and minimap. Nicknames remain in the capped world backing. The diagnostic
 A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
+Overlay image origins round to whole physical pixels after text baseline and
+alignment offsets. Controls and text rasterize at the window DPR and draw one
+source pixel per physical pixel. Clipping keeps whole texels inside the CSS clip;
+world nicknames retain their canvas placement. Pointer hit targets keep the core
+CSS layout; caret and IME candidate rectangles share physical-pixel rounding.
+Menu art is CPU-filtered on premultiplied pixels with Catmull-Rom once per source
+revision and physical destination size, then cached at that exact size.
+
 Authored Play capsules use eased vertical gradients and dim the normal surface
 and label together when disabled. Nickname uses one bordered purple surface with
 a broad shadow; tips and nickname use Lucida Sans Unicode on Windows, while Play
@@ -29,8 +37,9 @@ and a text logo fallback approximate the controls at gameplay size. The spinner 
 two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
 phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
 scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
-into one premultiplied antialiased raster at 128 CSS pixels times DPR (capped at
-384 pixels per side). One quad applies scale and alpha to the complete canvas,
+into one premultiplied antialiased raster at 128 CSS pixels times its animated
+scale and DPR, rounded to a physical pixel (at most 2048 pixels per side).
+One 1:1 quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
@@ -45,16 +54,22 @@ use solid materials without capsule shadows.
 
 ## Bounds and publication
 
-- Menu has **64 replacing slots / 4 MiB**, shared by text and authored materials,
+- Menu has **64 replacing slots / 8 MiB**, shared by text and authored materials,
   isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
-  are **386 slots / 22 MiB**; these are ceilings, not eager allocations.
+  are **386 slots / 26 MiB**; these are ceilings, not eager allocations. The Menu
+  allowance includes exact 5x control/shadow rasters.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Text caps at 3x. Each capsule's raster scale fits the existing 512px texture
-  limit including shadows and ceiling slack. Logical edges remain at core rectangles. Decoded menu art is
-  filtered to at most 512px on its longest axis, preserving aspect ratio.
+- Menu/HUD text uses exact DPR within the 2048px texture bound and its byte
+  budgets; world nicknames retain the 128px font guard and backing-space
+  diagnostics retain their 3x raster bound. Controls and
+  decoded menu art allow up to 2048px per axis. Menu decoding alone admits that
+  density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
+  pixel budgets and the two-resident-logo-frame limit still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
+  menu art admission reserves the five procedural skin roles' 79,424 RGBA bytes;
+  those mandatory roles also precede optional images at construction. Authored
   controls use the Menu group's own allowance, so a full cosmetics bank cannot
   block essential controls; unadmitted art uses authored fallbacks.
   Prepared pictures and staged replacements own additional bounded

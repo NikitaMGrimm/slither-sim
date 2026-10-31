@@ -50,6 +50,52 @@ fn png_rect(width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
         .unwrap();
     bytes.into_inner()
 }
+#[test]
+fn physical_menu_rasters_are_pixel_aligned_one_to_one_and_reused() {
+    let mut images = Images::default();
+    images
+        .add("menu/logo.png", &png_rect(1350, 405, [20, 180, 60, 255]))
+        .unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    assert_eq!(art.menu_art(MenuArt::Logo(0)).unwrap().asset.width, 1350);
+    assert_eq!(art.menu_art(MenuArt::Logo(0)).unwrap().asset.height, 405);
+    // The larger menu decode bound must not broaden world cosmetic inputs.
+    assert!(slither_wgpu_slice::cosmetics::decode(&png_rect(1350, 405, [255; 4])).is_err());
+    for dpr in [1., 1.25, 1.5, 1.75, 2.] {
+        let mut menu = Menu::default();
+        let mut text = TextCache::menu();
+        let view = slither_wgpu_slice::menu_specimen::view(4).unwrap();
+        let layout =
+            slither_wgpu_slice::menu_specimen::layout(&mut text, &view, [3840, 2160], dpr).unwrap();
+        let mut previous = None;
+        for _ in 0..2 {
+            let p = menu
+                .prepare(&mut text, &view, &layout, [3840, 2160], dpr, Some(&art), 0)
+                .unwrap();
+            assert!(!p.frame.draws.is_empty());
+            for draw in &p.frame.draws {
+                let r = draw.destination;
+                for value in [
+                    (r.x + draw.translation[0]) * dpr,
+                    (r.y + draw.translation[1]) * dpr,
+                ] {
+                    assert!((value - value.round()).abs() < 1e-9, "{dpr}: {draw:?}");
+                }
+                let source = draw
+                    .source
+                    .map(|s| [s.width, s.height])
+                    .unwrap_or([f64::from(draw.asset.width), f64::from(draw.asset.height)]);
+                assert!((r.width * dpr - source[0]).abs() < 1e-9, "{dpr}: {draw:?}");
+                assert!((r.height * dpr - source[1]).abs() < 1e-9, "{dpr}: {draw:?}");
+            }
+            let assets: Vec<_> = p.frame.draws.iter().map(|d| d.asset).collect();
+            if let Some(old) = previous {
+                assert_eq!(assets, old);
+            }
+            previous = Some(assets);
+        }
+    }
+}
 fn layout() -> MenuLayout {
     MenuLayout::new(
         1280.,
@@ -162,16 +208,54 @@ fn menu_art_shares_existing_cosmetic_pixel_allowance() {
     for path in ["s/a_oakley.png", "s/a_cap.png", "s/a_crown.png"] {
         images.add(path, &bytes).unwrap();
     }
-    images.add("menu/logo.png", &bytes).unwrap();
-    for path in ["menu/skin.png", "menu/builder.png", "menu/cosmetic.png"] {
-        images.add(path, &bytes).unwrap();
+    let menu_bytes = png(512, [1, 2, 3, 255]);
+    images.add("menu/logo.png", &menu_bytes).unwrap();
+    for path in ["menu/skin.png", "menu/builder.png"] {
+        images.add(path, &menu_bytes).unwrap();
     }
-    assert!(images.add("s/a_visor.png", &png(1, [0; 4])).is_err());
+    assert!(images.add("menu/cosmetic.png", &menu_bytes).is_err());
     // The failed insert cannot consume the last frame's pixels.
     let art = Cosmetics::from_images(images, None).unwrap();
     assert!(art.menu_art(MenuArt::Logo(0)).is_some());
     assert!(art.menu_art(MenuArt::Skin).is_some());
     assert_eq!(art.menu_art(MenuArt::Logo(0)).unwrap().asset.width, 512);
+}
+#[test]
+fn maximum_menu_image_cannot_displace_procedural_skin_roles() {
+    use slither_client::presentation::SkinSourceRole::*;
+    let mut images = Images::default();
+    assert_eq!(
+        images
+            .add("menu/logo.png", &png(2048, [80, 180, 60, 255]))
+            .unwrap_err(),
+        "Cosmetic pixel budget"
+    );
+    let art = Cosmetics::from_images(images, None).unwrap();
+    let roles = [SingleEyeBase, SingleEyePupil, MouthEyeMarks, AcBulb, CdBulb];
+    for role in roles {
+        assert!(art.role(role).is_some(), "{role:?}");
+    }
+    assert_eq!(
+        art.resources().map(|r| r.image.pixels.len()).sum::<usize>(),
+        79_424
+    );
+    let mut images = Images::default();
+    images
+        .manifest(b"menu-art-v1\nlogo:0 1 menu/logo.png\nlogo:1 1 menu/reveal.png\n")
+        .unwrap();
+    let frame = png_rect(1350, 405, [80, 180, 60, 255]);
+    images.add("menu/logo.png", &frame).unwrap();
+    images.add("menu/reveal.png", &frame).unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    for role in roles {
+        assert!(art.role(role).is_some(), "{role:?}");
+    }
+    assert!(art.menu_art(MenuArt::Logo(0)).is_some());
+    assert!(art.menu_art(MenuArt::Logo(1)).is_some());
+    assert!(
+        art.resources().map(|r| r.image.pixels.len()).sum::<usize>()
+            <= slither_wgpu_slice::cosmetics::COSMETIC_PIXEL_BUDGET
+    );
 }
 #[test]
 fn full_cosmetics_bank_keeps_essential_menu_and_authored_fallbacks() {
@@ -332,7 +416,7 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
             assert!(p.frame.draws.len() < 512);
             let nick =
                 layout().viewport_rect(slither_client::menu_layout::MenuElement::NicknameHolder);
-            let material_scale = dpr.min(3.).min(509. / (nick.width.max(nick.height) + 80.));
+            let material_scale = dpr;
             let pad = (40. * material_scale).ceil() / material_scale;
             let shape = p
                 .frame
@@ -348,7 +432,7 @@ fn states_dprs_missing_art_resize_and_replacement_keep_owned_frames() {
             assert!(
                 p.resources
                     .iter()
-                    .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
+                    .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
             );
             assert!(
                 p.resources
@@ -408,7 +492,6 @@ fn logo_paints_its_aspect_ratio_without_changing_the_flow_holder() {
             .add("menu/logo.png", &png_rect(w, h, [80, 200, 100, 255]))
             .unwrap();
         let art = Cosmetics::from_images(images, None).unwrap();
-        let asset = art.menu_art(MenuArt::Logo(0)).unwrap().asset;
         let p = Menu::default()
             .prepare(
                 &mut TextCache::menu(),
@@ -420,16 +503,10 @@ fn logo_paints_its_aspect_ratio_without_changing_the_flow_holder() {
                 0,
             )
             .unwrap();
-        let logo = p
-            .frame
-            .draws
-            .iter()
-            .find(|d| d.asset == asset)
-            .unwrap()
-            .destination;
+        let logo = p.frame.draws.first().unwrap().destination;
         assert_eq!(logo.y, holder.y);
         assert!((logo.width * f64::from(h) - logo.height * f64::from(w)).abs() < 1e-9);
-        assert!((logo.x + logo.width / 2. - holder.x - holder.width / 2.).abs() < 1e-9);
+        assert!((logo.x + logo.width / 2. - holder.x - holder.width / 2.).abs() <= 0.5);
         assert!(logo.height <= room);
         if h == 135 {
             assert_eq!(logo.width, holder.width);
@@ -622,7 +699,10 @@ fn spinner_raster_phase_and_revision_follow_shared_time() {
             assert_eq!(draw.effective_alpha, 0.6);
             assert_eq!(
                 (resource.asset.width, resource.asset.height),
-                ((128. * dpr) as u32, (128. * dpr) as u32)
+                (
+                    (128. * dpr * view.spinner_scale).ceil() as u32,
+                    (128. * dpr * view.spinner_scale).ceil() as u32
+                )
             );
             if let Some((handle, revision)) = previous {
                 assert_eq!(resource.asset.handle, handle);
@@ -632,9 +712,10 @@ fn spinner_raster_phase_and_revision_follow_shared_time() {
             // A ray just beyond the pinched tail crosses green at every phase,
             // independently of the radial wobble. Alpha lives on the one quad.
             let angle = phase + 0.25;
+            let raster_scale = f64::from(resource.asset.width) / 128.;
             let green = (25..=41).any(|radius| {
-                let x = ((64. + 1.25 * f64::from(radius) * angle.cos()) * dpr) as usize;
-                let y = ((64. + f64::from(radius) * angle.sin()) * dpr) as usize;
+                let x = ((64. + 1.25 * f64::from(radius) * angle.cos()) * raster_scale) as usize;
+                let y = ((64. + f64::from(radius) * angle.sin()) * raster_scale) as usize;
                 let px = &resource.image.pixels[(y * resource.image.width as usize + x) * 4..][..4];
                 px[1] > px[0] && px[1] > px[2] && px[3] > 32
             });
@@ -680,7 +761,7 @@ fn spinner_raster_phase_and_revision_follow_shared_time() {
     let faded = menu
         .prepare(&mut text, &view, &layout(), [1280, 720], 1., None, 0)
         .unwrap();
-    assert_eq!(faded.resources[0].asset, resumed.resources[0].asset);
+    assert_ne!(faded.resources[0].asset, resumed.resources[0].asset);
     assert_eq!(faded.frame.draws[0].effective_alpha, 0.3);
     assert_eq!(faded.frame.draws[0].destination.width, 64.);
     view.visible = true;
@@ -689,7 +770,7 @@ fn spinner_raster_phase_and_revision_follow_shared_time() {
         .unwrap();
     assert_eq!(
         menu_frame.frame.draws.last().unwrap().asset,
-        resumed.resources[0].asset
+        faded.resources[0].asset
     );
 }
 

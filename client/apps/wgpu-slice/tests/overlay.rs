@@ -133,6 +133,97 @@ fn fixed_scale_reuses_text_rasters_across_frames_and_window_resize() {
     assert_ne!(text_assets(&first), text_assets(&scale_changed));
     assert!(text_assets(&first)[0].height > text_assets(&scale_changed)[0].height);
 }
+#[test]
+fn fractional_display_scales_keep_hud_text_on_physical_texels() {
+    let mut game = tape::playing();
+    for dpr in [1.25, 1.5, 1.75] {
+        game.window_viewport([3840, 2160], dpr).unwrap();
+        let picture = snapshot(&mut game, 100);
+        let text: Vec<_> = picture
+            .overlay
+            .as_ref()
+            .unwrap()
+            .draws
+            .iter()
+            .filter(|d| d.asset.handle >> 60 == 4)
+            .collect();
+        assert!(!text.is_empty());
+        for d in text {
+            let s = d.source.unwrap();
+            for v in [
+                (d.destination.x + d.translation[0]) * dpr,
+                (d.destination.y + d.translation[1]) * dpr,
+            ] {
+                assert!((v - v.round()).abs() < 1e-9);
+            }
+            assert!((d.destination.width * dpr - s.width).abs() < 1e-9);
+            assert!((d.destination.height * dpr - s.height).abs() < 1e-9);
+        }
+    }
+}
+
+#[test]
+fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
+    use slither_wgpu_slice::{hud, login_native::NativeLogin};
+    let physical = [6400, 3600];
+    let mut game = tape::playing();
+    // DPR 5 covers Windows' maximum; DPR 8 crosses the former 128px guard
+    // with the actual largest HUD span (the 21px leaderboard heading).
+    for dpr in [5., 8.] {
+        game.window_viewport(physical, dpr).unwrap();
+        let plan = hud::plan(&game.hud_view(), physical, dpr).unwrap();
+        assert_eq!(
+            plan.lines
+                .iter()
+                .flat_map(|l| &l.spans)
+                .map(|s| s.style.size)
+                .fold(0_f64, f64::max),
+            21.
+        );
+        let picture = snapshot(&mut game, 100);
+        let resident = picture
+            .resources
+            .iter()
+            .map(|r| (r.asset.into(), r.asset))
+            .collect();
+        picture.frame.validate(&resident).unwrap();
+        let overlay = picture.overlay.as_ref().unwrap();
+        overlay.validate(&resident).unwrap();
+        for draw in overlay.draws.iter().filter(|d| d.asset.handle >> 60 == 4) {
+            let source = draw.source.unwrap();
+            assert!((draw.destination.width * dpr - source.width).abs() < 1e-9);
+            assert!((draw.destination.height * dpr - source.height).abs() < 1e-9);
+        }
+    }
+    let mut login = NativeLogin::new("Player").unwrap();
+    login.step(0., true, false).unwrap();
+    let menu = login.prepare_host(physical, 5., true, None).unwrap();
+    let resident = menu
+        .resources
+        .iter()
+        .map(|r| (r.asset.into(), r.asset))
+        .collect();
+    menu.frame.validate(&resident).unwrap();
+    let widest = menu
+        .resources
+        .iter()
+        .filter(|r| r.asset.handle >> 60 == 7)
+        .max_by_key(|r| r.asset.width)
+        .unwrap();
+    assert_eq!(widest.asset.width, 1640);
+    assert!(
+        menu.resources
+            .iter()
+            .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+    );
+    assert!(
+        menu.resources
+            .iter()
+            .map(|r| r.image.pixels.len())
+            .sum::<usize>()
+            <= slither_wgpu_slice::text::MENU_CACHE_BYTES
+    );
+}
 
 #[test]
 fn setup_retry_and_resize_keep_immutable_overlay_with_its_picture() {

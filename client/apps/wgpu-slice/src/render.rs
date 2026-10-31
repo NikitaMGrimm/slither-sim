@@ -1069,6 +1069,23 @@ fn prepare_composed(
         resources,
     })
 }
+// Clip on the same physical grid as the raster. Fractional source crops would
+// reintroduce filtering even after the tile origin has been snapped.
+pub(crate) fn clip_overlay_text(draw: &mut Draw, clip: BodyRect, scale: f64) -> bool {
+    let right = ((clip.x + clip.width) * scale).floor() / scale;
+    let bottom = ((clip.y + clip.height) * scale).floor() / scale;
+    let x = (clip.x * scale).ceil() / scale;
+    let y = (clip.y * scale).ceil() / scale;
+    clip_text(
+        draw,
+        BodyRect {
+            x,
+            y,
+            width: right - x,
+            height: bottom - y,
+        },
+    )
+}
 // Text tiles have no rotation. Intersect both the logical destination and its
 // source crop, so long names cannot paint into score/rank columns or offscreen.
 pub(crate) fn clip_text(draw: &mut Draw, clip: BodyRect) -> bool {
@@ -1117,18 +1134,23 @@ fn finish_plan(
         // Late overlays retain the captured scene's immutable resources. Text
         // slots may change afterward without changing queued Setup pictures.
         let total_draws = prepared.draw_count();
+        let physical_overlay = prepared.overlay.is_some();
         let frame = prepared.ui_frame_mut();
         let other_draws = total_draws - frame.draws.len();
         let scale = frame.viewport_scale;
-        let max_font_size = plan
-            .lines
-            .iter()
-            .flat_map(|line| &line.spans)
-            .map(|span| span.style.size)
-            .fold(0_f64, f64::max);
-        let raster_scale = scale
-            .min(crate::text::MAX_HUD_RASTER_SCALE)
-            .min(128. / max_font_size);
+        let raster_scale = if physical_overlay {
+            scale
+        } else {
+            let max_font_size = plan
+                .lines
+                .iter()
+                .flat_map(|line| &line.spans)
+                .map(|span| span.style.size)
+                .fold(0_f64, f64::max);
+            scale
+                .min(crate::text::MAX_HUD_RASTER_SCALE)
+                .min(128. / max_font_size)
+        };
         bank.text
             .begin_hud_frame(plan.lines.iter().map(|line| line.spans.len()).sum());
         let viewport = BodyRect {
@@ -1166,7 +1188,9 @@ fn finish_plan(
                     if frame.draws.len() >= draw_limit {
                         break;
                     }
-                    if clip_text(&mut draw, line.clip) && clip_text(&mut draw, viewport) {
+                    if clip_overlay_text(&mut draw, line.clip, scale)
+                        && clip_overlay_text(&mut draw, viewport, scale)
+                    {
                         check_draw_count(other_draws + frame.draws.len() + 1)?;
                         push_draw(&mut frame.draws, draw)?;
                         resources.insert(resource.asset.handle, resource);

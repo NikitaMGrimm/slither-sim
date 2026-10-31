@@ -1072,7 +1072,8 @@ fn zero_resize_retry_retains_generation_state_and_pending_world() {
     for (before, after) in hud_draws.iter().zip(&resized) {
         assert_eq!(before.effective_alpha, after.effective_alpha);
         // DPR requires new font rasters. Coverage bounds can round by a logical
-        // pixel, while the shared anchors and lifecycle state stay unchanged.
+        // pixel plus half a physical pixel when snapping the combined origin,
+        // while the shared anchors and lifecycle state stay unchanged.
         for (a, b) in [
             (before.destination.x, after.destination.x),
             (before.destination.y, after.destination.y),
@@ -1085,7 +1086,7 @@ fn zero_resize_retry_retains_generation_state_and_pending_world() {
                 after.destination.y + after.destination.height,
             ),
         ] {
-            assert!((a - b).abs() <= 1., "before={before:?}, after={after:?}");
+            assert!((a - b).abs() <= 1.5, "before={before:?}, after={after:?}");
         }
     }
     g.presented(true).unwrap();

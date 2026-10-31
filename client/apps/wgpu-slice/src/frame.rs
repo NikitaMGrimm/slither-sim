@@ -97,6 +97,15 @@ pub struct Draw {
     pub blend: BodyBlend,
 }
 impl Draw {
+    /// Overlay tiles are already rasterized in physical pixels. Round the
+    /// combined origin (including baseline/centering), never each term, so a
+    /// linear sampler reads texel centres without a second reconstruction.
+    pub(crate) fn snap_overlay(&mut self, scale: f64) {
+        self.destination.x = ((self.destination.x + self.translation[0]) * scale).round() / scale;
+        self.destination.y = ((self.destination.y + self.translation[1]) * scale).round() / scale;
+        self.translation = [0., 0.];
+    }
+
     /// Diagnostic geometry overlap only; transparent source pixels are not inspected.
     pub(crate) fn image_intersects_viewport(&self, extent: [u32; 2], scale: f64) -> bool {
         let r = self.destination;

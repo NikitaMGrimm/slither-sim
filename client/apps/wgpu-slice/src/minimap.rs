@@ -396,7 +396,7 @@ impl Minimap {
             return Ok(());
         }
         let scale = frame.viewport_scale;
-        let raster_scale = scale.min(crate::text::MAX_HUD_RASTER_SCALE);
+        let raster_scale = scale;
         let anchor = label.text_anchor();
         let clip = BodyRect {
             x: origin[0] + label.top_left.x,
@@ -430,8 +430,8 @@ impl Minimap {
             label.shadow_blur,
             label.size.x,
         )? {
-            if (!label.overflow_hidden || crate::render::clip_text(&mut draw, clip))
-                && crate::render::clip_text(&mut draw, viewport)
+            if (!label.overflow_hidden || crate::render::clip_overlay_text(&mut draw, clip, scale))
+                && crate::render::clip_overlay_text(&mut draw, viewport, scale)
             {
                 push_draw(&mut frame.draws, draw)?;
                 resources.push(resource);
@@ -627,7 +627,7 @@ mod tests {
     fn overlong_label_clips_css_overflow_at_every_dpr() {
         let mut map = Minimap::default();
         let mut cache = TextCache::default();
-        for dpr in [1., 2., 16., 1.25, 2.75] {
+        for dpr in [1., 2., 3., 1.25, 2.75] {
             let mut f = frame(dpr);
             let mut resources = vec![];
             let mut l = label(&"W".repeat(100));
@@ -664,11 +664,11 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn high_dpr_reuses_the_three_times_raster_without_changing_logical_placement() {
+    fn fixed_dpr_reuses_exact_physical_rasters() {
         let mut map = Minimap::default();
         let mut cache = TextCache::default();
         let mut previous = None;
-        for dpr in [3., 16.] {
+        for dpr in [3., 3.] {
             let mut f = frame(dpr);
             let mut resources = vec![];
             map.append_server_label(
@@ -714,7 +714,7 @@ mod tests {
             32_768,
             8192,
         ] {
-            let mut f = frame(16.);
+            let mut f = frame(3.);
             f.draws = vec![filler.clone(); count];
             let mut resources = vec![];
             let mut l = label(&"W".repeat(100));

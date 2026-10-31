@@ -109,7 +109,7 @@ impl Rasterizer {
             .into_iter()
             .all(f64::is_finite)
             || width > 8192.
-            || height > 512.
+            || height > f64::from(super::MAX_OVERLAY_TEXT_EXTENT)
         {
             return Err("text raster extent budget".into());
         }

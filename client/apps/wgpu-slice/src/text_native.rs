@@ -265,7 +265,7 @@ impl Rasterizer {
         let width = max_width.map_or(width, |limit| width.min(limit as usize + 2));
         let height =
             ((f64::from(bounds[3]) / SAMPLE as f64).ceil() as i32 - top + 1).max(1) as usize;
-        if width > 8192 || height > 512 {
+        if width > 8192 || height > super::MAX_OVERLAY_TEXT_EXTENT as usize {
             return Err("text raster extent budget".into());
         }
         let mut mask = vec![0_u8; width * height * SAMPLE * SAMPLE];

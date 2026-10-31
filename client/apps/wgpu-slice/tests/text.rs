@@ -141,7 +141,7 @@ fn native_arial_preserves_style_alpha_scale_and_evicted_frame_pixels() {
 #[test]
 fn hud_raster_errors_are_explicit_instead_of_omitting_fields() {
     let mut cache = TextCache::default();
-    assert!(cache.draw_hud(0, run("HUD"), 100., None).is_err());
+    assert!(cache.draw_hud(0, run("HUD"), 2049. / 15., None).is_err());
     assert_eq!(cache.cached_runs(), 0);
 }
 

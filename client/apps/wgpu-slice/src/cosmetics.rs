@@ -6,6 +6,9 @@ use std::{collections::BTreeMap, io::Cursor};
 
 pub const MAX_ENCODED_BYTES: usize = 4 * 1024 * 1024;
 pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
+// The five procedural faces/bulbs below must survive optional menu art. These
+// are their RGBA dimensions in procedural(); no eager rasterization is needed.
+const PROCEDURAL_PIXEL_BYTES: usize = (2 * 64 * 64 + 2 * 48 * 48 + 84 * 84) * 4;
 mod menu_art;
 pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
 
@@ -95,6 +98,9 @@ pub fn paths() -> Vec<String> {
 
 /// PNG/JPEG only, with limits installed before decoding and RGBA allocation.
 pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
+    decode_bounded(bytes, 1024)
+}
+fn decode_bounded(bytes: &[u8], max_extent: u32) -> Result<RgbaImage> {
     if bytes.is_empty() || bytes.len() > MAX_ENCODED_BYTES {
         return Err("Cosmetic encoded image budget".into());
     }
@@ -108,8 +114,8 @@ pub fn decode(bytes: &[u8]) -> Result<RgbaImage> {
         return Err("Cosmetic image must be PNG or JPEG".into());
     }
     let mut limits = image::Limits::default();
-    limits.max_image_width = Some(1024);
-    limits.max_image_height = Some(1024);
+    limits.max_image_width = Some(max_extent);
+    limits.max_image_height = Some(max_extent);
     limits.max_alloc = Some(16 * 1024 * 1024);
     reader.limits(limits);
     let rgba = reader.decode().map_err(|e| e.to_string())?.into_rgba8();
@@ -163,7 +169,11 @@ impl Images {
     }
     pub fn add(&mut self, path: &str, bytes: &[u8]) -> Result<()> {
         if let Some(entry) = self.menu.manifest.0.iter().find(|e| e.path == path) {
-            return self.menu.insert(entry.art, decode(bytes)?, self.bytes);
+            return self.menu.insert(
+                entry.art,
+                decode_bounded(bytes, menu_art::MAX_EXTENT)?,
+                self.bytes + PROCEDURAL_PIXEL_BYTES,
+            );
         }
         if !paths().iter().any(|p| p == path) || self.images.contains_key(path) {
             return Err("Unknown or duplicate cosmetic path".into());
@@ -261,13 +271,8 @@ impl Cosmetics {
             })
         };
         let mut roles = BTreeMap::new();
-        for (role, path, w, h, inset) in IMAGES {
-            if let Some(image) = images.images.remove(path)
-                && let Some(source) = resource(canvas_image(image, w, h, inset, inset != 0), path)
-            {
-                roles.insert(role.as_str(), source);
-            }
-        }
+        // Mandatory procedural roles precede optional external images, including
+        // images added after menu art consumed part of the shared allowance.
         for role in [
             SkinSourceRole::SingleEyeBase,
             SkinSourceRole::SingleEyePupil,
@@ -282,6 +287,13 @@ impl Cosmetics {
                     }
                 }
                 Err(error) => eprintln!("Cosmetic {} unavailable: {error}", role.as_str()),
+            }
+        }
+        for (role, path, w, h, inset) in IMAGES {
+            if let Some(image) = images.images.remove(path)
+                && let Some(source) = resource(canvas_image(image, w, h, inset, inset != 0), path)
+            {
+                roles.insert(role.as_str(), source);
             }
         }
         let accessories = ACCESSORIES
@@ -408,7 +420,11 @@ impl Cosmetics {
             .chain(self.accessories.values())
             .map(|r| r.image.pixels.len())
             .sum();
-        self.menu.insert(art, decode(bytes)?, other_bytes)
+        self.menu.insert(
+            art,
+            decode_bounded(bytes, menu_art::MAX_EXTENT)?,
+            other_bytes,
+        )
     }
 }
 

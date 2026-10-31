@@ -4,6 +4,9 @@ use super::*;
 pub const MANIFEST_PATH: &str = "menu/manifest.txt";
 pub const MANIFEST_LIMIT: usize = 4096;
 pub const MAX_LOGO_FRAMES: u8 = 32;
+// 450 CSS px at 3x fits without losing density; the shared cosmetics byte
+// allowance and two-frame logo residency still bound allocations.
+pub(super) const MAX_EXTENT: u32 = 2048;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MenuArt {
@@ -157,11 +160,10 @@ impl MenuArtCache {
             .iter()
             .find(|e| e.art == art)
             .ok_or("Unknown menu art")?;
-        // Menu slots display at most 450px wide. Keep the existing GPU texture
-        // bound without an atlas or eager multi-frame residency. Filtering is
-        // on premultiplied pixels, so transparent edges retain their colour.
-        let image = if image.width > 512 || image.height > 512 {
-            let scale = 512. / f64::from(image.width.max(image.height));
+        // Preserve high-density sources. Menu composition filters once to each
+        // physical destination size; never repeatedly minify art on the GPU.
+        let image = if image.width > MAX_EXTENT || image.height > MAX_EXTENT {
+            let scale = f64::from(MAX_EXTENT) / f64::from(image.width.max(image.height));
             let width = (f64::from(image.width) * scale).round().max(1.) as u32;
             let height = (f64::from(image.height) * scale).round().max(1.) as u32;
             let source = image::RgbaImage::from_raw(image.width, image.height, image.pixels)

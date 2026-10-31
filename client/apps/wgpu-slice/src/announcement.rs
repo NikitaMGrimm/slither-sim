@@ -112,7 +112,7 @@ impl Announcement {
         }
         let (plan, alpha) = self.plan(view, text, frame.viewport_scale)?;
         let draws = text
-            .draw_panel_composition_with_run_alphas(
+            .draw_overlay_panels_with_run_alphas(
                 &[PanelSubmission {
                     group: PanelGroup::Announcement,
                     plan: &plan,
@@ -132,7 +132,7 @@ impl Announcement {
             height: f64::from(frame.extent[1]) / frame.viewport_scale,
         };
         for (mut draw, resource) in draws {
-            if crate::render::clip_text(&mut draw, viewport) {
+            if crate::render::clip_overlay_text(&mut draw, viewport, frame.viewport_scale) {
                 crate::frame::push_draw(&mut frame.draws, draw)?;
                 resources.push(resource);
             }
