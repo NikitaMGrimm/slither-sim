@@ -11,7 +11,7 @@ mod pit_food_tests;
 mod spawn_bounds;
 #[cfg(test)]
 mod spawn_bounds_tests;
-use crate::bounds_index::BoundsIndex;
+use crate::bounds_index::{BoundsIndex, CollisionGrid};
 use crate::food_grid::{EaterGrid, FoodCache, PelletIndex};
 use crate::kiosk::{KioskConfig, KioskState};
 use crate::prey::{OUTWARD_SPEED, Prey, PreyConfig, PreyMode};
@@ -1861,14 +1861,31 @@ impl Simulator {
         order.clear();
         order.extend_from_slice(alive);
         order.sort_unstable_by_key(|&i| self.joins[i]);
+        let longest = order
+            .iter()
+            .map(|&j| self.snakes[j].segments)
+            .max()
+            .unwrap_or(0);
+        // Large dense worlds repay expanded body insertion by avoiding a merged,
+        // sorted query for every head. The grid declines sparse or oversized
+        // geometry, retaining the existing bounds index in those worlds.
+        let grid = (order.len() >= 4096)
+            .then(|| {
+                let bounds: Vec<_> = order.iter().map(|&j| bodies[j].unwrap()).collect();
+                let reaches: Vec<_> = order
+                    .iter()
+                    .map(|&j| 3.666 * collision_distance(longest, self.snakes[j].segments))
+                    .collect();
+                CollisionGrid::new(&bounds, &reaches)
+            })
+            .flatten();
         // Small worlds test every pair faster than they build an index.
-        let index = (order.len() >= 32).then(|| {
+        let index = (grid.is_none() && order.len() >= 32).then(|| {
             let bounds: Vec<Bounds> = order
                 .iter()
                 .map(|&j| bodies[j].expect("living snake has bounds"))
                 .collect();
-            let longest = order.iter().map(|&j| self.snakes[j].segments).max();
-            (BoundsIndex::new(&bounds), longest.unwrap_or(0))
+            BoundsIndex::new(&bounds)
         });
         candidates.clear();
         dead.clear();
@@ -1883,11 +1900,13 @@ impl Simulator {
             let s = &self.snakes[i];
             let (tip, direction, head_scale) = heads[i];
             let probe = Bounds::between(tip, tip);
-            let indexed = index.as_ref().is_some_and(|(index, longest)| {
-                // Scale grows with segments, so this bounds every pair's reach below.
-                let reach = 3.666 * collision_distance(s.segments, *longest);
-                index.candidates(probe, reach, candidates)
-            });
+            let grid_candidates = grid.as_ref().and_then(|grid| grid.candidates(tip));
+            let indexed = grid_candidates.is_none()
+                && index.as_ref().is_some_and(|index| {
+                    // Scale grows with segments, so this bounds every pair's reach below.
+                    let reach = 3.666 * collision_distance(s.segments, longest);
+                    index.candidates(probe, reach, candidates)
+                });
             let test = |j: usize, profile: &mut StepProfile| {
                 if i == j || fallen[j] {
                     return false;
@@ -1913,7 +1932,12 @@ impl Simulator {
             };
             // Both visit positions newest first; the index omits only snakes
             // whose bounds fail the test above.
-            let killer = if indexed {
+            let killer = if let Some(candidates) = grid_candidates {
+                candidates
+                    .iter()
+                    .map(|&k| order[k as usize])
+                    .find(|&j| test(j, profile))
+            } else if indexed {
                 candidates
                     .iter()
                     .map(|&k| order[k as usize])

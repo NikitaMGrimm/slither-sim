@@ -4,11 +4,122 @@
 //! bounds cannot be within a given reach of a query box, so results are
 //! unchanged. Items are hashed into coarse cells by their bounds; a hash
 //! collision adds candidates and never removes one.
+use crate::Point;
 use crate::physics::Bounds;
 
 const CELL: f64 = 512.0;
 /// Bounds spanning more cells than this per axis stay in an always-tested list.
 const MAX_SPAN: i64 = 16;
+
+/// Reverse broad phase for large populations: insert each expanded body box
+/// once per covered cell, then read one already-ordered list per head. This
+/// trades extra build entries for avoiding per-head bucket merging and sorting.
+pub(crate) struct CollisionGrid {
+    low: (i64, i64),
+    width: usize,
+    height: usize,
+    starts: Vec<u32>,
+    entries: Vec<u32>,
+}
+
+impl CollisionGrid {
+    const CELL: f64 = 256.0;
+
+    pub(crate) fn new(bounds: &[Bounds], reaches: &[f64]) -> Option<Self> {
+        let mut spans = Vec::with_capacity(bounds.len());
+        let (mut lx, mut hx, mut ly, mut hy) = (i64::MAX, i64::MIN, i64::MAX, i64::MIN);
+        let mut count = 0usize;
+        for (b, &reach) in bounds.iter().zip(reaches) {
+            if !b.min.finite()
+                || !b.max.finite()
+                || !(0.0..=1024.0).contains(&reach)
+                || b.min
+                    .x
+                    .abs()
+                    .max(b.min.y.abs())
+                    .max(b.max.x.abs())
+                    .max(b.max.y.abs())
+                    > 1048576.0
+            {
+                return None;
+            }
+            // `near` subtracts/adds reach on the query side. Round the body
+            // endpoints outward before reversing those operations, then round
+            // the result outward too, retaining matches at floating-point ties.
+            let span = (
+                ((b.min.x.next_down() - reach).next_down() / Self::CELL) as i64,
+                ((b.max.x.next_up() + reach).next_up() / Self::CELL) as i64,
+                ((b.min.y.next_down() - reach).next_down() / Self::CELL) as i64,
+                ((b.max.y.next_up() + reach).next_up() / Self::CELL) as i64,
+            );
+            count = count.checked_add(((span.1 - span.0 + 1) * (span.3 - span.2 + 1)) as usize)?;
+            if count > bounds.len().saturating_mul(32).min(8_388_608) {
+                return None;
+            }
+            lx = lx.min(span.0);
+            hx = hx.max(span.1);
+            ly = ly.min(span.2);
+            hy = hy.max(span.3);
+            spans.push(span);
+        }
+        if spans.is_empty() {
+            return None;
+        }
+        let width = (hx - lx + 1) as usize;
+        let height = (hy - ly + 1) as usize;
+        let cells = width.checked_mul(height)?;
+        if cells > bounds.len().saturating_mul(8).min(1048576) {
+            return None;
+        }
+        let mut starts = vec![0u32; cells + 1];
+        for &(x0, x1, y0, y1) in &spans {
+            for y in y0..=y1 {
+                let row = (y - ly) as usize * width;
+                for x in x0..=x1 {
+                    starts[row + (x - lx) as usize + 1] += 1;
+                }
+            }
+        }
+        for i in 1..starts.len() {
+            starts[i] += starts[i - 1];
+        }
+        let mut fill = starts.clone();
+        let mut entries = vec![0u32; count];
+        // Descending insertion retains the exact newest-first `order` positions
+        // with no duplicates and no per-probe sorting.
+        for (k, &(x0, x1, y0, y1)) in spans.iter().enumerate().rev() {
+            for y in y0..=y1 {
+                let row = (y - ly) as usize * width;
+                for x in x0..=x1 {
+                    let bucket = row + (x - lx) as usize;
+                    entries[fill[bucket] as usize] = k as u32;
+                    fill[bucket] += 1;
+                }
+            }
+        }
+        Some(Self {
+            low: (lx, ly),
+            width,
+            height,
+            starts,
+            entries,
+        })
+    }
+
+    /// None requests the original broad phase for unusual query coordinates.
+    pub(crate) fn candidates(&self, point: Point) -> Option<&[u32]> {
+        if !point.finite() {
+            return None;
+        }
+        let x = ((point.x / Self::CELL) as i64).checked_sub(self.low.0)?;
+        let y = ((point.y / Self::CELL) as i64).checked_sub(self.low.1)?;
+        if x < 0 || y < 0 || x as usize >= self.width || y as usize >= self.height {
+            return Some(&[]);
+        }
+        let bucket = y as usize * self.width + x as usize;
+        Some(&self.entries[self.starts[bucket] as usize..self.starts[bucket + 1] as usize])
+    }
+}
 
 pub(crate) struct BoundsIndex {
     mask: usize,
@@ -125,6 +236,100 @@ mod tests {
     use crate::physics::{collision_distance, head_tip, strikes};
 
     #[test]
+    fn reverse_grid_matches_bounds_scan_at_rounding_boundaries() {
+        let coordinates = [
+            -1048576.0, -32768.0, -512.0, -256.0, -0.0, 0.0, 256.0, 512.0, 32768.0, 1048576.0,
+        ];
+        for origin in coordinates {
+            let bounds: Vec<_> = (0..128)
+                .map(|i| {
+                    let x = origin + (i % 8) as f64 * 8.0;
+                    let y = (i / 8) as f64 * 8.0;
+                    Bounds::between(
+                        Point { x, y },
+                        Point {
+                            x: x + 42.0,
+                            y: y + 1.0,
+                        },
+                    )
+                })
+                .collect();
+            // Translate the last case inward so all bodies meet the dense guard.
+            let bounds: Vec<_> = bounds
+                .into_iter()
+                .map(|mut b| {
+                    if origin == 1048576.0 {
+                        b.min.x -= 256.0;
+                        b.max.x -= 256.0;
+                    }
+                    b
+                })
+                .collect();
+            let reaches: Vec<_> = (0..128)
+                .map(|i| 3.666 * collision_distance(430, i * 4 + 2))
+                .collect();
+            let index = CollisionGrid::new(&bounds, &reaches).unwrap();
+            for (b, &reach) in bounds.iter().zip(&reaches).step_by(8) {
+                for x in [b.min.x - reach, b.max.x + reach, -256.0, 0.0, 256.0] {
+                    for y in [b.min.y - reach, b.max.y + reach, 0.0, 256.0] {
+                        for x in [x.next_down(), x, x.next_up()] {
+                            for y in [y.next_down(), y, y.next_up()] {
+                                let point = Point { x, y };
+                                let query = Bounds::between(point, point);
+                                let candidates = index.candidates(point).unwrap();
+                                assert!(candidates.windows(2).all(|w| w[0] > w[1]));
+                                let actual: Vec<_> = candidates
+                                    .iter()
+                                    .copied()
+                                    .filter(|&k| {
+                                        bounds[k as usize].near(query, reaches[k as usize])
+                                    })
+                                    .collect();
+                                let expected: Vec<_> = (0..128u32)
+                                    .rev()
+                                    .filter(|&k| {
+                                        bounds[k as usize].near(query, reaches[k as usize])
+                                    })
+                                    .collect();
+                                assert_eq!(actual, expected, "origin={origin} point={point:?}");
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(
+                index
+                    .candidates(Point {
+                        x: f64::NAN,
+                        y: 0.0
+                    })
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn reverse_grid_declines_large_sparse_or_nonfinite_worlds() {
+        let small = Bounds::between(Point::default(), Point { x: 42.0, y: 42.0 });
+        let mut bounds = vec![small; 128];
+        let reaches = vec![200.0; 128];
+        assert!(CollisionGrid::new(&bounds, &reaches).is_some());
+        bounds[0].max.x = 100000.0;
+        bounds[0].max.y = 100000.0;
+        assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+        bounds[0] = Bounds::between(
+            Point { x: 1e6, y: 1e6 },
+            Point {
+                x: 1e6 + 1.0,
+                y: 1e6,
+            },
+        );
+        assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+        bounds[0].min.x = f64::NAN;
+        assert!(CollisionGrid::new(&bounds, &reaches).is_none());
+    }
+
+    #[test]
     fn filtered_candidates_match_exhaustive_on_numeric_boundaries() {
         let limit = (i64::MAX as f64) * CELL;
         let coordinates = [
@@ -210,6 +415,7 @@ mod tests {
         order: &[usize],
         boundary: &[bool],
         indexed: bool,
+        reverse: bool,
     ) -> (Vec<(usize, Option<usize>)>, Vec<usize>) {
         let tips: Vec<_> = snakes
             .iter()
@@ -227,6 +433,16 @@ mod tests {
             .collect();
         let index = BoundsIndex::new(&order.iter().map(|&j| boxes[j]).collect::<Vec<_>>());
         let longest = order.iter().map(|&j| snakes[j].segments).max().unwrap_or(0);
+        let grid = reverse.then(|| {
+            CollisionGrid::new(
+                &order.iter().map(|&j| boxes[j]).collect::<Vec<_>>(),
+                &order
+                    .iter()
+                    .map(|&j| 3.666 * collision_distance(longest, snakes[j].segments))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        });
         let mut candidates = Vec::new();
         let mut fallen = vec![false; snakes.len()];
         let mut deaths = Vec::new();
@@ -242,7 +458,10 @@ mod tests {
             }
             let s = &snakes[i];
             let probe = Bounds::between(tips[i], tips[i]);
-            if !(indexed
+            if let Some(grid) = &grid {
+                candidates.clear();
+                candidates.extend_from_slice(grid.candidates(tips[i]).unwrap());
+            } else if !(indexed
                 && index.candidates(
                     probe,
                     3.666 * collision_distance(s.segments, longest),
@@ -326,8 +545,8 @@ mod tests {
                 order.swap(i, (unit() * (i + 1) as f64) as usize);
             }
             assert_eq!(
-                resolve(&snakes, &order, &boundary, true),
-                resolve(&snakes, &order, &boundary, false),
+                resolve(&snakes, &order, &boundary, true, false),
+                resolve(&snakes, &order, &boundary, false, false),
                 "round {round}"
             );
         }
@@ -378,8 +597,8 @@ mod tests {
                 for late_boundary in [false, true] {
                     boundary[2] = late_boundary;
                     assert_eq!(
-                        resolve(&snakes, &order, &boundary, true),
-                        resolve(&snakes, &order, &boundary, false),
+                        resolve(&snakes, &order, &boundary, true, false),
+                        resolve(&snakes, &order, &boundary, false, false),
                         "origin={origin}, edge={edge}, boundary={late_boundary}"
                     );
                 }
@@ -409,14 +628,57 @@ mod tests {
             .collect();
         let order: Vec<_> = (0..64).collect();
         let mut boundary = vec![false; 64];
-        let (deaths, kills) = resolve(&snakes, &order, &boundary, true);
+        let (deaths, kills) = resolve(&snakes, &order, &boundary, true, false);
         assert_eq!(deaths, vec![(0, Some(2)), (1, Some(2))]);
         assert_eq!(kills[2], 2);
         boundary[2] = true;
-        let expected = resolve(&snakes, &order, &boundary, false);
+        let expected = resolve(&snakes, &order, &boundary, false, false);
         assert_eq!(expected.0, vec![(0, Some(2)), (1, Some(2)), (2, None)]);
         assert_eq!(expected.1[2], 2);
-        assert_eq!(resolve(&snakes, &order, &boundary, true), expected);
+        assert_eq!(resolve(&snakes, &order, &boundary, true, false), expected);
+    }
+
+    #[test]
+    fn reverse_grid_preserves_fallen_targets_and_killer_order() {
+        let snakes: Vec<_> = (0..256)
+            .map(|i| {
+                let head = if i < 3 {
+                    Point::default()
+                } else {
+                    Point {
+                        x: (i % 16 + 1) as f64 * 100.0,
+                        y: (i / 16 + 1) as f64 * 100.0,
+                    }
+                };
+                SnakeLine {
+                    head,
+                    heading: 0.0,
+                    segments: if i % 17 == 0 { 100 } else { 2 },
+                    last_tip: Point {
+                        x: head.x + 13.0,
+                        y: head.y,
+                    },
+                    body: vec![Point {
+                        x: head.x + 28.0,
+                        y: head.y,
+                    }],
+                }
+            })
+            .collect();
+        let mut order: Vec<_> = (0..snakes.len()).collect();
+        let mut boundary = vec![false; snakes.len()];
+        for rotated in [false, true] {
+            if rotated {
+                order.rotate_left(31);
+            }
+            for late_boundary in [false, true] {
+                boundary[2] = late_boundary;
+                assert_eq!(
+                    resolve(&snakes, &order, &boundary, true, true),
+                    resolve(&snakes, &order, &boundary, false, false),
+                );
+            }
+        }
     }
 
     #[test]
