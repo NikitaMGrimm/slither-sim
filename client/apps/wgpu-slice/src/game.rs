@@ -6,7 +6,7 @@ use crate::{
     render::{self, PreparedFrame},
 };
 use slither_client::{
-    challenge::solve_challenge,
+    challenge::challenge_reply,
     desktop_input::{DesktopInput, OwnInput},
     gameplay_policy::GameplayPolicy,
     presentation::*,
@@ -721,7 +721,16 @@ impl LocalGame {
             .receive_header(decoded.commands.len(), decoded.commands[0][0])
             .map_err(|e| e.0)?
         {
-            let reply = solve_challenge(&decoded.commands[0][1..]).map_err(|e| e.to_string())?;
+            #[cfg(target_arch = "wasm32")]
+            let random = js_sys::Math::random;
+            #[cfg(not(target_arch = "wasm32"))]
+            let random = rand::random::<f64>;
+            let reply =
+                challenge_reply(&decoded.commands[0][1..], random).map_err(|e| e.to_string())?;
+            if let Some(reason) = reply.unsolved {
+                eprintln!("challenge not solved ({reason}); sent the stock unsolved reply");
+            }
+            let reply = reply.bytes;
             self.session = session;
             self.enqueue(EffectKind::Send(reply), After::None)?;
             self.enqueue(EffectKind::Send(self.login.clone()), After::Challenged)?;

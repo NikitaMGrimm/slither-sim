@@ -5,7 +5,7 @@ and renderers. The slither-sim crate at the repository root owns server simulati
 
 | Path | Responsibility |
 | --- | --- |
-| src/protocol*, src/challenge.rs | Wire decoding, encoding and closed challenge grammar |
+| src/protocol*, src/challenge.rs | Wire decoding, encoding, closed challenge grammar and the stock unsolved-reply fallback |
 | src/state.rs | Atomic packet application and received world state |
 | src/presentation* | Animation, prediction/correction, camera, skins, ordered draw plans and HUD |
 | src/*_policy.rs, src/desktop_input.rs, src/menu_*.rs | Session, input, gameplay and menu policy |

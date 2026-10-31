@@ -132,6 +132,58 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
     Ok(reply)
 }
 
+/// The reply sent for a server challenge.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ChallengeReply {
+    /// The 27 reply bytes.
+    pub bytes: Vec<u8>,
+    /// Why the challenge was not solved, when the stock unsolved reply was used.
+    pub unsolved: Option<ChallengeError>,
+}
+
+/// Reply to a challenge, solving the supported grammar and otherwise replying
+/// as the stock client does.
+///
+/// The stock client never solves the challenge: it accepts any challenge whose
+/// bytes all lie in `A..=z` and replies with randomized bytes, so servers that
+/// do not check the reply admit it. Community servers send other challenge
+/// shapes, such as a no-op program, that the closed grammar rejects. Solving
+/// first keeps exact replies for servers that check them; the fallback is used
+/// only where the closed grammar would otherwise abort the connection. Inputs
+/// with bytes outside `A..=z` are rejected, as the stock client sends nothing.
+///
+/// `random` must return values in `0.0..1.0`.
+pub fn challenge_reply(
+    encoded: &[u8],
+    mut random: impl FnMut() -> f64,
+) -> Result<ChallengeReply, ChallengeError> {
+    let unsolved = match solve_challenge(encoded) {
+        Ok(bytes) => {
+            return Ok(ChallengeReply {
+                bytes,
+                unsolved: None,
+            });
+        }
+        Err(error) => error,
+    };
+    if !encoded.iter().all(|byte| (b'A'..=b'z').contains(byte)) {
+        return Err(unsolved);
+    }
+    // Byte i is 'A', optionally plus 32, plus the i-th lowercase letter, plus a
+    // random 0..26. The stock alphabet has 26 letters, so its 27th lookup is
+    // NaN and that byte becomes zero. The largest byte is 65+32+122+25 = 244.
+    let mut bytes = vec![0; 27];
+    for (index, byte) in bytes.iter_mut().take(26).enumerate() {
+        let case = if random() < 0.5 { 0 } else { 32 };
+        let offset = (random() * 26.0) as u8;
+        *byte = b'A' + case + b'a' + index as u8 + offset.min(25);
+    }
+    Ok(ChallengeReply {
+        bytes,
+        unsolved: Some(unsolved),
+    })
+}
+
 struct Parser<'a> {
     source: &'a [u8],
     offset: usize,
