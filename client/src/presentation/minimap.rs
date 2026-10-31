@@ -288,8 +288,9 @@ impl MinimapState {
                 return Err(MinimapError::InvalidNumericInput);
             }
             let radius = f64::from(self.dimension.unwrap()) / 2.;
-            let project = |coordinate| {
-                js_round(10. * (radius + 12. + radius * (coordinate - center) / boundary - 7.))
+            let project = |coordinate: f64| {
+                (10. * (radius + 12. + radius * (coordinate - center) / boundary - 7.) + 0.5)
+                    .floor()
                     / 10.
             };
             let position = Point {
@@ -356,42 +357,6 @@ impl MinimapState {
             marker: self.marker,
             server_number: self.server_number,
             game_mode: self.game_mode,
-        }
-    }
-}
-
-// Comparing the fractional part avoids adding 0.5 before rounding, which can
-// cross a tie for the representable value immediately below it. copysign keeps
-// negative zero for negative values rounded toward zero.
-fn js_round(value: f64) -> f64 {
-    let integer = value.trunc();
-    let fraction = value - integer;
-    if fraction >= 0.5 {
-        integer + 1.
-    } else if fraction < -0.5 {
-        integer - 1.
-    } else {
-        integer.copysign(value)
-    }
-}
-
-#[cfg(test)]
-mod rounding_tests {
-    use super::js_round;
-
-    #[test]
-    fn authored_synthetic_rounding_boundaries_keep_exact_bits() {
-        for (value, expected) in [
-            (0.5_f64.next_down(), 0_f64),
-            (0.5, 1.),
-            (-0.5, -0.),
-            ((-0.5_f64).next_down(), -1.),
-            (-1.5, -1.),
-            (-2.5, -2.),
-            (-0., -0.),
-            (f64::from_bits(1).copysign(-1.), -0.),
-        ] {
-            assert_eq!(js_round(value).to_bits(), expected.to_bits());
         }
     }
 }

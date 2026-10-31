@@ -1,7 +1,7 @@
 //! Numeric placement of one ready-source static head image, independent of gaze.
 
 use super::{BodyRect, EyeLayoutInput, PresentationError, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Appearance-owned geometry; source dimensions and objects are draw-local inputs.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,8 +98,8 @@ impl StaticHeadAccessoryGeometry {
         let distance = self.forward * view.scale;
         let scale_zoom = view.scale * view.zoom;
         finite(&[distance, scale_zoom])?;
-        let offset_x = math::cos(face_heading) * distance;
-        let offset_y = math::sin(face_heading) * distance;
+        let offset_x = face_heading.cos() * distance;
+        let offset_y = face_heading.sin() * distance;
         let multiplier = scale_zoom * self.image_scale;
         finite(&[offset_x, offset_y, multiplier])?;
         let head_x = offset_x + view.corrected_head.x;

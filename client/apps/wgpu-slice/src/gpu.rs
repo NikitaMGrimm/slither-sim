@@ -33,6 +33,7 @@ pub struct Renderer {
     pub adapter_info: wgpu::AdapterInfo,
     layout: wgpu::BindGroupLayout,
     over: wgpu::RenderPipeline,
+    overlay_over: wgpu::RenderPipeline,
     lighter: wgpu::RenderPipeline,
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
@@ -114,7 +115,7 @@ impl Renderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("quad.wgsl").into()),
         });
         let pipeline =
-            |blend, fragment| {
+            |blend, fragment, samples| {
                 device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("ordered paint"),
                 layout: Some(&pipeline_layout),
@@ -130,7 +131,7 @@ impl Renderer {
                 },
                 primitive: Default::default(),
                 depth_stencil: None,
-                multisample: wgpu::MultisampleState{count:sample_count,..Default::default()},
+                multisample: wgpu::MultisampleState{count:samples,..Default::default()},
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: Some(fragment),
@@ -145,7 +146,12 @@ impl Renderer {
                 cache: None,
             })
             };
-        let over = pipeline(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "fs");
+        let over = pipeline(
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            "fs",
+            sample_count,
+        );
+        let overlay_over = pipeline(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "fs", 1);
         let black_over = pipeline(
             wgpu::BlendState {
                 color: wgpu::BlendComponent {
@@ -156,6 +162,7 @@ impl Renderer {
                 alpha: wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING.alpha,
             },
             "fs_black",
+            sample_count,
         );
         let add = wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::One,
@@ -168,6 +175,7 @@ impl Renderer {
                 alpha: add,
             },
             "fs",
+            sample_count,
         );
         Ok(Self {
             sample_count,
@@ -177,6 +185,7 @@ impl Renderer {
             adapter_info: info,
             layout,
             over,
+            overlay_over,
             lighter,
             black_over,
             textures: BTreeMap::new(),
@@ -189,11 +198,13 @@ impl Renderer {
         if self.lost.load(Ordering::SeqCst) {
             return Err("GPU device lost; host stopped, scene retained".into());
         }
+        // WebGL2's 2048px downlevel cap keeps the future WebGL2 extension path valid.
+        let max_dimension = wgpu::Limits::downlevel_webgl2_defaults().max_texture_dimension_2d;
         if a.status != BodyAssetStatus::Ready
             || a.width == 0
             || a.height == 0
-            || a.width > 512
-            || a.height > 512
+            || a.width > max_dimension
+            || a.height > max_dimension
             || r.image.width != a.width
             || r.image.height != a.height
             || r.image.pixels.len() != a.width as usize * a.height as usize * 4
@@ -329,6 +340,13 @@ impl Renderer {
         Ok(())
     }
     pub fn render(&self, frame: &Frame, target: &wgpu::TextureView) -> Result<()> {
+        self.render_inner(frame, target, false)
+    }
+    /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
+    pub fn render_overlay(&self, frame: &Frame, target: &wgpu::TextureView) -> Result<()> {
+        self.render_inner(frame, target, true)
+    }
+    fn render_inner(&self, frame: &Frame, target: &wgpu::TextureView, overlay: bool) -> Result<()> {
         if self.lost.load(Ordering::SeqCst) {
             return Err("GPU device lost; no gameplay reset/retry".into());
         }
@@ -341,10 +359,8 @@ impl Renderer {
         if frame.extent.contains(&0) {
             return Ok(());
         }
-        if u64::from(frame.extent[0])
-            * u64::from(frame.extent[1])
-            * 4
-            * u64::from(self.sample_count)
+        let samples = if overlay { 1 } else { self.sample_count };
+        if u64::from(frame.extent[0]) * u64::from(frame.extent[1]) * 4 * u64::from(samples)
             > 128 * 1024 * 1024
         {
             return Err("Render attachment budget".into());
@@ -358,6 +374,12 @@ impl Renderer {
         let mut chunks = Vec::with_capacity(frame.draws.len().div_ceil(chunk_size));
         for quad in quads {
             let quad = quad?;
+            if overlay
+                && (quad.blend != slither_client::presentation::BodyBlend::SourceOver
+                    || quad.black_effect)
+            {
+                return Err("Overlay requires source-over quads".into());
+            }
             for vertex in quad.vertices {
                 for value in vertex {
                     bytes.extend_from_slice(&value.to_le_bytes());
@@ -389,7 +411,7 @@ impl Renderer {
             ));
         }
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        let multisample = if self.sample_count > 1 {
+        let multisample = if samples > 1 {
             Some(self.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("quad edge coverage"),
                 size: wgpu::Extent3d {
@@ -398,7 +420,7 @@ impl Renderer {
                     depth_or_array_layers: 1,
                 },
                 mip_level_count: 1,
-                sample_count: self.sample_count,
+                sample_count: samples,
                 dimension: wgpu::TextureDimension::D2,
                 format: self.format,
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -418,12 +440,16 @@ impl Renderer {
                     depth_slice: None,
                     resolve_target: msaa_view.as_ref().map(|_| target),
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.035,
-                            g: 0.045,
-                            b: 0.06,
-                            a: 1.,
-                        }),
+                        load: if overlay {
+                            wgpu::LoadOp::Load
+                        } else {
+                            wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.035,
+                                g: 0.045,
+                                b: 0.06,
+                                a: 1.,
+                            })
+                        },
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -437,7 +463,13 @@ impl Renderer {
                         pass.set_pipeline(match state.pipeline {
                             Pipeline::BlackOver => &self.black_over,
                             Pipeline::Lighter => &self.lighter,
-                            Pipeline::Over => &self.over,
+                            Pipeline::Over => {
+                                if overlay {
+                                    &self.overlay_over
+                                } else {
+                                    &self.over
+                                }
+                            }
                         });
                     }
                     if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
@@ -586,11 +618,18 @@ impl SurfaceHost {
         Ok(())
     }
     pub fn present(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, false)
+        self.present_inner(frame, false, None)
     }
     /// Render at the desktop policy size, then scale the complete image like a CSS canvas.
     pub fn present_scaled(&mut self, frame: &Frame) -> Result<bool> {
-        self.present_inner(frame, true)
+        self.present_inner(frame, true, None)
+    }
+    pub fn present_scaled_with_overlay(
+        &mut self,
+        frame: &Frame,
+        overlay: Option<&Frame>,
+    ) -> Result<bool> {
+        self.present_inner(frame, true, overlay)
     }
     /// Native waits for FIFO capacity before sampling the next model timestamp
     /// and draining ingress, rather than staging an update ahead of that wait.
@@ -630,7 +669,15 @@ impl SurfaceHost {
         });
         Ok(true)
     }
-    fn present_inner(&mut self, frame: &Frame, scale: bool) -> Result<bool> {
+    fn present_inner(
+        &mut self,
+        frame: &Frame,
+        scale: bool,
+        overlay: Option<&Frame>,
+    ) -> Result<bool> {
+        if overlay.is_some_and(|f| f.extent != self.extent) {
+            return Err("overlay/surface extent mismatch".into());
+        }
         let scaled = frame.extent != self.extent;
         if scaled && !scale {
             return Err("frame/surface extent mismatch".into());
@@ -687,6 +734,9 @@ impl SurfaceHost {
             self.renderer.queue.submit([encoder.finish()]);
         } else {
             self.renderer.render(frame, &view)?;
+        }
+        if let Some(overlay) = overlay {
+            self.renderer.render_overlay(overlay, &view)?;
         }
         self.renderer.queue.present(texture);
         Ok(true)

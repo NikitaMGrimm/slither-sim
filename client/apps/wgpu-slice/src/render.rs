@@ -17,8 +17,10 @@ impl From<ClientPresentationError> for PreparationError {
     }
 }
 
+#[derive(Clone)]
 pub struct PreparedFrame {
     pub frame: Frame,
+    pub overlay: Option<Frame>,
     pub resources: Vec<Resource>,
 }
 /// Producer limits bound text resources; they no longer reserve world capacity.
@@ -27,6 +29,15 @@ pub const PANEL_CONTROL_DRAWS: usize = 8;
 impl PreparedFrame {
     pub fn pixel_bytes(&self) -> usize {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
+    }
+    pub fn draw_count(&self) -> usize {
+        self.frame.draws.len() + self.overlay.as_ref().map_or(0, |f| f.draws.len())
+    }
+    pub fn ui_frame(&self) -> &Frame {
+        self.overlay.as_ref().unwrap_or(&self.frame)
+    }
+    pub fn ui_frame_mut(&mut self) -> &mut Frame {
+        self.overlay.as_mut().unwrap_or(&mut self.frame)
     }
 }
 /// Desktop content size in CSS/logical pixels. DPR affects presentation only.
@@ -672,8 +683,8 @@ fn prepare_composed(
         high_quality: applied.high_quality,
         blend: applied.quality_blend,
     };
-    let tile = bank.assets[bank.tile.asset];
-    let backdrop = bank.assets[bank.backdrop.asset];
+    let tile = bank.background_art(crate::cosmetics::BackgroundArt::HexTile);
+    let backdrop = bank.background_art(crate::cosmetics::BackgroundArt::Backdrop);
     let background = client
         .prepare_background(BackgroundInput {
             width: logical[0],
@@ -1025,14 +1036,25 @@ fn prepare_composed(
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
+    // Reference HUD/minimap are DOM siblings of the capped game canvas.
+    // Nicknames have already been submitted into the world frame above.
+    let mut overlay = bank.overlay_viewport.map(|(extent, viewport_scale)| Frame {
+        identity: frame.identity,
+        tick: frame.tick,
+        extent,
+        viewport_scale,
+        draws: Vec::new(),
+        snakes: Vec::new(),
+    });
+    let ui = overlay.as_mut().unwrap_or(&mut frame);
     if let Some(view) = announcement {
         bank.announcement
-            .append(view, &mut bank.text, &mut frame, &mut resources)?;
+            .append(view, &mut bank.text, ui, &mut resources)?;
     }
     bank.minimap
-        .append(client, &mut bank.text, &mut frame, &mut resources)?;
+        .append(client, &mut bank.text, ui, &mut resources)?;
     // Mandatory overlays must fit in full; never silently truncate a panel.
-    check_draw_count(frame.draws.len())?;
+    check_draw_count(frame.draws.len() + overlay.as_ref().map_or(0, |f| f.draws.len()))?;
     if resources
         .iter()
         .map(|r| r.image.pixels.len())
@@ -1041,7 +1063,11 @@ fn prepare_composed(
     {
         return Err("Whole-frame draw/pixel budget".into());
     }
-    Ok(PreparedFrame { frame, resources })
+    Ok(PreparedFrame {
+        frame,
+        overlay,
+        resources,
+    })
 }
 // Text tiles have no rotation. Intersect both the logical destination and its
 // source crop, so long names cannot paint into score/rank columns or offscreen.
@@ -1090,7 +1116,10 @@ fn finish_plan(
         let plan = plan?;
         // Late overlays retain the captured scene's immutable resources. Text
         // slots may change afterward without changing queued Setup pictures.
-        let scale = prepared.frame.viewport_scale;
+        let total_draws = prepared.draw_count();
+        let frame = prepared.ui_frame_mut();
+        let other_draws = total_draws - frame.draws.len();
+        let scale = frame.viewport_scale;
         let max_font_size = plan
             .lines
             .iter()
@@ -1105,16 +1134,16 @@ fn finish_plan(
         let viewport = BodyRect {
             x: 0.,
             y: 0.,
-            width: f64::from(prepared.frame.extent[0]) / scale,
-            height: f64::from(prepared.frame.extent[1]) / scale,
+            width: f64::from(frame.extent[0]) / scale,
+            height: f64::from(frame.extent[1]) / scale,
         };
-        let draw_limit = prepared.frame.draws.len() + crate::hud::MAX_DRAWS;
+        let draw_limit = frame.draws.len() + crate::hud::MAX_DRAWS;
         let mut slot = 0;
         let mut resources = std::collections::BTreeMap::new();
         for line in &plan.lines {
             let mut position = line.position;
             for span in &line.spans {
-                if prepared.frame.draws.len() >= draw_limit {
+                if frame.draws.len() >= draw_limit {
                     break;
                 }
                 let (advance, tiles) = bank.text.draw_hud(
@@ -1134,11 +1163,12 @@ fn finish_plan(
                 slot += 1;
                 position[0] += advance;
                 for (mut draw, resource) in tiles {
-                    if prepared.frame.draws.len() >= draw_limit {
+                    if frame.draws.len() >= draw_limit {
                         break;
                     }
                     if clip_text(&mut draw, line.clip) && clip_text(&mut draw, viewport) {
-                        push_draw(&mut prepared.frame.draws, draw)?;
+                        check_draw_count(other_draws + frame.draws.len() + 1)?;
+                        push_draw(&mut frame.draws, draw)?;
                         resources.insert(resource.asset.handle, resource);
                     }
                 }
@@ -1154,6 +1184,9 @@ fn finish_plan(
             .map(|r| (r.asset.into(), r.asset))
             .collect();
         prepared.frame.validate(&resident)?;
+        if let Some(overlay) = &prepared.overlay {
+            overlay.validate(&resident)?;
+        }
         Ok(prepared)
     })();
     bank.discard_text(identity);
@@ -1165,7 +1198,15 @@ pub fn finish(frame: Frame, bank: &mut Bank, hud: &str) -> Result<PreparedFrame>
     let result = (|| {
         let plan = crate::hud::plan_text(hud, frame.extent, frame.viewport_scale)?;
         let resources = bank.resources(&frame)?;
-        finish_plan(PreparedFrame { frame, resources }, bank, Ok(plan))
+        finish_plan(
+            PreparedFrame {
+                frame,
+                overlay: None,
+                resources,
+            },
+            bank,
+            Ok(plan),
+        )
     })();
     bank.discard_text(identity);
     result
@@ -1176,7 +1217,8 @@ pub fn finish_hud(
     bank: &mut Bank,
     hud: &crate::hud::View,
 ) -> Result<PreparedFrame> {
-    let plan = crate::hud::plan(hud, prepared.frame.extent, prepared.frame.viewport_scale);
+    let ui = prepared.ui_frame();
+    let plan = crate::hud::plan(hud, ui.extent, ui.viewport_scale);
     finish_plan(prepared, bank, plan.map_err(str::to_owned))
 }
 
@@ -1275,6 +1317,7 @@ mod text_staging_tests {
                     frame.draws[0].destination.width = f64::NAN;
                     finish_plan(
                         PreparedFrame {
+                            overlay: None,
                             frame,
                             resources: Vec::new(),
                         },
@@ -1288,13 +1331,17 @@ mod text_staging_tests {
                 }
                 3 => {
                     frame.draws[0].asset.handle += 1000;
-                    bank.resources(&frame)
-                        .map(|resources| PreparedFrame { frame, resources })
+                    bank.resources(&frame).map(|resources| PreparedFrame {
+                        frame,
+                        overlay: None,
+                        resources,
+                    })
                 }
                 _ => {
                     frame.viewport_scale = f64::NAN;
                     finish_hud(
                         PreparedFrame {
+                            overlay: None,
                             frame,
                             resources: Vec::new(),
                         },

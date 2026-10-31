@@ -281,21 +281,10 @@ pub fn plan_hud_text(
             align: TextAlign::Left,
             clip,
         });
-    } else if !view.playing {
-        plan = plan_hud_diagnostic(
-            &format!(
-                "{}{}",
-                view.status,
-                if view.final_score == "--" {
-                    String::new()
-                } else {
-                    format!("\nLast length: {}", view.final_score)
-                }
-            ),
-            extent,
-            scale,
-        )?;
     }
+    // Returning results belong to the login. Diagnostic entries call
+    // plan_hud_diagnostic explicitly rather than covering those controls.
+
     if let Some(message) = &view.message {
         plan.lines.push(HudTextLine {
             spans: vec![span(

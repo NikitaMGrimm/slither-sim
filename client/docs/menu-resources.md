@@ -7,18 +7,35 @@ renderers do not draw login controls. Chooser/picker screens remain later work.
 This layer owns no clock, hit test, focus or Play admission policy.
 
 Native login layout, pointer input and IME candidate rectangles use logical window
-pixels. `NativeLogin::prepare_host` maps the menu into the world backing before
-`SurfaceHost` scales the complete picture to the physical window. Login specimens
-use this same mapping and final linear blit before offscreen readback.
+pixels. `NativeLogin::prepare_host` prepares physical-resolution menu resources;
+`SurfaceHost` paints them directly over the world blit, alongside the DOM-style HUD
+and minimap. Nicknames remain in the capped world backing. The diagnostic
+`MenuFrame::into_backing` mapping remains available for retained comparisons.
 A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
-Authored Play capsules use two-stop vertical gradients, soft shadows and
-normal/hover/pressed/disabled states. Nickname boxes, plain skin icons, tips,
-text logo fallback and a green/purple dotted spinner approximate the controls
-at gameplay size. Spinner dots follow shared time/scale/opacity, approximating
-ribbons. A static logo uses shared reveal/opacity timing; it does not reproduce
-animated strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
+Authored Play capsules use eased vertical gradients and dim the normal surface
+and label together when disabled. Nickname uses one bordered purple surface with
+a broad shadow; tips and nickname use Lucida Sans Unicode on Windows, while Play
+keeps Arial Bold. The opaque `#161C22` page backdrop sits below the fading world;
+the world clear is unchanged. `MenuFrame.backdrop` carries it separately from the
+menu controls, retaining its texture in the menu resources. `append_to` places
+it below every world draw, mapped to the capped world viewport when controls
+use the physical overlay. A hidden login emits no backdrop, even while the
+spinner remains. Hosts can take it for a separate world layer before composing
+a physical-resolution menu overlay. Logo art keeps its image aspect inside the
+unchanged flow holder. Skin art uses idle/hover/press opacity 0.7/1/0.5. Plain skin icons, tips,
+and a text logo fallback approximate the controls at gameplay size. The spinner uses
+two vivid green/purple deforming ribbon arrows around a 1.25:1 oval. Its mean
+phase is shared time/44 (about 2.21 seconds per turn), with the existing shared
+scale/opacity unchanged. Each visible frame fills both nonzero-winding paths
+into one premultiplied antialiased raster at 128 CSS pixels times DPR (capped at
+384 pixels per side). One quad applies scale and alpha to the complete canvas,
+including folded/overlapping portions. A stable menu-material handle advances
+revision when time or raster size changes; frozen frames reuse their image.
+Hidden spinners allocate and rasterize nothing.
+A static logo uses shared reveal/opacity timing; it does not reproduce animated
+strokes. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Both browser art loaders share reserved cosmetic-path rejection with the bounded
@@ -34,8 +51,8 @@ use solid materials without capsule shadows.
 - Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
   enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
   reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Text caps at 3x. Capsules cap at 1.5x to fit the existing 512px texture limit
-  with shadows. Logical edges remain at core rectangles. Decoded menu art is
+- Text caps at 3x. Each capsule's raster scale fits the existing 512px texture
+  limit including shadows and ceiling slack. Logical edges remain at core rectangles. Decoded menu art is
   filtered to at most 512px on its longest axis, preserving aspect ratio.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
   controls use the Menu group's own allowance, so a full cosmetics bank cannot

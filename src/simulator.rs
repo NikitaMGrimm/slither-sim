@@ -2011,7 +2011,6 @@ impl Simulator {
                     pellets,
                     &self.snakes,
                     eaters,
-                    &self.food,
                     hits,
                     profile,
                 );
@@ -2924,7 +2923,6 @@ fn indexed_hits<const PROFILE: bool>(
     pellets: &PelletIndex,
     snakes: &[Snake],
     eaters: &[(usize, Point, f64, Bounds)],
-    food: &[Food],
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
@@ -2934,32 +2932,29 @@ fn indexed_hits<const PROFILE: bool>(
     if pellets.rebuilding() {
         indexed_hits_by::<PROFILE, _>(
             grid,
-            |cell| pellets.food(cell),
+            |cell| pellets.pellets(cell),
             snakes,
             eaters,
-            food,
             hits,
             profile,
         );
     } else {
         indexed_hits_by::<PROFILE, _>(
             grid,
-            |cell| pellets.own_food(cell),
+            |cell| pellets.own_pellets(cell),
             snakes,
             eaters,
-            food,
             hits,
             profile,
         );
     }
 }
 
-fn indexed_hits_by<const PROFILE: bool, I: Iterator<Item = usize>>(
+fn indexed_hits_by<'a, const PROFILE: bool, I: Iterator<Item = crate::food_grid::Pellet<'a>>>(
     grid: &EaterGrid,
     food_in_cell: impl Fn(u32) -> I,
     snakes: &[Snake],
     eaters: &[(usize, Point, f64, Bounds)],
-    food: &[Food],
     hits: &mut Vec<(usize, usize)>,
     profile: &mut StepProfile,
 ) {
@@ -2967,14 +2962,14 @@ fn indexed_hits_by<const PROFILE: bool, I: Iterator<Item = usize>>(
     // Reuse the exact tests and eater order; sorting restores the original
     // reverse-food event/mass/removal order before anything is applied.
     for (cell, candidates) in grid.occupied() {
-        for findex in food_in_cell(cell) {
+        for pellet in food_in_cell(cell) {
             if let Some(eater) = find_eater::<PROFILE>(
                 snakes,
-                food[findex].point(),
+                pellet.point(),
                 candidates.clone().map(|e| eaters[e]),
                 profile,
             ) {
-                hits.push((findex, eater));
+                hits.push((pellet.position(), eater));
             }
         }
     }
@@ -3524,7 +3519,6 @@ mod food_pickup_order_tests {
             cache.pellets(&food).unwrap(),
             &world.snakes,
             &eaters,
-            &food,
             &mut indexed,
             &mut profile,
         );

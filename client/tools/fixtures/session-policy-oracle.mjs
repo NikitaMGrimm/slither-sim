@@ -23,6 +23,7 @@ export function stageControls(commands, receivedMs, initial, hudSchema) {
         if (next.playing && !next.closeRequested) {
           if (command[1] === 1) next.phase = 'victory';
           else { next.closeRequested = true; next.phase = 'dead'; }
+          next.outcome ??= next.phase;
         }
       }
     }

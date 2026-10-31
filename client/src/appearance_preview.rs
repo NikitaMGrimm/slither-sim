@@ -211,7 +211,7 @@ impl AppearancePreview {
             absolute_body: (1..=28)
                 .map(|index| Point {
                     x: head.x - f64::from(index) * 9.,
-                    y: crate::math::sin(f64::from(index) * 0.2) * 12.,
+                    y: (f64::from(index) * 0.2).sin() * 12.,
                 })
                 .collect(),
             anchor_direction: None,

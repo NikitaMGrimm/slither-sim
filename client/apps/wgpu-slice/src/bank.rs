@@ -27,6 +27,8 @@ pub struct Family {
     pub glow: BodyAssetUse,
 }
 pub struct Bank {
+    /// Opt-in native DOM composition; browser/reference callers keep one backing layer.
+    pub overlay_viewport: Option<([u32; 2], f64)>,
     pub cosmetics: Option<crate::cosmetics::Cosmetics>,
     pub assets: Vec<BodyAsset>,
     recipes: Vec<CanvasRecipe>,
@@ -57,6 +59,7 @@ impl Bank {
     pub fn new() -> Result<Self> {
         let r = authored_source_recipes();
         let mut b = Self {
+            overlay_viewport: None,
             cosmetics: None,
             assets: Vec::new(),
             recipes: Vec::new(),
@@ -157,6 +160,17 @@ impl Bank {
         f.random_phase_unit = units[0];
         f.random_wobble_unit = units[1];
         f
+    }
+    pub fn background_art(&self, art: crate::cosmetics::BackgroundArt) -> BodyAsset {
+        self.cosmetics
+            .as_ref()
+            .and_then(|c| c.background_art(art))
+            .unwrap_or_else(|| {
+                self.assets[match art {
+                    crate::cosmetics::BackgroundArt::HexTile => self.tile.asset,
+                    crate::cosmetics::BackgroundArt::Backdrop => self.backdrop.asset,
+                }]
+            })
     }
     pub fn prey(&self, raw: u8, units: [f64; 2]) -> PreyFactory {
         let mut f = self.prey[usize::from(raw % 9)].clone();

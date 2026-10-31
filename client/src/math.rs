@@ -1,4 +1,5 @@
-//! Match the browser's trigonometric rounding at the Wasm presentation boundary.
+//! Host math seams for received geometry, predicted head/camera input and scores.
+//! Visual-only code uses Rust floating-point methods on every target.
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

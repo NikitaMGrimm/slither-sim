@@ -428,12 +428,11 @@ impl DesktopInput {
         if p.x != self.view.compared_pointer.x || p.y != self.view.compared_pointer.y {
             self.view.want_heading = true;
         }
-        let own = self.view.own.as_mut().ok_or_else(|| {
-            error(
-                ErrorKind::Type,
-                "Cannot set properties of null (setting 'gazeHeading')",
-            )
-        })?;
+        let own = self
+            .view
+            .own
+            .as_mut()
+            .ok_or_else(|| error(ErrorKind::Type, "Own snake required to update gaze"))?;
         own.gaze_heading = crate::math::atan2(p.y, p.x);
         if self.view.want_heading && now_ms - self.view.last_heading_ms > 33.0 {
             self.view.want_heading = false;
@@ -469,12 +468,10 @@ impl DesktopInput {
     }
     /// Observe gaze after callbacks; clearing own during a heading send still fails.
     pub fn required_gaze(&self) -> Result<f64> {
-        self.view.own.map(|own| own.gaze_heading).ok_or_else(|| {
-            error(
-                ErrorKind::Type,
-                "Cannot read properties of null (reading 'gazeHeading')",
-            )
-        })
+        self.view
+            .own
+            .map(|own| own.gaze_heading)
+            .ok_or_else(|| error(ErrorKind::Type, "Own snake required to read gaze"))
     }
 }
 

@@ -54,11 +54,14 @@ impl MenuSpecimen {
         let view = crate::menu_specimen::view(state).map_err(js_error)?;
         let layout =
             crate::menu_specimen::layout(&mut self.text, &view, extent, dpr).map_err(js_error)?;
-        let p = self
+        let mut p = self
             .menu
             .prepare(&mut self.text, &view, &layout, extent, dpr, None, 0)
             .map_err(js_error)?;
         self.host.resize(extent).map_err(js_error)?;
+        if let Some(backdrop) = p.backdrop.take() {
+            p.frame.draws.insert(0, backdrop);
+        }
         self.host
             .renderer
             .sync_resources(&p.resources)
@@ -146,8 +149,29 @@ impl LocalGameplay {
             };
             let presented = match &mut self.host {
                 GameplaySurface::Gpu(host) => {
-                    host.renderer.sync_resources(&p.resources)?;
-                    host.present(&p.frame)
+                    let session = self.game.login_session();
+                    // A close without an accepted outcome returns straight to login.
+                    let world_alpha = if session.playing || session.outcome.is_some() {
+                        session.return_fraction
+                    } else {
+                        0.
+                    };
+                    let composed = if world_alpha < 1. {
+                        let mut picture = p.clone();
+                        crate::menu::MenuFrame::world_crossfade(
+                            p.ui_frame().extent,
+                            p.ui_frame().viewport_scale,
+                            world_alpha,
+                        )?
+                        .append_to(&mut picture)?;
+                        Some(picture)
+                    } else {
+                        None
+                    };
+                    // Keep the issued picture unchanged for a presentation retry.
+                    let picture = composed.as_ref().unwrap_or(&p);
+                    host.renderer.sync_resources(&picture.resources)?;
+                    host.present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
                 }
                 #[cfg(feature = "feel-trace")]
                 GameplaySurface::Cpu => Ok(true),
@@ -183,6 +207,32 @@ impl LocalGameplay {
 impl LocalGameplay {
     pub fn phase(&self) -> String {
         self.game.phase().label().into()
+    }
+    pub fn login_view(&self) -> std::result::Result<JsValue, JsValue> {
+        let session = self.game.login_session();
+        let object = js_sys::Object::new();
+        for (name, value) in [
+            ("phase", session.phase.label().into()),
+            (
+                "outcome",
+                session.outcome.map_or(JsValue::NULL, |p| p.label().into()),
+            ),
+            ("playing", session.playing.into()),
+            ("deathPending", session.death_pending.into()),
+            ("returnActive", session.return_active.into()),
+            ("returnFraction", session.return_fraction.into()),
+        ] {
+            js_sys::Reflect::set(&object, &name.into(), &value)?;
+        }
+        if let Some(capture) = self.game.login_final() {
+            js_sys::Reflect::set(&object, &"score".into(), &capture.sample.score.into())?;
+            js_sys::Reflect::set(
+                &object,
+                &"ownToken".into(),
+                &JsValue::from(capture.sample.token.serial()),
+            )?;
+        }
+        Ok(object.into())
     }
     pub fn playing(&self) -> bool {
         self.game.phase() == slither_client::session_policy::Phase::Playing
@@ -408,6 +458,10 @@ impl LocalGameplay {
         let result = (|| {
             self.game.observe_time(now)?;
             self.host.resize([width, height])?;
+            if matches!(self.host, GameplaySurface::Gpu(_)) {
+                // HUD owns its opacity; the login cover must precede this layer.
+                self.game.bank.overlay_viewport = Some(([width, height], dpr));
+            }
             self.game.viewport([width, height], dpr)?;
             self.pictures()
         })();

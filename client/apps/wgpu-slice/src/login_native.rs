@@ -64,7 +64,10 @@ impl NativeLogin {
         admission: bool,
         playing: bool,
     ) -> Result<(Vec<StartMenuIntent>, Vec<HostEditEffect>)> {
-        let intents = self.state.step(now, false).map_err(str::to_owned)?;
+        let intents = self
+            .state
+            .step_with_admission(now, false, admission)
+            .map_err(str::to_owned)?;
         if playing {
             self.state.begin_outgoing();
         }
@@ -79,6 +82,24 @@ impl NativeLogin {
     }
     pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
         self.state.attempt_ended(phase)
+    }
+    pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        self.state
+            .observe_session(game.login_session(), game.login_final())
+            .map_err(str::to_owned)?;
+        Ok(())
+    }
+    pub fn sync_return_focus(&mut self, admission: bool) -> Vec<HostEditEffect> {
+        if self.state.view(admission).disabled {
+            return Vec::new();
+        }
+        let intents: Vec<_> = self.state.take_focus_intent().into_iter().collect();
+        if !intents.is_empty() {
+            self.focus = 0;
+        }
+        self.input
+            .state
+            .sync_menu(&self.state.view(admission), &intents)
     }
     pub fn focus(&mut self, focus: u8) -> Vec<HostEditEffect> {
         self.focus = focus;
@@ -121,6 +142,10 @@ impl NativeLogin {
         admission: bool,
     ) -> Vec<HostEditEffect> {
         let view = self.state.view(admission);
+        self.menu.skin_hovered = view.visible && self.layout.hit_test(E::Skin, point[0], point[1]);
+        if let Some(down) = down {
+            self.menu.skin_pressed = down && self.menu.skin_hovered;
+        }
         if !view.visible || view.disabled {
             self.pressed = false;
             return Vec::new();
@@ -162,7 +187,7 @@ impl NativeLogin {
                     let style = TextStyle {
                         size: 15. * self.layout.scale,
                         weight: Weight::Normal,
-                        family: Family::Arial,
+                        family: Family::Lucida,
                         slant: Slant::Normal,
                         color: [224, 224, 255],
                     };
@@ -216,10 +241,7 @@ impl NativeLogin {
         cosmetics: Option<&Cosmetics>,
     ) -> Result<MenuFrame> {
         crate::render::dimensions(physical, window_scale)?;
-        let area = physical.map(|n| f64::from(n) / window_scale);
-        let backing = crate::render::backing_size(area)?;
-        self.prepare_scaled(physical, window_scale, admission, cosmetics)?
-            .into_backing(backing)
+        self.prepare_scaled(physical, window_scale, admission, cosmetics)
     }
     fn prepare_scaled(
         &mut self,
@@ -307,7 +329,7 @@ impl NativeLogin {
         let style = TextStyle {
             size: 15. * self.layout.scale,
             weight: Weight::Normal,
-            family: Family::Arial,
+            family: Family::Lucida,
             slant: Slant::Normal,
             color: [224, 224, 255],
         };

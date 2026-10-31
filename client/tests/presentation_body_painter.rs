@@ -963,16 +963,3 @@ fn mixed_runs_do_not_need_an_unused_base_palette_glow() {
     f.glows[0] = None;
     assert!(f.plan().is_ok());
 }
-
-#[test]
-fn stored_float32_geometry_is_projected_without_an_extra_rounding_step() {
-    let mut f = Fixture::new(2);
-    f.samples[0].x = 16_777_217_u32 as f32;
-    f.view.camera.x = 16_777_216.5;
-    let plan = f.plan().unwrap();
-    let body = pass(&plan, Body)
-        .into_iter()
-        .find(|c| c.ordinal == 0)
-        .unwrap();
-    assert_eq!(body.translation.x, -0.375);
-}

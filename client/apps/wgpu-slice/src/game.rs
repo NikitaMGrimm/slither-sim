@@ -295,6 +295,13 @@ impl LocalGame {
     pub fn phase(&self) -> Phase {
         self.session.view().phase
     }
+    /// Login reads committed command-time history and the existing session clock.
+    pub fn login_session(&self) -> slither_client::start_page::MenuSession {
+        (&self.session.view()).into()
+    }
+    pub fn login_final(&self) -> Option<slither_client::presentation::HudFinal> {
+        self.hud.final_capture
+    }
     pub fn can_play(&self) -> bool {
         matches!(
             self.phase(),
@@ -680,7 +687,7 @@ impl LocalGame {
                     return Ok(());
                 };
                 // Bound all retained Setup draw records together, including late HUD capacity.
-                let draws=captured_draws.get()+frame.frame.draws.len()+crate::hud::MAX_DRAWS;
+                let draws=captured_draws.get()+frame.draw_count()+crate::hud::MAX_DRAWS;
                 if diagnostics.borrow_mut().admit(serial.get(),crate::frame::check_draw_count(draws)).map_err(Ingress)?.is_none() {
                     frames.borrow_mut().push(None);
                     return Ok(());
@@ -1163,6 +1170,23 @@ impl LocalGame {
         self.policy.frame_commit_done(self.session.view().connected);
         self.policy.finish_frame();
         Ok(())
+    }
+    /// Native DOM siblings use CSS coordinates and physical rasters independently
+    /// of the capped game canvas, including resizes that keep the same backing.
+    pub fn window_viewport(&mut self, physical: [u32; 2], dpr: f64) -> Result<[u32; 2]> {
+        if physical.contains(&0) {
+            self.viewport([0, 0], 1.)?;
+            return Ok([0, 0]);
+        }
+        render::dimensions(physical, dpr)?;
+        let overlay = Some((physical, dpr));
+        if self.bank.overlay_viewport != overlay {
+            self.bank.overlay_viewport = overlay;
+            self.suspended = true;
+        }
+        let backing = render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
+        self.viewport(backing, 1.)?;
+        Ok(backing)
     }
     /// Resize supersedes queued intermediate Setup pictures, never their admitted packet state.
     pub fn viewport(&mut self, extent: [u32; 2], scale: f64) -> Result<()> {

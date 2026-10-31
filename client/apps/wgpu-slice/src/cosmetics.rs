@@ -9,6 +9,26 @@ pub const COSMETIC_PIXEL_BUDGET: usize = 16 * 1024 * 1024;
 mod menu_art;
 pub use menu_art::{MANIFEST_LIMIT, MANIFEST_PATH, MenuArt, MenuArtEntry, MenuManifest};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BackgroundArt {
+    HexTile,
+    Backdrop,
+}
+impl BackgroundArt {
+    pub const ALL: [Self; 2] = [Self::HexTile, Self::Backdrop];
+
+    pub(crate) fn handle(self) -> u64 {
+        crate::bank::COSMETIC_HANDLE_BASE + 512 + self as u64
+    }
+
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::HexTile => "s/bg54.jpg",
+            Self::Backdrop => "s/gbg.jpg",
+        }
+    }
+}
+
 // Public resource identifiers and attachment metadata, independently transcribed
 // as data. This is not a copy of the external loader or drawing implementation.
 pub const ACCESSORIES: [(&str, f64, f64, f64); 32] = [
@@ -69,6 +89,7 @@ pub fn paths() -> Vec<String> {
         .iter()
         .map(|v| v.1.to_owned())
         .chain(ACCESSORIES.iter().map(|v| format!("s/a_{}.png", v.0)))
+        .chain(BackgroundArt::ALL.map(|art| art.path().to_owned()))
         .collect()
 }
 
@@ -160,6 +181,7 @@ impl Images {
 
 pub struct Cosmetics {
     roles: BTreeMap<&'static str, Resource>,
+    backgrounds: BTreeMap<BackgroundArt, Resource>,
     accessories: BTreeMap<u8, Resource>,
     pub own_accessory: Option<u8>,
     menu: menu_art::MenuArtCache,
@@ -271,8 +293,25 @@ impl Cosmetics {
                 resource(image, &path).map(|source| (id as u8, source))
             })
             .collect();
+        let backgrounds = BackgroundArt::ALL
+            .into_iter()
+            .filter_map(|art| {
+                let image = images.images.remove(art.path())?;
+                // The original backdrop selects a 512x512 source rectangle,
+                // even when the local file is larger; crop once before upload.
+                let image = match art {
+                    BackgroundArt::HexTile => image,
+                    BackgroundArt::Backdrop => canvas_image(image, 512, 512, 0, false),
+                };
+                resource(image, art.path()).map(|mut source| {
+                    source.asset.handle = art.handle();
+                    (art, source)
+                })
+            })
+            .collect();
         let result = Self {
             roles,
+            backgrounds,
             accessories,
             own_accessory: own,
             menu: images.menu,
@@ -281,6 +320,9 @@ impl Cosmetics {
     }
     pub fn role(&self, role: SkinSourceRole) -> Option<BodyAsset> {
         self.roles.get(role.as_str()).map(|r| r.asset)
+    }
+    pub fn background_art(&self, art: BackgroundArt) -> Option<BodyAsset> {
+        self.backgrounds.get(&art).map(|r| r.asset)
     }
     fn selected_accessory(&self, own: bool) -> Option<(u8, &Resource)> {
         let id = self.own_accessory.filter(|_| own)?;
@@ -346,6 +388,7 @@ impl Cosmetics {
     pub fn resources(&self) -> impl Iterator<Item = &Resource> {
         self.roles
             .values()
+            .chain(self.backgrounds.values())
             .chain(self.accessories.values())
             .chain(self.menu.resident.values())
     }
@@ -361,6 +404,7 @@ impl Cosmetics {
         let other_bytes = self
             .roles
             .values()
+            .chain(self.backgrounds.values())
             .chain(self.accessories.values())
             .map(|r| r.image.pixels.len())
             .sum();

@@ -804,7 +804,7 @@ fn assert_accessible_locale(
     menu.step(0., false).unwrap();
     assert!(menu.begin_outgoing());
     assert!(
-        menu.accepted_game_over(slither_client::session_policy::Phase::Victory, None, 10.)
+        menu.accepted_game_over(slither_client::session_policy::Phase::Victory, None)
             .unwrap()
     );
     assert_eq!(status(&menu).name, statuses[1]);

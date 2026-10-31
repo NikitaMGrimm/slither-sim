@@ -47,6 +47,56 @@ fn world(state: &mut StartMenuState, at: f64) {
     assert_eq!(state.view(true).phase, P::World);
 }
 
+struct ReturnClock {
+    session: slither_client::session_policy::SessionPolicy,
+    clock: slither_client::presentation::FrameClock,
+}
+impl ReturnClock {
+    fn new(death: f64, last: f64) -> Self {
+        use slither_client::session_policy::{Command, SessionPolicy};
+        let mut session = SessionPolicy::new();
+        session
+            .prepare_controls(
+                &[Command {
+                    opcode: b'a',
+                    argument: 0,
+                }],
+                0.,
+            )
+            .unwrap();
+        session.commit_controls().unwrap();
+        session.ui_tick(last).unwrap();
+        session
+            .prepare_controls(
+                &[Command {
+                    opcode: b'v',
+                    argument: 0,
+                }],
+                death,
+            )
+            .unwrap();
+        session.commit_controls().unwrap();
+        Self {
+            session,
+            clock: slither_client::presentation::FrameClock::new(last).unwrap(),
+        }
+    }
+    fn step(
+        &mut self,
+        state: &mut StartMenuState,
+        now: f64,
+        lagging: bool,
+    ) -> Result<Vec<I>, &'static str> {
+        self.session.ui_tick(now).unwrap();
+        let step = self.clock.advance(now, lagging, false).unwrap();
+        self.session
+            .advance_step(now, step.delta, f64::from(step.whole_steps))
+            .unwrap();
+        state.observe_session((&self.session.view()).into(), None)?;
+        state.step(now, lagging)
+    }
+}
+
 #[test]
 fn layout_border_boxes_and_measured_flow() {
     let layout = MenuLayout::new(1280., 720., 0., true, metrics()).unwrap();
@@ -65,7 +115,9 @@ fn layout_border_boxes_and_measured_flow() {
     ];
     for (element, values) in fixtures {
         let r = layout.viewport_rect(element);
-        assert_eq!([r.x, r.y, r.width, r.height], values, "{element:?}");
+        for (actual, expected) in [r.x, r.y, r.width, r.height].into_iter().zip(values) {
+            assert!((actual - expected).abs() <= 0.5, "{element:?}");
+        }
     }
     let mut changed = metrics();
     changed.last_length_line_height = 21.;
@@ -73,7 +125,7 @@ fn layout_border_boxes_and_measured_flow() {
     changed.padded_play_label_width = 90.01;
     let changed = MenuLayout::new(1280., 720., 0., true, changed).unwrap();
     assert_eq!(changed.viewport_rect(E::Play).y, 431.);
-    assert_eq!(changed.viewport_rect(E::Play).width, 125.);
+    assert!((changed.viewport_rect(E::Play).width - 125.).abs() <= 0.5);
 }
 
 #[test]
@@ -382,16 +434,17 @@ fn early_death_does_not_stop_the_independent_outgoing_clock() {
     state.begin_outgoing();
     state.step(100., false).unwrap();
     state
-        .accepted_game_over(Phase::Dead, Some(capture(5.)), 100.)
+        .accepted_game_over(Phase::Dead, Some(capture(5.)))
         .unwrap();
+    let mut clock = ReturnClock::new(100., 100.);
     assert!(state.view(true).visible);
-    state.step(500., false).unwrap();
+    clock.step(&mut state, 500., false).unwrap();
     assert_eq!(state.view(true).phase, P::DeathHold);
     assert_eq!(state.view(true).transition, 1.);
     assert!(!state.view(true).visible);
-    state.step(1700., false).unwrap();
+    clock.step(&mut state, 1700., false).unwrap();
     assert_eq!(state.view(true).phase, P::DeathHold);
-    state.step(1701., false).unwrap();
+    clock.step(&mut state, 1701., false).unwrap();
     assert_eq!(state.view(true).phase, P::Returning);
 }
 
@@ -447,7 +500,7 @@ fn lengths_1000_and_1001_and_translated_replay() {
             world(&mut state, 0.);
             assert!(
                 state
-                    .accepted_game_over(Phase::Dead, Some(capture(score)), 500.)
+                    .accepted_game_over(Phase::Dead, Some(capture(score)))
                     .unwrap()
             );
             let v = state.view(true);
@@ -466,34 +519,37 @@ fn strict_return_boundary_lag_floor_recovery_and_focus() {
     let mut state = menu();
     world(&mut state, 0.);
     state
-        .accepted_game_over(Phase::Dead, Some(capture(1001.)), 500.)
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)))
         .unwrap();
-    state.step(2100., false).unwrap();
+    let mut clock = ReturnClock::new(500., 500.);
+    clock.step(&mut state, 2100., false).unwrap();
     assert_eq!(state.view(true).phase, P::DeathHold);
     state.action(A::Play, true);
-    state.step(2101., false).unwrap();
+    clock.step(&mut state, 2101., false).unwrap();
     let v = state.view(true);
     assert_eq!(v.phase, P::Returning);
     assert!(v.visible && v.disabled);
     near(v.transition, 0.9995);
     near(v.play_return_alpha, 0.5);
-    state.step(2141., true).unwrap();
+    clock.step(&mut state, 2141., true).unwrap();
     near(state.view(true).transition, 0.9825); // .004 * 5 * .85
     let mut expected = 0.9825;
     let mut lag: f64 = 0.85;
     for step in 1..=12 {
         lag = (lag * 0.85).max(0.2);
         expected -= 0.004 * 5. * lag;
-        state.step(2141. + f64::from(step) * 40., true).unwrap();
+        clock
+            .step(&mut state, 2141. + f64::from(step) * 40., true)
+            .unwrap();
         near(state.view(true).transition, expected);
     }
-    state.step(2661., false).unwrap();
+    clock.step(&mut state, 2661., false).unwrap();
     expected -= 0.004 * 5. * 0.25;
     near(state.view(true).transition, expected);
     let mut focus_count = 0;
     for step in 1..=100 {
-        focus_count += state
-            .step(2661. + f64::from(step) * 40., false)
+        focus_count += clock
+            .step(&mut state, 2661. + f64::from(step) * 40., false)
             .unwrap()
             .iter()
             .filter(|i| **i == I::FocusNickname)
@@ -511,25 +567,28 @@ fn persistent_last_life_second_life_and_disconnect_has_no_result_authority() {
     assert_eq!(state.view(true).last_life.number, "\u{a0}");
     assert!(
         !state
-            .accepted_game_over(Phase::Disconnected, Some(capture(99.)), 0.)
+            .accepted_game_over(Phase::Disconnected, Some(capture(99.)))
             .unwrap()
     );
     state.disconnected();
     assert_eq!(state.view(true).last_life.number, "\u{a0}");
     world(&mut state, 0.);
     state
-        .accepted_game_over(Phase::Dead, Some(capture(1234567.)), 500.)
+        .accepted_game_over(Phase::Dead, Some(capture(1234567.)))
         .unwrap();
+    let mut clock = ReturnClock::new(500., 500.);
     let retained = state.view(true).last_life;
     assert!(
         !state
-            .accepted_game_over(Phase::Dead, Some(capture(2.)), 600.)
+            .accepted_game_over(Phase::Dead, Some(capture(2.)))
             .unwrap()
     );
     state.disconnected(); // accepted outcome and hold survive close
     assert_eq!(state.view(true).phase, P::DeathHold);
     for step in 0..=51 {
-        state.step(2101. + f64::from(step) * 40., false).unwrap();
+        clock
+            .step(&mut state, 2101. + f64::from(step) * 40., false)
+            .unwrap();
     }
     assert_eq!(state.view(true).phase, P::Login);
     assert_eq!(state.view(true).last_life, retained);
@@ -540,7 +599,7 @@ fn persistent_last_life_second_life_and_disconnect_has_no_result_authority() {
     assert_eq!(state.view(true).play_label, "Play Again");
     world(&mut state, 4800.);
     state
-        .accepted_game_over(Phase::Dead, Some(capture(88.)), 5300.)
+        .accepted_game_over(Phase::Dead, Some(capture(88.)))
         .unwrap();
     assert_eq!(state.view(true).last_life.number, "88");
 }
@@ -550,10 +609,13 @@ fn champion_suppresses_ordinary_controls_without_fake_editor() {
     let mut state = menu();
     world(&mut state, 0.);
     state
-        .accepted_game_over(Phase::Victory, Some(capture(1001.)), 500.)
+        .accepted_game_over(Phase::Victory, Some(capture(1001.)))
         .unwrap();
+    let mut clock = ReturnClock::new(500., 500.);
     for step in 0..=51 {
-        state.step(2101. + f64::from(step) * 40., false).unwrap();
+        clock
+            .step(&mut state, 2101. + f64::from(step) * 40., false)
+            .unwrap();
     }
     let v = state.view(true);
     assert!(v.champion_pending && v.disabled);
@@ -603,10 +665,13 @@ fn round1_return_removes_tips_from_flow_and_hits() {
     assert_eq!(layout.viewport_rect(E::Play).y, 426.);
     world(&mut state, 0.);
     state
-        .accepted_game_over(Phase::Dead, Some(capture(1001.)), 500.)
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)))
         .unwrap();
+    let mut clock = ReturnClock::new(500., 500.);
     for frame in 0..=51 {
-        state.step(2101. + f64::from(frame) * 40., false).unwrap();
+        clock
+            .step(&mut state, 2101. + f64::from(frame) * 40., false)
+            .unwrap();
         let view = state.view(true);
         assert!(!view.tips_visible);
         layout
@@ -684,10 +749,8 @@ fn round1_disabled_pointer_rejects_activation_but_accepts_releases() {
 
 #[test]
 fn round1_label_width_rounds_offset_width_before_adding_padding() {
-    // Blink 4dfbf1c0f8e59669a8d578f02c258a759d5c0b70, html_element.cc:
-    // 4458-4462,4503-4511 and platform/geometry/layout_unit.h:294-297.
-    // Width itself rounds nearest, positive .5 upward: no floor or edge snapping.
-    // Pinned links and input-metric contract: ../docs/start-menu.md#label-width.
+    // Old integer measurements remain the baseline; transforms and hits use
+    // the fractional rectangle under resize and animation.
     for (measured, expected) in [
         (52., 87.),
         (52.2, 87.),
@@ -698,12 +761,29 @@ fn round1_label_width_rounds_offset_width_before_adding_padding() {
     ] {
         let mut m = metrics();
         m.padded_play_label_width = measured;
-        let mut layout = MenuLayout::new(1280., 720., 0., true, m).unwrap();
-        assert_eq!(layout.viewport_rect(E::Play).width, expected);
-        near(layout.viewport_rect(E::Play).x, (1280. - expected) / 2.);
-        // Remeasure a replay label through the animation update seam too.
-        m.padded_play_label_width = 110.5;
-        layout.update(0., false, m).unwrap();
-        assert_eq!(layout.viewport_rect(E::Play).width, 146.);
+        for (w, h, progress) in [(1280., 720., 0.), (960., 280., 0.5), (320., 180., 1.)] {
+            let mut layout = MenuLayout::new(w, h, progress, true, m).unwrap();
+            assert!((layout.logical_rect(E::Play).width - expected).abs() <= 0.5);
+            let mut old_metrics = m;
+            old_metrics.padded_play_label_width = measured.round();
+            let old = MenuLayout::new(w, h, progress, true, old_metrics)
+                .unwrap()
+                .viewport_rect(E::Play);
+            let current = layout.viewport_rect(E::Play);
+            for (actual, baseline) in [
+                (current.x, old.x),
+                (current.x + current.width, old.x + old.width),
+                (current.y, old.y),
+                (current.y + current.height, old.y + old.height),
+            ] {
+                assert!((actual - baseline).abs() <= 2.);
+            }
+            assert!(layout.hit_test(E::Play, current.x + 0.01, current.y + 0.01));
+            assert!(!layout.hit_test(E::Play, current.x + current.width + 0.01, current.y));
+            let mut replay = m;
+            replay.padded_play_label_width = 110.5;
+            layout.update(progress, false, replay).unwrap();
+            assert!((layout.logical_rect(E::Play).width - 146.).abs() <= 0.5);
+        }
     }
 }

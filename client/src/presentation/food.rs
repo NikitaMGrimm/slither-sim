@@ -2,7 +2,7 @@
 
 use std::{error::Error, f64::consts::PI, fmt, num::NonZeroU64};
 
-use crate::{math, state::Point};
+use crate::state::Point;
 
 use super::{BodyAsset, BodyAssetStatus, FrameStep};
 
@@ -567,17 +567,17 @@ impl FoodWorld {
                 f.render_position.x = f.position.x
                     + (eater.head.x
                         + eater.head_offset.x
-                        + math::cos(heading) * (43. - k * 24.) * (1. - k)
+                        + heading.cos() * (43. - k * 24.) * (1. - k)
                         - f.position.x)
                         * k;
                 f.render_position.y = f.position.y
                     + (eater.head.y
                         + eater.head_offset.y
-                        + math::sin(heading) * (43. - k * 24.) * (1. - k)
+                        + heading.sin() * (43. - k * 24.) * (1. - k)
                         - f.position.y)
                         * k;
-                f.render_position.x += math::cos(f.wobble_rate * f.animation_phase) * 6. * (1. - p);
-                f.render_position.y += math::sin(f.wobble_rate * f.animation_phase) * 6. * (1. - p);
+                f.render_position.x += (f.wobble_rate * f.animation_phase).cos() * 6. * (1. - p);
+                f.render_position.y += (f.wobble_rate * f.animation_phase).sin() * 6. * (1. - p);
             } else {
                 if f.fade != 1. {
                     f.fade += f.spawn_speed * delta / 150.;
@@ -585,15 +585,13 @@ impl FoodWorld {
                         f.fade = 1.;
                         f.scale = 1.;
                     } else {
-                        f.scale = 0.5 * (1. - math::cos(PI * f.fade));
-                        f.scale += (0.5 * (1. - math::cos(PI * f.scale)) - f.scale) * 0.66;
+                        f.scale = 0.5 * (1. - (PI * f.fade).cos());
+                        f.scale += (0.5 * (1. - (PI * f.scale).cos()) - f.scale) * 0.66;
                     }
                     f.uneaten_scale = f.scale;
                 }
-                f.render_position.x =
-                    f.position.x + math::cos(f.wobble_rate * f.animation_phase) * 6.;
-                f.render_position.y =
-                    f.position.y + math::sin(f.wobble_rate * f.animation_phase) * 6.;
+                f.render_position.x = f.position.x + (f.wobble_rate * f.animation_phase).cos() * 6.;
+                f.render_position.y = f.position.y + (f.wobble_rate * f.animation_phase).sin() * 6.;
             }
             if !all_finite(&[f.render_position.x, f.render_position.y, f.scale]) {
                 return Err(FoodError::Arithmetic);

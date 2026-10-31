@@ -409,6 +409,7 @@ impl HeadMotion {
         }
         if alive {
             let travel = travel.min(self.segment_length);
+            // The predicted head also feeds pointer projection when follow is off.
             next.position.x += math::cos(next.heading) * travel;
             next.position.y += math::sin(next.heading) * travel;
             next.head_fraction += travel / self.segment_length;
@@ -432,6 +433,7 @@ impl<const N: usize, const C: usize> Default for CorrectionRing<N, C> {
     fn default() -> Self {
         Self {
             weights: std::array::from_fn(|index| {
+                // Head corrections can reach input through a subsequently frozen camera.
                 (0.5 * (1. - math::cos(PI * (N - 1 - index) as f64 / (N - 1) as f64))) as f32
             }),
             samples: [[0.; N]; C],

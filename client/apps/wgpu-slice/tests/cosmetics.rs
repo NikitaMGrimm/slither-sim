@@ -18,7 +18,20 @@ fn png(width: u32, height: u32) -> Vec<u8> {
 }
 fn cosmetics(own: Option<u8>) -> Cosmetics {
     let bytes = png(8, 8);
-    Cosmetics::load(|_| Ok(bytes.clone()), own).unwrap()
+    Cosmetics::load(
+        |path| {
+            if cosmetics::BackgroundArt::ALL
+                .iter()
+                .any(|art| art.path() == path)
+            {
+                Err("skin-only synthetic fixture".into())
+            } else {
+                Ok(bytes.clone())
+            }
+        },
+        own,
+    )
+    .unwrap()
 }
 fn quality() -> QualitySnapshot {
     QualityState::new(QualityMode::High, 0.).unwrap().snapshot()

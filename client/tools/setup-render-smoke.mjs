@@ -407,10 +407,11 @@ export function setupRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, o
           ...Array.from({ length: accepted - 1 }, () => ['width', size])],
         'first changed-size draw assigns both sizes, then every draw isolates once');
         const camera = JSON.parse(count.scene.snapshot()).camera;
-        eq(count.target.context.trace.filter(row => row.op === 'stroke').map(row => row.path),
-          Array.from({ length: accepted }, (_, index) => arenaEdgePoints({ center: 32550, angle: 0,
-            radius: 1000 + index, camera, width: size, height: size }).stroke),
-          'every accepted empty Setup submits exact screen vectors in event order');
+        const strokes = count.target.context.trace.filter(row => row.op === 'stroke');
+        eq(strokes.length, accepted);
+        strokes.forEach((row, index) => screen(row.path,
+          arenaEdgePoints({ center: 32550, angle: 0, radius: 1000 + index, camera,
+            width: size, height: size }).stroke, 'Setup screen vectors in event order'));
         eq(count.order, [], 'empty scenes invoke no artificial draw callbacks');
         const beforeNoSetup = observed.snapshot(), quality = count.quality.snapshot();
         eq(count.apply(bundle([112]), { width: size, height: size, draw: () => { throw new Error('no Setup resolver'); } }), 0);

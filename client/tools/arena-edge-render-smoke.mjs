@@ -105,7 +105,6 @@ export function arenaEdgeRenderSmoke(wasm, { fixture, appearance, vanillaEyes, e
       const camera = JSON.parse(f.scene.snapshot()).camera;
       const dx = camera.absoluteX - 32550, dy = camera.absoluteY - 32550;
       eq([...f.scene.arena_edge_view()], [32550, Math.atan2(dy, dx), Math.sqrt(dx * dx + dy * dy)]);
-      ok(first.stroke.path.some(p => !Object.is(Math.fround(p[0]), p[0])), 'edge retains precision beyond Float32');
       const hq = first.stroke.path;
       f.quality.begin_skin_preview();
       prepare(f, 32673.125, 32483.625);

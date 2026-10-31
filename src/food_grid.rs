@@ -360,8 +360,9 @@ pub(crate) struct PelletIndex {
 
 #[derive(Clone)]
 struct PelletSlot {
+    point: Point,
     cell: u32,
-    offset: usize,
+    offset: u32,
 }
 
 impl PelletIndex {
@@ -430,8 +431,13 @@ impl PelletIndex {
         self.live[word] |= 1u64 << (slot % 64);
         let list = self.cells.entry(cell).or_default();
         let value = PelletSlot {
+            point: Point {
+                x: f64::from_bits(entry.x),
+                y: f64::from_bits(entry.y),
+            },
             cell,
-            offset: list.len(),
+            // Every list is shorter than the bounded u32 handle array.
+            offset: list.len() as u32,
         };
         self.slots.push(value);
         list.push(slot);
@@ -451,10 +457,10 @@ impl PelletIndex {
     fn remove_cell(&mut self, slot: u32) {
         let value = &self.slots[slot as usize];
         let list = self.cells.get_mut(&value.cell).unwrap();
-        let offset = value.offset;
+        let offset = value.offset as usize;
         list.swap_remove(offset);
         if let Some(&moved) = list.get(offset) {
-            self.slots[moved as usize].offset = offset;
+            self.slots[moved as usize].offset = offset as u32;
         }
         if list.is_empty() {
             self.cells.remove(&self.slots[slot as usize].cell);
@@ -466,19 +472,40 @@ impl PelletIndex {
         (self.prefixes[word] + (self.live[word] & ((1u64 << (slot % 64)) - 1)).count_ones())
             as usize
     }
+    #[cfg(test)]
     pub(crate) fn food(&self, cell: u32) -> impl Iterator<Item = usize> + '_ {
-        self.own_food(cell)
-            .chain(self.growing.iter().flat_map(move |p| p.own_food(cell)))
+        self.pellets(cell).map(|pellet| pellet.position())
+    }
+    pub(crate) fn pellets(&self, cell: u32) -> impl Iterator<Item = Pellet<'_>> {
+        self.own_pellets(cell)
+            .chain(self.growing.iter().flat_map(move |p| p.own_pellets(cell)))
     }
     pub(crate) fn rebuilding(&self) -> bool {
         self.growing.is_some()
     }
-    pub(crate) fn own_food(&self, cell: u32) -> impl Iterator<Item = usize> + '_ {
+    pub(crate) fn own_pellets(&self, cell: u32) -> impl Iterator<Item = Pellet<'_>> {
         self.cells
             .get(&cell)
             .into_iter()
             .flatten()
-            .map(|&slot| self.position(slot))
+            .map(|&slot| Pellet { index: self, slot })
+    }
+}
+
+/// Coordinates are copied bit-for-bit from the verified food mirror. Querying a
+/// handle needs no live-bit rank or food-list read until its exact pickup wins.
+/// Each migration layer resolves its own handles; hits are still sorted by the
+/// original descending food position before mass or events change.
+pub(crate) struct Pellet<'a> {
+    index: &'a PelletIndex,
+    slot: u32,
+}
+impl Pellet<'_> {
+    pub(crate) fn point(&self) -> Point {
+        self.index.slots[self.slot as usize].point
+    }
+    pub(crate) fn position(&self) -> usize {
+        self.index.position(self.slot)
     }
 }
 
@@ -814,11 +841,13 @@ mod tests {
                 assert!(!handles.is_empty());
                 for (offset, &handle) in handles.iter().enumerate() {
                     let value = &index.slots[handle as usize];
-                    assert_eq!(value.offset, offset);
+                    assert_eq!(value.offset as usize, offset);
                     assert_eq!(value.cell, cell);
                     let position = index.position(handle);
                     assert_eq!(index.food_slots[position], handle);
                     assert_eq!(pellet_cell(Entry::of(&food[position])), cell);
+                    assert_eq!(value.point.x.to_bits(), food[position].x.to_bits());
+                    assert_eq!(value.point.y.to_bits(), food[position].y.to_bits());
                     seen.push(position);
                 }
             }
@@ -856,6 +885,97 @@ mod tests {
             .collect();
         actual.sort_unstable();
         assert_eq!(actual, (0..food.len()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn pellet_handles_preserve_bits_and_ranks_across_migration() {
+        fn check(cache: &FoodCache, food: &[Food]) {
+            let index = cache.pellets.as_ref().unwrap();
+            let mut cells: Vec<_> = food.iter().map(|f| pellet_cell(Entry::of(f))).collect();
+            cells.extend([0, pack_cell(7000, -7000)]);
+            cells.sort_unstable();
+            cells.dedup();
+            for cell in cells {
+                let mut actual: Vec<_> = index
+                    .pellets(cell)
+                    .map(|p| (p.position(), p.point().x.to_bits(), p.point().y.to_bits()))
+                    .collect();
+                actual.sort_unstable();
+                let expected: Vec<_> = food
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, f)| pellet_cell(Entry::of(f)) == cell)
+                    .map(|(i, f)| (i, f.x.to_bits(), f.y.to_bits()))
+                    .collect();
+                assert_eq!(actual, expected);
+            }
+        }
+        let values = [
+            -0.0,
+            0.0,
+            -128.0f64.next_up(),
+            -128.0,
+            -128.0f64.next_down(),
+            f64::from_bits(1),
+            f64::MAX,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0047),
+        ];
+        let mut food: Vec<_> = (0..1024)
+            .map(|i| Food {
+                x: values[i % values.len()],
+                y: values[(i / values.len()) % values.len()],
+                value: 1.0,
+                size: None,
+                origin: None,
+            })
+            .collect();
+        let mut cache = FoodCache::default();
+        cache.begin();
+        cache.pellets(&food).unwrap();
+        for round in 0..5 {
+            cache.pellets.as_mut().unwrap().start_rebuild();
+            let entries = cache.entries.clone();
+            cache
+                .pellets
+                .as_mut()
+                .unwrap()
+                .advance_rebuild(&entries, 127);
+            check(&cache, &food);
+            let removed = [0, 63, 64, 126, 127, 128, food.len() - 1];
+            cache.remove(food.len(), removed.into_iter());
+            let mut i = 0;
+            food.retain(|_| {
+                let keep = !removed.contains(&i);
+                i += 1;
+                keep
+            });
+            check(&cache, &food);
+            check(&cache.clone(), &food);
+            for i in 0..17 {
+                let f = Food {
+                    x: i as f64,
+                    y: -0.0,
+                    value: 1.0,
+                    size: None,
+                    origin: None,
+                };
+                cache.push(&f);
+                food.push(f);
+            }
+            check(&cache, &food);
+            let entries = cache.entries.clone();
+            cache
+                .pellets
+                .as_mut()
+                .unwrap()
+                .advance_rebuild(&entries, usize::MAX / 2);
+            assert!(
+                !cache.pellets.as_ref().unwrap().rebuilding(),
+                "round {round}"
+            );
+            check(&cache, &food);
+        }
     }
 
     #[test]

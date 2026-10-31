@@ -283,7 +283,7 @@ mod desktop {
             self.effects()?;
             // Do not return while a cancelled acquisition still owns its worker.
             if self.preparation.is_none() {
-                self.login.observe_session(self.game.phase());
+                self.login.observe_game(&self.game)?;
             }
             let active = !matches!(
                 self.game.phase(),
@@ -327,10 +327,8 @@ mod desktop {
             let size = self.window.inner_size();
             let physical = [size.width, size.height];
             let dpr = self.window.scale_factor();
-            let extent =
-                slither_wgpu_slice::render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
             self.host.resize(physical)?;
-            self.game.viewport(extent, 1.)?;
+            let extent = self.game.window_viewport(physical, dpr)?;
             if !self.host.prepare_present()? {
                 if self.host.is_occluded() {
                     self.surface_occluded = true;
@@ -386,6 +384,10 @@ mod desktop {
             self.game
                 .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
             self.effects()?;
+            // A fresh official acquisition still refers to the previous session.
+            if self.preparation.is_none() {
+                self.login.observe_game(&self.game)?;
+            }
             let Some(p) = self.game.take_frame() else {
                 self.host.discard_acquired();
                 self.schedule.retry(Instant::now());
@@ -393,13 +395,7 @@ mod desktop {
             };
             let view = self.login.state.view(admission);
             let composed = if view.visible || view.spinner_visible {
-                let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                    frame: p.frame.clone(),
-                    resources: p.resources.clone(),
-                };
-                for draw in &mut picture.frame.draws {
-                    draw.effective_alpha *= view.world_alpha;
-                }
+                let mut picture = p.clone();
                 self.login
                     .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
                     .append_to(&mut picture)?;
@@ -415,9 +411,14 @@ mod desktop {
                 return Err(e);
             }
             self.window.pre_present_notify();
-            match self.host.present_scaled(&picture.frame) {
+            match self
+                .host
+                .present_scaled_with_overlay(&picture.frame, picture.overlay.as_ref())
+            {
                 Ok(true) => {
                     self.game.presented(true)?;
+                    let effects = self.login.sync_return_focus(self.game.can_play());
+                    self.edit_effects(effects);
                     self.schedule.presented();
                     self.log_present();
                 }

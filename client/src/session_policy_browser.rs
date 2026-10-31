@@ -64,6 +64,12 @@ impl SessionPolicy {
             ("connected", v.connected.into()),
             ("playing", v.playing.into()),
             ("lifeEnded", v.life_ended.into()),
+            (
+                "outcome",
+                v.outcome.map_or(JsValue::NULL, |p| p.label().into()),
+            ),
+            ("deathPending", v.death_pending.into()),
+            ("returnActive", v.return_active.into()),
             ("lagging", v.lagging.into()),
             ("pingPending", v.ping_pending.into()),
             ("lastPingMs", v.last_ping_ms.into()),

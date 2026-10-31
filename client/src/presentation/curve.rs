@@ -3,7 +3,7 @@
 use std::f64::consts::PI;
 
 use super::{BodyPoint, MAX_RETAINED_BODY_POINTS, PresentationError, finite};
-use crate::{math, state::Point};
+use crate::state::Point;
 
 /// Independent retention limit for the active curve, including its terminal sample.
 pub const MAX_CURVE_SAMPLES: usize = 65_536;
@@ -109,7 +109,7 @@ fn midpoint(a: Point, b: Point) -> Result<Point, PresentationError> {
     point(a.x + (b.x - a.x) * 0.5, a.y + (b.y - a.y) * 0.5)
 }
 
-/// Chained interpolation preserves the scalar rounding of a quadratic traversal.
+/// Evaluate the quadratic with de Casteljau interpolation.
 fn quadratic(a: Point, control: Point, b: Point, t: f64) -> Result<Point, PresentationError> {
     let left = point(a.x + (control.x - a.x) * t, a.y + (control.y - a.y) * t)?;
     let right = point(
@@ -238,7 +238,7 @@ impl Scratch {
                         previous.y + (next.sampled.y - previous.y) * along / edge,
                     )?;
                     let original = self.vertices[index].sampled;
-                    let restoration = math::pow(index as f64 / count as f64, 2.);
+                    let restoration = (index as f64 / count as f64).powf(2.);
                     p.x += (original.x - p.x) * restoration;
                     p.y += (original.y - p.y) * restoration;
                     finite(&[p.x, p.y])?;
@@ -455,8 +455,9 @@ pub(super) fn single_anchor_eye_target(
         second.position.x - first.position.x,
         second.position.y - first.position.y,
     )?;
-    let angle = math::atan2(delta.y, delta.x) as f32;
+    let angle = delta.y.atan2(delta.x) as f32;
     finite(&[f64::from(angle)])?;
+    // Tangent rounding selects the turn direction at the antipodal boundary.
     Ok(f64::from(angle) + PI)
 }
 
@@ -606,7 +607,7 @@ fn sample_curve_inner(
         } else {
             let delta = point(p.x - previous.x, p.y - previous.y)?;
             distance_cursor_seed = Some(delta);
-            math::atan2(delta.y, delta.x)
+            delta.y.atan2(delta.x)
         };
         let sample = CurveSample {
             x: p.x as f32,
@@ -621,6 +622,7 @@ fn sample_curve_inner(
     }
     let target_eye_heading = if samples.len() >= 2 {
         samples[0].angle = samples[1].angle;
+        // Preserve the antipodal turn choice made by the stored tangent.
         f64::from(samples[1].angle) + PI
     } else {
         raw_heading.ok_or(PresentationError)?

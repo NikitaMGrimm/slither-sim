@@ -17,7 +17,11 @@ use std::collections::BTreeMap;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 use crate::bank::MENU_MATERIAL_HANDLE_BASE;
+// Reserved menu-material handles; the generic allocator starts above them.
+const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
+const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 type MaterialKey = (u32, u32, u8, u64);
+const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -28,19 +32,75 @@ pub fn check_menu_draws(count: usize) -> Result<()> {
 /// Immutable prepared resources survive subsequent resize, retirement and art replacement.
 pub struct MenuFrame {
     pub frame: Frame,
+    /// Page colour below the world, in the frame's coordinate space; absent when login is hidden.
+    pub backdrop: Option<Draw>,
+    /// Crossfade cover after the world blit, before the independently fading HUD.
+    pub world_cover: Option<Draw>,
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
-    /// Map the menu's logical quads into the world backing before the native
-    /// host scales that complete picture to the physical window. Input/IME keep
-    /// the original logical layout, including fractional window DPR.
+    /// DOM login hosts need the same page/world composition without native controls.
+    pub fn world_crossfade(extent: [u32; 2], scale: f64, world_alpha: f64) -> Result<Self> {
+        crate::render::dimensions(extent, scale)?;
+        if !world_alpha.is_finite() || !(0. ..=1.).contains(&world_alpha) {
+            return Err("Invalid world opacity".into());
+        }
+        let resource = Resource {
+            asset: BodyAsset {
+                handle: PAGE_HANDLE,
+                revision: 1,
+                width: 1,
+                height: 1,
+                status: BodyAssetStatus::Ready,
+            },
+            image: materials::RgbaImage {
+                width: 1,
+                height: 1,
+                pixels: vec![PAGE_COLOR[0], PAGE_COLOR[1], PAGE_COLOR[2], 255],
+            },
+        };
+        let backdrop = image(
+            &resource,
+            MenuRect {
+                x: 0.,
+                y: 0.,
+                width: f64::from(extent[0]) / scale,
+                height: f64::from(extent[1]) / scale,
+            },
+            1.,
+        );
+        let mut cover = backdrop.clone();
+        cover.effective_alpha = 1. - world_alpha;
+        Ok(Self {
+            frame: Frame {
+                identity: 0,
+                tick: 0,
+                extent,
+                viewport_scale: scale,
+                draws: Vec::new(),
+                snakes: Vec::new(),
+            },
+            backdrop: Some(backdrop),
+            world_cover: Some(cover),
+            resources: vec![resource],
+        })
+    }
+
+    /// Diagnostic backing composition for retained comparisons. The native
+    /// host submits the physical menu directly; input/IME stay in CSS pixels.
     pub fn into_backing(mut self, extent: [u32; 2]) -> Result<Self> {
         crate::render::dimensions(extent, 1.)?;
         let scale = [
             f64::from(extent[0]) * self.frame.viewport_scale / f64::from(self.frame.extent[0]),
             f64::from(extent[1]) * self.frame.viewport_scale / f64::from(self.frame.extent[1]),
         ];
-        for draw in &mut self.frame.draws {
+        for draw in self
+            .frame
+            .draws
+            .iter_mut()
+            .chain(&mut self.backdrop)
+            .chain(&mut self.world_cover)
+        {
             // Menu composition emits axis-aligned images, unlike world bodies.
             if draw.rotation != 0. {
                 return Err("Rotated menu host mapping".into());
@@ -62,11 +122,15 @@ impl MenuFrame {
         self.frame.viewport_scale = 1.;
         Ok(self)
     }
-    /// Append in paint order. A failed whole-picture admission publishes nothing.
+    /// Put the page below every world draw and menu controls above them.
+    /// A failed whole-picture admission publishes nothing.
     pub fn append_to(self, picture: &mut PreparedFrame) -> Result<()> {
-        check_menu_draws(self.frame.draws.len())?;
-        if self.frame.extent != picture.frame.extent
-            || self.frame.viewport_scale != picture.frame.viewport_scale
+        let count = self.frame.draws.len()
+            + usize::from(self.backdrop.is_some())
+            + usize::from(self.world_cover.is_some());
+        check_menu_draws(count)?;
+        if self.frame.extent != picture.ui_frame().extent
+            || self.frame.viewport_scale != picture.ui_frame().viewport_scale
         {
             return Err("Menu picture extent/scale mismatch".into());
         }
@@ -88,8 +152,37 @@ impl MenuFrame {
         {
             return Err("Menu whole-picture pixel budget".into());
         }
-        frame::reserve_draws(&mut picture.frame.draws, self.frame.draws.len())?;
-        picture.frame.draws.extend(self.frame.draws);
+        frame::check_draw_count(picture.draw_count() + count)?;
+        if let Some(overlay) = &mut picture.overlay {
+            frame::reserve_draws(
+                &mut overlay.draws,
+                self.frame.draws.len() + usize::from(self.world_cover.is_some()),
+            )?;
+            frame::reserve_draws(
+                &mut picture.frame.draws,
+                usize::from(self.backdrop.is_some()),
+            )?;
+        } else {
+            frame::reserve_draws(&mut picture.frame.draws, count)?;
+        }
+        if let Some(mut backdrop) = self.backdrop {
+            // The page fills the world backing; controls keep their physical UI coordinates.
+            backdrop.destination = BodyRect {
+                x: 0.,
+                y: 0.,
+                width: f64::from(picture.frame.extent[0]) / picture.frame.viewport_scale,
+                height: f64::from(picture.frame.extent[1]) / picture.frame.viewport_scale,
+            };
+            picture.frame.draws.insert(0, backdrop);
+        }
+        if let Some(cover) = self.world_cover {
+            if let Some(overlay) = &mut picture.overlay {
+                overlay.draws.insert(0, cover);
+            } else {
+                picture.frame.draws.push(cover);
+            }
+        }
+        picture.ui_frame_mut().draws.extend(self.frame.draws);
         picture.resources = std::mem::take(&mut resources).into_values().collect();
         Ok(())
     }
@@ -97,8 +190,11 @@ impl MenuFrame {
 #[derive(Default)]
 pub struct Menu {
     pub focus: Option<E>,
+    pub skin_hovered: bool,
+    pub skin_pressed: bool,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
 }
 struct Label {
     text: String,
@@ -111,6 +207,7 @@ struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     materials: BTreeMap<MaterialKey, Resource>,
     next_handle: u64,
+    spinner_revision: u64,
     scale: f64,
     draws: Vec<Draw>,
     art: Vec<Resource>,
@@ -139,7 +236,7 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
     }
 }
 impl Composition<'_> {
-    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+    fn solid_draw(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<Draw> {
         let key = (1, 1, kind, 0);
         if !self.materials.contains_key(&key) {
             let resource = if let Some(resource) = self.old.get(&key) {
@@ -150,10 +247,10 @@ impl Composition<'_> {
                     .checked_add(1)
                     .filter(|h| *h < MENU_MATERIAL_HANDLE_BASE + crate::bank::HANDLE_NAMESPACE_SIZE)
                     .ok_or("Menu material handle overflow")?;
-                let rgb = if kind == 8 {
-                    [224, 224, 255]
-                } else {
-                    [150, 108, 213]
+                let rgb = match kind {
+                    8 => [224, 224, 255],
+                    10 => PAGE_COLOR,
+                    _ => [150, 108, 213],
                 };
                 Resource {
                     asset: BodyAsset {
@@ -172,16 +269,28 @@ impl Composition<'_> {
             };
             self.materials.insert(key, resource);
         }
-        self.push(image(&self.materials[&key], r, alpha))
+        Ok(image(&self.materials[&key], r, alpha))
+    }
+    fn solid(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
+        let draw = self.solid_draw(r, kind, alpha)?;
+        self.push(draw)
     }
     fn push(&mut self, draw: Draw) -> Result<()> {
         check_menu_draws(self.draws.len() + 1)?;
         frame::push_draw(&mut self.draws, draw)
     }
     fn control(&mut self, r: MenuRect, kind: u8, alpha: f64) -> Result<()> {
-        // Capsules need few pixels; keep their complete shadow inside the
-        // renderer's existing 512px texture limit. Text retains its 3x raster.
-        let scale = self.scale.min(1.5);
+        let surface = match kind {
+            0 => materials::MenuSurface::Play,
+            1..=2 => materials::MenuSurface::Overlay,
+            5 => materials::MenuSurface::Nickname,
+            _ => materials::MenuSurface::Compact,
+        };
+        // Include the broader nickname shadow and the menu's outgoing growth;
+        // leave room for the three independent ceil operations below.
+        let scale = self
+            .scale
+            .min(509. / (r.width.max(r.height) + 2. * surface.padding()));
         let size = [
             (r.width * scale).ceil() as u32,
             (r.height * scale).ceil() as u32,
@@ -195,13 +304,12 @@ impl Composition<'_> {
                     0 => [[86, 172, 129], [54, 108, 81]],
                     1 => [[117, 240, 202], [72, 171, 132]],
                     2 => [[12, 20, 18], [40, 59, 54]],
-                    3 => [[75, 91, 84], [50, 65, 58]],
-                    4 => [[76, 68, 124], [76, 68, 124]],
-                    5 => [[0, 0, 0], [0, 0, 0]],
+                    4 | 5 => [[76, 68, 124], [76, 68, 124]],
                     6 => [[108, 215, 128], [80, 160, 100]],
                     _ => [[150, 108, 213], [100, 70, 150]],
                 };
-                let image = materials::menu_control(size, f64::from(size[1]) / 2., colors, scale)?;
+                let image =
+                    materials::menu_control(size, f64::from(size[1]) / 2., colors, scale, surface)?;
                 self.next_handle = self
                     .next_handle
                     .checked_add(1)
@@ -220,7 +328,7 @@ impl Composition<'_> {
             };
             self.materials.insert(key, resource);
         }
-        let pad = (12. * scale).ceil() / scale;
+        let pad = (surface.padding() * scale).ceil() / scale;
         let resource = &self.materials[&key];
         let r = MenuRect {
             x: r.x - pad,
@@ -248,6 +356,42 @@ impl Composition<'_> {
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
         self.push(image(resource, r, alpha))?;
         self.art.push(resource.clone());
+        Ok(())
+    }
+    fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
+        let side = (128. * self.scale).ceil() as u32;
+        let key = (side, side, 6, view.spinner_time.to_bits());
+        let resource = if let Some(old) = self.old.get(&key) {
+            old.clone()
+        } else {
+            let pixels = materials::menu_spinner(view.spinner_time, side)?;
+            self.spinner_revision = self
+                .spinner_revision
+                .checked_add(1)
+                .ok_or("Spinner revision overflow")?;
+            Resource {
+                asset: BodyAsset {
+                    handle: SPINNER_HANDLE,
+                    revision: self.spinner_revision,
+                    width: side,
+                    height: side,
+                    status: BodyAssetStatus::Ready,
+                },
+                image: pixels,
+            }
+        };
+        let width = 128. * view.spinner_scale;
+        self.push(image(
+            &resource,
+            MenuRect {
+                x: r.x + (r.width - width) / 2.,
+                y: r.y + (r.height - width) / 2.,
+                width,
+                height: width,
+            },
+            view.spinner_alpha,
+        ))?;
+        self.materials.insert(key, resource);
         Ok(())
     }
 }
@@ -284,13 +428,35 @@ impl Menu {
         let mut c = Composition {
             old: &self.materials,
             materials: BTreeMap::new(),
-            next_handle: self.next_handle.max(MENU_MATERIAL_HANDLE_BASE),
+            next_handle: self.next_handle.max(PAGE_HANDLE),
+            spinner_revision: self.spinner_revision,
             scale: dpr.min(3.),
             draws: Vec::new(),
             art: Vec::new(),
             labels: Vec::new(),
         };
         let a = view.login_alpha;
+        let backdrop = if view.visible {
+            Some(c.solid_draw(
+                MenuRect {
+                    x: 0.,
+                    y: 0.,
+                    width: f64::from(extent[0]) / dpr,
+                    height: f64::from(extent[1]) / dpr,
+                },
+                10,
+                1.,
+            )?)
+        } else {
+            None
+        };
+        // Fade the completed canvas, not overlapping world draws. The HUD
+        // already owns its return opacity, so this cover goes before that layer.
+        let world_cover = backdrop.clone().map(|mut draw| {
+            draw.effective_alpha = a;
+            draw
+        });
+        let busy = view.phase == slither_client::start_page::MenuPhase::Connecting;
         if view.visible {
             let qr = layout.viewport_rect(E::Quality);
             if self.focus == Some(E::Quality) {
@@ -318,7 +484,21 @@ impl Menu {
             let logo = layout.viewport_rect(E::Logo);
             let logo_alpha = a * view.logo_alpha * view.logo_reveal;
             if let Some(art) = cosmetics.and_then(|p| p.menu_art(MenuArt::Logo(logo_frame))) {
-                c.art(art, logo, logo_alpha)?;
+                // Local art may be taller than the 450x135 original; it must
+                // not paint over the rows below the holder.
+                let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
+                let room = layout.viewport_rect(E::LastLength).y - logo.y;
+                let fit = (room / natural).min(1.);
+                c.art(
+                    art,
+                    MenuRect {
+                        x: logo.x + logo.width * (1. - fit) / 2.,
+                        width: logo.width * fit,
+                        height: natural * fit,
+                        ..logo
+                    },
+                    logo_alpha,
+                )?;
             } else {
                 c.label("slither", logo, 40. * layout.scale, true, logo_alpha);
                 c.labels.last_mut().unwrap().style.color = [130, 214, 91];
@@ -331,20 +511,78 @@ impl Menu {
                     false,
                     a * view.tip_alpha,
                 );
+                let label = c.labels.last_mut().unwrap();
+                label.style.family = Family::Lucida;
+                label.style.color = [128, 104, 192];
+            }
+            // Center the whole line; its three runs share a box/baseline and
+            // preserve the regular prefix/punctuation and real bold number.
+            let last = &view.last_life;
+            let runs = [
+                (
+                    format!(
+                        "{}{}",
+                        last.label,
+                        if last.label.is_empty() { "" } else { " " }
+                    ),
+                    false,
+                    last.label_alpha,
+                ),
+                (last.number.clone(), true, 1.),
+                (last.suffix.to_owned(), false, 1.),
+            ];
+            let rect = layout.viewport_rect(E::LastLength);
+            let size = 15. * layout.scale;
+            let mut widths = Vec::new();
+            for (value, bold, _) in &runs {
+                let style = TextStyle {
+                    size,
+                    weight: if *bold { Weight::Bold } else { Weight::Normal },
+                    family: Family::Lucida,
+                    slant: Slant::Normal,
+                    color: [255; 3],
+                };
+                widths.push(text.measure_panel(value, style)?.advance);
+            }
+            let total: f64 = widths.iter().sum();
+            let fit = if total > rect.width {
+                rect.width / total
+            } else {
+                1.
+            };
+            let mut x = rect.x + (rect.width - total * fit) / 2.;
+            for ((value, bold, alpha), width) in runs.iter().zip(widths) {
+                if !value.is_empty() {
+                    c.label(
+                        value,
+                        MenuRect {
+                            x,
+                            width: width * fit,
+                            ..rect
+                        },
+                        size * fit,
+                        *bold,
+                        a * alpha,
+                    );
+                    let label = c.labels.last_mut().unwrap();
+                    label.align = Align::Left;
+                    label.style.color = [255; 3];
+                    label.style.family = Family::Lucida;
+                }
+                x += width * fit;
+            }
+            if view.champion_pending {
+                c.label(
+                    view.wording.champion_pending,
+                    layout.viewport_rect(E::NicknameHolder),
+                    15. * layout.scale,
+                    false,
+                    a,
+                );
             }
             if view.ordinary_controls_visible {
                 let nick = layout.viewport_rect(E::NicknameHolder);
                 c.control(nick, 5, a * view.nickname_alpha)?;
-                c.control(
-                    MenuRect {
-                        x: nick.x + 2. * layout.scale,
-                        y: nick.y + 2. * layout.scale,
-                        width: nick.width - 4. * layout.scale,
-                        height: nick.height - 4. * layout.scale,
-                    },
-                    4,
-                    a * view.nickname_alpha,
-                )?;
                 c.label(
                     if view.nickname.is_empty() {
                         view.wording.nickname
@@ -354,9 +592,10 @@ impl Menu {
                     layout.viewport_rect(E::Nickname),
                     15. * layout.scale,
                     false,
-                    a * view.nickname_alpha * if view.disabled { 0.5 } else { 1. },
+                    a * view.nickname_alpha,
                 );
                 c.labels.last_mut().unwrap().align = Align::Left;
+                c.labels.last_mut().unwrap().style.family = Family::Lucida;
                 if view.nickname.is_empty() {
                     c.labels.last_mut().unwrap().style.color = [112, 112, 176];
                 }
@@ -421,8 +660,9 @@ impl Menu {
                     }
                 }
                 let play = layout.viewport_rect(E::Play);
-                let pa = a * view.play_alpha * view.play_return_alpha;
-                c.control(play, if view.disabled { 3 } else { 0 }, pa)?;
+                let pa =
+                    a * view.play_alpha * view.play_return_alpha * if busy { 0.38 } else { 1. };
+                c.control(play, 0, pa)?;
                 if !view.disabled {
                     c.control(
                         play,
@@ -435,17 +675,20 @@ impl Menu {
                     )?;
                     c.control(play, 2, pa * view.press_alpha)?;
                 }
-                c.label(
-                    view.play_label,
-                    play,
-                    20. * layout.scale,
-                    true,
-                    pa * if view.disabled { 0.45 } else { 1. },
-                );
+                c.label(view.play_label, play, 20. * layout.scale, true, pa);
                 c.labels.last_mut().unwrap().style.color = [255; 3];
                 let r = layout.viewport_rect(E::Skin);
+                let skin_alpha = a
+                    * view.skin_alpha
+                    * if self.skin_pressed && self.skin_hovered {
+                        0.5
+                    } else if self.skin_hovered {
+                        1.
+                    } else {
+                        0.7
+                    };
                 if let Some(art) = cosmetics.and_then(|p| p.menu_art(MenuArt::Skin)) {
-                    c.art(art, r, a * view.skin_alpha)?;
+                    c.art(art, r, skin_alpha)?;
                 } else {
                     c.control(
                         MenuRect {
@@ -455,7 +698,7 @@ impl Menu {
                             height: 25.,
                         },
                         0,
-                        a * view.skin_alpha,
+                        skin_alpha,
                     )?;
                     c.label(
                         view.wording.change_skin,
@@ -466,32 +709,16 @@ impl Menu {
                         },
                         14.,
                         false,
-                        a * view.skin_alpha,
+                        skin_alpha,
                     );
                 }
             }
         }
+        let spinner_start = c.draws.len();
         if view.spinner_visible {
-            let r = layout.viewport_rect(E::Spinner);
-            let center = [r.x + r.width / 2., r.y + r.height / 2.];
-            for n in 0..16 {
-                let phase = n as f64 * std::f64::consts::TAU / 16. + view.spinner_time * 0.05;
-                let radius = 40. * view.spinner_scale;
-                let side = 10. * view.spinner_scale;
-                if side > 0. {
-                    c.control(
-                        MenuRect {
-                            x: center[0] + radius * phase.cos() - side / 2.,
-                            y: center[1] + radius * phase.sin() - side / 2.,
-                            width: side,
-                            height: side,
-                        },
-                        if n < 8 { 6 } else { 7 },
-                        view.spinner_alpha * (0.35 + 0.65 * n as f64 / 15.),
-                    )?;
-                }
-            }
+            c.spinner(layout.viewport_rect(E::Spinner), view)?;
         }
+        let spinner_draws = c.draws.split_off(spinner_start);
         let material_bytes = c
             .materials
             .values()
@@ -546,6 +773,15 @@ impl Menu {
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
+                // The spinner is above the login's text, including the fading tips.
+                check_menu_draws(
+                    c.draws.len()
+                        + spinner_draws.len()
+                        + usize::from(backdrop.is_some())
+                        + usize::from(world_cover.is_some()),
+                )?;
+                frame::reserve_draws(&mut c.draws, spinner_draws.len())?;
+                c.draws.extend(spinner_draws);
                 let frame = Frame {
                     identity: 0,
                     extent,
@@ -557,11 +793,14 @@ impl Menu {
                 frame.validate(&resources.iter().map(|(k, r)| (*k, r.asset)).collect())?;
                 Ok(MenuFrame {
                     frame,
+                    backdrop,
+                    world_cover,
                     resources: resources.into_values().collect(),
                 })
             },
         )?;
         self.next_handle = c.next_handle;
+        self.spinner_revision = c.spinner_revision;
         self.materials = c.materials;
         Ok(result)
     }

@@ -27,7 +27,6 @@ import { leaderboardScoreSmoke } from './leaderboard-score-smoke.mjs';
 import { minimapRenderSmoke } from './minimap-render-smoke.mjs';
 import { skinPolicySmoke } from './skin-policy-smoke.mjs';
 import { startPageSmoke } from './start-page-smoke.mjs';
-import { endScreenSmoke } from './end-screen-smoke.mjs';
 import { menuPreferencesSmoke } from './menu-preferences-smoke.mjs';
 import { appearancePreviewSmoke } from './appearance-preview-smoke.mjs';
 import { desktopLayoutSmoke } from './desktop-layout-smoke.mjs';
@@ -38,6 +37,7 @@ import { profileLiteralsSmoke } from './profile-literals-smoke.mjs';
 import { playAdmissionSmoke } from './play-admission-smoke.mjs';
 import { menuLoadingSmoke } from './menu-loading-smoke.mjs';
 import { desktopInputSmoke } from './desktop-input-smoke.mjs';
+import { projectedInputSmoke } from './projected-input-smoke.mjs';
 import { desktopInputLifetimeSmoke } from './desktop-input-lifetime-smoke.mjs';
 
 // Entirely synthetic ABI integration; no reference files or network are used.
@@ -97,6 +97,7 @@ console.log('Synthetic runtime Play requirements with real Rust admission passed
   playAdmissionResult.split(/\r?\n/).filter(line => /^# (tests|pass|fail|skipped) /.test(line)).join(', '));
 console.log('Synthetic appearance preview ABI passed:', appearancePreviewSmoke(wasm));
 console.log('Synthetic real-Wasm desktop input equivalence passed:', desktopInputSmoke(wasm));
+console.log('Synthetic real-Wasm projected input controls passed:', projectedInputSmoke(wasm));
 console.log('Synthetic real-Wasm desktop input release passed:', desktopInputLifetimeSmoke(wasm));
 const inputRequirements = execFileSync(process.execPath,
   ['--test', '--test-reporter=tap', fileURLToPath(new URL('./client-input.test.mjs', import.meta.url))],
@@ -112,7 +113,6 @@ const hudHistoryResult = execFileSync(process.execPath,
 console.log('Synthetic real-Wasm HUD/leaderboard history requirements passed:',
   hudHistoryResult.split(/\r?\n/).filter(line => /^# (tests|pass|fail|skipped) /.test(line)).join(', '));
 console.log('Synthetic start-page view ABI passed:', startPageSmoke(wasm));
-endScreenSmoke(wasm);
 console.log('Synthetic Rust skin policy ABI passed:', skinPolicySmoke(wasm));
 leaderboardScoreSmoke(wasm);
 console.log('Synthetic native minimap view ABI passed:', minimapRenderSmoke(wasm));
