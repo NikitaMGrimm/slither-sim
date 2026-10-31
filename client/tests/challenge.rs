@@ -1,8 +1,6 @@
 //! Synthetic programs and literals only; no captured challenge fixtures.
 
-use slither_client::challenge::{
-    ChallengeError, ChallengeReply, MAX_SOURCE_BYTES, challenge_reply, solve_challenge,
-};
+use slither_client::challenge::{ChallengeError, MAX_SOURCE_BYTES, solve_challenge};
 
 // Construct synthetic source from individual grammar tokens. This is a test
 // generator, not an embedded decoded challenge or a copied JavaScript snippet.
@@ -136,7 +134,6 @@ fn invalid_literals_reject() {
     for first in [
         b"ABCD".as_slice(),
         b"ABCDEF",
-        b"AB\"DE",
         b"AB\\DE",
         b"AB\nDE",
         b"AB\x7fDE",
@@ -152,6 +149,57 @@ fn invalid_literals_reject() {
         solve_challenge(&encode(tokens.join(" ").as_bytes())),
         Err(ChallengeError::Literal)
     );
+    // An embedded delimiter ends the literal early, leaving unsupported tokens.
+    let tokens = synthetic_tokens(b"AB\"DE", &[b'A'; 22]);
+    assert_eq!(
+        solve_challenge(&encode(tokens.join(" ").as_bytes())),
+        Err(ChallengeError::Syntax)
+    );
+}
+
+#[test]
+fn single_literal_copy_loops_use_the_same_transform() {
+    let literal = "A".repeat(24);
+    let expected = b"DHLPTXBFJNRVZDHLPTXBFJNR";
+    for source in [
+        format!("var a='{literal}';for (var i=0;i<24;i++){{idba[i]=a.charCodeAt(i);}}"),
+        format!("var a='{literal}';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);"),
+        format!(
+            "var a = \"{literal}\" ; for ( var i = 0 ; i < 24 ; i ++ ) idba [ i ] = a . charCodeAt ( i ) ;"
+        ),
+    ] {
+        assert_eq!(
+            solve_challenge(&encode(source.as_bytes())).unwrap(),
+            expected
+        );
+    }
+    let quoted = r#"var a='A"B';for(var i=0;i<3;i++)idba[i]=a.charCodeAt(i);"#;
+    assert_eq!(
+        solve_challenge(&encode(quoted.as_bytes())).unwrap().len(),
+        3
+    );
+}
+
+#[test]
+fn copy_counts_and_delimiters_must_match() {
+    for (literal, count) in [("AAAA", "3"), ("AAAA", "5"), ("AAAA", "04"), ("", "0")] {
+        let source =
+            format!("var a='{literal}';for(var i=0;i<{count};i++)idba[i]=a.charCodeAt(i);");
+        assert!(
+            solve_challenge(&encode(source.as_bytes())).is_err(),
+            "{literal} {count}"
+        );
+    }
+    for source in [
+        r#"var a='AAAA";for(var i=0;i<4;i++)idba[i]=a.charCodeAt(i);"#,
+        "var a='AAAA';for(var i=0;i<4;i++){idba[i]=a.charCodeAt(i);",
+        "var a='AAAA';for(var i=0;i<4;i++)idba[i]=a.charCodeAt(i);}",
+    ] {
+        assert!(
+            solve_challenge(&encode(source.as_bytes())).is_err(),
+            "{source}"
+        );
+    }
 }
 
 #[test]
@@ -168,52 +216,5 @@ fn invalid_wire_sizes_alphabet_and_nibble_reject() {
     let valid = encode(source().join(" ").as_bytes());
     for end in (2..valid.len()).step_by(2) {
         assert!(solve_challenge(&valid[..end]).is_err());
-    }
-}
-
-#[test]
-fn supported_challenges_are_solved_without_randomness() {
-    let encoded = encode(source().join(" ").as_bytes());
-    let reply = challenge_reply(&encoded, || {
-        unreachable!("solved replies use no randomness")
-    });
-    assert_eq!(
-        reply,
-        Ok(ChallengeReply {
-            bytes: solve_challenge(&encoded).unwrap(),
-            unsolved: None,
-        })
-    );
-}
-
-#[test]
-fn unsupported_letter_challenges_get_the_stock_unsolved_reply() {
-    // A synthetic no-op program in single quotes, as some community servers send.
-    let no_op = encode(b"var a='AAAAAAAAAAAAAAAAAAAAAAAAAAA'//");
-    let cases: [(&[u8], ChallengeError); 4] = [
-        (&no_op, ChallengeError::Literal),
-        (b"", ChallengeError::Size),
-        (b"[]^_`", ChallengeError::Size),
-        (b"na", ChallengeError::Nibble),
-    ];
-    for (encoded, error) in cases {
-        let low = challenge_reply(encoded, || 0.0).unwrap();
-        assert_eq!(low.unsolved, Some(error));
-        let high = challenge_reply(encoded, || 0.999_999).unwrap();
-        for (index, (low, high)) in low.bytes[..26].iter().zip(&high.bytes[..26]).enumerate() {
-            assert_eq!(usize::from(*low), 162 + index);
-            assert_eq!(usize::from(*high), 219 + index);
-        }
-        assert_eq!((low.bytes.len(), low.bytes[26], high.bytes[26]), (27, 0, 0));
-    }
-}
-
-#[test]
-fn challenges_outside_the_stock_alphabet_still_fail() {
-    for encoded in [b"@a".as_slice(), b"a{", b"a a", &[0xff, b'a']] {
-        assert_eq!(
-            challenge_reply(encoded, || 0.0),
-            Err(solve_challenge(encoded).unwrap_err())
-        );
     }
 }

@@ -26,9 +26,7 @@ pub fn encode_login(
 
 #[wasm_bindgen]
 pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, JsValue> {
-    challenge::challenge_reply(encoded, js_sys::Math::random)
-        .map(|reply| reply.bytes)
-        .map_err(error)
+    challenge::solve_challenge(encoded).map_err(error)
 }
 
 /// Pack complete commands as repeated u32 big-endian lengths and command bytes.
