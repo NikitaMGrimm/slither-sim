@@ -8,6 +8,41 @@ use crate::{
 /// Stable control identity within a panel generation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ControlId(pub u16);
+/// Fixed-height list window. Only this range is copied, rasterised and drawn.
+#[derive(Clone, Debug)]
+pub struct ScrollList {
+    first: usize,
+    visible: usize,
+}
+impl ScrollList {
+    /// Bound a window to at most 32 rows, independent of directory length.
+    pub fn new(visible: usize) -> Self {
+        Self {
+            first: 0,
+            visible: visible.clamp(1, 32),
+        }
+    }
+    /// Clamp after refresh/resize and return only the visible row indices.
+    pub fn window(&mut self, total: usize) -> std::ops::Range<usize> {
+        self.first = self.first.min(total.saturating_sub(self.visible));
+        self.first..(self.first + self.visible).min(total)
+    }
+    /// Move a whole number of rows, saturating at both ends.
+    pub fn scroll(&mut self, rows: isize, total: usize) {
+        self.first = self.first.saturating_add_signed(rows);
+        self.window(total);
+    }
+    /// Keep a keyboard target visible.
+    pub fn reveal(&mut self, index: usize, total: usize) {
+        if index < self.first {
+            self.first = index;
+        }
+        if index >= self.first + self.visible {
+            self.first = index + 1 - self.visible;
+        }
+        self.window(total);
+    }
+}
 /// Logical placement relative to the containing panel (or viewport).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
@@ -70,9 +105,29 @@ impl Placement {
             .then_some((rect, s))
     }
 }
-/// The three kinds with real adopters in this slice.
+/// Concrete controls used by the mounted menu screens.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ControlKind {
+    /// One login link: server icon above an unboxed caption.
+    IconLink {
+        /// Visible caption and accessible name.
+        label: String,
+    },
+    /// Full viewport modal hit shield.
+    Backdrop,
+    /// Passive themed panel surface.
+    Surface,
+    /// One visible row of a windowed list. Offscreen rows never enter the view.
+    ListRow {
+        /// Primary row text.
+        label: String,
+        /// Secondary status text.
+        detail: String,
+        /// Current committed selection.
+        selected: bool,
+        /// Measured latency, absent until supplied by the adapter.
+        ping: Option<u32>,
+    },
     /// Single-line label; long instructions are not result-panel text.
     Label {
         /// Label content.
@@ -238,8 +293,19 @@ impl PanelView {
             .map(|r| {
                 let enabled = self.enabled && r.control.enabled;
                 let (role, value, actions) = match r.control.kind {
+                    ControlKind::Backdrop => (
+                        AccessibleRole::Button,
+                        String::new(),
+                        vec![PanelAction::Activate],
+                    ),
+                    ControlKind::Surface => (AccessibleRole::Status, String::new(), vec![]),
+                    ControlKind::ListRow { label, detail, .. } => (
+                        AccessibleRole::Button,
+                        format!("{label}, {detail}"),
+                        vec![PanelAction::Focus, PanelAction::Activate],
+                    ),
                     ControlKind::Label { text } => (AccessibleRole::Status, text, vec![]),
-                    ControlKind::Button { .. } => (
+                    ControlKind::Button { .. } | ControlKind::IconLink { .. } => (
                         AccessibleRole::Button,
                         String::new(),
                         vec![PanelAction::Focus, PanelAction::Activate],
@@ -367,6 +433,16 @@ pub struct PanelInputState {
     selection: MouseSelection,
 }
 impl PanelInputState {
+    /// Set an available keyboard target through the same admission gate as Tab.
+    pub fn focus_control(&mut self, panel: &PanelView, id: ControlId) {
+        if panel
+            .controls
+            .iter()
+            .any(|c| c.id == id && Self::available(panel, c))
+        {
+            self.focus = Some(id);
+        }
+    }
     /// Current logical focus.
     pub fn focus(&self) -> Option<ControlId> {
         self.focus

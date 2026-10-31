@@ -7,7 +7,7 @@ use crate::{
     text::TextCache,
 };
 use slither_client::{
-    login_controls::{self, NICKNAME, PLAY, QUALITY},
+    login_controls::{self, NICKNAME, PLAY, QUALITY, SERVER},
     menu_controls::{ControlId, PanelInputState, PanelView},
     menu_input::{EditIntent, HostEditEffect, TextField},
     menu_layout::{MenuElement as E, MenuLayout},
@@ -18,6 +18,7 @@ use slither_client::{
 pub struct NativeLogin {
     pub input: NativeMenuInput,
     pub champion: crate::panel_native::NativePanel,
+    pub picker: crate::server_picker_native::NativeServerPicker,
     pub state: StartMenuState,
     pub layout: MenuLayout,
     pub controls: PanelInputState,
@@ -38,7 +39,8 @@ impl NativeLogin {
         self.state.view(true).visible || self.champion_session.death_pending
     }
     pub fn blocks_gameplay(&self) -> bool {
-        self.champion.policy.visible()
+        self.picker.policy.visible()
+            || self.champion.policy.visible()
             || matches!(
                 self.state.view(true).phase,
                 slither_client::start_page::MenuPhase::Login
@@ -67,6 +69,7 @@ impl NativeLogin {
                 &slither_client::session_policy::SessionPolicy::new().view(),
             ),
             state,
+            picker: crate::server_picker_native::NativeServerPicker::default(),
             layout,
             panel,
             controls: PanelInputState::default(),
@@ -107,6 +110,14 @@ impl NativeLogin {
                 slither_client::menu_theme::MenuTheme::default(),
             )
             .map_err(str::to_owned)?;
+        let picker_visible = self.picker.panel.visible || self.picker.policy.visible();
+        let picker_effects = self.picker.step(now)?;
+        if picker_visible {
+            effects = picker_effects;
+            if !self.picker.policy.visible() {
+                effects.extend(self.focus(NICKNAME));
+            }
+        }
         if self.champion.policy.visible() || self.champion.policy.finished() {
             self.champion.step(
                 now,
@@ -161,6 +172,9 @@ impl NativeLogin {
         self.controls.sync_focus(&self.panel, &mut self.input.state)
     }
     pub fn activate(&mut self, admission: bool) {
+        if self.picker.policy.visible() {
+            return;
+        }
         let composing = self.input.state.editor(TextField::Nickname).composing();
         let view = self.state.view(admission);
         if view.phase == slither_client::start_page::MenuPhase::Returning && !view.play_disabled {
@@ -178,6 +192,13 @@ impl NativeLogin {
             }
             Some(QUALITY) => {
                 self.state.action(MenuAction::Quality, admission);
+            }
+            Some(SERVER) if slither_client::server_picker::available(&view) => {
+                self.picker.policy.open();
+                self.picker
+                    .input
+                    .state
+                    .reset_editor(slither_client::server_picker::SEARCH_EDITOR, "");
             }
             _ => {}
         }
@@ -222,7 +243,9 @@ impl NativeLogin {
                     effects: Vec::new(),
                 };
             }
-            if !view.disabled && !self.input.state.editor(TextField::Nickname).composing() {
+            if (!view.disabled || slither_client::server_picker::available(&view))
+                && !self.input.state.editor(TextField::Nickname).composing()
+            {
                 if event.logical == &Key::Named(NamedKey::Tab) {
                     self.controls.tab(&self.panel, self.input.shift_key());
                     return NativeInputResult {
@@ -230,7 +253,7 @@ impl NativeLogin {
                         effects: self.controls.sync_focus(&self.panel, &mut self.input.state),
                     };
                 }
-                if matches!(self.controls.focus(), Some(PLAY | QUALITY))
+                if matches!(self.controls.focus(), Some(PLAY | QUALITY | SERVER))
                     && !event.repeat
                     && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
                 {
@@ -250,6 +273,12 @@ impl NativeLogin {
         down: Option<bool>,
         admission: bool,
     ) -> Vec<HostEditEffect> {
+        if self.picker.policy.visible() {
+            return self
+                .picker
+                .pointer(&mut self.text, point, down)
+                .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
+        }
         if self.champion.policy.visible() {
             return self
                 .champion
@@ -282,6 +311,10 @@ impl NativeLogin {
                         }
                         QUALITY => {
                             self.state.action(MenuAction::Quality, admission);
+                        }
+                        SERVER => {
+                            effects.extend(self.input.state.apply(EditIntent::Focus(None)));
+                            effects.extend(self.picker.open());
                         }
                         _ => {}
                     }
@@ -359,6 +392,16 @@ impl NativeLogin {
                 scroll: &mut self.champion.scroll,
                 theme: slither_client::menu_theme::MenuTheme::default(),
             })
+        } else if self.picker.policy.visible() {
+            self.picker.viewport = area;
+            self.picker.panel = self.picker.policy.panel(area);
+            Some(crate::menu::PanelPaint {
+                panel: &self.picker.panel,
+                input: &self.picker.controls,
+                edit: &self.picker.input.state,
+                scroll: &mut self.picker.scroll,
+                theme: slither_client::menu_theme::MenuTheme::default(),
+            })
         } else {
             Some(crate::menu::PanelPaint {
                 panel: &self.panel,
@@ -390,6 +433,9 @@ impl NativeLogin {
         text
     }
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
+        if self.picker.policy.visible() {
+            return self.picker.cursor_area(&mut self.text, self.pixel_scale);
+        }
         if self.champion.policy.visible() {
             return self.champion.cursor_area(&mut self.text, self.pixel_scale);
         }

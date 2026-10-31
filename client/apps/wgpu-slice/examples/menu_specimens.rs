@@ -156,6 +156,92 @@ fn synthetic_logo(color: [u8; 4]) -> Result<Vec<u8>> {
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--server-picker") {
+        use slither_client::{server_directory::Server, server_picker::ServerPreference};
+        use slither_wgpu_slice::login_native::NativeLogin;
+        use std::{collections::BTreeMap, net::SocketAddr};
+        let validation = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let servers = (1..=2000)
+            .map(|id| Server {
+                id,
+                cluster: id % 5,
+                address: SocketAddr::from(([192, 0, 2, 1], id)),
+                population: 40,
+                active: true,
+            })
+            .collect::<Vec<_>>();
+        let pings = BTreeMap::from([(0, 18), (1, 67), (2, 130), (3, 285)]);
+        let mut measurements = Vec::new();
+        // One resource owner across DPR changes, like the actual native host.
+        let mut login = NativeLogin::new("")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        let mut now = 9600.;
+        for dpr in [1., 1.5, 2.] {
+            let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+            login.picker.policy.close();
+            for _ in 0..40 {
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            let picture = login.prepare_host(extent, dpr, true, None)?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!("server-login-{dpr}x.png")),
+            )?;
+            login
+                .picker
+                .policy
+                .replace(&servers, &pings)
+                .map_err(str::to_owned)?;
+            login.picker.policy.selection = ServerPreference(Some(25));
+            login.picker.open();
+            for _ in 0..40 {
+                now += 16.;
+                login.step(now, true, false)?;
+            }
+            for (name, offset) in [("picker", 0), ("scrolled", 1994)] {
+                login.picker.policy.scroll(offset);
+                login.picker.sync();
+                let picture = login.prepare_host(extent, dpr, true, None)?;
+                capture(
+                    &mut renderer,
+                    &picture,
+                    &output.join(format!("server-{name}-{dpr}x.png")),
+                )?;
+                measurements.push(serde_json::json!({"dpr":dpr,"state":name,"directory_rows":2000,"draws":picture.frame.draws.len(),"resources":picture.resources.len(),"bytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+            }
+        }
+        // Retain the same native menu across the reported DPR-3 resize trigger.
+        for logical in [[960., 540.], [960., 720.]] {
+            let dpr = 3.;
+            let extent = logical.map(|v| (v * dpr) as u32);
+            let picture = login.prepare_host(extent, dpr, true, None)?;
+            capture(
+                &mut renderer,
+                &picture,
+                &output.join(format!(
+                    "server-resize-3x-{}x{}.png",
+                    logical[0], logical[1]
+                )),
+            )?;
+            measurements.push(serde_json::json!({"dpr":dpr,"logical":logical,"state":"resize","directory_rows":2000,"draws":picture.frame.draws.len(),"resources":picture.resources.len(),"bytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
+        }
+        std::fs::write(
+            output.join("server-picker.json"),
+            serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        if let Some(error) = validation.pop().await {
+            return Err(error.to_string());
+        }
+        return Ok(());
+    }
     if std::env::args().nth(2).as_deref() == Some("--champion") {
         use slither_client::{
             champion::ChampionState,

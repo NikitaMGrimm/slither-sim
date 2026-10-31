@@ -302,6 +302,8 @@ pub struct Menu {
     spinner_revision: u64,
 }
 struct Label {
+    /// Material boundary for content below a later modal backdrop.
+    before: Option<usize>,
     text: String,
     rect: MenuRect,
     style: TextStyle,
@@ -462,12 +464,30 @@ impl Composition<'_> {
         resolved: &[ResolvedControl],
     ) -> Result<()> {
         if panel.visible {
+            if panel
+                .controls
+                .iter()
+                .any(|c| c.visible && matches!(c.kind, ControlKind::Backdrop))
+            {
+                for label in &mut self.labels {
+                    label.before.get_or_insert(self.draws.len());
+                }
+            }
             for r in resolved.iter().filter(|r| r.control.visible) {
                 let control = &r.control;
                 let enabled = panel.enabled && control.enabled;
                 let alpha = panel.alpha
                     * control.alpha
-                    * if enabled || matches!(control.kind, ControlKind::Label { .. }) {
+                    * if enabled
+                        || control.style == ControlStyle::MenuLink
+                        || matches!(
+                            control.kind,
+                            ControlKind::Label { .. }
+                                | ControlKind::Backdrop
+                                | ControlKind::Surface
+                                | ControlKind::ListRow { .. }
+                        )
+                    {
                         1.
                     } else {
                         theme.disabled_opacity(control.style)
@@ -484,6 +504,7 @@ impl Composition<'_> {
                                  align: Align,
                                  clip: MenuRect| {
                     c.labels.push(Label {
+                        before: None,
                         text: value,
                         rect,
                         style,
@@ -497,6 +518,182 @@ impl Composition<'_> {
                     });
                 };
                 match &control.kind {
+                    ControlKind::IconLink { label } => {
+                        let [hover, press] = input.progress(control.id);
+                        let link_alpha = if press > 0. {
+                            0.5
+                        } else if hover > 0. || input.focus() == Some(control.id) {
+                            1.
+                        } else {
+                            0.7
+                        };
+                        let icon = MenuRect {
+                            x: r.rect.x + (r.rect.width - 48.) / 2.,
+                            y: r.rect.y + 37.,
+                            width: 48.,
+                            height: 22.,
+                        };
+                        for row in 0..3 {
+                            let bar = MenuRect {
+                                y: icon.y + f64::from(row) * 8.,
+                                height: 6.,
+                                ..icon
+                            };
+                            self.ink(bar, theme.field, alpha * link_alpha, r.clip)?;
+                            self.ink(
+                                MenuRect {
+                                    x: bar.x + 4.,
+                                    y: bar.y + 2.,
+                                    width: 2.,
+                                    height: 2.,
+                                },
+                                theme.selection,
+                                alpha * link_alpha,
+                                r.clip,
+                            )?;
+                        }
+                        if input.focus() == Some(control.id) && enabled {
+                            for border in [
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y - 3.,
+                                    width: icon.width + 6.,
+                                    height: 1.,
+                                },
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y + icon.height + 2.,
+                                    width: icon.width + 6.,
+                                    height: 1.,
+                                },
+                                MenuRect {
+                                    x: icon.x - 3.,
+                                    y: icon.y - 2.,
+                                    width: 1.,
+                                    height: icon.height + 4.,
+                                },
+                                MenuRect {
+                                    x: icon.x + icon.width + 2.,
+                                    y: icon.y - 2.,
+                                    width: 1.,
+                                    height: icon.height + 4.,
+                                },
+                            ] {
+                                self.ink(border, theme.text, alpha, r.clip)?;
+                            }
+                        }
+                        add_label(
+                            self,
+                            label.clone(),
+                            MenuRect {
+                                y: r.rect.y + r.rect.height - 24.,
+                                height: 24.,
+                                ..r.rect
+                            },
+                            style,
+                            Align::Center,
+                            r.clip,
+                        );
+                        self.labels.last_mut().unwrap().alpha *= link_alpha;
+                    }
+                    ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
+                    ControlKind::Surface => self.sliced(
+                        r.rect,
+                        theme.surface(control.style, ControlState::Idle),
+                        alpha,
+                        surface_clip,
+                        r.scale,
+                    )?,
+                    ControlKind::ListRow {
+                        label,
+                        detail,
+                        selected,
+                        ping,
+                    } => {
+                        // Rows share tiny solid materials; only this window owns text rasters.
+                        let focused = input.focus() == Some(control.id);
+                        let color = if *selected {
+                            theme.selection
+                        } else if focused || input.progress(control.id)[0] > 0. {
+                            theme.field
+                        } else {
+                            theme
+                                .surface(ControlStyle::ListRow, ControlState::Idle)
+                                .colors[0]
+                        };
+                        self.fill(r.rect, color, alpha)?;
+                        let inset = 14. * r.scale;
+                        if *selected || focused {
+                            self.fill(
+                                MenuRect {
+                                    width: 3. * r.scale,
+                                    ..r.rect
+                                },
+                                theme.text,
+                                alpha,
+                            )?;
+                        }
+                        let left = MenuRect {
+                            x: r.rect.x + inset,
+                            width: r.rect.width * 0.45,
+                            ..r.rect
+                        };
+                        let right = MenuRect {
+                            x: r.rect.x + r.rect.width * 0.48,
+                            width: r.rect.width * 0.32,
+                            ..r.rect
+                        };
+                        add_label(
+                            self,
+                            label.clone(),
+                            left,
+                            style,
+                            Align::Left,
+                            intersection(left, r.clip),
+                        );
+                        add_label(
+                            self,
+                            detail.clone(),
+                            right,
+                            style,
+                            Align::Right,
+                            intersection(right, r.clip),
+                        );
+                        let bars = ping.map_or(0, |p| {
+                            if p < 80 {
+                                4
+                            } else if p < 160 {
+                                3
+                            } else if p < 300 {
+                                2
+                            } else {
+                                1
+                            }
+                        });
+                        for index in 0..4 {
+                            let h = (5. + index as f64 * 4.) * r.scale;
+                            self.fill(
+                                MenuRect {
+                                    x: r.rect.x + r.rect.width
+                                        - inset
+                                        - (4 - index) as f64 * 7. * r.scale,
+                                    y: r.rect.y + (r.rect.height - h) / 2.,
+                                    width: 4. * r.scale,
+                                    height: h,
+                                },
+                                if index < bars {
+                                    if *selected {
+                                        theme.text
+                                    } else {
+                                        theme.selection
+                                    }
+                                } else {
+                                    theme.placeholder
+                                },
+                                alpha,
+                            )?;
+                        }
+                    }
                     ControlKind::Label { text: value } => {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
@@ -610,6 +807,19 @@ impl Composition<'_> {
         Ok(())
     }
 
+    fn fill(&mut self, rect: MenuRect, color: [u8; 3], alpha: f64) -> Result<()> {
+        if alpha == 0. {
+            return Ok(());
+        }
+        let resource = self.cached_material(MaterialKey::Solid([1, 1], color), || {
+            Ok(materials::RgbaImage {
+                width: 1,
+                height: 1,
+                pixels: vec![color[0], color[1], color[2], 255],
+            })
+        })?;
+        self.push(image(&resource, rect, alpha))
+    }
     fn cached_material(
         &mut self,
         key: MaterialKey,
@@ -670,7 +880,7 @@ impl Composition<'_> {
         let surface = match tokens.recipe {
             SurfaceRecipe::Button => materials::MenuSurface::Play,
             SurfaceRecipe::Overlay => materials::MenuSurface::Overlay,
-            SurfaceRecipe::Field => materials::MenuSurface::Nickname,
+            SurfaceRecipe::Field | SurfaceRecipe::Panel => materials::MenuSurface::Nickname,
             SurfaceRecipe::Compact => materials::MenuSurface::Compact,
         };
         let pad = (surface.padding() * raster_scale).ceil() as u32;
@@ -679,7 +889,14 @@ impl Composition<'_> {
             (r.width * scale).round().max(1.) as u32,
             (r.height * scale).round().max(1.) as u32,
         ];
-        let middle = 32;
+        // Uniform centre strips use logical pixels: DPR must not multiply
+        // the number of quads, including the fields/buttons above a modal.
+        let logical_middle = match tokens.recipe {
+            SurfaceRecipe::Panel => 64.,
+            SurfaceRecipe::Compact => 128.,
+            _ => 32.,
+        };
+        let middle = (logical_middle * raster_scale).ceil().max(1.) as u32;
         let atlas = size.map(|n| n.min(2 * radius + middle));
         let padded = atlas.map(|n| n + 2 * pad);
         if padded.iter().any(|n| *n > 2048) {
@@ -723,8 +940,8 @@ impl Composition<'_> {
                 tiles.push((x, y, resource));
             }
         }
-        let xs = slice_axis(size[0], atlas[0], pad)?;
-        let ys = slice_axis(size[1], atlas[1], pad)?;
+        let xs = slice_axis(size[0], atlas[0], pad, middle)?;
+        let ys = slice_axis(size[1], atlas[1], pad, middle)?;
         check_menu_draws(xs.len() * ys.len())?;
         for &(dy, sy, h) in &ys {
             for &(dx, sx, w) in &xs {
@@ -875,6 +1092,7 @@ impl Composition<'_> {
     }
     fn label(&mut self, text: &str, r: MenuRect, size: f64, bold: bool, alpha: f64) {
         self.labels.push(Label {
+            before: None,
             text: text.into(),
             rect: r,
             style: TextStyle {
@@ -1386,11 +1604,11 @@ type Published = (
     BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
-fn slice_axis(size: u32, atlas: u32, pad: u32) -> Result<Vec<(u32, u32, u32)>> {
+fn slice_axis(size: u32, atlas: u32, pad: u32, centre: u32) -> Result<Vec<(u32, u32, u32)>> {
     if size == atlas {
         return Ok(vec![(0, 0, size + 2 * pad)]);
     }
-    let edge = atlas.saturating_sub(32) / 2;
+    let edge = atlas.saturating_sub(centre) / 2;
     let middle = atlas - 2 * edge;
     let mut out = vec![(0, 0, edge + pad)];
     let mut offset = edge + pad;
@@ -1455,10 +1673,10 @@ impl Composition<'_> {
                     style: l.style,
                     position: [
                         l.rect.x
-                            + if l.align == Align::Left {
-                                0.
-                            } else {
-                                l.rect.width / 2.
+                            + match l.align {
+                                Align::Left => 0.,
+                                Align::Center => l.rect.width / 2.,
+                                Align::Right => l.rect.width,
                             },
                         if alphabetic {
                             placement.origin[1]
@@ -1498,6 +1716,8 @@ impl Composition<'_> {
             self.scale,
             (self.materials.len(), material_bytes),
             |groups| {
+                let mut underlays = BTreeMap::<usize, Vec<Draw>>::new();
+                let mut underlay_count = 0;
                 let mut resources: BTreeMap<_, _> = self
                     .materials
                     .values()
@@ -1512,10 +1732,20 @@ impl Composition<'_> {
                             continue;
                         }
                         for part in reveal_draw(draw, label.reveal, self.scale, label.reveal_span) {
-                            self.push(part)?;
+                            if let Some(index) = label.before {
+                                check_menu_draws(self.draws.len() + underlay_count + 1)?;
+                                underlays.entry(index).or_default().push(part);
+                                underlay_count += 1;
+                            } else {
+                                self.push(part)?;
+                            }
                         }
                         resources.insert(resource.asset.into(), resource);
                     }
+                }
+                frame::reserve_draws(&mut self.draws, underlay_count)?;
+                for (index, draws) in underlays.into_iter().rev() {
+                    self.draws.splice(index..index, draws);
                 }
                 // The spinner is above the login's text, including the fading tips.
                 check_menu_draws(
