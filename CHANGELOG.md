@@ -44,6 +44,9 @@
 
 ### Performance
 
+- Use the exact guarded distance threshold for collision endpoints, retaining
+  the original hypot fallback at floating-point boundaries and extreme inputs.
+
 - Keep collision join order between ticks instead of sorting every living snake.
   The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
   timing pairs, with identical events and final state.

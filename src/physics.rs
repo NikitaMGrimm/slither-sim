@@ -266,7 +266,7 @@ pub(crate) fn strikes_scaled(
     };
     for b in points {
         if (b.x - tip.x).abs().max((b.y - tip.y).abs()) < reach
-            && (segments_intersect(last_tip, end, a, b) || tip.distance(b) < 0.975 * body_radius)
+            && (segments_intersect(last_tip, end, a, b) || tip.distance_lt(b, 0.975 * body_radius))
         {
             return true;
         }
@@ -845,6 +845,194 @@ mod directed_geometry_tests {
                 "circle case {i}"
             );
             assert_eq!(actual.1.to_bits(), expected.1.to_bits(), "radius case {i}");
+        }
+    }
+    // Frozen scalar reference: do not share the new threshold helper.
+    fn original_strikes_threshold(
+        last: Point,
+        tip: Point,
+        direction: (f64, f64),
+        head_scale: f64,
+        body_scale: f64,
+        line: &[Point],
+    ) -> bool {
+        fn intersect(a0: Point, a1: Point, b0: Point, b1: Point) -> bool {
+            let (a1c, b1c) = (a0.y - a1.y, a1.x - a0.x);
+            let c1 = a1c * a1.x + b1c * a1.y;
+            let (a2c, b2c) = (b1.y - b0.y, b0.x - b1.x);
+            let c2 = a2c * b0.x + b2c * b0.y;
+            let det = a1c * b2c - a2c * b1c;
+            if det == 0.0 {
+                return false;
+            }
+            let x = (b2c * c1 - b1c * c2) / det;
+            let y = (a1c * c2 - a2c * c1) / det;
+            let within = |v: f64, p: f64, q: f64| {
+                if p < q {
+                    p <= v && v <= q
+                } else if p > q {
+                    q <= v && v <= p
+                } else {
+                    v == p
+                }
+            };
+            within(x, a0.x, a1.x)
+                && within(y, a0.y, a1.y)
+                && within(x, b0.x, b1.x)
+                && within(y, b0.y, b1.y)
+        }
+        let radius = 14.5 * body_scale;
+        let reach = 3.666 * (14.5 * (head_scale + body_scale));
+        let end = Point {
+            x: tip.x + direction.0 * radius,
+            y: tip.y + direction.1 * radius,
+        };
+        for edge in line.windows(2) {
+            let b = edge[1];
+            if (b.x - tip.x).abs().max((b.y - tip.y).abs()) < reach
+                && (intersect(last, end, edge[0], b)
+                    || (tip.x - b.x).hypot(tip.y - b.y) < 0.975 * radius)
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn strikes_threshold_matches_original_at_float_boundaries() {
+        for origin in [
+            0.0,
+            -0.0,
+            512.0,
+            -512.0,
+            1e15,
+            -1e15,
+            1e300,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NAN,
+        ] {
+            for body_scale in [
+                -1.0,
+                -0.0,
+                0.0,
+                1e-202,
+                1e-50,
+                1.0,
+                1.25,
+                6.0,
+                1e50,
+                1e200,
+                f64::INFINITY,
+                f64::NAN,
+            ] {
+                let r = 0.975 * (14.5 * body_scale);
+                let tip = Point {
+                    x: origin,
+                    y: origin,
+                };
+                for d in [
+                    0.0,
+                    r.next_down(),
+                    r,
+                    r.next_up(),
+                    -r,
+                    f64::MIN_POSITIVE,
+                    f64::MAX,
+                    f64::INFINITY,
+                    f64::NAN,
+                ] {
+                    for head_scale in [1.0, 6.0, -1.0, f64::INFINITY, f64::NAN] {
+                        let b = Point {
+                            x: tip.x,
+                            y: tip.y + d,
+                        };
+                        let line = [b, b];
+                        let expected = original_strikes_threshold(
+                            tip,
+                            tip,
+                            (1.0, 0.0),
+                            head_scale,
+                            body_scale,
+                            &line,
+                        );
+                        assert_eq!(
+                            strikes_scaled(tip, tip, (1.0, 0.0), head_scale, body_scale, line),
+                            expected,
+                            "origin={origin:?} scale={body_scale:?} d={d:?} head={head_scale:?}"
+                        );
+                    }
+                }
+            }
+        }
+        let reach = 3.666 * (14.5 * (1.0 + 1.0));
+        let line = [
+            Point {
+                x: -reach,
+                y: -10.0,
+            },
+            Point { x: reach, y: 10.0 },
+        ];
+        let last = Point { x: -3.0, y: 0.0 };
+        let tip = Point::default();
+        assert!(!original_strikes_threshold(
+            last,
+            tip,
+            (1.0, 0.0),
+            1.0,
+            1.0,
+            &line
+        ));
+        assert!(!strikes_scaled(last, tip, (1.0, 0.0), 1.0, 1.0, line));
+    }
+
+    #[test]
+    fn strikes_threshold_matches_original_random_lines() {
+        let mut seed = 0x4a19_c33b_6d83_7f21_u64;
+        let mut unit = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1_u64 << 53) as f64
+        };
+        let sizes = [2, 3, 10, 106, 430, 512, usize::MAX];
+        for case in 0_usize..4096 {
+            let extent = [1e-200, 1.0, 2e4, 1e150][case % 4];
+            let tip = Point {
+                x: (unit() - 0.5) * extent,
+                y: (unit() - 0.5) * extent,
+            };
+            let last = Point {
+                x: tip.x + (unit() - 0.5) * 20.0,
+                y: tip.y + (unit() - 0.5) * 20.0,
+            };
+            let angle = unit() * TAU;
+            let direction = (angle.cos(), angle.sin());
+            let head_scale = scale(sizes[case % sizes.len()]);
+            let body_scale = scale(sizes[(case / 7) % sizes.len()]);
+            let r = 0.975 * (14.5 * body_scale);
+            let mut line = Vec::new();
+            for k in 0..case % 17 {
+                let d = match k % 4 {
+                    0 => r.next_down(),
+                    1 => r,
+                    2 => r.next_up(),
+                    _ => unit() * 500.0,
+                };
+                let angle = unit() * TAU;
+                line.push(Point {
+                    x: tip.x + angle.cos() * d,
+                    y: tip.y + angle.sin() * d,
+                });
+            }
+            let expected =
+                original_strikes_threshold(last, tip, direction, head_scale, body_scale, &line);
+            assert_eq!(
+                strikes_scaled(last, tip, direction, head_scale, body_scale, line),
+                expected,
+                "case {case}"
+            );
         }
     }
 }
