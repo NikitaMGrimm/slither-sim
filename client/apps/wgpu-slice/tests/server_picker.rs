@@ -461,3 +461,37 @@ fn picker_reopening_inherits_the_current_opener_modality() {
         login.picker.controls.focus()
     );
 }
+
+#[test]
+fn text_navigation_reveals_pointer_focused_search_without_activating() {
+    for (navigation, code) in [
+        (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
+        (NamedKey::ArrowRight, KeyCode::ArrowRight),
+        (NamedKey::Home, KeyCode::Home),
+        (NamedKey::End, KeyCode::End),
+    ] {
+        let mut p = NativeServerPicker::default();
+        p.open();
+        p.policy.alpha = 1.;
+        p.sync();
+        let resolved = p.panel.resolve(p.viewport).unwrap();
+        let r = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
+        let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+        let mut text = slither_wgpu_slice::text::TextCache::menu();
+        p.pointer(&mut text, point, Some(true)).unwrap();
+        p.pointer(&mut text, point, Some(false)).unwrap();
+        p.input.state.apply(EditIntent::KeyText("123".into()));
+        assert_eq!(p.controls.focus(), Some(SEARCH));
+        assert_eq!(p.controls.visible_focus(), None);
+        let effects = key(&mut p, navigation, code);
+        assert!(
+            effects
+                .iter()
+                .all(|e| !matches!(e, HostEditEffect::Activate(_)))
+        );
+        assert_eq!(p.controls.visible_focus(), Some(SEARCH));
+        assert_eq!(p.input.state.editor(SEARCH_EDITOR).text(), "123");
+        assert!(p.policy.is_open());
+        assert_eq!(p.policy.selection, ServerPreference(None));
+    }
+}
