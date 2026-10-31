@@ -44,9 +44,9 @@ impl std::error::Error for ChallengeError {}
 /// Only a declaration, literal appends, and one copy loop over every literal
 /// byte are accepted, with literals in double or single quotes and an optional
 /// braced loop body. Official servers send a 5- and a 22-byte literal copied by
-/// a 27-byte loop. Some community servers send one single-quoted 24-byte
-/// literal and check the reply: on 2026-11-01 one accepted this transform over
-/// 24 bytes and disconnected random, untransformed and other-rotation replies.
+/// a 27-byte loop. Some community servers, like slither-sim's legacy path,
+/// send one single-quoted 24-byte literal and accept the rotated 24-byte reply
+/// (see docs/raw-server.md, "Packet compatibility").
 /// Whitespace between tokens is allowed. Literal contents are runtime input,
 /// not credentials embedded in the library.
 pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
