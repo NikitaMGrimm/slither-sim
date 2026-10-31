@@ -7,7 +7,7 @@ use crate::{
     text::TextCache,
 };
 use slither_client::{
-    login_controls::{self, NICKNAME, PLAY, QUALITY, SERVER},
+    login_controls::{self, CHANGE_SKIN, NICKNAME, PLAY, QUALITY, SERVER},
     menu_controls::{ControlId, PanelInputState, PanelView},
     menu_input::{EditIntent, HostEditEffect, TextField},
     menu_layout::{MenuElement as E, MenuLayout},
@@ -16,6 +16,7 @@ use slither_client::{
 };
 
 pub struct NativeLogin {
+    pub studio: crate::skin_studio_native::SkinStudioNative,
     pub input: NativeMenuInput,
     pub champion: crate::panel_native::NativePanel,
     pub picker: crate::server_picker_native::NativeServerPicker,
@@ -56,6 +57,19 @@ impl NativeLogin {
                 }))
     }
     pub fn new(nickname: &str) -> Result<Self> {
+        Self::with_preferences(
+            slither_client::skin_studio::AppearanceRecord {
+                nickname: slither_client::start_page::normalize_nickname(nickname),
+                ..Default::default()
+            },
+            crate::menu_storage::MenuStorage::at(None),
+        )
+    }
+    pub fn with_preferences(
+        record: slither_client::skin_studio::AppearanceRecord,
+        storage: crate::menu_storage::MenuStorage,
+    ) -> Result<Self> {
+        let nickname = &record.nickname;
         let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
         state.edit_nickname(&nickname.encode_utf16().collect::<Vec<_>>());
         let mut input = NativeMenuInput::default();
@@ -64,6 +78,7 @@ impl NativeLogin {
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         let panel = login_controls::panel(&state.view(true), &layout, [960., 540.]);
         Ok(Self {
+            studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
             champion: crate::panel_native::NativePanel::new(
                 &slither_client::session_policy::SessionPolicy::new().view(),
@@ -87,6 +102,7 @@ impl NativeLogin {
         admission: bool,
         playing: bool,
     ) -> Result<(Vec<StartMenuIntent>, Vec<HostEditEffect>)> {
+        self.studio.step(now);
         let intents = self
             .state
             .step_with_admission(now, false, admission)
@@ -95,7 +111,7 @@ impl NativeLogin {
         if playing {
             self.state.begin_outgoing();
         }
-        if intents.contains(&StartMenuIntent::FocusNickname) {
+        if !self.studio.state.visible() && intents.contains(&StartMenuIntent::FocusNickname) {
             self.controls.set_focus(NICKNAME);
         }
         let mut effects = self
@@ -149,6 +165,16 @@ impl NativeLogin {
         Ok(())
     }
     pub fn sync_return_focus(&mut self, admission: bool) -> Vec<HostEditEffect> {
+        if self.studio.state.visible() {
+            return Vec::new();
+        }
+        if self.studio.state.take_return_focus()
+            && self.state.view(true).phase == slither_client::start_page::MenuPhase::Login
+        {
+            let mut effects = self.sync_controls(admission);
+            effects.extend(self.focus(CHANGE_SKIN));
+            return effects;
+        }
         if self.state.view(admission).disabled {
             return Vec::new();
         }
@@ -164,8 +190,47 @@ impl NativeLogin {
         effects
     }
     fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
-        self.panel = login_controls::panel(&self.state.view(admission), &self.layout, self.area);
+        self.panel = if self.studio.state.visible() {
+            self.studio.state.panel(self.area, &self.studio.status)
+        } else {
+            let mut panel =
+                login_controls::panel(&self.state.view(admission), &self.layout, self.area);
+            if self.studio.status == "Saved for this run" {
+                panel.controls.push(slither_client::menu_controls::Control {
+                    id: ControlId(30),
+                    placement: slither_client::menu_controls::Placement::rect(
+                        self.area[0] / 2. - 120.,
+                        self.area[1] - 32.,
+                        240.,
+                        28.,
+                    ),
+                    clip: None,
+                    visible: true,
+                    enabled: false,
+                    alpha: 1.,
+                    name: self.studio.status.clone(),
+                    tab_order: None,
+                    style: slither_client::menu_theme::ControlStyle::HelpText,
+                    kind: slither_client::menu_controls::ControlKind::Label {
+                        text: self.studio.status.clone(),
+                    },
+                });
+            }
+            panel
+        };
         self.controls.sync(&self.panel, &mut self.input.state)
+    }
+    pub fn open_studio(&mut self) -> Vec<HostEditEffect> {
+        let admitted = self.state.action(MenuAction::Skin, true)
+            == Some(StartMenuIntent::OpenSkinChooser)
+            && !self.champion.policy.visible()
+            && !self.picker.policy.visible();
+        if self.studio.open(admitted) {
+            self.controls.blur();
+            self.sync_controls(true)
+        } else {
+            Vec::new()
+        }
     }
     pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
         self.controls.set_focus(focus);
@@ -173,6 +238,12 @@ impl NativeLogin {
     }
     pub fn activate(&mut self, admission: bool) {
         if self.picker.policy.visible() {
+            return;
+        }
+        if self.studio.state.visible() {
+            if let Some(id) = self.controls.focus() {
+                self.studio.activate(id, &self.state.view(true).nickname);
+            }
             return;
         }
         let composing = self.input.state.editor(TextField::Nickname).composing();
@@ -200,6 +271,12 @@ impl NativeLogin {
                     .state
                     .reset_editor(slither_client::server_picker::SEARCH_EDITOR, "");
             }
+            Some(CHANGE_SKIN) => {
+                let admitted = self.state.action(MenuAction::Skin, true)
+                    == Some(StartMenuIntent::OpenSkinChooser)
+                    && !self.champion.policy.visible();
+                self.studio.open(admitted);
+            }
             _ => {}
         }
     }
@@ -211,6 +288,14 @@ impl NativeLogin {
         use winit::event::WindowEvent;
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
+            self.studio.cancel_capture();
+        }
+        if matches!(
+            event,
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
+        ) {
+            self.controls.blur();
+            self.studio.cancel_capture();
         }
         if let WindowEvent::KeyboardInput { event, .. } = event {
             return self.key(event.into(), admission);
@@ -229,6 +314,48 @@ impl NativeLogin {
             keyboard::{Key, NamedKey},
         };
         let view = self.state.view(admission);
+        if self.studio.state.visible() {
+            let mut effects = Vec::new();
+            if event.state == ElementState::Pressed && !event.repeat {
+                match event.logical {
+                    Key::Named(NamedKey::Escape) => self.studio.state.cancel(self.studio.now),
+                    Key::Named(NamedKey::Tab) => {
+                        self.controls.tab(&self.panel, self.input.shift_key())
+                    }
+                    Key::Named(NamedKey::ArrowLeft)
+                        if matches!(
+                            self.controls.focus(),
+                            Some(
+                                slither_client::skin_studio::PREVIOUS
+                                    | slither_client::skin_studio::NEXT
+                            )
+                        ) =>
+                    {
+                        self.studio
+                            .activate(slither_client::skin_studio::PREVIOUS, &view.nickname)
+                    }
+                    Key::Named(NamedKey::ArrowRight)
+                        if matches!(
+                            self.controls.focus(),
+                            Some(
+                                slither_client::skin_studio::PREVIOUS
+                                    | slither_client::skin_studio::NEXT
+                            )
+                        ) =>
+                    {
+                        self.studio
+                            .activate(slither_client::skin_studio::NEXT, &view.nickname)
+                    }
+                    Key::Named(NamedKey::Enter | NamedKey::Space) => self.activate(admission),
+                    _ => {}
+                }
+                effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
+            }
+            return NativeInputResult {
+                consumed: true,
+                effects,
+            };
+        }
         if event.state == ElementState::Pressed {
             // #363: consume Enter through the existing terminal-session guard;
             // it must not become a control packet on the old live connection.
@@ -253,14 +380,16 @@ impl NativeLogin {
                         effects: self.controls.sync_focus(&self.panel, &mut self.input.state),
                     };
                 }
-                if matches!(self.controls.focus(), Some(PLAY | QUALITY | SERVER))
-                    && !event.repeat
+                if matches!(
+                    self.controls.focus(),
+                    Some(PLAY | QUALITY | SERVER | CHANGE_SKIN)
+                ) && !event.repeat
                     && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
                 {
                     self.activate(admission);
                     return NativeInputResult {
                         consumed: true,
-                        effects: Vec::new(),
+                        effects: self.sync_controls(admission),
                     };
                 }
             }
@@ -284,6 +413,29 @@ impl NativeLogin {
                 .champion
                 .pointer_scaled(&mut self.text, point, down, self.pixel_scale)
                 .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
+        }
+        if self.studio.state.visible() {
+            let mut effects = self.sync_controls(admission);
+            let outside = !slither_client::skin_studio::StudioState::bounds(self.area)
+                .contains(point[0], point[1]);
+            if down == Some(true) {
+                self.studio.outside_pressed = outside;
+            }
+            let dismiss = down == Some(false) && outside && self.studio.outside_pressed;
+            if down == Some(false) {
+                self.studio.outside_pressed = false;
+            }
+            if dismiss {
+                self.studio.state.cancel(self.studio.now);
+                self.controls.blur();
+            }
+            let resolved = self.panel.resolve(self.area).unwrap_or_default();
+            if let Some(intent) = self.controls.pointer(&self.panel, &resolved, point, down) {
+                self.studio
+                    .activate(intent.control, &self.state.view(true).nickname);
+            }
+            effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
+            return effects;
         }
         let view = self.state.view(admission);
         self.menu.skin_hovered = view.visible && self.layout.hit_test(E::Skin, point[0], point[1]);
@@ -316,6 +468,7 @@ impl NativeLogin {
                             effects.extend(self.input.state.apply(EditIntent::Focus(None)));
                             effects.extend(self.picker.open());
                         }
+                        CHANGE_SKIN => effects.extend(self.open_studio()),
                         _ => {}
                     }
                 }
@@ -367,6 +520,10 @@ impl NativeLogin {
             view.skin_alpha *= alpha;
         }
         let area = extent.map(|n| f64::from(n) / dpr);
+        if area != self.area || dpr != self.pixel_scale {
+            self.controls.blur();
+            self.studio.cancel_capture();
+        }
         self.pixel_scale = dpr;
         let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
         if self.area == area {
@@ -375,8 +532,43 @@ impl NativeLogin {
         }
         self.layout = fresh;
         self.area = area;
+        if self.studio.state.visible() {
+            self.sync_controls(admission);
+            view.login_alpha *= 1. - self.studio.state.alpha();
+            view.visible = view.login_alpha > 0.;
+            let mut picture = self.menu.prepare_with_panel(
+                &mut self.text,
+                &view,
+                &self.layout,
+                extent,
+                dpr,
+                cosmetics,
+                0,
+                Some(&self.input.state),
+                Some(crate::menu::PanelPaint {
+                    panel: &self.panel,
+                    input: &self.controls,
+                    edit: &self.input.state,
+                    scroll: &mut self.scroll,
+                    theme: Default::default(),
+                }),
+            )?;
+            if picture.backdrop.is_none() {
+                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
+                picture.backdrop = page.backdrop;
+                picture.resources.extend(page.resources);
+            }
+            return Ok(picture);
+        }
         view.nickname = self.displayed_nickname();
-        self.panel = login_controls::panel(&view, &self.layout, self.area);
+        self.sync_controls(admission);
+        if self.champion.policy.finished() {
+            for control in &mut self.panel.controls {
+                if matches!(control.id, NICKNAME | PLAY | CHANGE_SKIN | SERVER) {
+                    control.alpha *= self.champion.policy.ordinary_alpha();
+                }
+            }
+        }
         let panel = if self.champion.policy.visible() {
             self.champion.viewport = extent.map(|n| f64::from(n) / dpr);
             self.champion.panel = self
@@ -435,6 +627,9 @@ impl NativeLogin {
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
         if self.picker.policy.visible() {
             return self.picker.cursor_area(&mut self.text, self.pixel_scale);
+        }
+        if self.studio.state.visible() {
+            return Ok(Vec::new());
         }
         if self.champion.policy.visible() {
             return self.champion.cursor_area(&mut self.text, self.pixel_scale);

@@ -14,6 +14,10 @@ pub mod hud;
 pub mod materials;
 pub mod menu;
 pub mod menu_specimen;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod menu_storage;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod skin_studio_native;
 // Same targets as the winit dependency (Cargo.toml); Linux builds only the GPU-free e2e probe.
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod login_native;

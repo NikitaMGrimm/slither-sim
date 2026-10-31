@@ -60,9 +60,11 @@ Desktop `--endpoint` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
 that copied the official login.
 
-The window opens on login. `--nickname` and `--skin` seed the initial values;
-edit the nickname, then click Play or press Enter to acquire the profile/server
-and connect once. Add `--wordmark` to show the authored green/purple
+The window opens on login, restoring saved appearance preferences. Explicit
+`--nickname` and `--skin` override restored values for that run. Change Skin opens
+the offline [skin studio](docs/skin-studio.md); Save commits the draft and Cancel
+discards it. Click Play or press Enter to acquire the profile/server and connect
+once. Add `--wordmark` to show the authored green/purple
 SlitherClient wordmark even with local `--cosmetics-dir` logo art. Without local
 logo art the wordmark is the default. Quality selects the requested mode for that Play.
 

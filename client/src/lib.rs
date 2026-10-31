@@ -125,3 +125,5 @@ mod leaderboard_history_browser;
 pub mod server_directory;
 /// Shared server picker.
 pub mod server_picker;
+pub mod skin_studio;
+pub mod studio_preview;
