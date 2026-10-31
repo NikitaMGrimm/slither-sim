@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertBuildBinding, rebuildArtifacts } from './feel-replay/artifacts.mjs';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
-const env = { ...process.env, CARGO_BUILD_JOBS: '2', CARGO_TARGET_DIR: path.resolve('target/feel-replay') };
+const env = { ...process.env, CARGO_BUILD_JOBS: '2', CARGO_TARGET_DIR: path.resolve(process.env.CARGO_TARGET_DIR || 'target/feel-replay') };
 const bindgen = process.env.WASM_BINDGEN || 'wasm-bindgen';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const source = () => {

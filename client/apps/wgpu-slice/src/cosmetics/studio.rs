@@ -4,6 +4,9 @@ use std::{path::PathBuf, time::SystemTime};
 
 pub const THUMBNAIL_PIXEL_BUDGET: usize = 4 * 1024 * 1024;
 const THUMBNAIL_EXTENT: u32 = 128;
+const SOURCE_IO: &str = "Cosmetic read: ";
+const ART_CAPACITY: &str = "Cosmetic pixel budget";
+const THUMBNAIL_CAPACITY: &str = "Thumbnail pixel budget";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CosmeticArtStatus {
@@ -12,16 +15,63 @@ pub enum CosmeticArtStatus {
     Missing,
     OverBudget,
 }
+impl CosmeticArtStatus {
+    fn failure(error: &str) -> Self {
+        if error.contains("budget") {
+            Self::OverBudget
+        } else {
+            Self::Missing
+        }
+    }
+    fn error(self) -> String {
+        if self == Self::OverBudget {
+            "Cosmetic image budget"
+        } else {
+            "Cosmetic art unavailable"
+        }
+        .into()
+    }
+}
 #[derive(Clone, PartialEq, Eq)]
 enum Stamp {
     File(u64, SystemTime),
     Bound(crate::frame::ResourceKey),
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct RetainedCapacity {
+    art: usize,
+    thumbnails: usize,
+}
+struct FailedArt {
+    stamp: Stamp,
+    status: CosmeticArtStatus,
+    capacity: Option<RetainedCapacity>,
+}
+impl FailedArt {
+    fn new(stamp: Stamp, error: &str, capacity: RetainedCapacity) -> Self {
+        // Source limits are fixed; only admission against retained pixels can improve after eviction.
+        Self {
+            stamp,
+            status: CosmeticArtStatus::failure(error),
+            capacity: matches!(error, ART_CAPACITY | THUMBNAIL_CAPACITY).then_some(capacity),
+        }
+    }
+    fn matches(&self, stamp: &Stamp, capacity: RetainedCapacity) -> bool {
+        self.stamp == *stamp && self.capacity.is_none_or(|previous| previous == capacity)
+    }
 }
 #[derive(Default)]
 pub(super) struct StudioArt {
     pub directory: Option<PathBuf>,
     thumbnails: BTreeMap<u8, (Resource, Stamp)>,
     selected: Option<(u8, Resource, Stamp)>,
+    // Full art and thumbnails have different peak allocation requirements.
+    selected_failures: BTreeMap<u8, FailedArt>,
+    thumbnail_failures: BTreeMap<u8, FailedArt>,
+    #[cfg(test)]
+    source_reads: std::cell::Cell<usize>,
+    #[cfg(test)]
+    source_read_error: std::cell::Cell<bool>,
     revisions: [u64; 32],
     status: [CosmeticArtStatus; 32],
 }
@@ -44,6 +94,8 @@ impl Cosmetics {
     pub fn release_studio(&mut self) {
         self.studio.thumbnails.clear();
         self.studio.selected = None;
+        self.studio.selected_failures.clear();
+        self.studio.thumbnail_failures.clear();
     }
     fn source(&self, id: u8) -> Result<(Option<PathBuf>, Stamp)> {
         if id > 31 {
@@ -58,9 +110,6 @@ impl Cosmetics {
                 return Err("Cosmetic path escaped directory".into());
             }
             let metadata = file.metadata().map_err(|e| e.to_string())?;
-            if metadata.len() > MAX_ENCODED_BYTES as u64 {
-                return Err("Cosmetic encoded image budget".into());
-            }
             let stamp = Stamp::File(
                 metadata.len(),
                 metadata.modified().map_err(|e| e.to_string())?,
@@ -89,22 +138,53 @@ impl Cosmetics {
         }
         sources.values().sum()
     }
+    fn retained_capacity(&self) -> RetainedCapacity {
+        RetainedCapacity {
+            art: self.studio_pixel_bytes(),
+            thumbnails: self
+                .studio
+                .thumbnails
+                .values()
+                .map(|(r, _)| r.image.pixels.len())
+                .sum(),
+        }
+    }
+    fn read_source(&self, file: PathBuf, bytes: &mut Vec<u8>) -> std::io::Result<()> {
+        use std::io::Read;
+        #[cfg(test)]
+        {
+            self.studio
+                .source_reads
+                .set(self.studio.source_reads.get() + 1);
+            if self.studio.source_read_error.get() {
+                return Err(std::io::Error::other("synthetic transient read failure"));
+            }
+        }
+        std::fs::File::open(file)?
+            .take(MAX_ENCODED_BYTES as u64 + 1)
+            .read_to_end(bytes)?;
+        Ok(())
+    }
     fn decoded_source(&self, id: u8, file: Option<PathBuf>, extra: usize) -> Result<RgbaImage> {
         if let Some(file) = file {
-            use std::io::Read;
+            if file
+                .metadata()
+                .map_err(|e| format!("{SOURCE_IO}{e}"))?
+                .len()
+                > MAX_ENCODED_BYTES as u64
+            {
+                return Err("Cosmetic encoded image budget".into());
+            }
             let mut bytes = Vec::new();
-            std::fs::File::open(file)
-                .map_err(|e| e.to_string())?
-                .take(MAX_ENCODED_BYTES as u64 + 1)
-                .read_to_end(&mut bytes)
-                .map_err(|e| e.to_string())?;
+            self.read_source(file, &mut bytes)
+                .map_err(|e| format!("{SOURCE_IO}{e}"))?;
             let (w, h) = bounded_reader(&bytes, 1024)?
                 .into_dimensions()
                 .map_err(image_error)?;
             if self.studio_pixel_bytes() + w as usize * h as usize * 4 + extra
                 > COSMETIC_PIXEL_BUDGET
             {
-                return Err("Cosmetic pixel budget".into());
+                return Err(ART_CAPACITY.into());
             }
             decode(&bytes)
         } else {
@@ -113,14 +193,14 @@ impl Cosmetics {
                 .get(&id)
                 .ok_or("Cosmetic art unavailable")?;
             if self.studio_pixel_bytes() + r.image.pixels.len() + extra > COSMETIC_PIXEL_BUDGET {
-                return Err("Cosmetic pixel budget".into());
+                return Err(ART_CAPACITY.into());
             }
             Ok((*r.image).clone())
         }
     }
     fn resource(&mut self, id: u8, image: RgbaImage, thumbnail: bool) -> Result<Resource> {
         if self.studio_pixel_bytes() + image.pixels.len() > COSMETIC_PIXEL_BUDGET {
-            return Err("Cosmetic pixel budget".into());
+            return Err(ART_CAPACITY.into());
         }
         let revision = self.studio.revisions[usize::from(id)]
             .checked_add(1)
@@ -139,12 +219,17 @@ impl Cosmetics {
             image: image.into(),
         })
     }
-    fn prepare_selected(&mut self, selected: Option<u8>) -> Result<()> {
+    fn prepare_selected(&mut self, selected: Option<u8>, capacity: RetainedCapacity) -> Result<()> {
         let Some(id) = selected else {
             self.studio.selected = None;
             return Ok(());
         };
         let (file, stamp) = self.source(id)?;
+        if let Some(failure) = self.studio.selected_failures.get(&id)
+            && failure.matches(&stamp, capacity)
+        {
+            return Err(failure.status.error());
+        }
         if self
             .studio
             .selected
@@ -154,17 +239,51 @@ impl Cosmetics {
             return Ok(());
         }
         // A bound in-memory source is already decoded and admitted.
-        let resource = if file.is_none() {
-            self.accessories[&id].clone()
+        let loaded = if file.is_none() {
+            Ok(self.accessories[&id].clone())
         } else {
-            let image = self.decoded_source(id, file, 0)?;
-            self.resource(id, image, false)?
+            self.decoded_source(id, file, 0)
+                .and_then(|image| self.resource(id, image, false))
         };
+        let resource = match loaded {
+            Ok(resource) => resource,
+            Err(error) => {
+                // Readability can recover without changing file metadata.
+                if !error.starts_with(SOURCE_IO) {
+                    self.studio
+                        .selected_failures
+                        .insert(id, FailedArt::new(stamp, &error, capacity));
+                }
+                return Err(error);
+            }
+        };
+        self.studio.selected_failures.remove(&id);
         self.studio.selected = Some((id, resource, stamp));
         Ok(())
     }
-    fn prepare_thumbnail(&mut self, id: u8) -> Result<()> {
+    fn prepare_thumbnail(&mut self, id: u8, capacity: RetainedCapacity) -> Result<()> {
         let (file, stamp) = self.source(id)?;
+        if let Some(failure) = self.studio.thumbnail_failures.get(&id)
+            && failure.matches(&stamp, capacity)
+        {
+            return Err(failure.status.error());
+        }
+        let result = self.load_thumbnail(id, file, stamp.clone());
+        match &result {
+            Ok(()) => {
+                self.studio.thumbnail_failures.remove(&id);
+            }
+            Err(error) => {
+                if !error.starts_with(SOURCE_IO) {
+                    self.studio
+                        .thumbnail_failures
+                        .insert(id, FailedArt::new(stamp, error, capacity));
+                }
+            }
+        }
+        result
+    }
+    fn load_thumbnail(&mut self, id: u8, file: Option<PathBuf>, stamp: Stamp) -> Result<()> {
         if self
             .studio
             .thumbnails
@@ -180,7 +299,7 @@ impl Cosmetics {
             if self.studio_pixel_bytes() + r.image.pixels.len() + 128 * 128 * 4
                 > COSMETIC_PIXEL_BUDGET
             {
-                return Err("Thumbnail pixel budget".into());
+                return Err(THUMBNAIL_CAPACITY.into());
             }
             (*r.image).clone()
         } else {
@@ -207,7 +326,7 @@ impl Cosmetics {
             .map(|(r, _)| r.image.pixels.len())
             .sum();
         if kept + pixels.len() > THUMBNAIL_PIXEL_BUDGET {
-            return Err("Thumbnail pixel budget".into());
+            return Err(THUMBNAIL_CAPACITY.into());
         }
         let resource = self.resource(
             id,
@@ -230,31 +349,43 @@ impl Cosmetics {
             return Err("Cosmetic window budget".into());
         }
         self.studio.thumbnails.retain(|id, _| visible.contains(id));
+        self.studio
+            .thumbnail_failures
+            .retain(|id, _| visible.contains(id));
+        // Recompute after actual resource changes, not after cached failures or status updates.
+        let mut capacity = self.retained_capacity();
+        let previous = self.studio.selected.as_ref().map(|(_, r, _)| r.asset);
         if let Some(id) = selected {
-            match self.prepare_selected(Some(id)) {
+            match self.prepare_selected(Some(id), capacity) {
                 Ok(()) => self.studio.status[usize::from(id)] = CosmeticArtStatus::Ready,
                 Err(e) => {
                     self.studio.selected = None;
-                    self.studio.status[usize::from(id)] = if e.contains("budget") {
-                        CosmeticArtStatus::OverBudget
-                    } else {
-                        CosmeticArtStatus::Missing
-                    };
+                    self.studio.status[usize::from(id)] = CosmeticArtStatus::failure(&e);
                 }
             }
         } else {
             self.studio.selected = None;
         }
+        if previous != self.studio.selected.as_ref().map(|(_, r, _)| r.asset) {
+            capacity = self.retained_capacity();
+        }
         for &id in visible {
-            if let Err(e) = self.prepare_thumbnail(id) {
-                self.studio.thumbnails.remove(&id);
-                if selected != Some(id) || self.studio.selected.is_none() {
-                    self.studio.status[usize::from(id)] = if e.contains("budget") {
-                        CosmeticArtStatus::OverBudget
-                    } else {
-                        CosmeticArtStatus::Missing
-                    };
+            let previous = self.studio.thumbnails.get(&id).map(|(r, _)| r.asset);
+            match self.prepare_thumbnail(id, capacity) {
+                Ok(()) => {
+                    if selected != Some(id) {
+                        self.studio.status[usize::from(id)] = CosmeticArtStatus::Ready;
+                    }
                 }
+                Err(e) => {
+                    self.studio.thumbnails.remove(&id);
+                    if selected != Some(id) || self.studio.selected.is_none() {
+                        self.studio.status[usize::from(id)] = CosmeticArtStatus::failure(&e);
+                    }
+                }
+            }
+            if previous != self.studio.thumbnails.get(&id).map(|(r, _)| r.asset) {
+                capacity = self.retained_capacity();
             }
         }
         Ok(())
@@ -349,6 +480,13 @@ mod tests {
                 .save(path)
                 .unwrap();
         }
+        fn menu_art(&self, count: usize) {
+            std::fs::create_dir_all(self.0.join("menu")).unwrap();
+            let image = image::RgbaImage::from_pixel(1024, 1024, image::Rgba([80, 120, 180, 255]));
+            for name in ["skin", "builder", "cosmetic"].into_iter().take(count) {
+                image.save(self.0.join(format!("menu/{name}.png"))).unwrap();
+            }
+        }
     }
     impl Drop for Directory {
         fn drop(&mut self) {
@@ -362,6 +500,154 @@ mod tests {
             );
             std::fs::remove_dir_all(path).unwrap();
         }
+    }
+    #[test]
+    fn transient_read_failure_recovers_without_a_stamp_change() {
+        for selected in [None, Some(0)] {
+            let directory = Directory::new();
+            directory.accessory(0, [32, 24]);
+            let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+            let (_, stamp) = art.source(0).unwrap();
+            art.studio.source_read_error.set(true);
+            art.prepare_studio(&[0], selected).unwrap();
+            assert_eq!(art.studio_status(0), CosmeticArtStatus::Missing);
+            assert!(art.studio.selected_failures.is_empty());
+            assert!(art.studio.thumbnail_failures.is_empty());
+            let reads = art.studio.source_reads.get();
+            art.studio.source_read_error.set(false);
+            assert!(art.source(0).unwrap().1 == stamp);
+            art.prepare_studio(&[0], selected).unwrap();
+            assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+            assert!(art.studio_thumbnails().contains_key(&0));
+            assert!(art.studio.source_reads.get() > reads);
+            if selected.is_some() {
+                assert!(art.studio.selected.is_some());
+            }
+        }
+    }
+    #[test]
+    fn selection_switch_retries_capacity_failure_after_releasing_the_old_selection() {
+        let directory = Directory::new();
+        directory.menu_art(3);
+        directory.accessory(0, [768, 1024]);
+        directory.accessory(1, [768, 1024]);
+        let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+        art.prepare_studio(&[], Some(0)).unwrap();
+        assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+        art.prepare_studio(&[], Some(1)).unwrap();
+        assert_eq!(art.studio_status(1), CosmeticArtStatus::OverBudget);
+        assert!(art.studio.selected.is_none());
+        let reads = art.studio.source_reads.get();
+        art.prepare_studio(&[], Some(1)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 1);
+        assert_eq!(art.studio_status(1), CosmeticArtStatus::Ready);
+        assert!(art.preview_sources_for(Some(1)).accessory(true).is_some());
+    }
+    #[test]
+    fn unchanged_capacity_failures_do_not_reread_selected_or_thumbnail_sources() {
+        let directory = Directory::new();
+        directory.menu_art(3);
+        directory.accessory(0, [1024, 1024]);
+        let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+        art.prepare_studio(&[0], Some(0)).unwrap();
+        assert_eq!(art.studio_status(0), CosmeticArtStatus::OverBudget);
+        let reads = art.studio.source_reads.get();
+        assert_eq!(reads, 2);
+        for _ in 0..16 {
+            art.prepare_studio(&[0], Some(0)).unwrap();
+        }
+        assert_eq!(art.studio.source_reads.get(), reads);
+        // Both cached failures are invalidated by real retained capacity becoming available.
+        art.menu.resident.clear();
+        art.prepare_studio(&[0], Some(0)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 1);
+        assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+        assert!(art.studio.thumbnails.contains_key(&0));
+    }
+    #[test]
+    fn evicting_thumbnails_retries_a_capacity_blocked_source_without_touching_the_file() {
+        let directory = Directory::new();
+        directory.menu_art(2);
+        for id in 0..12 {
+            directory.accessory(id, [128, 128]);
+        }
+        directory.accessory(30, [1000, 1000]);
+        directory.accessory(31, [1024, 1024]);
+        let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+        art.prepare_studio(&(0..12).collect::<Vec<_>>(), Some(31))
+            .unwrap();
+        let visible = (0..11).chain([30]).collect::<Vec<_>>();
+        art.prepare_studio(&visible, Some(31)).unwrap();
+        assert_eq!(art.studio_status(30), CosmeticArtStatus::OverBudget);
+        let reads = art.studio.source_reads.get();
+        for _ in 0..8 {
+            art.prepare_studio(&visible, Some(31)).unwrap();
+        }
+        assert_eq!(art.studio.source_reads.get(), reads);
+        art.prepare_studio(&[30], Some(31)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 1);
+        assert_eq!(art.studio_status(30), CosmeticArtStatus::Ready);
+        assert!(art.studio.thumbnails.contains_key(&30));
+    }
+    #[test]
+    fn unchanged_failed_window_and_selection_do_not_reread_and_replacement_retries() {
+        let directory = Directory::new();
+        for id in (0..12).chain([31]) {
+            std::fs::write(
+                directory.0.join(format!("s/a_{}.png", ACCESSORIES[id].0)),
+                b"broken",
+            )
+            .unwrap();
+        }
+        let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+        let visible = (0..12).collect::<Vec<_>>();
+        art.prepare_studio(&visible, Some(31)).unwrap();
+        let reads = art.studio.source_reads.get();
+        assert_eq!(reads, 13);
+        for _ in 0..32 {
+            art.prepare_studio(&visible, Some(31)).unwrap();
+        }
+        assert_eq!(art.studio.source_reads.get(), reads);
+        assert_eq!(art.studio_status(31), CosmeticArtStatus::Missing);
+        assert!(art.studio.thumbnails.is_empty());
+        // Different encoded sizes guarantee new stamps even on a coarse timestamp filesystem.
+        directory.accessory(0, [32, 24]);
+        directory.accessory(31, [48, 24]);
+        art.prepare_studio(&visible, Some(31)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 2);
+        assert!(art.studio.thumbnails.contains_key(&0));
+        assert!(art.preview_sources_for(Some(31)).accessory(true).is_some());
+        assert_eq!(art.studio_status(31), CosmeticArtStatus::Ready);
+        art.prepare_studio(&visible, Some(31)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 2);
+    }
+    #[test]
+    fn over_budget_failures_keep_their_status_until_replaced() {
+        let directory = Directory::new();
+        directory.accessory(0, [1025, 1]);
+        std::fs::write(
+            directory.0.join("s/a_graduation.png"),
+            vec![0; MAX_ENCODED_BYTES + 1],
+        )
+        .unwrap();
+        let mut art = Cosmetics::directory(&directory.0, None).unwrap();
+        art.prepare_studio(&[0, 1], Some(0)).unwrap();
+        let reads = art.studio.source_reads.get();
+        for _ in 0..8 {
+            art.prepare_studio(&[0, 1], Some(0)).unwrap();
+        }
+        assert_eq!(art.studio.source_reads.get(), reads);
+        assert_eq!(art.studio_status(0), CosmeticArtStatus::OverBudget);
+        assert_eq!(art.studio_status(1), CosmeticArtStatus::OverBudget);
+        directory.accessory(0, [32, 24]);
+        directory.accessory(1, [48, 24]);
+        art.prepare_studio(&[0, 1], Some(0)).unwrap();
+        assert_eq!(art.studio.source_reads.get(), reads + 2);
+        assert_eq!(art.studio_status(0), CosmeticArtStatus::Ready);
+        assert_eq!(art.studio_status(1), CosmeticArtStatus::Ready);
+        assert_eq!(art.studio.thumbnails.len(), 2);
+        assert!(art.studio.selected_failures.is_empty());
+        assert!(art.studio.thumbnail_failures.is_empty());
     }
     #[test]
     fn compressed_metadata_is_bounded_during_probe_and_world_decode() {

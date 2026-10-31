@@ -1,9 +1,10 @@
-//! Bounded synthetic Battledome work, independent of socket scheduling.
+//! Bounded synthetic engine work, independent of socket scheduling.
 use super::*;
 
 #[derive(Clone, Copy)]
 pub(super) enum EngineWorld {
     SpawnOverload,
+    CollisionGrid,
 }
 
 impl EngineWorld {
@@ -11,18 +12,41 @@ impl EngineWorld {
         16
     }
     pub(super) fn name(self) -> &'static str {
+        if matches!(self, Self::CollisionGrid) {
+            return "engine-collision-grid-4096";
+        }
         "engine-battledome-spawn-318"
     }
     pub(super) fn mode(self) -> &'static str {
+        if matches!(self, Self::CollisionGrid) {
+            return "sandbox";
+        }
         "battledome"
     }
     pub(super) fn operation(self) -> &'static str {
+        if matches!(self, Self::CollisionGrid) {
+            return "step";
+        }
         "admission-searches+raw-tick"
     }
     pub(super) fn synthetic(self) -> &'static str {
+        if matches!(self, Self::CollisionGrid) {
+            return "4096 separated straight bodies on a 64 by 64 lattice; 4095 eight-anchor snakes and one 532-anchor snake; fixed heading, no food or prey; 16-tick epochs";
+        }
         "study-derived 318-snake geometry at time zero; fresh ambient ecology; constant boost; frozen refused/successful search seeds; no live-capacity claim"
     }
     pub(super) fn config(self) -> Config {
+        if matches!(self, Self::CollisionGrid) {
+            let mut config = Config::sandbox();
+            config.radius = 60000.;
+            config.dynamic_radius = false;
+            config.size_to_population = false;
+            config.food_count = 0;
+            config.ambient_replenish_per_second = 0.;
+            config.prey.count = 0;
+            config.kiosk.enabled = false;
+            return pinned_config(self.name(), config);
+        }
         let mut config = Config::battledome();
         let scale = 11333.603134043473 / config.radius;
         // Freezing the wall also freezes its grown pit and spawn band.
@@ -38,6 +62,14 @@ impl EngineWorld {
         pinned_config(self.name(), config)
     }
     pub(super) fn definition(self) -> Value {
+        if matches!(self, Self::CollisionGrid) {
+            return json!({"version":1, "config":self.config(),
+                "construction":self.synthetic(), "population":4096,
+                "latticePitch":512, "anchorSpacing":42, "grownSlot":0,
+                "segments":[532,8], "heading":0, "boost":false,
+                "warmupTicks":0, "epochTicks":self.epoch_ticks(),
+                "trace":"complete initial and per-tick authoritative state and events"});
+        }
         use sha2::{Digest, Sha256};
         let hash: String = Sha256::digest(include_bytes!("catalog_spawn.bin"))
             .iter()
@@ -58,6 +90,9 @@ pub(super) fn run(args: &Args, world: EngineWorld, out: &mut impl Write) -> Resu
     use crate::catalog_backend::Fixture;
     if args.parallel {
         return Err("simulation-thread rows are serial".into());
+    }
+    if matches!(world, EngineWorld::CollisionGrid) {
+        return catalog_collision::run(args, world, out);
     }
     let setup = Instant::now();
     let mut fixture = Fixture::new(world)?;

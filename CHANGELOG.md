@@ -2,8 +2,23 @@
 
 ## Unreleased
 
+### Fixed
+
+- Vlither players can join. Vlither answers the login challenge with its own
+  built-in formula, which differs from the stock client's, so the host used to
+  close every Vlither connection with "Invalid challenge reply". The host now
+  accepts that answer too, with or without a custom skin.
 ### Added
 
+- An optional `maxTick` host setting lets an overloaded world stretch its
+  ticks instead of falling behind, which players see as a growing ping. Each
+  tick then lasts the real time since the previous one, up to `maxTick`;
+  `--stats` reports any time lost above that cap as `lost_seconds`. Fixed ticks
+  stay the default, with identical output. `Simulator::set_dt` changes the tick
+  length between steps.
+- With `--stats`, the host also counts refused connections by stage and
+  reason, so the log shows why players can't join. No client addresses or
+  request data are recorded.
 - The README and Linux hosting guide state the measured one-core capacity:
   500 fully grown bot players on an AWS c7a.medium core for 30 minutes without
   falling behind
@@ -44,9 +59,16 @@
 
 ### Performance
 
-- Use the exact guarded distance threshold for collision endpoints, retaining
-  the original hypot fallback at floating-point boundaries and extreme inputs.
-
+- Collision tests compare squared distances first and take the slower exact
+  distance only near the boundary. The 32-snake Battledome step gets about 1.3%
+  faster, with all ten timing pairs faster, and a live 64,000-bot world about
+  3.6%. Collision results are unchanged.
+- In worlds with 4,096 or more snakes, one long snake no longer widens the
+  collision-grid area of every other body. Long snakes search a wider area
+  themselves instead. On a synthetic
+  4,096-snake world, collision CPU per tick falls from about 444 to 352 µs, with
+  all ten timing pairs faster, and on a live 64,000-bot world from about 77.4 to
+  73.6 ms. Collision results are unchanged.
 - Keep collision join order between ticks instead of sorting every living snake.
   The frozen 64,000-snake storm replay saves 1.85 ms of CPU per tick in ten
   timing pairs, with identical events and final state.

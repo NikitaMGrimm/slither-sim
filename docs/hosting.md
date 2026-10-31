@@ -125,15 +125,28 @@ To see the tick rate and load, add `--stats 5` to the `host` command. Every five
 seconds the log gets a line like:
 
 ```text
-stats: ticks/s=142.86 deferred_ticks=0 simulation_load=41.2% players=40 bot_slots=0
+stats: ticks/s=142.86 deferred_ticks=0 lost_seconds=0.000000 simulation_load=41.2% players=40 bot_slots=0
 ```
 
 - `ticks/s`: physics ticks run per second; 142.86 is full speed (one per 7 ms).
 - `deferred_ticks`: ticks that fell behind schedule in the interval.
+- `lost_seconds`: wall time discarded above the optional `maxTick` in the interval;
+  zero in fixed mode. See [tick stretching](raw-server.md#vps-use).
 - `simulation_load`: share of one core used by the game loop, not counting
   sockets and bots.
 - `players`: connected players, including those waiting to spawn.
 - `bot_slots`: configured background bots.
+
+With `--stats`, failed admissions also produce cumulative counts, for example:
+
+```text
+admission_rejections: phase=reply reason="Invalid challenge reply" count=3
+```
+
+Phases are `http`, `hello`, `reply` and `login`. Reasons match WebSocket policy
+close text; HTTP failures use fixed labels (`Not found`, `HTTP timeout`, or
+`Invalid WebSocket handshake`). No client addresses or request data are logged.
+Normal disconnects and rejections after login do not increment these counts.
 
 ## Connect
 

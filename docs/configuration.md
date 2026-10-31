@@ -44,6 +44,7 @@ both delays.
 | --- | --- | --- |
 | `bind` | `"127.0.0.1:8766"` | Literal IP and port; `--bind` overrides it. |
 | `seed` | `1` | Unsigned 32-bit simulation seed. |
+| `maxTick` | `null` (fixed ticks) | Optional maximum physics tick in seconds, finite and at least `simulation.world.dt`. Both endpoints must satisfy the world's dt limits (including the sliding-boundary limit). See [tick stretching](raw-server.md#vps-use). |
 | `players.max` | `4` | Reserved socket slots; at least 1. |
 | `players.latency` | Zero added delay | Server-side link delay added to socket connections; both processing fields must be zero. |
 | `bots.count` | `4` | Background food-seeking bots; players + bots must be at most 65,535. |
