@@ -23,7 +23,6 @@ Rust/Python lifecycle tests. Without a wire protocol or client-frame contract,
 it stays outside this inventory. Error text is illustrative; tests check literal
 protocol and `sessionEnded` independently of runtime defaults.
 
-
 The corresponding `serve-errors-v6.json`, `serve-rules-v6.json` and
 `serve-radius-v6.json` keep those mechanics and error/radius expectations,
 changing only the current geometric protocol label. The v5 files remain

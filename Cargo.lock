@@ -2160,7 +2160,7 @@ dependencies = [
 
 [[package]]
 name = "slither-sim"
-version = "0.9.0"
+version = "0.8.2"
 dependencies = [
  "rayon",
  "serde",
@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "slither-sim-ffi"
-version = "0.9.0"
+version = "0.8.2"
 dependencies = [
  "serde_json",
  "slither-sim",
@@ -2180,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "slither-sim-py"
-version = "0.9.0"
+version = "0.8.2"
 dependencies = [
  "pyo3",
  "serde",
