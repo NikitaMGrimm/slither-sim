@@ -256,7 +256,7 @@ measure your own workload before relying on them.
 
 ### Build and allocator
 
-On Linux with glibc, set `GLIBC_TUNABLES=glibc.malloc.hugetlb=1` in the host's
+On Linux with glibc 2.35 or newer, set `GLIBC_TUNABLES=glibc.malloc.hugetlb=1` in the host's
 environment (for systemd: `Environment=GLIBC_TUNABLES=glibc.malloc.hugetlb=1`).
 It asks the allocator to use transparent huge pages and needs no reserved
 hugepage pool. It cut world-step time by 6.9% in a replay of a 64k world.

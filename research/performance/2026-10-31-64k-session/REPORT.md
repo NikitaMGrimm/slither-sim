@@ -172,3 +172,27 @@ tick. The per-recipient loop took 0.6 ms with about two viewers. Reducing that
 shared work (the bounds reuse above) comes first. Extra presentation threads
 would only help hosts with many real players, and only as an opt-in that costs a
 one-core host nothing.
+
+## Sources
+
+The numbers above come from these retained records, kept outside the
+repository with restricted access. SHA-256 of each file as cited:
+
+| Record | SHA-256 |
+| --- | --- |
+| Final session report | `15845d98301257bfd6d0116c7bc190a34fc5ae7cea0136bad27da342662f9132` |
+| Fixed-80 ms validation report | `e555d181812e01f69b1d994e131e5cb865a1b53fc498bb3fe8a881f38f6722c1` |
+| Session log | `d3b8654b652227b92833e0f90949946a9238f102c1962a2150846d1978dcc23f` |
+| Speed scoreboard | `7341f167edda89deeb6e4a7d5fcf38cafee77b2c3801ef22d012fe09608910f6` |
+| PGO build report | `2c8340ecca9223ba3bf53d70acb0d444718e9d864e948bc96543bb71358ecc54` |
+| Allocator (hugetlb/THP) report | `ad6a09fcd3af6e9264efbe4a70466852157de63a574179bb120d634921dea579` |
+| Collision stride study | `97d430a2b54858ab2ea2256f134abb7042719869afd76c529d89ed5d9fc897c4` |
+| Player-aware LOD study | `941c6206c15a50ae79de7a2361e31267b86bdb11b067d508c767c961e0fe6150` |
+| Guarded distance study | `09fc0f8f59d98af52e92cb2be593a7ee8fcc41cf3ae607cf4db2f91f67cf6dbc` |
+| Collision grid results | `b7abb52e618a2e2b1f11f77b949f438c8223a3a2214dfe21ac25e1caeb668a5e` |
+| Live food study | `61593f4c55300e76115366a5a9b9337b46e2373d2db2fc3ed60f88bb6796bf43` |
+| Adaptive tick study | `27ccd03029eb97aa9c6412334b07050fc1d5256986d1becb6652a25af2528c94` |
+| Presentation-thread design study | `c8d350e33e12b6551573dedf0d87c57262a18cde5005bc4e1862ed704a23b46d` |
+| Live session log archive (17:54 UTC) | `4c384aa8581d55a4eb05dc6133ef4963c10a8ff5d78eb76e666cac8292d63cd9` |
+
+Each record names its own measurement windows; the tables above quote them.
