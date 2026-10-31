@@ -269,6 +269,32 @@ fn list_window_raster_and_draw_cost_stays_bounded_across_refresh_and_scrolling()
     }
 }
 #[test]
+fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
+    let mut picker = NativeServerPicker::default();
+    picker.policy.replace(&[], &BTreeMap::new()).unwrap();
+    picker.open();
+    picker.policy.alpha = 1.;
+    picker.sync();
+    let mut text = slither_wgpu_slice::text::TextCache::menu();
+    let resolved = picker.panel.resolve(picker.viewport).unwrap();
+    let search = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
+    let point = [search.rect.x + 20., search.rect.y + search.rect.height / 2.];
+    for query in ["909", "808"] {
+        let effects = picker.input.state.apply(EditIntent::KeyText(query.into()));
+        picker.commit_effects(effects);
+        assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), query);
+        assert_eq!(picker.controls.focus(), Some(SEARCH));
+        let effects = picker.pointer(&mut text, point, Some(true)).unwrap();
+        picker.commit_effects(effects);
+        let effects = picker.pointer(&mut text, point, Some(false)).unwrap();
+        picker.commit_effects(effects);
+        assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), "");
+        assert_eq!(picker.policy.search, "");
+        assert!(picker.policy.is_open());
+        assert_eq!(picker.policy.selection, ServerPreference(None));
+    }
+}
+#[test]
 fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_memory() {
     let mut p = NativeServerPicker::default();
     p.policy.replace(&servers(), &BTreeMap::new()).unwrap();

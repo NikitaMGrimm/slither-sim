@@ -21,7 +21,8 @@ select an inactive directory entry.
 Search strips non-digits and retains at most four digits. A changed value whose
 numeric ID matches selects immediately and closes, including leading zeroes;
 an empty changed value has numeric value zero. Search does not invent regions
-or silently filter the directory. Clicking the search field clears its text.
+or silently filter the directory. Clicking the search field deliberately clears
+its text on every click, including when already focused, matching the reference.
 
 Automatic (best ping) is the default. A separate versioned preference records
 only the chosen ID (`1:<id>`), or `1:auto`, like the independent quality
@@ -38,6 +39,8 @@ playing elsewhere. Directory fetches and pings remain bounded, cancellable
 native effects. Cold Play retains its directory/pings for later opens and Plays;
 a Play racing picker acquisition waits for that same worker. Only the profile
 page and script are reacquired per Play. The picker does not execute downloaded scripts.
+Completed directory/ping samples are published even if that Play later fails
+profile acquisition or selected-ID resolution; reopening reuses those samples.
 An explicit or forced endpoint leaves pending discovery with the picker; Play
 does not wait on it, and its success or failure is handled independently.
 

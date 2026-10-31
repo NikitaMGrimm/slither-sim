@@ -197,6 +197,7 @@ impl NativeServerPicker {
         let intent = self.controls.pointer(&self.panel, &resolved, point, down);
         let effects = self.controls.sync_focus(&self.panel, &mut self.input.state);
         if down == Some(true) && self.controls.focus() == Some(SEARCH) {
+            // The reference deliberately clears numeric search on every click.
             self.input.state.reset_editor(SEARCH_EDITOR, "");
         }
         if let Some(intent) = intent {

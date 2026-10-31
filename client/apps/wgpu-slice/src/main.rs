@@ -290,21 +290,21 @@ mod desktop {
                 eprintln!("Server preference write failed: {error}");
             }
             if let Some(preparation) = &mut self.preparation
-                && let Some(result) = preparation.poll()
+                && let Some(completion) = preparation.poll()
             {
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
                 official::complete_picker_preparation(
                     &mut self.login.picker.policy,
                     &mut self.directory_snapshot,
-                    &result,
+                    &completion,
                     cancelled,
                     self.directory.is_some(),
                 )?;
                 if cancelled {
                     self.game.stop();
                 } else {
-                    match result {
+                    match completion.result {
                         Ok(prepared) => {
                             println!("Selected {}; starting explicit Play", prepared.endpoint);
                             if let Err(error) = self.game.play_with_profile(
