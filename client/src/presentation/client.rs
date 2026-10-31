@@ -3355,6 +3355,14 @@ impl AnimatedClient {
     }
 
     #[cfg(feature = "feel-trace")]
+    pub(crate) fn geometry_packet_comparable(&self, token: SnakeObjectToken, id: u16) -> bool {
+        self.lookup_index(id).is_some_and(|index| {
+            let entry = &self.entries[index];
+            entry.token == token && entry.snake.metrics().alive
+        })
+    }
+
+    #[cfg(feature = "feel-trace")]
     pub(crate) fn geometry_packet_head(&self, id: u16) -> Option<Point> {
         if let Some(heads) = &self.trace_setup_heads {
             return heads.head(id);

@@ -183,6 +183,14 @@ export function pairedResponse(base,impulse) {
   }
   return out;
 }
+// Higher thresholds can resolve even when lower levels lack a crossing bracket.
+// Every declared level must resolve before this stratum enters a complete table.
+export function completeResponse(value) {
+  for(const role of ['own','enemy']) for(const kind of ['position','heading'])
+    for(const group of ['levels','sustainedLevels']) for(const level of ['t10','t50','t90'])
+      check(value[role][kind][group][level],`unresolved correction detector: ${role}/${kind}/${group}/${level}`);
+  return value;
+}
 function controls() {
   const known=error([10,0],[9,0],0,20);check(known.lagEquivalentMs===50,'lag units/sign control');
   check(error([10,0],[11,0],0,20).lagEquivalentMs===-50,'ahead sign control');
@@ -223,9 +231,7 @@ function runMatrix(binary,out) {
     const result={config};
     try {
       check(runs.every(Boolean),'missing run');result.baseline=completeProbe(runs[0]);result.impulse=completeProbe(runs[1]);result.response=pairedResponse(...runs);
-      for(const role of ['own','enemy']) {
-        for(const kind of ['position','heading'])check(result.response[role][kind].levels.t90 && result.response[role][kind].sustainedLevels.t90,'unresolved correction detector');
-      }
+      completeResponse(result.response);
     }catch(e){result.failure=String(e);receipt.failures.push({id,error:String(e)});}
     receipt.results.push(result);fs.writeFileSync(path.join(out,'summary.json'),JSON.stringify(receipt,null,2));
     console.log(`${id}: ${result.failure??'retained'}`);

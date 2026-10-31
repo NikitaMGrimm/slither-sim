@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { error, station, smoothness, response, distribution, analyzeProbe, completeProbe } from './smoothing-lag.mjs';
+import { error, station, smoothness, response, distribution, analyzeProbe, completeProbe, completeResponse } from './smoothing-lag.mjs';
 
 test('truth minus draw has signed millisecond units, with undefined stationary lag',()=>{
   assert.equal(error([10,0],[9,0],0,20).lagEquivalentMs,50);
@@ -34,6 +34,23 @@ test('a transient first crossing cannot masquerade as sustained response',()=>{
   assert.equal(r.levels.t50.estimateMs,0);
   assert.equal(r.recrossings.t50,1);
   assert.equal(r.sustainedLevels.t50.estimateMs,90);
+});
+test('complete responses require all first and sustained levels for both roles and kinds',()=>{
+  const ramp=response(Array.from({length:101},(_,i)=>({t:i*5,y:Math.min(1,Math.max(0,(i*5-40)/100))})),0,1);
+  const complete=()=>Object.fromEntries(['own','enemy'].map(role=>[role,
+    Object.fromEntries(['position','heading'].map(kind=>[kind,structuredClone(ramp)]))]));
+  assert.doesNotThrow(()=>completeResponse(complete()));
+  // The paired window already exceeds t10/t50, but still brackets t90.
+  const highStart=response([{t:-10,y:.6},{t:0,y:.6},{t:10,y:1}],0,1);
+  assert.equal(highStart.levels.t10,null);assert.equal(highStart.levels.t50,null);
+  assert.ok(highStart.levels.t90);assert.ok(highStart.sustainedLevels.t90);
+  const unbracketed=complete();unbracketed.own.position=highStart;
+  assert.throws(()=>completeResponse(unbracketed),/unresolved correction detector: own\/position\/levels\/t10/);
+  for(const role of ['own','enemy']) for(const kind of ['position','heading'])
+    for(const group of ['levels','sustainedLevels']) for(const level of ['t10','t50','t90']) {
+      const missing=complete();missing[role][kind][group][level]=null;
+      assert.throws(()=>completeResponse(missing),new RegExp(`unresolved correction detector: ${role}/${kind}/${group}/${level}`));
+    }
 });
 test('p99 under 1000 samples is descriptive and incomplete runs fail closed',()=>{
   assert.equal(distribution([1,2,3]).p99DescriptiveOnly,true);

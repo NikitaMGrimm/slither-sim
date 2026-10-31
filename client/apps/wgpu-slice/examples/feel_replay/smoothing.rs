@@ -254,8 +254,13 @@ fn probe(config: Value, malformed_at: Option<usize>) -> Result<Value> {
                     "truth":truth,"truthBody":stations,"truthBodyHeadings":station_headings,"truthBodySegments":station_segments,"body":s.body,"packetHead":[s.packet_head.x,s.packet_head.y],
                     "anchorId":pose_id,"poseGeneratedMs":pose_time,"headingGeneratedMs":pose_time,"speedGeneratedMs":ORIGIN}));
             }
-            rows.push(json!({"frame":frame,"sequence":g.sequence.to_string(),"atMs":now,"measured":now>=ORIGIN+2000.,
-                "acknowledged":ack,"camera":[g.camera.x,g.camera.y],"zoom":g.zoom,"snakes":snakes}));
+            let mut row = json!({"frame":frame,"sequence":g.sequence.to_string(),"atMs":now,"measured":now>=ORIGIN+2000.,
+                "acknowledged":ack,"camera":[g.camera.x,g.camera.y],"zoom":g.zoom,"snakes":snakes});
+            // Zero is implicit so the frozen live-only captures keep their ABI.
+            if g.excluded_retained != 0 {
+                row["excludedRetained"] = json!(g.excluded_retained);
+            }
+            rows.push(row);
         }
         if d.recorder.has_failed() {
             failures.extend(d.recorder.take_errors());

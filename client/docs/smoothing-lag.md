@@ -12,6 +12,12 @@ second mutex acquisition per preparation.
 Setup draws use selected packet heads captured at that command boundary,
 including earlier anchors/spawns in the bundle and excluding later commands;
 the callback's ordinary `received()` view still commits after the whole bundle.
+Only the appearance token owning the live packet lookup enters the comparison.
+Selected prepared appearances retained after death/removal or same-ID replacement
+are excluded before the two-snake limit and counted in `excluded_retained` on
+each geometry observation (`excludedRetained` in probe rows, omitted when zero).
+They neither borrow the replacement's packet head nor fail the recorder. The
+probe still requires both selected live snakes for its declared coverage.
 
 ## Method and frozen schedule
 

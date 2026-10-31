@@ -39,8 +39,11 @@ pub struct GeometryObservation {
     pub camera: Point,
     /// Actual world-to-backing scale.
     pub zoom: f64,
-    /// Selected visible snakes in painter order.
+    /// Selected live, packet-addressed appearances in painter order.
     pub snakes: Vec<GeometrySnake>,
+    /// Selected prepared appearances excluded because their token no longer owns
+    /// the live packet lookup (death/removal or same-ID replacement).
+    pub excluded_retained: usize,
 }
 /// Original prepared head/body and admitted packet state for one appearance.
 #[derive(Clone, Debug, PartialEq)]
@@ -81,11 +84,19 @@ impl Journal {
             return false;
         }
         let mut snakes = Vec::new();
+        let mut excluded_retained = 0;
         for p in prepared
             .iter()
             .map(|p| &p.snake)
             .filter(|s| self.ids.contains(&s.metrics.id))
         {
+            // Wire IDs can outlive their packet lookup or be reused while old
+            // appearances still draw. Exclude them before capacity/provenance
+            // checks: the live map cannot establish their own packet head.
+            if !client.geometry_packet_comparable(p.token, p.metrics.id) {
+                excluded_retained += 1;
+                continue;
+            }
             let body = p
                 .body_geometry
                 .as_ref()
@@ -113,6 +124,7 @@ impl Journal {
             camera: client.camera().position(),
             zoom: client.camera().zoom(),
             snakes,
+            excluded_retained,
         });
         self.count += 1;
         true
