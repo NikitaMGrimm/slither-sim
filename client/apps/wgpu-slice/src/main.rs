@@ -62,14 +62,9 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
-                }
-                "--endpoint" => {
-                    let e = args.next().ok_or("Endpoint value required")?;
-                    slither_wgpu_slice::game::server_endpoint(&e)?;
-                    o.endpoint = Some(e);
                 }
                 "--official" => o.official = true,
                 "--headless" => headless = true,
@@ -91,8 +86,10 @@ mod desktop {
                     headless_arguments = true;
                 }
                 "--server" => {
-                    let server = args.next().ok_or("Server value required")?;
-                    official::explicit_endpoint(&server)?;
+                    let server = args.next().ok_or("--server requires host:port")?;
+                    o.endpoint = Some(official::explicit_endpoint(&server).map_err(|error| {
+                        format!("Invalid --server (expected host:port): {error}")
+                    })?);
                     o.server = Some(server);
                 }
                 "--nickname" => {
@@ -125,16 +122,13 @@ mod desktop {
                 _ => return Err(format!("Unknown option {arg}")),
             }
         }
-        if o.official && o.endpoint.is_some() {
-            return Err("Use --official or --endpoint".into());
-        }
-        if o.server.is_some() && !o.official {
-            return Err("--server requires --official".into());
+        if o.official {
+            o.endpoint = None;
         }
         if headless {
             // Owner decision 2026-10-30: official logins only from a person pressing Play.
             if o.official || o.endpoint.is_none() {
-                return Err("Headless requires --endpoint; --official is interactive only".into());
+                return Err("Headless requires --server without --official; official play is interactive only".into());
             }
             o.headless = Some(crate::headless::Options::new(
                 duration,
@@ -1009,7 +1003,7 @@ mod desktop {
                 options
                     .endpoint
                     .as_deref()
-                    .ok_or("Headless requires --endpoint")?,
+                    .ok_or("Headless requires --server")?,
                 &options.nickname,
                 options.skin,
                 cosmetics,
@@ -1017,7 +1011,7 @@ mod desktop {
         }
         if !options.official && options.endpoint.is_none() {
             eprintln!(
-                "No connection mode configured; Play stays disabled. Use --official or --endpoint."
+                "No connection mode configured; Play stays disabled. Use --server host:port or --official."
             );
         }
         let trace = latency::Run::from_env();
@@ -1066,11 +1060,10 @@ mod desktop {
                 .unwrap()
                 .unwrap();
             assert!(explicit_defaults.skin_explicit && explicit_defaults.nickname_explicit);
-            assert!(parse(&["--endpoint", "ws://localhost:19491/slither"]).is_ok());
+            assert!(parse(&["--server", "localhost:19491"]).is_ok());
             assert!(parse(&["--help"]).unwrap().is_none());
             for args in [
-                vec!["--official", "--endpoint", "ws://127.0.0.1:19491/slither"],
-                vec!["--server", "x:445"],
+                vec!["--endpoint", "ws://127.0.0.1:19491/slither"],
                 vec!["--official", "--skin", "66"],
                 vec!["--official", "--server"],
                 vec![
@@ -1083,8 +1076,8 @@ mod desktop {
             }
         }
         #[test]
-        fn headless_requires_an_endpoint_and_bounded_explicit_output() {
-            let endpoint = ["--endpoint", "ws://127.0.0.1:19491/slither"];
+        fn headless_requires_a_server_and_bounded_explicit_output() {
+            let endpoint = ["--server", "127.0.0.1:19491"];
             let options = parse(
                 &[
                     &endpoint[..],
@@ -1140,7 +1133,83 @@ mod desktop {
             ] {
                 let args = [mode, vec!["--headless", "--frames", "unused"]].concat();
                 let error = parse(&args).err().expect("official headless run");
-                assert!(error.contains("--official is interactive only"), "{error}");
+                assert!(error.contains("interactive only"), "{error}");
+            }
+        }
+        #[test]
+        fn server_values_preserve_address_properties_and_official_flag_order() {
+            for server in [
+                "127.0.0.1:19491",
+                "game.example:445",
+                "localhost:80",
+                "[2001:db8::1]:443",
+            ] {
+                let direct = parse(&["--server", server]).unwrap().unwrap();
+                assert!(!direct.official);
+                let endpoint =
+                    slither_wgpu_slice::game::server_endpoint(direct.endpoint.as_deref().unwrap())
+                        .unwrap();
+                assert_eq!(endpoint.scheme(), "ws");
+                assert_eq!(endpoint.path(), "/slither");
+                assert_eq!(
+                    endpoint.port_or_known_default(),
+                    server.rsplit_once(':').unwrap().1.parse().ok()
+                );
+                for args in [
+                    ["--official", "--server", server],
+                    ["--server", server, "--official"],
+                ] {
+                    let official = parse(&args).unwrap().unwrap();
+                    assert!(official.official);
+                    assert!(official.endpoint.is_none());
+                    assert_eq!(official.server.as_deref(), Some(server));
+                }
+            }
+            for server in [
+                "",
+                "host",
+                "host:0",
+                "host:65536",
+                "host:abc",
+                "user@host:80",
+                "host:80/path",
+                "ws://host:80/slither",
+                "host:80?x",
+                "host:80#x",
+                "host\\x:80",
+                "host :80",
+            ] {
+                for official in [false, true] {
+                    let mut args = vec!["--server", server];
+                    if official {
+                        args.push("--official");
+                    }
+                    let error = parse(&args).err().expect("invalid server");
+                    assert!(error.contains("--server"), "{error}");
+                }
+            }
+        }
+        #[test]
+        fn server_alone_uses_direct_login_without_official_discovery() {
+            for server in ["192.0.2.1:445", "game.example:80", "[2001:db8::1]:446"] {
+                let options = parse(&["--server", server]).unwrap().unwrap();
+                // The startup and Play acquisition gates both use this opt-in.
+                assert!(!options.official);
+                let mut picker = slither_client::server_picker::ServerPicker::default();
+                picker.start_directory(options.official);
+                assert!(!picker.take_directory_request());
+                let mut game = LocalGame::new(0.).unwrap();
+                let endpoint = options.endpoint.as_deref().unwrap();
+                slither_wgpu_slice::endpoint_login::play(&mut game, endpoint, "Fixed", 9).unwrap();
+                game.begin_frame(1., [960, 540], 1.).unwrap();
+                while game.take_frame().is_some() {
+                    game.presented(true).unwrap();
+                }
+                let effect = game.effect().unwrap();
+                assert!(
+                    matches!(&effect.kind, slither_wgpu_slice::game::EffectKind::Connect(url) if url == endpoint)
+                );
+                assert!(game.failure.is_none());
             }
         }
     }

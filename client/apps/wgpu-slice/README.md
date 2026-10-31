@@ -15,22 +15,24 @@ If slither-sim is not on PATH, set SLITHER_SIM or run
 `npm run dev:desktop -- --simulator <path>`.
 Enter starts Play, Escape stops; pointer/arrows/Space and mouse boost feed the
 shared input policy. No connection starts until Play, and reconnect is explicit.
-Use `--endpoint ws://host:port/slither` for a simulator elsewhere.
+Use `--server host:port` for a simulator elsewhere (IPv6: `[address]:port`).
+The client builds `ws://host:port/slither` internally.
 
-Desktop `--endpoint` sends a fixed official-format login (the same values as the
+Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
-that copied the official login.
+that copied the official login. Without `--official`, it never fetches the
+official website or performs discovery.
 
 ## Official servers
 
 `--official` configures official play (native only). The window opens on login;
 `--nickname`/`--skin` are initial values. Click Play or press Enter to connect.
-Each explicit Play fetches the
-homepage, its `/s/game<digits>.js` script and the server directory as inert data,
+Official discovery starts in the background at login. Each explicit Play fetches
+the homepage and its `/s/game<digits>.js` script as inert data,
 parses `client_version`/`cpw` with the core's closed literal grammar (code is
-never evaluated), pings one address per cluster over `ws://address:80/ptc` and
-picks a server like the original: lowest cluster RTT, then population-weighted.
-`--server host:port` skips discovery. Game sockets use the original `ws://`
+never evaluated). Automatic selection joins the directory/ping worker and picks
+by lowest cluster RTT, then population-weighted. `--official --server host:port`
+uses that explicit server with fresh login values. Game sockets use the original `ws://`
 path with `Origin: http://slither.io`. Downloads are capped after gzip decoding
 (256 KiB page/directory, 1 MiB script, 5 s, at most three same-host redirects,
 no HTTPS-to-HTTP downgrade for the script/directory) and kept only in memory.
@@ -46,11 +48,12 @@ choice; check slither.io's terms before you do.
 
 ## Headless runs
 
-`--endpoint <url> --headless --duration <s> --frames <new-dir> [--frame-every <s>]`
+`--server host:port --headless --duration <s> --frames <new-dir> [--frame-every <s>]`
 starts one Play without a window, wanders along broad drifting arcs with a periodic boost through the
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
 (server, profile version, handshake/login/Setup, packet and frame counts, own
 length over time, exit reason). Page echo bytes and raw packets are never printed.
+Headless runs reject `--official` even when an explicit server is supplied.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and

@@ -58,6 +58,11 @@ test('desktop launcher hides only the simulator and cleans up both owned process
   assert.equal(calls[0].options.windowsHide, true);
   assert.equal(calls[1].command, 'synthetic-desktop.exe');
   assert.equal(calls[1].options.windowsHide, false);
+  assert.equal(calls[1].args[0], '--server');
+  const server = new URL(`ws://${calls[1].args[1]}/slither`);
+  assert.equal(server.hostname, '127.0.0.1');
+  assert(Number(server.port) > 0);
+  assert.equal(calls[1].args.length, 2);
   const stop = process.listeners('SIGINT').find(listener => !before.get('SIGINT').has(listener));
   assert.equal(typeof stop, 'function');
   stop();

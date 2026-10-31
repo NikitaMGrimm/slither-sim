@@ -54,9 +54,14 @@ slither-client is an independent project, not affiliated with or endorsed by
 slither.io or Lowtech Studios. Connecting to the official servers is your own
 choice; check slither.io's terms before you do.
 
-Official play is interactive only: headless runs accept only `--endpoint`.
+Use `--server host:port` to connect directly to a custom server. The client builds
+`ws://host:port/slither` internally; IPv6 uses `[address]:port`. Without `--official`,
+it never fetches the official website or discovers servers. Combining
+`--official --server host:port` still fetches fresh login values before using
+that explicit server.
+Official play is interactive only: headless runs need `--server` without `--official`.
 
-Desktop `--endpoint` sends a fixed official-format login (the same values as the
+Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
 that copied the official login.
 

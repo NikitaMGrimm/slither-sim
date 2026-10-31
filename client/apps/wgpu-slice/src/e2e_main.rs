@@ -240,14 +240,14 @@ mod probe {
         }
     }
 
-    pub fn run() -> Result<()> {
-        let args: Vec<_> = std::env::args().skip(1).collect();
-        if args.len() != 4 || args[0] != "--endpoint" || args[2] != "--seconds" {
-            return Err(
-                "arguments: --endpoint ws://127.0.0.1:<port>/slither --seconds 5..60".into(),
-            );
+    fn arguments(args: &[String]) -> Result<(String, f64)> {
+        if args.len() != 4 || args[0] != "--server" || args[2] != "--seconds" {
+            return Err("arguments: --server 127.0.0.1:<port> --seconds 5..60".into());
         }
-        let port = loopback_endpoint(&args[1])?;
+        let endpoint = slither_wgpu_slice::official::explicit_endpoint(&args[1])?;
+        // Preserve the probe's literal loopback gate before URL normalization
+        // removes :80 or expands IPv4 aliases such as 127.1.
+        let port = loopback_endpoint(&format!("ws://{}/slither", args[1]))?;
         if [8766, 18884, 18885].contains(&port) {
             return Err("arguments: reserved port".into());
         }
@@ -255,6 +255,10 @@ mod probe {
         if !seconds.is_finite() || !(5. ..=60.).contains(&seconds) {
             return Err("arguments: seconds must be 5..60".into());
         }
+        Ok((endpoint, seconds))
+    }
+    pub fn run() -> Result<()> {
+        let (endpoint, seconds) = arguments(&std::env::args().skip(1).collect::<Vec<_>>())?;
         let started = Instant::now();
         let mut host = Host {
             game: LocalGame::new(0.)?,
@@ -263,11 +267,63 @@ mod probe {
             started,
             playing: None,
         };
-        host.game.play(&args[1], "Local E2E", 0)?;
+        host.game.play(&endpoint, "Local E2E", 0)?;
         let result = host.run(seconds);
         host.transport.close();
         host.summary.print(started.elapsed().as_secs_f64());
         result
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn server_arguments_keep_literal_loopback_and_time_bounds() {
+            for port in [1, 80, 49152, 65535] {
+                for seconds in [5., 8.5, 60.] {
+                    let args = [
+                        "--server".into(),
+                        format!("127.0.0.1:{port}"),
+                        "--seconds".into(),
+                        seconds.to_string(),
+                    ];
+                    let (endpoint, duration) = arguments(&args).unwrap();
+                    let url = url::Url::parse(&endpoint).unwrap();
+                    assert_eq!(url.host_str(), Some("127.0.0.1"));
+                    assert_eq!(url.port_or_known_default(), Some(port));
+                    assert_eq!(duration, seconds);
+                }
+            }
+            for server in [
+                "127.1:49152",
+                "localhost:49152",
+                "192.0.2.1:49152",
+                "127.0.0.1:0",
+                "127.0.0.1:8766",
+                "127.0.0.1:18884",
+                "127.0.0.1:18885",
+            ] {
+                assert!(
+                    arguments(&[
+                        "--server".into(),
+                        server.into(),
+                        "--seconds".into(),
+                        "5".into()
+                    ])
+                    .is_err()
+                );
+            }
+            for seconds in ["0", "4.9", "60.1", "NaN", "inf"] {
+                assert!(
+                    arguments(&[
+                        "--server".into(),
+                        "127.0.0.1:49152".into(),
+                        "--seconds".into(),
+                        seconds.into()
+                    ])
+                    .is_err()
+                );
+            }
+        }
     }
 }
 
