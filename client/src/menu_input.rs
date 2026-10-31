@@ -416,6 +416,9 @@ pub struct MenuInputState {
     token: u64,
     pending: Option<(u64, bool)>,
     modal_focus: Option<TextField>,
+    caret_clock: f64,
+    caret_restart: f64,
+    caret_pending: bool,
 }
 impl Default for MenuInputState {
     fn default() -> Self {
@@ -429,10 +432,30 @@ impl Default for MenuInputState {
             token: 0,
             pending: None,
             modal_focus: None,
+            caret_clock: 0.,
+            caret_restart: 0.,
+            caret_pending: false,
         }
     }
 }
 impl MenuInputState {
+    /// Advance from the existing menu callback clock, never a host wall clock.
+    pub fn step_caret(&mut self, now_ms: f64) {
+        if now_ms.is_finite() {
+            self.caret_clock = self.caret_clock.max(now_ms);
+            if self.caret_pending {
+                self.caret_restart = self.caret_clock;
+                self.caret_pending = false;
+            }
+        }
+    }
+    /// A focus/edit starts a solid 530ms interval, followed by 530ms off.
+    pub fn caret_visible(&self) -> bool {
+        self.window_focused
+            && !self.modal
+            && self.focus.is_some()
+            && (self.caret_clock - self.caret_restart) % 1060. < 530.
+    }
     /// Read an editor's copied state.
     pub fn editor(&self, field: TextField) -> &TextEditState {
         match field {
@@ -484,6 +507,29 @@ impl MenuInputState {
     }
     /// Reduce one copied intent and return host work.
     pub fn apply(&mut self, intent: EditIntent) -> Vec<HostEditEffect> {
+        if matches!(
+            intent,
+            EditIntent::Focus(Some(_))
+                | EditIntent::WindowFocused(true)
+                | EditIntent::Modal(false)
+                | EditIntent::Select { .. }
+                | EditIntent::Move { .. }
+                | EditIntent::SelectAll
+                | EditIntent::KeyText(_)
+                | EditIntent::Preedit(..)
+                | EditIntent::ImeCommit(_)
+                | EditIntent::Backspace
+                | EditIntent::Delete
+                | EditIntent::Undo
+                | EditIntent::Redo
+                | EditIntent::ClipboardRead { .. }
+                | EditIntent::ClipboardWritten { .. }
+        ) {
+            self.caret_restart = self.caret_clock;
+            // Edits can arrive after a long idle interval. Start the solid
+            // phase at the next core-clock seam, not the previous picture.
+            self.caret_pending = true;
+        }
         let mut effects = Vec::new();
         match intent {
             EditIntent::Focus(focus) => {

@@ -798,3 +798,140 @@ fn page_crossfade_and_menu_materials_never_share_a_handle() {
         );
     }
 }
+
+#[test]
+fn wordmark_runs_abut_and_override_only_logo_art() {
+    use slither_client::menu_layout::MenuElement as E;
+    use slither_wgpu_slice::{
+        menu::{WORDMARK_GREEN, WORDMARK_PURPLE, wordmark_runs},
+        menu_specimen,
+    };
+    let has_color = |p: &slither_wgpu_slice::menu::MenuFrame, rgb: [u8; 3]| {
+        p.resources.iter().any(|r| {
+            r.image
+                .pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|p| p[..3] == rgb && p[3] > 200)
+        })
+    };
+    let mut text = TextCache::menu();
+    let mut images = Images::default();
+    images
+        .add("menu/logo.png", &png_rect(450, 135, [80, 200, 100, 255]))
+        .unwrap();
+    let art = Cosmetics::from_images(images, None).unwrap();
+    let mut view = menu_specimen::view(0).unwrap();
+    for transition in [0., 1.] {
+        view.transition = transition;
+        view.hover_alpha = 1.;
+        view.press_alpha = 1.;
+        view.last_life.label = view.wording.final_length;
+        view.last_life.number = "10000".into();
+        view.last_life.suffix = "!";
+        view.play_label = if transition == 0. {
+            view.wording.play
+        } else {
+            view.wording.play_again
+        };
+        for dpr in [1., 1.25, 1.5, 1.75, 2., 3., 5.] {
+            let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+            let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+            let holder = layout.viewport_rect(E::Logo);
+            let [(left, green), (right, purple)] = wordmark_runs(&mut text, holder, dpr).unwrap();
+            assert_eq!(
+                (right.x * dpr).round() - (left.x * dpr).round(),
+                (left.width * dpr).round()
+            );
+            assert_eq!(green.color, WORDMARK_GREEN);
+            assert_eq!(purple.color, WORDMARK_PURPLE);
+            assert!((left.width + right.width - holder.width).abs() < 0.01);
+            let mut menu = Menu::default();
+            let ordinary = menu.prepare(&mut text, &view, &layout, extent, dpr, Some(&art), 0);
+            // Local art is capped at the same 2048 physical texture bound.
+            if dpr <= 2. {
+                assert!(has_color(&ordinary.unwrap(), [80, 200, 100]));
+            }
+            menu.wordmark = true;
+            for fraction in [0., 0.15, 0.55, 1.] {
+                view.logo_reveal = fraction;
+                let p = menu
+                    .prepare(&mut text, &view, &layout, extent, dpr, Some(&art), 0)
+                    .unwrap_or_else(|e| panic!("dpr={dpr} transition={transition}: {e}"));
+                assert!(
+                    p.resources
+                        .iter()
+                        .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+                );
+                assert!(p.frame.draws.len() <= 512);
+                assert!(has_color(&p, WORDMARK_GREEN));
+                assert!(has_color(&p, WORDMARK_PURPLE));
+                assert!(!has_color(&p, [80, 200, 100]));
+                assert!(!p.resources.iter().any(
+                    |r| r.asset.handle == art.menu_art(MenuArt::Logo(0)).unwrap().asset.handle
+                ));
+            }
+            view.logo_reveal = 1.;
+        }
+    }
+}
+
+#[test]
+fn wordmark_composed_origins_share_one_snapped_advance_boundary() {
+    use slither_client::menu_layout::MenuElement as E;
+    use slither_wgpu_slice::{
+        menu::{WORDMARK_GREEN, WORDMARK_PURPLE, wordmark_runs},
+        menu_specimen,
+    };
+    let mut text = TextCache::menu();
+    let view = menu_specimen::view(0).unwrap();
+    let mut adjacent = true;
+    for dpr in [1., 1.25, 1.5, 1.75, 2.] {
+        let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
+        let layout = menu_specimen::layout(&mut text, &view, extent, dpr).unwrap();
+        let logo = layout.viewport_rect(E::Logo);
+        let [(_, mut style), _] = wordmark_runs(&mut text, logo, dpr).unwrap();
+        style.size *= dpr;
+        let advance = text.measure_panel("Slither", style).unwrap().advance;
+        let picture = Menu::default()
+            .prepare(&mut text, &view, &layout, extent, dpr, None, 0)
+            .unwrap();
+        let origin = |rgb: [u8; 3]| {
+            picture
+                .frame
+                .draws
+                .iter()
+                .filter(|d| {
+                    d.destination.y >= logo.y
+                        && d.destination.y < logo.y + logo.height
+                        && picture.resources.iter().any(|r| {
+                            r.asset == d.asset
+                                && r.image
+                                    .pixels
+                                    .as_chunks::<4>()
+                                    .0
+                                    .iter()
+                                    .any(|p| *p == [rgb[0], rgb[1], rgb[2], 255])
+                        })
+                })
+                .map(|d| {
+                    let x = (d.destination.x + d.translation[0]) * dpr;
+                    assert!((x - x.round()).abs() < 1e-8);
+                    x
+                })
+                .min_by(f64::total_cmp)
+                .unwrap()
+        };
+        let painted_advance = origin(WORDMARK_PURPLE) - origin(WORDMARK_GREEN);
+        println!(
+            "DPR {dpr}: advance={advance:.6}, rounded={}, painted={painted_advance:.0}",
+            advance.round()
+        );
+        adjacent &= (painted_advance - advance.round()).abs() < 1e-8;
+    }
+    assert!(
+        adjacent,
+        "composed wordmark origins must meet at the rounded physical advance"
+    );
+}

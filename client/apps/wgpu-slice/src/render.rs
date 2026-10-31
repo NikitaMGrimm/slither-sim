@@ -1309,7 +1309,8 @@ mod text_staging_tests {
                     width: 1,
                     height: 1,
                     pixels: vec![255; 4],
-                },
+                }
+                .into(),
             }],
         )
         .unwrap();

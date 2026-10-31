@@ -15,7 +15,7 @@ the spinner remains while connecting. Focus changes release held turn/boost
 inputs. Window blur and stale generations cannot admit a new attempt.
 
 The Choose Server control is hidden. Change Skin is a labelled passive icon
-until the chooser arrives. Server picker, chooser and animated logo remain known gaps. The initial
+until the chooser arrives. Server picker and chooser remain known gaps. The initial
 final-length slot is blank.
 
 Adapters consume the localized wording, separate last-length prefix/bold
@@ -28,7 +28,33 @@ The 50px Play bottom margin is trailing flow space, not part of its hit rectangl
 
 Supply normal last-length line-box height and nickname row baseline space from
 the chosen platform font/flow implementation. The numeric tests use authored
-18px/4px/52.2px metrics, not measured font parity. Login scales about the center
+18px/4px/52.2px metrics, not measured font parity. Native measures the selected
+Lucida font box for the last-length line, the two NBSPs around the bold Arial
+Play label, and the 20px gap directly after the nickname border box. Creation
+and retained updates use the same measurements. The logo flow holder stays
+450x115. Native nickname, Play, tips and wordmark use ascent/descent baselines;
+tips use a normal line at the top of their reserved row. Nickname painting,
+pointer selection and IME anchoring share the single-line input content box.
+`menu_layout::single_line_field_placement(field, inset, font_size, ascent,
+descent)` is shared by all single-line painters: it returns the content left
+edge/alphabetic baseline and the centred font-size caret top/height. Insets
+are symmetric horizontal/vertical content padding in logical units; callers
+include borders only if their field rect still includes them. Values and
+placeholders share this placement; caret and IME hosts snap its outputs once.
+`tests/field_text.rs` independently checks line/caret centring at multiple font
+sizes, input/champion-sized boxes and DPRs. The champion TextField painter can
+call this same API without depending on the login renderer.
+The caret uses a 530ms on/off clock from the menu
+callback, restarted by focus/edit/movement; raw IME preedit stays separate.
+
+Native local logo art keeps its aspect ratio and independent opacity. An authored
+left-to-right wipe uses the retained reveal fraction, one opaque crop and at
+most 32 physical-pixel feather strips per raster. No masked texture revisions
+or shaders are added. Without local logo art, or with desktop `--wordmark`, two
+bold measured runs form the green/purple SlitherClient wordmark inside the same
+holder. The two runs share one reveal span and one fitted size. Authored tests
+and offscreen specimens establish these effects, not original curve-motion or
+physical IME parity. Login scales about the center
 of its viewport-sized border box, with its 64px margin outside that box. Fixed
 corner links and the centered 128px spinner are siblings: they never inherit the
 login transform. The spinner uses its own center-origin scale from the view.

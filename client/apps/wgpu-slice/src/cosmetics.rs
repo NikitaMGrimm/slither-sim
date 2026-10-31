@@ -267,7 +267,7 @@ impl Cosmetics {
                     height: image.height,
                     status: BodyAssetStatus::Ready,
                 },
-                image,
+                image: image.into(),
             })
         };
         let mut roles = BTreeMap::new();

@@ -21,6 +21,41 @@ impl MenuRect {
     }
 }
 
+/// Logical single-line text origin and a text-height caret before pixel snapping.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FieldTextPlacement {
+    /// Content left edge and alphabetic baseline.
+    pub origin: [f64; 2],
+    /// Top of the caret in viewport/CSS pixels.
+    pub caret_top: f64,
+    /// Caret height, limited to the available content height.
+    pub caret_height: f64,
+}
+
+/// Place any single-line field's value or placeholder using the selected font.
+/// `inset` is symmetric horizontal/vertical content padding in the same logical
+/// units as `field`; include borders here if the rect still includes them.
+/// Callers supply validated finite geometry and nonnegative font metrics.
+/// Font ascent/descent are positive distances from the alphabetic baseline.
+/// Center the font line box in the content box and a font-size caret on that
+/// same centre. Painters and IME hosts snap these outputs once at their DPR.
+pub fn single_line_field_placement(
+    field: MenuRect,
+    inset: [f64; 2],
+    font_size: f64,
+    ascent: f64,
+    descent: f64,
+) -> FieldTextPlacement {
+    let height = (field.height - 2. * inset[1]).max(0.);
+    let center = field.y + inset[1] + height / 2.;
+    let caret_height = font_size.max(0.).min(height);
+    FieldTextPlacement {
+        origin: [field.x + inset[0], center + (ascent - descent) / 2.],
+        caret_top: center - caret_height / 2.,
+        caret_height,
+    }
+}
+
 /// Platform text/inline-flow measurements, independent of world rendering.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MenuMetrics {

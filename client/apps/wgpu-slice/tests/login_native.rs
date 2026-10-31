@@ -8,6 +8,68 @@ use slither_client::{
 use slither_wgpu_slice::login_native::NativeLogin;
 
 #[test]
+fn shared_field_placement_keeps_placeholder_value_preedit_and_ime_together() {
+    for dpr in [1., 1.25, 1.5, 1.75, 2.] {
+        for value in ["", "Player", "WWWWWWWWWWWWWWWWWWWWWWWW"] {
+            let mut login = NativeLogin::new(value).unwrap();
+            login.step(0., true, false).unwrap();
+            for preedit in [false, true] {
+                if preedit {
+                    login
+                        .input
+                        .state
+                        .apply(EditIntent::Preedit("é".into(), Some((0, 2))));
+                }
+                let picture = login
+                    .prepare_host([(960. * dpr) as u32, (540. * dpr) as u32], dpr, true, None)
+                    .unwrap();
+                let caret = picture
+                    .frame
+                    .draws
+                    .iter()
+                    .find(|d| {
+                        d.destination.height > 5.
+                            && picture.resources.iter().any(|r| {
+                                r.asset == d.asset
+                                    && r.image
+                                        .pixels
+                                        .as_chunks::<4>()
+                                        .0
+                                        .iter()
+                                        .all(|p| *p == [224, 224, 255, 255])
+                            })
+                    })
+                    .unwrap();
+                assert!(login.cursor_area().unwrap().iter().any(|e| matches!(e,
+                    HostEditEffect::ImeCursorArea { position, size }
+                    if *position == [caret.destination.x, caret.destination.y]
+                    && *size == [caret.destination.width, caret.destination.height]
+                )));
+            }
+        }
+    }
+}
+
+#[test]
+fn selected_font_flow_matches_initial_and_retained_login() {
+    for (extent, dpr) in [([1920, 1080], 1.), ([960, 540], 1.), ([1920, 1080], 2.)] {
+        let mut login = NativeLogin::new("Player").unwrap();
+        login.step(9600., true, false).unwrap();
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        let first = login.layout.clone();
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        assert_eq!(login.layout, first);
+        let nick = first.viewport_rect(E::NicknameHolder);
+        let play = first.viewport_rect(E::Play);
+        assert_eq!(first.logical_rect(E::Logo).height, 115.);
+        assert!((first.logical_rect(E::NicknameHolder).y + 64. - 360.).abs() < 0.01);
+        assert!((first.logical_rect(E::Play).y + 64. - 427.).abs() < 0.01);
+        assert!((play.width / first.scale - 87.).abs() < 0.5);
+        assert!((play.y - nick.y - 67. * first.scale).abs() < 0.01);
+    }
+}
+
+#[test]
 fn native_login_commit_focus_pointer_and_deferred_play() {
     let mut login = NativeLogin::new("Initial").unwrap();
     let (intents, effects) = login.step(0., true, false).unwrap();
@@ -152,7 +214,7 @@ fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
                     assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
                     let nick = login.layout.viewport_rect(E::Nickname);
                     let effects = login.cursor_area().unwrap();
-                    assert!(effects.iter().any(|e| matches!(e,HostEditEffect::ImeCursorArea{position,..} if position[0]>=nick.x - 0.5/dpr && position[0]<=nick.x+nick.width && position[1]==(nick.y*dpr).round()/dpr)));
+                    assert!(effects.iter().any(|e| matches!(e,HostEditEffect::ImeCursorArea{position,..} if position[0]>=nick.x - 0.5/dpr && position[0]<=nick.x+nick.width && position[1]>=nick.y - 0.5/dpr && position[1]<nick.y+nick.height)));
                     let painted = login.prepare_host(physical, dpr, true, None).unwrap();
                     let caret = painted
                         .frame
@@ -283,10 +345,17 @@ fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
         .frame
         .draws
         .iter()
-        .find(|draw| draw.destination.width == 1. && draw.destination.height == nick.height.round())
+        .find(|draw| {
+            draw.destination.width == 1.
+                && draw.destination.height < nick.height
+                && draw.destination.height > 10.
+        })
         .unwrap();
-    assert_eq!(caret.destination.x, nick.x.round());
-    assert_eq!(caret.destination.y, nick.y.round());
+    assert_eq!(
+        caret.destination.x,
+        (nick.x + 2. * login.layout.scale).round()
+    );
+    assert!(caret.destination.y > nick.y);
     let material = picture
         .resources
         .iter()
@@ -294,7 +363,7 @@ fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
         .unwrap();
     assert_eq!(
         (material.image.width, material.image.height),
-        (1, nick.height.round() as u32)
+        (1, caret.destination.height.round() as u32)
     );
     assert_eq!(
         material.image.pixels,

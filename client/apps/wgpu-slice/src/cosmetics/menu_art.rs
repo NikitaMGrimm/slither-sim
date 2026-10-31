@@ -234,7 +234,7 @@ impl MenuArtCache {
                     height: image.height,
                     status: BodyAssetStatus::Ready,
                 },
-                image,
+                image: image.into(),
             },
         );
         Ok(())

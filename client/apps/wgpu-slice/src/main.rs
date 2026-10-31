@@ -12,7 +12,7 @@ mod desktop {
     use slither_wgpu_slice::{
         Result,
         game::LocalGame,
-        gpu::{SurfaceHost, instance},
+        gpu::{RenderError, SurfaceHost, instance},
         login_native::NativeLogin,
         menu_input_native::WindowEditHost,
         native::{Event, Transport},
@@ -40,6 +40,7 @@ mod desktop {
         server: Option<String>,
         headless: Option<crate::headless::Options>,
         cosmetics_dir: Option<std::path::PathBuf>,
+        wordmark: bool,
         accessory: Option<u8>,
     }
     pub fn options() -> Result<Option<Options>> {
@@ -59,7 +60,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official [--server host:port] | --endpoint ws://host:port/slither] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--wordmark] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nHeadless (--endpoint only; official servers are interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. --endpoint uses a fixed official-format login for custom-server compatibility, without fetching. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -68,6 +69,7 @@ mod desktop {
                     slither_wgpu_slice::game::server_endpoint(&e)?;
                     o.endpoint = Some(e);
                 }
+                "--wordmark" => o.wordmark = true,
                 "--official" => o.official = true,
                 "--headless" => headless = true,
                 "--duration" | "--frame-every" => {
@@ -394,21 +396,32 @@ mod desktop {
                 return Ok(());
             };
             let view = self.login.state.view(admission);
-            let composed = if view.visible || view.spinner_visible {
-                let mut picture = p.clone();
-                self.login
-                    .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
-                    .append_to(&mut picture)?;
-                let effects = self.login.cursor_area()?;
-                self.edit_effects(effects);
-                Some(picture)
-            } else {
-                None
+            let composed = (|| -> Result<_> {
+                Ok(if view.visible || view.spinner_visible {
+                    let picture = self
+                        .login
+                        .prepare_host(physical, dpr, admission, self.game.menu_cosmetics())?
+                        .compose_over(&p)?;
+                    let effects = self.login.cursor_area()?;
+                    self.edit_effects(effects);
+                    Some(picture)
+                } else {
+                    None
+                })
+            })();
+            let composed = match composed {
+                Ok(picture) => picture,
+                Err(error) => return self.skip_bad_frame(p.frame.identity, error),
             };
             let picture = composed.as_ref().unwrap_or(&p);
             if let Err(e) = self.host.renderer.sync_resources(&picture.resources) {
-                self.game.presented(false)?;
-                return Err(e);
+                return match e {
+                    RenderError::Frame(e) => self.skip_bad_frame(p.frame.identity, e),
+                    RenderError::Host(e) => {
+                        self.game.presented(false)?;
+                        Err(e)
+                    }
+                };
             }
             self.window.pre_present_notify();
             match self
@@ -426,13 +439,25 @@ mod desktop {
                     self.game.retry_frame(p)?;
                     self.schedule.retry(Instant::now());
                 }
-                Err(e) => {
+                Err(RenderError::Frame(e)) => {
+                    return self.skip_bad_frame(p.frame.identity, e);
+                }
+                Err(RenderError::Host(e)) => {
                     self.game.presented(false)?;
                     return Err(e);
                 }
             }
             self.effects()?;
             Ok(())
+        }
+        fn skip_bad_frame(&mut self, identity: u64, error: String) -> Result<()> {
+            self.host.discard_acquired();
+            self.game
+                .draw_diagnostics
+                .admit::<()>(identity, Err(error))?;
+            self.game.skip_frame()?;
+            self.schedule.retry(Instant::now());
+            self.effects()
         }
         fn log_present(&mut self) {
             if let Some((since, count, last, max_gap)) = &mut self.pacing_log {
@@ -524,8 +549,10 @@ mod desktop {
                 "Actual adapter {:?}; MSAA{}; no transport until explicit Play",
                 host.renderer.adapter_info, host.renderer.sample_count
             );
+            let mut login = NativeLogin::new(&options.nickname)?;
+            login.set_wordmark(options.wordmark);
             Ok(Running {
-                login: NativeLogin::new(&options.nickname)?,
+                login,
                 endpoint: options.endpoint.clone(),
                 official: options.official,
                 server: options.server.clone(),
@@ -830,6 +857,15 @@ mod desktop {
             ] {
                 assert!(parse(&args).is_err());
             }
+        }
+        #[test]
+        fn wordmark_overrides_local_logo_only_when_requested() {
+            assert!(!parse(&[]).unwrap().unwrap().wordmark);
+            let options = parse(&["--wordmark", "--cosmetics-dir", "synthetic-artwork"])
+                .unwrap()
+                .unwrap();
+            assert!(options.wordmark);
+            assert!(options.cosmetics_dir.is_some());
         }
         #[test]
         fn headless_requires_an_endpoint_and_bounded_explicit_output() {

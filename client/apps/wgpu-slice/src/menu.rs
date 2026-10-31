@@ -9,7 +9,7 @@ use crate::{
     text::*,
 };
 use slither_client::{
-    menu_layout::{MenuElement as E, MenuLayout, MenuRect},
+    menu_layout::{MenuElement as E, MenuLayout, MenuRect, single_line_field_placement},
     presentation::*,
     start_page::StartMenuView,
 };
@@ -22,6 +22,10 @@ const SPINNER_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE;
 const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 type MaterialKey = (u32, u32, u8, u64, u64);
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
+pub const WORDMARK_GREEN: [u8; 3] = [86, 172, 129];
+pub const WORDMARK_PURPLE: [u8; 3] = [150, 76, 224];
+// Content padding inside the already border-free native input rect.
+pub const FIELD_CONTENT_INSET: [f64; 2] = [2., 0.];
 
 pub fn check_menu_draws(count: usize) -> Result<()> {
     if count > MENU_PRODUCER_DRAWS {
@@ -57,7 +61,8 @@ impl MenuFrame {
                 width: 1,
                 height: 1,
                 pixels: vec![PAGE_COLOR[0], PAGE_COLOR[1], PAGE_COLOR[2], 255],
-            },
+            }
+            .into(),
         };
         let backdrop = image(
             &resource,
@@ -121,6 +126,47 @@ impl MenuFrame {
         self.frame.extent = extent;
         self.frame.viewport_scale = 1.;
         Ok(self)
+    }
+    /// Keep the retry picture intact and allocate its composed draw storage once.
+    pub fn compose_over(self, picture: &PreparedFrame) -> Result<PreparedFrame> {
+        let world_extra = usize::from(self.backdrop.is_some());
+        let ui_extra = self.frame.draws.len() + usize::from(self.world_cover.is_some());
+        check_menu_draws(world_extra + ui_extra)?;
+        frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
+        let copy = |frame: &Frame, extra: usize| -> Result<Frame> {
+            let mut draws = Vec::new();
+            draws
+                .try_reserve_exact(frame.draws.len() + extra)
+                .map_err(|_| "frame draw allocation failed")?;
+            draws.extend_from_slice(&frame.draws);
+            Ok(Frame {
+                identity: frame.identity,
+                extent: frame.extent,
+                viewport_scale: frame.viewport_scale,
+                tick: frame.tick,
+                draws,
+                snakes: frame.snakes.clone(),
+            })
+        };
+        let mut composed = PreparedFrame {
+            frame: copy(
+                &picture.frame,
+                world_extra
+                    + if picture.overlay.is_none() {
+                        ui_extra
+                    } else {
+                        0
+                    },
+            )?,
+            overlay: picture
+                .overlay
+                .as_ref()
+                .map(|f| copy(f, ui_extra))
+                .transpose()?,
+            resources: picture.resources.clone(),
+        };
+        self.append_to(&mut composed)?;
+        Ok(composed)
     }
     /// Put the page below every world draw and menu controls above them.
     /// A failed whole-picture admission publishes nothing.
@@ -189,6 +235,7 @@ impl MenuFrame {
 }
 #[derive(Default)]
 pub struct Menu {
+    pub wordmark: bool,
     pub focus: Option<E>,
     pub skin_hovered: bool,
     pub skin_pressed: bool,
@@ -203,7 +250,106 @@ struct Label {
     style: TextStyle,
     alpha: f64,
     align: Align,
+    reveal: f64,
+    reveal_span: Option<[f64; 2]>,
+    line_box: bool,
+    field_inset: Option<[f64; 2]>,
 }
+/// Two bold runs with one fitted size and a shared advance boundary.
+pub fn wordmark_runs(
+    text: &mut TextCache,
+    logo: MenuRect,
+    dpr: f64,
+) -> Result<[(MenuRect, TextStyle); 2]> {
+    let mut style = TextStyle {
+        size: logo.height,
+        weight: Weight::Bold,
+        family: Family::Arial,
+        slant: Slant::Normal,
+        color: WORDMARK_GREEN,
+    };
+    let cap = text.measure_panel("H", style)?.ascent;
+    style.size *= logo.height * 0.8 / cap;
+    let width = text.measure_panel("Slither", style)?.advance
+        + text.measure_panel("Client", style)?.advance;
+    style.size *= (logo.width / width).min(1.);
+    let mut physical = style;
+    physical.size *= dpr;
+    let left_px = text.measure_panel("Slither", physical)?.advance;
+    let right_px = text.measure_panel("Client", physical)?.advance;
+    // Snap the common origin and advance once. Rounding each run's origin
+    // independently can move the join one physical pixel in either direction.
+    let origin_px = ((logo.x + logo.width / 2.) * dpr - (left_px + right_px) / 2.).round();
+    let boundary_px = origin_px + left_px.round();
+    Ok([
+        (
+            MenuRect {
+                x: origin_px / dpr,
+                width: left_px / dpr,
+                ..logo
+            },
+            style,
+        ),
+        (
+            MenuRect {
+                x: boundary_px / dpr,
+                width: right_px / dpr,
+                ..logo
+            },
+            TextStyle {
+                color: WORDMARK_PURPLE,
+                ..style
+            },
+        ),
+    ])
+}
+// Authored wipe: one opaque crop plus at most 32 one-pixel feather strips.
+// Source crops and destinations remain 1:1 on the snapped overlay path.
+fn reveal_draw(mut draw: Draw, reveal: f64, scale: f64, span: Option<[f64; 2]>) -> Vec<Draw> {
+    draw.snap_overlay(scale);
+    if reveal >= 1. {
+        return vec![draw];
+    }
+    if reveal <= 0. {
+        return Vec::new();
+    }
+    let source = draw.source.unwrap_or(BodyRect {
+        x: 0.,
+        y: 0.,
+        width: f64::from(draw.asset.width),
+        height: f64::from(draw.asset.height),
+    });
+    let feather = (12. * scale).round().clamp(1., 32.);
+    let span = span.unwrap_or([draw.destination.x, source.width / scale]);
+    let end = ((span[1] * scale + feather) * reveal).round()
+        - ((draw.destination.x - span[0]) * scale).round();
+    let solid = (end - feather).max(0.).min(source.width);
+    let mut result = Vec::new();
+    let mut crop = |x: f64, width: f64, alpha: f64| {
+        let mut part = draw.clone();
+        part.source = Some(BodyRect {
+            x: source.x + x,
+            width,
+            ..source
+        });
+        part.destination.x += x / scale;
+        part.destination.width = width / scale;
+        part.effective_alpha *= alpha;
+        result.push(part);
+    };
+    if solid > 0. {
+        crop(0., solid, 1.);
+    }
+    for x in solid as u32..(end.min(source.width) as u32) {
+        crop(
+            f64::from(x),
+            1.,
+            ((end - f64::from(x) - 0.5) / feather).clamp(0., 1.),
+        );
+    }
+    result
+}
+
 struct Composition<'a> {
     old: &'a BTreeMap<MaterialKey, Resource>,
     old_art: &'a BTreeMap<(frame::ResourceKey, [u32; 2]), Resource>,
@@ -278,7 +424,8 @@ impl Composition<'_> {
                         height: size[1],
                         pixels: [rgb[0], rgb[1], rgb[2], 255]
                             .repeat(size[0] as usize * size[1] as usize),
-                    },
+                    }
+                    .into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -340,7 +487,7 @@ impl Composition<'_> {
                         height: image.height,
                         status: BodyAssetStatus::Ready,
                     },
-                    image,
+                    image: image.into(),
                 }
             };
             self.materials.insert(key, resource);
@@ -368,9 +515,22 @@ impl Composition<'_> {
             },
             alpha,
             align: Align::Center,
+            reveal: 1.,
+            reveal_span: None,
+            line_box: false,
+            field_inset: None,
         });
     }
     fn art(&mut self, resource: &Resource, r: MenuRect, alpha: f64) -> Result<()> {
+        self.art_revealed(resource, r, alpha, 1.)
+    }
+    fn art_revealed(
+        &mut self,
+        resource: &Resource,
+        r: MenuRect,
+        alpha: f64,
+        reveal: f64,
+    ) -> Result<()> {
         let size = [
             (r.width * self.scale).round().max(1.) as u32,
             (r.height * self.scale).round().max(1.) as u32,
@@ -422,7 +582,8 @@ impl Composition<'_> {
                         width: size[0],
                         height: size[1],
                         pixels,
-                    },
+                    }
+                    .into(),
                 }
             };
             let bytes: usize = self.art.values().map(|r| r.image.pixels.len()).sum();
@@ -436,7 +597,9 @@ impl Composition<'_> {
             height: f64::from(size[1]) / self.scale,
             ..r
         };
-        self.push(image(&self.art[&key], r, alpha))?;
+        for draw in reveal_draw(image(&self.art[&key], r, alpha), reveal, self.scale, None) {
+            self.push(draw)?;
+        }
         Ok(())
     }
     fn spinner(&mut self, r: MenuRect, view: &StartMenuView) -> Result<()> {
@@ -462,7 +625,7 @@ impl Composition<'_> {
                     height: side,
                     status: BodyAssetStatus::Ready,
                 },
-                image: pixels,
+                image: pixels.into(),
             }
         };
         let width = f64::from(side) / self.scale;
@@ -568,14 +731,20 @@ impl Menu {
                 );
             }
             let logo = layout.viewport_rect(E::Logo);
-            let logo_alpha = a * view.logo_alpha * view.logo_reveal;
-            if let Some(art) = cosmetics.and_then(|p| p.menu_art(MenuArt::Logo(logo_frame))) {
+            let logo_alpha = a * view.logo_alpha;
+            // Authored wipe completes in the first quarter of the retained
+            // reveal clock (~1.67s), with bright partial art during the intro.
+            let logo_reveal = (4. * view.logo_reveal).clamp(0., 1.);
+            if let Some(art) = cosmetics
+                .filter(|_| !self.wordmark)
+                .and_then(|p| p.menu_art(MenuArt::Logo(logo_frame)))
+            {
                 // Local art may be taller than the 450x135 original; it must
                 // not paint over the rows below the holder.
                 let natural = logo.width * f64::from(art.asset.height) / f64::from(art.asset.width);
                 let room = layout.viewport_rect(E::LastLength).y - logo.y;
                 let fit = (room / natural).min(1.);
-                c.art(
+                c.art_revealed(
                     art,
                     MenuRect {
                         x: logo.x + logo.width * (1. - fit) / 2.,
@@ -584,10 +753,20 @@ impl Menu {
                         ..logo
                     },
                     logo_alpha,
+                    logo_reveal,
                 )?;
             } else {
-                c.label("slither", logo, 40. * layout.scale, true, logo_alpha);
-                c.labels.last_mut().unwrap().style.color = [130, 214, 91];
+                let runs = wordmark_runs(text, logo, dpr)?;
+                let span = [runs[0].0.x, runs[0].0.width + runs[1].0.width];
+                for ((r, style), value) in runs.into_iter().zip(["Slither", "Client"]) {
+                    c.label(value, r, style.size, true, logo_alpha);
+                    let label = c.labels.last_mut().unwrap();
+                    label.style = style;
+                    label.line_box = true;
+                    label.align = Align::Left;
+                    label.reveal = logo_reveal;
+                    label.reveal_span = Some(span);
+                }
             }
             if view.tips_visible {
                 c.label(
@@ -599,7 +778,12 @@ impl Menu {
                 );
                 let label = c.labels.last_mut().unwrap();
                 label.style.family = Family::Lucida;
+                label.line_box = true;
                 label.style.color = [128, 104, 192];
+                // Tips reserve 30px of flow but use a normal font line at the
+                // top of that row, rather than centering in the spare space.
+                let m = text.measure_panel(view.tip, label.style)?;
+                label.rect.height = m.font_ascent.round() + m.font_descent.round();
             }
             // Center the whole line; its three runs share a box/baseline and
             // preserve the regular prefix/punctuation and real bold number.
@@ -680,6 +864,8 @@ impl Menu {
                     false,
                     a * view.nickname_alpha,
                 );
+                c.labels.last_mut().unwrap().field_inset =
+                    Some(FIELD_CONTENT_INSET.map(|v| v * layout.scale));
                 c.labels.last_mut().unwrap().align = Align::Left;
                 c.labels.last_mut().unwrap().style.family = Family::Lucida;
                 if view.nickname.is_empty() {
@@ -691,9 +877,27 @@ impl Menu {
                     let editor = input.editor(slither_client::menu_input::TextField::Nickname);
                     let (anchor, caret) = editor.selection();
                     let r = layout.viewport_rect(E::Nickname);
+                    let inset = FIELD_CONTENT_INSET.map(|v| v * layout.scale);
+                    let content_width = r.width - 2. * inset[0];
                     let style = c.labels.last().unwrap().style;
                     let full = text.measure_panel(&view.nickname, style)?.advance;
-                    let fit = if full > r.width { r.width / full } else { 1. };
+                    let fit = if full > content_width {
+                        content_width / full
+                    } else {
+                        1.
+                    };
+                    let fitted = TextStyle {
+                        size: style.size * fit,
+                        ..style
+                    };
+                    let m = text.measure_panel("", fitted)?;
+                    let placement = single_line_field_placement(
+                        r,
+                        inset,
+                        fitted.size,
+                        m.font_ascent,
+                        m.font_descent,
+                    );
                     let advance = |prefix: &str, text: &mut TextCache| -> Result<f64> {
                         Ok(text.measure_panel(prefix, style)?.advance * fit)
                     };
@@ -702,7 +906,7 @@ impl Menu {
                     if anchor != caret && editor.preedit().is_none() {
                         c.solid(
                             MenuRect {
-                                x: r.x + left,
+                                x: placement.origin[0] + left,
                                 y: r.y,
                                 width: (right - left).max(1.),
                                 height: r.height,
@@ -718,23 +922,26 @@ impl Menu {
                     } else {
                         advance(&editor.text()[..caret], text)?
                     };
-                    c.solid(
-                        MenuRect {
-                            x: r.x + cursor.min(r.width - 1.),
-                            y: r.y,
-                            width: 1.,
-                            height: r.height,
-                        },
-                        8,
-                        a * view.nickname_alpha,
-                    )?;
+                    if input.caret_visible() {
+                        c.solid(
+                            MenuRect {
+                                x: placement.origin[0] + cursor.min(content_width - 1.),
+                                y: placement.caret_top,
+                                width: 1.,
+                                height: placement.caret_height,
+                            },
+                            8,
+                            a * view.nickname_alpha,
+                        )?;
+                    }
                     if let Some(preedit) = editor.preedit() {
                         let start = advance(&editor.text()[..anchor.min(caret)], text)?;
-                        let width = advance(&preedit.text, text)?.min((r.width - start).max(0.));
+                        let width =
+                            advance(&preedit.text, text)?.min((content_width - start).max(0.));
                         if width > 0. {
                             c.solid(
                                 MenuRect {
-                                    x: r.x + start,
+                                    x: placement.origin[0] + start,
                                     y: r.y + r.height - 2.,
                                     width,
                                     height: 1.,
@@ -761,7 +968,14 @@ impl Menu {
                     )?;
                     c.control(play, 2, pa * view.press_alpha)?;
                 }
-                c.label(view.play_label, play, 20. * layout.scale, true, pa);
+                c.label(
+                    &format!("\u{a0}{}\u{a0}", view.play_label),
+                    play,
+                    20. * layout.scale,
+                    true,
+                    pa,
+                );
+                c.labels.last_mut().unwrap().line_box = true;
                 c.labels.last_mut().unwrap().style.color = [255; 3];
                 let r = layout.viewport_rect(E::Skin);
                 let skin_alpha = a
@@ -816,28 +1030,56 @@ impl Menu {
         // boxes, without synthetic bold or browser-specific metric machinery.
         for l in &mut c.labels {
             let width = text.measure_panel(&l.text, l.style)?.advance;
-            if width > l.rect.width {
-                l.style.size *= l.rect.width / width;
+            let available = l.rect.width - 2. * l.field_inset.map_or(0., |i| i[0]);
+            if width > available && l.reveal_span.is_none() {
+                l.style.size *= available / width;
             }
         }
         let labels = std::mem::take(&mut c.labels);
+        let measurements = labels
+            .iter()
+            .map(|l| text.measure_panel(&l.text, l.style))
+            .collect::<Result<Vec<_>>>()?;
         let runs: Vec<_> = labels
             .iter()
-            .map(|l| TextRun {
-                text: &l.text,
-                style: l.style,
-                position: [
-                    l.rect.x
-                        + if l.align == Align::Left {
-                            0.
+            .zip(measurements)
+            .map(|(l, m)| {
+                let placement = single_line_field_placement(
+                    l.rect,
+                    l.field_inset.unwrap_or([0.; 2]),
+                    l.style.size,
+                    m.font_ascent,
+                    m.font_descent,
+                );
+                let alphabetic = l.line_box || l.field_inset.is_some();
+                TextRun {
+                    text: &l.text,
+                    style: l.style,
+                    position: [
+                        if l.field_inset.is_some() {
+                            placement.origin[0]
                         } else {
-                            l.rect.width / 2.
+                            l.rect.x
+                                + if l.align == Align::Left {
+                                    0.
+                                } else {
+                                    l.rect.width / 2.
+                                }
                         },
-                    l.rect.y + l.rect.height / 2.,
-                ],
-                align: l.align,
-                baseline: Baseline::Middle,
-                alpha: l.alpha,
+                        if alphabetic {
+                            placement.origin[1]
+                        } else {
+                            l.rect.y + l.rect.height / 2.
+                        },
+                    ],
+                    align: l.align,
+                    baseline: if alphabetic {
+                        Baseline::Alphabetic
+                    } else {
+                        Baseline::Middle
+                    },
+                    alpha: l.alpha,
+                }
             })
             .collect();
         let result = text.compose_menu(
@@ -851,9 +1093,11 @@ impl Menu {
                     .chain(c.art.values())
                     .map(|r| (frame::ResourceKey::from(r.asset), r.clone()))
                     .collect();
-                for group in groups {
+                for (group, label) in groups.into_iter().zip(&labels) {
                     for (draw, resource) in group {
-                        c.push(draw)?;
+                        for part in reveal_draw(draw, label.reveal, c.scale, label.reveal_span) {
+                            c.push(part)?;
+                        }
                         resources.insert(resource.asset.into(), resource);
                     }
                 }
@@ -895,5 +1139,73 @@ impl Menu {
         self.materials = materials;
         self.art = art;
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod reveal_tests {
+    use super::*;
+    #[test]
+    fn reveal_is_bounded_monotone_and_separate_from_opacity() {
+        let resource = Resource {
+            asset: BodyAsset {
+                handle: 42,
+                revision: 1,
+                width: 900,
+                height: 270,
+                status: BodyAssetStatus::Ready,
+            },
+            image: materials::RgbaImage {
+                width: 900,
+                height: 270,
+                pixels: vec![],
+            }
+            .into(),
+        };
+        let draw = image(
+            &resource,
+            MenuRect {
+                x: 20.,
+                y: 50.,
+                width: 450.,
+                height: 135.,
+            },
+            0.8,
+        );
+        assert!(reveal_draw(draw.clone(), 0., 2., None).is_empty());
+        assert_eq!(
+            reveal_draw(draw.clone(), 1., 2., None)[0].effective_alpha,
+            0.8
+        );
+        let mut right = draw.clone();
+        right.destination.x += 450.;
+        let span = Some([20., 900.]);
+        assert!(reveal_draw(right.clone(), 0.25, 2., span).is_empty());
+        let left = reveal_draw(draw.clone(), 0.75, 2., span);
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].effective_alpha, 0.8);
+        let right = reveal_draw(right, 0.75, 2., span);
+        assert!(right.len() <= 33);
+        assert_eq!(right[0].effective_alpha, 0.8);
+        let mut previous = 0.;
+        for fraction in [0.01, 0.1, 0.25, 0.5, 0.99] {
+            let parts = reveal_draw(draw.clone(), fraction, 2., None);
+            assert!(parts.len() <= 33);
+            let mut end = 0.;
+            for p in &parts {
+                let s = p.source.unwrap();
+                assert_eq!(s.x, end);
+                assert!(s.x + s.width <= 900.);
+                assert_eq!(p.destination.width * 2., s.width);
+                assert_eq!(p.destination.x, 20. + s.x / 2.);
+                assert!(p.effective_alpha > 0. && p.effective_alpha <= 0.8);
+                end += s.width;
+            }
+            if fraction >= 0.1 {
+                assert_eq!(parts[0].effective_alpha, 0.8);
+            }
+            assert!(end >= previous);
+            previous = end;
+        }
     }
 }

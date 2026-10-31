@@ -65,7 +65,8 @@ fn appearance() -> Vec<u8> {
 #[derive(Clone, Debug)]
 pub struct Resource {
     pub asset: BodyAsset,
-    pub image: RgbaImage,
+    /// Cache eviction and retained pictures share immutable rasters without copying pixels.
+    pub image: std::sync::Arc<RgbaImage>,
 }
 
 pub struct Scene {
@@ -91,7 +92,10 @@ fn add(resources: &mut Vec<Resource>, r: &CanvasRecipe) -> Result<BodyAsset> {
         height: image.height,
         status: BodyAssetStatus::Ready,
     };
-    resources.push(Resource { asset, image });
+    resources.push(Resource {
+        asset,
+        image: image.into(),
+    });
     Ok(asset)
 }
 fn food_source(asset: BodyAsset, r: &CanvasRecipe) -> Result<FoodSource> {
