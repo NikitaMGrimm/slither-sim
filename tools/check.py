@@ -99,8 +99,7 @@ def commands(group):
         ]
     if group == "package":
         return [["cargo", "package", "--locked", "-p", "slither-protocol", "-p", "slither-sim",
-                 "--registry", "crates-io"],
-                [sys.executable, "tools/verify_packages.py"]]
+                 "--registry", "crates-io"]]
     if group == "wasm":
         return [
             ["cargo", "check", "-p", "slither-protocol", "--lib", "--locked", "--target", "wasm32-unknown-unknown"],

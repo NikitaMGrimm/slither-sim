@@ -9,6 +9,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
+    # Multi-package verification deliberately uses Cargo's temporary registry.
+    # Its generated root lock contains the local protocol archive's checksum
+    # (including this checkout's VCS identity), not the published archive's.
+    # Repackage normally after dependency publication; never patch that lock.
+    subprocess.run(["cargo", "package", "--locked", "-p", "slither-sim", "--registry", "crates-io"],
+                   cwd=ROOT, check=True)
     target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
     if not target.is_absolute():
         target = ROOT / target

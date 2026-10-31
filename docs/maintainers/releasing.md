@@ -51,16 +51,22 @@ Metadata-only release PRs may update either or both versions/changelogs and
 exact corresponding workspace lock entries; code or dependency changes need
 ordinary review. Minor/major bumps still require a maintainer merge.
 
-The package check runs Rust 1.99 multi-package verification with the real
-optional `path` + `version = "0.1"` dependency under `networking`:
+The package check runs multi-package verification with the real optional
+`path` + `version = "0.1"` dependency under `networking`. Once the protocol
+version is published, also verify the extracted root against the registry:
 
 ```sh
 cargo +1.99.0 package --locked -p slither-protocol -p slither-sim --registry crates-io
 python3 tools/verify_packages.py
 ```
 
-The second command verifies the extracted normalized manifests and checks the
-root library/CLI against a **registry** protocol dependency. Do not bypass
+The second command repackages the root alone, verifies the extracted normalized
+manifests and checks the root library/CLI against a **registry** protocol
+dependency. Cargo's multi-package run uses a temporary registry whose checksum
+differs from the published archive's VCS identity; never edit an archive/lock
+to substitute checksums. Keep the pre-publication CI package group on Cargo's
+multi-package verification; the publisher dry-runs the root against the real
+registry after the protocol is visible. Do not bypass
 archive verification with `--no-verify` or a local patch. The tools group builds
 and tests the Python wheel and C ABI; `python-wheels.yml` also builds and tests
 a maturin sdist after pruning unpublished client workspace members. The sdist
