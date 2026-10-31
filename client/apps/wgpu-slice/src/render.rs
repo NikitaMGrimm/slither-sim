@@ -698,14 +698,18 @@ fn prepare_composed(
         })
         .map_err(|e| e.to_string())?;
     let [x, y, w, h] = background.clear.rect;
-    let mut draws = vec![image(
-        bank.solid(background.clear.color),
-        x,
-        y,
-        w,
-        h,
-        background.clear.alpha,
-    )];
+    let mut draws = bank.take_draws(false);
+    push_draw(
+        &mut draws,
+        image(
+            bank.solid(background.clear.color),
+            x,
+            y,
+            w,
+            h,
+            background.clear.alpha,
+        ),
+    )?;
     if let Some(layer) = background.image {
         let [x, y, w, h] = layer.destination;
         push_draw(&mut draws, image(backdrop, x, y, w, h, layer.alpha))?;
@@ -729,16 +733,21 @@ fn prepare_composed(
         });
         push_draw(&mut draws, draw)?;
     }
-    let food = plan_food(FoodPaintInput {
-        foods: client.foods().foods(),
-        view,
-        quality,
-        bounds: client.food_bounds(),
-        assets: &bank.assets,
-        target_handle: None,
-        entry_alpha: 1.,
-        command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
-    })
+    let [early, late] = std::mem::take(&mut bank.food_commands);
+    let food = plan_food_with_storage(
+        FoodPaintInput {
+            foods: client.foods().foods(),
+            view,
+            quality,
+            bounds: client.food_bounds(),
+            assets: &bank.assets,
+            target_handle: None,
+            entry_alpha: 1.,
+            command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+        },
+        early,
+        late,
+    )
     .map_err(|e| {
         if e == FoodPaintError::CommandLimit {
             DRAW_MEMORY_LIMIT.into()
@@ -817,7 +826,8 @@ fn prepare_composed(
         .map_err(|e| e.to_string())?;
         let mut antenna_index = draws.len();
         if let Some(geometry) = &snake.body_geometry {
-            let body = plan_standard_body_with_antenna(
+            let body_storage = std::mem::take(&mut bank.body_commands);
+            let body = plan_standard_body_with_storage(
                 BodyPaintInput {
                     geometry: geometry.as_paint_geometry(),
                     recipe: BodyPaintRecipe {
@@ -856,6 +866,7 @@ fn prepare_composed(
                     .antenna
                     .as_ref()
                     .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
+                body_storage,
             )
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
@@ -876,6 +887,7 @@ fn prepare_composed(
             draws.extend(body.commands[..body.antenna_barrier].iter().map(Draw::from));
             antenna_index = draws.len();
             draws.extend(body.commands[body.antenna_barrier..].iter().map(Draw::from));
+            bank.body_commands = body.commands;
         }
         snakes.push(observation);
         let input = EyeLayoutInput {
@@ -904,6 +916,7 @@ fn prepare_composed(
     reserve_draws(&mut draws, food.late.len() + prey_plan.late.len())?;
     draws.extend(food.late.iter().map(Draw::from));
     draws.extend(prey_plan.late.iter().map(prey));
+    bank.food_commands = [food.early, food.late];
     if let Some(boundary) = client.boundary()
         && let Some(edge) = plan_arena_edge(ArenaEdgeInput {
             view: client.arena_edge_view(),
@@ -1043,7 +1056,7 @@ fn prepare_composed(
         tick: frame.tick,
         extent,
         viewport_scale,
-        draws: Vec::new(),
+        draws: bank.take_draws(true),
         snakes: Vec::new(),
     });
     let ui = overlay.as_mut().unwrap_or(&mut frame);

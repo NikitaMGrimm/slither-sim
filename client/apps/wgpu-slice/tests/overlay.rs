@@ -19,6 +19,116 @@ fn snapshot(game: &mut LocalGame, identity: u64) -> render::PreparedFrame {
 }
 
 #[test]
+fn retired_storage_reuses_world_and_overlay_without_changing_an_issued_retry() {
+    use slither_client::presentation::BodyPaintError;
+    use slither_wgpu_slice::frame::MAX_DRAWS;
+
+    let mut game = tape::playing();
+    game.window_viewport([960, 540], 1.).unwrap();
+    game.begin_redraw(40., [960, 540], 1.).unwrap();
+    tape::effects(&mut game);
+    let retained = game.take_frame().unwrap();
+    let original = retained.frame.clone();
+    let original_overlay = retained.overlay.clone();
+    game.retry_frame(retained).unwrap();
+
+    let mut retired = snapshot(&mut game, 100);
+    retired
+        .frame
+        .draws
+        .reserve_exact(MAX_DRAWS / 4 - retired.frame.draws.len());
+    retired
+        .frame
+        .draws
+        .resize(29_804, retired.frame.draws[0].clone());
+    let overlay = retired.overlay.as_mut().unwrap();
+    overlay
+        .draws
+        .reserve_exact(MAX_DRAWS / 2 - overlay.draws.len());
+    overlay.draws.resize(4096, overlay.draws[0].clone());
+    let capacities = [retired.frame.draws.capacity(), overlay.draws.capacity()];
+    assert!(capacities[0] + capacities[1] <= MAX_DRAWS);
+    let pointers = [
+        retired.frame.draws.as_ptr(),
+        retired.overlay.as_ref().unwrap().draws.as_ptr(),
+    ];
+    let expected = snapshot(&mut game, 101);
+    game.bank.recycle_frame(retired);
+    let reused = snapshot(&mut game, 101);
+    assert_eq!(reused.frame, expected.frame);
+    assert_eq!(reused.overlay, expected.overlay);
+    assert_eq!(reused.frame.draws.as_ptr(), pointers[0]);
+    assert_eq!(reused.overlay.as_ref().unwrap().draws.as_ptr(), pointers[1]);
+    assert!(reused.frame.draws.len() < 29_804);
+    assert!(reused.overlay.as_ref().unwrap().draws.len() < 4096);
+
+    game.bank.recycle_frame(reused);
+    let mut larger_world = expected.clone();
+    larger_world.overlay = None;
+    larger_world
+        .frame
+        .draws
+        .reserve_exact(3 * MAX_DRAWS / 4 - larger_world.frame.draws.len());
+    let world_capacity = larger_world.frame.draws.capacity();
+    assert!(world_capacity <= MAX_DRAWS);
+    assert!(world_capacity + capacities[1] > MAX_DRAWS);
+    game.bank.recycle_frame(larger_world);
+    let small = snapshot(&mut game, 101);
+    assert_eq!(small.frame, expected.frame);
+    assert_eq!(small.overlay, expected.overlay);
+    assert_eq!(small.frame.draws.capacity(), world_capacity);
+    let overlay_capacity = small.overlay.as_ref().unwrap().draws.capacity();
+    assert!(overlay_capacity < capacities[1]);
+    assert!(world_capacity + overlay_capacity <= MAX_DRAWS);
+
+    game.bank.recycle_frame(small);
+    let mut larger_overlay = expected.clone();
+    larger_overlay.frame.draws = Vec::new();
+    let overlay = larger_overlay.overlay.as_mut().unwrap();
+    overlay
+        .draws
+        .reserve_exact(MAX_DRAWS / 2 - overlay.draws.len());
+    assert!(world_capacity + overlay.draws.capacity() > MAX_DRAWS);
+    game.bank.recycle_frame(larger_overlay);
+    let small = snapshot(&mut game, 101);
+    assert_eq!(small.frame, expected.frame);
+    assert_eq!(small.overlay, expected.overlay);
+    assert_eq!(small.frame.draws.capacity(), world_capacity);
+    assert_eq!(
+        small.overlay.as_ref().unwrap().draws.capacity(),
+        overlay_capacity
+    );
+
+    let expected_recovery = snapshot(&mut game, 102);
+    game.bank.recycle_frame(small);
+    let shadow = game.bank.shadow;
+    game.bank.shadow.asset = game.bank.assets.len();
+    let mut world = game.client().clone();
+    let quality = game.quality();
+    let error = render::prepare_gameplay(
+        &mut world,
+        &mut game.bank,
+        expected_recovery.frame.extent,
+        1.,
+        102,
+        quality,
+    )
+    .err()
+    .expect("missing shadow must reject body planning");
+    assert_eq!(error, BodyPaintError::MissingAsset.to_string());
+    game.bank.shadow = shadow;
+    let recovered = snapshot(&mut game, 102);
+    assert_eq!(recovered.frame, expected_recovery.frame);
+    assert_eq!(recovered.overlay, expected_recovery.overlay);
+
+    let retry = game.take_frame().unwrap();
+    assert_eq!(retry.frame, original);
+    assert_eq!(retry.overlay, original_overlay);
+    game.presented(true).unwrap();
+    game.bank.recycle_frame(retry);
+}
+
+#[test]
 fn physical_hud_keeps_css_anchors_and_leaves_world_quads_and_pixels_unchanged() {
     let mut game = tape::negotiating();
     let mut named = tape::snake(44);

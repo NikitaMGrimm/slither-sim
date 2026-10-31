@@ -177,7 +177,12 @@ fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
     let instance = gpu::instance();
     let mut seen = std::collections::BTreeSet::new();
-    for adapter in pollster::block_on(instance.enumerate_adapters(wgpu::Backends::DX12)) {
+    let backends = if std::env::var_os("FRAME_PERF_VULKAN").is_some() {
+        wgpu::Backends::VULKAN
+    } else {
+        wgpu::Backends::DX12
+    };
+    for adapter in pollster::block_on(instance.enumerate_adapters(backends)) {
         let info = adapter.get_info();
         if info.device_type == wgpu::DeviceType::Cpu {
             continue;
@@ -225,9 +230,11 @@ fn run(output: &Path) -> Result<()> {
                     }
                     if mode == "login" {
                         // Match native retained-picture composition, including its clone.
-                        p = login
+                        let picture = login
                             .prepare_host([960, 540], 1., true, None)?
                             .compose_over(&p)?;
+                        game.bank.recycle_frame(p);
+                        p = picture;
                     }
                     Ok(p)
                 })?;
@@ -256,6 +263,7 @@ fn run(output: &Path) -> Result<()> {
                 if [40, 70, 99].contains(&index) {
                     capture(&r, &texture, &dir.join(format!("{mode}-{index}.rgba")))?;
                 }
+                game.bank.recycle_frame(p);
             }
         }
         wait(&r)?;
@@ -266,7 +274,7 @@ fn run(output: &Path) -> Result<()> {
         println!("PASS {name}: 60 measured frames per scene, no frame errors");
     }
     if seen.is_empty() {
-        return Err("no hardware DX12 adapter exposed".into());
+        return Err("no hardware adapter exposed".into());
     }
     Ok(())
 }

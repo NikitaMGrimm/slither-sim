@@ -1,7 +1,7 @@
 //! Numeric source binding with lazy CPU materialization. No host objects or game state.
 use crate::{
     Result,
-    frame::{Frame, ResourceKey},
+    frame::{Draw, Frame, MAX_DRAWS, ResourceKey},
     materials::materialize,
     scene::Resource,
 };
@@ -48,6 +48,9 @@ pub struct Bank {
     pub text: crate::text::TextCache,
     text_frames: BTreeMap<u64, Vec<Resource>>,
     pub palette_rgb: Vec<[u8; 3]>,
+    draw_storage: [Vec<Draw>; 2],
+    pub(crate) body_commands: Vec<BodyImageCommand>,
+    pub(crate) food_commands: [Vec<FoodImageCommand>; 2],
 }
 fn use_at(i: usize) -> BodyAssetUse {
     BodyAssetUse {
@@ -56,6 +59,36 @@ fn use_at(i: usize) -> BodyAssetUse {
     }
 }
 impl Bank {
+    pub(crate) fn take_draws(&mut self, overlay: bool) -> Vec<Draw> {
+        std::mem::take(&mut self.draw_storage[usize::from(overlay)])
+    }
+
+    /// Only consumed pictures can return storage: retries and queued Setup
+    /// pictures keep exclusive ownership until their host retires them.
+    pub fn recycle_frame(&mut self, picture: crate::render::PreparedFrame) {
+        self.keep_draws(picture.frame.draws, false);
+        if let Some(overlay) = picture.overlay {
+            self.keep_draws(overlay.draws, true);
+        }
+    }
+
+    fn keep_draws(&mut self, mut draws: Vec<Draw>, overlay: bool) {
+        let index = usize::from(overlay);
+        let capacity = draws.capacity();
+        if capacity <= self.draw_storage[index].capacity() || capacity > MAX_DRAWS {
+            return;
+        }
+        // The two spare vectors together retain at most one picture's 64 MiB.
+        if capacity + self.draw_storage[1 - index].capacity() > MAX_DRAWS {
+            if overlay {
+                return;
+            }
+            self.draw_storage[1] = Vec::new();
+        }
+        draws.clear();
+        self.draw_storage[index] = draws;
+    }
+
     pub fn new() -> Result<Self> {
         let r = authored_source_recipes();
         let mut b = Self {
@@ -79,6 +112,9 @@ impl Bank {
             text: crate::text::TextCache::default(),
             text_frames: BTreeMap::new(),
             palette_rgb: r.palette_rgb,
+            draw_storage: [Vec::new(), Vec::new()],
+            body_commands: Vec::new(),
+            food_commands: [Vec::new(), Vec::new()],
         };
         for p in r.body_sources.palettes {
             let variants = p.variants.into_iter().map(|r| b.add(r)).collect();

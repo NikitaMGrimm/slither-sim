@@ -750,6 +750,16 @@ pub fn plan_standard_body_with_antenna(
     input: BodyPaintInput<'_>,
     effect: AntennaBarrierEffect,
 ) -> Result<BodyPaintPlan, BodyPaintError> {
+    plan_standard_body_with_storage(input, effect, Vec::new())
+}
+
+/// Reuse retired command storage; previous contents are discarded. Validation
+/// and command ordering match the allocating entry point; no partial plan escapes.
+pub fn plan_standard_body_with_storage(
+    input: BodyPaintInput<'_>,
+    effect: AntennaBarrierEffect,
+    mut commands: Vec<BodyImageCommand>,
+) -> Result<BodyPaintPlan, BodyPaintError> {
     use BodyPaintPass::*;
     match effect {
         AntennaBarrierEffect::Disabled => {}
@@ -767,7 +777,7 @@ pub fn plan_standard_body_with_antenna(
     }
     let style = validate(&input)?;
     let count = command_count(&input, style)?;
-    let mut commands = Vec::new();
+    commands.clear();
     commands
         .try_reserve_exact(count)
         .map_err(|_| BodyPaintError::Allocation)?;
