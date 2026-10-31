@@ -357,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn overflow_observation_is_retained_without_claiming_a_picture_acknowledgement() {
+    fn overflow_respects_strict_debug_and_release_skip_contracts() {
         let mut steps = Vec::new();
         let mut step = |kind: &str, now: f64, packet: Option<Vec<u8>>| {
             let mut value = json!({"event":{"seq":steps.len(),"sourceId":format!("synthetic-{}",steps.len()),
@@ -385,8 +385,17 @@ mod tests {
             "surface":{"width":960,"height":540},"dpr":1});
         let result = replay(
             json!({"geometry":geometry,"pointer":{"x":0,"y":0},"steps":steps,"durationMs":60}),
-        )
-        .unwrap();
+        );
+        // Native debug intentionally surfaces invalid frames; release records a
+        // skipped picture. The old test incorrectly expected release in debug.
+        if cfg!(debug_assertions) {
+            assert_eq!(
+                result.unwrap_err(),
+                slither_wgpu_slice::frame::DRAW_MEMORY_LIMIT
+            );
+            return;
+        }
+        let result = result.unwrap();
         let samples = result["body"]["samples"].as_array().unwrap();
         let draw_rows = samples
             .iter()
