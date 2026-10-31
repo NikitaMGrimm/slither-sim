@@ -29,6 +29,85 @@ fn interior(
         && source.y + source.height + f64::from(tile[1]) <= f64::from(atlas[1]) + 2. * pad - edge
 }
 
+impl Composition<'_> {
+    pub(super) fn studio_panel(
+        &mut self,
+        rect: MenuRect,
+        tokens: SurfaceTokens,
+        alpha: f64,
+        clip: Option<MenuRect>,
+        control_scale: f64,
+    ) -> Result<()> {
+        let start = self.draws.len();
+        self.sliced(rect, tokens, alpha, clip, control_scale)?;
+        if tokens.recipe != SurfaceRecipe::StudioPanel || tokens.colors[0] != tokens.colors[1] {
+            return Ok(());
+        }
+        let density = self.scale * control_scale;
+        let mut bounds = [i64::MAX, i64::MAX, i64::MIN, i64::MIN];
+        let mut area = 0;
+        let mut count = 0;
+        let mut first = start;
+        for (index, draw) in self.draws.iter().enumerate().skip(start) {
+            if !interior(draw, &self.materials, tokens, density) {
+                continue;
+            }
+            if count == 0 {
+                first = index;
+            }
+            count += 1;
+            let r = draw.destination;
+            let b = [
+                (r.x * self.scale).round() as i64,
+                (r.y * self.scale).round() as i64,
+                ((r.x + r.width) * self.scale).round() as i64,
+                ((r.y + r.height) * self.scale).round() as i64,
+            ];
+            bounds = [
+                bounds[0].min(b[0]),
+                bounds[1].min(b[1]),
+                bounds[2].max(b[2]),
+                bounds[3].max(b[3]),
+            ];
+            area += (b[2] - b[0]) * (b[3] - b[1]);
+        }
+        // Keep the old path for small/unrepeated surfaces and any nonrectangular
+        // clipped union. Never increase records or cover a hole in that union.
+        if count < 2 || area != (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) {
+            return Ok(());
+        }
+        let mut flat = self.draws[first].clone();
+        let source = flat.source.as_mut().expect("interior source");
+        *source = BodyRect {
+            x: (source.x + source.width / 2.).floor(),
+            y: (source.y + source.height / 2.).floor(),
+            width: 1.,
+            height: 1.,
+        };
+        flat.corners = None;
+        flat.destination = BodyRect {
+            x: bounds[0] as f64 / self.scale,
+            y: bounds[1] as f64 / self.scale,
+            width: (bounds[2] - bounds[0]) as f64 / self.scale,
+            height: (bounds[3] - bounds[1]) as f64 / self.scale,
+        };
+        let materials = &self.materials;
+        let mut index = 0;
+        self.draws.retain_mut(|draw| {
+            let keep = if index == first {
+                *draw = flat.clone();
+                true
+            } else {
+                index < start || !interior(draw, materials, tokens, density)
+            };
+            index += 1;
+            keep
+        });
+        self.attribution.remove(self.component, count - 1);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -118,84 +197,5 @@ mod tests {
                 "non-flat themes retain the original path"
             );
         }
-    }
-}
-
-impl Composition<'_> {
-    pub(super) fn studio_panel(
-        &mut self,
-        rect: MenuRect,
-        tokens: SurfaceTokens,
-        alpha: f64,
-        clip: Option<MenuRect>,
-        control_scale: f64,
-    ) -> Result<()> {
-        let start = self.draws.len();
-        self.sliced(rect, tokens, alpha, clip, control_scale)?;
-        if tokens.recipe != SurfaceRecipe::StudioPanel || tokens.colors[0] != tokens.colors[1] {
-            return Ok(());
-        }
-        let density = self.scale * control_scale;
-        let mut bounds = [i64::MAX, i64::MAX, i64::MIN, i64::MIN];
-        let mut area = 0;
-        let mut count = 0;
-        let mut first = start;
-        for (index, draw) in self.draws.iter().enumerate().skip(start) {
-            if !interior(draw, &self.materials, tokens, density) {
-                continue;
-            }
-            if count == 0 {
-                first = index;
-            }
-            count += 1;
-            let r = draw.destination;
-            let b = [
-                (r.x * self.scale).round() as i64,
-                (r.y * self.scale).round() as i64,
-                ((r.x + r.width) * self.scale).round() as i64,
-                ((r.y + r.height) * self.scale).round() as i64,
-            ];
-            bounds = [
-                bounds[0].min(b[0]),
-                bounds[1].min(b[1]),
-                bounds[2].max(b[2]),
-                bounds[3].max(b[3]),
-            ];
-            area += (b[2] - b[0]) * (b[3] - b[1]);
-        }
-        // Keep the old path for small/unrepeated surfaces and any nonrectangular
-        // clipped union. Never increase records or cover a hole in that union.
-        if count < 2 || area != (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]) {
-            return Ok(());
-        }
-        let mut flat = self.draws[first].clone();
-        let source = flat.source.as_mut().expect("interior source");
-        *source = BodyRect {
-            x: (source.x + source.width / 2.).floor(),
-            y: (source.y + source.height / 2.).floor(),
-            width: 1.,
-            height: 1.,
-        };
-        flat.corners = None;
-        flat.destination = BodyRect {
-            x: bounds[0] as f64 / self.scale,
-            y: bounds[1] as f64 / self.scale,
-            width: (bounds[2] - bounds[0]) as f64 / self.scale,
-            height: (bounds[3] - bounds[1]) as f64 / self.scale,
-        };
-        let materials = &self.materials;
-        let mut index = 0;
-        self.draws.retain_mut(|draw| {
-            let keep = if index == first {
-                *draw = flat.clone();
-                true
-            } else {
-                index < start || !interior(draw, materials, tokens, density)
-            };
-            index += 1;
-            keep
-        });
-        self.attribution.remove(self.component, count - 1);
-        Ok(())
     }
 }
