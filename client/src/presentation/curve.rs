@@ -66,9 +66,63 @@ pub struct CurveOutput {
     vertices: Vec<CurveVertex>,
     redistribution_count: usize,
     distance_cursor_seed: Option<Point>,
+    ordinal_stride: usize,
+    terminal_ordinal: usize,
 }
 
 impl CurveOutput {
+    /// Head-relative source sample index, preserved when pressure removes detail.
+    pub fn sample_ordinal(&self, index: usize) -> usize {
+        if index + 1 == self.samples.len() {
+            self.terminal_ordinal
+        } else {
+            index * self.ordinal_stride
+        }
+    }
+
+    /// Keep a nested subset of the stock sampling grid, plus its tail endpoint.
+    /// Re-spacing the entire curve for each camera quota makes shades and stripes
+    /// travel along otherwise unchanged bodies (see body::compact_tests).
+    pub(super) fn reduce_samples(&mut self, limit: usize) -> Result<(), PresentationError> {
+        if limit < 2 {
+            return Err(PresentationError);
+        }
+        let n = self.samples.len();
+        if n <= limit {
+            return Ok(());
+        }
+        let mut stride = 1;
+        while (n - 2) / stride + 2 > limit {
+            stride *= 2;
+        }
+        let mut index = 0;
+        self.samples.retain(|_| {
+            let keep = index % stride == 0 || index == n - 1;
+            index += 1;
+            keep
+        });
+        index = 0;
+        self.vertices.retain(|_| {
+            let keep = index % stride == 0 || index == n - 1;
+            index += 1;
+            keep
+        });
+        self.ordinal_stride *= stride;
+        Ok(())
+    }
+
+    pub(super) fn scale_ordinals(&mut self, factor: usize) -> Result<(), PresentationError> {
+        self.ordinal_stride = self
+            .ordinal_stride
+            .checked_mul(factor)
+            .ok_or(PresentationError)?;
+        self.terminal_ordinal = self
+            .terminal_ordinal
+            .checked_mul(factor)
+            .ok_or(PresentationError)?;
+        Ok(())
+    }
+
     /// Pre- and post-redistribution f64 positions in head-to-tail order.
     pub fn vertices(&self) -> &[CurveVertex] {
         &self.vertices
@@ -496,17 +550,24 @@ fn sample_compact_curve(
             }],
             redistribution_count: 0,
             distance_cursor_seed: None,
+            ordinal_stride: 1,
+            terminal_ordinal: 0,
         });
     }
-    let count = (input.displayed_length.max(1.) * density).ceil() + 1.;
-    if !count.is_finite() || count > MAX_CURVE_SAMPLES as f64 {
-        return Err(PresentationError);
-    }
-    let count = (count as usize).max(2);
     let total = path
         .windows(2)
         .try_fold(0., |sum, p| distance(p[0], p[1]).map(|d| sum + d))?;
     finite(&[total])?;
+    // Stock colour/shade indices start at the head. Keep that spatial grid as
+    // the predicted head advances; fitting a fixed count to the entire changing
+    // span stretches every pattern band between consecutive anchor packets.
+    let world_step = input.segment_length / density;
+    positive(world_step)?;
+    let count = (total / world_step).ceil() + 1.;
+    if !count.is_finite() || count > MAX_CURVE_SAMPLES as f64 {
+        return Err(PresentationError);
+    }
+    let count = (count as usize).max(2);
     let mut samples = Vec::with_capacity(count);
     let mut vertices = Vec::with_capacity(count);
     let mut segment = 1;
@@ -514,7 +575,7 @@ fn sample_compact_curve(
     let mut previous = first;
     let mut seed = None;
     for i in 0..count {
-        let target = total * i as f64 / (count - 1) as f64;
+        let target = (world_step * i as f64).min(total);
         let mut length = distance(path[segment - 1], path[segment])?;
         while segment + 1 < path.len() && before + length < target {
             before += length;
@@ -555,6 +616,8 @@ fn sample_compact_curve(
         target_eye_heading,
         redistribution_count: 0,
         distance_cursor_seed: seed,
+        ordinal_stride: 1,
+        terminal_ordinal: count - 1,
     })
 }
 
@@ -728,6 +791,8 @@ fn sample_curve_inner(
         raw_heading.ok_or(PresentationError)?
     };
     Ok(CurveOutput {
+        terminal_ordinal: samples.len().saturating_sub(1),
+        ordinal_stride: 1,
         samples,
         point_spacing: spacing,
         target_eye_heading,

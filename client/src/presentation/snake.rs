@@ -594,19 +594,22 @@ impl SnakePresentation {
             0 => (None, metrics.heading),
             1 => (None, single_anchor_eye_target(input, metrics.heading)?),
             _ => {
-                // Only previously inadmissible worlds select a limit. Sampling
-                // is private and does not advance spacing/eyes on retries.
+                // Only previously inadmissible worlds select a limit. Preserve
+                // the stock grid and source ordinals when dropping detail.
                 let mut curve = sample_curve_with_heading(input, metrics.heading);
                 if let Some(limit) = sample_limit {
+                    let mut ordinal_scale = 1_usize;
                     for _ in 0..32 {
-                        if curve.as_ref().is_ok_and(|c| c.samples.len() <= limit) {
+                        if curve.is_ok() {
                             break;
                         }
-                        input.quality_scale *= curve.as_ref().map_or(2., |c| {
-                            (c.samples.len() as f64 / limit.saturating_sub(2).max(1) as f64)
-                                .max(1.05)
-                        });
+                        input.quality_scale *= 2.;
+                        ordinal_scale = ordinal_scale.checked_mul(2).ok_or(PresentationError)?;
                         curve = sample_curve_with_heading(input, metrics.heading);
+                    }
+                    if let Ok(curve) = &mut curve {
+                        curve.scale_ordinals(ordinal_scale)?;
+                        curve.reduce_samples(limit)?;
                     }
                 }
                 let curve = curve?;

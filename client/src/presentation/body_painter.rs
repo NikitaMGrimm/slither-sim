@@ -14,7 +14,7 @@ pub const MAX_BODY_PAINT_COMMANDS: usize = 8 * MAX_BODY_PAINT_SAMPLES + 16;
 /// Stored geometry and retained, effective flags; culled samples keep their ordinal.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BodyPaintSample {
-    /// Original index in the uncompacted head-to-tail active sample prefix.
+    /// Original head-to-tail source index; reduced geometry may skip indices.
     pub ordinal: usize,
     /// Absolute horizontal position after the sampler's f32 store.
     pub x: f32,
@@ -397,7 +397,7 @@ fn validate_use(input: &BodyPaintInput<'_>, usage: BodyAssetUse) -> Result<(), B
     Ok(())
 }
 
-fn validate(input: &BodyPaintInput<'_>) -> Result<BodyStyle, BodyPaintError> {
+fn validate(input: &BodyPaintInput<'_>, reduced: bool) -> Result<BodyStyle, BodyPaintError> {
     use BodyPaintError::*;
     let g = input.geometry;
     if !g.eligible || g.active_count < 2 {
@@ -411,7 +411,16 @@ fn validate(input: &BodyPaintInput<'_>) -> Result<BodyStyle, BodyPaintError> {
     }
     let samples = &g.samples[..g.active_count];
     for (i, s) in samples.iter().enumerate() {
-        if s.ordinal != i || s.flag > 2 || !all_finite(&[s.x.into(), s.y.into(), s.tangent.into()])
+        let ordinal_valid = if reduced {
+            if i == 0 {
+                s.ordinal == 0
+            } else {
+                s.ordinal > samples[i - 1].ordinal
+            }
+        } else {
+            s.ordinal == i
+        };
+        if !ordinal_valid || s.flag > 2 || !all_finite(&[s.x.into(), s.y.into(), s.tangent.into()])
         {
             return Err(InvalidGeometry);
         }
@@ -690,7 +699,7 @@ impl Painter<'_> {
         self.commands.push(BodyImageCommand {
             sequence: self.commands.len(),
             pass,
-            ordinal: i,
+            ordinal: s.ordinal,
             asset_index: usage.asset,
             asset: self.input.assets[usage.asset],
             source_rect: usage.source_rect,
@@ -761,16 +770,25 @@ pub fn plan_reduced_body_with_storage(
     input: BodyPaintInput<'_>,
     mut commands: Vec<BodyImageCommand>,
 ) -> Result<BodyPaintPlan, BodyPaintError> {
-    let style = validate(&input)?;
+    let style = validate(&input, true)?;
     let n = input.geometry.active_count;
     let samples = &input.geometry.samples[..n];
-    let selected = n.min(
+    let capacity = n.min(
         input
             .command_limit
             .min(MAX_BODY_PAINT_COMMANDS)
             .saturating_add(1)
             / 2,
     );
+    let mut stride = 1;
+    while capacity >= 2 && (n - 2) / stride + 2 > capacity {
+        stride *= 2;
+    }
+    let selected = if capacity < 2 {
+        capacity
+    } else {
+        (n - 2) / stride + 2
+    };
     let count = selected.saturating_mul(2).saturating_sub(1);
     commands.clear();
     commands
@@ -788,17 +806,21 @@ pub fn plan_reduced_body_with_storage(
     for slot in (0..selected).rev() {
         let i = if selected < 2 {
             0
+        } else if slot == selected - 1 {
+            n - 1
         } else {
-            slot * (n - 1) / (selected - 1)
+            slot * stride
         };
-        let usage = input.recipe.palettes[painter.palette(i)].variants[painter.variant(i)];
+        let ordinal = samples[i].ordinal;
+        let usage =
+            input.recipe.palettes[painter.palette(ordinal)].variants[painter.variant(ordinal)];
         if samples[i].flag != 0 {
             painter.draw(i, BodyPaintPass::Body, usage, square(diameter / 2.), alpha)?;
         }
         if slot == 0 {
             continue;
         }
-        let previous = (slot - 1) * (n - 1) / (selected - 1);
+        let previous = (slot - 1) * stride;
         if samples[i].flag == 0 && samples[previous].flag == 0 {
             continue;
         }
@@ -892,7 +914,7 @@ pub fn plan_standard_body_with_zoom_and_storage(
     {
         return Err(BodyPaintError::InvalidVisual);
     }
-    let style = validate(&input)?;
+    let style = validate(&input, false)?;
     let distant = zoom_factor < 1.
         && 29. * input.visual.scale * input.view.zoom * logical_pixels_per_unit < 4.;
     let count = command_count(&input, style, distant)?;

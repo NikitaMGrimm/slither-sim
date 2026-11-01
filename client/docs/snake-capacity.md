@@ -35,7 +35,14 @@ Under pressure:
   into the next tailward endpoint. The logical count stays independent. Reductions
   are nested and are not reversed during that appearance, preventing oscillation
   as the camera crosses a boundary. Newly arriving head anchors remain detailed.
-  Reduced curves resample the retained polyline, without terminal extrapolation.
+  Reduced curves sample the retained polyline on a fixed head-relative distance
+  grid, without terminal extrapolation. Colour runs and shade variants retain
+  their original source-sample indices when detail is removed. Ordinary stock
+  skins, including single-colour skins, repeat spatial shade variants; custom
+  skins use variant zero. Gameplay selection uses neither tail-relative indices,
+  cumulative travel nor wall-clock phase. The authored regression
+  `compact_shades_and_stripes_survive_motion_tail_retirement_and_camera_quotas`
+  checks a fixed head-relative body position through motion and nested quotas.
   A tail update consumes one logical interval before retiring a physical anchor;
   ingress pins the endpoint to the complete received tail. Straight-body extent
   regressions use a 0.02-unit Float32 tolerance; deterministic smooth curved
@@ -43,8 +50,10 @@ Under pressure:
   length when simplified; received geometry is always complete.
 - Share **49,152 curve samples** among visible rivals, with an eight-sample floor.
   Extra samples are proportional to `scale / (256 + camera distance)`. This
-  avoids swapping whole quotas when two rivals exchange distance order. Sampling
-  retries are private; eye/spacing transitions commit once. The own curve keeps
+  avoids swapping whole quotas when two rivals exchange distance order. Keep a
+  nested subset of the original curve grid plus its tail endpoint, rather than
+  redistributing all colour indices over each new quota. Sampling retries are
+  private; eye/spacing transitions commit once. The own curve keeps
   its existing independent 65,536-sample bound.
 - Paint reduced rivals as connected base-image spans with covered joints, at
   most two image commands per sample. Omit their outline, shadow, boost, death
@@ -74,6 +83,19 @@ Under pressure:
 Unused visual-vector capacity is reclaimed when its aggregate exceeds the
 corresponding anchor budget. This does not change any retained numeric record.
 Allocation is lazy; none of these ceilings preallocates an entire maximum world.
+
+The offline body-pattern regression runs with
+`cargo test -p slither-client --locked --lib compact_`. Its authored 128-anchor
+straight body moves six world units between anchor arrivals. Before the fix,
+the sample at 384 units behind the head changed index from 387 to 384, moving
+both ordinary shade variants and stripes. The compact span-fitting sampler and
+quota-dependent re-spacing were introduced in #416 (`d3cdd9b0`). The fix keeps
+the head-relative grid and carries source indices through nested reductions,
+including a second reduction for the painter's command budget. Tests cover
+16 non-growing anchor updates (with tail retirement), four sampling quotas,
+command quotas, single-colour and striped skins, and the cyclic-shade family.
+This is a numeric curve/material-selection regression, not a pixel comparison
+or owner-play acceptance. The own and ordinary unpressured paths stay unchanged.
 
 ## Quota audit
 

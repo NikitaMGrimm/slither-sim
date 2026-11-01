@@ -3590,7 +3590,7 @@ impl AnimatedClient {
                             };
                         }
                         BodyPaintSample {
-                            ordinal,
+                            ordinal: curve.sample_ordinal(ordinal),
                             x: sample.x,
                             y: sample.y,
                             tangent: sample.angle,
