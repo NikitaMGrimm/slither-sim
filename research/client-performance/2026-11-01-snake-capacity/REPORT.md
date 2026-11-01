@@ -6,7 +6,7 @@ submission is part of the synthetic workload. The optional loopback cross-check
 is separate and does not establish subscription coverage of 500 bots.
 
 Base: `3669ac9a` (current main at task start). The
-[quota audit and presentation policy](../../../client/docs/snake-capacity.md)
+[quota audit and presentation policy](https://github.com/NikitaMGrimm/slither-sim/blob/a0a4579e3cdcd51972be5c4f58e9d7cde383d6d9/client/docs/snake-capacity.md)
 own the current behavior; this report records this bounded validation.
 
 ## Question and method
