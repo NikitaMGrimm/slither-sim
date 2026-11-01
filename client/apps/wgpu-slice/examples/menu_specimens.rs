@@ -983,16 +983,21 @@ fn underlay_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
                 login.step(f64::from(now), true, false)?;
                 now += 16;
             }
-            let picture = login.prepare_host(extent, dpr, true, None)?;
+            let mut picture = login.prepare_host(extent, dpr, true, None)?;
             if !login.egui.paint_only() {
                 return Err("The studio must keep the egui login below it".into());
             }
+            // As on the desktop path, the preview presents with the studio above egui.
+            let (preview, resources) = login.studio.prepare_preview(extent, dpr, None)?;
+            picture.frame.draws.extend(preview.draws);
+            picture.resources.extend(resources);
             capture_underlay(
                 renderer,
                 &picture,
                 &mut login,
                 &output.join(format!("studio-{name}-{dpr}x.png")),
             )?;
+            login.studio.presented();
         }
     }
     Ok(())
