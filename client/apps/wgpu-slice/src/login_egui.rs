@@ -533,7 +533,13 @@ impl LoginUi {
                         // Keep the committed edit and its current caret, while
                         // discarding every provisional undo/redo entry.
                         if let Some(range) = state.cursor.char_range() {
-                            snapshot.undoer.add_undo(&(range, self.nickname.clone()));
+                            let committed = (range, self.nickname.clone());
+                            // Feeding the edit also invalidates a redo branch
+                            // from before composition; adding a point alone does not.
+                            snapshot
+                                .undoer
+                                .feed_state(ctx.input(|i| i.time), &committed);
+                            snapshot.undoer.add_undo(&committed);
                         }
                         state.set_undoer(snapshot.undoer);
                     }

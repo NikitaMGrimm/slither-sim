@@ -340,6 +340,70 @@ fn timed_ime_candidates_never_enter_cancelled_or_committed_undo_history() {
 }
 
 #[test]
+fn ime_commit_after_undo_discards_old_redo_while_cancellation_preserves_it() {
+    for commit in [false, true] {
+        let mut login = settled("Before");
+        let command = egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        };
+        select_all(&mut login);
+        input(&mut login, egui::Event::Text("Committed".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        for _ in 0..6 {
+            press(&mut login, egui::Key::Z, command);
+        }
+        assert_eq!(login.displayed_nickname(), "Before");
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        login.step(12800., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        input(
+            &mut login,
+            if commit {
+                egui::Event::Ime(egui::ImeEvent::Commit("Final".into()))
+            } else {
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: String::new(),
+                    active_range_chars: None,
+                })
+            },
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        let committed = login.displayed_nickname();
+        if commit {
+            assert!(committed.contains("Final"));
+        }
+        for _ in 0..6 {
+            press(
+                &mut login,
+                egui::Key::Z,
+                egui::Modifiers {
+                    shift: true,
+                    ..command
+                },
+            );
+        }
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit {
+                committed
+            } else {
+                "Committed".into()
+            }
+        );
+    }
+}
+
+#[test]
 fn windows_process_enter_cannot_insert_payload_or_activate_until_key_up() {
     use slither_wgpu_slice::menu_input_native::KeyInput;
     use winit::{
