@@ -7,7 +7,9 @@ release_always = false
 publish = false
 git_tag_enable = false
 git_release_enable = false
-pr_name = "chore(release): prepare{% if version %} v{{ version }}{% endif %}"
+# release-plz sets `version` only for one package or equal versions, and
+# `package` only for one package; the versions are in the PR body.
+pr_name = "chore(release): prepare{% if package == 'slither-protocol' %} slither-protocol v{{ version }}{% elif version %} v{{ version }}{% else %} slither-sim and slither-protocol{% endif %}"
 pr_body = """
 {% for release in releases %}
 <!-- release-plz {{ release.package }} {{ release.previous_version }} {{ release.next_version }} {{ release.semver_check }} -->
