@@ -134,7 +134,6 @@ fn invalid_literals_reject() {
     for first in [
         b"ABCD".as_slice(),
         b"ABCDEF",
-        b"AB\"DE",
         b"AB\\DE",
         b"AB\nDE",
         b"AB\x7fDE",
@@ -150,6 +149,61 @@ fn invalid_literals_reject() {
         solve_challenge(&encode(tokens.join(" ").as_bytes())),
         Err(ChallengeError::Literal)
     );
+    // An embedded delimiter ends the literal early, leaving unsupported tokens.
+    let tokens = synthetic_tokens(b"AB\"DE", &[b'A'; 22]);
+    assert_eq!(
+        solve_challenge(&encode(tokens.join(" ").as_bytes())),
+        Err(ChallengeError::Syntax)
+    );
+}
+
+#[test]
+fn single_literal_copy_loops_use_the_same_transform() {
+    let literal = "A".repeat(24);
+    let expected = b"DHLPTXBFJNRVZDHLPTXBFJNR";
+    for source in [
+        format!("var a='{literal}';for (var i=0;i<24;i++){{idba[i]=a.charCodeAt(i);}}"),
+        format!("var a='{literal}';for(var i=0;i<24;i++)idba[i]=a.charCodeAt(i);"),
+        format!(
+            "var a = \"{literal}\" ; for ( var i = 0 ; i < 24 ; i ++ ) idba [ i ] = a . charCodeAt ( i ) ;"
+        ),
+    ] {
+        assert_eq!(
+            solve_challenge(&encode(source.as_bytes())).unwrap(),
+            expected
+        );
+    }
+    // A double quote is an ordinary byte inside single quotes; its negative
+    // value takes JavaScript's signed remainder, as in the 27-byte shape.
+    let quoted = r#"var a='A"B';for(var i=0;i<3;i++)idba[i]=a.charCodeAt(i);"#;
+    assert_eq!(solve_challenge(&encode(quoted.as_bytes())).unwrap(), b"D).");
+    let appended = r#"var a='AA';a+="AAA";a += 'A';for(var i=0;i<6;i++){idba[i]=a.charCodeAt(i);}"#;
+    assert_eq!(
+        solve_challenge(&encode(appended.as_bytes())).unwrap(),
+        b"DHLPTX"
+    );
+}
+
+#[test]
+fn copy_counts_and_delimiters_must_match() {
+    for (literal, count) in [("AAAA", "3"), ("AAAA", "5"), ("AAAA", "04"), ("", "0")] {
+        let source =
+            format!("var a='{literal}';for(var i=0;i<{count};i++)idba[i]=a.charCodeAt(i);");
+        assert!(
+            solve_challenge(&encode(source.as_bytes())).is_err(),
+            "{literal} {count}"
+        );
+    }
+    for source in [
+        r#"var a='AAAA";for(var i=0;i<4;i++)idba[i]=a.charCodeAt(i);"#,
+        "var a='AAAA';for(var i=0;i<4;i++){idba[i]=a.charCodeAt(i);",
+        "var a='AAAA';for(var i=0;i<4;i++)idba[i]=a.charCodeAt(i);}",
+    ] {
+        assert!(
+            solve_challenge(&encode(source.as_bytes())).is_err(),
+            "{source}"
+        );
+    }
 }
 
 #[test]

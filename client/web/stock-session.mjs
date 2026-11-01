@@ -178,7 +178,10 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     owner().receive_bytes(bytes.length);
     const commands = unpackCommands(wasm.decode_frame(bytes, false));
     if (owner().receive_header(commands.length, commands[0][0])) {
-      const reply = copiedBytes(wasm.solve_challenge(commands[0].subarray(1)), 27, 'challenge reply');
+      const reply = copiedBytes(wasm.solve_challenge(commands[0].subarray(1)), undefined, 'challenge reply');
+      // Official challenges copy 27 bytes; some community servers copy 24. The
+      // Rust solver bounds the length by its 256-byte source limit.
+      if (reply.length === 0 || reply.length > 256) throw new TypeError('Invalid challenge reply');
       send(reply); send(launch.login.slice());
       launch.login.fill(0); launch = undefined;
       owner().challenged(); publish(); return;

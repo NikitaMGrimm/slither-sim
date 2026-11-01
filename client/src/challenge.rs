@@ -1,4 +1,4 @@
-//! A tokenized, closed grammar for the two-literal string-copy challenge family.
+//! A tokenized, closed grammar for the string-copy challenge family.
 //!
 //! Unknown programs are rejected; no source is evaluated or interpreted generally.
 
@@ -18,7 +18,8 @@ pub enum ChallengeError {
     Nibble,
     /// A token, expression, or trailing input was unsupported.
     Syntax,
-    /// A literal was not unescaped printable ASCII of its required length.
+    /// A literal was not unescaped printable ASCII, or the literals did not
+    /// match the copy count.
     Literal,
 }
 
@@ -30,7 +31,7 @@ impl fmt::Display for ChallengeError {
             Self::Nibble => "challenge encoding contains a nibble above 15",
             Self::Syntax => "unsupported challenge syntax or trailing tokens",
             Self::Literal => {
-                "challenge requires unescaped printable ASCII literals of 5 and 22 bytes"
+                "challenge literals must be unescaped printable ASCII matching the copy count"
             }
         })
     }
@@ -40,9 +41,14 @@ impl std::error::Error for ChallengeError {}
 
 /// Decode a challenge command payload (without its command byte) and solve it.
 ///
-/// Only a declaration, literal append, and the fixed 27-byte copy loop are
-/// accepted. Whitespace between tokens is allowed. Literal contents are runtime
-/// input, not credentials embedded in the library.
+/// Only a declaration, literal appends, and one copy loop over every literal
+/// byte are accepted, with literals in double or single quotes and an optional
+/// braced loop body. Official servers send a 5- and a 22-byte literal copied by
+/// a 27-byte loop. Some community servers, like slither-sim's legacy path,
+/// send one single-quoted 24-byte literal and accept the rotated 24-byte reply
+/// (see docs/raw-server.md, "Packet compatibility").
+/// Whitespace between tokens is allowed. Literal contents are runtime input,
+/// not credentials embedded in the library.
 pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
     if encoded.is_empty()
         || encoded.len() > MAX_SOURCE_BYTES * 2
@@ -73,26 +79,28 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
         offset: 0,
     };
     parser.tokens(&["var", "a", "="])?;
-    let first = parser.literal(5)?;
-    parser.tokens(&[";", "a", "+="])?;
-    let second = parser.literal(22)?;
+    let mut reply = parser.literal()?.to_vec();
+    parser.tokens(&[";"])?;
+    loop {
+        let start = parser.offset;
+        if parser.tokens(&["a", "+="]).is_err() {
+            parser.offset = start;
+            break;
+        }
+        reply.extend(parser.literal()?);
+        parser.tokens(&[";"])?;
+    }
+    parser.tokens(&["for", "(", "var", "i", "=", "0", ";", "i", "<"])?;
+    if parser.count()? != reply.len() {
+        return Err(ChallengeError::Literal);
+    }
+    parser.tokens(&[";", "i", "++", ")"])?;
+    parser.whitespace();
+    let braced = parser.source.get(parser.offset) == Some(&b'{');
+    if braced {
+        parser.tokens(&["{"])?;
+    }
     parser.tokens(&[
-        ";",
-        "for",
-        "(",
-        "var",
-        "i",
-        "=",
-        "0",
-        ";",
-        "i",
-        "<",
-        "27",
-        ";",
-        "i",
-        "++",
-        ")",
-        "{",
         "idba",
         "[",
         "i",
@@ -105,14 +113,15 @@ pub fn solve_challenge(encoded: &[u8]) -> Result<Vec<u8>, ChallengeError> {
         "i",
         ")",
         ";",
-        "}",
     ])?;
+    if braced {
+        parser.tokens(&["}"])?;
+    }
     parser.whitespace();
     if parser.offset != source.len() {
         return Err(ChallengeError::Syntax);
     }
 
-    let mut reply: Vec<_> = first.iter().chain(second).copied().collect();
     let mut rotation = 0_i32;
     for (index, byte) in reply.iter_mut().enumerate() {
         let (base, upper) = if *byte >= b'a' {
@@ -185,22 +194,42 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn literal(&mut self, length: usize) -> Result<&'a [u8], ChallengeError> {
+    fn literal(&mut self) -> Result<&'a [u8], ChallengeError> {
         self.whitespace();
-        if self.source.get(self.offset) != Some(&b'"') {
-            return Err(ChallengeError::Literal);
-        }
+        let quote = match self.source.get(self.offset) {
+            Some(&quote @ (b'"' | b'\'')) => quote,
+            _ => return Err(ChallengeError::Literal),
+        };
         let start = self.offset + 1;
-        let end = start + length;
-        let literal = self.source.get(start..end).ok_or(ChallengeError::Literal)?;
-        if literal
+        let length = self.source[start..]
             .iter()
-            .any(|c| !(b' '..=b'~').contains(c) || matches!(c, b'"' | b'\\'))
-            || self.source.get(end) != Some(&b'"')
+            .position(|&c| c == quote)
+            .ok_or(ChallengeError::Literal)?;
+        let literal = &self.source[start..start + length];
+        if literal.is_empty()
+            || literal
+                .iter()
+                .any(|c| !(b' '..=b'~').contains(c) || *c == b'\\')
         {
             return Err(ChallengeError::Literal);
         }
-        self.offset = end + 1;
+        self.offset = start + length + 1;
         Ok(literal)
+    }
+
+    /// A decimal copy count without leading zeros.
+    fn count(&mut self) -> Result<usize, ChallengeError> {
+        self.whitespace();
+        let start = self.offset;
+        while self.source.get(self.offset).is_some_and(u8::is_ascii_digit) {
+            self.offset += 1;
+        }
+        let digits = &self.source[start..self.offset];
+        if digits.is_empty() || digits[0] == b'0' || digits.len() > 3 {
+            return Err(ChallengeError::Syntax);
+        }
+        Ok(digits
+            .iter()
+            .fold(0, |count, digit| count * 10 + usize::from(digit - b'0')))
     }
 }

@@ -56,13 +56,13 @@ function thrown(callback) {
   assert.equal(caught, true, 'Expected a throw, including a falsy thrown value');
   return value;
 }
-function harness({ hud = true, observe = hud, subscribe = true } = {}) {
+function harness({ hud = true, observe = hud, subscribe = true, reply = new Uint8Array(27).fill(65) } = {}) {
   let clock = 1000, reads = 0, decodes = 0;
   const hooks = {}, sockets = [], trace = [], states = [], errors = [], packets = [];
   const session = createStockSession({ now() { reads++; return clock; },
     wasm: {
       encode_login() { return Uint8Array.of(115, 1, 2); },
-      solve_challenge() { return new Uint8Array(27).fill(65); },
+      solve_challenge() { return reply; },
       decode_frame(bytes, elapsed) {
         decodes++; assert.equal(elapsed, false);
         return Uint8Array.from(decode(bytes).flatMap(c => [0, 0, c.length >> 8, c.length & 255, ...c]));
@@ -138,6 +138,21 @@ function paired() {
   const tick = (...args) => { const result = step(...args); call('commitControl'); return result; };
   return { all, verify, each, call, step, tick, connect, message, setTime: ms => each(h => h.setTime(ms)) };
 }
+
+test('challenge reply length bounds gate login', () => {
+  for (const reply of [Uint8Array.from({ length: 24 }, (_, i) => 65 + i), new Uint8Array(256).fill(65)]) {
+    const h = harness({ reply });
+    h.connect();
+    assert.deepEqual(h.sockets[0].sent.slice(-2), [[...reply], [115, 1, 2]]);
+    assert.deepEqual(h.errors, []);
+  }
+  for (const length of [0, 257]) {
+    const h = harness({ reply: new Uint8Array(length).fill(65) });
+    h.connect();
+    assert.equal(h.sockets[0].sent.some(bytes => bytes[0] === 115), false);
+    assert.equal(h.errors.length, 1);
+  }
+});
 
 test('HUD facade rejects unselected and legacy modes before request reads or staged Play consumption', () => {
   for (const subscribe of [false, true]) {
