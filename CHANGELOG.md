@@ -4,7 +4,10 @@
 
 ### Added
 
-- An opt-in `latency-rig` host recorder retains bounded per-tick head truth for local measurement and exports it after shutdown.
+- An opt-in `latency-rig` build feature lets a local host record every
+  snake's true head position each tick and write it to a file after a run of
+  fixed length, to measure how far behind a client's display is. Normal builds
+  don't include it.
 
 ## [0.9.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.2...v0.9.0) - 2026-11-01
 
