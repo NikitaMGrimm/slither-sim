@@ -41,8 +41,9 @@ It does not start the simulator or produce frozen A/B timing data.
 
 Start the simulator with `slither-sim host --config YOUR_LOCAL_CONFIG`, using a
 Battledome configuration as described in the [server guide](../../docs/raw-server.md#presets).
-Replace `HOST:PORT` below with that simulator's literal loopback IP and listening
-port. This path is loopback-only: remote hosts and hostnames are rejected.
+Replace `HOST:PORT` below with `127.0.0.1:PORT`, using the simulator's listening
+port. The validator accepts only `127.0.0.1`; other loopback IPs, remote hosts
+and hostnames are rejected.
 Choose a free port other than the reserved 8766, 18884 and 18885. Do not use an
 outside game server. The output directory must be new and remain outside Git.
 
