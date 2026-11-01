@@ -10,6 +10,7 @@ use slither_client::{
 pub struct SettingsUi {
     pub controls: Vec<(ControlId, Rect, bool)>,
     pub panel_rect: Rect,
+    pub scroll_id: Option<Id>,
     request_focus: Option<ControlId>,
 }
 impl Default for SettingsUi {
@@ -17,6 +18,7 @@ impl Default for SettingsUi {
         Self {
             controls: Vec::new(),
             panel_rect: Rect::NOTHING,
+            scroll_id: None,
             request_focus: None,
         }
     }
@@ -79,7 +81,7 @@ impl SettingsUi {
                     ui.set_width((width - 2. * f32::from(theme::PANEL_PADDING)).max(1.));
                     theme::title(ui, "Settings");
                     ui.add_space(theme::ROW_GAP);
-                    egui::ScrollArea::vertical()
+                    let scroll = egui::ScrollArea::vertical()
                         .animated(false)
                         .max_height((area.y - 238.).max(24.))
                         .show(ui, |ui| {
@@ -129,6 +131,7 @@ impl SettingsUi {
                                 theme::help(ui, "Not saved; applies this session");
                             }
                         });
+                    self.scroll_id = Some(scroll.id);
                     ui.add_space(theme::ROW_GAP);
                     ui.vertical_centered(|ui| {
                         let response = theme::pill_button(

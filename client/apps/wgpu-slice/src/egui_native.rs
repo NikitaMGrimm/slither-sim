@@ -194,6 +194,13 @@ impl NativeEguiHost {
             s.input.append(input);
         }
     }
+    pub fn has_pending_events(&self) -> bool {
+        self.active
+            && self
+                .session
+                .as_ref()
+                .is_some_and(|s| !s.input.events.is_empty())
+    }
     fn adapter(&mut self, window: &Window) -> Option<&mut egui_winit::State> {
         let modifiers = self.window.modifiers;
         let cursor = self.window.physical_cursor;

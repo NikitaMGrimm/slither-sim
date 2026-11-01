@@ -338,7 +338,27 @@ impl NativeLogin {
         }
     }
     /// Authored input and the native egui-winit adapter feed the same widget tree.
-    pub fn settings_input(&mut self, input: egui::RawInput) {
+    pub fn settings_input(&mut self, mut input: egui::RawInput) {
+        // egui clears a pending drag on release before deciding whether motion
+        // started it. Preserve each button boundary, including within a batch.
+        while let Some(index) = input
+            .events
+            .iter()
+            .position(|event| matches!(event, egui::Event::PointerButton { .. }))
+        {
+            let mut tail = input.events.split_off(index);
+            self.egui.input(input.take());
+            if self.egui.has_pending_events() {
+                self.settings_frame();
+            }
+            input.events.push(tail.remove(0));
+            self.egui.input(input.take());
+            self.settings_frame();
+            input.events = tail;
+            if input.events.is_empty() {
+                return;
+            }
+        }
         let discrete = input.events.iter().any(|event| {
             !matches!(
                 event,

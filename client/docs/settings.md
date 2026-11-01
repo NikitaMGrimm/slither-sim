@@ -57,7 +57,9 @@ holds and disables nickname IME. Native accessibility bridging remains separate.
 Pointer motion and modifier-only callbacks queue for the next frame. Discrete
 actions run layout/action passes in callback order: batching Space, Tab, Space
 into one pass would retarget the first activation to the final focus. Only the
-final shapes are tessellated at paint, once per redraw.
+final shapes are tessellated at paint, once per redraw. Pointer press/release
+boundaries flush queued events first, including within one raw input batch, so
+a scrollbar drag can start and apply motion before release ends it.
 
 Offline tests cover record precedence, write failures, entry/return focus,
 modality, capture cancellation and Play snapshots. Layout tests check containment,

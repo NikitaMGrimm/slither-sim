@@ -634,6 +634,65 @@ fn motion_callbacks_wait_for_one_redraw_pass() {
 }
 
 #[test]
+fn scrollbar_drag_applies_queued_motion_before_release_without_redraw() {
+    for bundled in [false, true] {
+        let mut login = settled();
+        login.prepare([640, 360], true, None).unwrap();
+        login.open_settings(true);
+        login.step(10_000., true, false).unwrap();
+        login.prepare([640, 360], true, None).unwrap();
+        let context = login.egui.context().unwrap().clone();
+        let id = login.settings_ui.scroll_id.unwrap();
+        let bar = context.read_response(id.with(1_usize)).unwrap().rect;
+        let offset = || {
+            egui::scroll_area::State::load(&context, id)
+                .unwrap()
+                .clamped_offset()
+                .y
+        };
+        let start = egui::pos2(bar.center().x, bar.top() + bar.height() * 0.05);
+        let end = egui::pos2(bar.center().x, bar.bottom() - bar.height() * 0.05);
+        let button = |pos, pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        login.settings_input(egui::RawInput {
+            events: vec![egui::Event::PointerMoved(start), button(start, true)],
+            ..Default::default()
+        });
+        let before = offset();
+        let moved = egui::Event::PointerMoved(end);
+        let release = button(end, false);
+        if bundled {
+            login.settings_input(egui::RawInput {
+                events: vec![moved, release],
+                ..Default::default()
+            });
+        } else {
+            let passes = context.cumulative_pass_nr();
+            login.settings_input(egui::RawInput {
+                events: vec![moved],
+                ..Default::default()
+            });
+            assert_eq!(context.cumulative_pass_nr(), passes);
+            login.settings_input(egui::RawInput {
+                events: vec![release],
+                ..Default::default()
+            });
+        }
+        assert!(
+            offset() > before,
+            "scrollbar drag was lost (bundled={bundled})"
+        );
+        assert!(!context.input(|input| input.pointer.any_down()));
+        assert!(context.dragged_id().is_none());
+        assert!(login.state.settings.is_open());
+    }
+}
+
+#[test]
 fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
     let mut login = settled();
     assert!(!login.egui.initialized());
