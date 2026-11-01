@@ -14,8 +14,8 @@ export class ReferencePolicy {
     const pit=view.arena.radius*1784/3584,radius=Math.hypot(x,y);
     const primary=view.opponents.find(s=>String(s.id)==='1');
     let target=primary?{
-      x:primary.head.x-Math.sin(primary.heading)*600,
-      y:primary.head.y+Math.cos(primary.heading)*600,
+      x:primary.head.x-Math.sin(primary.heading)*250,
+      y:primary.head.y+Math.cos(primary.heading)*250,
     }:{x:0,y:0};
     if(radius<pit&&Math.hypot(target.x,target.y)>pit*.85){
       const scale=pit*.85/Math.hypot(target.x,target.y);target={x:target.x*scale,y:target.y*scale};
@@ -101,7 +101,7 @@ export async function startReference(binary,endpoint,output){
   })();
   return {id,get failure(){return failure;},finished,async stop(){
     stopping=true;child.stdin.end();child.kill();await finished;
-    await writeFile(output,JSON.stringify({format:'latency-rig-scripted-reference-v2',complete:!failure,id,failure:String(failure??''),journal,stderr},null,2),{flag:'wx'});
+    await writeFile(output,JSON.stringify({format:'latency-rig-scripted-reference-v3',complete:!failure,id,failure:String(failure??''),journal,stderr},null,2),{flag:'wx'});
     if(failure)throw failure;
   }};
 }
