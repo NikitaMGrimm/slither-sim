@@ -30,7 +30,7 @@ struct BodyCorrections {
 #[cfg(test)]
 mod compact_tests {
     use super::*;
-    use crate::presentation::{CurveInput, sample_curve_with_heading};
+    use crate::presentation::*;
     use crate::state::Direction;
 
     fn fixture(count: usize, direction: f64) -> BodyGeometry {
@@ -136,6 +136,370 @@ mod compact_tests {
             (length - received_length).abs() <= epsilon + relative_tolerance * received_length,
             "visual {length}, received {received_length}"
         );
+    }
+
+    #[test]
+    fn compact_straight_motion_keeps_the_pattern_at_a_fixed_head_distance() {
+        // Authored straight pose: one world unit per stock paint sample.
+        // Advancing between anchors must not stretch the pattern over the tail.
+        let mut body = fixture(128, 1.);
+        body.compact_visual();
+        let mut indices = Vec::new();
+        for phase in [0., 1., 2., 3., 4., 5., 6.] {
+            let head = Point {
+                x: 60030. + phase,
+                y: 4.,
+            };
+            let curve = sample_curve_with_heading(
+                CurveInput {
+                    corrected_head: head,
+                    head_fraction: phase / 6.,
+                    body: body.points(),
+                    displayed_length: 128.,
+                    segment_length: 6.,
+                    point_spacing: 6.,
+                    target_point_spacing: 6.,
+                    quality_scale: 1.,
+                    detailed_style: false,
+                },
+                0.,
+            )
+            .unwrap();
+            let index = curve
+                .samples
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| {
+                    (head.x - f64::from(a.x) - 384.)
+                        .abs()
+                        .total_cmp(&(head.x - f64::from(b.x) - 384.).abs())
+                })
+                .unwrap()
+                .0;
+            indices.push(index);
+        }
+        assert_eq!(indices, vec![384; 7], "head-anchored pattern samples");
+    }
+
+    fn painted_pattern(curve: &CurveOutput, skin_id: u8, head: Point, limit: usize) -> usize {
+        let skin = resolve_authored_local_skin(skin_id, &[]).unwrap();
+        let samples: Vec<_> = curve
+            .samples
+            .iter()
+            .enumerate()
+            .map(|(i, p)| BodyPaintSample {
+                ordinal: curve.sample_ordinal(i),
+                x: p.x,
+                y: p.y,
+                tangent: p.angle,
+                flag: 2,
+            })
+            .collect();
+        // Unique authored numeric handles let this test observe both palette and
+        // shade without installing or rendering any image assets.
+        let assets: Vec<_> = (0..42 * 60)
+            .map(|handle| BodyAsset {
+                handle,
+                revision: 1,
+                width: 48,
+                height: 48,
+                status: BodyAssetStatus::Ready,
+            })
+            .collect();
+        let variants: Vec<Vec<_>> = (0..42)
+            .map(|palette| {
+                (0..60)
+                    .map(|variant| BodyAssetUse {
+                        asset: palette * 60 + variant,
+                        source_rect: None,
+                    })
+                    .collect()
+            })
+            .collect();
+        let palettes: Vec<_> = variants
+            .iter()
+            .map(|variants| BodyPalette {
+                variants,
+                boost_glow: Some(variants[0]),
+            })
+            .collect();
+        let effect = Some(BodyAssetUse {
+            asset: 0,
+            source_rect: None,
+        });
+        let plan = plan_reduced_body(BodyPaintInput {
+            geometry: BodyPaintGeometry {
+                samples: &samples,
+                active_count: samples.len(),
+                distance_cursor_seed: curve.distance_cursor_seed().unwrap(),
+                eligible: true,
+            },
+            recipe: BodyPaintRecipe {
+                base_palette: skin.base_palette,
+                palettes: &palettes,
+                runs: &skin.runs,
+                variant_mode: skin.variant_mode,
+                variant_period: skin.variant_period,
+                custom: skin.custom,
+                style: Some(skin.body_style),
+                outline: effect,
+                shadow: effect,
+                death: effect,
+            },
+            assets: &assets,
+            view: BodyPaintView {
+                camera: head,
+                zoom: 1.,
+                half_width: 1000.,
+                half_height: 1000.,
+            },
+            quality: BodyPaintQuality {
+                high_quality: true,
+                blend: 1.,
+            },
+            visual: BodyPaintVisual {
+                scale: 1.,
+                spawn: 1.,
+                death: 0.,
+                dead: false,
+                smoothed_speed: 4.,
+                boost_threshold: 5.,
+                cruise_speed: 4.,
+                maximum_speed: 10.,
+                boost_phase: 0.,
+            },
+            entry_alpha: 1.,
+            command_limit: limit,
+        })
+        .unwrap();
+        plan.commands
+            .iter()
+            .find(|c| c.ordinal == 384 && c.destination.width == c.destination.height)
+            .expect("fixed body sample survives nested quotas")
+            .asset_index
+    }
+
+    #[test]
+    fn compact_shades_and_stripes_survive_motion_tail_retirement_and_camera_quotas() {
+        for skin in [0, 10, 60] {
+            let mut body = fixture(128, 1.);
+            body.compact_visual();
+            let mut expected = None;
+            for anchor in 0..16 {
+                if anchor > 0 {
+                    let head = Point {
+                        x: 60030. + f64::from(anchor) * 6.,
+                        y: 4.,
+                    };
+                    body.apply_anchor(Some(head), None, false, head, false)
+                        .unwrap();
+                    body.advance(1000);
+                }
+                for phase in [0., 1., 3., 5.] {
+                    let head = Point {
+                        x: 60030. + f64::from(anchor) * 6. + phase,
+                        y: 4.,
+                    };
+                    let curve = sample_curve_with_heading(
+                        CurveInput {
+                            corrected_head: head,
+                            head_fraction: phase / 6.,
+                            body: body.points(),
+                            displayed_length: 128.,
+                            segment_length: 6.,
+                            point_spacing: 6.,
+                            target_point_spacing: 6.,
+                            quality_scale: 1.,
+                            detailed_style: false,
+                        },
+                        0.,
+                    )
+                    .unwrap();
+                    for quota in [97, 193, 385, 1000] {
+                        let reduced = super::super::curve::sample_curve_with_limit(
+                            CurveInput {
+                                corrected_head: head,
+                                head_fraction: phase / 6.,
+                                body: body.points(),
+                                displayed_length: 128.,
+                                segment_length: 6.,
+                                point_spacing: 6.,
+                                target_point_spacing: 6.,
+                                quality_scale: 1.,
+                                detailed_style: false,
+                            },
+                            0.,
+                            quota,
+                        )
+                        .unwrap();
+                        assert!(reduced.samples.len() <= quota);
+                        assert_eq!(reduced.samples.capacity(), reduced.samples.len());
+                        assert_eq!(
+                            reduced.storage_bytes(),
+                            reduced.samples.len()
+                                * (size_of::<CurveSample>() + size_of::<CurveVertex>())
+                        );
+                        for (i, sample) in reduced.samples.iter().enumerate() {
+                            assert_eq!(sample, &curve.samples[reduced.sample_ordinal(i)]);
+                        }
+                        let i = (0..reduced.samples.len())
+                            .find(|&i| reduced.sample_ordinal(i) == 384)
+                            .unwrap();
+                        assert_eq!(head.x - f64::from(reduced.samples[i].x), 384.);
+                        let pattern = painted_pattern(&reduced, skin, head, usize::MAX);
+                        assert_eq!(
+                            pattern,
+                            *expected.get_or_insert(pattern),
+                            "skin {skin}, anchor {anchor}, phase {phase}, quota {quota}"
+                        );
+                        assert_eq!(painted_pattern(&reduced, skin, head, quota), pattern);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn compact_turning_and_growing_snakes_keep_pattern_indices_at_fixed_arc_distance() {
+        for growing in [false, true] {
+            for skin in [0, 10, 60] {
+                let position = |i: f64| {
+                    if growing {
+                        Point {
+                            x: 60030. + i * 6.,
+                            y: 4.,
+                        }
+                    } else {
+                        Point {
+                            x: 60030. + 1000. * (i * 0.006).sin(),
+                            y: 1000. * (i * 0.006).cos(),
+                        }
+                    }
+                };
+                let mut body = fixture(128, 1.);
+                for (i, point) in body.points.iter_mut().enumerate() {
+                    point.position = position(-(i as f64));
+                }
+                body.compact_visual();
+                let mut expected_pattern = None;
+                for step in 0..16 {
+                    if step > 0 {
+                        let head = position(f64::from(step));
+                        body.apply_anchor(Some(head), None, growing, head, false)
+                            .unwrap();
+                        body.advance(1000);
+                        if step % 5 == 0 {
+                            body.compact_visual();
+                        }
+                    }
+                    for phase in [0., 0.25, 0.75] {
+                        let head = position(f64::from(step) + phase);
+                        // Independently walk the retained polyline to the same
+                        // physical distance behind the head, even as it turns
+                        // or the tail-to-head extent grows.
+                        let mut remaining = 384.;
+                        let mut previous = head;
+                        let mut expected_position = None;
+                        for point in body.points().iter().filter(|p| !p.dying()) {
+                            let next = point.position();
+                            let length = (next.x - previous.x).hypot(next.y - previous.y);
+                            if length >= remaining {
+                                expected_position = Some(Point {
+                                    x: previous.x + (next.x - previous.x) * remaining / length,
+                                    y: previous.y + (next.y - previous.y) * remaining / length,
+                                });
+                                break;
+                            }
+                            remaining -= length;
+                            previous = next;
+                        }
+                        let expected_position = expected_position.unwrap();
+                        for quota in [97, 193, 385] {
+                            let curve = super::super::curve::sample_curve_with_limit(
+                                CurveInput {
+                                    corrected_head: head,
+                                    head_fraction: phase,
+                                    body: body.points(),
+                                    displayed_length: body.logical_segments() as f64,
+                                    segment_length: 6.,
+                                    point_spacing: 6.,
+                                    target_point_spacing: 6.,
+                                    quality_scale: 1.,
+                                    detailed_style: false,
+                                },
+                                0.,
+                                quota,
+                            )
+                            .unwrap();
+                            let (i, sample) = curve
+                                .samples
+                                .iter()
+                                .enumerate()
+                                .min_by(|(_, a), (_, b)| {
+                                    (f64::from(a.x) - expected_position.x)
+                                        .hypot(f64::from(a.y) - expected_position.y)
+                                        .total_cmp(
+                                            &(f64::from(b.x) - expected_position.x)
+                                                .hypot(f64::from(b.y) - expected_position.y),
+                                        )
+                                })
+                                .unwrap();
+                            assert_eq!(
+                                curve.sample_ordinal(i),
+                                384,
+                                "growing {growing}, step {step}, phase {phase}, quota {quota}"
+                            );
+                            assert!(
+                                (f64::from(sample.x) - expected_position.x)
+                                    .hypot(f64::from(sample.y) - expected_position.y)
+                                    < 0.01
+                            );
+                            let pattern = painted_pattern(&curve, skin, head, usize::MAX);
+                            assert_eq!(pattern, *expected_pattern.get_or_insert(pattern));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn limited_curves_preserve_full_grid_samples_tangents_vertices_and_eye_target() {
+        for compact in [false, true] {
+            let mut body = fixture(128, 1.);
+            if compact {
+                body.compact_visual();
+            }
+            let input = CurveInput {
+                corrected_head: Point { x: 60033., y: 5. },
+                head_fraction: 0.5,
+                body: body.points(),
+                displayed_length: 127.4,
+                segment_length: 6.,
+                point_spacing: 6.,
+                target_point_spacing: 6.,
+                quality_scale: 1.,
+                detailed_style: false,
+            };
+            let full = sample_curve_with_heading(input, 0.).unwrap();
+            for limit in [2, 8, 97, 385, 1000] {
+                let reduced =
+                    super::super::curve::sample_curve_with_limit(input, 0., limit).unwrap();
+                assert!(reduced.samples.capacity() <= limit);
+                assert_eq!(
+                    reduced.storage_bytes(),
+                    reduced.samples.len() * (size_of::<CurveSample>() + size_of::<CurveVertex>())
+                );
+                assert_eq!(reduced.target_eye_heading, full.target_eye_heading);
+                assert_eq!(reduced.distance_cursor_seed(), full.distance_cursor_seed());
+                for (i, sample) in reduced.samples.iter().enumerate() {
+                    let ordinal = reduced.sample_ordinal(i);
+                    assert_eq!(sample, &full.samples[ordinal]);
+                    assert_eq!(reduced.vertices()[i], full.vertices()[ordinal]);
+                }
+                assert_eq!(reduced.samples.last(), full.samples.last());
+            }
+        }
     }
 
     #[test]

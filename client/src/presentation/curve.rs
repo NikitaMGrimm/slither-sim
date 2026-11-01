@@ -66,9 +66,38 @@ pub struct CurveOutput {
     vertices: Vec<CurveVertex>,
     redistribution_count: usize,
     distance_cursor_seed: Option<Point>,
+    ordinal_stride: usize,
+    terminal_ordinal: usize,
 }
 
 impl CurveOutput {
+    /// Head-relative source sample index, preserved when pressure removes detail.
+    pub fn sample_ordinal(&self, index: usize) -> usize {
+        if index + 1 == self.samples.len() {
+            self.terminal_ordinal
+        } else {
+            index * self.ordinal_stride
+        }
+    }
+
+    /// Allocated sample and vertex payloads, including unused Vec capacity.
+    pub fn storage_bytes(&self) -> usize {
+        self.samples.capacity() * size_of::<CurveSample>()
+            + self.vertices.capacity() * size_of::<CurveVertex>()
+    }
+
+    pub(super) fn scale_ordinals(&mut self, factor: usize) -> Result<(), PresentationError> {
+        self.ordinal_stride = self
+            .ordinal_stride
+            .checked_mul(factor)
+            .ok_or(PresentationError)?;
+        self.terminal_ordinal = self
+            .terminal_ordinal
+            .checked_mul(factor)
+            .ok_or(PresentationError)?;
+        Ok(())
+    }
+
     /// Pre- and post-redistribution f64 positions in head-to-tail order.
     pub fn vertices(&self) -> &[CurveVertex] {
         &self.vertices
@@ -83,6 +112,41 @@ impl CurveOutput {
     /// Fewer than two samples leave no displacement and therefore no seed.
     pub fn distance_cursor_seed(&self) -> Option<Point> {
         self.distance_cursor_seed
+    }
+}
+
+// Choose the nested source grid before allocating output. Retaining a full-grid
+// Vec only bounds its length, not the aggregate allocations in a prepared frame.
+struct SampleGrid {
+    stride: usize,
+    count: usize,
+    terminal: usize,
+}
+
+impl SampleGrid {
+    fn new(count: usize, limit: Option<usize>) -> Result<Self, PresentationError> {
+        let mut stride = 1;
+        if let Some(limit) = limit {
+            if limit < 2 {
+                return Err(PresentationError);
+            }
+            while count > limit && (count - 2) / stride + 2 > limit {
+                stride *= 2;
+            }
+        }
+        Ok(Self {
+            stride,
+            count: if count < 2 {
+                count
+            } else {
+                (count - 2) / stride + 2
+            },
+            terminal: count.saturating_sub(1),
+        })
+    }
+
+    fn contains(&self, index: usize) -> bool {
+        index.is_multiple_of(self.stride) || index == self.terminal
     }
 }
 
@@ -270,7 +334,7 @@ fn positive(value: f64) -> Result<(), PresentationError> {
 /// Sample one visible curve, preserving retained geometry and draw arithmetic.
 /// Call this exactly once per visible draw; no animation clock advances here.
 pub fn sample_curve(input: CurveInput<'_>) -> Result<CurveOutput, PresentationError> {
-    sample_curve_inner(input, None)
+    sample_curve_inner(input, None, None)
 }
 
 /// Sample with the raw head heading needed when fewer than two samples are emitted.
@@ -280,7 +344,16 @@ pub fn sample_curve_with_heading(
     raw_heading: f64,
 ) -> Result<CurveOutput, PresentationError> {
     finite(&[raw_heading])?;
-    sample_curve_inner(input, Some(raw_heading))
+    sample_curve_inner(input, Some(raw_heading), None)
+}
+
+pub(super) fn sample_curve_with_limit(
+    input: CurveInput<'_>,
+    raw_heading: f64,
+    limit: usize,
+) -> Result<CurveOutput, PresentationError> {
+    finite(&[raw_heading])?;
+    sample_curve_inner(input, Some(raw_heading), Some(limit))
 }
 
 fn sampling_parameters(input: CurveInput<'_>) -> Result<(f64, f64), PresentationError> {
@@ -467,6 +540,7 @@ pub(super) fn single_anchor_eye_target(
 fn sample_compact_curve(
     input: CurveInput<'_>,
     raw_heading: Option<f64>,
+    sample_limit: Option<usize>,
 ) -> Result<CurveOutput, PresentationError> {
     let (spacing, density) = sampling_parameters(input)?;
     let mut path = vec![input.corrected_head];
@@ -496,25 +570,40 @@ fn sample_compact_curve(
             }],
             redistribution_count: 0,
             distance_cursor_seed: None,
+            ordinal_stride: 1,
+            terminal_ordinal: 0,
         });
     }
-    let count = (input.displayed_length.max(1.) * density).ceil() + 1.;
-    if !count.is_finite() || count > MAX_CURVE_SAMPLES as f64 {
-        return Err(PresentationError);
-    }
-    let count = (count as usize).max(2);
     let total = path
         .windows(2)
         .try_fold(0., |sum, p| distance(p[0], p[1]).map(|d| sum + d))?;
     finite(&[total])?;
-    let mut samples = Vec::with_capacity(count);
-    let mut vertices = Vec::with_capacity(count);
+    // Stock colour/shade indices start at the head. Keep that spatial grid as
+    // the predicted head advances; fitting a fixed count to the entire changing
+    // span stretches every pattern band between consecutive anchor packets.
+    let world_step = input.segment_length / density;
+    positive(world_step)?;
+    let count = (total / world_step).ceil() + 1.;
+    if !count.is_finite() || count > MAX_CURVE_SAMPLES as f64 {
+        return Err(PresentationError);
+    }
+    let count = (count as usize).max(2);
+    let grid = SampleGrid::new(count, sample_limit)?;
+    let mut samples = Vec::with_capacity(grid.count);
+    let mut vertices = Vec::with_capacity(grid.count);
     let mut segment = 1;
     let mut before = 0.;
     let mut previous = first;
     let mut seed = None;
+    let mut first_angle = 0.;
     for i in 0..count {
-        let target = total * i as f64 / (count - 1) as f64;
+        // A retained tangent uses its immediate full-grid predecessor. The
+        // second full-grid point also owns the eye target. Other omitted
+        // positions need neither evaluation nor storage.
+        if !grid.contains(i) && !grid.contains(i + 1) && i != 1 {
+            continue;
+        }
+        let target = (world_step * i as f64).min(total);
         let mut length = distance(path[segment - 1], path[segment])?;
         while segment + 1 < path.len() && before + length < target {
             before += length;
@@ -531,23 +620,28 @@ fn sample_compact_curve(
         let p = point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)?;
         let delta = point(p.x - previous.x, p.y - previous.y)?;
         let angle = if i == 0 { 0. } else { delta.y.atan2(delta.x) };
-        samples.push(CurveSample {
-            x: p.x as f32,
-            y: p.y as f32,
-            angle: angle as f32,
-        });
-        vertices.push(CurveVertex {
-            sampled: p,
-            position: p,
-            distance_from_previous: Some(distance(previous, p)?),
-        });
+        if i == 1 {
+            first_angle = angle as f32;
+        }
+        if grid.contains(i) {
+            samples.push(CurveSample {
+                x: p.x as f32,
+                y: p.y as f32,
+                angle: angle as f32,
+            });
+            vertices.push(CurveVertex {
+                sampled: p,
+                position: p,
+                distance_from_previous: Some(distance(previous, p)?),
+            });
+        }
         if i != 0 {
             seed = Some(delta);
         }
         previous = p;
     }
-    samples[0].angle = samples[1].angle;
-    let target_eye_heading = f64::from(samples[1].angle) + PI;
+    samples[0].angle = first_angle;
+    let target_eye_heading = f64::from(first_angle) + PI;
     Ok(CurveOutput {
         samples,
         vertices,
@@ -555,18 +649,21 @@ fn sample_compact_curve(
         target_eye_heading,
         redistribution_count: 0,
         distance_cursor_seed: seed,
+        ordinal_stride: grid.stride,
+        terminal_ordinal: count - 1,
     })
 }
 
 fn sample_curve_inner(
     input: CurveInput<'_>,
     raw_heading: Option<f64>,
+    sample_limit: Option<usize>,
 ) -> Result<CurveOutput, PresentationError> {
     if input.body.len() < 2 {
         return Err(PresentationError);
     }
     if input.body.iter().any(BodyPoint::compacted) {
-        return sample_compact_curve(input, raw_heading);
+        return sample_compact_curve(input, raw_heading, sample_limit);
     }
     let (spacing, mut density) = sampling_parameters(input)?;
     let base_density = density;
@@ -697,9 +794,11 @@ fn sample_curve_inner(
         }
     }
     let redistribution_count = scratch.redistribute()?;
-    let mut samples = Vec::with_capacity(scratch.vertices.len());
+    let grid = SampleGrid::new(scratch.vertices.len(), sample_limit)?;
+    let mut samples = Vec::with_capacity(grid.count);
     let mut previous = head;
     let mut distance_cursor_seed = None;
+    let mut first_angle = 0.;
     for (index, vertex) in scratch.vertices.iter().enumerate() {
         let p = vertex.position;
         let angle = if index == 0 {
@@ -717,21 +816,41 @@ fn sample_curve_inner(
         if !sample.x.is_finite() || !sample.y.is_finite() || !sample.angle.is_finite() {
             return Err(PresentationError);
         }
-        samples.push(sample);
+        if index == 1 {
+            first_angle = sample.angle;
+        }
+        if grid.contains(index) {
+            samples.push(sample);
+        }
         previous = p;
     }
     let target_eye_heading = if samples.len() >= 2 {
-        samples[0].angle = samples[1].angle;
+        samples[0].angle = first_angle;
         // Preserve the antipodal turn choice made by the stored tangent.
-        f64::from(samples[1].angle) + PI
+        f64::from(first_angle) + PI
     } else {
         raw_heading.ok_or(PresentationError)?
     };
+    let vertices = if sample_limit.is_none() {
+        scratch.vertices
+    } else {
+        let mut selected = Vec::with_capacity(grid.count);
+        selected.extend(
+            scratch
+                .vertices
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, v)| grid.contains(i).then_some(v)),
+        );
+        selected
+    };
     Ok(CurveOutput {
+        terminal_ordinal: grid.terminal,
+        ordinal_stride: grid.stride,
         samples,
         point_spacing: spacing,
         target_eye_heading,
-        vertices: scratch.vertices,
+        vertices,
         redistribution_count,
         distance_cursor_seed,
     })
