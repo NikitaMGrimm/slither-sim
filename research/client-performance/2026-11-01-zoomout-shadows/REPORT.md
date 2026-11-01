@@ -1,12 +1,31 @@
 # Distant snake shadows at whole-map zoom (2026-11-01)
 
-**Preliminary retained-binary study; final candidate pending.** Independent review
-found that the native four-pixel eligibility used backing coordinates rather
-than displayed logical pixels, and that the disabled observer still performed
-thread-local checks. The retained results below describe the pinned old pair,
-not the corrected candidate. The 08:00 A/A and reversed B/A investigation will
-use that old pair unchanged; after 08:40 the scale conversion and observer
-feature gate will be corrected and the affected cells/crop remeasured.
+**Historical retained-binary study; new measurements pending.** The logical-pixel
+conversion and non-default observer feature are now implemented and have focused
+regressions. The 08:00 A/A and reversed B/A data did **not** clear the AMD merge
+blocker. Three newly built, #412-based binaries await the booked 10:10�10:50
+validation/remeasure window; compiler wait may extend it only to 11:05. Input
+validation precedes timing and any unequal unaffected input stops timing.
+
+All tables below, `selected.csv` and `phases.csv` use **retained-02**: baseline
+commit `181bc01f21441d3447cad7acefec1f683b347e29`, executable SHA-256
+`82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd`;
+candidate commit `583c502478fce0e576c82af1de5103bd21bc46ff`, executable SHA-256
+`42fe9aa38ab6effd10abf32d83b7053bc0af03675e3aa3665bfdaabff173eb32`.
+They are direct-offscreen data, not Original/Native measurements. Every CSV row
+now repeats its pair/commit/binary mapping. The A/A/B/A tables have their own
+explicit pairs in [CONTROL-RESULTS.md](CONTROL-RESULTS.md).
+
+`selected-preliminary.csv` retains the different first-window pair, explicitly
+mapped in [source-provenance.json](source-provenance.json). Those builds used
+uncommitted source trees; exact recorded trees are preserved as honestly labelled
+**retrospective** source-snapshot commits, created after capture. They did not
+exist at build time and are not the later retained-02 commits. Both original
+binary hashes and tree IDs remain unchanged.
+
+The same manifest pins the three new binaries: stock baseline `d1f4b031`,
+candidate `804f20c3`, and the candidate's forced-off diagnostic feature build.
+Their new CPU/GPU numbers will be published separately after validation.
 
 Dropping interleaved body shadows below four logical pixels reduces CPU render
 submission and GPU state changes in the authored Battledome workload. The native

@@ -1,0 +1,123 @@
+{
+  "retained_02": {
+    "pair_id": "retained-02",
+    "baseline_commit": "181bc01f21441d3447cad7acefec1f683b347e29",
+    "candidate_commit": "583c502478fce0e576c82af1de5103bd21bc46ff",
+    "baseline_binary_sha256": "82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd",
+    "candidate_binary_sha256": "42fe9aa38ab6effd10abf32d83b7053bc0af03675e3aa3665bfdaabff173eb32",
+    "presentation_mode": "direct-offscreen"
+  },
+  "preliminary_01": {
+    "pair_id": "preliminary-01",
+    "baseline_commit": "bb10d032bd9b3039b510c7a35cbac60c842b2aca",
+    "candidate_commit": "832f54f1a177ba39e81de7507005792d0209cb01",
+    "baseline_binary_sha256": "b9aebe0bd2bbd6f561f607c169cba359f1a05683eac26571cba8265b27027c4a",
+    "candidate_binary_sha256": "20e7c106191dbe73ba6af7a18d49955ab4ab07f5aa7bbbdf5163d7522b000093",
+    "baseline_source_tree": "2a9c3f619aeaece733bd770027789e435e6c8683",
+    "candidate_source_tree": "66c1b384ec2a976184fe12ee01a5721d270d316c",
+    "commit_kind": "retrospective source snapshot; original build used an uncommitted tree",
+    "presentation_mode": "direct-offscreen"
+  },
+  "preliminary_snapshot_details": {
+    "candidate": {
+      "capture_commit": "not recorded (uncommitted source tree at build time)",
+      "binary_sha256": "20e7c106191dbe73ba6af7a18d49955ab4ab07f5aa7bbbdf5163d7522b000093",
+      "snapshot_commit": "832f54f1a177ba39e81de7507005792d0209cb01",
+      "commit_kind": "retrospective snapshot created after capture",
+      "tag": "client-zoomout-preliminary-candidate-20261101",
+      "source_tree": "66c1b384ec2a976184fe12ee01a5721d270d316c"
+    },
+    "baseline": {
+      "capture_commit": "not recorded (uncommitted source tree at build time)",
+      "binary_sha256": "b9aebe0bd2bbd6f561f607c169cba359f1a05683eac26571cba8265b27027c4a",
+      "snapshot_commit": "bb10d032bd9b3039b510c7a35cbac60c842b2aca",
+      "commit_kind": "retrospective snapshot created after capture",
+      "tag": "client-zoomout-preliminary-baseline-20261101",
+      "source_tree": "2a9c3f619aeaece733bd770027789e435e6c8683"
+    }
+  },
+  "rebased_04": {
+    "baseline": {
+      "commit": "d1f4b031d3f9c863944791023063af28dd51b97f",
+      "tree": "3259c7ffffd1e6c33dab6dd19b5036b654e3b1b4",
+      "base_main": "3669ac9a3a334a3d6d5b767cbe2080646487dc97",
+      "features": "frame-profile,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "target_dir": "D:/CargoTargets/zoomout-perf",
+      "jobs": 2,
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "built": {
+        "started": "2026-11-01T09:25:07.035704+01:00",
+        "ended": "2026-11-01T09:29:01.627091+01:00",
+        "exit": 0
+      },
+      "frame_perf": {
+        "artifact": "baseline-frame_perf-04.exe",
+        "sha256": "998f0ef0ea72e886ecbc9cdc270eb7fbc59fccaba1c12282006ed35e7a0020b9"
+      },
+      "feel_replay": {
+        "artifact": "baseline-feel-replay-04.exe",
+        "sha256": "3b02ec78cd9bc3473e6cd6b1177f139a437e13ba77cff6515d9e3f16a1d434d8"
+      },
+      "gpu_trace_json": {
+        "artifact": "baseline-gpu-trace-json-04.exe",
+        "sha256": "6a8406ad139e6692f939148d693602e3e4b99bb6ec9ea064aaf966491c531dda"
+      }
+    },
+    "candidate": {
+      "commit": "804f20c39442d1eccb8eea2074c2dc2e3e58c04b",
+      "tree": "d817c57e29ed2d82516f419a0925ef8ecc6f6e0e",
+      "base_main": "3669ac9a3a334a3d6d5b767cbe2080646487dc97",
+      "features": "frame-profile,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "target_dir": "D:/CargoTargets/zoomout-perf",
+      "jobs": 2,
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "built": {
+        "started": "2026-11-01T09:29:25.9828+01:00",
+        "ended": "2026-11-01T09:31:32.322184+01:00",
+        "exit": 0
+      },
+      "frame_perf": {
+        "artifact": "candidate-frame_perf-04.exe",
+        "sha256": "5e57734ea0cd2754729b3290c2be6915bf6718fced8b6f8ac5401ea873a8439e"
+      },
+      "feel_replay": {
+        "artifact": "candidate-feel-replay-04.exe",
+        "sha256": "9effedf67b938c500764f5419692b9063a59022d3512fbb16f61bd442f86ef1d"
+      },
+      "gpu_trace_json": {
+        "artifact": "candidate-gpu-trace-json-04.exe",
+        "sha256": "d312a62ec42afb15b130b645be5eb9bb86acfa67b75483e74054009d107039e3"
+      }
+    },
+    "forced_off": {
+      "commit": "804f20c39442d1eccb8eea2074c2dc2e3e58c04b",
+      "tree": "d817c57e29ed2d82516f419a0925ef8ecc6f6e0e",
+      "base_main": "3669ac9a3a334a3d6d5b767cbe2080646487dc97",
+      "features": "frame-profile-no-shadow-cut,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile-no-shadow-cut,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "target_dir": "D:/CargoTargets/zoomout-perf",
+      "jobs": 2,
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: x86_64-pc-windows-msvc\nrelease: 1.99.0\nLLVM version: 23.1.1",
+      "built": {
+        "started": "2026-11-01T09:32:37.735056+01:00",
+        "ended": "2026-11-01T09:34:29.169622+01:00",
+        "exit": 0
+      },
+      "frame_perf": {
+        "artifact": "forced-off-frame_perf-04.exe",
+        "sha256": "5eaaace4f6a540a3b1fe0cc58b145e32314843d94a2cb2dcd3e5dc39aecdc754"
+      },
+      "feel_replay": {
+        "artifact": "forced-off-feel-replay-04.exe",
+        "sha256": "c117abcabf43d24e0af005ba3bff0cdc49428da07a3bf37d5ccd38a67e7a8389"
+      },
+      "gpu_trace_json": {
+        "artifact": "forced-off-gpu-trace-json-04.exe",
+        "sha256": "d8dce337aa841a97d5532fb6e957e606a4cad918178c949d2ddf28f5837572d7"
+      }
+    }
+  },
+  "rebased_04_status": "binaries built; timing/input-validation results pending booked 10:10 window"
+}
