@@ -716,3 +716,49 @@ fn duplicate_and_eaten_capacity_counts_and_clear_releases_without_reusing_serial
     assert!(SnakeObjectToken::new(0).is_err());
     assert_eq!(SnakeObjectToken::new(u64::MAX).unwrap().serial(), u64::MAX);
 }
+
+#[test]
+fn cloned_food_branches_preserve_order_animation_and_serials() {
+    let palette = Palette::new(1);
+    let mut original = FoodWorld::new();
+    for key in [1, 2, 1] {
+        add(&mut original, &palette, key);
+    }
+    let frozen = original.clone();
+    let mut branch = original.clone();
+    let token = SnakeObjectToken::new(7).unwrap();
+    assert_eq!(
+        branch
+            .consume(1, FoodConsume::Eaten(Some(token)))
+            .unwrap()
+            .serial(),
+        3
+    );
+    branch.advance(step(1.), |_| Ok(pose())).unwrap();
+    assert_eq!(original, frozen);
+    assert!(!original.foods()[2].snapshot().eaten);
+    assert!(branch.foods()[2].snapshot().eaten);
+    assert_ne!(branch.foods()[2].snapshot(), original.foods()[2].snapshot());
+
+    let mut removed = original.clone();
+    removed.consume(2, FoodConsume::Immediate);
+    assert_eq!(
+        removed
+            .foods()
+            .iter()
+            .map(|f| f.snapshot().instance.serial())
+            .collect::<Vec<_>>(),
+        [1, 3]
+    );
+    assert_eq!(original, frozen);
+    assert_eq!(removed.clear_sector((2, 3)), 2);
+    assert!(removed.foods().is_empty());
+    assert_eq!(add(&mut removed, &palette, 9).serial(), 4);
+    assert_eq!(original, frozen);
+
+    branch.clear();
+    assert_eq!(add(&mut branch, &palette, 8).serial(), 4);
+    assert_eq!(add(&mut original, &palette, 7).serial(), 4);
+    assert_eq!(frozen.foods().len(), 3);
+    assert_eq!(original.foods().len(), 4);
+}

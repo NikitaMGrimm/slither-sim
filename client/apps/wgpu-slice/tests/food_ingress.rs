@@ -13,6 +13,19 @@ thread_local! {
     static ENABLED: Cell<bool> = const { Cell::new(false) };
     static COUNT: Cell<usize> = const { Cell::new(0) };
     static BYTES: Cell<usize> = const { Cell::new(0) };
+    static FAIL_AT_LEAST: Cell<usize> = const { Cell::new(usize::MAX) };
+}
+fn fail_allocation(bytes: usize) -> bool {
+    FAIL_AT_LEAST
+        .try_with(|limit| {
+            if bytes >= limit.get() {
+                limit.set(usize::MAX);
+                true
+            } else {
+                false
+            }
+        })
+        .unwrap_or(false)
 }
 fn charge(bytes: usize) {
     if ENABLED.try_with(Cell::get).unwrap_or(false) {
@@ -24,14 +37,23 @@ fn charge(bytes: usize) {
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         charge(layout.size());
+        if fail_allocation(layout.size()) {
+            return std::ptr::null_mut();
+        }
         unsafe { System.alloc(layout) }
     }
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         charge(layout.size());
+        if fail_allocation(layout.size()) {
+            return std::ptr::null_mut();
+        }
         unsafe { System.alloc_zeroed(layout) }
     }
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
         charge(size);
+        if fail_allocation(size) {
+            return std::ptr::null_mut();
+        }
         unsafe { System.realloc(ptr, layout, size) }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
@@ -79,6 +101,57 @@ fn own_move(protocol: u8) -> Vec<u8> {
         wire::anchor(b'g', 7, &[4, 176, 4, 76], None)
     } else {
         vec![b'=', 0, 0, 4, 176, 4, 76]
+    }
+}
+
+#[test]
+fn retained_food_is_not_recopied_by_read_only_world_snapshots() {
+    let game = ready(13, 6000);
+    let mut snapshots = Vec::with_capacity(3);
+    let food_bytes = std::mem::size_of_val(game.client().foods().foods());
+    BYTES.set(0);
+    ENABLED.set(true);
+    for _ in 0..3 {
+        snapshots.push(game.client().clone());
+    }
+    ENABLED.set(false);
+    let allocated = BYTES.get();
+    // Received maps and snake channels still copy. The three transaction
+    // snapshots together must allocate less than one full retained-food array.
+    assert!(
+        allocated < food_bytes,
+        "snapshots={allocated}, food={food_bytes}"
+    );
+    for snapshot in snapshots {
+        assert_eq!(&snapshot, game.client());
+    }
+    println!("6000 foods, 3 snapshots: allocated_bytes={allocated}, food_bytes={food_bytes}");
+}
+
+#[test]
+fn failed_shared_food_detach_preserves_the_staged_packet_and_snapshot() {
+    for protocol in [13, 19] {
+        let mut game = ready(protocol, 6000);
+        let frozen = game.client().clone();
+        let packet = food(protocol, b'f', 0);
+        FAIL_AT_LEAST.set(std::mem::size_of_val(frozen.foods().foods()));
+        let result = game.receive(game.generation(), &packet, 301.);
+        let pending = FAIL_AT_LEAST.replace(usize::MAX);
+        assert_eq!(pending, usize::MAX, "detach reservation was not reached");
+        assert!(result.is_err());
+        assert_eq!(game.client(), &frozen);
+        // The failed packet cannot advance serials, caches, counters or session
+        // controls; retrying it after the injected failure succeeds once.
+        game.receive(game.generation(), &packet, 302.).unwrap();
+        assert_eq!(
+            game.client().received().frames_applied,
+            frozen.received().frames_applied + 1
+        );
+        assert_eq!(
+            game.client().foods().foods().len(),
+            frozen.foods().foods().len() + 1
+        );
+        assert_eq!(frozen.foods().foods().len(), 6000);
     }
 }
 
