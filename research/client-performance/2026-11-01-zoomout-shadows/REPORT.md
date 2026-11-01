@@ -281,7 +281,8 @@ observer's rebuilt baseline/candidate pair.
 - Full `npm run check` reached the native studio-cosmetics tests before its
   measurement-window guard stopped that attempt. A fresh check was paused at
   the owner's next quiet-window instruction. Full validation will resume after
-  08:40; no complete full-check pass is claimed yet.
+  09:15, after the latency rig's reserved capture window; no complete full-check
+  pass is claimed yet.
 - Final all-target format/Clippy, 33 body-painter tests, nine release zoom tests,
   issued-picture feel regression, two latency tests and observer regression passed.
 - Final baseline/candidate workload preflights completed, score-400 assertions
