@@ -226,6 +226,12 @@ mod desktop {
             Ok(())
         }
         fn effects(&mut self) -> Result<()> {
+            if self.login.take_cancel_request() {
+                if let Some(p) = &self.preparation {
+                    p.cancel();
+                }
+                self.login.cancel_game(&mut self.game);
+            }
             for _ in 0..64 {
                 let Some(e) = self.game.effect() else {
                     return Ok(());
@@ -578,7 +584,9 @@ mod desktop {
                 }
             }
             self.effects()?;
-            if let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref()) {
+            if self.login.egui_owns_input()
+                && let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref())
+            {
                 if self.game.ingame_menu_open() {
                     self.login.ingame_input(&mut self.game, input)?;
                 } else {
@@ -901,10 +909,17 @@ mod desktop {
             .then(latency::callback);
             let result = (|| -> Result<()> {
                 // Raw window state belongs to the host, before any modal can consume delivery.
-                let response = r
-                    .login
-                    .egui
-                    .window_event(&event, r.window.scale_factor(), || r.window.as_ref());
+                let response = if r.login.egui_owns_input() {
+                    r.login
+                        .egui
+                        .window_event(&event, r.window.scale_factor(), || r.window.as_ref())
+                } else {
+                    r.login.egui.observe_only(&event, r.window.scale_factor());
+                    egui_winit::EventResponse {
+                        consumed: false,
+                        repaint: false,
+                    }
+                };
                 if matches!(
                     event,
                     WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
@@ -937,7 +952,7 @@ mod desktop {
                         inactive.window_event(&event);
                     }
                 }
-                if r.login.egui.active() {
+                if r.login.egui_owns_input() {
                     if response.repaint {
                         r.schedule.invalidate();
                     }
@@ -961,7 +976,12 @@ mod desktop {
                             r.login.ingame_input(&mut r.game, input)?;
                             r.effects()?;
                         } else {
+                            r.login.set_admission(admission);
                             r.login.settings_input(input);
+                            r.login.egui.platform_output(&r.window);
+                            let effects = r.login.take_egui_effects();
+                            r.edit_effects(effects);
+                            r.effects()?;
                         }
                     }
                     if input_event {

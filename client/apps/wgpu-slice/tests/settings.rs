@@ -66,7 +66,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     login.focus(NICKNAME);
     for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
         assert!(key(&mut login, NamedKey::Tab));
-        assert_eq!(login.controls.focus(), Some(id));
+        assert_eq!(login.focused(), Some(id));
     }
     login.focus(SETTINGS);
     let opened = login.key(
@@ -107,13 +107,13 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     assert!(key(&mut login, NamedKey::Escape));
     assert!(!login.state.settings.is_open());
     login.step(9846., true, false).unwrap();
-    assert_eq!(login.controls.focus(), Some(SETTINGS));
+    assert_eq!(login.focused(), Some(SETTINGS));
     login.prepare([960, 540], true, None).unwrap();
     assert!(key(&mut login, NamedKey::Enter));
     login.focus(DONE);
     assert!(key(&mut login, NamedKey::Space));
     assert!(!login.state.settings.visible());
-    assert_eq!(login.controls.focus(), Some(SETTINGS));
+    assert_eq!(login.focused(), Some(SETTINGS));
     assert_eq!(login.state.view(true).nickname, "Player");
     assert_eq!(login.studio.state.committed().nickname, "Player");
     assert_eq!(login.studio.state.committed(), &appearance);
@@ -129,7 +129,8 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
             quality: Q::Low
         }]
     );
-    assert!(!key(&mut login, NamedKey::Escape)); // host retains Stop/cancel.
+    assert!(key(&mut login, NamedKey::Escape));
+    assert!(login.take_cancel_request());
 }
 
 #[test]
@@ -398,8 +399,8 @@ fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
     assert_eq!(login.state.settings.alpha(), alpha);
     assert!(login.egui.active());
     login.step(9945., true, false).unwrap();
-    assert!(!login.egui.active());
-    assert_eq!(login.controls.focus(), Some(SETTINGS));
+    assert!(login.egui.active());
+    assert_eq!(login.focused(), Some(SETTINGS));
 }
 
 #[test]
@@ -415,8 +416,8 @@ fn native_settings_uses_the_shared_picker_fade_durations() {
     for now in (10_016..=10_320).step_by(16) {
         login.step(now as f64, true, false).unwrap();
     }
-    assert!(!login.egui.active());
-    assert_eq!(login.controls.focus(), Some(SETTINGS));
+    assert!(login.egui.active());
+    assert_eq!(login.focused(), Some(SETTINGS));
 }
 
 #[test]
@@ -479,19 +480,21 @@ fn backdrop_closes_on_matching_release_and_retains_the_return_fade() {
 
 #[test]
 fn nickname_composition_blocks_settings_entry() {
-    use slither_client::menu_input::{EditIntent, EditorId};
     let mut login = settled();
-    login
-        .input
-        .state
-        .apply(EditIntent::Focus(Some(EditorId::Nickname)));
-    login
-        .input
-        .state
-        .apply(EditIntent::Preedit("authored preedit".into(), None));
+    login.prepare([960, 540], true, None).unwrap();
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "authored preedit".into(),
+            active_range_chars: None,
+        })],
+        ..Default::default()
+    });
     login.open_settings(true);
     assert!(!login.state.settings.visible());
-    login.input.state.apply(EditIntent::CancelComposition);
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::Ime(egui::ImeEvent::Commit(String::new()))],
+        ..Default::default()
+    });
     login.open_settings(true);
     assert!(login.state.settings.visible());
     assert_eq!(login.input.state.focus(), None);
@@ -767,7 +770,7 @@ fn wheel_and_click_keep_callback_and_raw_batch_order() {
 }
 
 #[test]
-fn ime_preedit_and_commit_keep_immediate_passes() {
+fn ime_preedit_waits_for_redraw_and_commit_keeps_its_boundary() {
     let mut login = settled();
     login.open_settings(true);
     let context = login.egui.context().unwrap().clone();
@@ -778,12 +781,13 @@ fn ime_preedit_and_commit_keep_immediate_passes() {
         },
         egui::ImeEvent::Commit("authored".into()),
     ] {
+        let preedit = matches!(event, egui::ImeEvent::Preedit { .. });
         let passes = context.cumulative_pass_nr();
         login.settings_input(egui::RawInput {
             events: vec![egui::Event::Ime(event)],
             ..Default::default()
         });
-        assert_eq!(context.cumulative_pass_nr(), passes + 1);
+        assert_eq!(context.cumulative_pass_nr(), passes + u64::from(!preedit));
     }
     assert!(login.state.settings.is_open());
     assert_eq!(login.state.settings.preferences().quality, Q::High);
@@ -909,7 +913,7 @@ fn scrollbar_drag_applies_queued_motion_before_release_without_redraw() {
 #[test]
 fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
     let mut login = settled();
-    assert!(!login.egui.initialized());
+    assert!(login.egui.initialized());
     login
         .egui
         .window
@@ -960,10 +964,8 @@ fn modal_cursor_handoff_uses_the_latest_physical_position_without_another_move()
     assert!(
         login
             .egui
-            .route_window_event(&moved(start), 1., |_| panic!(
-                "closed owner translated input"
-            ))
-            .is_none()
+            .route_window_event(&moved(start), 1., |_| ())
+            .is_some()
     );
     login.pointer(login.egui.window.cursor(), Some(true), true);
     login.pointer(login.egui.window.cursor(), Some(false), true);

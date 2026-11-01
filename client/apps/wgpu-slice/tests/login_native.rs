@@ -1,54 +1,618 @@
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use slither_client::{
-    menu_input::{EditIntent, HostEditEffect, TextField},
+    login_controls::{CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
+    menu_input::{EditIntent, HostEditEffect},
     menu_layout::MenuElement as E,
-    menu_preferences::MenuQuality,
     start_page::{MenuPhase, StartMenuIntent},
 };
 use slither_wgpu_slice::login_native::NativeLogin;
 
+fn settled(nickname: &str) -> NativeLogin {
+    let mut login = NativeLogin::new(nickname).unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    for _ in 0..2 {
+        login.prepare([960, 540], true, None).unwrap();
+    }
+    login
+}
+fn input(login: &mut NativeLogin, event: egui::Event) {
+    login.settings_input(egui::RawInput {
+        events: vec![event],
+        ..Default::default()
+    });
+}
+fn press(login: &mut NativeLogin, key: egui::Key, modifiers: egui::Modifiers) {
+    for pressed in [true, false] {
+        input(
+            login,
+            egui::Event::Key {
+                key,
+                physical_key: Some(key),
+                pressed,
+                repeat: false,
+                modifiers,
+            },
+        );
+    }
+}
+fn select_all(login: &mut NativeLogin) {
+    press(
+        login,
+        egui::Key::A,
+        egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        },
+    );
+}
+
 #[test]
-fn shared_field_placement_keeps_placeholder_value_preedit_and_ime_together() {
-    for dpr in [1., 1.25, 1.5, 1.75, 2.] {
-        for value in ["", "Player", "WWWWWWWWWWWWWWWWWWWWWWWW"] {
-            let mut login = NativeLogin::new(value).unwrap();
-            login.step(0., true, false).unwrap();
-            login.step(16., true, false).unwrap();
-            for preedit in [false, true] {
-                if preedit {
-                    login
-                        .input
-                        .state
-                        .apply(EditIntent::Preedit("é".into(), Some((0, 2))));
+fn egui_focus_is_unique_and_every_control_is_reachable_in_both_directions() {
+    for area in [[360., 640.], [960., 540.], [1920., 1080.]] {
+        for dpr in [1., 1.5, 2.] {
+            let extent = area.map(|n| (n * dpr) as u32);
+            let mut login = settled("Player");
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            assert_eq!(login.focused(), Some(NICKNAME));
+            for (modifiers, order) in [
+                (
+                    egui::Modifiers::NONE,
+                    [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME],
+                ),
+                (
+                    egui::Modifiers::SHIFT,
+                    [SETTINGS, SERVER, CHANGE_SKIN, PLAY, NICKNAME],
+                ),
+            ] {
+                for id in order {
+                    press(&mut login, egui::Key::Tab, modifiers);
+                    assert_eq!(login.focused(), Some(id), "{area:?}, DPR {dpr}");
+                    assert_eq!(login.login_ui.controls.iter().filter(|c| c.2).count(), 1);
                 }
-                let picture = login
-                    .prepare_host([(960. * dpr) as u32, (540. * dpr) as u32], dpr, true, None)
-                    .unwrap();
-                let caret = picture
-                    .frame
-                    .draws
-                    .iter()
-                    .find(|d| {
-                        d.destination.height > 5.
-                            && picture.resources.iter().any(|r| {
-                                r.asset == d.asset
-                                    && r.image
-                                        .pixels
-                                        .as_chunks::<4>()
-                                        .0
-                                        .iter()
-                                        .all(|p| *p == [224, 224, 255, 255])
-                            })
-                    })
-                    .unwrap();
-                assert!(login.cursor_area().unwrap().iter().any(|e| matches!(e,
-                    HostEditEffect::ImeCursorArea { position, size }
-                    if *position == [caret.destination.x, caret.destination.y]
-                    && *size == [caret.destination.width, caret.destination.height]
-                )));
             }
         }
     }
+}
+
+#[test]
+fn egui_controls_and_ime_cursor_stay_inside_small_and_large_windows() {
+    for area in [[320., 240.], [360., 640.], [960., 540.], [1920., 1080.]] {
+        for dpr in [1., 1.5, 2.] {
+            let mut login = settled("WWWWWWWWWWWWWWWWWWWWWWWW");
+            let extent = area.map(|n| (n * dpr) as u32);
+            for _ in 0..2 {
+                login.prepare_host(extent, dpr, true, None).unwrap();
+            }
+            let window = egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(area[0] as f32, area[1] as f32),
+            );
+            for (_, r, _) in &login.login_ui.controls {
+                assert!(
+                    r.is_positive() && window.contains_rect(*r),
+                    "{area:?} {dpr} {r:?}"
+                );
+            }
+            let ime = login.egui.output().and_then(|o| o.ime).unwrap();
+            assert!(window.contains_rect(ime.rect));
+            let field = login
+                .login_ui
+                .controls
+                .iter()
+                .find(|c| c.0 == NICKNAME)
+                .unwrap()
+                .1;
+            assert!(
+                field.contains_rect(ime.cursor_rect),
+                "{area:?} DPR {dpr}, IME {ime:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn nickname_uses_utf16_substitution_and_full_value_truncation_before_play() {
+    for text in ["A😀\u{7f}\n日", "12345678901234567890123😀tail"] {
+        let mut login = settled("Initial");
+        select_all(&mut login);
+        input(&mut login, egui::Event::Paste(text.into()));
+        let expected = slither_client::start_page::normalize_nickname(text);
+        assert_eq!(login.state.view(true).nickname, expected);
+        press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+        assert!(
+            matches!(login.step(9616.,true,false).unwrap().0.as_slice(),[StartMenuIntent::Play{nickname,..}] if nickname==&expected)
+        );
+        assert!(login.step(9632., true, false).unwrap().0.is_empty());
+    }
+    let mut login = settled("123456789012345678901234");
+    press(&mut login, egui::Key::Home, egui::Modifiers::NONE);
+    input(&mut login, egui::Event::Text("AB".into()));
+    assert_eq!(login.state.view(true).nickname, "AB1234567890123456789012");
+}
+
+#[test]
+fn normalized_cjk_and_emoji_pastes_keep_both_caret_endpoints_within_text() {
+    for text in ["日".repeat(32), "😀".repeat(32), "日😀".repeat(16)] {
+        let mut login = settled("12345678901234567890123");
+        press(&mut login, egui::Key::End, egui::Modifiers::NONE);
+        input(&mut login, egui::Event::Paste(text));
+        assert_eq!(login.state.view(true).nickname, "12345678901234567890123 ");
+        let ctx = login.egui.context().unwrap();
+        let state =
+            egui::TextEdit::load_state(ctx, slither_wgpu_slice::login_egui::widget_id(NICKNAME))
+                .unwrap();
+        let range = state.cursor.char_range().unwrap();
+        let chars = login.login_ui.nickname.chars().count();
+        assert_eq!(chars, 24);
+        assert!(range.primary.index.0 <= chars, "{range:?}");
+        assert!(range.secondary.index.0 <= chars, "{range:?}");
+    }
+}
+
+#[test]
+fn sustained_ime_coalesces_before_redraw_and_commit_does_not_play() {
+    let mut login = settled("Initial");
+    select_all(&mut login);
+    let context = login.egui.context().unwrap().clone();
+    let passes = context.cumulative_pass_nr();
+    for n in 0..1000 {
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: format!("日{n}"),
+                active_range_chars: Some(0..1),
+            }),
+        );
+    }
+    assert_eq!(context.cumulative_pass_nr(), passes);
+    assert_eq!(login.state.view(true).nickname, "Initial");
+    login.prepare([960, 540], true, None).unwrap();
+    assert_eq!(context.cumulative_pass_nr(), passes + 1);
+    assert_eq!(login.displayed_nickname(), "日999");
+    press(&mut login, egui::Key::Tab, egui::Modifiers::NONE);
+    assert_eq!(login.focused(), Some(NICKNAME));
+    press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    input(
+        &mut login,
+        egui::Event::Ime(egui::ImeEvent::Commit("A😀\u{7f}".into())),
+    );
+    assert!(!login.login_ui.composing);
+    assert_eq!(login.state.view(true).nickname, "A  \u{7f}");
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+    assert!(
+        matches!(login.step(9616.,true,false).unwrap().0.as_slice(),[StartMenuIntent::Play{nickname,..}] if nickname=="A  \u{7f}")
+    );
+}
+
+#[test]
+fn ime_cancellation_restores_committed_text_and_full_field_commit_uses_the_same_limit() {
+    for cancel in [
+        egui::Event::WindowFocused(false),
+        egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: String::new(),
+            active_range_chars: None,
+        }),
+    ] {
+        let mut login = settled("Initial");
+        select_all(&mut login);
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "日".into(),
+                active_range_chars: None,
+            }),
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        input(&mut login, cancel);
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(login.state.view(true).nickname, "Initial");
+        assert!(!login.login_ui.composing);
+    }
+    let mut login = settled("123456789012345678901234");
+    press(&mut login, egui::Key::Home, egui::Modifiers::NONE);
+    input(
+        &mut login,
+        egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "日".into(),
+            active_range_chars: None,
+        }),
+    );
+    input(
+        &mut login,
+        egui::Event::Ime(egui::ImeEvent::Commit("AB".into())),
+    );
+    assert_eq!(login.state.view(true).nickname, "AB1234567890123456789012");
+}
+
+#[test]
+fn native_ime_disabled_restores_preedit_before_and_after_redraw() {
+    for redraw in [false, true] {
+        let mut login = settled("Initial");
+        select_all(&mut login);
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        if redraw {
+            login.prepare([960, 540], true, None).unwrap();
+        }
+        assert!(login.login_ui.composing);
+        let response = login.egui.window_event(
+            &winit::event::WindowEvent::Ime(winit::event::Ime::Disabled),
+            1.,
+            || panic!("native Disabled must be handled before the window adapter"),
+        );
+        assert!(response.repaint);
+        login.settings_input(egui::RawInput::default());
+        assert!(!login.login_ui.composing);
+        assert_eq!(login.displayed_nickname(), "Initial");
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(login.displayed_nickname(), "Initial");
+        press(&mut login, egui::Key::Tab, egui::Modifiers::NONE);
+        assert_eq!(login.focused(), Some(PLAY));
+        press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+        assert!(matches!(
+            login.step(9616., true, false).unwrap().0.as_slice(),
+            [StartMenuIntent::Play { nickname, .. }] if nickname == "Initial"
+        ));
+    }
+}
+
+#[test]
+fn timed_ime_candidates_never_enter_cancelled_or_committed_undo_history() {
+    for commit in [false, true] {
+        let mut login = settled("Before");
+        select_all(&mut login);
+        input(&mut login, egui::Event::Text("Committed".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        select_all(&mut login);
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        login.step(12800., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(login.displayed_nickname(), "候補");
+        input(
+            &mut login,
+            if commit {
+                egui::Event::Ime(egui::ImeEvent::Commit("Final".into()))
+            } else {
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: String::new(),
+                    active_range_chars: None,
+                })
+            },
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit { "Final" } else { "Committed" }
+        );
+        let command = egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        };
+        let mut saw_committed = !commit;
+        for _ in 0..6 {
+            press(&mut login, egui::Key::Z, command);
+            let text = login.displayed_nickname();
+            assert!(matches!(text.as_str(), "Before" | "Committed"), "{text:?}");
+            saw_committed |= text == "Committed";
+        }
+        assert!(saw_committed);
+        assert_eq!(login.displayed_nickname(), "Before");
+        for _ in 0..6 {
+            press(
+                &mut login,
+                egui::Key::Z,
+                egui::Modifiers {
+                    shift: true,
+                    ..command
+                },
+            );
+            let text = login.displayed_nickname();
+            assert!(
+                matches!(text.as_str(), "Before" | "Committed" | "Final"),
+                "{text:?}"
+            );
+        }
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit { "Final" } else { "Committed" }
+        );
+    }
+}
+
+#[test]
+fn ime_commit_after_undo_discards_old_redo_while_cancellation_preserves_it() {
+    for commit in [false, true] {
+        let mut login = settled("Before");
+        let command = egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        };
+        select_all(&mut login);
+        input(&mut login, egui::Event::Text("Committed".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        for _ in 0..6 {
+            press(&mut login, egui::Key::Z, command);
+        }
+        assert_eq!(login.displayed_nickname(), "Before");
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        login.step(12800., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        input(
+            &mut login,
+            if commit {
+                egui::Event::Ime(egui::ImeEvent::Commit("Final".into()))
+            } else {
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: String::new(),
+                    active_range_chars: None,
+                })
+            },
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        let committed = login.displayed_nickname();
+        if commit {
+            assert!(committed.contains("Final"));
+        }
+        for _ in 0..6 {
+            press(
+                &mut login,
+                egui::Key::Z,
+                egui::Modifiers {
+                    shift: true,
+                    ..command
+                },
+            );
+        }
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit {
+                committed
+            } else {
+                "Committed".into()
+            }
+        );
+    }
+}
+
+#[test]
+fn windows_process_enter_cannot_insert_payload_or_activate_until_key_up() {
+    use slither_wgpu_slice::menu_input_native::KeyInput;
+    use winit::{
+        event::ElementState,
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+    };
+    let mut login = settled("Player");
+    let logical = Key::Named(NamedKey::Process);
+    let physical = PhysicalKey::Code(KeyCode::Enter);
+    assert!(login.egui.process_key(KeyInput {
+        logical: &logical,
+        physical,
+        text: Some("uncommitted"),
+        state: ElementState::Pressed,
+        repeat: false
+    }));
+    input(
+        &mut login,
+        egui::Event::Key {
+            key: egui::Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Default::default(),
+        },
+    );
+    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
+    assert_eq!(login.state.view(true).nickname, "Player");
+    assert!(login.egui.process_key(KeyInput {
+        logical: &logical,
+        physical,
+        text: None,
+        state: ElementState::Released,
+        repeat: false
+    }));
+    login.prepare([960, 540], true, None).unwrap();
+    press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+    assert_eq!(login.state.view(true).phase, MenuPhase::Connecting);
+}
+
+#[test]
+fn egui_nickname_refocus_keeps_exclusive_ime_ownership() {
+    let mut login = settled("Initial");
+    for focused in [false, true] {
+        input(&mut login, egui::Event::WindowFocused(focused));
+        let result = login.event(&winit::event::WindowEvent::Focused(focused), true);
+        assert!(
+            !result
+                .effects
+                .iter()
+                .any(|e| matches!(e, HostEditEffect::ImeAllowed(_)))
+        );
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    assert!(login.egui.output().unwrap().ime.is_some());
+    press(&mut login, egui::Key::Escape, egui::Modifiers::NONE);
+    assert_eq!(login.focused(), Some(NICKNAME));
+    assert!(!login.take_cancel_request());
+}
+
+#[test]
+fn pointer_and_keyboard_entry_points_keep_the_legacy_screens() {
+    for keyboard in [false, true] {
+        for id in [PLAY, SETTINGS, SERVER, CHANGE_SKIN] {
+            let mut login = settled("Player");
+            if keyboard {
+                login.focus(id);
+                press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+            } else {
+                let r = login
+                    .login_ui
+                    .controls
+                    .iter()
+                    .find(|c| c.0 == id)
+                    .unwrap()
+                    .1;
+                let p = [r.center().x as f64, r.center().y as f64];
+                login.pointer(p, Some(true), true);
+                login.pointer(p, Some(false), true);
+            }
+            assert_eq!(login.state.settings.is_open(), id == SETTINGS);
+            assert_eq!(login.picker.policy.visible(), id == SERVER);
+            assert_eq!(login.studio.state.visible(), id == CHANGE_SKIN);
+            assert_eq!(
+                login.state.view(true).phase == MenuPhase::Connecting,
+                id == PLAY
+            );
+        }
+    }
+}
+
+#[test]
+fn nickname_persists_at_the_existing_skin_save_boundary() {
+    use slither_wgpu_slice::menu_storage::MenuStorage;
+    let directory =
+        std::env::temp_dir().join(format!("egui-login-preferences-{}", std::process::id()));
+    assert!(!directory.exists());
+    let mut login =
+        NativeLogin::with_preferences(Default::default(), MenuStorage::at(Some(directory.clone())))
+            .unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    for _ in 0..2 {
+        login.prepare([960, 540], true, None).unwrap();
+    }
+    select_all(&mut login);
+    input(&mut login, egui::Event::Paste("Saved😀".into()));
+    assert!(
+        !directory.exists(),
+        "editing alone never writes preferences"
+    );
+    login.open_studio();
+    login.step(9830., true, false).unwrap();
+    login.studio.activate_with_random(
+        slither_client::skin_studio::SAVE,
+        &login.state.view(true).nickname,
+        &mut || 7,
+    );
+    let mut storage = MenuStorage::at(Some(directory.clone()));
+    assert_eq!(storage.restore().record.nickname, "Saved  ");
+    std::fs::remove_file(directory.join("menu.v2")).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+}
+
+#[test]
+fn failed_preference_save_keeps_the_run_only_message_on_login() {
+    let mut login = settled("Memory");
+    login.open_studio();
+    login.step(9830., true, false).unwrap();
+    login
+        .studio
+        .activate_with_random(slither_client::skin_studio::SAVE, "Memory", &mut || 7);
+    login.step(10060., true, false).unwrap();
+    login.sync_return_focus(true);
+    for _ in 0..2 {
+        login.prepare([960, 540], true, None).unwrap();
+    }
+    assert_eq!(login.studio.status, "Saved for this run");
+    assert!(login.egui.prepared_shapes().iter().any(|shape| matches!(&shape.shape,egui::Shape::Text(text) if text.galley.job.text=="Saved for this run")));
+}
+
+#[test]
+fn held_and_refocus_enter_never_queue_a_second_play() {
+    use winit::{
+        event::ElementState,
+        keyboard::{Key, NamedKey},
+    };
+    for synthetic in [false, true] {
+        let mut login = settled("Once");
+        if synthetic {
+            login
+                .egui
+                .synthetic_key(&Key::Named(NamedKey::Enter), ElementState::Pressed);
+        }
+        for _ in 0..10 {
+            input(
+                &mut login,
+                egui::Event::Key {
+                    key: egui::Key::Enter,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            );
+        }
+        let intents = login.step(9616., true, false).unwrap().0;
+        assert_eq!(
+            intents
+                .iter()
+                .filter(|i| matches!(i, StartMenuIntent::Play { .. }))
+                .count(),
+            usize::from(!synthetic)
+        );
+        assert!(login.step(9632., true, false).unwrap().0.is_empty());
+    }
+}
+
+#[test]
+fn clipboard_commands_survive_input_passes_until_platform_output() {
+    let mut login = settled("Copy me");
+    select_all(&mut login);
+    input(&mut login, egui::Event::Copy);
+    login.prepare([960, 540], true, None).unwrap();
+    assert!(
+        login.egui.output().unwrap().commands.iter().any(
+            |command| matches!(command,egui::OutputCommand::CopyText(text) if text=="Copy me")
+        )
+    );
+    input(&mut login, egui::Event::Cut);
+    assert_eq!(login.state.view(true).nickname, "");
+    input(&mut login, egui::Event::Paste("Restored".into()));
+    assert_eq!(login.state.view(true).nickname, "Restored");
+}
+
+#[test]
+fn callback_admission_changes_do_not_queue_play_or_retarget_the_press() {
+    let mut login = settled("Player");
+    login.set_admission(false);
+    press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+    assert_eq!(login.state.view(false).phase, MenuPhase::Login);
+    assert!(!login.studio.state.visible());
+    assert!(!login.state.settings.visible());
+    assert!(!login.picker.policy.visible());
+    login.set_admission(true);
+    login.focus(NICKNAME);
+    press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+    assert_eq!(login.state.view(true).phase, MenuPhase::Connecting);
 }
 
 #[test]
@@ -67,209 +631,6 @@ fn selected_font_flow_matches_initial_and_retained_login() {
         assert!((first.logical_rect(E::Play).y + 64. - 427.).abs() < 0.01);
         assert!((play.width / first.scale - 87.).abs() < 0.5);
         assert!((play.y - nick.y - 67. * first.scale).abs() < 0.01);
-    }
-}
-
-#[test]
-fn native_login_commit_focus_pointer_and_deferred_play() {
-    let mut login = NativeLogin::new("Initial").unwrap();
-    let (intents, effects) = login.step(0., true, false).unwrap();
-    assert_eq!(intents, vec![StartMenuIntent::FocusNickname]);
-    assert!(effects.contains(&HostEditEffect::ImeAllowed(true)));
-    login.input.state.apply(EditIntent::SelectAll);
-    login
-        .input
-        .state
-        .apply(EditIntent::Preedit("日".into(), Some((0, 3))));
-    assert_eq!(login.displayed_nickname(), "日");
-    login.prepare([960, 540], true, None).unwrap();
-    let r = login.layout.viewport_rect(E::Play);
-    let point = [r.x + r.width / 2., r.y + r.height / 2.];
-    login.pointer(point, Some(true), true);
-    login.pointer(point, Some(false), true);
-    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
-    let effects = login
-        .input
-        .state
-        .apply(EditIntent::ImeCommit("A😀\u{7f}".into()));
-    login
-        .input
-        .state
-        .commit_menu(effects, &mut login.state, true);
-    assert_eq!(login.state.view(true).nickname, "A  \u{7f}");
-    login.pointer(point, Some(true), true);
-    login.pointer(point, Some(false), true);
-    login.activate(true);
-    assert!(login.state.view(true).spinner_visible);
-    let (effects, _) = login.step(16., true, false).unwrap();
-    assert_eq!(
-        effects,
-        vec![StartMenuIntent::Play {
-            nickname: "A  \u{7f}".into(),
-            quality: MenuQuality::High
-        }]
-    );
-    assert!(login.step(32., true, false).unwrap().0.is_empty());
-    assert_eq!(login.state.view(true).phase, MenuPhase::Connecting);
-    assert!(login.blocks_gameplay());
-    login.step(48., true, true).unwrap();
-    assert_eq!(login.state.view(true).phase, MenuPhase::Outgoing);
-    assert!(!login.blocks_gameplay());
-    assert!(!login.intercepts_pointer([0., 0.]));
-    assert!(login.intercepts_pointer(point));
-}
-
-#[test]
-fn tab_focus_releases_all_holds_and_settings_has_no_play_effect() {
-    let mut login = NativeLogin::new("").unwrap();
-    login.step(0., true, false).unwrap();
-    for focus in [
-        slither_client::login_controls::PLAY,
-        slither_client::login_controls::SETTINGS,
-        slither_client::login_controls::NICKNAME,
-    ] {
-        let effects = login.focus(focus);
-        assert!(effects.contains(&HostEditEffect::ReleasePointerBoost));
-        assert_eq!(
-            effects
-                .iter()
-                .filter(|e| matches!(e, HostEditEffect::Gameplay { pressed: false, .. }))
-                .count(),
-            4
-        );
-    }
-    login.focus(slither_client::login_controls::SETTINGS);
-    login.activate(true);
-    assert!(login.state.settings.visible());
-    assert_eq!(login.state.view(true).quality, MenuQuality::High);
-    assert!(login.step(16., true, false).unwrap().0.is_empty());
-    login.close_settings(true);
-    assert_eq!(login.input.state.focus(), None);
-    for frame in 2..256 {
-        let (intents, _) = login.step(f64::from(frame) * 16., true, false).unwrap();
-        assert!(
-            !intents
-                .iter()
-                .any(|i| matches!(i, StartMenuIntent::Play { .. }))
-        );
-        if !login.state.settings.visible() {
-            break;
-        }
-        assert_eq!(login.input.state.focus(), None);
-    }
-    assert!(!login.state.settings.visible());
-    assert_eq!(
-        login.controls.focus(),
-        Some(slither_client::login_controls::SETTINGS)
-    );
-    login.focus(slither_client::login_controls::NICKNAME);
-    assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
-}
-
-#[test]
-fn window_overlay_controls_use_logical_pointer_and_ime_coordinates() {
-    for (physical, dpr) in [
-        ([960, 540], 1.),
-        ([1200, 675], 1.25),
-        ([1920, 1080], 2.),
-        ([3840, 2160], 1.5),
-        ([5760, 3240], 6.),
-        ([6720, 3780], 7.),
-        ([7680, 4320], 8.),
-    ] {
-        for element in [E::Play, E::NicknameHolder, E::Settings] {
-            let mut login = NativeLogin::new("Test").unwrap();
-            for now in (0..=9600).step_by(16) {
-                login.step(now as f64, true, false).unwrap();
-            }
-            login
-                .prepare(physical.map(|n| (f64::from(n) / dpr) as u32), true, None)
-                .unwrap();
-            let rect = login.layout.viewport_rect(element);
-            let center = [
-                rect.x + rect.width / 2.,
-                rect.y
-                    + if element == E::Settings {
-                        46.
-                    } else {
-                        rect.height / 2.
-                    },
-            ];
-            let host = login.prepare_host(physical, dpr, true, None).unwrap();
-            assert_eq!(host.frame.extent, physical);
-            assert_eq!(host.frame.viewport_scale, dpr);
-            // Slicing changes quad topology with DPR. Verify the physical target
-            // lies in an actual painted tile, then route its logical inverse.
-            let physical_point = center.map(|n| (n * dpr).round());
-            let point = physical_point.map(|n| n / host.frame.viewport_scale);
-            assert!(
-                host.frame.draws.iter().any(|d| {
-                    let x = d.destination.x + d.translation[0];
-                    let y = d.destination.y + d.translation[1];
-                    point[0] >= x
-                        && point[0] < x + d.destination.width
-                        && point[1] >= y
-                        && point[1] < y + d.destination.height
-                }),
-                "{element:?} at DPR {dpr}: {point:?}"
-            );
-            assert!(
-                (point[0] - center[0]).abs() < 2.,
-                "{element:?}: {point:?} {center:?}"
-            );
-            assert!((point[1] - center[1]).abs() < 2.);
-            login.pointer(point, Some(true), true);
-            login.pointer(point, Some(false), true);
-            match element {
-                E::Play => {
-                    assert_eq!(
-                        login
-                            .step(9616., true, false)
-                            .unwrap()
-                            .0
-                            .iter()
-                            .filter(|i| matches!(i, StartMenuIntent::Play { .. }))
-                            .count(),
-                        1
-                    );
-                    assert!(login.step(9632., true, false).unwrap().0.is_empty());
-                }
-                E::NicknameHolder => {
-                    assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
-                    let nick = login.layout.viewport_rect(E::Nickname);
-                    let effects = login.cursor_area().unwrap();
-                    assert!(effects.iter().any(|e| matches!(e,HostEditEffect::ImeCursorArea{position,..} if position[0]>=nick.x - 0.5/dpr && position[0]<=nick.x+nick.width && position[1]>=nick.y - 0.5/dpr && position[1]<nick.y+nick.height)));
-                    let painted = login.prepare_host(physical, dpr, true, None).unwrap();
-                    let caret = painted
-                        .frame
-                        .draws
-                        .iter()
-                        .find(|d| {
-                            painted.resources.iter().any(|r| {
-                                r.asset == d.asset
-                                    && r.image
-                                        .pixels
-                                        .as_chunks::<4>()
-                                        .0
-                                        .iter()
-                                        .all(|p| *p == [224, 224, 255, 255])
-                            })
-                        })
-                        .unwrap();
-                    assert!(
-                        effects.iter().any(
-                            |e| matches!(e, HostEditEffect::ImeCursorArea{position,size}
-                        if *position == [caret.destination.x,caret.destination.y]
-                        && *size == [caret.destination.width,caret.destination.height])
-                        ),
-                        "DPR {dpr}: IME {effects:?}, caret {:?}",
-                        caret.destination
-                    );
-                }
-                E::Settings => assert!(login.state.settings.visible()),
-                _ => unreachable!(),
-            }
-        }
     }
 }
 
@@ -360,90 +721,6 @@ fn acquisition_cancel_and_pre_game_socket_outcomes_release_native_admission() {
             login.step(48., true, false).unwrap().0.as_slice(),
             [StartMenuIntent::Play { .. }]
         ));
-    }
-}
-
-#[test]
-fn empty_field_uses_placeholder_colour_and_shadow_free_caret() {
-    let mut login = NativeLogin::new("").unwrap();
-    login.step(0., true, false).unwrap();
-    login.step(16., true, false).unwrap();
-    let picture = login.prepare([960, 540], true, None).unwrap();
-    let nick = login.layout.viewport_rect(E::Nickname);
-    let caret = picture
-        .frame
-        .draws
-        .iter()
-        .find(|draw| {
-            draw.destination.width == 1.
-                && draw.destination.height < nick.height
-                && draw.destination.height > 10.
-        })
-        .unwrap();
-    assert_eq!(
-        caret.destination.x,
-        (nick.x + 2. * login.layout.scale).round()
-    );
-    assert!(caret.destination.y > nick.y);
-    let material = picture
-        .resources
-        .iter()
-        .find(|r| r.asset.handle == caret.asset.handle)
-        .unwrap();
-    assert_eq!(
-        (material.image.width, material.image.height),
-        (1, caret.destination.height.round() as u32)
-    );
-    assert_eq!(
-        material.image.pixels,
-        [224, 224, 255, 255].repeat(material.image.height as usize)
-    );
-    // Text tint is baked into its padded raster, independently of caret material.
-    assert!(picture.resources.iter().any(|r| {
-        r.image
-            .pixels
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .any(|p| p[3] > 0 && p[..3] == [112, 112, 176])
-    }));
-}
-
-#[test]
-fn physical_menu_reuses_rasters_and_bounds_controls_at_hidpi() {
-    for dpr in [1., 1.5, 2.] {
-        let mut login = NativeLogin::new("Player").unwrap();
-        login.step(0., true, false).unwrap();
-        login.step(16., true, false).unwrap();
-        let first = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
-        let second = login.prepare_host([3840, 2160], dpr, true, None).unwrap();
-        let resized = login.prepare_host([3600, 2025], dpr, true, None).unwrap();
-        let assets = |p: &slither_wgpu_slice::menu::MenuFrame| {
-            p.resources.iter().map(|r| r.asset).collect::<Vec<_>>()
-        };
-        assert_eq!(assets(&first), assets(&second));
-        assert_eq!(assets(&first), assets(&resized));
-        assert!(
-            first
-                .resources
-                .iter()
-                .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
-        );
-        assert!(
-            first
-                .resources
-                .iter()
-                .map(|r| r.image.pixels.len())
-                .sum::<usize>()
-                < slither_wgpu_slice::text::MENU_CACHE_BYTES
-        );
-        if dpr == 2. {
-            // A 2x field/shadow still exceeds the old 1.5x density, while
-            // bounded tiles replace the former full-width material.
-            assert!(first.resources.iter().any(|r| r.asset.handle >> 60 == 7
-                && r.asset.height > 200
-                && r.asset.width <= 512));
-        }
     }
 }
 
@@ -667,7 +944,10 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
             assert_eq!(game.take_frame().unwrap().frame.identity, identity);
             game.presented(true).unwrap();
             login.sync_return_focus(game.can_play());
-            assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
+            assert_eq!(
+                login.focused(),
+                Some(slither_client::login_controls::NICKNAME)
+            );
             completion_retried = true;
             focus += 1;
         } else {
@@ -685,6 +965,25 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
     assert_eq!(focus, 1);
     assert!(game.can_play());
     assert_eq!(login.state.view(true).last_life, captured);
+    login.prepare_host([1920, 1080], 2., true, None).unwrap();
+    fn shows(shape: &egui::Shape, text: &str) -> bool {
+        match shape {
+            egui::Shape::Text(shape) => shape.galley.job.text.contains(text),
+            egui::Shape::Vec(shapes) => shapes.iter().any(|shape| shows(shape, text)),
+            _ => false,
+        }
+    }
+    assert!(login.egui.prepared_shapes().iter().any(|shape| shows(
+        &shape.shape,
+        &format!("Your final length was {}", captured.number)
+    )));
+    assert!(
+        login
+            .egui
+            .prepared_shapes()
+            .iter()
+            .any(|shape| shows(&shape.shape, "Play Again"))
+    );
     let generation = game.generation();
     login.activate(true);
     login.activate(true);
@@ -750,7 +1049,10 @@ fn champion_requires_v1_and_close_restores_ordinary_login() {
             !matches!(flag, Some(0 | 1))
         );
         assert!(!view.disabled);
-        assert_eq!(login.input.state.focus(), Some(TextField::Nickname));
+        assert_eq!(
+            login.focused(),
+            Some(slither_client::login_controls::NICKNAME)
+        );
         assert!(!game.champion_session().champion_acknowledged);
     }
 }
@@ -854,112 +1156,6 @@ fn login_menu_composes_over_the_world_picture() {
     assert!(menu.append_to(&mut picture).is_err());
 }
 
-#[test]
-fn shared_login_hits_fitted_text_and_drags_clamp_at_hidpi() {
-    use slither_client::{
-        login_controls::NICKNAME, menu_controls::ControlKind, menu_theme::MenuTheme,
-    };
-    use slither_wgpu_slice::{editor_geometry::field_geometry, text::TextCache};
-    for dpr in [1.5, 2.] {
-        for value in ["abcdef", "WWWWWWWWWWWWWWWWWWWWWWWW"] {
-            let mut login = NativeLogin::new(value).unwrap();
-            login.step(0., true, false).unwrap();
-            let extent = [(960. * dpr) as u32, (540. * dpr) as u32];
-            login.prepare_host(extent, dpr, true, None).unwrap();
-            let resolved = login.panel.resolve([960., 540.]).unwrap();
-            let r = resolved.iter().find(|r| r.control.id == NICKNAME).unwrap();
-            let ControlKind::TextField { fit, .. } = r.control.kind else {
-                unreachable!()
-            };
-            assert!(fit);
-            let mut text = TextCache::menu();
-            let (_, g) = field_geometry(&mut text, r, &login.input.state, &mut Default::default())
-                .unwrap()
-                .unwrap();
-            let base = MenuTheme::default().text_style(r.control.style).size * r.scale;
-            if value.starts_with('W') {
-                assert!(g.style.size < base);
-            }
-            let advance = |text: &mut TextCache, count| {
-                text.measure_panel(&value[..count], g.style)
-                    .unwrap()
-                    .advance
-            };
-            let point = |text: &mut TextCache, count| {
-                [
-                    g.placement.origin[0] + advance(text, count),
-                    g.rect.y + g.rect.height / 2.,
-                ]
-            };
-            // Native coordinates arrive as snapped physical pixels divided by DPR.
-            let start = point(&mut text, 2).map(|v| (v * dpr).round() / dpr);
-            login.pointer(start, Some(true), true);
-            assert_eq!(
-                login.input.state.editor(TextField::Nickname).selection(),
-                (2, 2)
-            );
-            let end = point(&mut text, 5).map(|v| (v * dpr).round() / dpr);
-            login.pointer(end, None, true);
-            assert_eq!(
-                login.input.state.editor(TextField::Nickname).selection(),
-                (2, 5)
-            );
-            let outside = [g.rect.x - 20., start[1]];
-            assert!(login.intercepts_pointer(outside));
-            login.pointer(outside, None, true);
-            assert_eq!(
-                login.input.state.editor(TextField::Nickname).selection(),
-                (2, 0)
-            );
-            let outside = [g.rect.x + g.rect.width + 20., start[1]];
-            login.pointer(outside, None, true);
-            assert_eq!(
-                login.input.state.editor(TextField::Nickname).selection(),
-                (2, value.len())
-            );
-            login.pointer(outside, Some(false), true);
-            assert_eq!(login.controls.capture(), None);
-            login.pointer(start, None, true);
-            assert_eq!(
-                login.input.state.editor(TextField::Nickname).selection(),
-                (2, value.len())
-            );
-            login.input.state.apply(EditIntent::KeyText("X".into()));
-            assert_eq!(login.displayed_nickname(), format!("{}X", &value[..2]));
-        }
-    }
-}
-#[test]
-fn login_preedit_suppresses_pointer_selection_and_activation_but_releases_capture() {
-    use slither_client::login_controls::NICKNAME;
-    let mut login = NativeLogin::new("abcdef").unwrap();
-    login.step(0., true, false).unwrap();
-    login.prepare([960, 540], true, None).unwrap();
-    let r = login.layout.viewport_rect(E::Nickname);
-    let p = [r.x + 30., r.y + 12.];
-    login.pointer(p, Some(true), true);
-    assert_eq!(login.controls.capture(), Some(NICKNAME));
-    let selected = login.input.state.editor(TextField::Nickname).selection();
-    login
-        .input
-        .state
-        .apply(EditIntent::Preedit("é".into(), None));
-    let play = login.layout.viewport_rect(E::Play);
-    login.pointer([play.x + 10., play.y + 10.], Some(false), true);
-    assert_eq!(login.controls.capture(), None);
-    assert_eq!(
-        login.input.state.editor(TextField::Nickname).selection(),
-        selected
-    );
-    assert_eq!(login.state.view(true).phase, MenuPhase::Login);
-    login.input.state.apply(EditIntent::ImeCommit("X".into()));
-    let after = login.input.state.editor(TextField::Nickname).selection();
-    login.pointer([r.x, r.y], None, true);
-    assert_eq!(
-        login.input.state.editor(TextField::Nickname).selection(),
-        after
-    );
-}
 #[cfg(windows)]
 #[test]
 fn windows_click_preferences_are_converted_to_logical_half_extents() {
@@ -1046,62 +1242,6 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
                 matches!(intents.as_slice(), [StartMenuIntent::Play { nickname, .. }] if nickname == "Stored")
             );
             assert!(login.step(96., true, false).unwrap().0.is_empty());
-        }
-    }
-}
-
-#[test]
-fn settled_login_density_cap_keeps_real_viewport_layout_and_hits() {
-    use slither_client::desktop_input::mouse_client_position;
-    for height in [540., 720.] {
-        let mut login = NativeLogin::new("Player").unwrap();
-        for now in (0..=9600).step_by(16) {
-            login.step(now as f64, true, false).unwrap();
-        }
-        let mut previous = None;
-        for dpr in [5., 6., 7., 8., 5.] {
-            let extent = [(960. * dpr) as u32, (height * dpr) as u32];
-            let frame = login.prepare_host(extent, dpr, true, None).unwrap();
-            assert_eq!(frame.frame.extent, extent);
-            assert_eq!(frame.frame.viewport_scale, dpr);
-            assert!(
-                frame.frame.draws.len()
-                    + usize::from(frame.backdrop.is_some())
-                    + usize::from(frame.world_cover.is_some())
-                    <= 512
-            );
-            assert!(
-                frame
-                    .resources
-                    .iter()
-                    .map(|r| r.image.pixels.len())
-                    .sum::<usize>()
-                    <= 13 * 1024 * 1024
-            );
-            let rects = [E::Logo, E::NicknameHolder, E::Play, E::Settings, E::Server]
-                .map(|e| login.layout.viewport_rect(e));
-            if let Some(old) = previous {
-                assert_eq!(rects, old);
-            }
-            previous = Some(rects);
-            let rect = login.layout.viewport_rect(E::Settings);
-            let point = mouse_client_position(
-                [(rect.x + rect.width / 2.) * dpr, (rect.y + 46.) * dpr],
-                dpr,
-            );
-            assert!(frame.frame.draws.iter().any(|draw| {
-                let r = draw.destination;
-                point[0] >= r.x
-                    && point[0] < r.x + r.width
-                    && point[1] >= r.y
-                    && point[1] < r.y + r.height
-            }));
-            let quality = login.state.view(true).quality;
-            login.pointer(point, Some(true), true);
-            login.pointer(point, Some(false), true);
-            assert!(login.state.settings.visible());
-            assert_eq!(login.state.view(true).quality, quality);
-            login.close_settings(true);
         }
     }
 }

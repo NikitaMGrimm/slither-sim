@@ -83,7 +83,7 @@ semantic local art. The [server picker](server-picker.md) uses shared directory
 and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
 
-Native Settings currently uses one lazy `egui_native::NativeEguiHost`. It owns
+Native login, Settings and the in-game menu use one lazy `egui_native::NativeEguiHost`. It owns
 the context, egui-winit adapter, ordered input, texture deltas, meshes and
 egui-wgpu renderer.
 Closed screens bypass translation, draining and context mutation. Window cursor,
@@ -91,7 +91,11 @@ DPI, focus, modifier and held-key bookkeeping precedes input ownership; activati
 synchronizes the adapter from that state. Repeated key-down events are filtered
 before custom Tab traversal and egui processing.
 
-Settings and the native in-game Esc overlay use this host. `ingame_egui.rs` owns
+The [native login](login-egui.md) uses `login_egui.rs` for editable nickname,
+Play and menu entry points, including the after-death result. Adjacent IME
+preedit updates wait for redraw; commits and discrete actions retain order.
+`StartMenuState` and session policy retain normalization, persistence boundaries
+and transition/admission rules. `ingame_egui.rs` owns
 the single Leave game button and outside-click dismissal. `LocalGame` gates
 native steering while the overlay is open, releases held boost/turn debt at entry,
 and keeps the existing ping/presentation flow running. Leave and an unadmitted

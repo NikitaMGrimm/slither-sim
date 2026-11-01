@@ -81,7 +81,10 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
             login.step(now as f64, true, false).unwrap();
         }
         assert!(!login.picker.policy.visible());
-        assert_eq!(login.input.state.focus(), Some(EditorId::Nickname));
+        assert_eq!(
+            login.focused(),
+            Some(slither_client::login_controls::NICKNAME)
+        );
         assert!(!login.state.view(true).spinner_visible);
     }
 }
@@ -98,7 +101,10 @@ fn picker_is_available_without_a_play_route_and_immediate_close_restores_focus()
     login.picker.policy.close();
     login.step(16., false, false).unwrap();
     assert!(!login.picker.policy.visible());
-    assert_eq!(login.input.state.focus(), Some(EditorId::Nickname));
+    assert_eq!(
+        login.focused(),
+        Some(slither_client::login_controls::NICKNAME)
+    );
     assert!(!login.state.view(false).spinner_visible);
 }
 #[test]
@@ -108,7 +114,8 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     for now in (0..=9600).step_by(16) {
         login.step(now as f64, false, false).unwrap();
     }
-    let unfocused = login.prepare([960, 720], false, None).unwrap();
+    login.prepare([960, 720], false, None).unwrap();
+    let unfocused = login.egui.prepared_shapes().len();
     let logical = Key::Named(NamedKey::Tab);
     let result = login.key(
         KeyInput {
@@ -121,7 +128,7 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
         false,
     );
     assert!(result.consumed);
-    assert_eq!(login.controls.focus(), Some(CHANGE_SKIN));
+    assert_eq!(login.focused(), Some(CHANGE_SKIN));
     login.key(
         KeyInput {
             logical: &logical,
@@ -132,20 +139,14 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
         },
         false,
     );
-    assert_eq!(login.controls.focus(), Some(SERVER));
-    let focused = login.prepare([960, 720], false, None).unwrap();
-    assert_eq!(login.controls.visible_focus(), Some(SERVER));
-    assert!(focused.frame.draws.len() > unfocused.frame.draws.len());
+    assert_eq!(login.focused(), Some(SERVER));
+    login.prepare([960, 720], false, None).unwrap();
+    assert_eq!(login.focused(), Some(SERVER));
+    assert!(login.login_ui.keyboard_focus);
+    assert!(login.egui.prepared_shapes().len() > unfocused);
+    let order = slither_wgpu_slice::login_egui::focus_order(&login.state.view(false));
     for id in [PLAY, SETTINGS] {
-        assert!(
-            !login
-                .panel
-                .controls
-                .iter()
-                .find(|c| c.id == id)
-                .unwrap()
-                .enabled
-        );
+        assert!(!order.contains(&slither_wgpu_slice::login_egui::widget_id(id)));
     }
     assert!(login.state.view(false).play_disabled);
 }

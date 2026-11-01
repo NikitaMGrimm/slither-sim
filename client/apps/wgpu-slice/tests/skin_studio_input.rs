@@ -12,6 +12,9 @@ use winit::{
     keyboard::{Key, KeyCode, ModifiersState, NamedKey, PhysicalKey},
 };
 fn key(login: &mut NativeLogin, named: NamedKey) {
+    key_admitted(login, named, false);
+}
+fn key_admitted(login: &mut NativeLogin, named: NamedKey, admission: bool) {
     let logical = Key::Named(named);
     let result = login.key(
         KeyInput {
@@ -21,7 +24,7 @@ fn key(login: &mut NativeLogin, named: NamedKey) {
             state: ElementState::Pressed,
             repeat: false,
         },
-        false,
+        admission,
     );
     assert!(result.consumed);
 }
@@ -49,19 +52,19 @@ fn login_change_skin_opens_without_endpoint_and_save_returns_focus_after_fade() 
             .iter()
             .any(|i| matches!(i, StartMenuIntent::Play { .. }))
     );
-    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
+    assert_eq!(login.focused(), Some(BUILT_IN_TAB));
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(PREVIOUS));
+    assert_eq!(login.focused(), Some(PREVIOUS));
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(NEXT));
+    assert_eq!(login.focused(), Some(NEXT));
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(CANCEL));
+    assert_eq!(login.focused(), Some(CANCEL));
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(SAVE));
+    assert_eq!(login.focused(), Some(SAVE));
     key(&mut login, NamedKey::Enter);
     key(&mut login, NamedKey::Space);
     assert_eq!(login.studio.state.committed().builtin, 1);
@@ -70,10 +73,10 @@ fn login_change_skin_opens_without_endpoint_and_save_returns_focus_after_fade() 
     assert!(login.step(459., false, false).unwrap().0.is_empty());
     assert!(login.studio.state.visible());
     login.sync_return_focus(false);
-    assert_ne!(login.controls.focus(), Some(CHANGE_SKIN));
+    assert_ne!(login.focused(), Some(CHANGE_SKIN));
     assert!(login.step(460., false, false).unwrap().0.is_empty());
     login.sync_return_focus(false);
-    assert_eq!(login.controls.focus(), Some(CHANGE_SKIN));
+    assert_eq!(login.focused(), Some(CHANGE_SKIN));
     assert_eq!(login.state.view(false).phase, MenuPhase::Login);
 }
 #[test]
@@ -100,10 +103,10 @@ fn blur_resize_matching_release_outside_cancel_and_tab_trap_preserve_draft() {
     login.focus(BUILT_IN_TAB);
     login.input.modifiers(ModifiersState::SHIFT);
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(SAVE));
+    assert_eq!(login.focused(), Some(SAVE));
     login.input.modifiers(ModifiersState::empty());
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(BUILT_IN_TAB));
+    assert_eq!(login.focused(), Some(BUILT_IN_TAB));
     login.pointer([0., 0.], Some(true), false);
     login.pointer([0., 0.], Some(false), false);
     login.step(460., false, false).unwrap();
@@ -159,17 +162,17 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
     ]));
     login.focus(NICKNAME);
     for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
-        key(&mut login, NamedKey::Tab);
-        assert_eq!(login.controls.focus(), Some(id));
+        key_admitted(&mut login, NamedKey::Tab, true);
+        assert_eq!(login.focused(), Some(id));
     }
     login.input.modifiers(ModifiersState::SHIFT);
     for id in [SETTINGS, SERVER, CHANGE_SKIN, PLAY, NICKNAME] {
-        key(&mut login, NamedKey::Tab);
-        assert_eq!(login.controls.focus(), Some(id));
+        key_admitted(&mut login, NamedKey::Tab, true);
+        assert_eq!(login.focused(), Some(id));
     }
     login.input.modifiers(ModifiersState::empty());
     login.focus(SERVER);
-    key(&mut login, NamedKey::Enter);
+    key_admitted(&mut login, NamedKey::Enter, true);
     assert!(login.picker.policy.visible());
     login.open_studio();
     assert!(!login.studio.state.visible());
@@ -398,7 +401,7 @@ fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
         }
         login.prepare([960, 540], false, None).unwrap();
         if keyboard {
-            while login.controls.focus() != Some(CHANGE_SKIN) {
+            while login.focused() != Some(CHANGE_SKIN) {
                 key(&mut login, NamedKey::Tab);
             }
             key(&mut login, NamedKey::Enter);
@@ -415,16 +418,17 @@ fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
         login.step(10200., false, false).unwrap();
         login.sync_return_focus(false);
         assert!(!login.studio.state.visible());
-        assert_eq!(login.controls.focus(), Some(CHANGE_SKIN));
-        assert_eq!(login.controls.visible_focus().is_some(), keyboard);
+        assert_eq!(login.focused(), Some(CHANGE_SKIN));
+        assert_eq!(login.login_ui.keyboard_focus, keyboard);
         assert!(login.controls.capture().is_none());
         assert!(
-            login.panel.controls.iter().all(|c| login
-                .controls
-                .progress(c.id)
-                .into_iter()
-                .all(|p| p == 0.))
+            !login
+                .egui
+                .context()
+                .unwrap()
+                .input(|i| i.pointer.any_down())
         );
+        assert!(login.egui.context().unwrap().dragged_id().is_none());
         let returned = login.prepare([960, 540], false, None).unwrap();
         // Moving the pointer away cannot remove any additional stale ring/press paint.
         login.pointer([-1., -1.], None, false);
