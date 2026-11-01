@@ -43,7 +43,9 @@ frame completion without changing these pinned planning measurements.
 
 Five rounds alternate population order. The 26-anchor cells have 10 warm + 30
 measured pictures per round; maximum-length cells have 5 warm + 15 measured.
-Report pooled lower-median/p95 and the range of per-round medians, not a speedup claim.
+The historical table reports lower-median/p95; the corrected capture uses the
+conventional average of the middle two observations. Both report nearest-rank
+p95 and the range of per-round medians, not a speedup claim.
 Populations can use different detail policies: the 512-ID cell exceeds the old
 live bound; both maximum-length cells exceed the old aggregate body bound.
 Allocation counts requested alloc/zeroed/realloc bytes on the calling Rust thread,
@@ -51,9 +53,58 @@ excluding resident heap, deallocation, allocator overhead and GPU/driver memory.
 The timing executable enables `feel-trace` with no recorder installed.
 
 Builds and timing are separate. Before the approved quiet timing interval, wait
-for all cargo/rustc processes without stopping them; monitor their absence during
-the retained run. Preserve interrupted/overlapping attempts rather than counting
+for all cargo/rustc processes without stopping them; the corrected window also
+checks tar/zstd and monitors compiler/archiver absence throughout the run.
+Preserve interrupted/overlapping attempts rather than counting
 their fast or partial rows.
+
+## Corrected results (15:45 quiet window)
+
+The corrected benchmark binary is bound to shared-core/planner source `8b800bfd`,
+rebased onto `d716697b` including #411 and #417. The later strict loopback probe
+at `fe081b6a` is a separate executable and is not linked into this benchmark.
+All 450 measured pictures completed across four cells and five alternating
+rounds per cell, with every population present, a body for every snake, and no
+draw/pixel quota failure.
+
+The approved interval was 15:45–15:50 local on 2026-11-01. Window entry was
+15:45:16.632; the initial process check took 0.031 seconds and found no blockers.
+The capture ran **15:45:16.663–15:45:50.711 local** (34.05 seconds), starting
+16.663 seconds after window opening. All **94** process-presence checks found
+no cargo, rustc, tar, bsdtar, zstd, zstdmt or pzstd overlap. No process was stopped.
+System CPU load across the whole harness interval was **24% median / 47% peak**
+(25 samples); this is a compiler/archiver-free capture, not an idle-host claim.
+Hardware/profile remain the Windows x86-64 Ryzen 7 9800X3D and Rust 1.99
+release/thin-LTO setup also used by the historical capture.
+
+These are **elapsed wall-planning** times, not thread CPU time or gameplay FPS.
+The median averages the middle pair for even-sized cells; p95 uses nearest rank.
+Allocation is requested calling-thread alloc/zeroed/realloc bytes per warm
+picture, not resident or peak heap. The draw-staging full-client copy and private
+sampling are included; ingress transaction copies and the other exclusions in
+the method remain outside the bracket.
+
+| Live snakes | Anchors/snake | Elapsed median / p95 ms | Round-median range ms | Requested MiB/frame | Draws | Measured frames |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 256 | 26 | 4.03 / 5.42 | 3.90–4.14 | 12.17 | 24,467 | 150 |
+| 512 | 26 | 12.08 / 16.14 | 10.73–13.73 | 26.98 | 60,487 | 150 |
+| 256 | 4096 | 41.90 / 46.53 | 39.02–44.41 | 116.79 | 104,913 | 75 |
+| 512 | 4096 | 64.32 / 76.83 | 60.06–67.91 | 193.99 | 105,477 | 75 |
+
+Maximum-length 512-snake pictures retained all 2,097,152 received anchors.
+Visual-anchor payload peaked at **31,433,280 bytes**, within the 31,457,280-byte
+pressure quota. The current draw maximum was **105,477**, below 262,144; picture
+pixels peaked at **1,936,988 bytes**, below 64 MiB. These results demonstrate
+bounded completion of the measured frozen worlds, not a low-latency guarantee
+for ingress or an optimization claim. The historical and corrected tables are
+not a controlled before/after comparison: planner geometry, shadow policy and
+background conditions differ.
+
+[Corrected selected samples](review-selected.csv), [summary](review-summary.json),
+[source/binary provenance](review-source-provenance.json), and
+[process-free receipt](review-timing-receipt.json) bind this capture separately.
+Full raw CSV, stderr, process/wait samples and CPU-load samples remain outside Git.
+The earlier 11:10 capture remains unchanged and explicitly historical below.
 
 ## Historical results (before rebase/review corrections)
 
@@ -100,7 +151,8 @@ the historical samples must not be read as measurements of the corrected code.
 ## Historical functional controls
 
 The [untimed loopback attempts](loopback-summary.json) used 500 configured
-Battledome bots on an OS-assigned loopback port. The corrected 20-second probe
+Battledome bots on an OS-assigned loopback port. The historical 20-second probe
+(wheel/acknowledgement fixes applied, before the camera endpoint fix)
 received **501 live snakes**, prepared up to 503 retained visual appearances,
 recorded **zero picture skips** and closed cleanly. Its strict whole-circle fit
 assertion still failed during camera motion (best excess 3.56 logical pixels),
@@ -170,6 +222,9 @@ matches at **151,384,002 bytes**, 24,467 draws, with ordered Draw SHA-256
 Main's shadow cut explains why these totals differ from the historical control.
 The [review controls](review-controls.json) bind the updated binaries, replay,
 allocation, accounting and loopback results separately from the old timings.
+The baseline and host were built from the retained `d716697b` archive. Earlier
+JSON labels accidentally followed a later `origin/main` ref; schema 2 corrects
+those metadata labels while retaining the superseded values and binary hashes.
 
 Default stress fixtures separately cover 512 live IDs and a 17 × 4,096-anchor
 world crossing the same pressure threshold. The latter sends 80 arrivals across
@@ -180,9 +235,9 @@ The affected presentation-client, state and new selector binaries take **0.12 s*
 **0.10 s** and **0.00 s** respectively. The longer release compaction rules take
 **0.02 s**. These are test-suite durations, not frame-time captures.
 
-Corrected frame-time measurements require a new agreed quiet window. The
+The corrected capture above was collected in the approved 15:45 window. The
 11:10 historical capture predates the reported 13:40 disk-full incident; no
-corrected capture was taken during that incident.
+capture was taken during that incident.
 
 ## Reproduction
 
@@ -193,6 +248,8 @@ The final exhaustion edge fix additionally passed focused core/body/selector
 tests, core Clippy, rebuilt Canvas smoke, release seeded compaction rules,
 both exhaustive native cases, the fast native capacity suite, and fresh native
 feel/allocation/loopback controls. The explicit real-Wasm 512 × 4,096 case passed.
+The later strict loopback collector additionally passed its two Rust rules,
+seven Node rules, strict bin Clippy, and the new wide/default-vision runs.
 Root `uv run --locked --only-group tools python tools/test_documentation.py`
 passed all seven tests. Hardware-GPU tests remain ignored; no desktop/browser
 or outside game server was used.
@@ -231,7 +288,9 @@ node tools/e2e-local-host.mjs --host-bin <slither-sim> --client-bin <slither-cli
 ```
 
 It binds only `127.0.0.1:0`, excludes reserved ports, requests full zoom-out and
-asserts a whole-map camera, no picture skips, no session failure, at least 500
+measures every acknowledged post-wheel committed transform. It requires at least
+one fit sample and worst overflow at most 0.000001 logical pixels, no picture skips,
+no session failure, at least 500
 received/prepared snakes and a clean requested close. Full
 recordings and failed attempts stay outside Git.
 
@@ -244,21 +303,32 @@ the strength of that cross-check.
 The host's default snake/prey coverage is 1,500 units around the player's head
 (`src/simulator.rs`, `src/client/simulation/broadcast.rs`). A 501-seat Battledome
 scales its arena radius to roughly 14,181 units and spreads spawns across it.
-Client wheel zoom is local and sends no subscription change. An untimed
+Client wheel zoom is local and sends no subscription change. Untimed
 same-fixture controls at `--vision 1500` reached only **5–8** received/prepared
-snakes despite `fullMap=true` and zero skips; the stricter population assertion
-correctly rejects it. This explains the handful-sized census in #411 without
+snakes and the population assertion correctly rejected them. A fitted arena
+transform does not establish 500-player delivery. This explains the handful-sized census in #411 without
 attributing server subscriptions to the client cap. The simulator lane must
 choose a whole-map interest policy for an ordinary host; this e2e opts into
 40,000-unit coverage explicitly.
 
-The final wide-coverage 20-second session reached **501** received and **501** prepared
-appearances, with zero picture skips, `fullMap=true`, zero best fit overflow and
-a clean requested close. The earlier 8-second session reached only 411 and failed
-the new population gate; that failed attempt is retained. Battledome defaults
-to a 20-second client session (other probes retain eight seconds). The threshold
-remains at least 500 rather than treating a configured population as delivered.
-The final eight-second default-vision control reached eight and closed
-cleanly before the population gate rejected it. A longer default-vision control
-also stayed at five but failed clean close with `Socket is not open`; its error
-is retained and is not counted as successful session validation.
+The strict post-wheel probe is a **different binary and run** from historical
+attempt 4's 3.5604467877800516-pixel failure. After the camera endpoint fix, the
+20-second wide-vision run reached **501 received / 501 prepared**, with zero skips
+and a clean close. All **40** acknowledged post-wheel pictures fit: best overflow
+0, worst **1.1368683772161603e-13 logical pixels**, within the 1e-6 tolerance. This
+is headless transform acceptance for that run, not hardware-pixel evidence.
+
+The new eight-second default-vision control measured **440** post-wheel pictures,
+best/worst overflow **0/0**, but reached only **5** snakes and therefore failed
+500-player acceptance. Earlier best-only probes could report `fullMap=true` after
+one fitted picture and default an unmeasured best overflow to zero. They retained
+neither post-wheel sample counts nor worst overflow; schema 2 marks their
+continuous-fit acceptance **not measured**. Population/close failures remain
+failed controls even when their raw best-only fields looked fitted. Their raw
+records remain bound to the earlier published revision.
+
+Battledome defaults to a 20-second client session after the existing fill delay.
+The earlier eight-second wide run reached only 411; a longer low-vision run failed
+close with `Socket is not open`. Both remain retained failures. The latest
+collector rejects a late overflow even if an earlier or later picture fits, and
+serializes absent fit measurements as `null`, not zero.
