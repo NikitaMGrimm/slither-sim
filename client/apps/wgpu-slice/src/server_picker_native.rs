@@ -321,14 +321,10 @@ enum SaveStep {
 }
 pub struct CustomServerStorage {
     path: PathBuf,
-    lock_wait: Duration,
 }
 impl CustomServerStorage {
     pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            lock_wait: CUSTOM_LOCK_WAIT,
-        }
+        Self { path }
     }
     /// Merge user operations with the latest bounded record, not a startup snapshot.
     /// Unreadable/malformed storage retains the caller's in-memory fallback.
@@ -382,7 +378,7 @@ impl CustomServerStorage {
                 Err(TryLockError::Error(error)) => return Err(error),
                 Err(TryLockError::WouldBlock) => {
                     contended();
-                    let remaining = self.lock_wait.saturating_sub(started.elapsed());
+                    let remaining = CUSTOM_LOCK_WAIT.saturating_sub(started.elapsed());
                     if remaining.is_zero() {
                         return Err(std::io::ErrorKind::TimedOut.into());
                     }
@@ -512,12 +508,7 @@ mod storage_tests {
         });
         let second_path = path.clone();
         let second = std::thread::spawn(move || {
-            // The first save finishes after contention is signalled; slow CI file replacement
-            // can outlast the production wait, which the timeout test covers separately.
-            let storage = CustomServerStorage {
-                lock_wait: Duration::from_secs(10),
-                ..CustomServerStorage::new(second_path)
-            };
+            let storage = CustomServerStorage::new(second_path);
             let mut current = Vec::new();
             let mut contended = Some(contended);
             read.wait();

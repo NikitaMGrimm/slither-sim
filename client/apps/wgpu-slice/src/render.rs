@@ -832,6 +832,7 @@ fn prepare_composed(
             },
         )
         .map_err(|e| e.0)?;
+    crate::latency::build("curves_end", identity);
     let view = BodyPaintView {
         camera: client.camera().position(),
         zoom: client.camera().zoom(),
@@ -893,6 +894,7 @@ fn prepare_composed(
         push_draw(&mut draws, draw)?;
     }
     let [early, late] = std::mem::take(&mut bank.food_commands);
+    crate::latency::build("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
     let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
@@ -917,6 +919,7 @@ fn prepare_composed(
             e.to_string()
         }
     })?;
+    crate::latency::build("food_end", identity);
     let eaters: Vec<_> = client
         .snake_objects()
         .map(|(token, _, _, snake)| {
@@ -955,6 +958,7 @@ fn prepare_composed(
         }
     })?;
     let families = bank.bodies.clone();
+    crate::latency::build("prey_end", identity);
     let palettes: Vec<_> = families
         .iter()
         .map(|p| BodyPalette {
@@ -1094,6 +1098,7 @@ fn prepare_composed(
     draws.extend(food.late.iter().map(Draw::from));
     draws.extend(prey_plan.late.iter().map(prey));
     bank.food_commands = [food.early, food.late];
+    crate::latency::build("bodies_end", identity);
     if let Some(boundary) = client.boundary()
         && let Some(edge) = plan_arena_edge_with_zoom(
             ArenaEdgeInput {
@@ -1169,6 +1174,7 @@ fn prepare_composed(
         }
     }
     let mut text_draws = Vec::new();
+    crate::latency::build("arena_end", identity);
     let mut text_resources = std::collections::BTreeMap::new();
     let name_zoom = user_zoom;
     for name in client
@@ -1232,6 +1238,7 @@ fn prepare_composed(
         inserted += count;
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
+    crate::latency::build("names_end", identity);
     let mut frame = Frame {
         identity,
         extent,
@@ -1252,12 +1259,14 @@ fn prepare_composed(
         snakes: Vec::new(),
     });
     let ui = overlay.as_mut().unwrap_or(&mut frame);
+    crate::latency::build("resources_end", identity);
     if let Some(view) = announcement {
         bank.announcement
             .append(view, &mut bank.text, ui, &mut resources)?;
     }
     bank.minimap
         .append(client, &mut bank.text, ui, &mut resources)?;
+    crate::latency::build("minimap_end", identity);
     // Mandatory overlays must fit in full; never silently truncate a panel.
     check_draw_count(frame.draws.len() + overlay.as_ref().map_or(0, |f| f.draws.len()))?;
     if resources

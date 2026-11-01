@@ -37,12 +37,12 @@ export function readyEndpoint(output) {
   return match[1];
 }
 
-export function assertSummary(s, protocol = 19) {
+export function assertSummary(s) {
   if (!s || typeof s !== 'object') throw fail('summary', 'Missing client summary');
   const stages = [
     ['handshake', s.websocket === true && s.challenge === true],
     ['login', s.loginSent === true],
-    ['setup', s.setup === true && s.protocol === protocol],
+    ['setup', s.setup === true && s.protocol === 19],
     ['own-snake', s.ownSnake === true],
     ['steering', Number.isInteger(s.steeringCommands) && s.steeringCommands > 0 && s.moved === true && s.turned === true],
     ['boost', s.boostOn === true && s.boostOff === true && s.accelerated === true && s.decelerated === true],
@@ -134,8 +134,6 @@ export async function runWithCleanup(session, cleanup) {
 }
 
 export async function runLocalHost(options) {
-  const protocol = Number(process.env.SLITHER_CLIENT_E2E_PROTOCOL ?? 19);
-  if (![13, 19].includes(protocol)) throw fail('arguments', 'SLITHER_CLIENT_E2E_PROTOCOL must be 13 or 19');
   const started = performance.now();
   const controller = new AbortController();
   const interrupt = () => controller.abort();
@@ -167,14 +165,14 @@ export async function runLocalHost(options) {
     try { summary = JSON.parse(client.stdout.trim()); }
     catch { throw fail('summary', `Client produced no valid JSON: ${client.stderr}; ${JSON.stringify(result)}`); }
     try {
-      assertSummary(summary, protocol);
+      assertSummary(summary);
       if (result.code !== 0) throw fail('client-exit', JSON.stringify(result));
     } catch (error) {
       error.client = summary;
       if (client.stderr) error.message += `; ${client.stderr.trim()}`;
       throw error;
     }
-    return { ok: true, endpoint, protocolCoverage: [protocol], client: summary,
+    return { ok: true, endpoint, protocolCoverage: [19], client: summary,
       seconds: Number(((performance.now() - started) / 1000).toFixed(3)) };
   }, async () => {
     // All launched children are direct, shell-free binaries. Reap both even if one cleanup fails.

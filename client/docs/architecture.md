@@ -26,12 +26,6 @@ arena plans. Session and input policies own connection phases, timing, ping,
 turning and boost intents. HUD/menu owners retain scores, leaderboard, minimap,
 appearance and player-facing state.
 
-Setup selects the shared crate's protocol-13 or protocol-19 reader for the
-connection. The 13 adapter maps explicit IDs, coordinate anchors, all appearance
-deltas and absolute food keys into the same presentation inputs. A later Setup
-keeps the selected version; reset starts a new selection. HUD/minimap layouts
-are shared between the readers. Login and outbound command encoding are unchanged.
-
 Adapters execute socket, DOM and GPU effects outside Rust borrows and acknowledge
 successful work. Preserve packet ordering, arithmetic and transactional rollback
 when changing these boundaries; do not add another policy reducer in JavaScript.
