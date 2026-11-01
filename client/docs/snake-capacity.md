@@ -52,7 +52,14 @@ Under pressure:
   Extra samples are proportional to `scale / (256 + camera distance)`. This
   avoids swapping whole quotas when two rivals exchange distance order. Keep a
   nested subset of the original curve grid plus its tail endpoint, rather than
-  redistributing all colour indices over each new quota. Sampling retries are
+  redistributing all colour indices over each new quota. Select the grid before
+  allocating the returned sample and vertex vectors: both capacities fit the
+  selected count. Compact curves evaluate only selected positions and the
+  immediate predecessors needed for stock tangents/eye targets; no full-grid
+  sample or vertex buffer is created. Ordinary quadratic curves retain their
+  existing single-snake redistribution scratch, released before return, and
+  emit quota-sized output. There is no full-grid output followed by a shrink
+  allocation on each frame. Sampling retries are
   private; eye/spacing transitions commit once. The own curve keeps
   its existing independent 65,536-sample bound.
 - Paint reduced rivals as connected base-image spans with covered joints, at
@@ -94,6 +101,14 @@ the head-relative grid and carries source indices through nested reductions,
 including a second reduction for the painter's command budget. Tests cover
 16 non-growing anchor updates (with tail retirement), four sampling quotas,
 command quotas, single-colour and striped skins, and the cyclic-shade family.
+Turning and growing fixtures also check material selection at a fixed retained
+polyline arc distance. `presentation_curve_capacity` prepares the authored
+512 x 4,096-anchor full-map world and checks aggregate returned capacities over
+three normal-quality frames. At the original #421 head (`f0be9245`), its first
+frame had 35,648 active rival samples but 1,878,398 retained sample slots. The
+direct-output path retains 35,648 slots and 2,138,880 bytes across rival samples
+and vertices on that fixture. These are requested vector payloads, not RSS or
+timing measurements.
 This is a numeric curve/material-selection regression, not a pixel comparison
 or owner-play acceptance. The own and ordinary unpressured paths stay unchanged.
 
