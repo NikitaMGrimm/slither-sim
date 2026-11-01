@@ -19,7 +19,7 @@ pub enum WorldResolution {
     /// Existing capped world raster and linear presentation blit.
     #[default]
     Original,
-    /// Physical-size attachment, resolving directly into the presentation image.
+    /// Physical-size attachment with bounded MSAA, resolving directly into presentation.
     Native,
 }
 

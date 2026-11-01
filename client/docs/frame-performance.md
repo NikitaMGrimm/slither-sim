@@ -37,9 +37,19 @@ Compare readback bytes within each adapter and report per-phase median/p95,
 per-frame allocation bytes, and variation across runs. Draw planning, geometry
 conversion and GPU submission remain work after cached texture copies disappear.
 
+## High-DPI world workload
+
+The finite `world_resolution_perf` example covers a separate high-DPI world
+workload at 1080p, 1440p and 4K, including stock and maximum wheel zoom-in.
+It requires a DX12 integrated GPU and uses authored procedural artwork only.
+Run `world_resolution_perf --validate-fixture` first for a GPU-free check that
+food has completed spawning; see [world resolution](world-resolution.md) for the
+policy, sampling method, memory accounting and measurements. Do not collect
+timings while other compilers or GPU workloads are running.
+
 ## Retained-food CPU preparation
 
-The same driver has a GPU-free food-validation workload:
+The `frame_perf` driver also has a GPU-free food-validation workload:
 
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'

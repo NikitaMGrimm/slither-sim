@@ -203,7 +203,7 @@ fn direct_resolve_sample_one_resize_and_retained_submissions() {
             assert_eq!(image_pairs[0], image_pairs[2]); // Original after swap
             assert_eq!(image_pairs[1], image_pairs[3]); // Native after resize/swap
             if samples == 4 {
-                let physical = [4096, 2160]; // MSAA4 exceeds the unchanged guard
+                let physical = [4096, 2160]; // Keep Native sharp without a large MSAA target.
                 let target = offscreen::target(&r, physical);
                 let (_, overlay, _) = offscreen::scene(physical);
                 let report = p
@@ -216,9 +216,12 @@ fn direct_resolve_sample_one_resize_and_retained_submissions() {
                         Native,
                     )
                     .unwrap();
-                assert_eq!(report.plan.effective, Original);
-                assert!(report.plan.native_unavailable);
-                assert_eq!(p.backing_extent(), Some(world.extent));
+                assert_eq!(report.plan.effective, Native);
+                assert_eq!(report.plan.samples, 1);
+                assert!(!report.plan.native_unavailable);
+                assert_eq!(report.target_bytes, 0);
+                assert!(r.multisample_extent().is_none());
+                assert!(p.backing_extent().is_none());
                 let target = offscreen::target(&r, [128, 128]);
                 let (_, overlay, _) = offscreen::scene([128, 128]);
                 assert_eq!(

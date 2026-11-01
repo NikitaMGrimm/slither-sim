@@ -21,7 +21,9 @@ mapping. High retains automatic degradation/recovery.
 World resolution defaults to Original. The Native/sharp toggle requests physical
 world attachments with the same view area: “Sharper world; higher GPU use. Same
 view area.” It applies at the next safely prepared picture, including after the
-login closes, without changing the game's Quality state. Unsupported dimensions
+login closes, without changing the game's Quality state. Native uses MSAA4 only
+while its world MSAA target fits 64 MiB; larger sizes use single-sample physical
+coverage (including 4K). Original keeps its existing MSAA. Unsupported dimensions
 leave Original effective and show “Native unavailable at this size”; the request
 is retained and can become effective on a supported resize. See
 [world resolution](world-resolution.md) for target ownership and costs.
