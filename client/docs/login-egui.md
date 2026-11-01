@@ -28,8 +28,10 @@ champion editor keep their old-toolkit panels and input adapters, but egui
 still paints the login below them in a paint-only host mode; the desktop host
 presents their draws in a layer above egui. No screen transition swaps the
 login's renderer, so its text never shifts by the ~1–2 px the two renderers
-place text apart. `menu_specimens OUTPUT --underlay` renders that order
-offscreen for the studio entering and open. The outgoing login fade still paints while gameplay owns
+place text apart. On native non-Linux hosts (the app tests and specimen tool
+are not built on Linux), `menu_specimens OUTPUT --underlay` renders that order
+offscreen for the studio entering and open; elsewhere it fails rather than
+writing other specimens. The outgoing login fade still paints while gameplay owns
 steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.

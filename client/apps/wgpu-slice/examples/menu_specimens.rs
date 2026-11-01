@@ -239,6 +239,11 @@ async fn run(output: &Path) -> Result<()> {
     if std::env::args().nth(2).as_deref() == Some("--underlay") {
         return underlay_specimens(output, &mut renderer);
     }
+    // The native login host is not built here; never substitute default specimens.
+    #[cfg(any(target_arch = "wasm32", target_os = "linux"))]
+    if std::env::args().nth(2).as_deref() == Some("--underlay") {
+        return Err("--underlay needs the native login host (not built on Linux or wasm)".into());
+    }
     #[cfg(not(target_os = "linux"))]
     if std::env::args().nth(2).as_deref() == Some("--studio") {
         return studio_specimens(&mut renderer, output);
@@ -919,8 +924,9 @@ fn capture_settings(
     .map_err(|e| e.to_string())
 }
 
-/// The desktop host's order below an old-toolkit screen: page, egui login,
-/// then that screen's draws above it.
+/// The desktop host's order below an old-toolkit screen: page, world cover,
+/// egui login, then that screen's draws above it. These login-only specimens
+/// have no game world between the page and its cover.
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn capture_underlay(
     renderer: &mut Renderer,
@@ -934,9 +940,9 @@ fn capture_underlay(
         snakes: Vec::new(),
         ..frame.clone()
     };
-    if let Some(backdrop) = &picture.backdrop {
-        frame.draws.insert(0, backdrop.clone());
-    }
+    frame
+        .draws
+        .extend(picture.backdrop.iter().chain(&picture.world_cover).cloned());
     let mut layer = Ok(());
     let pixels = readback_with(renderer, &frame, &picture.resources, None, |r, v| {
         login.egui.paint(r, v);

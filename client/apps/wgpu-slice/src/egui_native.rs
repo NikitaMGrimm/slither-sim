@@ -610,13 +610,31 @@ impl NativeEguiHost {
                 renderer.update_texture(&gpu.device, &gpu.queue, *id, delta);
             }
         }
+        // A login fully hidden under an old-toolkit screen tessellates to
+        // nothing; texture writes still reach the queue's next submit.
+        if !s.meshes.is_empty() {
+            Self::submit(gpu, renderer, &s.meshes, s.extent, s.dpr, target);
+        }
+        for id in &s.textures.free {
+            renderer.free_texture(id);
+        }
+        s.textures.clear();
+    }
+    fn submit(
+        gpu: &gpu::Renderer,
+        renderer: &mut egui_wgpu::Renderer,
+        meshes: &[egui::ClippedPrimitive],
+        extent: [u32; 2],
+        dpr: f32,
+        target: &wgpu::TextureView,
+    ) {
         let screen = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: s.extent,
-            pixels_per_point: s.dpr,
+            size_in_pixels: extent,
+            pixels_per_point: dpr,
         };
         let mut encoder = gpu.device.create_command_encoder(&Default::default());
         let commands =
-            renderer.update_buffers(&gpu.device, &gpu.queue, &mut encoder, &s.meshes, &screen);
+            renderer.update_buffers(&gpu.device, &gpu.queue, &mut encoder, meshes, &screen);
         {
             let pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("native egui menus"),
@@ -631,13 +649,9 @@ impl NativeEguiHost {
                 })],
                 ..Default::default()
             });
-            renderer.render(&mut pass.forget_lifetime(), &s.meshes, &screen);
+            renderer.render(&mut pass.forget_lifetime(), meshes, &screen);
         }
         gpu.queue
             .submit(commands.into_iter().chain([encoder.finish()]));
-        for id in &s.textures.free {
-            renderer.free_texture(id);
-        }
-        s.textures.clear();
     }
 }
