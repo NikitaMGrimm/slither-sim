@@ -1213,6 +1213,8 @@ impl LocalGame {
                 .map_err(|e| e.to_string())?;
         }
         let lagging = self.session.view().lagging;
+        #[cfg(feature = "frame-profile")]
+        render::observe_preparation("control_probe_begin", self.identity + 1);
         let mut captured = None;
         let probe = self
             .client
@@ -1224,6 +1226,8 @@ impl LocalGame {
             return Err(e);
         }
         let (step, view) = captured.ok_or("Missing core step")?;
+        #[cfg(feature = "frame-profile")]
+        render::observe_preparation("control_probe_end", self.identity + 1);
         self.policy.begin_frame();
         self.policy.begin_control();
         self.input.set_connected(self.session.view().connected);
@@ -1380,7 +1384,11 @@ impl LocalGame {
         self.policy.control_done();
         let expected = w.step;
         let actions = w.actions;
+        #[cfg(feature = "frame-profile")]
+        render::observe_preparation("advance_begin", self.identity + 1);
         let mut world = self.client.clone();
+        #[cfg(feature = "frame-profile")]
+        render::observe_preparation("advance_snapshot_end", self.identity + 1);
         world
             .advance_with_control::<Probe, _>(w.now, w.lagging, |step, _| {
                 if step != expected {
@@ -1392,6 +1400,8 @@ impl LocalGame {
                 Probe::Core(e) => e,
                 Probe::Captured => "Unexpected probe".into(),
             })?;
+        #[cfg(feature = "frame-profile")]
+        render::observe_preparation("advance_end", self.identity + 1);
         self.identity += 1;
         let playing = self.session.view().playing;
         w.quality

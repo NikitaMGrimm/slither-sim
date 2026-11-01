@@ -1,0 +1,594 @@
+--- a/client/apps/wgpu-slice/Cargo.toml
++++ b/client/apps/wgpu-slice/Cargo.toml
+@@ -90 +90,6 @@
+ serde_json = { version = "=1.0.151", features = ["float_roundtrip"] }
++
++[[example]]
++name = "frame_stage_probe"
++path = "examples/frame_stage_probe.rs"
++required-features = ["frame-profile", "latency-rig"]
+--- /dev/null
++++ b/client/apps/wgpu-slice/examples/frame_stage_probe.rs
+@@ -0,0 +1,524 @@
++#[path = "frame_perf/probe_synthetic.rs"]
++mod synthetic_world;
++#[path = "../tests/support/announcement_tape.rs"]
++mod tape;
++use slither_wgpu_slice::{
++    Result, endpoint_login,
++    game::{EffectKind, LocalGame},
++    gpu, latency,
++    native::{Event, Transport},
++    render,
++};
++use std::{
++    alloc::{GlobalAlloc, Layout, System},
++    cell::{Cell, RefCell},
++    hash::{Hash, Hasher},
++    io::Write,
++    path::PathBuf,
++    time::{Duration, Instant},
++};
++struct Counting;
++thread_local! { static ALLOC: Cell<(u64,u64)> = const {Cell::new((0,0))}; static PHASES: RefCell<Vec<(&'static str,u64)>> = const {RefCell::new(Vec::new())}; }
++unsafe impl GlobalAlloc for Counting {
++    unsafe fn alloc(&self, l: Layout) -> *mut u8 {
++        ALLOC.with(|s| {
++            let (n, b) = s.get();
++            s.set((n + 1, b + l.size() as u64));
++        });
++        unsafe { System.alloc(l) }
++    }
++    unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
++        unsafe { System.dealloc(p, l) }
++    }
++    unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
++        ALLOC.with(|s| {
++            let (n, b) = s.get();
++            s.set((n + 1, b + l.size() as u64));
++        });
++        unsafe { System.alloc_zeroed(l) }
++    }
++    unsafe fn realloc(&self, p: *mut u8, l: Layout, n: usize) -> *mut u8 {
++        ALLOC.with(|s| {
++            let (a, b) = s.get();
++            s.set((a + 1, b + n as u64));
++        });
++        unsafe { System.realloc(p, l, n) }
++    }
++}
++#[global_allocator]
++static COUNTING: Counting = Counting;
++static EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
++fn phase(s: &'static str, _: u64) {
++    PHASES.with_borrow_mut(|p| {
++        p.push((
++            s,
++            EPOCH.get_or_init(Instant::now).elapsed().as_nanos() as u64,
++        ))
++    });
++}
++fn ns(t: Instant) -> u64 {
++    t.elapsed().as_nanos() as u64
++}
++fn effects(
++    g: &mut LocalGame,
++    t: &mut Transport,
++    live: bool,
++    now: f64,
++    hash: &mut impl Hasher,
++) -> Result<()> {
++    for _ in 0..256 {
++        let Some(e) = g.effect() else { return Ok(()) };
++        let connect = matches!(e.kind, EffectKind::Connect(_));
++        if connect {
++            g.construct(e.generation, e.id, now)?;
++        }
++        if live {
++            t.execute(&e)?;
++        }
++        if let EffectKind::Send(b) = &e.kind {
++            b.hash(hash);
++        }
++        g.acknowledge(e.generation, e.id, true)?;
++        if connect && !live {
++            g.opened(e.generation, now)?;
++        }
++    }
++    Err("effect budget".into())
++}
++struct Gpu {
++    presenter: slither_wgpu_slice::world_presenter::WorldPresenter,
++    r: gpu::Renderer,
++    _target: wgpu::Texture,
++    view: wgpu::TextureView,
++}
++impl Gpu {
++    fn new() -> Result<Self> {
++        let i = gpu::instance();
++        let a = pollster::block_on(i.enumerate_adapters(wgpu::Backends::DX12))
++            .into_iter()
++            .find(|a| a.get_info().vendor == 0x1002)
++            .ok_or("AMD adapter missing")?;
++        let r = pollster::block_on(gpu::Renderer::from_adapter_for_diagnostics(
++            a,
++            wgpu::TextureFormat::Rgba8Unorm,
++            4,
++            true,
++        ))?;
++        println!("adapter={:?},samples={}", r.adapter_info, r.sample_count);
++        let target = r.device.create_texture(&wgpu::TextureDescriptor {
++            label: Some("capture profile"),
++            size: wgpu::Extent3d {
++                width: 960,
++                height: 540,
++                depth_or_array_layers: 1,
++            },
++            mip_level_count: 1,
++            sample_count: 1,
++            dimension: wgpu::TextureDimension::D2,
++            format: wgpu::TextureFormat::Rgba8Unorm,
++            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
++            view_formats: &[],
++        });
++        let view = target.create_view(&Default::default());
++        let presenter = slither_wgpu_slice::world_presenter::WorldPresenter::new(&r);
++        Ok(Self {
++            presenter,
++            r,
++            _target: target,
++            view,
++        })
++    }
++    fn draw(&mut self, p: &render::PreparedFrame) -> Result<(u64, u64, u64, f64, usize)> {
++        let t = Instant::now();
++        self.r.sync_resources(&p.resources).map_err(String::from)?;
++        let sync = ns(t);
++        let t = Instant::now();
++        self.r.begin_diagnostic_frame();
++        let report = self
++            .presenter
++            .render(
++                &mut self.r,
++                &p.frame,
++                p.overlay.as_ref(),
++                &self.view,
++                [960, 540],
++                slither_client::settings::WorldResolution::Original,
++            )
++            .map_err(String::from)?;
++        let submit = ns(t);
++        let gpu_ns = self.timestamp()?;
++        let t = Instant::now();
++        self.r
++            .device
++            .poll(wgpu::PollType::Wait {
++                submission_index: None,
++                timeout: Some(Duration::from_secs(10)),
++            })
++            .map_err(|e| e.to_string())?;
++        Ok((
++            sync,
++            submit,
++            ns(t),
++            gpu_ns,
++            report.world_draws + report.overlay_draws,
++        ))
++    }
++    fn timestamp(&self) -> Result<f64> {
++        let b = self.r.device.create_buffer(&wgpu::BufferDescriptor {
++            label: None,
++            size: 64,
++            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
++            mapped_at_creation: false,
++        });
++        let read = self.r.device.create_buffer(&wgpu::BufferDescriptor {
++            label: None,
++            size: 64,
++            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
++            mapped_at_creation: false,
++        });
++        let mut e = self.r.device.create_command_encoder(&Default::default());
++        e.resolve_query_set(
++            self.r.diagnostic_timestamps().unwrap(),
++            0..(self.r.diagnostic_passes().len() as u32 * 2),
++            &b,
++            0,
++        );
++        e.copy_buffer_to_buffer(&b, 0, &read, 0, 64);
++        self.r.queue.submit([e.finish()]);
++        let (tx, rx) = std::sync::mpsc::channel();
++        read.slice(..).map_async(wgpu::MapMode::Read, move |x| {
++            let _ = tx.send(x);
++        });
++        self.r
++            .device
++            .poll(wgpu::PollType::Wait {
++                submission_index: None,
++                timeout: Some(Duration::from_secs(10)),
++            })
++            .map_err(|e| e.to_string())?;
++        rx.recv().unwrap().map_err(|e| e.to_string())?;
++        let d = read
++            .slice(..)
++            .get_mapped_range()
++            .map_err(|e| e.to_string())?;
++        let mut total = 0;
++        for i in 0..self.r.diagnostic_passes().len() {
++            let a = u64::from_le_bytes(d[i * 16..i * 16 + 8].try_into().unwrap());
++            let b = u64::from_le_bytes(d[i * 16 + 8..i * 16 + 16].try_into().unwrap());
++            total += b.saturating_sub(a);
++        }
++        Ok(total as f64 * self.r.queue.get_timestamp_period() as f64)
++    }
++}
++fn main() -> Result<()> {
++    let a: Vec<_> = std::env::args().collect();
++    if a.len() != 6 {
++        return Err("frame_stage_probe replay|synthetic INPUT NEW_DIR SECONDS ZOOM_NOTCHES".into());
++    }
++    let synthetic = a[1] == "synthetic";
++    let live = false;
++    if a[1] != "replay" && !synthetic {
++        return Err("offline only".into());
++    }
++    let output = PathBuf::from(&a[3]);
++    std::fs::create_dir(&output).map_err(|e| e.to_string())?;
++    let duration: f64 = a[4].parse().unwrap();
++    let zoom: f64 = a[5].parse().unwrap();
++    let trace = if std::env::var_os("PROFILE_TRACE").is_some() {
++        Some(latency::Recorder::new(900000))
++    } else {
++        None
++    };
++    let guard = trace.as_ref().map(|t| t.attach());
++    PHASES.with_borrow_mut(|p| p.reserve(2_000_000));
++    if std::env::var_os("PROFILE_PHASES").is_some() {
++        render::set_preparation_observer(Some(phase));
++    }
++    let mut records = Vec::new();
++    if !synthetic {
++        let b = std::fs::read(&a[2]).map_err(|e| e.to_string())?;
++        let mut i = 0;
++        while i < b.len() {
++            let t = u64::from_be_bytes(b[i..i + 8].try_into().unwrap()) as f64 / 1000.;
++            let n = u32::from_be_bytes(b[i + 8..i + 12].try_into().unwrap()) as usize;
++            i += 12;
++            records.push((t, b[i..i + n].to_vec()));
++            i += n;
++        }
++    }
++    let mut completed = true;
++    let mut raw = if live {
++        Some(std::io::BufWriter::new(
++            std::fs::File::create(output.join("capture.bin")).map_err(|e| e.to_string())?,
++        ))
++    } else {
++        None
++    };
++    let mut gpu = if std::env::var_os("PROFILE_CPU_ONLY").is_some() {
++        None
++    } else {
++        Some(Gpu::new()?)
++    };
++    let start = Instant::now();
++    let mut g = if synthetic {
++        synthetic_world::world(true)?
++    } else {
++        LocalGame::new(0.)?
++    };
++    g.window_viewport([960, 540], 1.)?;
++    let mut transport = Transport::default();
++    let mut digest = std::collections::hash_map::DefaultHasher::new();
++    if !synthetic {
++        endpoint_login::play(
++            &mut g,
++            if live {
++                &a[2]
++            } else {
++                "ws://127.0.0.1:9/slither"
++            },
++            "",
++            0,
++        )?;
++        effects(&mut g, &mut transport, live, 0., &mut digest)?;
++    }
++    let mut csv = String::from(
++        "frame,model_ms,wall_ns,poll_ns,ingress_ns,redraw_ns,sync_ns,submit_ns,wait_ns,gpu_ns,allocs,alloc_bytes,messages,foods,snakes,preys,draws,draw_calls,correction,lagging,zoom,own_exists,raw_x,raw_y,head_x,head_y,heading,speed_per_32ms\n",
++    );
++    let mut types = [(0_u64, 0_u64, 0_u64); 256];
++    let mut cursor = 0;
++    let mut frame = 0;
++    let mut last_model = 0.;
++    let mut zoomed = false;
++    let parity = std::env::var_os("PROFILE_PARITY").is_some();
++    while (if live {
++        start.elapsed().as_secs_f64()
++    } else {
++        frame as f64 / 60.
++    }) < duration
++    {
++        let iteration = (|| -> Result<bool> {
++            let model = if live {
++                start.elapsed().as_secs_f64() * 1000.
++            } else {
++                frame as f64 * 1000. / 60. + if synthetic { 1000. } else { 0. }
++            };
++            let tick = Instant::now();
++            if std::env::var_os("PROFILE_PHASES").is_some() {
++                phase("tick_begin", 0);
++            }
++            let alloc = ALLOC.with(Cell::get);
++            if g.phase() == slither_client::session_policy::Phase::Playing {
++                if !zoomed && zoom != 0. {
++                    g.wheel_zoom(zoom);
++                    zoomed = true;
++                }
++                let cb = latency::callback();
++                let angle = model / 1000. * 0.017 + 0.55 * (model / 16000.).sin();
++                g.pointer(
++                    480. + 220. * angle.cos(),
++                    270. + 220. * angle.sin(),
++                    960.,
++                    540.,
++                    false,
++                )?;
++                g.key("Space", model % 12000. >= 8000. && model % 12000. < 9000.);
++                drop(cb);
++            }
++            let poll = Instant::now();
++            let events = if live { transport.poll() } else { Vec::new() };
++            let poll_ns = ns(poll);
++            let ingress = Instant::now();
++            let mut messages = 0;
++            for e in events {
++                match e {
++                    Event::Opened(generation) => g.opened(generation, model)?,
++                    Event::Binary(generation, b) => {
++                        if let Some(raw) = &mut raw {
++                            raw.write_all(&((model * 1000.) as u64).to_be_bytes())
++                                .unwrap();
++                            raw.write_all(&(b.len() as u32).to_be_bytes()).unwrap();
++                            raw.write_all(&b).unwrap();
++                        }
++                        let id = transport.message_id();
++                        let t = Instant::now();
++                        g.receive_message(generation, &b, model, id)?;
++                        let op = b[if b[0] < 32 { 2 } else { 0 }] as usize;
++                        types[op].0 += 1;
++                        types[op].1 += ns(t);
++                        types[op].2 += b.len() as u64;
++                        messages += 1;
++                        effects(&mut g, &mut transport, live, model, &mut digest)?;
++                    }
++                    Event::Closed(generation) => g.closed(generation),
++                    Event::Failed(_, e) => {
++                        completed = false;
++                        eprintln!("transport_failed={e}");
++                        g.closed(g.generation());
++                    }
++                }
++            }
++            if !live {
++                while cursor < records.len() && records[cursor].0 <= model {
++                    let (t, b) = &records[cursor];
++                    let begin = Instant::now();
++                    g.receive(g.generation(), b, *t)?;
++                    let op = b[if b[0] < 32 { 2 } else { 0 }] as usize;
++                    types[op].0 += 1;
++                    types[op].1 += ns(begin);
++                    types[op].2 += b.len() as u64;
++                    effects(&mut g, &mut transport, false, *t, &mut digest)?;
++                    messages += 1;
++                    cursor += 1;
++                }
++            }
++            let ingress_ns = ns(ingress);
++            let t = Instant::now();
++            g.begin_redraw(model, [960, 540], 1.)?;
++            effects(&mut g, &mut transport, live, model, &mut digest)?;
++            let redraw_ns = ns(t);
++            let (mut sync, mut submit, mut wait, mut gpu_ns, mut draws, mut calls) =
++                (0, 0, 0, 0., 0, 0);
++            while let Some(p) = g.take_frame() {
++                draws += p.draw_count();
++                if let Some(gpu) = &mut gpu {
++                    let (s, u, w, n, c) = gpu.draw(&p)?;
++                    sync += s;
++                    submit += u;
++                    wait += w;
++                    gpu_ns += n;
++                    calls += c;
++                }
++                if parity {
++                    format!("{:?}{:?}{:?}", p.frame, p.overlay, p.resources).hash(&mut digest);
++                }
++                if synthetic
++                    && std::env::var_os("PROFILE_CAPTURE").is_some()
++                    && [40, 90, 179].contains(&frame)
++                {
++                    if let Some(gpu) = &gpu {
++                        capture(gpu, &output.join(format!("pixels-{frame}.rgba")))?;
++                    }
++                }
++                g.presented(true)?;
++                g.bank.recycle_frame(p);
++                effects(&mut g, &mut transport, live, model, &mut digest)?;
++            }
++            let wall = ns(tick);
++            let end_alloc = ALLOC.with(Cell::get);
++            let c = g.client();
++            let correction = c.own_snake().map_or(0., |s| {
++                let o = s.head_corrections().offset();
++                o[0].hypot(o[1])
++            });
++            let own = c.own_snake().map(|s| s.metrics());
++            let state = c.received();
++            use std::fmt::Write as _;
++            writeln!(csv,"{frame},{model},{wall},{poll_ns},{ingress_ns},{redraw_ns},{sync},{submit},{wait},{gpu_ns},{},{},{messages},{},{},{},{draws},{calls},{correction},{},{},{},{},{},{},{},{},{}",end_alloc.0-alloc.0,end_alloc.1-alloc.1,state.foods.len(),state.snakes.len(),c.preys().preys().len(),g.champion_session().lagging,c.camera().zoom(),u8::from(own.is_some()),own.map_or(0.,|s|s.raw_head.x),own.map_or(0.,|s|s.raw_head.y),own.map_or(0.,|s|s.corrected_head.x),own.map_or(0.,|s|s.corrected_head.y),own.map_or(0.,|s|s.corrected_heading),own.map_or(0.,|s|s.speed_per_32ms)).unwrap();
++            frame += 1;
++            last_model = model;
++            if matches!(
++                g.phase(),
++                slither_client::session_policy::Phase::Failed
++                    | slither_client::session_policy::Phase::Disconnected
++                    | slither_client::session_policy::Phase::Dead
++            ) {
++                return Ok(true);
++            }
++            if live {
++                std::thread::sleep(Duration::from_secs_f64(
++                    (1. / 60. - tick.elapsed().as_secs_f64()).max(0.),
++                ));
++            }
++            Ok(false)
++        })();
++        match iteration {
++            Ok(false) => {}
++            Ok(true) => break,
++            Err(e) => {
++                completed = false;
++                eprintln!("partial_run_error={e}");
++                break;
++            }
++        }
++    }
++    println!("phase_before_stop={:?},complete={completed}", g.phase());
++    g.stop();
++    transport.close();
++    drop(guard);
++    if let Some(t) = trace {
++        t.write(&output.join("latency.jsonl"), "3209d873", completed)
++            .map_err(|e| e.to_string())?;
++    }
++    std::fs::write(output.join("frames.csv"), csv).map_err(|e| e.to_string())?;
++    let mut csv = String::from("opcode,count,receive_ns,bytes\n");
++    for (op, (n, t, b)) in types.into_iter().enumerate() {
++        if n > 0 {
++            use std::fmt::Write as _;
++            writeln!(csv, "{op},{n},{t},{b}").unwrap();
++        }
++    }
++    std::fs::write(output.join("messages.csv"), csv).unwrap();
++    let mut csv = String::from("stage,ns\n");
++    PHASES.with_borrow(|p| {
++        use std::fmt::Write as _;
++        for (s, n) in p {
++            writeln!(csv, "{s},{n}").unwrap();
++        }
++    });
++    std::fs::write(output.join("phases.csv"), csv).unwrap();
++    println!("terminal_phase={:?}", g.phase());
++    println!(
++        "frames={frame},model_ms={last_model},wall_s={},messages={},digest={:016x},skips={}",
++        start.elapsed().as_secs_f64(),
++        types.iter().map(|t| t.0).sum::<u64>(),
++        digest.finish(),
++        g.draw_diagnostics.skipped_frames
++    );
++    Ok(())
++}
++
++fn capture(gpu: &Gpu, path: &std::path::Path) -> Result<()> {
++    let r = &gpu.r;
++    let b = r.device.create_buffer(&wgpu::BufferDescriptor {
++        label: None,
++        size: 960 * 540 * 4,
++        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
++        mapped_at_creation: false,
++    });
++    let mut e = r.device.create_command_encoder(&Default::default());
++    e.copy_texture_to_buffer(
++        wgpu::TexelCopyTextureInfo {
++            texture: &gpu._target,
++            mip_level: 0,
++            origin: wgpu::Origin3d::ZERO,
++            aspect: wgpu::TextureAspect::All,
++        },
++        wgpu::TexelCopyBufferInfo {
++            buffer: &b,
++            layout: wgpu::TexelCopyBufferLayout {
++                offset: 0,
++                bytes_per_row: Some(3840),
++                rows_per_image: Some(540),
++            },
++        },
++        gpu._target.size(),
++    );
++    r.queue.submit([e.finish()]);
++    let (tx, rx) = std::sync::mpsc::channel();
++    b.slice(..).map_async(wgpu::MapMode::Read, move |v| {
++        let _ = tx.send(v);
++    });
++    r.device
++        .poll(wgpu::PollType::Wait {
++            submission_index: None,
++            timeout: Some(Duration::from_secs(10)),
++        })
++        .map_err(|e| e.to_string())?;
++    rx.recv().unwrap().map_err(|e| e.to_string())?;
++    std::fs::write(
++        path,
++        &b.slice(..).get_mapped_range().map_err(|e| e.to_string())?,
++    )
++    .map_err(|e| e.to_string())?;
++    Ok(())
++}
+--- /dev/null
++++ b/client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs
+@@ -0,0 +1,55 @@
++//! Authored synthetic retained-food workloads, without a GPU, window or socket.
++use super::tape;
++use slither_wgpu_slice::{Result, game::LocalGame};
++
++pub fn world(stress: bool) -> Result<LocalGame> {
++    let mut game = tape::negotiating();
++    game.receive(
++        game.generation(),
++        &tape::bundle(&[tape::setup(), tape::snake(44)]),
++        3.,
++    )?;
++    tape::pictures(&mut game);
++    let mut packets = Vec::new();
++    for i in 0..if stress { 39_u16 } else { 7 } {
++        let x = 900 + (i % 8) * 65;
++        let y = 800 + (i / 8) * 60;
++        let mut p = tape::snake(0);
++        p[1..3].copy_from_slice(&(100 + i).to_be_bytes());
++        // The helper's head/anchor coordinates are protocol 19 fifth-units.
++        p[16..19].copy_from_slice(&tape::u24(u32::from(x) * 5));
++        p[19..22].copy_from_slice(&tape::u24(u32::from(y) * 5));
++        packets.push(p);
++    }
++    let (count, columns, spacing) = if stress {
++        (30_000, 256, 8)
++    } else {
++        (324, 18, 114)
++    };
++    for i in 0..count {
++        let x = 100 + (i % columns) * spacing;
++        let y = 100 + (i / columns) * spacing;
++        packets.push(vec![
++            b'F',
++            (x / 100) as u8,
++            (y / 100) as u8,
++            (i % 10) as u8,
++            ((x % 100) * 255 / 100) as u8,
++            ((y % 100) * 255 / 100) as u8,
++            20,
++        ]);
++    }
++    // Bounded ingress bundles; no transport is constructed.
++    for chunk in packets.chunks(4000) {
++        game.receive(game.generation(), &tape::bundle(chunk), 21.)?;
++        tape::pictures(&mut game);
++    }
++    tape::pump(&mut game, 1000.);
++    game.window_viewport([960, 540], 1.)?;
++    assert_eq!(game.client().foods().foods().len(), count);
++    assert_eq!(
++        game.client().snake_objects().count(),
++        if stress { 40 } else { 8 }
++    );
++    Ok(game)
++}

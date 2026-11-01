@@ -20,7 +20,7 @@ pub const MAX_DRAWS: usize = (slither_client::protocol::minimap::MAX_MINIMAP_DIM
 
 #[derive(Default)]
 pub struct Minimap {
-    background: Option<(u16, RgbaImage)>,
+    background: Option<(u16, f64, RgbaImage)>,
     pixels: Vec<u8>,
     tiles: Vec<(Draw, Resource)>,
     revision: u64,
@@ -30,6 +30,42 @@ fn over(dst: &mut [u8], src: &[u8], opacity: f64) {
     let alpha = f64::from(src[3]) / 255. * opacity;
     for i in 0..4 {
         dst[i] = (f64::from(src[i]) * opacity + f64::from(dst[i]) * (1. - alpha)).round() as u8;
+    }
+}
+
+/// Map planes repeat colors while their crossfade opacity changes every update.
+/// Memoize the exact byte-to-byte scalar blend for one present color, rather
+/// than recomposing a full image cache at each slightly different opacity.
+fn composite_layer(image: &mut RgbaImage, layer: MinimapImageLayer<'_>) {
+    let Some(&common) = layer.rgba.as_chunks::<4>().0.iter().find(|p| **p != [0; 4]) else {
+        return;
+    };
+    let alpha = f64::from(common[3]) / 255. * layer.opacity;
+    let table: [[u8; 256]; 4] = std::array::from_fn(|c| {
+        std::array::from_fn(|dst| {
+            (f64::from(common[c]) * layer.opacity + dst as f64 * (1. - alpha)).round() as u8
+        })
+    });
+    let n = u32::from(layer.dimension);
+    for y in 0..n {
+        for x in 0..n {
+            let src = &layer.rgba[((y * n + x) * 4) as usize..][..4];
+            if src == [0; 4] {
+                continue;
+            }
+            let i = (((y + layer.top_left.y as u32) * image.width + x + layer.top_left.x as u32)
+                * 4) as usize;
+            let dst = &mut image.pixels[i..i + 4];
+            if src == common {
+                for (c, dst) in dst.iter_mut().enumerate() {
+                    *dst = table[c][usize::from(*dst)];
+                }
+            } else {
+                // Layered/team packets also contain other colors; keep their
+                // original scalar operation, with no palette restriction.
+                over(dst, src, layer.opacity);
+            }
+        }
     }
 }
 
@@ -258,26 +294,17 @@ impl Minimap {
         if self
             .background
             .as_ref()
-            .is_none_or(|(d, _)| *d != dimension)
+            .is_none_or(|(d, opacity, _)| *d != dimension || *opacity != widget.background.opacity)
         {
-            self.background = Some((dimension, background(widget.background, side)));
-        }
-        let mut composed = self.background.as_ref().unwrap().1.clone();
-        for pixel in composed.pixels.as_chunks_mut::<4>().0 {
-            for c in pixel {
+            let mut pixels = background(widget.background, side);
+            for c in &mut pixels.pixels {
                 *c = (f64::from(*c) * widget.background.opacity).round() as u8;
             }
+            self.background = Some((dimension, widget.background.opacity, pixels));
         }
+        let mut composed = self.background.as_ref().unwrap().2.clone();
         for layer in widget.images {
-            let n = u32::from(layer.dimension);
-            for y in 0..n {
-                for x in 0..n {
-                    let src = &layer.rgba[((y * n + x) * 4) as usize..][..4];
-                    let i = (((y + layer.top_left.y as u32) * side + x + layer.top_left.x as u32)
-                        * 4) as usize;
-                    over(&mut composed.pixels[i..i + 4], src, layer.opacity);
-                }
-            }
+            composite_layer(&mut composed, layer);
         }
         let m = widget.marker;
         let marker = marker(m);
@@ -444,6 +471,89 @@ impl Minimap {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn layer_tables_match_scalar_rounding_for_fades_colors_and_destinations() {
+        for opacity in [0., 0.00001, 0.137, 0.475, 0.7, 1.] {
+            for common in [
+                [255; 4],
+                [153, 170, 255, 255],
+                [0, 0, 0, 128],
+                [7, 19, 32, 64],
+                [1, 2, 3, 0],
+            ] {
+                let pixels: Vec<_> = (0..256).flat_map(|_| common).collect();
+                let mut fast = image(16, 16);
+                for (i, pixel) in fast.pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                    pixel.fill(i as u8);
+                }
+                let mut expected = fast.clone();
+                for dst in expected.pixels.as_chunks_mut::<4>().0 {
+                    over(dst, &common, opacity);
+                }
+                composite_layer(
+                    &mut fast,
+                    MinimapImageLayer {
+                        rgba: &pixels,
+                        dimension: 16,
+                        top_left: Point::default(),
+                        opacity,
+                        z_index: 12,
+                    },
+                );
+                assert_eq!(fast.pixels, expected.pixels);
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_and_transparent_planes_match_scalar_composition_at_all_sizes() {
+        for n in [0_u16, 24, 80, 512] {
+            let pixels: Vec<_> = (0..usize::from(n).pow(2))
+                .flat_map(|i| match i % 7 {
+                    0 => [0; 4],
+                    1 => [153, 170, 255, 255],
+                    2 => [255; 4],
+                    _ => [3, 17, 9, 32],
+                })
+                .collect();
+            let side = u32::from(n) + 24;
+            let mut fast = image(side, side);
+            fast.pixels.fill(19);
+            let mut expected = fast.clone();
+            let opacity = 0.137;
+            for y in 0..u32::from(n) {
+                for x in 0..u32::from(n) {
+                    let src = &pixels[((y * u32::from(n) + x) * 4) as usize..][..4];
+                    let i = (((y + 12) * side + x + 12) * 4) as usize;
+                    over(&mut expected.pixels[i..i + 4], src, opacity);
+                }
+            }
+            composite_layer(
+                &mut fast,
+                MinimapImageLayer {
+                    rgba: &pixels,
+                    dimension: n,
+                    top_left: Point { x: 12., y: 12. },
+                    opacity,
+                    z_index: 12,
+                },
+            );
+            assert_eq!(fast.pixels, expected.pixels);
+            let empty = vec![0; pixels.len()];
+            composite_layer(
+                &mut fast,
+                MinimapImageLayer {
+                    rgba: &empty,
+                    dimension: n,
+                    top_left: Point { x: 12., y: 12. },
+                    opacity,
+                    z_index: 12,
+                },
+            );
+            assert_eq!(fast.pixels, expected.pixels);
+        }
+    }
 
     #[test]
     fn fractional_marker_strip_does_not_exceed_its_texture() {

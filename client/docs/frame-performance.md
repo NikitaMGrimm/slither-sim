@@ -1,5 +1,24 @@
 # Native frame workload
 
+## Crowded frame preparation
+
+The minimap compositor retains its opacity-adjusted procedural background.
+For each image layer it memoizes the exact scalar byte-to-byte blend for one
+present source color in a 1,024-byte table. Transparent pixels need no blend;
+other colors keep the scalar operation. Crossfade opacity can change every
+picture without repeating floating-point blend/rounding work at every map cell.
+Marker position, holder opacity and label placement still apply per picture.
+Resource revisions, GPU uploads and picture retirement are unchanged.
+
+Read-only control probes stage the small frame clock before calling control;
+the complete world snapshot follows only an accepted callback. Errors retain
+the original clock and model, and callbacks still run once before entity motion.
+
+The [crowded preparation study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-01-frame-preparation-reuse/REPORT.md)
+records the ranked CPU/offscreen GPU profile, restricted replay and authored
+30,000-pellet/40-snake workloads, exact output controls, alternating runs and
+rejected texture-array/composition-cache trials. It does not establish gameplay FPS.
+
 ## Battledome zoom-out matrix
 
 The finite headless `frame_perf --battledome NEW_DIRECTORY` driver uses authored
