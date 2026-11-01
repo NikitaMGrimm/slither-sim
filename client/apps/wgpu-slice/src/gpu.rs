@@ -87,9 +87,10 @@ pub struct Renderer {
 }
 impl Renderer {
     pub fn supports_native(&self, physical: [u32; 2]) -> bool {
+        // Capability includes Native's single-sample path at large outputs.
         crate::world_resolution::validate_target(
             physical,
-            self.sample_count,
+            1,
             self.device.limits().max_texture_dimension_2d,
         )
         .is_ok()
@@ -133,6 +134,16 @@ impl Renderer {
         format: wgpu::TextureFormat,
         max_samples: u32,
     ) -> Result<Self> {
+        Self::from_adapter_with_features(adapter, format, max_samples, wgpu::Features::empty())
+            .await
+    }
+    /// Explicit offscreen diagnostics only; ordinary hosts request no optional features.
+    pub async fn from_adapter_with_features(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+        required_features: wgpu::Features,
+    ) -> Result<Self> {
         if !matches!(max_samples, 1 | 4) {
             return Err("Unsupported sample count".into());
         }
@@ -153,7 +164,7 @@ impl Renderer {
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("synthetic-gameplay-slice"),
-                required_features: wgpu::Features::empty(),
+                required_features,
                 // Every backend validates against WebGL2 so native runs reject what
                 // the planned WebGL2 extension cannot create. Surfaces and offscreen
                 // targets keep the adapter's resolution; uploads have their own cap.

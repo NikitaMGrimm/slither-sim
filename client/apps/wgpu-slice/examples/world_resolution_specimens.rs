@@ -15,10 +15,20 @@ async fn run(output: &Path) -> Result<()> {
     let mut measurements = Vec::new();
     let mut adapters = Vec::new();
     for samples in [4, 1] {
-        let adapter = instance()
-            .request_adapter(&Default::default())
-            .await
-            .map_err(|e| e.to_string())?;
+        let instance = instance();
+        let adapter = if std::env::args().any(|arg| arg == "--integrated") {
+            instance
+                .enumerate_adapters(wgpu::Backends::DX12)
+                .await
+                .into_iter()
+                .find(|a| a.get_info().device_type == wgpu::DeviceType::IntegratedGpu)
+                .ok_or("No DX12 integrated GPU")?
+        } else {
+            instance
+                .request_adapter(&Default::default())
+                .await
+                .map_err(|e| e.to_string())?
+        };
         let mut renderer = Renderer::from_adapter_with_max_samples(
             adapter,
             wgpu::TextureFormat::Rgba8Unorm,
@@ -87,14 +97,17 @@ async fn run(output: &Path) -> Result<()> {
                 } else {
                     "native"
                 };
-                let file = format!("{name}-{}x{}-msaa{samples}.png", physical[0], physical[1]);
+                let file = format!(
+                    "{name}-{}x{}-max-msaa{samples}-world-msaa{}.png",
+                    physical[0], physical[1], report.plan.samples
+                );
                 image.save(output.join(&file)).map_err(|e| e.to_string())?;
                 let crop = [physical[0] / 2 - 192, physical[1] / 2 - 128, 384, 256];
                 image::imageops::crop_imm(&image, crop[0], crop[1], crop[2], crop[3])
                     .to_image()
                     .save(output.join(format!("edge-{file}")))
                     .map_err(|e| e.to_string())?;
-                measurements.push(serde_json::json!({"file":file,"physical":physical,"projection":world.extent,"attachment":report.plan.attachment,"samples":samples,"world_producer_quads":world.draws.len(),"overlay_producer_quads":overlay.draws.len(),"world_gpu_draws":report.world_draws,"overlay_gpu_draws":report.overlay_draws,"blit_draws":usize::from(report.plan.blit),"render_passes":report.passes,"backing_bytes":report.plan.backing_bytes(),"msaa_bytes":report.plan.msaa_bytes(),"persistent_world_target_bytes":report.target_bytes,"transition_world_target_peak_bytes":report.transient_target_bytes,"one_presentation_image_bytes":u64::from(physical[0])*u64::from(physical[1])*4,"uploaded_resource_slots":resources.len(),"uploaded_resource_bytes":resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),"prepare_cpu_us":prepare_us,"sync_cpu_us":sync_us,"first_submit_cpu_us":first_submit_us,"warm_submit_cpu_us":warm_submit_us,"copy_wait_readback_cpu_us":wait_copy_us,"edge_crop":crop}));
+                measurements.push(serde_json::json!({"file":file,"physical":physical,"projection":world.extent,"attachment":report.plan.attachment,"maximum_samples":samples,"world_samples":report.plan.samples,"world_producer_quads":world.draws.len(),"overlay_producer_quads":overlay.draws.len(),"world_gpu_draws":report.world_draws,"overlay_gpu_draws":report.overlay_draws,"blit_draws":usize::from(report.plan.blit),"render_passes":report.passes,"backing_bytes":report.plan.backing_bytes(),"msaa_bytes":report.plan.msaa_bytes(),"persistent_world_target_bytes":report.target_bytes,"transition_world_target_peak_bytes":report.transient_target_bytes,"one_presentation_image_bytes":u64::from(physical[0])*u64::from(physical[1])*4,"uploaded_resource_slots":resources.len(),"uploaded_resource_bytes":resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),"prepare_cpu_us":prepare_us,"sync_cpu_us":sync_us,"first_submit_cpu_us":first_submit_us,"warm_submit_cpu_us":warm_submit_us,"copy_wait_readback_cpu_us":wait_copy_us,"edge_crop":crop}));
             }
         }
         if let Some(error) = scope.pop().await {

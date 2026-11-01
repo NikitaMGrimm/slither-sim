@@ -44,6 +44,7 @@ pub mod settings;
 pub mod start_page;
 pub mod state;
 pub mod stock_controller_policy;
+pub mod world_resolution;
 
 #[cfg(target_arch = "wasm32")]
 mod start_page_browser;
