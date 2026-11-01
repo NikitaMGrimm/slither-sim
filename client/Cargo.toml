@@ -20,6 +20,8 @@ unicode-segmentation = "=1.13.3"
 [features]
 # Offline measuring instrument; absent from ordinary builds.
 feel-trace = []
+# Scalar protocol observations for the opt-in local latency measurement host.
+latency-rig = []
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "=0.3.106"

@@ -5,6 +5,8 @@ use slither_protocol::{DecodeAdmission, ErrorKind, frame, v19};
 use std::fmt;
 
 pub mod hud;
+#[cfg(feature = "latency-rig")]
+pub mod latency;
 pub mod minimap;
 
 pub use slither_protocol::frame::{MAX_FRAME_BYTES, MAX_FRAME_COMMANDS};

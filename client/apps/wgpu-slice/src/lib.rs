@@ -12,6 +12,8 @@ pub mod game;
 pub mod gpu;
 pub mod hud;
 pub mod latency;
+#[cfg(all(feature = "latency-rig", not(target_arch = "wasm32")))]
+pub mod latency_rig;
 pub mod materials;
 pub mod menu;
 pub mod menu_counts;
