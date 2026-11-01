@@ -13,18 +13,19 @@ const target = 'D:/CargoTargets/latency-rig';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const check = (ok, message) => { if (!ok) throw Error(message); };
 export function optionsFor(args) {
-  const o = { seconds: 60, zoom: 0, truth: true };
+  const o = { seconds: 60, zoom: 0, truth: true, region: 'inner' };
   const seen = new Set();
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === '--without-truth') { o.truth = false; continue; }
-    const key = { '--host-bin':'hostBin','--client-bin':'clientBin','--output':'output','--seconds':'seconds','--zoom':'zoom','--build-host-root':'hostRoot','--host-revision':'hostRevision' }[flag];
+    const key = { '--host-bin':'hostBin','--client-bin':'clientBin','--output':'output','--seconds':'seconds','--zoom':'zoom','--build-host-root':'hostRoot','--host-revision':'hostRevision','--region':'region' }[flag];
     check(key && !seen.has(key) && args[i+1] !== undefined, 'unknown/repeated/missing rig option');
-    seen.add(key); const value = args[++i]; o[key] = ['seconds','zoom'].includes(key) ? Number(value) : key==='hostRevision'?value:path.resolve(value);
+    seen.add(key); const value = args[++i]; o[key] = ['seconds','zoom'].includes(key) ? Number(value) : ['hostRevision','region'].includes(key)?value:path.resolve(value);
   }
   check(o.output && (o.hostBin || o.hostRoot) && (o.clientBin || o.hostRoot), 'need --output, --host-bin/--client-bin or --build-host-root');
   check(Number.isFinite(o.seconds) && o.seconds >= 10 && o.seconds <= 120 && [0,-17].includes(o.zoom), 'seconds 10..120; zoom 0 or -17');
   check(!o.hostRevision||/^[a-f0-9]{40}$/i.test(o.hostRevision),'invalid host source revision');
+  check(['inner','pit-edge'].includes(o.region)&&(o.region!=='pit-edge'||o.truth),'region inner or pit-edge (truth required)');
   return o;
 }
 export async function directoryBytes(dir) {
@@ -90,9 +91,9 @@ export async function run(o) {
       format:'latency-rig-plan-v1',sourceRevision:git(['rev-parse','HEAD']),
       clientDiff:git(['diff','--','client']),hostBinarySha256:await hash(o.hostBin),clientBinarySha256:await hash(o.clientBin),
       hostSourceRevision:o.hostRevision??null,
-      seconds:o.seconds,zoomNotches:o.zoom,truth:o.truth,config,
+      seconds:o.seconds,zoomNotches:o.zoom,truth:o.truth,region:o.region,config,
       reference:'nearest live received bot within 1200 units; hold until disappearance/life change/out of range; ID tie break',
-      middle:'head radius < 0.7 current pit; target orbit 0.5 pit; normal approach; never command exit after entry',
+      middle:o.region==='pit-edge'?'measurement head radius <=1.1 live pit; control/zoom arm remains <0.7 pit; target orbit0.5 pit; references warm2s from first observation; zoomout waits2s after actual zoom<0.5':'head radius <0.7 current pit; target orbit0.5 pit; references warm2s from segment entry',
       strata:'reference normal/boost from host state; straight <=0.05 rad heading change over preceding 100ms, turning >=0.15 rad; remainder transitional',
       lag:'truth minus actual f32 painter head, tangent/speed lag equivalent; during turns not temporal delay',
       quantiles:'nearest rank p50/p90/p99; descriptive correlated frames; p99 under 1000 samples explicitly sparse',
@@ -133,7 +134,7 @@ export async function run(o) {
     active=false;
     await stop(host);
     await writeFile(path.join(o.output,'load.json'),JSON.stringify({contaminated,samples:all},null,2),{flag:'wx'});
-    const result=await analyzeCapture(o.output);
+    const result=await analyzeCapture(o.output,{region:o.region});
     await writeFile(path.join(o.output,'results.json'),JSON.stringify(result,null,2),{flag:'wx'});
     console.log(JSON.stringify(result,null,2));
     return result;

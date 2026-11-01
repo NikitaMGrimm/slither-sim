@@ -34,7 +34,9 @@ export function interpolateTruth(ticks,ns,id) {
     heading:s[5]+angle(e[5],s[5])*phase,speed:s[6]+(e[6]-s[6])*phase,boost:s[7],
     tickGapMs:Number(b.ns-a.ns)/1e6,stepBracketMs:Math.max(a.bracket,b.bracket)};
 }
-export async function analyzeCapture(directory) {
+export async function analyzeCapture(directory, { region = 'inner' } = {}) {
+  check(['inner','pit-edge'].includes(region),'unknown analysis region');
+  const plan=JSON.parse(await readFile(path.join(directory,'plan.json'),'utf8'));
   const traceText=await readFile(path.join(directory,'latency.jsonl'),'utf8');
   const validation=analyze(traceText,{cpu:true}); // Offscreen has no acquire/present. Strengthen transport/submission below.
   const trace=rows(traceText).slice(1,-1);
@@ -74,21 +76,28 @@ export async function analyzeCapture(directory) {
       const before=BigInt(r.unix_before_ns);
       check(ns>=before,'reversed host step');
       if(prev)check(ns>=prev.ns&&mono>=prev.mono&&Math.abs(Number((ns-prev.ns)-(mono-prev.mono)))/1e6<1,'host wall clock jump/drift');
-      ticks.push({ns,mono,bracket:Number(ns-before)/1e6,heads:new Map(r.heads.filter(h=>needed.has(h[0])).map(h=>[h[0],h]))});
+      ticks.push({ns,mono,pit:r.pit_radius,liveBots:r.heads.slice(1).filter(h=>h[2]).length,bracket:Number(ns-before)/1e6,heads:new Map(r.heads.filter(h=>needed.has(h[0])).map(h=>[h[0],h]))});
       clockSteps.push(Number(ns-before)/1e6);prev={ns,mono};
     }
     check(truthMetadata?.schema==='host-latency-truth-v1'&&summary?.complete===true&&summary.ticks===ticks.length&&summary.heads===ticks.length*truthMetadata.slot_count,'incomplete host truth');
   }
+  check(region!=='pit-edge'||hasTruth,'pit-edge analysis needs host geometry');
   const controls=rows(await readFile(path.join(directory,'client/controls.jsonl'),'utf8'));
   const controlMap=new Map(controls.map(r=>[`${r.generation}/${r.effect}`,r.bytes]));
-  const groups=new Map(),total=new Map(),coverage={issued:selected.length,prepared:headRows.length,nearMiddle:0,withReference:0,truthMatched:0,transition:0};
+  const groups=new Map(),total=new Map(),measuredPopulation=[],coverage={issued:selected.length,prepared:headRows.length,innerBand:0,nearMiddle:0,withReference:0,truthMatched:0,transition:0};
   const push=(group,metric,value)=>{if(!Number.isFinite(value))return;if(!group.has(metric))group.set(metric,[]);group.get(metric).push(value);};
-  const warm=new Map(), motionHistory=new Map(),tokenLives=new Map();let activeIdentity=null;
+  const warm=new Map(),firstSeen=new Map(),motionHistory=new Map(),tokenLives=new Map();let activeIdentity=null,zoomStarted=null;
   for(const r of selected){
     const h=r.heads.find(h=>!h[2]);
-    if(!r.middle){activeIdentity=null;continue;}coverage.nearMiddle++;
+    if(r.zoom<.5&&zoomStarted===null)zoomStarted=r.t;
+    const identity=h?`${r.generation}/${h[1]}`:null;
+    if(identity&&!firstSeen.has(identity))firstSeen.set(identity,r.t);
+    if(r.middle)coverage.innerBand++;
+    const world=ticks[Math.max(0,lower(ticks,r.ns,t=>t.ns)-1)];
+    const own=r.heads.find(h=>h[2]);
+    const eligible=region==='inner'?r.middle:Boolean(world?.pit&&own&&Math.hypot(own[7],own[8])<=1.1*world.pit);
+    if(!eligible){activeIdentity=null;continue;}coverage.nearMiddle++;
     if(!h){activeIdentity=null;continue;}coverage.withReference++;
-    const identity=`${r.generation}/${h[1]}`;
     if(activeIdentity!==identity){warm.set(identity,r.t);activeIdentity=identity;}
     if(hasTruth&&!tokenLives.has(identity)) {
       // Wire IDs are reused. Bind this client token once, only to a unique host
@@ -110,12 +119,15 @@ export async function analyzeCapture(directory) {
     if(!motionHistory.has(key))motionHistory.set(key,[]);
     const history=motionHistory.get(key);history.push({ns:r.ns,heading});
     const prevIndex=lower(history,r.ns-100_000_000n,x=>x.ns);
-    if(prevIndex>=history.length-1||r.t-warm.get(identity)<2_000_000_000n)continue;
+    const warmed=region==='inner'?warm.get(identity):firstSeen.get(identity);
+    if(prevIndex>=history.length-1||r.t-warmed<2_000_000_000n)continue;
+    if(region==='pit-edge'&&plan.zoomNotches!==0&&(zoomStarted===null||r.t-zoomStarted<2_000_000_000n))continue;
     const delta=Math.abs(angle(heading,history[prevIndex].heading));
     const motion=delta<=.05?'straight':delta>=.15?'turning':'transition';
     if(motion==='transition'){coverage.transition++;continue;}
     r.stratum=`${motion}/${boost?'boost':'normal'}`;
     if(!groups.has(r.stratum))groups.set(r.stratum,new Map());const group=groups.get(r.stratum);
+    if(world)measuredPopulation.push(world.liveBots);
     const packet=lagError([h[7],h[8]],[h[3],h[4]],heading,speed);
     push(group,'packetRelativeLagEquivalentMs',packet.lagMs);push(group,'packetRelativeHeadErrorUnits',packet.distance);
     if(truth){coverage.truthMatched++;const e=lagError(truth.position,[h[3],h[4]],heading,speed);push(group,'authoritativeLagEquivalentAtSubmitMs',e.lagMs);push(group,'authoritativeHeadErrorAtSubmitUnits',e.distance);push(group,'truthInterpolationGapMs',truth.tickGapMs);if(preparedTruth)push(group,'authoritativeLagEquivalentAtPrepareMs',lagError(preparedTruth.position,[h[3],h[4]],preparedTruth.heading,preparedTruth.speed).lagMs);}
@@ -128,13 +140,28 @@ export async function analyzeCapture(directory) {
     if(!start||!end)return;const value=Number(end.t-start.t)/1e6;check(value>=0,`reversed ${name}`);
     push(total,name,value);const g=frame?groups.get(frame.stratum):groupAt(end);if(g)push(g,name,value);
   };
+  const appliedByGeneration=new Map(),messageCursor=new Map();
+  for(const r of trace.filter(r=>r.stage==='apply_end')){
+    if(!appliedByGeneration.has(r.generation))appliedByGeneration.set(r.generation,[]);
+    appliedByGeneration.get(r.generation).push(r);
+  }
   for(const r of trace){
     if(r.stage==='apply_end') {interval('receiveToApplyMs',get('message',r),get('apply_begin',r));interval('applyMs',get('apply_begin',r),r);}
     if(r.stage==='build_end')interval('prepareMs',get('build_begin',r),r,byFrame.get(`${r.generation}/${r.id}`));
     if(r.stage==='presented'){
       const frame=byFrame.get(`${r.generation}/${r.id}`),build=get('build_end',r),submit=get('submit_end',r);
       interval('prepareEndToSubmitMs',build,submit,frame);
-      if(build?.related!=='0')interval('receiveToSubmitMs',get('message',r,build.related),submit,frame);
+      if(build?.related!=='0'){
+        interval('latestMessageAgeAtSubmitMs',get('message',r,build.related),submit,frame);
+        const watermark=get('apply_end',r,build.related),messages=appliedByGeneration.get(r.generation)??[];
+        let cursor=messageCursor.get(r.generation)??0;
+        while(cursor<messages.length&&messages[cursor].event<=watermark.event){
+          const applied=messages[cursor++];
+          interval('receiveToFirstSubmitMs',get('message',applied),submit,frame);
+          interval('applyEndToFirstSubmitMs',applied,submit,frame);
+        }
+        messageCursor.set(r.generation,cursor);
+      }
       interval('submitToOffscreenAckMs',submit,r,frame);
     }
     if(r.stage==='decision'&&r.related!=='0'){
@@ -146,7 +173,8 @@ export async function analyzeCapture(directory) {
   for(const motion of ['straight','turning'])for(const speed of ['normal','boost'])if(!groups.has(`${motion}/${speed}`))groups.set(`${motion}/${speed}`,new Map());
   const load=JSON.parse(await readFile(path.join(directory,'load.json'),'utf8'));
   check(!load.contaminated,'compiler-contaminated capture');
-  return {format:'latency-rig-results-v1',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
+  return {format:'latency-rig-results-v1',analysisScope:region==='inner'?'original-inner-band':'pit-edge-first-observed-reference-v2',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
+    liveBotPopulation:{allHostTicks:distribution(ticks.map(t=>t.liveBots)),measuredReferenceFrames:distribution(measuredPopulation)},
     clock:{source:'system-time-unix+instant',observedMinPositiveClockStepNs:headHeader.observed_min_positive_clock_step_ns,mappingBracketMs:distribution(maps.map(r=>r.mapWidthMs)),hostStepBracketMs:distribution(clockSteps),nominalWindowsSystemTimeQuantumNs:100},
     machineCpuPercent:distribution(load.samples.map(s=>s.cpuPercent).filter(v=>v!==null)),
     stages:format(total),strata:Object.fromEntries([...groups].map(([k,g])=>[k,format(g)])),
@@ -154,5 +182,5 @@ export async function analyzeCapture(directory) {
     limitations:['No surface acquire, present, scanout or physical input. GPU waits are serialized.','UNIX/QPC storage precision is not clock accuracy. System-time jumps over 1ms per adjacent sample reject capture.','Authoritative truth is linearly interpolated between post-step samples (gap <=30ms). Lag equivalent during turns is spatial error divided by speed, not temporal delay.','Frame quantiles are correlated descriptive observations; sparse p99 is flagged. Missing strata remain missing.']};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
-  try{console.log(JSON.stringify(await analyzeCapture(path.resolve(process.argv[2])),null,2));}catch(e){console.error(String(e));process.exitCode=1;}
+  try{console.log(JSON.stringify(await analyzeCapture(path.resolve(process.argv[2]),{region:process.argv.includes('--pit-edge')?'pit-edge':'inner'}),null,2));}catch(e){console.error(String(e));process.exitCode=1;}
 }

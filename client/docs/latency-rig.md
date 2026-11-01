@@ -55,6 +55,17 @@ Git. Do not overwrite or delete earlier attempts to obtain a passing result.
 
 ## Approach and reference
 
+The original `--region inner` plan below retains its strict 0.7-pit band and
+two seconds of warmup after entry. A separate `--region pit-edge` analysis
+accepts head radius at most 1.1 times the live authoritative pit radius, matching
+the requested safe pit-edge alternative. It warms a reference for two seconds
+from its first observation, including approach observations. Zoom-out samples
+also wait two seconds after actual camera zoom falls below 0.5; a requested zoom
+that never activates produces no zoom-out geometry samples. Control still aims
+at 0.5 pit and arms zoom/boost at 0.7 pit. Region choice is frozen in each new
+capture's plan. Retrospective pit-edge results must be labelled supplemental and
+kept alongside the original results, never overwrite them.
+
 The client joins normally; no spawn placement or bot takeover is needed. A
 scripted vector field points inward outside an orbit and tangentially at its
 target radius, 0.5 of the live pit radius. The harness derives the pit from the
@@ -158,6 +169,7 @@ Reanalyze retained evidence without launching any process or game connection:
 
 ```powershell
 node client/tools/latency-rig-analysis.mjs C:/external/evidence/baseline-default
+node client/tools/latency-rig-analysis.mjs C:/external/evidence/baseline-default --pit-edge
 node --test client/tools/latency-rig.test.mjs client/tools/latency-trace.test.mjs
 ```
 
