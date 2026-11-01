@@ -82,7 +82,7 @@ export class InputHasher {
   end(label) {
     if (!this.frame || this.frame.label !== label) throw Error('Unmatched trace frame marker');
     const frame = this.frame;
-    const descriptors = [...this.resources.entries()].map(([id, r]) => ({ kind: r.kind, descriptor_sha256: this.descriptor(id), label: r.desc?.label ?? null,
+    const descriptors = [...this.resources.entries()].map(([id, r]) => ({ kind: r.kind, descriptor_sha256: this.descriptor(id), label: r.desc?.label ?? null, cpu_input: r.cpuInput ?? null,
       ...(r.kind === 'Buffer' ? { size: r.desc.size, usage: r.desc.usage } : {}) }));
     descriptors.sort((a, b) => stable(a).localeCompare(stable(b)));
     const device = structuredClone(this.init ?? {});
@@ -134,7 +134,8 @@ export class InputHasher {
       // claiming equality from an incomplete reconstruction.
       if (kind === 'WriteBuffer' && value.offset !== 0) throw Error('Partial buffer write requires explicit state composition');
       if (kind === 'WriteTexture' && r.cpuInput) throw Error('Mutable texture requires explicit state composition');
-      r.cpuInput = { ...data, ...(kind === 'WriteBuffer' ? { offset: value.offset } : { layout: value.layout, size: value.size }) };
+      const textureTarget = kind === 'WriteTexture' ? Object.fromEntries(Object.entries(value.to).filter(([key]) => key !== 'texture')) : null;
+      r.cpuInput = { ...data, ...(kind === 'WriteBuffer' ? { offset: value.offset } : { target: textureTarget, layout: value.layout, size: value.size }) };
       this.cache.clear();
       if (this.frame) {
         const upload = { kind: kind === 'WriteBuffer' ? 'buffer' : 'texture', resource: this.normalize(id), ...data, usage: r.desc.usage ?? null, details: this.normalize(details) };

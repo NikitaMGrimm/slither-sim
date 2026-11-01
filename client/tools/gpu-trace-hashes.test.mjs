@@ -49,3 +49,16 @@ test('missing bytes, failed GPU commands and unsupported partial writes fail clo
   await assert.rejects(collect(partial), /Partial buffer write/);
   await assert.rejects(collect([{ FailedCommands: { error: 'validation' } }]), /FailedCommands/);
 });
+
+test('retained CPU inputs uploaded before the frame remain part of its fingerprint', async () => {
+  const input = byte => {
+    const stream = actions();
+    stream.splice(2, 0,
+      { CreateBuffer: [id(400), { label: 'immutable uniform', size: 4, usage: 'UNIFORM | COPY_DST', mapped_at_creation: false }] },
+      { WriteBuffer: { id: id(400), data: { Binary: ['bin', [byte, 0, 0, 0]] }, offset: 0, size: 4, queued: true } });
+    return stream;
+  };
+  const a = await collect(input(1)), b = await collect(input(2));
+  assert.equal(a.uploads_sha256, b.uploads_sha256);
+  assert.notEqual(a.descriptor_sha256, b.descriptor_sha256);
+});

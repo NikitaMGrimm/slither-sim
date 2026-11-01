@@ -119,5 +119,10 @@
       }
     }
   },
-  "rebased_04_status": "binaries built; timing/input-validation results pending booked 10:10 window"
+  "rebased_04_status": "binaries built; timing/input-validation results pending booked 10:10 window",
+  "offline_validation_tools": {
+    "note": "Offline tool revision is pinned separately; the retained Rust binaries are unchanged.",
+    "hasher_source": "client/tools/gpu-trace-hashes.mjs",
+    "hasher_sha256": "8c4dde546d1974ee9b41699025ced3903e2b7261220d32032d91d7d5f6259a32"
+  }
 }
