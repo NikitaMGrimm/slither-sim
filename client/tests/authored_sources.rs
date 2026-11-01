@@ -114,30 +114,6 @@ fn food_and_prey_sizes_glows_and_shadows_use_the_standard_material_contract() {
     assert_eq!(p.prey[0].glows, p.food[0].glows);
 }
 #[test]
-fn hexagons_preserve_nested_column_row_layer_and_operand_order() {
-    let tile = authored_source_recipes().tile;
-    assert_eq!(tile.commands.len(), 600);
-    assert_eq!(
-        &tile.commands[..10],
-        &[
-            PaintCommand::FillStyle("#09131d".into()),
-            PaintCommand::BeginPath,
-            PaintCommand::MoveTo([45., -84.75]),
-            PaintCommand::LineTo([11.25, -51.]),
-            PaintCommand::LineTo([-33.75, -62.25]),
-            PaintCommand::LineTo([-45., -107.25]),
-            PaintCommand::LineTo([-11.25, -141.]),
-            PaintCommand::LineTo([33.75, -129.75]),
-            PaintCommand::ClosePath,
-            PaintCommand::Fill,
-        ]
-    );
-    assert_eq!(tile.commands[10], PaintCommand::FillStyle("#26384a".into()));
-    assert_eq!(tile.commands[20], PaintCommand::FillStyle("#1c2b3b".into()));
-    assert_eq!(tile.commands[122], PaintCommand::MoveTo([126., -36.75]));
-}
-
-#[test]
 fn numeric_plans_and_pixel_buffers_are_owned_fresh_values() {
     let mut a = authored_source_recipes();
     let expected = a.clone();

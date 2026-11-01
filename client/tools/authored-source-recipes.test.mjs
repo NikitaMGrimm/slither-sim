@@ -11,7 +11,7 @@ import { createSyntheticPreyResolver as originalPrey } from './fixtures/authored
 import { authoredSourceRecipesDouble, authoredSourceRealm } from './fixtures/authored-source-fixture.mjs';
 
 
-test('explicit source plan preserves every existing source/paint/decode/random operation', async () => {
+test('explicit source plan preserves every existing source/paint/random operation', async () => {
   await compareAuthoredSourceEffects(authoredSourceRecipesDouble());
 });
 
@@ -24,7 +24,7 @@ test('required export and every nested output use own data without executing get
     raw => Object.defineProperty(raw.bodySources.effects, 'shadow', getter),
     raw => Object.defineProperty(raw.food[0].bodies[0].commands[2], '0', getter),
     raw => { raw.prey[0].glows[0].width = NaN; },
-    raw => { raw.tile.commands[0][0] = { get [Symbol.toPrimitive]() { assert.fail('coercion getter'); } }; }]) {
+    raw => { raw.palettes[0].commands[0][0] = { get [Symbol.toPrimitive]() { assert.fail('coercion getter'); } }; }]) {
     const raw = authoredSourceRecipesDouble(), f = authoredSourceRealm(); mutate(raw);
     await assert.rejects(createClientAssetMap({ realm: f.realm, sourceRecipes: raw }), error => error.code !== 'ERR_ASSERTION');
     assert.equal(f.events.length, 0);
@@ -47,19 +47,20 @@ test('copied source output neither aliases input nor invokes prototype setters',
     if (zero) Object.defineProperty(Array.prototype, '0', zero); else delete Array.prototype[0];
   }
   assert.equal(writes, 0);
-  raw.paletteRgb[0][0] = 0; raw.tile.commands[0][1] = 'changed';
-  assert.equal(copied.paletteRgb[0][0], 131); assert.equal(copied.tile.commands[0][1], '#09131d');
+  raw.paletteRgb[0][0] = 0; raw.palettes[0].commands[0][1] = 'changed';
+  assert.equal(copied.paletteRgb[0][0], 131); assert.equal(copied.palettes[0].commands[0][1], '#83d5b0');
   assert(Object.isFrozen(copied) && Object.isFrozen(copied.food[0].bodies[0].commands));
 });
 
-test('missing recipe plan never falls back and decode errors preserve the primary value', async () => {
+test('missing recipe plan never falls back and paint errors preserve the primary value', async () => {
   const f = authoredSourceRealm();
   await assert.rejects(createClientAssetMap({ realm: f.realm }), /record/);
   assert.equal(f.events.length, 0);
-  for (const value of [undefined, new Error('authored decode failure')]) {
-    const failed = authoredSourceRealm({ decode() { throw value; } }); let caught = false;
+  for (const value of [undefined, new Error('authored paint failure')]) {
+    const failed = authoredSourceRealm(); let caught = false;
+    failed.realm.document.createElement = () => { throw value; };
     try { await createClientAssetMap({ realm: failed.realm, sourceRecipes: authoredSourceRecipesDouble() }); }
     catch (error) { caught = true; assert.equal(error, value); }
-    assert(caught); assert.equal(failed.canvases.length, 5); assert.equal(failed.images.length, 2);
+    assert(caught); assert.equal(failed.canvases.length, 0); assert.equal(failed.images.length, 0);
   }
 });

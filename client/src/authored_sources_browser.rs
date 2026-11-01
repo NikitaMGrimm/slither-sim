@@ -68,7 +68,6 @@ fn command(command: &PaintCommand) -> Result<JsValue, JsValue> {
         PaintCommand::FillStyle(color) => ("fillStyle", vec![color.into()]),
         PaintCommand::GlobalAlpha(alpha) => ("globalAlpha", vec![(*alpha).into()]),
         PaintCommand::BeginPath => ("beginPath", vec![]),
-        PaintCommand::ClosePath => ("closePath", vec![]),
         PaintCommand::Fill => ("fill", vec![]),
         PaintCommand::Arc(values) => ("arc", values.iter().copied().map(JsValue::from).collect()),
         PaintCommand::MoveTo(values) => (
@@ -139,7 +138,7 @@ fn entities(palettes: &[EntitySourcePalette]) -> Result<JsValue, JsValue> {
     )
 }
 
-/// Copy Rust-owned standard material plans and branded backgrounds without browser resources.
+/// Copy Rust-owned standard material plans without browser resources.
 #[wasm_bindgen]
 pub fn authored_source_recipes() -> Result<JsValue, JsValue> {
     let recipes = crate::authored_sources::authored_source_recipes();
@@ -157,8 +156,6 @@ pub fn authored_source_recipes() -> Result<JsValue, JsValue> {
             )?,
         ),
         ("palettes", canvases(&recipes.palettes)?),
-        ("tile", canvas(&recipes.tile)?),
-        ("backdrop", canvas(&recipes.backdrop)?),
         (
             "bodySources",
             record(&[

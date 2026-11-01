@@ -10,6 +10,23 @@ export function patternRenderSmoke(wasm, { fixture, eq, ok, rejects }) {
     f.scene.reset();
     f.scene.apply_frame_with_factories(syntheticSetup(), false, unused, unused);
     const context = f.target.context;
+    const clearPath = globalThis.Path2D, nativeCreatePattern = context.createPattern;
+    globalThis.Path2D = undefined;
+    context.createPattern = () => { throw new Error('Black clear must not allocate a pattern'); };
+    try {
+      for (const [width, height] of [[801, 603], [319, 241]]) {
+        context.trace = [];
+        f.scene.render_standard_at_size(f.target, ...f.foods, undefined, width, height, f.resolve, f.quality);
+        eq(context.trace.filter(row => row.op === 'fillRect').map(row => [row.color, row.args]),
+          [['#000000', [0, 0, width, height]]], 'absent art uses only a black fill');
+        ok(!context.trace.some(row => row.op === 'patternFill' || row.op === 'image'));
+      }
+      context.trace = [];
+      f.scene.apply_frame_and_render_standard(bundle(syntheticSetup(), syntheticSetup()), false, unused, unused,
+        f.target, ...f.foods, undefined, 801, 603, f.resolve, f.quality);
+      eq(context.trace.filter(row => row.op === 'fillRect').map(row => row.color), ['#000000', '#000000'],
+        'ordered Setup draws also clear black without any pattern resources');
+    } finally { globalThis.Path2D = clearPath; context.createPattern = nativeCreatePattern; }
     const nativeFill = context.fill;
     let preserved = 0;
     context.fill = function(path, ...args) {

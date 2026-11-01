@@ -129,3 +129,10 @@ examples alongside the renderer. See its README for builds and controls.
 
 [World resolution](world-resolution.md) keeps projection and input in the shared
 core while the presenter selects Original backing/blit or Native direct resolve.
+
+The world clears to solid black on native wgpu, browser wgpu and Canvas2D when
+no local background images are supplied. There is no built-in background art.
+Optional local `s/bg54.jpg` (repeating tile) and `s/gbg.jpg` (backdrop) retain the
+shared camera phase/zoom and quality plan; see [Optional cosmetics](../apps/wgpu-slice/README.md#optional-cosmetics).
+Canvas retains supplied-image pattern submission for the reference and parity
+tooling, without generating any default tile or backdrop.

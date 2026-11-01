@@ -750,7 +750,7 @@ fn dying_skin_41_outline_does_not_cover_the_eye_interior() {
     ];
     let resources = bank.resources(&frame).unwrap();
     let mut alpha = 0.;
-    // The background reuses the black solid; measure the eye scope after it.
+    // Measure the eye scope from its outline onward.
     let outline_start = frame
         .draws
         .iter()

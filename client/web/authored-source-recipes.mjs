@@ -81,7 +81,7 @@ function copier() {
       })]);
     } else {
       const arity = { fillStyle: 1, globalAlpha: 1, beginPath: 0, arc: 5,
-        moveTo: 2, lineTo: 2, closePath: 0, fill: 0, fillRect: 4 };
+        moveTo: 2, lineTo: 2, fill: 0, fillRect: 4 };
       if (!Object.hasOwn(arity, kind)) throw new TypeError('Unsupported authored paint operation');
       const input = tuple(raw, arity[kind] + 1, value => value);
       const values = new Array(input.length);
@@ -120,8 +120,7 @@ export function copyAuthoredSourceRecipes(raw) {
   return record([
     ['schema', 1],
     ['paletteRgb', list(own(raw, 'paletteRgb'), 64, rgb => tuple(rgb, 3, value => integer(value, 255)))],
-    ['palettes', copy.canvases(own(raw, 'palettes'))], ['tile', copy.canvas(own(raw, 'tile'))],
-    ['backdrop', copy.canvas(own(raw, 'backdrop'))],
+    ['palettes', copy.canvases(own(raw, 'palettes'))],
     ['bodySources', record([
       ['palettes', list(own(body, 'palettes'), 64, palette => record([
         ['variants', copy.canvases(own(palette, 'variants'))], ['boostGlow', copy.canvas(own(palette, 'boostGlow'))],
@@ -170,7 +169,6 @@ export function paintAuthoredCanvas(realm, recipe) {
       case 'arc': context.arc(...args); break;
       case 'moveTo': context.moveTo(...args); break;
       case 'lineTo': context.lineTo(...args); break;
-      case 'closePath': context.closePath(); break;
       case 'fill': context.fill(); break;
       case 'fillRect': context.fillRect(...args); break;
       default: throw new TypeError('Unsupported copied authored paint operation');

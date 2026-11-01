@@ -39,8 +39,6 @@ pub enum PaintCommand {
     MoveTo([f64; 2]),
     /// Append a source-pixel point.
     LineTo([f64; 2]),
-    /// Close the current path.
-    ClosePath,
     /// Fill the current path.
     Fill,
     /// Fill a source-pixel rectangle.
@@ -125,10 +123,6 @@ pub struct AuthoredSourceRecipes {
     pub palette_rgb: Vec<[u8; 3]>,
     /// Three legacy flat source canvases.
     pub palettes: Vec<CanvasRecipe>,
-    /// Repeating hexagon tile; remains distinct from the backdrop.
-    pub tile: CanvasRecipe,
-    /// Existing whole-scene backdrop.
-    pub backdrop: CanvasRecipe,
     /// Existing shaded body/effect sources.
     pub body_sources: BodySourceRecipes,
     /// Ten authored food families.
@@ -160,58 +154,21 @@ fn circle(width: u32, height: u32, color: &str, alpha: Option<f64>, radius: f64)
     CanvasRecipe::new(width, height, commands)
 }
 
-fn hexagon(commands: &mut Vec<PaintCommand>, x: f64, y: f64, radius: f64, color: &str) {
-    let x = x * 3.;
-    let y = y * 3.;
-    let radius = radius * 3.;
-    commands.extend([
-        PaintCommand::FillStyle(color.into()),
-        PaintCommand::BeginPath,
-        PaintCommand::MoveTo([x + radius, y + radius / 4.]),
-        PaintCommand::LineTo([x + radius / 4., y + radius]),
-        PaintCommand::LineTo([x - radius * 3. / 4., y + radius * 3. / 4.]),
-        PaintCommand::LineTo([x - radius, y - radius / 4.]),
-        PaintCommand::LineTo([x - radius / 4., y - radius]),
-        PaintCommand::LineTo([x + radius * 3. / 4., y - radius * 3. / 4.]),
-        PaintCommand::ClosePath,
-        PaintCommand::Fill,
-    ]);
-}
-
 /// Authored standard palette ink, shared by body sources and studio swatches.
 pub fn standard_palette_rgb(palette: u8) -> Option<[u8; 3]> {
     standard::COLORS.get(usize::from(palette)).copied()
 }
 
-/// Plan standard body/entity source materials while preserving branded background sources.
+/// Plan standard body/entity source materials.
 pub fn authored_source_recipes() -> AuthoredSourceRecipes {
     let palette_rgb = standard::COLORS.to_vec();
     // Keep the three legacy context canvases separate from standard body sources.
     let palettes = [[0x83, 0xd5, 0xb0], [0xef, 0xbb, 0x62], [0x76, 0xb9, 0xed]]
         .map(|rgb| circle(32, 32, &css_hex(rgb), None, 16.))
         .into();
-    let mut tile_commands = Vec::new();
-    for column in 0..=4 {
-        for row in -1..=2 {
-            let x = f64::from(column * 27);
-            let y = f64::from(row * 32 + (column % 2) * 16);
-            hexagon(&mut tile_commands, x, y, 15., "#09131d");
-            hexagon(&mut tile_commands, x, y - 0.5, 13.5, "#26384a");
-            hexagon(&mut tile_commands, x, y + 0.5, 13., "#1c2b3b");
-        }
-    }
     AuthoredSourceRecipes {
         palette_rgb,
         palettes,
-        tile: CanvasRecipe::new(108 * 3, 64 * 3, tile_commands),
-        backdrop: CanvasRecipe::new(
-            512,
-            512,
-            vec![
-                PaintCommand::FillStyle("#34475b".into()),
-                PaintCommand::FillRect([0., 0., 512., 512.]),
-            ],
-        ),
         body_sources: standard::bodies(),
         food: standard::food(),
         prey: standard::prey(),

@@ -767,12 +767,7 @@ impl Renderer {
                         load: if overlay {
                             wgpu::LoadOp::Load
                         } else {
-                            wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.035,
-                                g: 0.045,
-                                b: 0.06,
-                                a: 1.,
-                            })
+                            wgpu::LoadOp::Clear(wgpu::Color::BLACK)
                         },
                         store: wgpu::StoreOp::Store,
                     },

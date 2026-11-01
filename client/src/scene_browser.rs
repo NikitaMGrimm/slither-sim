@@ -84,7 +84,7 @@ impl Scene {
         )
     }
 
-    /// Draw received anchors using three caller-owned sprites and a loaded tile.
+    /// Draw received anchors using three caller-owned sprites and an optional loaded tile.
     /// Skins and food colors select `value % 3`; this is a small palette preview.
     #[allow(clippy::too_many_arguments)]
     pub fn render(
@@ -93,13 +93,20 @@ impl Scene {
         palette_0: HtmlCanvasElement,
         palette_1: HtmlCanvasElement,
         palette_2: HtmlCanvasElement,
-        background: HtmlImageElement,
+        background: Option<HtmlImageElement>,
         camera_x: f64,
         camera_y: f64,
         zoom: f64,
     ) -> Result<(), JsValue> {
         let sprites = [palette_0, palette_1, palette_2];
-        let frame = CanvasFrame::new(&target, &sprites, &background, camera_x, camera_y, zoom)?;
+        let frame = CanvasFrame::new(
+            &target,
+            &sprites,
+            background.as_ref(),
+            camera_x,
+            camera_y,
+            zoom,
+        )?;
         let context = frame.context();
         if let Some(setup) = &self.state.setup {
             context.begin_path();

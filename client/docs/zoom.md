@@ -77,7 +77,8 @@ samples, palette ordinals, other pass order and distance-cursor visits, includin
 the antenna/death boundary. Factor one retains every command. The
 [Battledome study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
 records CPU/GPU measurements, default-view equality and unresolved GPU controls.
-The background already uses one repeating-texture quad regardless of tile count.
+A configured local background uses one repeating-texture quad regardless of tile count;
+without local art, the world clears to black.
 Native food planning combines this zoom policy with the retained catalog index
 from [frame performance](frame-performance.md#retained-food-cpu-preparation).
 Factor one keeps stock retained-source validation and draw ordering; catalog
@@ -128,3 +129,12 @@ of the zoom implementation. Cross-revision native CPU replay separately uses
 the unchanged `feel-perceptual-v1` comparator and authored
 `tools/feel-replay/browser-synthetic.json` schedule; neither check is a pixel or
 physical-input acceptance claim.
+
+The Windows factor-one golden keeps the historical `zoom-stock-main.json`
+unchanged. `zoom-stock-black.json` removes only the three built-in background
+draws: pristine `3209d873` reproduces every historical frame hash, then its
+remaining Frame/overlay records and ordered material dimensions/pixels match
+the black-background candidate byte for byte after replacing allocation handles
+with content hashes. The fixture records those projection rules and byte hashes;
+wire packets and stationary/repeated-pointer cases remain exact. This is an
+authored CPU-frame control, not browser pixels or live gameplay acceptance.

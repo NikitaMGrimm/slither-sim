@@ -38,8 +38,6 @@ pub struct Bank {
     pub outline: BodyAssetUse,
     pub shadow: BodyAssetUse,
     pub death: BodyAssetUse,
-    pub tile: BodyAssetUse,
-    pub backdrop: BodyAssetUse,
     food: Vec<FoodFactory>,
     prey: Vec<PreyFactory>,
     cache: BTreeMap<usize, Resource>,
@@ -103,8 +101,6 @@ impl Bank {
             outline: use_at(0),
             shadow: use_at(0),
             death: use_at(0),
-            tile: use_at(0),
-            backdrop: use_at(0),
             food: Vec::new(),
             prey: Vec::new(),
             cache: BTreeMap::new(),
@@ -128,8 +124,6 @@ impl Bank {
         b.outline = b.add(r.body_sources.outline);
         b.shadow = b.add(r.body_sources.shadow);
         b.death = b.add(r.body_sources.death_highlight);
-        b.tile = b.add(r.tile);
-        b.backdrop = b.add(r.backdrop);
         for p in r.food {
             let mut family = |rs: Vec<CanvasRecipe>| -> Result<Vec<FoodSource>> {
                 rs.into_iter()
@@ -201,16 +195,8 @@ impl Bank {
         f.random_wobble_unit = units[1];
         f
     }
-    pub fn background_art(&self, art: crate::cosmetics::BackgroundArt) -> BodyAsset {
-        self.cosmetics
-            .as_ref()
-            .and_then(|c| c.background_art(art))
-            .unwrap_or_else(|| {
-                self.assets[match art {
-                    crate::cosmetics::BackgroundArt::HexTile => self.tile.asset,
-                    crate::cosmetics::BackgroundArt::Backdrop => self.backdrop.asset,
-                }]
-            })
+    pub fn background_art(&self, art: crate::cosmetics::BackgroundArt) -> Option<BodyAsset> {
+        self.cosmetics.as_ref().and_then(|c| c.background_art(art))
     }
     pub fn prey(&self, raw: u8, units: [f64; 2]) -> PreyFactory {
         let mut f = self.prey[usize::from(raw % 9)].clone();

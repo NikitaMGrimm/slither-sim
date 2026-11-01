@@ -38,8 +38,8 @@ fn local_roles_keep_pixels_dimensions_phase_and_layer_order() {
     }
     let mut bank = Bank::new().unwrap();
     bank.cosmetics = Some(art);
-    let tile = bank.background_art(BackgroundArt::HexTile);
-    let backdrop = bank.background_art(BackgroundArt::Backdrop);
+    let tile = bank.background_art(BackgroundArt::HexTile).unwrap();
+    let backdrop = bank.background_art(BackgroundArt::Backdrop).unwrap();
     assert_eq!((tile.width, tile.height), (599, 519));
     assert_eq!((backdrop.width, backdrop.height), (512, 512));
     let mut client = AnimatedClient::new(0.).unwrap();
@@ -47,18 +47,10 @@ fn local_roles_keep_pixels_dimensions_phase_and_layer_order() {
     client.set_zoom(0.8).unwrap();
     let high = QualityState::new(QualityMode::High, 0.).unwrap().snapshot();
     let first = render::prepare(&mut client, &mut bank, [960, 540], 1., 1, high).unwrap();
-    assert_eq!(first.frame.draws[0].effective_alpha, 1.);
-    assert_eq!(first.frame.draws[1].asset, backdrop);
-    assert_eq!(first.frame.draws[1].effective_alpha, 0.3);
-    assert_eq!(first.frame.draws[2].asset, tile);
-    assert_eq!(first.frame.draws[2].effective_alpha, 1.);
-    let clear = &first
-        .resources
-        .iter()
-        .find(|r| r.asset == first.frame.draws[0].asset)
-        .unwrap()
-        .image;
-    assert_eq!(clear.pixels, [0, 0, 0, 255]);
+    assert_eq!(first.frame.draws[0].asset, backdrop);
+    assert_eq!(first.frame.draws[0].effective_alpha, 0.3);
+    assert_eq!(first.frame.draws[1].asset, tile);
+    assert_eq!(first.frame.draws[1].effective_alpha, 1.);
     let pixels = &first
         .resources
         .iter()
@@ -79,13 +71,6 @@ fn local_roles_keep_pixels_dimensions_phase_and_layer_order() {
         pixels.pixels,
         cosmetics::decode(&png(512, 512)).unwrap().pixels
     );
-    assert!(
-        !first
-            .resources
-            .iter()
-            .any(|r| r.asset == bank.assets[bank.tile.asset])
-    );
-
     let previous = client.camera().position();
     client
         .set_camera_position(Point {
@@ -97,24 +82,20 @@ fn local_roles_keep_pixels_dimensions_phase_and_layer_order() {
     let phase = client.background().phase();
     assert_eq!(phase.x, 1. - 17. / 599.);
     assert_eq!(phase.y, 11. / 519.);
-    let uv = second.frame.draws[2].repeat_uv.unwrap();
+    let uv = second.frame.draws[1].repeat_uv.unwrap();
     assert_eq!(uv.x, -960. / client.camera().zoom() / 599. - phase.x);
     assert_eq!(uv.height, 1080. / client.camera().zoom() / 519.);
-    assert_eq!(second.frame.draws[2].asset, tile);
+    assert_eq!(second.frame.draws[1].asset, tile);
     let mut low = QualityState::new(QualityMode::Low, 0.).unwrap();
     low.begin_connection();
     let third = render::prepare(&mut client, &mut bank, [960, 540], 1., 3, low.snapshot()).unwrap();
-    assert_eq!(third.frame.draws[1].asset, tile);
+    assert_eq!(third.frame.draws[0].asset, tile);
     assert!(!third.resources.iter().any(|r| r.asset == backdrop));
 }
 
 #[test]
-fn missing_invalid_and_over_budget_roles_fall_back_independently() {
+fn missing_invalid_and_over_budget_roles_are_absent_independently() {
     let mut bank = Bank::new().unwrap();
-    let tile = bank.assets[bank.tile.asset];
-    let backdrop = bank.assets[bank.backdrop.asset];
-    assert_eq!(bank.background_art(BackgroundArt::HexTile), tile);
-    assert_eq!(bank.background_art(BackgroundArt::Backdrop), backdrop);
     for valid in BackgroundArt::ALL {
         bank.cosmetics = Some(
             Cosmetics::load(
@@ -134,6 +115,7 @@ fn missing_invalid_and_over_budget_roles_fall_back_independently() {
         for role in BackgroundArt::ALL {
             let selected = bank.background_art(role);
             if role == valid {
+                let selected = selected.unwrap();
                 assert_eq!(
                     (selected.width, selected.height),
                     if role == BackgroundArt::Backdrop {
@@ -143,13 +125,29 @@ fn missing_invalid_and_over_budget_roles_fall_back_independently() {
                     }
                 );
             } else {
+                assert_eq!(selected, None);
+            }
+        }
+        let mut client = AnimatedClient::new(0.).unwrap();
+        for mode in [QualityMode::High, QualityMode::Low] {
+            let mut quality = QualityState::new(mode, 0.).unwrap();
+            quality.begin_connection();
+            let picture = render::prepare(
+                &mut client,
+                &mut bank,
+                [960, 540],
+                1.,
+                1,
+                quality.snapshot(),
+            )
+            .unwrap();
+            let visible = valid == BackgroundArt::HexTile || mode == QualityMode::High;
+            assert_eq!(picture.frame.draws.len(), usize::from(visible));
+            assert_eq!(picture.resources.len(), usize::from(visible));
+            if visible {
                 assert_eq!(
-                    selected,
-                    if role == BackgroundArt::HexTile {
-                        tile
-                    } else {
-                        backdrop
-                    }
+                    picture.frame.draws[0].asset,
+                    bank.background_art(valid).unwrap()
                 );
             }
         }
@@ -174,8 +172,8 @@ fn missing_invalid_and_over_budget_roles_fall_back_independently() {
         );
     }
     bank.cosmetics = Some(Cosmetics::from_images(images, None).unwrap());
-    assert_eq!(bank.background_art(BackgroundArt::HexTile), tile);
-    assert_eq!(bank.background_art(BackgroundArt::Backdrop), backdrop);
+    assert_eq!(bank.background_art(BackgroundArt::HexTile), None);
+    assert_eq!(bank.background_art(BackgroundArt::Backdrop), None);
     let mut images = Images::default();
     for role in BackgroundArt::ALL {
         assert!(images.add(role.path(), &png(1025, 1)).is_err());
@@ -184,5 +182,21 @@ fn missing_invalid_and_over_budget_roles_fall_back_independently() {
                 .add(role.path(), &vec![0; cosmetics::MAX_ENCODED_BYTES + 1])
                 .is_err()
         );
+    }
+}
+
+#[test]
+fn no_art_has_no_background_draws_or_resources_at_any_quality_or_size() {
+    let mut bank = Bank::new().unwrap();
+    let mut client = AnimatedClient::new(0.).unwrap();
+    for mode in [QualityMode::High, QualityMode::Low] {
+        let mut quality = QualityState::new(mode, 0.).unwrap();
+        quality.begin_connection();
+        for extent in [[960, 540], [1920, 1080]] {
+            let picture =
+                render::prepare(&mut client, &mut bank, extent, 1., 1, quality.snapshot()).unwrap();
+            assert!(picture.frame.draws.is_empty());
+            assert!(picture.resources.is_empty());
+        }
     }
 }

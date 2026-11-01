@@ -99,7 +99,7 @@ the 1080p default filtering.
 | Prey body / glow | 44–86 / 29–157 square | 22 circle/shadow bodies and the 17 food glow sources per palette. |
 | Paired eyes/pupils | 64×64 disk per used color | Authored circle; normally strongly minified. |
 | Procedural cosmetic roles | Eye base 64×64, pupil/eye marks 48×48, bulbs 64×64 or 84×84 | Authored analytic pixels, gradient or coverage raster. Generated even without an art pack. |
-| Background | Tile 324×192, uniform backdrop 512×512 | Authored paths/flat color. A flat color has no missing detail when enlarged. Arena/other solid quads likewise have no source-resolution limit. |
+| Background | Black clear; optional local tile and 512×512 backdrop | No default texture. Configured local art retains its decoded tile dimensions and cropped backdrop. |
 | Runtime cosmetic images | Fixed face/bulb canvases: 79×130 through 190×188; accessories retain decoded dimensions | Optional owner-supplied PNG/JPEG only, max 1024 per axis, 4 MiB encoded, 16 MiB combined cosmetic pixels. Existing insets/shadows and source crops stay authoritative. Backdrop retains its 512×512 crop. |
 | Menu art / studio thumbnails | Menu up to 2048 per axis; thumbnails 128×128 | Separate semantic runtime loading/windowed thumbnail rules; physical HUD/menu raster remains independent of the world mode. |
 
@@ -167,6 +167,9 @@ unverified. The finite iGPU measurements below cover one workload. Use
 `CARGO_BUILD_JOBS=2`; full verification remains `npm run check`.
 
 ## Integrated-GPU measurements (2026-11-01)
+
+These retained measurements predate removal of the built-in background. They
+describe the pinned source below, not the current black default.
 
 Keep Original as the default. On this workload, bounded Native at 4K reduces the
 Native MSAA4 control's GPU queue span and memory, but still costs more GPU time
@@ -275,9 +278,9 @@ At Native 4K, maximum destination pixels per source texel in this fixture:
 | Uniform 512×512 backdrop, horizontal | 7.50× | 7.50× |
 
 Thus body and food texels remain magnified after fixing the world raster;
-zoom-in adds another 25%. Glows/shadows are deliberately soft. The backdrop is
-uniform authored color, so its enlargement loses no detail. Repeating tile UVs,
-constant-color quads, body boost/death states and image-dependent cosmetics are
+zoom-in adds another 25%. Glows/shadows are deliberately soft. The measured
+backdrop was uniform authored color, so its enlargement lost no detail. Repeating
+tile UVs, constant-color quads, body boost/death states and image-dependent cosmetics are
 not quantified by this fixture's per-sprite table; their dimensions and scaling
 rules are audited above. Optional external art was not loaded, so no claim is
 made about its pixel quality. Mipmaps cannot repair any of this magnification.

@@ -237,13 +237,6 @@ test('local host supplies authored sources/profile and one claim without startin
   assert.deepEqual(host.profile, { clientVersion: 0, pageEcho: new Uint8Array(20), protocolVersion: 19 });
   assert.equal(host.sources.palettes.length, 3);
   assert(host.sources.palettes.every(value => value instanceof f.realm.HTMLCanvasElement));
-  assert(host.sources.background instanceof f.realm.HTMLImageElement);
-  assert.equal(host.sources.background.src, 'data:image/png;base64,synthetic-local-324x192');
-  assert(host.sources.backgroundImage instanceof f.realm.HTMLImageElement);
-  assert.equal(host.sources.backgroundImage.src, 'data:image/png;base64,synthetic-local-512x512');
-  assert.equal(host.sources.background.complete, true); assert.equal(host.sources.backgroundImage.complete, true);
-  assert.equal(host.sources.background.naturalWidth, 324); assert.equal(host.sources.backgroundImage.naturalWidth, 512);
-  assert.deepEqual(f.calls, ['decode', 'decode']);
   assert.equal(f.sockets.length, 0); assert.equal(f.listeners.size, 0);
   const metadata = host.gate.metadata();
   assert.equal(metadata, host.gate.metadata()); assert.equal(metadata.schema, 1); assert.equal(metadata.code, 'held');
@@ -305,7 +298,7 @@ test('bound Rust policy resolves only inside the existing source operation with 
   // The selected authored family supplies the base; three units are drawn once here.
   assert.deepEqual(appearance.nicknameTint, { baseRgb: [0x76, 0xb9, 0xed], randomUnits: [0.25, 0.25, 0.25] });
   assert(Object.isFrozen(appearance.nicknameTint) && Object.isFrozen(appearance.nicknameTint.randomUnits));
-  assert.deepEqual(f.calls, ['decode', 'decode', 'random', 'random', 'random']);
+  assert.deepEqual(f.calls, ['random', 'random', 'random']);
   assert.deepEqual(calls, [{ skin: 255, bytes: customBytes }]);
   assert.equal(calls[0].bytes, customBytes);
   const result = adapter.resolveRecipe(request);
@@ -327,7 +320,7 @@ test('bound Rust policy resolves only inside the existing source operation with 
   assert(palettes.every(source => source.width === 32 && source.height === 32));
   assert.throws(() => adapter.resolveRecipe({ skin: 256 }), /skin/);
   assert.equal(calls.length, 2);
-  assert.deepEqual(f.calls, ['decode', 'decode', 'random', 'random', 'random'], 'recipes draw no tint units');
+  assert.deepEqual(f.calls, ['random', 'random', 'random'], 'recipes draw no tint units');
   const food = hostAssets.resolveFood({ palette: 9 }, active), prey = hostAssets.resolvePrey({ palette: 8 }, active);
   assert.equal(food.palette.color, 9); assert.equal(prey.palette.color, 8);
   assert(food.palette.bodies[0].asset.source instanceof f.realm.HTMLCanvasElement);
@@ -495,14 +488,14 @@ test('socket capability constructs only the selected endpoint; status and local 
   }
   assert.equal(f.sockets.length, 0);
   const socket = native.createSocket(endpoint); assert.equal(socket.url, endpoint); assert.equal(f.sockets.length, 1);
-  native.status('connected'); native.ordinaryReload(); assert.deepEqual(f.calls, ['decode', 'decode', 'reload']);
+  native.status('connected'); native.ordinaryReload(); assert.deepEqual(f.calls, ['reload']);
   f.realm.requestAnimationFrame = () => assert.fail('Uncaptured RAF');
   native.requestAnimationFrame(() => {}); assert.equal(f.calls.at(-1)[0], 'requestAnimationFrame');
   host.dispose(); assert.throws(() => native.createSocket(endpoint), /Current local/);
   assert.throws(() => native.ordinaryReload(), /Current local/);
 });
 
-test('document, top and URL changes invalidate the host, including navigation during source decode', async () => {
+test('document, top and URL changes invalidate the host, including navigation during source creation', async () => {
   for (const change of [f => { f.realm.document = {}; }, f => { f.realm.top = {}; },
     f => { f.realm.location.href += '?other'; }, f => { f.realm.location = { href: f.realm.location.href }; }]) {
     const f = fixture(), host = await create(f), native = claim(host);
@@ -511,10 +504,8 @@ test('document, top and URL changes invalidate the host, including navigation du
     assert.throws(() => host.sources.adapter.beginOperation(), /Current local/);
     assert.throws(() => native.createSocket(endpoint), /Current local/); host.dispose();
   }
-  const releases = [];
-  const f = fixture({ decode: () => new Promise(resolve => { releases.push(resolve); }) });
+  const f = fixture();
   const pending = create(f); f.realm.location.href += '?navigation';
-  for (const release of releases) release();
   await assert.rejects(pending, /Current local/);
   assert.equal(f.listeners.size, 0); assert.equal(f.sockets.length, 0);
 });
@@ -554,7 +545,7 @@ test('default local bootstrap initializes once before sources and shares the exa
   assert.equal(calls, 1); assert.equal(f.canvases.length, 0);
   initialized = true; release();
   assert.equal(await pending, 'authored runtime result'); assert.equal(calls, 1);
-  assert.equal(f.canvases.length, 335); assert.equal(f.calls.filter(v => v === 'decode').length, 2);
+  assert.equal(f.canvases.length, 333); assert.equal(f.calls.filter(v => v === 'decode').length, 0);
   assert.equal(f.calls.filter(v => v === 'random').length, 0, 'preview recipe consumes no appearance randomness');
   runtimeHost.dispose();
 });
@@ -605,11 +596,11 @@ function startupStatusProbe(document) {
 }
 
 test('default local stale completions preserve both documents loading subtrees', async () => {
-  for (const stage of ['config', 'initialize', 'decode']) {
+  for (const stage of ['config', 'initialize', 'recipes']) {
     for (const outcome of [{ reject: true, primary: undefined }, { reject: true, primary: {} }, { reject: false }]) {
       let f, replacement;
       const complete = () => { f.realm.document = replacement; if (outcome.reject) throw outcome.primary; };
-      f = fixture({ decode: async () => { if (stage === 'decode') complete(); } });
+      f = fixture();
       replacement = new f.dom.Document();
       const original = startupStatusProbe(f.document), next = startupStatusProbe(replacement);
       localConfig(f);
@@ -620,7 +611,7 @@ test('default local stale completions preserve both documents loading subtrees',
       try {
         await startDefault(() => assert.fail('stale runtime'))({ realm: f.realm,
           initialize: async () => { if (stage === 'initialize') complete(); },
-          wasmApi: { authored_source_recipes: authoredSourceRecipesDouble } });
+          wasmApi: { authored_source_recipes() { if (stage === 'recipes') complete(); return authoredSourceRecipesDouble(); } } });
       } catch (error) {
         caught = true;
         if (outcome.reject) assert.equal(error, outcome.primary);
@@ -661,12 +652,13 @@ test('default local fallback rechecks document ownership after status lookup', a
   }
 });
 
-test('default local decode failure retains its primary and supplied host bypasses early initialization', async () => {
-  const primary = new Error('authored tile decode'); const f = fixture({ decode() { throw primary; } });
+test('default local paint failure retains its primary and supplied host bypasses early initialization', async () => {
+  const primary = new Error('authored source paint'); const f = fixture();
+  f.realm.Document.prototype.createElement = () => { throw primary; };
   localConfig(f); let calls = 0;
-  await assert.rejects(startDefault(() => assert.fail('decode failure runtime'))({ realm: f.realm,
+  await assert.rejects(startDefault(() => assert.fail('paint failure runtime'))({ realm: f.realm,
     initialize() { calls++; }, wasmApi: { authored_source_recipes: authoredSourceRecipesDouble } }), error => error === primary);
-  assert.equal(calls, 1); assert.equal(f.canvases.length, 5);
+  assert.equal(calls, 1); assert.equal(f.canvases.length, 0);
   const supplied = { authored: true }, initialize = () => assert.fail('early supplied-host initialization');
   const g = fixture(); g.realm.fetch = () => assert.fail('supplied host fetch');
   const marker = {};

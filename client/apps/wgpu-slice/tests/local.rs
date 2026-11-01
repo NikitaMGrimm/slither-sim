@@ -208,7 +208,6 @@ fn effects(g: &mut LocalGame) -> Vec<Vec<u8>> {
 fn pictures(g: &mut LocalGame) {
     for _ in 0..16 {
         let Some(p) = g.take_frame() else { return };
-        assert!(!p.resources.is_empty());
         let r = p
             .resources
             .iter()
@@ -802,46 +801,6 @@ fn desktop_backing_uses_content_size_without_dpr_and_suspends_zero() {
     assert!(render::backing_size([f64::NAN, 540.]).is_err());
 }
 #[test]
-fn background_draw_order_phase_zoom_and_quality_gate_match_core_plan() {
-    let mut g = playing();
-    let mut c = g.client().clone();
-    c.set_follows(false);
-    c.set_camera_position(slither_client::state::Point { x: 100., y: 200. })
-        .unwrap();
-    c.set_zoom(0.8).unwrap();
-    let q = g.quality();
-    let first = render::prepare(&mut c, &mut g.bank, [960, 540], 1., 1, q).unwrap();
-    let tile = g.bank.assets[g.bank.tile.asset];
-    let backdrop = g.bank.assets[g.bank.backdrop.asset];
-    assert_eq!(first.frame.draws[1].asset, backdrop);
-    assert_eq!(first.frame.draws[1].effective_alpha, 0.3);
-    assert_eq!(first.frame.draws[2].asset, tile);
-    assert_eq!(first.frame.draws[0].effective_alpha, 1.);
-    assert!(first.frame.draws[2].repeat_uv.is_some());
-    let previous = c.camera().position();
-    c.set_camera_position(slither_client::state::Point {
-        x: previous.x + 17.,
-        y: previous.y - 11.,
-    })
-    .unwrap();
-    let second = render::prepare(&mut c, &mut g.bank, [1280, 720], 1., 2, q).unwrap();
-    let uv = second.frame.draws[2].repeat_uv.unwrap();
-    let phase = c.background().phase();
-    assert_eq!(
-        uv.x,
-        (-640. / c.camera().zoom() - phase.x * f64::from(tile.width)) / f64::from(tile.width)
-    );
-    assert_eq!(uv.width, 1280. / c.camera().zoom() / f64::from(tile.width));
-    let low = QualityState::new(QualityMode::Low, 0.).unwrap();
-    let mut low = low;
-    low.begin_connection();
-    let third = render::prepare(&mut c, &mut g.bank, [960, 540], 1., 3, low.snapshot()).unwrap();
-    assert_eq!(third.frame.draws[1].asset, tile);
-    assert!(!third.frame.draws.iter().any(|d| d.asset == backdrop));
-    let resources = third.resources;
-    assert!(!resources.iter().any(|r| r.asset == backdrop));
-}
-#[test]
 fn local_skin_style_and_applied_sampling_scale_match_canvas_policy() {
     let mut g = negotiating();
     g.receive(g.generation(), &bundle(&[setup(), snake(60)]), 3.)
@@ -859,18 +818,16 @@ fn local_skin_style_and_applied_sampling_scale_match_canvas_policy() {
             .as_ref()
             .is_some_and(|b| b.samples.iter().all(|sample| sample.flag == 2))
     }));
-    let tile = g.bank.assets[g.bank.tile.asset];
-    let backdrop = g.bank.assets[g.bank.backdrop.asset];
     expected
         .prepare_background(BackgroundInput {
             width: 960,
             height: 540,
             zoom: expected.camera().zoom(),
-            image_size: Some([backdrop.width, backdrop.height]),
-            pattern_available: true,
+            image_size: None,
+            pattern_available: false,
             quality,
-            tile_width: f64::from(tile.width),
-            tile_height: f64::from(tile.height),
+            tile_width: 1.,
+            tile_height: 1.,
         })
         .unwrap();
     render::prepare(&mut client, &mut g.bank, [960, 540], 1., 4, quality).unwrap();

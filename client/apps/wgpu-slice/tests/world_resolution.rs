@@ -244,3 +244,54 @@ fn direct_resolve_sample_one_resize_and_retained_submissions() {
         }
     });
 }
+
+#[test]
+#[ignore = "explicit finite offscreen GPU check"]
+fn empty_world_is_opaque_black_without_texture_draws_in_both_modes() {
+    use slither_client::presentation::{AnimatedClient, QualityMode, QualityState};
+    use slither_wgpu_slice::{bank::Bank, render};
+    pollster::block_on(async {
+        let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm)
+            .await
+            .unwrap();
+        let scope = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut presenter = WorldPresenter::new(&renderer);
+        let mut bank = Bank::new().unwrap();
+        let mut client = AnimatedClient::new(0.).unwrap();
+        for quality in [QualityMode::High, QualityMode::Low] {
+            let mut quality = QualityState::new(quality, 0.).unwrap();
+            quality.begin_connection();
+            for physical in [[320, 180], [960, 540]] {
+                let picture =
+                    render::prepare(&mut client, &mut bank, physical, 1., 1, quality.snapshot())
+                        .unwrap();
+                assert!(picture.frame.draws.is_empty());
+                assert!(picture.resources.is_empty());
+                for mode in [Original, Native] {
+                    let target = offscreen::target(&renderer, physical);
+                    presenter
+                        .render(
+                            &mut renderer,
+                            &picture.frame,
+                            None,
+                            &target.create_view(&Default::default()),
+                            physical,
+                            mode,
+                        )
+                        .unwrap();
+                    assert!(
+                        offscreen::pixels(&renderer, &target)
+                            .unwrap()
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .all(|pixel| *pixel == [0, 0, 0, 255])
+                    );
+                }
+            }
+        }
+        assert!(scope.pop().await.is_none());
+    });
+}

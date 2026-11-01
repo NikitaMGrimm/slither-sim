@@ -1151,7 +1151,8 @@ fn login_menu_composes_over_the_world_picture() {
     }
     let mut picture = game.take_frame().expect("world picture");
     let mut menu = login.prepare_host([960, 540], 1., true, None).unwrap();
-    menu.resources[0].asset = picture.resources[0].asset;
+    // Empty black worlds have no textures; inject the resource collision explicitly.
+    picture.resources.push(menu.resources[0].clone());
     menu.resources[0].asset.revision += 1;
     assert!(menu.append_to(&mut picture).is_err());
 }

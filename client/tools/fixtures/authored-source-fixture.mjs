@@ -3,8 +3,8 @@ import { createSyntheticFoodResolver } from './authored-food-source-oracle.mjs';
 import { createSyntheticPreyResolver } from './authored-prey-source-oracle.mjs';
 
 // Authored in-memory source recorder. No browser, URL request, pixel read or timers.
-export function authoredSourceRealm({ decode, events = [] } = {}) {
-  const canvases = [], images = [], encoded = new Map();
+export function authoredSourceRealm({ events = [] } = {}) {
+  const canvases = [], images = [];
   class Canvas {
     #width = 0; #height = 0;
     commands = [];
@@ -35,24 +35,16 @@ export function authoredSourceRealm({ decode, events = [] } = {}) {
         closePath() { call('closePath'); }, fill() { call('fill'); }, fillRect(...args) { call('fillRect', ...args); },
       };
     }
-    toDataURL() { const url = `authored-fixture:${canvases.indexOf(this)}`; encoded.set(url, this); events.push(['encode', canvases.indexOf(this)]); return url; }
+    toDataURL() { throw new Error('Source artwork must not encode a background image'); }
   }
   class Image {
-    complete = false; naturalWidth = 0; naturalHeight = 0;
-    constructor() { images.push(this); events.push(['image', images.indexOf(this)]); }
-    async decode() {
-      const canvas = encoded.get(this.src); if (!canvas) throw new Error('Unknown authored fixture source');
-      events.push(['decode', images.indexOf(this)]);
-      await decode?.(canvas);
-      this.complete = true; this.naturalWidth = canvas.width; this.naturalHeight = canvas.height;
-      events.push(['decoded', images.indexOf(this)]);
-    }
+    constructor() { throw new Error('Source artwork must not allocate a background image'); }
   }
   const realm = { HTMLCanvasElement: Canvas, HTMLImageElement: Image, Image, document: { createElement(tag) {
     if (tag !== 'canvas') throw new Error('Authored Canvas only');
     const canvas = new Canvas(); canvases.push(canvas); events.push(['canvas', canvases.indexOf(canvas)]); return canvas;
   } } };
-  return { realm, canvases, images, encoded, events };
+  return { realm, canvases, images, events };
 }
 
 const recipe = canvas => ({ width: canvas.width, height: canvas.height,
@@ -68,10 +60,9 @@ const entities = (resolve, count, outlines) => Array.from({ length: count }, (_,
     glows: value.glows.map(entry => recipe(entry.asset.source)) };
 });
 const cached = { schema: 1, paletteRgb: authoredPaletteRgb, palettes: assets.palettes.map(recipe),
-  tile: recipe(f.encoded.get(assets.background.src)), backdrop: recipe(f.encoded.get(assets.backgroundImage.src)),
   bodySources: { palettes: assets.bodySources.palettes.map(palette => ({ variants: palette.variants.map(recipe), boostGlow: recipe(palette.boostGlow) })),
     effects: Object.fromEntries(Object.entries(assets.bodySources.effects).map(([key, source]) => [key, recipe(source)])) },
   food: entities(food, 10, true), prey: entities(prey, 9, false) };
 
-/** Explicit test-only copied ABI double from the preserved authored pre-R7 oracle. */
+/** Explicit test-only copied ABI double from the authored pre-R7 body oracle. */
 export function authoredSourceRecipesDouble() { return structuredClone(cached); }
