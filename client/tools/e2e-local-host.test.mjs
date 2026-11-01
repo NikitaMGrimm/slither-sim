@@ -24,6 +24,7 @@ test('Battledome requires full-map pictures without skips and preserves measured
   assert.equal(options.seconds, 20);
   assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
   const summary = { ...complete(), fullMap: true, mapFitSamples: 12, bestMapOverflowPixels: 0, worstMapOverflowPixels: 0,
+    mapCameraMoved: true, mapCameraMaxDisplacementWorldUnits: 20,
     pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
   assert.equal(assertSummary(summary, 19, true), summary);
   for (const count of [7, 256, 499]) {
@@ -36,6 +37,19 @@ test('Battledome requires full-map pictures without skips and preserves measured
     assert.throws(() => assertSummary({ ...summary, ...patch }, 19, true), { stage: 'full-map' });
   }
   assert.throws(() => assertSummary({ ...summary, pictureSkips: 1 }, 19, true), { stage: 'picture-skips' });
+});
+
+test('Battledome rejects stationary post-zoom summaries despite earlier snake movement', () => {
+  const summary = { ...complete(), fullMap: true, mapFitSamples: 3, bestMapOverflowPixels: 0, worstMapOverflowPixels: 0,
+    pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501,
+    mapCameraMoved: true, mapCameraMaxDisplacementWorldUnits: 20 };
+  assert.equal(assertSummary(summary, 19, true), summary);
+  for (const patch of [{mapCameraMoved: false, mapCameraMaxDisplacementWorldUnits: 0},
+    {mapCameraMaxDisplacementWorldUnits: 0}, {mapCameraMaxDisplacementWorldUnits: null}, {mapFitSamples: 1}]) {
+    assert.throws(() => assertSummary({ ...summary, ...patch }, 19, true), {stage: 'camera-motion'});
+  }
+  assert.throws(() => assertSummary({ ...summary, bestMapOverflowPixels: 0, worstMapOverflowPixels: 4,
+    fullMap: false }, 19, true), {stage: 'full-map'}, 'authored [3.56, 0, 4] must fail');
 });
 
 test('readiness requires a complete exact loopback announcement, independent of log chunking', () => {

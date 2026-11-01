@@ -18,6 +18,7 @@ mod probe {
     use std::time::{Duration, Instant};
 
     const EXTENT: [u32; 2] = [960, 540];
+    const MAP_CAMERA_MOTION_MIN_UNITS: f64 = 1.;
 
     #[derive(Default)]
     struct Summary {
@@ -43,12 +44,18 @@ mod probe {
         best_map_overflow: Option<f64>,
         worst_map_overflow: Option<f64>,
         map_fit_samples: usize,
+        map_camera_origin: Option<Point>,
+        map_camera_max_displacement: f64,
         closed: bool,
         baseline: Option<(Point, f64, f64)>,
         peak_speed: f64,
     }
     impl Summary {
-        fn observe_map_fit(&mut self, overflow: f64) {
+        fn observe_map_fit(&mut self, overflow: f64, position: Point) {
+            let origin = *self.map_camera_origin.get_or_insert(position);
+            self.map_camera_max_displacement = self
+                .map_camera_max_displacement
+                .max((position.x - origin.x).hypot(position.y - origin.y));
             self.map_fit_samples += 1;
             self.best_map_overflow =
                 Some(self.best_map_overflow.map_or(overflow, |p| p.min(overflow)));
@@ -57,6 +64,9 @@ mod probe {
                     .map_or(overflow, |p| p.max(overflow)),
             );
             self.full_map = self.worst_map_overflow.is_some_and(|p| p <= 1e-6);
+        }
+        fn map_camera_moved(&self) -> bool {
+            self.map_camera_max_displacement > MAP_CAMERA_MOTION_MIN_UNITS
         }
         fn observe(&mut self, game: &LocalGame, active: f64) -> Result<()> {
             let state = game.client().received();
@@ -99,7 +109,7 @@ mod probe {
         }
         fn print(&self, seconds: f64) {
             println!(
-                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"mapFitSamples\":{},\"bestMapOverflowPixels\":{},\"worstMapOverflowPixels\":{},\"seconds\":{:.3}}}",
+                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"mapFitSamples\":{},\"bestMapOverflowPixels\":{},\"worstMapOverflowPixels\":{},\"mapCameraMoved\":{},\"mapCameraMaxDisplacementWorldUnits\":{},\"seconds\":{:.3}}}",
                 self.opened,
                 self.challenge,
                 self.login,
@@ -126,6 +136,10 @@ mod probe {
                     .map_or("null".to_owned(), |p| p.to_string()),
                 self.worst_map_overflow
                     .map_or("null".to_owned(), |p| p.to_string()),
+                self.map_camera_moved(),
+                self.map_camera_origin.map_or("null".to_owned(), |_| self
+                    .map_camera_max_displacement
+                    .to_string()),
                 seconds
             );
         }
@@ -210,7 +224,7 @@ mod probe {
                                 - f64::from(side)
                         })
                         .fold(0., f64::max);
-                    self.summary.observe_map_fit(overflow);
+                    self.summary.observe_map_fit(overflow, camera.position());
                 }
                 self.summary.pictures += 1;
             }
@@ -360,14 +374,48 @@ mod probe {
             assert_eq!(summary.best_map_overflow, None);
             assert_eq!(summary.worst_map_overflow, None);
             assert!(!summary.full_map);
-            summary.observe_map_fit(0.);
+            summary.observe_map_fit(0., Point::default());
             assert!(summary.full_map);
-            summary.observe_map_fit(3.56);
-            summary.observe_map_fit(0.);
+            summary.observe_map_fit(3.56, Point { x: 2., y: 0. });
+            summary.observe_map_fit(0., Point { x: 4., y: 0. });
             assert_eq!(summary.map_fit_samples, 3);
             assert_eq!(summary.best_map_overflow, Some(0.));
             assert_eq!(summary.worst_map_overflow, Some(3.56));
             assert!(!summary.full_map);
+            assert!(summary.map_camera_moved());
+        }
+        #[test]
+        fn authored_motion_sequence_keeps_both_clipped_endpoints() {
+            let mut summary = Summary::default();
+            for (index, overflow) in [3.56, 0., 4.].into_iter().enumerate() {
+                summary.observe_map_fit(
+                    overflow,
+                    Point {
+                        x: index as f64 * 2.,
+                        y: 0.,
+                    },
+                );
+            }
+            assert_eq!(summary.map_fit_samples, 3);
+            assert_eq!(summary.best_map_overflow, Some(0.));
+            assert_eq!(summary.worst_map_overflow, Some(4.));
+            assert!(summary.map_camera_moved());
+            assert!(!summary.full_map);
+        }
+        #[test]
+        fn stationary_post_zoom_summary_does_not_prove_camera_motion() {
+            // Lifetime snake movement is deliberately true: it cannot stand
+            // in for camera movement during the fitted post-wheel pictures.
+            let mut summary = Summary {
+                moved: true,
+                ..Summary::default()
+            };
+            for _ in 0..3 {
+                summary.observe_map_fit(0., Point { x: 20., y: 30. });
+            }
+            assert!(summary.full_map);
+            assert_eq!(summary.map_camera_max_displacement, 0.);
+            assert!(!summary.map_camera_moved());
         }
         #[test]
         fn server_arguments_keep_literal_loopback_and_time_bounds() {
