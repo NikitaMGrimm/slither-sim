@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 #[cfg(target_arch = "wasm32")]
 fn main() {}
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod headless;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod scheduling;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod desktop {
     use crate::scheduling::Schedule;
     use slither_client::session_policy::Phase;
@@ -62,7 +62,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape in-game menu/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -154,8 +154,6 @@ mod desktop {
         game: LocalGame,
         transport: Transport,
         started: Instant,
-        cursor: [f64; 2],
-        cursor_physical: Option<[f64; 2]>,
         cursor_generation: Option<u32>,
         preparation: Option<Preparation>,
         directory: Option<DirectoryPreparation>,
@@ -243,8 +241,12 @@ mod desktop {
                     )?;
                     self.handshake_wake = Some(constructed + Duration::from_millis(3334));
                 }
-                match self.transport.execute(&e) {
-                    Ok(()) => self.game.acknowledge(e.generation, e.id, true)?,
+                match self.transport.execute_pending(&e, Instant::now()) {
+                    Ok(true) => self.game.acknowledge(e.generation, e.id, true)?,
+                    Ok(false) => {
+                        self.handshake_wake = None;
+                        return Ok(());
+                    }
                     Err(error) => {
                         self.transport.close();
                         self.game.fail(&error);
@@ -399,7 +401,7 @@ mod desktop {
                     }
                     Event::Closed(g) => self.game.closed(g),
                     Event::Failed(g, e) => {
-                        if g == self.game.generation() {
+                        if g == self.game.generation() && !self.game.stopping() {
                             self.game.fail(&e);
                         }
                     }
@@ -576,18 +578,28 @@ mod desktop {
                 }
             }
             self.effects()?;
+            if let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref()) {
+                if self.game.ingame_menu_open() {
+                    self.login.ingame_input(&mut self.game, input)?;
+                } else {
+                    self.login.egui.input(input);
+                }
+            }
+            self.login.prepare_ingame(&mut self.game, physical, dpr)?;
+            self.effects()?;
             if self.cursor_generation != Some(self.game.generation())
                 || self.login.zoom_input_available()
             {
                 // Menu callbacks need not reach Game::pointer. Seed the zoom
                 // source at ownership handoff, re-normalizing physical position
                 // with current DPR; leave admitted stock input untouched.
-                if let Some(cursor) = self.cursor_physical {
+                if let Some(cursor) = self.login.egui.window.physical_cursor() {
                     window.observe_cursor(&mut self.game, cursor)?;
                 } else {
                     let [width, height] = window.css_size();
+                    let cursor = self.login.egui.window.cursor();
                     self.game
-                        .observe_cursor(self.cursor[0], self.cursor[1], width, height)?;
+                        .observe_cursor(cursor[0], cursor[1], width, height)?;
                 }
             }
             self.game
@@ -657,10 +669,11 @@ mod desktop {
             }
             latency::picture("pre_present_notify");
             self.window.pre_present_notify();
-            match self.host.present_world_with_overlay(
+            match self.host.present_with_menu(
                 &picture.frame,
                 picture.overlay.as_ref(),
                 window.requested,
+                &mut self.login.egui,
             ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {
@@ -688,6 +701,7 @@ mod desktop {
                     return Err(e);
                 }
             }
+            self.login.egui.platform_output(&self.window);
             self.effects()?;
             Ok(())
         }
@@ -736,7 +750,7 @@ mod desktop {
                 dpr: self.window.scale_factor(),
                 requested: self.login.state.settings.preferences().resolution,
             }
-            .pointer(&mut self.game, self.cursor, down)
+            .pointer(&mut self.game, self.login.egui.window.cursor(), down)
         }
     }
     pub struct App {
@@ -770,7 +784,7 @@ mod desktop {
             let window = Arc::new(
                 l.create_window(
                     Window::default_attributes()
-                        .with_title("SlitherClient — Enter Play / Escape Stop")
+                        .with_title("SlitherClient — Enter Play / Escape menu")
                         .with_inner_size(winit::dpi::LogicalSize::new(960., 540.)),
                 )
                 .map_err(|e| e.to_string())?,
@@ -837,8 +851,6 @@ mod desktop {
                     let _ = proxy.send_event(TransportWake);
                 }),
                 started: Instant::now(),
-                cursor: [480., 270.],
-                cursor_physical: None,
                 cursor_generation: None,
                 preparation: None,
                 directory: None,
@@ -888,10 +900,21 @@ mod desktop {
             )
             .then(latency::callback);
             let result = (|| -> Result<()> {
-                // Capture even when the menu consumes the event below. Physical
-                // coordinates can be converted again after a DPR change.
-                if let WindowEvent::CursorMoved { position, .. } = &event {
-                    r.cursor_physical = Some([position.x, position.y]);
+                // Raw window state belongs to the host, before any modal can consume delivery.
+                let response = r
+                    .login
+                    .egui
+                    .window_event(&event, r.window.scale_factor(), || r.window.as_ref());
+                if matches!(
+                    event,
+                    WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
+                ) {
+                    let size = r.window.inner_size();
+                    r.login.prepare_ingame(
+                        &mut r.game,
+                        [size.width, size.height],
+                        r.window.scale_factor(),
+                    )?;
                 }
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
@@ -913,6 +936,60 @@ mod desktop {
                         };
                         inactive.window_event(&event);
                     }
+                }
+                if r.login.egui.active() {
+                    if response.repaint {
+                        r.schedule.invalidate();
+                    }
+                    let input_event = matches!(
+                        event,
+                        WindowEvent::KeyboardInput { .. }
+                            | WindowEvent::CursorMoved { .. }
+                            | WindowEvent::CursorLeft { .. }
+                            | WindowEvent::MouseInput { .. }
+                            | WindowEvent::MouseWheel { .. }
+                            | WindowEvent::Ime(_)
+                    );
+                    if (input_event
+                        || matches!(
+                            event,
+                            WindowEvent::Focused(_) | WindowEvent::ModifiersChanged(_)
+                        ))
+                        && let Some(input) = r.login.egui.take_window_input(|| r.window.as_ref())
+                    {
+                        if r.game.ingame_menu_open() {
+                            r.login.ingame_input(&mut r.game, input)?;
+                            r.effects()?;
+                        } else {
+                            r.login.settings_input(input);
+                        }
+                    }
+                    if input_event {
+                        r.game.mouse_up();
+                        r.schedule.invalidate();
+                        return Ok(());
+                    }
+                }
+                if let WindowEvent::KeyboardInput {
+                    event,
+                    is_synthetic: false,
+                    ..
+                } = &event
+                    && r.login.ingame_key(
+                        &mut r.game,
+                        event.into(),
+                        r.started.elapsed().as_secs_f64() * 1000.,
+                    )?
+                {
+                    let size = r.window.inner_size();
+                    r.login.prepare_ingame(
+                        &mut r.game,
+                        [size.width, size.height],
+                        r.window.scale_factor(),
+                    )?;
+                    r.effects()?;
+                    r.schedule.invalidate();
+                    return Ok(());
                 }
                 let mapped = if r.login.picker.policy.visible() {
                     r.login.picker.event(&event)
@@ -990,14 +1067,11 @@ mod desktop {
                             r.schedule.invalidate();
                         }
                     }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let d = r.window.scale_factor();
-                        r.cursor = slither_client::desktop_input::mouse_client_position(
-                            [position.x, position.y],
-                            d,
-                        );
-                        if r.login.intercepts_pointer(r.cursor) {
-                            let effects = r.login.pointer(r.cursor, None, admission);
+                    WindowEvent::CursorMoved { .. } => {
+                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
+                            let effects =
+                                r.login
+                                    .pointer(r.login.egui.window.cursor(), None, admission);
                             r.edit_effects(effects);
                         } else {
                             r.pointer(false)?;
@@ -1008,9 +1082,9 @@ mod desktop {
                         button: MouseButton::Left,
                         ..
                     } => {
-                        if r.login.intercepts_pointer(r.cursor) {
+                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
                             let effects = r.login.pointer(
-                                r.cursor,
+                                r.login.egui.window.cursor(),
                                 Some(state == ElementState::Pressed),
                                 admission,
                             );
@@ -1033,12 +1107,11 @@ mod desktop {
                         let down = event.state == ElementState::Pressed;
                         match event.physical_key {
                             PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
-                            PhysicalKey::Code(KeyCode::Escape) if down => {
-                                r.login.state.cancel_pending_play();
+                            PhysicalKey::Code(KeyCode::Escape) if down && !event.repeat => {
                                 if let Some(p) = &r.preparation {
                                     p.cancel();
                                 }
-                                r.game.stop();
+                                r.login.cancel_game(&mut r.game);
                                 r.effects()?;
                                 r.schedule.invalidate();
                             }
@@ -1074,10 +1147,15 @@ mod desktop {
                 if r.schedule.request_redraw(Instant::now()) {
                     r.window.request_redraw();
                 }
-                if let Some(deadline) = [r.schedule.deadline(), r.discovery_poll, r.handshake_wake]
-                    .into_iter()
-                    .flatten()
-                    .min()
+                if let Some(deadline) = [
+                    r.schedule.deadline(),
+                    r.discovery_poll,
+                    r.handshake_wake,
+                    r.transport.close_deadline(),
+                ]
+                .into_iter()
+                .flatten()
+                .min()
                 {
                     l.set_control_flow(ControlFlow::WaitUntil(deadline));
                 }
@@ -1310,11 +1388,20 @@ mod desktop {
         }
     }
 }
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn main() {
     let result = desktop::options().and_then(|o| o.map_or(Ok(()), desktop::run));
     if let Err(e) = result {
         eprintln!("{e}");
         std::process::exit(1);
     }
+}
+
+// Linux intentionally has no winit backend; slither-client-e2e remains headless.
+#[cfg(target_os = "linux")]
+fn main() {
+    eprintln!(
+        "The desktop client is not supported on Linux; use slither-client-e2e for offline probes."
+    );
+    std::process::exit(1);
 }

@@ -1,7 +1,6 @@
 //! Authored settings/control regressions, without storage, renderer or transport.
 use slither_client::{
     menu_controls::*,
-    menu_input::*,
     menu_preferences::MenuQuality as Q,
     settings::*,
     start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
@@ -15,14 +14,13 @@ fn menu(quality: Q) -> StartMenuState {
 fn settings_identity_rejects_studio_activations() {
     let mut menu = menu(Q::High);
     menu.settings.open(&menu.view(true));
-    let panel = menu.settings.panel([960., 540.]);
     let studio = slither_client::skin_studio::StudioState::new(Default::default())
         .unwrap()
         .panel([960., 540.], "");
-    assert_ne!(panel.id, studio.id);
-    let mut input = PanelInputState::default();
-    input.sync(&panel, &mut MenuInputState::default());
-    let mut intent = input.activate(&panel, Activation::Space).unwrap();
+    let mut intent = menu
+        .settings
+        .intent(QUALITY, Some(false), Activation::Space);
+    assert_ne!(intent.panel, studio.id);
     intent.panel = studio.id;
     menu.settings.activate(intent);
     assert_eq!(menu.settings.preferences().quality, Q::High);
@@ -107,12 +105,7 @@ fn v2_roundtrips_strictly_and_resolution_is_independent_of_quality_and_capabilit
     }
     let mut m = menu(Q::Low);
     m.settings.open(&m.view(true));
-    let panel = m.settings.panel([960., 540.]);
-    let mut input = PanelInputState::default();
-    input.sync(&panel, &mut MenuInputState::default());
-    input.focus_control(&panel, RESOLUTION);
-    let intent = input.activate(&panel, Activation::Enter).unwrap();
-    assert_eq!(intent.checked, Some(true));
+    let intent = m.settings.intent(RESOLUTION, Some(true), Activation::Enter);
     m.settings.activate(intent);
     m.settings.activate(intent);
     assert_eq!(m.settings.take_write(), Some("2:0:native"));
@@ -120,92 +113,14 @@ fn v2_roundtrips_strictly_and_resolution_is_independent_of_quality_and_capabilit
     m.settings.storage_result(false);
     assert_eq!(m.settings.preferences().quality, Q::Low);
     assert_eq!(m.settings.preferences().resolution, WorldResolution::Native);
-    assert!(
-        m.settings
-            .panel([960., 540.])
-            .controls
-            .iter()
-            .any(|c| c.name == "Native unavailable at this size")
-    );
+    assert!(m.settings.native_unavailable());
+    assert!(m.settings.not_saved());
     assert_eq!(m.settings.take_write(), None);
     m.settings.native_available(true);
-    assert!(
-        !m.settings
-            .panel([960., 540.])
-            .controls
-            .iter()
-            .any(|c| c.name == "Native unavailable at this size")
-    );
-    input.focus_control(&panel, QUALITY);
+    assert!(!m.settings.native_unavailable());
     m.settings
-        .activate(input.activate(&panel, Activation::Space).unwrap());
+        .activate(m.settings.intent(QUALITY, Some(true), Activation::Space));
     assert_eq!(m.settings.take_write(), Some("2:1:native"));
-}
-
-#[test]
-fn toggle_shared_capture_semantics_focus_and_explicit_set() {
-    let mut m = menu(Q::High);
-    assert!(m.settings.open(&m.view(true)));
-    let mut panel = m.settings.panel([960., 540.]);
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    input.sync(&panel, &mut edit);
-    assert_eq!(input.focus(), Some(QUALITY));
-    let resolved = panel.resolve([960., 540.]).unwrap();
-    let toggle = resolved.iter().find(|r| r.control.id == QUALITY).unwrap();
-    let p = [toggle.rect.x + 10., toggle.rect.y + 10.];
-    input.pointer(&panel, &resolved, p, Some(true));
-    assert!(
-        input
-            .pointer(&panel, &resolved, [0., 0.], Some(false))
-            .is_none()
-    );
-    input.pointer(&panel, &resolved, p, Some(true));
-    input.blur();
-    assert!(input.pointer(&panel, &resolved, p, Some(false)).is_none());
-    input.pointer(&panel, &resolved, p, Some(true));
-    panel.generation += 1;
-    input.sync(&panel, &mut edit);
-    assert!(input.pointer(&panel, &resolved, p, Some(false)).is_none());
-    panel = m.settings.panel([960., 540.]);
-    input.sync(&panel, &mut edit);
-    let nodes = panel.semantics([960., 540.], &input, &edit).unwrap();
-    let node = nodes.iter().find(|n| n.id == QUALITY).unwrap();
-    assert_eq!(node.role, AccessibleRole::Checkbox);
-    assert_eq!(node.checked, Some(true));
-    assert!(node.actions.contains(&PanelAction::SetChecked));
-    for activation in [Activation::Pointer, Activation::Enter, Activation::Space] {
-        input.focus_control(&panel, QUALITY);
-        let intent = if activation == Activation::Pointer {
-            input.pointer(&panel, &resolved, p, Some(true));
-            input.pointer(&panel, &resolved, p, Some(false)).unwrap()
-        } else {
-            input.activate(&panel, activation).unwrap()
-        };
-        assert_eq!(intent.checked, Some(false));
-        m.settings.activate(intent);
-        m.settings.activate(intent); // repeated Set cannot invert or queue a second write.
-        assert_eq!(m.settings.preferences().quality, Q::Low);
-    }
-    assert_eq!(m.settings.take_write(), Some("2:0:original"));
-    assert_eq!(m.settings.take_write(), None);
-    input.tab(&panel, false);
-    assert_eq!(input.focus(), Some(RESOLUTION));
-    input.tab(&panel, false);
-    assert_eq!(input.focus(), Some(DONE));
-    input.tab(&panel, false);
-    assert_eq!(input.focus(), Some(QUALITY));
-    input.tab(&panel, true);
-    assert_eq!(input.focus(), Some(DONE));
-    panel
-        .controls
-        .iter_mut()
-        .find(|c| c.id == QUALITY)
-        .unwrap()
-        .enabled = false;
-    input.sync(&panel, &mut edit);
-    input.focus_control(&panel, QUALITY);
-    assert_ne!(input.focus(), Some(QUALITY));
 }
 
 #[test]
@@ -215,26 +130,16 @@ fn storage_failure_and_done_preserve_quality_next_play_and_generation() {
     let view = m.view(true);
     assert!(!m.settings.open(&m.view(false)));
     assert!(m.settings.open(&view));
-    let old = m.settings.panel([960., 540.]);
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    input.sync(&old, &mut edit);
-    let toggle = input.activate(&old, Activation::Space).unwrap();
+    let toggle = m.settings.intent(QUALITY, Some(false), Activation::Space);
     m.settings.activate(toggle);
     m.action(MenuAction::Play, true);
     assert!(!m.view(true).spinner_visible);
     assert_eq!(m.settings.take_write(), Some("2:0:original"));
     m.settings.storage_result(false);
-    let panel = m.settings.panel([360., 640.]);
-    assert!(
-        panel.controls.iter().any(
-            |c| matches!(&c.kind, ControlKind::Label { text } if text == "applies this session")
-        )
-    );
+    assert!(m.settings.not_saved());
     assert_eq!(m.settings.take_write(), None);
-    input.focus_control(&old, DONE);
     m.settings
-        .activate(input.activate(&old, Activation::Enter).unwrap());
+        .activate(m.settings.intent(DONE, None, Activation::Enter));
     assert!(!m.settings.visible());
     assert!(m.settings.open(&m.view(true)));
     m.settings.activate(toggle); // previous generation is inert.
@@ -251,83 +156,28 @@ fn storage_failure_and_done_preserve_quality_next_play_and_generation() {
             })
     );
 }
+
 #[test]
-fn fade_is_monotonic_visible_through_exit_and_never_replays_a_write() {
+fn modal_clock_matches_picker_rates_caps_and_atomic_rejection() {
     let mut m = menu(Q::High);
     m.settings.step(0.).unwrap();
-    assert!(m.settings.open(&m.view(true)));
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    let panel = m.settings.panel([960., 540.]);
-    input.sync(&panel, &mut edit);
-    m.settings
-        .activate(input.activate(&panel, Activation::Space).unwrap());
-    let prefs = m.settings.preferences();
-    assert_eq!(m.settings.take_write(), Some(prefs.serialize()));
-    let mut now = 0.;
-    let mut previous = m.settings.alpha();
-    let mut previous_width = 0.;
-    let mut centre: Option<[f64; 2]> = None;
-    for _ in 0..256 {
-        now += 16.;
-        m.settings.step(now).unwrap();
-        let alpha = m.settings.alpha();
-        assert!((previous..=1.).contains(&alpha));
-        assert!(m.settings.visible());
-        let panel = m.settings.panel([960., 540.]);
-        let resolved = panel.resolve([960., 540.]).unwrap();
-        let surface = resolved
-            .iter()
-            .find(|r| matches!(r.control.kind, ControlKind::Surface))
-            .unwrap()
-            .rect;
-        assert!(surface.width >= previous_width);
-        let current = [
-            surface.x + surface.width / 2.,
-            surface.y + surface.height / 2.,
-        ];
-        if let Some(old) = centre {
-            assert!(
-                current
-                    .into_iter()
-                    .zip(old)
-                    .all(|(a, b)| (a - b).abs() < 1e-7)
-            );
-        }
-        centre = Some(current);
-        previous_width = surface.width;
-        previous = alpha;
-        assert!(m.settings.take_write().is_none());
-        if alpha == 1. {
-            break;
-        }
+    m.settings.open(&m.view(true));
+    for now in (16..=400).step_by(16) {
+        m.settings.step(now as f64).unwrap();
     }
     assert_eq!(m.settings.alpha(), 1.);
-    let old_panel = m.settings.panel([960., 540.]);
-    input.sync(&old_panel, &mut edit);
-    let toggle = input.activate(&old_panel, Activation::Space).unwrap();
     m.settings.close();
     assert!(m.settings.visible());
-    assert!(!m.settings.is_open());
-    for _ in 0..256 {
-        m.settings.activate(toggle);
-        now += 16.;
-        m.settings.step(now).unwrap();
-        let alpha = m.settings.alpha();
-        assert!((0. ..=previous).contains(&alpha));
-        assert_eq!(m.settings.visible(), alpha > 0.);
-        let panel = m.settings.panel([960., 540.]);
-        assert_eq!(panel.visible, m.settings.visible());
-        assert_eq!(panel.enabled, panel.visible);
-        assert_eq!(m.settings.preferences(), prefs);
-        assert!(m.settings.take_write().is_none());
-        previous = alpha;
-        if !m.settings.visible() {
-            break;
-        }
+    for now in (416..=720).step_by(16) {
+        m.settings.step(now as f64).unwrap();
     }
     assert!(!m.settings.visible());
-    let closed = m.settings.clone();
-    assert!(m.settings.step(f64::NAN).is_err());
-    assert_eq!(m.settings, closed);
+    m.settings.open(&m.view(true));
+    m.settings.step(10_000.).unwrap();
+    assert_eq!(m.settings.alpha(), 0.1);
+    let saved = m.settings.clone();
+    for now in [9999., f64::NAN, f64::INFINITY] {
+        assert!(m.settings.step(now).is_err());
+        assert_eq!(m.settings, saved);
+    }
 }

@@ -294,6 +294,31 @@ impl DesktopInput {
     pub fn mouse_up(&mut self) {
         self.set_boost(false);
     }
+    /// Native modal handoff: discard held controls and turn debt, releasing boost
+    /// immediately rather than waiting for the ordinary boost cadence gate.
+    pub fn release_controls(&mut self, now_ms: f64) -> Result<Vec<u8>> {
+        finite(now_ms, "Invalid timestamp")?;
+        self.view.left_held = false;
+        self.view.right_held = false;
+        self.view.boost_key_held = false;
+        self.view.left_steps = 0;
+        self.view.right_steps = 0;
+        self.view.want_heading = false;
+        let Some(own) = &mut self.view.own else {
+            return Ok(Vec::new());
+        };
+        own.requested_boost = false;
+        if !own.sent_boost {
+            return Ok(Vec::new());
+        }
+        own.sent_boost = false;
+        self.view.last_boost_ms = now_ms;
+        Ok(if self.view.protocol >= 5 {
+            slither_protocol::v19::client::boost(false).to_vec()
+        } else {
+            vec![109, 0]
+        })
+    }
     /// Update one recognized held key; unrecognized codes have no effect.
     pub fn key(&mut self, code: &str, down: bool) -> bool {
         match code {

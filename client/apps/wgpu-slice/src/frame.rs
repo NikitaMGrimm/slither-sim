@@ -14,7 +14,7 @@ pub const MAX_DRAWS: usize = DRAW_RECORD_BUDGET / std::mem::size_of::<Draw>();
 pub const DRAW_MEMORY_LIMIT: &str = "frame draw-record memory budget exceeded; picture skipped";
 pub const VERTEX_CHUNK_QUADS: usize = 8192;
 pub const QUAD_VERTEX_BYTES: usize = 6 * 5 * 4;
-pub const MAX_EXTENT: u32 = 8192;
+pub const MAX_EXTENT: u32 = slither_client::world_resolution::MAX_EXTENT;
 
 pub fn check_draw_count(count: usize) -> Result<()> {
     if count > MAX_DRAWS {

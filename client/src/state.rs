@@ -1,4 +1,4 @@
-//! Bounded received scene state for a documented subset of protocol 19.
+//! Bounded received scene state for documented subsets of protocols 13 and 19.
 //!
 //! This original presentation model reads transmitted anchors, not authoritative
 //! physics. Bodies are head-to-tail; coordinates are centered on setup's grid
@@ -20,6 +20,9 @@ use slither_protocol::{
     scalar,
     v19::{self, Message},
 };
+
+mod v13;
+use v13::AppearanceHeader;
 
 /// Maximum simultaneously retained snakes.
 pub const MAX_SNAKES: usize = 256;
@@ -44,7 +47,7 @@ pub struct Point {
 /// Typed transmitted world configuration. No physics constants are inferred.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Setup {
-    /// Advertised protocol; this module accepts only 19.
+    /// Advertised protocol, 13 or 19, selected for the connection by Setup.
     pub protocol: u8,
     /// Offset subtracted from wire positions on both axes.
     pub grid_center: f64,
@@ -125,6 +128,13 @@ pub struct Food {
     pub sector: (u8, u8),
 }
 
+/// Validated received value awaiting presentation admission before publication.
+pub(crate) struct PreparedFood {
+    pub spawn: FoodSpawnInput,
+    food: Food,
+    update_added_cache: bool,
+}
+
 /// Outcome of one committed frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FrameReport {
@@ -193,7 +203,7 @@ pub struct Appearance {
 /// One food creation, independent of the lossy unique-key received map.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FoodSpawnInput {
-    /// Packed sector and offset bytes, preserving the complete wire bit pattern.
+    /// Packed sector/offset bytes in 19, or absolute x16/y16 in 13.
     pub key: u32,
     /// Original sector coordinates, independent of later animation.
     pub sector: (u8, u8),
@@ -434,7 +444,7 @@ pub struct ClientState {
     pub setup: Option<Setup>,
     /// Current snakes, in wire identifier order.
     pub snakes: BTreeMap<u16, Snake>,
-    /// Lossy unique-key projection in packed sector/offset order. Creation replaces
+    /// Lossy unique-key projection in protocol-specific key order. Creation replaces
     /// the latest value and consumption removes it immediately. This map cannot
     /// represent duplicate instances, insertion order, or consumption animation.
     pub foods: BTreeMap<u32, Food>,
@@ -452,6 +462,8 @@ pub struct ClientState {
     eaten_sector: Option<(u8, u8)>,
     added_color: u8,
     eater_id: Option<u16>,
+    // Absolute v13 front anchors also retain the dying own object's relative base.
+    legacy_fronts: BTreeMap<u16, Point>,
 }
 
 impl ClientState {
@@ -751,6 +763,19 @@ impl ClientState {
         } else {
             DecodeAdmission::ClientReceived
         };
+        let version = if code == b'a' {
+            let version = v19::setup_protocol_version(p, admission)
+                .map_err(|_| StateError::InvalidPacket(code))?;
+            if self.setup.as_ref().is_some_and(|s| s.protocol != version) {
+                return Err(StateError::UnsupportedProtocol(version));
+            }
+            version
+        } else {
+            self.setup.as_ref().map_or(19, |s| s.protocol)
+        };
+        if version == 13 {
+            return self.apply_v13(command, admission, events);
+        }
         let message = v19::decode_command(command, admission).map_err(|error| {
             if error.kind == ErrorKind::UnsupportedVersion {
                 StateError::UnsupportedProtocol(
@@ -761,6 +786,15 @@ impl ClientState {
                 StateError::InvalidPacket(code)
             }
         })?;
+        self.apply_message(message, code, events)
+    }
+
+    fn apply_message(
+        &mut self,
+        message: Message<'_>,
+        code: u8,
+        events: Option<&mut Vec<PresentationEvent>>,
+    ) -> Result<bool, StateError> {
         if let Message::ScoreAdjustment(value) = message {
             if let Some(events) = events {
                 events.push(PresentationEvent::OwnScoreAdjustment(value));
@@ -797,7 +831,13 @@ impl ClientState {
         }
         let setup = self.setup.as_ref().ok_or(StateError::MissingSetup)?.clone();
         match message {
-            Message::SnakeAppearance(raw) => self.appearance(raw, &setup, events)?,
+            Message::SnakeAppearance(raw) => self.appearance(
+                raw.into(),
+                raw.body.first,
+                raw.body.deltas(),
+                &setup,
+                events,
+            )?,
             Message::SnakeRemoval(raw) => {
                 self.snakes.remove(&raw.id);
                 if let Some(events) = events {
@@ -935,7 +975,9 @@ impl ClientState {
 
     fn appearance(
         &mut self,
-        raw: v19::SnakeAppearanceRef<'_>,
+        raw: AppearanceHeader<'_>,
+        first: Option<[u32; 2]>,
+        deltas: impl Iterator<Item = v19::BodyDelta>,
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
@@ -953,7 +995,7 @@ impl ClientState {
         let mut absolute_body = events.as_ref().map(|_| Vec::new());
         let mut anchor_direction = None;
         let mut effective_heading = scalar::angle24(raw.heading);
-        if let Some([x, y]) = raw.body.first {
+        if let Some([x, y]) = first {
             let mut absolute_point = Point {
                 x: scalar::position5(x),
                 y: scalar::position5(y),
@@ -963,7 +1005,7 @@ impl ClientState {
             if let Some(body) = &mut absolute_body {
                 body.push(absolute_point);
             }
-            for delta in raw.body.deltas() {
+            for delta in deltas {
                 match delta {
                     v19::BodyDelta::FinalDirection(direction) => {
                         point = advance(point, direction, setup.body_spacing)?;
@@ -1059,13 +1101,23 @@ impl ClientState {
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
-        let own = raw.target == v19::Target::Own;
-        let grow = raw.grew;
-        let direction = raw.direction;
         let absolute_position = raw.absolute.map(|[x, y]| Point {
             x: f64::from(x),
             y: f64::from(y),
         });
+        self.anchor_at(raw, setup, events, absolute_position)
+    }
+
+    fn anchor_at(
+        &mut self,
+        raw: v19::AnchorRef,
+        setup: &Setup,
+        events: Option<&mut Vec<PresentationEvent>>,
+        absolute_position: Option<Point>,
+    ) -> Result<(), StateError> {
+        let own = raw.target == v19::Target::Own;
+        let grow = raw.grew;
+        let direction = raw.direction;
         let position = absolute_position
             .map(|point| centered(setup, point.x, point.y))
             .transpose()?;
@@ -1176,6 +1228,69 @@ impl ClientState {
         Ok(())
     }
 
+    pub(crate) fn prepare_single_food(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedFood>, StateError> {
+        let Some(setup) = self.setup.as_ref() else {
+            return Ok(None);
+        };
+        if !matches!(command.first(), Some(b'F' | b'f' | b'b')) {
+            return Ok(None);
+        }
+        match setup.protocol {
+            13 => self.prepare_single_v13_food(command),
+            19 => {
+                let raw = v19::decode(command, DecodeAdmission::ClientPresentation)
+                    .map_err(|_| StateError::InvalidPacket(command[0]))?;
+                match raw {
+                    Message::FoodSpawn(raw) => {
+                        let sector = raw
+                            .sector
+                            .map(|s| (s[0], s[1]))
+                            .or(self.added_sector)
+                            .ok_or(StateError::MissingSector)?;
+                        let mut prepared = self.prepare_food(
+                            setup,
+                            sector,
+                            (raw.offset[0], raw.offset[1]),
+                            raw.size,
+                            raw.color.unwrap_or(self.added_color),
+                            raw.rapid,
+                        )?;
+                        prepared.update_added_cache = true;
+                        Ok(Some(prepared))
+                    }
+                    Message::FoodSector(raw) if raw.foods().len() == 1 => {
+                        let food = raw.foods().next().expect("one food");
+                        self.prepare_food(
+                            setup,
+                            (raw.sector[0], raw.sector[1]),
+                            (food.offset[0], food.offset[1]),
+                            food.size,
+                            food.color,
+                            true,
+                        )
+                        .map(Some)
+                    }
+                    _ => Ok(None),
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+
+    pub(crate) fn commit_single_food(&mut self, prepared: PreparedFood, elapsed: Option<u16>) {
+        if prepared.update_added_cache {
+            self.added_sector = Some(prepared.spawn.sector);
+            self.added_color = prepared.spawn.raw_color;
+        }
+        self.foods.insert(prepared.spawn.key, prepared.food);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
     fn insert_food(
         &mut self,
         setup: &Setup,
@@ -1185,6 +1300,20 @@ impl ClientState {
         color: u8,
         rapid: bool,
     ) -> Result<FoodSpawnInput, StateError> {
+        let prepared = self.prepare_food(setup, sector, offset, size, color, rapid)?;
+        self.foods.insert(prepared.spawn.key, prepared.food);
+        Ok(prepared.spawn)
+    }
+
+    fn prepare_food(
+        &self,
+        setup: &Setup,
+        sector: (u8, u8),
+        offset: (u8, u8),
+        size: u8,
+        color: u8,
+        rapid: bool,
+    ) -> Result<PreparedFood, StateError> {
         let (rx, ry) = offset;
         let key = food_key(sector, rx, ry);
         if !self.foods.contains_key(&key) && self.foods.len() >= MAX_FOODS {
@@ -1196,26 +1325,26 @@ impl ClientState {
             (f64::from(sector.0) + f64::from(rx) / 256.) * unit,
             (f64::from(sector.1) + f64::from(ry) / 256.) * unit,
         )?;
-        self.foods.insert(
-            key,
-            Food {
+        Ok(PreparedFood {
+            update_added_cache: false,
+            food: Food {
                 position,
                 size: f64::from(size) / 5.,
                 color,
                 sector,
             },
-        );
-        Ok(FoodSpawnInput {
-            key,
-            sector,
-            absolute_position: Point {
-                x: f64::from(rx) * (unit / 256.) + f64::from(sector.0) * unit,
-                y: f64::from(ry) * (unit / 256.) + f64::from(sector.1) * unit,
+            spawn: FoodSpawnInput {
+                key,
+                sector,
+                absolute_position: Point {
+                    x: f64::from(rx) * (unit / 256.) + f64::from(sector.0) * unit,
+                    y: f64::from(ry) * (unit / 256.) + f64::from(sector.1) * unit,
+                },
+                size_byte: size,
+                base_size: f64::from(size) / 5.,
+                raw_color: color,
+                rapid,
             },
-            size_byte: size,
-            base_size: f64::from(size) / 5.,
-            raw_color: color,
-            rapid,
         })
     }
 

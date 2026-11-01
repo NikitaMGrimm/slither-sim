@@ -74,7 +74,7 @@ pub use body_painter::{
     BodyPaintQuality, BodyPaintRecipe, BodyPaintSample, BodyPaintView, BodyPaintVisual,
     BodyPalette, BodyRect, BodyRun, BodyStyle, BodyVariantMode, MAX_BODY_PAINT_COMMANDS,
     MAX_BODY_PAINT_SAMPLES, plan_standard_body, plan_standard_body_with_antenna,
-    plan_standard_body_with_storage,
+    plan_standard_body_with_storage, plan_standard_body_with_zoom_and_storage,
 };
 pub use boundary::{BOUNDARY_SAMPLES, BoundaryRadius};
 pub(crate) use camera::UserZoom;

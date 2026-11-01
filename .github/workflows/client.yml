@@ -41,7 +41,9 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # Windows already takes up to ~14.5 min on main (uncached wgpu target, slow
+    # linker); 15 left no headroom and cancelled #416's run mid-test.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 25 || 15 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,6 +66,9 @@ jobs:
       - run: cargo test --all-targets --locked
       - run: cargo test --doc --locked
       - run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Check desktop target stays gated on Linux
+        if: matrix.os == 'ubuntu-24.04'
+        run: cargo check --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop --bin slither-client-e2e
       # Without a target cache, one-core builds and unoptimized raster/layout
       # tests used 10-12.5 of this job's 15 minutes. The wgpu steps use all four
       # runner cores and opt-level 1, which keeps debug assertions and overflow

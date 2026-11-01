@@ -10,6 +10,9 @@ use std::{
     time::{Duration, Instant},
 };
 #[cfg(windows)]
+#[path = "frame_perf/battledome.rs"]
+mod battledome;
+#[cfg(windows)]
 #[path = "frame_perf/food.rs"]
 mod food;
 #[cfg(windows)]
@@ -289,9 +292,25 @@ fn main() {
     let mut args = std::env::args_os().skip(1);
     let first = args
         .next()
-        .expect("[--cpu-food|--zoom] new external output directory");
+        .expect(
+            "[--cpu-food|--zoom|--battledome|--battledome-presented|--battledome-live HOST:PORT] new external output directory",
+        );
     let result = if first == "--cpu-food" {
         food::run()
+    } else if first == "--battledome-live" {
+        let endpoint = args.next().expect("literal loopback host:port");
+        battledome::live(
+            endpoint.to_str().expect("UTF-8 endpoint"),
+            Path::new(&args.next().expect("new external output directory")),
+        )
+    } else if first == "--battledome-presented" {
+        battledome::presented(Path::new(
+            &args.next().expect("new external output directory"),
+        ))
+    } else if first == "--battledome" {
+        battledome::run(Path::new(
+            &args.next().expect("new external output directory"),
+        ))
     } else if first == "--zoom" {
         zoom::run(Path::new(
             &args.next().expect("new external output directory"),

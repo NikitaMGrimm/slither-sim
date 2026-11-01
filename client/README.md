@@ -42,7 +42,12 @@ Windows desktop (wgpu):
 npm run dev:desktop
 ```
 
-Press Enter to Play, Escape to Stop; use pointer/arrows and Space or mouse boost.
+Press Enter to Play; use pointer/arrows and Space or mouse boost.
+During play, Escape opens a small menu with **Leave game**. Escape again or click
+outside to dismiss it. The game keeps running: steering holds its last heading
+and boost is released until the menu closes. Leave game returns to login after
+the peer closes or the five-second close deadline. Enter during that wait queues
+another Play. Escape still cancels a pending connection.
 During play, the mouse wheel [zooms](docs/zoom.md) from 1.25 times the stock
 scale out to the whole map. Zoom lasts until the app closes.
 
@@ -66,6 +71,8 @@ Official play is interactive only: headless runs need `--server` without `--offi
 Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
 that copied the official login.
+The server's Setup selects protocol 13 or 19 for the connection; both use the
+same client core and stock login.
 
 The window opens on login, restoring saved appearance preferences. Explicit
 `--nickname` and `--skin` override restored values for that run. Change Skin opens

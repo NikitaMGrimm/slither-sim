@@ -133,13 +133,7 @@ impl Rasterizer {
         let key = (style.family, style.weight, style.slant);
         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
             let file = face_name(style);
-            let directory = if cfg!(target_os = "linux") {
-                "/usr/share/fonts/truetype/dejavu"
-            } else {
-                "C:/Windows/Fonts"
-            };
-            let bytes = std::fs::read(std::path::Path::new(directory).join(file))
-                .map_err(|e| format!("installed face ({file}): {e}"))?;
+            let bytes = font_bytes(style)?;
             let font = Font::from_bytes(bytes, FontSettings::default())
                 .map_err(|e| format!("font ({file}): {e}"))?;
             let metrics = font
@@ -356,4 +350,15 @@ pub fn face_name(style: TextStyle) -> &'static str {
         (Weight::Normal, Slant::Italic) => "DejaVuSans-Oblique.ttf",
         (Weight::Bold, Slant::Italic) => "DejaVuSans-BoldOblique.ttf",
     }
+}
+
+pub fn font_bytes(style: TextStyle) -> Result<Vec<u8>> {
+    let directory = if cfg!(target_os = "linux") {
+        "/usr/share/fonts/truetype/dejavu"
+    } else {
+        "C:/Windows/Fonts"
+    };
+    let file = face_name(style);
+    std::fs::read(std::path::Path::new(directory).join(file))
+        .map_err(|e| format!("installed face ({file}): {e}"))
 }

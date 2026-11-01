@@ -10,6 +10,30 @@ use crate::{
 };
 use slither_client::{presentation::*, state::Point};
 
+/// Passive diagnostic callback; it must not mutate presentation or submit work.
+#[cfg(feature = "frame-profile")]
+pub type PreparationObserver = fn(&'static str, u64);
+#[cfg(feature = "frame-profile")]
+thread_local! {
+    static PREPARATION_OBSERVER: std::cell::Cell<Option<PreparationObserver>> = const { std::cell::Cell::new(None) };
+}
+/// Install a calling-thread observer for finite profiling, returning the previous
+/// observer for restoration. This does not add records to latency-trace-v1.
+#[cfg(feature = "frame-profile")]
+pub fn set_preparation_observer(
+    observer: Option<PreparationObserver>,
+) -> Option<PreparationObserver> {
+    PREPARATION_OBSERVER.with(|slot| slot.replace(observer))
+}
+macro_rules! preparation_phase {
+    ($stage:literal, $identity:expr) => {{
+        #[cfg(feature = "frame-profile")]
+        if let Some(observer) = PREPARATION_OBSERVER.with(|slot| slot.get()) {
+            observer($stage, $identity);
+        }
+    }};
+}
+
 struct PreparationError(String);
 impl From<ClientPresentationError> for PreparationError {
     fn from(e: ClientPresentationError) -> Self {
@@ -67,6 +91,23 @@ pub fn dimensions(extent: [u32; 2], scale: f64) -> Result<[u32; 2]> {
         return Err("logical extent budget".into());
     }
     Ok(logical.map(|n| n as u32))
+}
+/// Convert body geometry coordinates to displayed logical pixels. Attachment
+/// resolution/MSAA do not affect this mapping. Use the larger axis so backing
+/// rounding cannot omit a shadow whose displayed diameter reaches four pixels.
+pub fn body_logical_scale(
+    extent: [u32; 2],
+    scale: f64,
+    window: Option<([u32; 2], f64)>,
+) -> Result<f64> {
+    dimensions(extent, scale)?;
+    let Some((physical, dpr)) = window else {
+        return Ok(1.);
+    };
+    dimensions(physical, dpr)?;
+    Ok((0..2)
+        .map(|axis| scale * f64::from(physical[axis]) / dpr / f64::from(extent[axis]))
+        .fold(0., f64::max))
 }
 fn image(asset: BodyAsset, x: f64, y: f64, w: f64, h: f64, alpha: f64) -> Draw {
     Draw {
@@ -777,6 +818,7 @@ pub fn prepare_gameplay(
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
     crate::latency::build("build_begin", identity);
+    preparation_phase!("build_begin", identity);
     let announcement = client.announcement_view();
     prepare_composed(
         client,
@@ -832,12 +874,14 @@ fn prepare_composed(
             },
         )
         .map_err(|e| e.0)?;
+    preparation_phase!("curves_end", identity);
     let view = BodyPaintView {
         camera: client.camera().position(),
         zoom: client.camera().zoom(),
         half_width: f64::from(extent[0]) / scale / 2.,
         half_height: f64::from(extent[1]) / scale / 2.,
     };
+    let body_pixels_per_unit = body_logical_scale(extent, scale, bank.overlay_viewport)?;
     let quality = BodyPaintQuality {
         high_quality: applied.high_quality,
         blend: applied.quality_blend,
@@ -893,6 +937,7 @@ fn prepare_composed(
         push_draw(&mut draws, draw)?;
     }
     let [early, late] = std::mem::take(&mut bank.food_commands);
+    preparation_phase!("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
     let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
@@ -917,6 +962,7 @@ fn prepare_composed(
             e.to_string()
         }
     })?;
+    preparation_phase!("food_end", identity);
     let eaters: Vec<_> = client
         .snake_objects()
         .map(|(token, _, _, snake)| {
@@ -955,6 +1001,7 @@ fn prepare_composed(
         }
     })?;
     let families = bank.bodies.clone();
+    preparation_phase!("prey_end", identity);
     let palettes: Vec<_> = families
         .iter()
         .map(|p| BodyPalette {
@@ -1004,7 +1051,7 @@ fn prepare_composed(
                 quality
             };
             let body_storage = std::mem::take(&mut bank.body_commands);
-            let body = plan_standard_body_with_storage(
+            let body = plan_standard_body_with_zoom_and_storage(
                 BodyPaintInput {
                     geometry: geometry.as_paint_geometry(),
                     recipe: BodyPaintRecipe {
@@ -1044,6 +1091,12 @@ fn prepare_composed(
                     .as_ref()
                     .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                 body_storage,
+                if cfg!(feature = "frame-profile-no-shadow-cut") {
+                    1.
+                } else {
+                    user_zoom
+                },
+                body_pixels_per_unit,
             )
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
@@ -1094,6 +1147,7 @@ fn prepare_composed(
     draws.extend(food.late.iter().map(Draw::from));
     draws.extend(prey_plan.late.iter().map(prey));
     bank.food_commands = [food.early, food.late];
+    preparation_phase!("bodies_end", identity);
     if let Some(boundary) = client.boundary()
         && let Some(edge) = plan_arena_edge_with_zoom(
             ArenaEdgeInput {
@@ -1169,6 +1223,7 @@ fn prepare_composed(
         }
     }
     let mut text_draws = Vec::new();
+    preparation_phase!("arena_end", identity);
     let mut text_resources = std::collections::BTreeMap::new();
     let name_zoom = user_zoom;
     for name in client
@@ -1232,6 +1287,7 @@ fn prepare_composed(
         inserted += count;
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
+    preparation_phase!("names_end", identity);
     let mut frame = Frame {
         identity,
         extent,
@@ -1252,12 +1308,14 @@ fn prepare_composed(
         snakes: Vec::new(),
     });
     let ui = overlay.as_mut().unwrap_or(&mut frame);
+    preparation_phase!("resources_end", identity);
     if let Some(view) = announcement {
         bank.announcement
             .append(view, &mut bank.text, ui, &mut resources)?;
     }
     bank.minimap
         .append(client, &mut bank.text, ui, &mut resources)?;
+    preparation_phase!("minimap_end", identity);
     // Mandatory overlays must fit in full; never silently truncate a panel.
     check_draw_count(frame.draws.len() + overlay.as_ref().map_or(0, |f| f.draws.len()))?;
     if resources

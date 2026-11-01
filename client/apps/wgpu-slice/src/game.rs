@@ -37,6 +37,8 @@ enum After {
     Opened,
     Challenged,
     Control,
+    #[cfg(not(target_arch = "wasm32"))]
+    Stopped,
 }
 struct Pending {
     effect: Effect,
@@ -162,6 +164,10 @@ pub struct LocalGame {
     pub bank: Bank,
     session: SessionPolicy,
     input: DesktopInput,
+    #[cfg(not(target_arch = "wasm32"))]
+    ingame_menu: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    stop_requested: bool,
     cursor: Option<Cursor>,
     zoom_pointer_projected: bool,
     policy: GameplayPolicy,
@@ -215,6 +221,10 @@ impl LocalGame {
             bank: Bank::new()?,
             session,
             input: DesktopInput::new(19.).map_err(|e| e.to_string())?,
+            #[cfg(not(target_arch = "wasm32"))]
+            ingame_menu: false,
+            #[cfg(not(target_arch = "wasm32"))]
+            stop_requested: false,
             cursor: None,
             zoom_pointer_projected: false,
             policy: GameplayPolicy::new(true, true, true, true, true, false),
@@ -473,7 +483,7 @@ impl LocalGame {
         if !now.is_finite() {
             return Err("Invalid host timestamp".into());
         }
-        if self.session.handshake_timed_out(now) {
+        if !self.stopping() && self.session.handshake_timed_out(now) {
             self.fail("Handshake timed out");
         }
         Ok(())
@@ -515,11 +525,16 @@ impl LocalGame {
                 self.session.challenged();
             }
             After::Control => self.control()?,
+            #[cfg(not(target_arch = "wasm32"))]
+            After::Stopped => {
+                self.has_socket = false;
+                self.stop_as(false, "Stopped");
+            }
         }
         Ok(())
     }
     fn active(&self, generation: u32) -> bool {
-        generation == self.generation && !self.session.terminal()
+        generation == self.generation && !self.session.terminal() && !self.stopping()
     }
     pub fn opened(&mut self, generation: u32, now: f64) -> Result<()> {
         if !self.active(generation) {
@@ -542,6 +557,81 @@ impl LocalGame {
     pub fn stop(&mut self) {
         self.stop_as(false, "Stopped");
     }
+    /// Native UI Stop waits for the transport's bounded close acknowledgement.
+    /// Keep the existing world/session until then, so redraws remain presentable.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn request_stop(&mut self) {
+        if self.stop_requested || self.session.terminal() {
+            return;
+        }
+        if !self.has_socket {
+            self.stop();
+            return;
+        }
+        self.close_ingame_menu();
+        self.stop_requested = true;
+        // Cancel a retained picture's session revision without publishing its
+        // world candidate, just as terminal teardown does before discarding work.
+        self.session.commit_control(self.has_socket);
+        self.effects.clear();
+        self.work = None;
+        self.input.leave_tick();
+        self.packet_frames.clear();
+        self.inflight = 0;
+        self.deferred.clear();
+        self.deferred_bytes = 0;
+        let _ = self.enqueue(EffectKind::Close, After::Stopped);
+    }
+    pub fn stopping(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.stop_requested
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            false
+        }
+    }
+    /// Native menu admission excludes setup, death and returning sessions.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn can_open_ingame_menu(&self) -> bool {
+        !self.stopping()
+            && self.phase() == Phase::Playing
+            && self.client.control_view().own.is_some_and(|own| !own.dead)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn ingame_menu_open(&self) -> bool {
+        self.ingame_menu && self.can_open_ingame_menu()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open_ingame_menu(&mut self, now: f64) -> Result<bool> {
+        if !self.can_open_ingame_menu() || self.ingame_menu_open() {
+            return Ok(false);
+        }
+        let release = self
+            .input
+            .release_controls(now)
+            .map_err(|e| e.to_string())?;
+        self.ingame_menu = true;
+        if !release.is_empty() {
+            self.enqueue(EffectKind::Send(release), After::None)?;
+        }
+        Ok(true)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn close_ingame_menu(&mut self) {
+        self.ingame_menu = false;
+    }
+    fn controls_captured(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.ingame_menu_open() || self.stopping()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            false
+        }
+    }
     pub fn fail(&mut self, message: &str) {
         latency::generation(self.generation);
         latency::event("game_failed", 0, 0, 0);
@@ -562,6 +652,12 @@ impl LocalGame {
         self.session.commit_control(self.has_socket);
         self.login.fill(0);
         self.login.clear();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.close_ingame_menu();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.stop_requested = false;
+        }
         self.effects.clear();
         self.work = None;
         self.input.leave_tick();
@@ -770,6 +866,52 @@ impl LocalGame {
             })
             .collect::<Result<_>>()?;
         let plan = session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        if decoded.command_count() == 1
+            && matches!(commands[0].opcode, b'F' | b'f' | b'b')
+            && self
+                .client
+                .received()
+                .setup
+                .as_ref()
+                .is_some_and(|s| matches!(s.protocol, 13 | 19))
+        {
+            // A single food spawn has no HUD/Setup output. Admit its empty
+            // session journal before the core's atomic append; HUD histories
+            // remain unchanged. See tests/food_ingress.rs for the flood
+            // regression: copying the growing world blocks later moves/pongs.
+            session.match_report(&[], 0).map_err(|e| e.0)?;
+            session.commit_controls().map_err(|e| e.0)?;
+            let rng = Cell::new(self.rng);
+            let applied = self
+                .client
+                .try_apply_single_food::<Ingress, _>(bytes, ElapsedHeader::Absent, |spawn, _| {
+                    let unit = || {
+                        let state =
+                            rng.get().wrapping_mul(1664525).wrapping_add(1013904223) & 0xffff_ffff;
+                        rng.set(state);
+                        #[cfg(feature = "feel-trace")]
+                        if let Some(trace) = &self.trace {
+                            trace.random("factory-unit", state as f64 / 4294967296.);
+                        }
+                        state as f64 / 4294967296.
+                    };
+                    Ok(self.bank.food(spawn.raw_color, [unit(), unit()]))
+                })
+                .map_err(|e| e.0)?;
+            if applied.is_some() {
+                self.session = session;
+                self.rng = rng.get();
+                #[cfg(feature = "feel-trace")]
+                if self.trace.is_some() {
+                    self.ingress_observations.push(now);
+                }
+                return Ok(());
+            }
+            // Batches and compositions without retained food use the ordinary
+            // transaction, including its complete session plan.
+            session = self.session.clone();
+            session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        }
         let guards: Vec<_> = plan
             .guards
             .iter()
@@ -1016,7 +1158,7 @@ impl LocalGame {
         }
         if self.work.is_some()
             || self.inflight != 0
-            || !self.effects.is_empty()
+            || (!self.effects.is_empty() && !self.stopping())
             || !self.packet_frames.is_empty()
         {
             return Ok(());
@@ -1083,7 +1225,7 @@ impl LocalGame {
             .session
             .advance_step(now, step.delta, f64::from(step.whole_steps))
             .map_err(|e| e.0)?;
-        if close {
+        if close && !self.stopping() {
             self.stop_as(false, "Life returned");
         }
         self.session.finish_step(self.has_socket);
@@ -1149,6 +1291,8 @@ impl LocalGame {
     }
     fn control(&mut self) -> Result<()> {
         loop {
+            let captured = self.controls_captured();
+            let stopping = self.stopping();
             let Some(w) = &mut self.work else {
                 return Ok(());
             };
@@ -1156,26 +1300,27 @@ impl LocalGame {
             let phase = w.phase;
             w.phase += 1;
             let packet = match phase {
-                0 => self
+                0 if !captured => self
                     .input
                     .keyboard_phase(now, 0.)
                     .map_err(|e| e.to_string())?,
+                0 => Vec::new(),
                 1 => {
-                    if self.session.ping_available() && self.session.ping_due(now) {
+                    if !stopping && self.session.ping_available() && self.session.ping_due(now) {
                         self.session.commit_ping(now)
                     } else {
                         Vec::new()
                     }
                 }
                 2 => {
-                    if self.input.view().own.is_some() {
+                    if self.input.view().own.is_some() && !stopping {
                         self.input.boost_phase(now).map_err(|e| e.to_string())?
                     } else {
                         Vec::new()
                     }
                 }
                 3 => {
-                    if self.input.view().own.is_some() {
+                    if self.input.view().own.is_some() && !captured {
                         self.refresh_zoom_pointer()?;
                         self.input.heading_phase(now).map_err(|e| e.to_string())?
                     } else {
@@ -1433,6 +1578,9 @@ impl LocalGame {
         Ok(())
     }
     pub fn key(&mut self, code: &str, down: bool) -> bool {
+        if self.controls_captured() {
+            return false;
+        }
         latency::generation(self.generation);
         let admitted = self.input.key(code, down);
         if admitted {
@@ -1449,7 +1597,8 @@ impl LocalGame {
     }
     /// Returns whether play consumed the wheel. Menus route their input first.
     pub fn wheel_zoom(&mut self, notches: f64) -> bool {
-        if self.phase() != Phase::Playing
+        if self.controls_captured()
+            || self.phase() != Phase::Playing
             || !notches.is_finite()
             || notches == 0.
             || self.client.control_view().own.is_none_or(|own| own.dead)
@@ -1533,6 +1682,9 @@ impl LocalGame {
         Ok(())
     }
     pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
+        if self.controls_captured() {
+            return self.observe_cursor(x, y, width, height);
+        }
         latency::generation(self.generation);
         let cursor = [x, y, width, height];
         let (mut stock_args, args) = self.pointer_args(cursor)?;

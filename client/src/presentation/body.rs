@@ -219,7 +219,7 @@ impl BodyGeometry {
             appearance.absolute_head.x,
             appearance.absolute_head.y,
         ])?;
-        if setup.protocol != 19
+        if !matches!(setup.protocol, 13 | 19)
             || setup.body_spacing <= 0.
             || !(0. ..=1.).contains(&setup.body_contraction)
             || appearance.absolute_body.len() > MAX_BODY_POINTS

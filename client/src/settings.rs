@@ -1,5 +1,5 @@
 //! Login-only settings and bounded persistence, independent of appearance and transport.
-use crate::{menu_controls::*, menu_preferences::MenuQuality, menu_theme::ControlStyle as S};
+use crate::{menu_controls::*, menu_preferences::MenuQuality};
 
 /// Bound host reads before parsing, including unknown future records.
 pub const MAX_SETTINGS_BYTES: usize = 64;
@@ -19,7 +19,7 @@ pub enum WorldResolution {
     /// Existing capped world raster and linear presentation blit.
     #[default]
     Original,
-    /// Physical-size attachment, resolving directly into the presentation image.
+    /// Physical-size attachment with bounded MSAA, resolving directly into presentation.
     Native,
 }
 
@@ -179,200 +179,28 @@ impl SettingsState {
     pub fn native_available(&mut self, available: bool) {
         self.native_available = available;
     }
-    /// Both independent settings, with readable wrapped help on narrow windows.
-    pub fn panel(&self, viewport: [f64; 2]) -> PanelView {
-        let width = 560_f64.min((viewport[0] - 32.).max(1.));
-        let narrow = width < 480.;
-        let height = if narrow { 512. } else { 400. };
-        let scale = crate::menu_transition::scale(self.alpha);
-        let x = (viewport[0] - width * scale) / 2.;
-        let y = ((viewport[1] - height) / 2.).max(8.) + height * (1. - scale) / 2.;
-        let mut controls = Vec::new();
-        let mut add = |id, rect: [f64; 4], style, text: &str, tab, kind| {
-            let mut placement =
-                Placement::rect(x + rect[0] * scale, y + rect[1] * scale, rect[2], rect[3]);
-            placement.scale = scale;
-            controls.push(Control {
-                id,
-                placement,
-                clip: None,
-                visible: true,
-                enabled: true,
-                alpha: 1.,
-                name: text.into(),
-                tab_order: tab,
-                style,
-                kind,
-            });
-        };
-        add(
-            ControlId(0),
-            [0., 0., width, height],
-            S::SettingsSurface,
-            "Settings",
-            None,
-            ControlKind::Surface,
-        );
-        add(
-            ControlId(1),
-            [24., 16., width - 48., 32.],
-            S::Heading,
-            "Settings",
-            None,
-            ControlKind::Label {
-                text: "Settings".into(),
-            },
-        );
-        for (row, id, name, caption, checked) in [
-            (
-                0,
-                QUALITY,
-                "Quality",
-                "High quality",
-                self.preferences.quality == MenuQuality::High,
-            ),
-            (
-                1,
-                RESOLUTION,
-                "World resolution",
-                "Native/sharp",
-                self.preferences.resolution == WorldResolution::Native,
-            ),
-        ] {
-            let top = if narrow {
-                56. + f64::from(row) * 136.
-            } else {
-                60. + f64::from(row) * 104.
-            };
-            add(
-                ControlId(6 + row),
-                [
-                    24.,
-                    top,
-                    if narrow { width - 48. } else { 168. },
-                    if narrow { 24. } else { 40. },
-                ],
-                S::HelpText,
-                name,
-                None,
-                ControlKind::Label { text: name.into() },
-            );
-            add(
-                id,
-                if narrow {
-                    [24., top + 28., width - 48., 40.]
-                } else {
-                    [196., top, width - 220., 40.]
-                },
-                S::SecondaryButton,
-                caption,
-                Some(row),
-                ControlKind::Toggle {
-                    label: caption.into(),
-                    checked,
-                },
-            );
-            let lines = if row == 0 {
-                ["Off: Low. High adapts to load.", "Next game."]
-            } else {
-                ["Sharper world; higher GPU use.", "Same view area."]
-            };
-            for (line, text) in lines.iter().enumerate() {
-                add(
-                    ControlId(10 + row * 2 + line as u16),
-                    [
-                        24.,
-                        top + if narrow { 72. } else { 44. } + line as f64 * 24.,
-                        width - 48.,
-                        24.,
-                    ],
-                    S::SettingsHelp,
-                    text,
-                    None,
-                    ControlKind::Label {
-                        text: (*text).into(),
-                    },
-                );
-            }
-        }
-        if self.preferences.resolution == WorldResolution::Native && !self.native_available {
-            let lines: &[&str] = if narrow {
-                &["Native unavailable", "at this size"]
-            } else {
-                &["Native unavailable at this size"]
-            };
-            for (i, text) in lines.iter().enumerate() {
-                add(
-                    ControlId(20 + i as u16),
-                    [
-                        24.,
-                        if narrow { 320. } else { 272. } + i as f64 * 24.,
-                        width - 48.,
-                        24.,
-                    ],
-                    S::SettingsHelp,
-                    text,
-                    None,
-                    ControlKind::Label {
-                        text: (*text).into(),
-                    },
-                );
-            }
-        }
-        if self.not_saved {
-            let lines: &[&str] = if narrow {
-                &["Not saved;", "applies this session"]
-            } else {
-                &["Not saved; applies this session"]
-            };
-            for (i, text) in lines.iter().enumerate() {
-                add(
-                    ControlId(24 + i as u16),
-                    [
-                        24.,
-                        if narrow { 376. } else { 304. } + i as f64 * 24.,
-                        width - 48.,
-                        24.,
-                    ],
-                    S::SettingsHelp,
-                    text,
-                    None,
-                    ControlKind::Label {
-                        text: (*text).into(),
-                    },
-                );
-            }
-        }
-        add(
-            DONE,
-            [(width - 112.) / 2., height - 56., 112., 40.],
-            S::PrimaryButton,
-            "Done",
-            Some(2),
-            ControlKind::Button {
-                label: "Done".into(),
-            },
-        );
-        let mut backdrop = controls[0].clone();
-        backdrop.id = BACKDROP;
-        backdrop.placement = Placement::rect(0., 0., viewport[0], viewport[1]);
-        backdrop.kind = ControlKind::Backdrop;
-        backdrop.name = "Settings backdrop".into();
-        backdrop.alpha = 0.88;
-        controls.insert(0, backdrop);
-        PanelView {
-            id: PANEL,
+    /// Explicit generation-bound action, shared by native widgets and offline tests.
+    pub fn intent(
+        &self,
+        control: ControlId,
+        checked: Option<bool>,
+        activation: Activation,
+    ) -> ControlIntent {
+        ControlIntent {
+            panel: PANEL,
             generation: self.generation,
-            placement: Placement::rect(0., 0., viewport[0], viewport[1]),
-            visible: self.visible(),
-            // Keep feedback through exit; activation independently rechecks `open`.
-            enabled: self.visible(),
-            alpha: self.alpha,
-            modal: self.visible(),
-            initial_focus: Some(QUALITY),
-            restore_focus: Some(crate::login_controls::SETTINGS),
-            controls,
+            control,
+            checked,
+            activation,
         }
+    }
+    /// A failed save is visible until a later explicit change succeeds.
+    pub fn not_saved(&self) -> bool {
+        self.not_saved
+    }
+    /// Capability status never changes the requested resolution.
+    pub fn native_unavailable(&self) -> bool {
+        self.preferences.resolution == WorldResolution::Native && !self.native_available
     }
 }
 /// Shared entry gate; no pending Play, return, champion, or missing route admission.

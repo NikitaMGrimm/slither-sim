@@ -22,6 +22,12 @@ pub mod menu_storage;
 pub mod skin_studio_native;
 // Same targets as the winit dependency (Cargo.toml); Linux builds only the GPU-free e2e probe.
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod egui_native;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod egui_theme;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod ingame_egui;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod login_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod menu_input_native;
@@ -36,6 +42,8 @@ pub mod render;
 pub mod scene;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod server_picker_native;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod settings_egui;
 pub mod text;
 pub mod wordmark;
 pub mod world_presenter;

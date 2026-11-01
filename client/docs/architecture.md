@@ -26,6 +26,12 @@ arena plans. Session and input policies own connection phases, timing, ping,
 turning and boost intents. HUD/menu owners retain scores, leaderboard, minimap,
 appearance and player-facing state.
 
+Setup selects the shared crate's protocol-13 or protocol-19 reader for the
+connection. The 13 adapter maps explicit IDs, coordinate anchors, all appearance
+deltas and absolute food keys into the same presentation inputs. A later Setup
+keeps the selected version; reset starts a new selection. HUD/minimap layouts
+are shared between the readers. Login and outbound command encoding are unchanged.
+
 Adapters execute socket, DOM and GPU effects outside Rust borrows and acknowledge
 successful work. Preserve packet ordering, arithmetic and transactional rollback
 when changing these boundaries; do not add another policy reducer in JavaScript.
@@ -72,6 +78,35 @@ The [menu resource layer](menu-resources.md) supplies native login controls and
 semantic local art. The [server picker](server-picker.md) uses shared directory
 and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
+
+Native Settings currently uses one lazy `egui_native::NativeEguiHost`. It owns
+the context, egui-winit adapter, ordered input, texture deltas, meshes and
+egui-wgpu renderer.
+Closed screens bypass translation, draining and context mutation. Window cursor,
+DPI, focus, modifier and held-key bookkeeping precedes input ownership; activation
+synchronizes the adapter from that state. Repeated key-down events are filtered
+before custom Tab traversal and egui processing.
+
+Settings and the native in-game Esc overlay use this host. `ingame_egui.rs` owns
+the single Leave game button and outside-click dismissal. `LocalGame` gates
+native steering while the overlay is open, releases held boost/turn debt at entry,
+and keeps the existing ping/presentation flow running. Leave and an unadmitted
+Esc queue the existing Close effect through `request_stop()`. The native effect
+owner reuses `begin_close()` and its five-second deadline before acknowledging
+that effect and running the existing session teardown/login return. Frames keep
+presenting while closing, with no new game sends; Enter retains a Play request
+until the old socket has been released. Dismissal samples the current window cursor
+without resetting heading cadence. Browser DOM menus are unchanged.
+`settings_egui.rs` owns layout and
+actions; the shared `settings::SettingsState` owns preferences, fade timing,
+generation checks and persistence. `egui_theme.rs` maps `MenuTheme` and installed
+fonts to egui style, with shared pill buttons, checkbox rows, titles and shadowed
+panel frames. Other screens will use the same host/frame callback and widgets
+after they are ported, without another context, input adapter or render pass
+integration. The host paints
+after existing composition and before presentation on the same device and queue.
+Other native menus retain their adapters until ported; browser menus retain DOM
+controls. See [Settings](settings.md) and [dependency licences](egui-licenses.md).
 
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
