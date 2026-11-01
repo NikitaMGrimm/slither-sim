@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { InputHasher } from './gpu-trace-hashes.mjs';
+import { mkdtemp, mkdir, open, rm, symlink, writeFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createGzip, gzipSync } from 'node:zlib';
+import { InputHasher, loadTracePayload, MAX_PAYLOAD_BYTES } from './gpu-trace-hashes.mjs';
 const id = pointer => ({ PointerId: [pointer] });
 function actions({ pointer = 1, byte = 1, size = 512, reverse = false, path = 'first' } = {}) {
   const pass = label => ({ RunRenderPass: { pass: { label, commands: [
@@ -82,4 +89,57 @@ test('opaque address reuse creates a new resource identity within the frame', as
     return stream;
   };
   assert.equal((await collect(input(1))).combined_sha256, (await collect(input(600))).combined_sha256);
+});
+
+async function traceFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'gpu-trace-hash-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const root = join(directory, 'trace');
+  await mkdir(root);
+  return { root, directory };
+}
+
+test('oversized raw and compressed files fail the size check before reading', async t => {
+  const { root } = await traceFixture(t);
+  for (const name of ['raw.bin', 'compressed.bin.gz']) {
+    const file = await open(join(root, name), 'wx');
+    try { await file.truncate(MAX_PAYLOAD_BYTES + 1); } finally { await file.close(); }
+  }
+  await assert.rejects(loadTracePayload(root, 'raw.bin'), /GPU payload exceeds diagnostic bound/);
+  await assert.rejects(loadTracePayload(root, 'compressed.bin'), /GPU payload exceeds diagnostic bound/);
+  await writeFile(join(root, 'ok.bin.gz'), gzipSync(Buffer.from('authored payload')));
+  assert.deepEqual(await loadTracePayload(root, 'ok.bin'), Buffer.from('authored payload'));
+});
+
+test('decompression enforces the output bound and retains the ENOENT-only fallback', async t => {
+  const { root } = await traceFixture(t);
+  const block = Buffer.alloc(1024 * 1024);
+  async function* oversized() {
+    for (let size = 0; size < MAX_PAYLOAD_BYTES; size += block.length) yield block;
+    yield Buffer.from([0]);
+  }
+  await pipeline(Readable.from(oversized()), createGzip(), createWriteStream(join(root, 'large.bin.gz')));
+  await assert.rejects(loadTracePayload(root, 'large.bin'), /GPU payload exceeds diagnostic bound/);
+  await writeFile(join(root, 'broken.bin.gz'), Buffer.from('invalid gzip'));
+  await assert.rejects(loadTracePayload(root, 'broken.bin'), { code: 'Z_DATA_ERROR' });
+});
+
+test('real paths confine raw and gzip symlinks to the trace root', async t => {
+  const { root, directory } = await traceFixture(t);
+  const outside = join(directory, 'outside.bin');
+  await writeFile(outside, Buffer.from('outside trace'));
+  try { await symlink(outside, join(root, 'escape.bin'), 'file'); } catch (error) {
+    if (error.code === 'EPERM' || error.code === 'ENOSYS') {
+      t.skip('File symlinks are unavailable to this account');
+      return;
+    }
+    throw error;
+  }
+  await assert.rejects(loadTracePayload(root, 'escape.bin'), /outside trace directory/);
+  await symlink(outside, join(root, 'escape-gzip.bin.gz'), 'file');
+  await assert.rejects(loadTracePayload(root, 'escape-gzip.bin'), /outside trace directory/);
+  await writeFile(join(root, 'inside.bin'), Buffer.from('inside trace'));
+  await symlink(join(root, 'inside.bin'), join(root, 'inside-link.bin'), 'file');
+  assert.deepEqual(await loadTracePayload(root, 'inside-link.bin'), Buffer.from('inside trace'));
+  await assert.rejects(loadTracePayload(root, '../outside.bin'), /outside trace directory/);
 });

@@ -1,13 +1,50 @@
 // Offline hashing of typed wgpu-30 API actions, never a reconstruction of Draws.
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
+import { open, realpath, writeFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
-import { resolve, relative, isAbsolute, basename } from 'node:path';
+import { resolve, relative, isAbsolute, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+export const MAX_PAYLOAD_BYTES = 128 * 1024 * 1024;
+const payloadBound = () => Error('GPU payload exceeds diagnostic bound');
+
+async function confinedFile(root, name) {
+  if (basename(name) !== name) throw Error('Payload outside trace directory');
+  const path = await realpath(resolve(root, name)), rel = relative(root, path);
+  if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) throw Error('Payload outside trace directory');
+  return path;
+}
+
+async function readBounded(path) {
+  const file = await open(path, 'r');
+  try {
+    if ((await file.stat()).size > MAX_PAYLOAD_BYTES) throw payloadBound();
+    const chunks = [];
+    let size = 0;
+    // The stream bound also holds if a file grows after the initial size check.
+    for await (const chunk of file.createReadStream({ autoClose: false })) {
+      size += chunk.length;
+      if (size > MAX_PAYLOAD_BYTES) throw payloadBound();
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks, size);
+  } finally { await file.close(); }
+}
+
+export async function loadTracePayload(trace, name) {
+  const root = await realpath(resolve(trace));
+  try { return await readBounded(await confinedFile(root, name)); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  const compressed = await readBounded(await confinedFile(root, `${name}.gz`));
+  try { return gunzipSync(compressed, { maxOutputLength: MAX_PAYLOAD_BYTES }); } catch (error) {
+    if (error.code === 'ERR_BUFFER_TOO_LARGE') throw payloadBound();
+    throw error;
+  }
+}
 const stable = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
   ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 const idOf = value => {
@@ -27,10 +64,15 @@ export class InputHasher {
   async data(data) {
     let bytes;
     if (Object.hasOwn(data, 'File')) bytes = await this.loadData(data.File);
-    else if (Object.hasOwn(data, 'Binary')) bytes = Buffer.from(data.Binary[1]);
-    else if (Object.hasOwn(data, 'String')) bytes = Buffer.from(data.String[1], 'utf8');
+    else if (Object.hasOwn(data, 'Binary')) {
+      if (data.Binary[1].length > MAX_PAYLOAD_BYTES) throw payloadBound();
+      bytes = Buffer.from(data.Binary[1]);
+    } else if (Object.hasOwn(data, 'String')) {
+      if (Buffer.byteLength(data.String[1], 'utf8') > MAX_PAYLOAD_BYTES) throw payloadBound();
+      bytes = Buffer.from(data.String[1], 'utf8');
+    }
     else throw Error('Unknown GPU payload representation');
-    if (bytes.length > 128 * 1024 * 1024) throw Error('GPU payload exceeds diagnostic bound');
+    if (bytes.length > MAX_PAYLOAD_BYTES) throw payloadBound();
     const record = { bytes: bytes.length, sha256: digest(bytes) };
     this.payloads.push({ file: data.File ?? null, ...record });
     return record;
@@ -177,16 +219,9 @@ export class InputHasher {
 }
 
 export async function hashTrace(converter, trace, output) {
-  const root = resolve(trace), reports = [];
-  const load = async name => {
-    const path = resolve(root, name), rel = relative(root, path);
-    if (isAbsolute(rel) || rel.startsWith('..') || basename(name) !== name) throw Error('Payload outside trace directory');
-    try { return await readFile(path); } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      return gunzipSync(await readFile(`${path}.gz`));
-    }
-  };
-  const process = spawn(converter, [resolve(root, 'trace.ron')], { windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] });
+  const root = await realpath(resolve(trace)), reports = [];
+  const load = name => loadTracePayload(root, name);
+  const process = spawn(converter, [await confinedFile(root, 'trace.ron')], { windowsHide: true, stdio: ['ignore', 'pipe', 'inherit'] });
   const completion = new Promise((ok, fail) => { process.once('error', fail); process.once('exit', code => code === 0 ? ok() : fail(Error(`Trace converter exit ${code}`))); });
   completion.catch(() => {});
   const hasher = new InputHasher(load, row => reports.push(row));
