@@ -70,8 +70,29 @@ fn setup_and_appearance_round_trip_with_fixed_raw_fields_and_all_body_pairs() {
         panic!()
     };
     assert_eq!(
-        (s.protocol, s.grid_center, s.radius, s.body_spacing),
-        (13, 32550, Some(1800), 42)
+        s,
+        SetupRef {
+            command: &setup,
+            protocol: 13,
+            grid_center: 32550,
+            max_segments: 430,
+            sector_size: 300,
+            sector_count: 217,
+            spangdv: 48,
+            nsp1: 539,
+            nsp2: 40,
+            nsp3: 1400,
+            mamu: 33,
+            // The supplied turn rate quantizes to zero at the 8 ms reference frame.
+            mamu2: 0,
+            contraction: 430,
+            body_spacing: 42,
+            server_number: Some(1),
+            radius: Some(1800),
+            game_mode: None,
+            team: None,
+            extensions: &[],
+        }
     );
     for id in [9, 17] {
         let p = appearance(&mut encoder, id);
