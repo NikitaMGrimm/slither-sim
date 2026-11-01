@@ -7,7 +7,8 @@ use std::{
 };
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
-    event::{DeviceId, WindowEvent},
+    event::{DeviceId, ElementState, WindowEvent},
+    keyboard::{Key, NamedKey},
 };
 
 struct Counted;
@@ -63,6 +64,8 @@ fn closed_callbacks(host: &mut NativeEguiHost) {
             );
         }
         host.set_active(false);
+        host.synthetic_key(&Key::Named(NamedKey::Space), ElementState::Pressed);
+        host.synthetic_key(&Key::Named(NamedKey::Space), ElementState::Released);
         host.cancel_pointer();
         host.step(i as f64);
     }

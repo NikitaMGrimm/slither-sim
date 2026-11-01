@@ -586,6 +586,210 @@ fn adapter_format_repeated_down_does_not_repeat_activation_or_traversal() {
 }
 
 #[test]
+fn native_synthetic_refocus_press_does_not_activate_or_traverse_on_repeat() {
+    use winit::event::WindowEvent;
+    for (native, key) in [
+        (NamedKey::Enter, egui::Key::Enter),
+        (NamedKey::Space, egui::Key::Space),
+        (NamedKey::Tab, egui::Key::Tab),
+    ] {
+        let mut login = settled();
+        login.open_settings(true);
+        let native = Key::Named(native);
+        login.egui.window.key(&native, ElementState::Pressed);
+        adapter_key(&mut login, key, true, false);
+        let quality = login.state.settings.preferences().quality;
+
+        login.egui.window.observe(&WindowEvent::Focused(false), 1.);
+        login.settings_input(egui::RawInput {
+            focused: false,
+            events: vec![egui::Event::WindowFocused(false)],
+            ..Default::default()
+        });
+        // Windows synthesizes releases on blur; egui-winit forwards releases.
+        login.egui.synthetic_key(&native, ElementState::Released);
+        login.settings_input(egui::RawInput {
+            focused: false,
+            events: vec![egui::Event::Key {
+                key,
+                physical_key: Some(key),
+                pressed: false,
+                repeat: false,
+                modifiers: egui::Modifiers::NONE,
+            }],
+            ..Default::default()
+        });
+        login.egui.window.observe(&WindowEvent::Focused(true), 1.);
+        login.settings_input(egui::RawInput {
+            events: vec![egui::Event::WindowFocused(true)],
+            ..Default::default()
+        });
+        let focus = login.settings_ui.focused();
+        assert!(focus.is_some());
+        // This production hook sees the native synthetic press that egui-winit
+        // intentionally drops. There is no corresponding egui Key event.
+        login.egui.synthetic_key(&native, ElementState::Pressed);
+        for _ in 0..10 {
+            login.egui.window.key(&native, ElementState::Pressed);
+            adapter_key(&mut login, key, true, false);
+            assert_eq!(login.state.settings.preferences().quality, quality);
+            assert_eq!(login.settings_ui.focused(), focus);
+        }
+        login.egui.window.key(&native, ElementState::Released);
+        adapter_key(&mut login, key, false, false);
+        login.egui.window.key(&native, ElementState::Pressed);
+        adapter_key(&mut login, key, true, false);
+        if key == egui::Key::Tab {
+            assert_ne!(login.settings_ui.focused(), focus);
+        } else {
+            assert_ne!(login.state.settings.preferences().quality, quality);
+        }
+    }
+}
+
+fn wheel(delta: f32) -> egui::Event {
+    egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0., delta),
+        phase: egui::TouchPhase::Move,
+        source: egui::MouseWheelSource::Unknown,
+        modifiers: egui::Modifiers::NONE,
+    }
+}
+
+#[test]
+fn wheel_bursts_wait_for_one_redraw_without_changing_focus_or_preferences() {
+    let mut login = settled();
+    login.prepare([640, 360], true, None).unwrap();
+    login.open_settings(true);
+    login.step(10_000., true, false).unwrap();
+    login.prepare([640, 360], true, None).unwrap();
+    let context = login.egui.context().unwrap().clone();
+    let id = login.settings_ui.scroll_id.unwrap();
+    let offset = || {
+        egui::scroll_area::State::load(&context, id)
+            .unwrap()
+            .clamped_offset()
+            .y
+    };
+    let pos = point(&login, QUALITY, [640., 360.]);
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::PointerMoved(egui::pos2(
+            pos[0] as f32,
+            pos[1] as f32,
+        ))],
+        ..Default::default()
+    });
+    let passes = context.cumulative_pass_nr();
+    let before = offset();
+    let focus = login.settings_ui.focused();
+    let quality = login.state.settings.preferences().quality;
+    for _ in 0..1000 {
+        login.settings_input(egui::RawInput {
+            events: vec![wheel(-0.5)],
+            ..Default::default()
+        });
+    }
+    assert_eq!(context.cumulative_pass_nr(), passes);
+    assert_eq!(offset(), before);
+    login.step(10_016., true, false).unwrap();
+    login.prepare([640, 360], true, None).unwrap();
+    assert_eq!(context.cumulative_pass_nr(), passes + 1);
+    assert!(offset() > before);
+    assert_eq!(login.settings_ui.focused(), focus);
+    assert_eq!(login.state.settings.preferences().quality, quality);
+}
+
+#[test]
+fn wheel_and_click_keep_callback_and_raw_batch_order() {
+    for bundled in [false, true] {
+        for wheel_first in [false, true] {
+            let mut login = settled();
+            login.prepare([640, 360], true, None).unwrap();
+            login.open_settings(true);
+            login.step(10_000., true, false).unwrap();
+            login.prepare([640, 360], true, None).unwrap();
+            let context = login.egui.context().unwrap().clone();
+            let id = login.settings_ui.scroll_id.unwrap();
+            let offset = || {
+                egui::scroll_area::State::load(&context, id)
+                    .unwrap()
+                    .clamped_offset()
+                    .y
+            };
+            let before = offset();
+            let pos = point(&login, QUALITY, [640., 360.]);
+            let pos = egui::pos2(pos[0] as f32, pos[1] as f32);
+            let button = |pressed| egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            };
+            let mut events = vec![egui::Event::PointerMoved(pos)];
+            if wheel_first {
+                events.push(wheel(-0.5));
+            }
+            events.extend([button(true), button(false)]);
+            if !wheel_first {
+                events.push(wheel(-0.5));
+            }
+            if bundled {
+                login.settings_input(egui::RawInput {
+                    events,
+                    ..Default::default()
+                });
+            } else {
+                for event in events {
+                    login.settings_input(egui::RawInput {
+                        events: vec![event],
+                        ..Default::default()
+                    });
+                }
+            }
+            assert_eq!(login.state.settings.preferences().quality, Q::Low);
+            assert_eq!(login.settings_ui.focused(), Some(QUALITY));
+            assert_eq!(
+                login.state.settings.preferences().resolution,
+                slither_client::settings::WorldResolution::Original
+            );
+            assert!(!context.input(|input| input.pointer.any_down()));
+            if wheel_first {
+                assert!(offset() > before);
+            } else {
+                assert_eq!(offset(), before);
+            }
+            login.prepare([640, 360], true, None).unwrap();
+            assert!(offset() > before);
+            assert_eq!(login.state.settings.preferences().quality, Q::Low);
+        }
+    }
+}
+
+#[test]
+fn ime_preedit_and_commit_keep_immediate_passes() {
+    let mut login = settled();
+    login.open_settings(true);
+    let context = login.egui.context().unwrap().clone();
+    for event in [
+        egui::ImeEvent::Preedit {
+            text: "authored".into(),
+            active_range_chars: None,
+        },
+        egui::ImeEvent::Commit("authored".into()),
+    ] {
+        let passes = context.cumulative_pass_nr();
+        login.settings_input(egui::RawInput {
+            events: vec![egui::Event::Ime(event)],
+            ..Default::default()
+        });
+        assert_eq!(context.cumulative_pass_nr(), passes + 1);
+    }
+    assert!(login.state.settings.is_open());
+    assert_eq!(login.state.settings.preferences().quality, Q::High);
+}
+
+#[test]
 fn genuine_adapter_callbacks_preserve_activation_order_before_redraw() {
     let mut login = settled();
     login.open_settings(true);

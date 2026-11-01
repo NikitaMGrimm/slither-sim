@@ -49,17 +49,22 @@ pointer release and Enter/Space carry an explicit next value into the same
 generation-checked settings owner. The host tracks ordered held-key state before
 egui processing, including egui-winit auto-repeat events marked `repeat: false`.
 A held opener cannot activate the new screen; key releases and blur reset the
-gate. Tab/Shift+Tab wrap
+gate. Native synthetic key presses on refocus restore the held-key gate before
+egui-winit suppresses those presses, so a still-held key cannot activate again.
+Tab/Shift+Tab wrap
 without an unfocused frame. Blur, resize, DPI changes and a new mount cancel
 pointer capture. Nickname composition blocks entry; the modal releases gameplay
 holds and disables nickname IME. Native accessibility bridging remains separate.
 
-Pointer motion and modifier-only callbacks queue for the next frame. Discrete
-actions run layout/action passes in callback order: batching Space, Tab, Space
+Pointer motion, modifier changes and wheel/touchpad bursts queue for the next
+frame. Discrete actions run layout/action passes in callback order: batching Space, Tab, Space
 into one pass would retarget the first activation to the final focus. Only the
 final shapes are tessellated at paint, once per redraw. Pointer press/release
 boundaries flush queued events first, including within one raw input batch, so
-a scrollbar drag can start and apply motion before release ends it.
+a scrollbar drag can start and apply motion before release ends it. The same
+boundaries preserve wheel-before-click and click-before-wheel ordering. IME
+Preedit/Commit still run immediate passes; Settings has no editable field, and
+composition ordering/cost remains a validation task for editable-menu ports.
 
 Offline tests cover record precedence, write failures, entry/return focus,
 modality, capture cancellation and Play snapshots. Layout tests check containment,

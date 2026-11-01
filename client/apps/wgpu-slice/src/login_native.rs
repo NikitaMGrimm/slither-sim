@@ -366,10 +366,11 @@ impl NativeLogin {
                     | egui::Event::MouseMoved(_)
                     | egui::Event::PointerGone
                     | egui::Event::ModifiersChanged(_)
+                    | egui::Event::MouseWheel { .. }
             )
         });
         self.egui.input(input);
-        // Queue motion/modifier-only callbacks for redraw. Discrete actions must
+        // Queue motion/modifier/wheel callbacks for redraw. Discrete actions must
         // stay ordered: batching Space -> Tab -> Space retargets the first press.
         if discrete {
             self.settings_frame();

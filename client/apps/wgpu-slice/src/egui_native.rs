@@ -201,6 +201,16 @@ impl NativeEguiHost {
                 .as_ref()
                 .is_some_and(|s| !s.input.events.is_empty())
     }
+    pub fn synthetic_key(&mut self, key: &NativeKey, state: ElementState) {
+        self.window.key(key, state);
+        // egui-winit drops synthetic presses on refocus. Seed the repeat gate
+        // from native state so the next auto-repeat cannot become a fresh press.
+        if self.active
+            && let Some(s) = &mut self.session
+        {
+            s.held = self.window.held;
+        }
+    }
     fn adapter(&mut self, window: &Window) -> Option<&mut egui_winit::State> {
         let modifiers = self.window.modifiers;
         let cursor = self.window.physical_cursor;
@@ -242,6 +252,14 @@ impl NativeEguiHost {
         translate: impl FnOnce(&mut Self) -> R,
     ) -> Option<R> {
         self.window.observe(event, dpr);
+        if let WindowEvent::KeyboardInput {
+            event,
+            is_synthetic: true,
+            ..
+        } = event
+        {
+            self.synthetic_key(&event.logical_key, event.state);
+        }
         if self.active {
             Some(translate(self))
         } else {
