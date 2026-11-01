@@ -462,7 +462,23 @@ impl FoodWorld {
             .ok_or(FoodError::SerialExhausted)?;
         let instance = FoodInstance(serial);
         let food = create(instance, spawn, input)?;
-        let foods = Arc::make_mut(&mut self.foods);
+        if Arc::get_mut(&mut self.foods).is_none() {
+            // Reserve the detached array fallibly before cloning its numeric
+            // records. Arc::make_mut would allocate the full copy infallibly.
+            let mut foods = Vec::new();
+            let capacity = self
+                .foods
+                .len()
+                .saturating_mul(2)
+                .max(self.foods.len() + 1)
+                .min(MAX_RETAINED_FOODS);
+            foods
+                .try_reserve(capacity)
+                .map_err(|_| FoodError::Allocation)?;
+            foods.extend_from_slice(&self.foods);
+            self.foods = Arc::new(foods);
+        }
+        let foods = Arc::get_mut(&mut self.foods).expect("unique food array");
         foods.try_reserve(1).map_err(|_| FoodError::Allocation)?;
         foods.push(food);
         self.last_instance_serial = serial;

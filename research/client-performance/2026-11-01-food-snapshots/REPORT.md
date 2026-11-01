@@ -142,8 +142,8 @@ separate server/network rubber-banding cause, and smoothing was not changed.
 A separate trace-enabled candidate replay completed all 32,106 messages and 366
 callbacks, without dropped trace records or picture skips. It took 26.32 seconds
 under concurrent checks; these diagnostic durations are excluded from the primary
-performance comparison. Of 26.0 seconds inside callbacks, ingress accounted for
-16.8 seconds and redraw preparation for 9.2 seconds. The outer ingress snapshot
+performance comparison. Of 26.2495 seconds inside callbacks, ingress accounted for
+16.5740 seconds and redraw preparation for 9.1728 seconds. The outer ingress snapshot
 observer accounted for 3.46 seconds, and core apply after that snapshot for 11.00
 seconds. Initial borrowed frame decode/session-header work was only 5.8 ms total.
 
@@ -206,8 +206,28 @@ GPU were not tested. Windows socket aborts remain unattributed.
   before measurement and retained separately. Final executable identities above
   come from forced-fresh builds; the stale artifact is excluded.
 - Focused authored food tests: 18 food-world + 8 client-food tests passed.
-- Native food-ingress tests: 4 passed; 2 manual timing cases intentionally ignored.
+- Native food-ingress tests: 5 passed; 2 manual timing cases intentionally ignored.
   The new 6,000-food/three-snapshot allocation regression requests 1,395,471 bytes,
   below one full 2,544,000-byte food array, with exact client-value equality.
 - `npm test` and seven documentation checks passed. Full `npm run check` is
-  running at PR opening; its result will be recorded before handoff.
+  progressing through its remaining checks; completed stages passed.
+- The exact Windows CI strict Clippy command passes locally:
+  `cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --features latency-rig --all-targets -- -D warnings`,
+  with CI dev optimization/debug settings and this task's dedicated target/two-job limit.
+
+### Review corrections after the measured candidate
+
+The independent review approved snapshot isolation, edge cases and measurement
+validity at the original PR head. Follow-up corrections make shared food-spawn
+array detachment fallible before publication, add allocation-failure injection
+through production LocalGame for protocols 13/19, fix the Windows strict-Clippy
+slice-size assertion and correct the retained diagnostic stage totals above.
+The injected failed allocation preserves the complete frozen client; retrying the
+same packet succeeds once. The detached array retains geometric spare capacity
+so the existing singleton flood allocation bounds still apply.
+
+The timing/executable identities above remain the measured pre-correction
+candidate. Successful packet/presentation semantics are unchanged by these review
+fixes; final-head timing has not been rerun. The new reservation may change
+allocation capacity, so the historical allocation totals are not relabelled as
+measurements of the review-corrected head.
