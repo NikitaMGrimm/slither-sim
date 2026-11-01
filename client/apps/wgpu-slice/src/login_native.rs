@@ -18,6 +18,9 @@ use slither_client::{
 pub struct NativeLogin {
     pub egui: crate::egui_native::NativeEguiHost,
     pub settings_ui: crate::settings_egui::SettingsUi,
+    pub ingame_ui: crate::ingame_egui::InGameUi,
+    ingame_visible: bool,
+    ingame_viewport: ([u32; 2], f64),
     settings_storage: crate::menu_storage::SettingsStorage,
     pub studio: crate::skin_studio_native::SkinStudioNative,
     pub input: NativeMenuInput,
@@ -40,7 +43,8 @@ impl NativeLogin {
         self.state.view(true).visible || self.champion_session.death_pending
     }
     pub fn blocks_gameplay(&self) -> bool {
-        self.picker.policy.visible()
+        self.ingame_visible
+            || self.picker.policy.visible()
             || self.champion.policy.visible()
             || matches!(
                 self.state.view(true).phase,
@@ -89,6 +93,9 @@ impl NativeLogin {
         Ok(Self {
             egui: Default::default(),
             settings_ui: Default::default(),
+            ingame_ui: Default::default(),
+            ingame_visible: false,
+            ingame_viewport: ([960, 540], 1.),
             settings_storage: crate::menu_storage::SettingsStorage::at(None),
             studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
@@ -118,7 +125,8 @@ impl NativeLogin {
         let settings_visible = self.state.settings.visible();
         self.state.settings.step(now).map_err(str::to_owned)?;
         self.egui.step(now);
-        self.egui.set_active(self.state.settings.visible());
+        self.egui
+            .set_active(self.state.settings.visible() || self.ingame_visible);
         if let Some(record) = self.state.settings.take_write() {
             self.state
                 .settings
@@ -182,6 +190,15 @@ impl NativeLogin {
         self.state.attempt_ended(phase)
     }
     pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        let opened = game.ingame_menu_open() && !self.ingame_visible;
+        self.ingame_visible = game.ingame_menu_open();
+        self.egui
+            .set_active(self.state.settings.visible() || self.ingame_visible);
+        if opened {
+            self.controls.blur();
+            self.panel.visible = false;
+            self.egui.focus(crate::ingame_egui::leave_id());
+        }
         self.champion_session = game.champion_session();
         self.champion.observe(game);
         if self.champion.policy.finished() {
@@ -190,6 +207,100 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
+        Ok(())
+    }
+    /// Esc admission is shared by the desktop callback and CPU-only session tests.
+    pub fn ingame_key(
+        &mut self,
+        game: &mut crate::game::LocalGame,
+        event: crate::menu_input_native::KeyInput<'_>,
+        now: f64,
+    ) -> Result<bool> {
+        use winit::{
+            event::ElementState,
+            keyboard::{KeyCode, PhysicalKey},
+        };
+        if event.physical == PhysicalKey::Code(KeyCode::Escape)
+            && event.state == ElementState::Pressed
+            && !event.repeat
+        {
+            return self.open_ingame_menu(game, now);
+        }
+        Ok(false)
+    }
+    pub fn open_ingame_menu(
+        &mut self,
+        game: &mut crate::game::LocalGame,
+        now: f64,
+    ) -> Result<bool> {
+        if !self.zoom_input_available() || !game.open_ingame_menu(now)? {
+            return Ok(false);
+        }
+        self.observe_game(game)?;
+        // Establish the modal layer and its centred geometry before the next input.
+        self.ingame_frame(game)?;
+        self.ingame_frame(game)?;
+        Ok(true)
+    }
+    pub fn prepare_ingame(
+        &mut self,
+        game: &mut crate::game::LocalGame,
+        extent: [u32; 2],
+        dpr: f64,
+    ) -> Result<()> {
+        if !game.ingame_menu_open() {
+            return Ok(());
+        }
+        if self.ingame_viewport != (extent, dpr) {
+            self.egui.cancel_pointer();
+        }
+        self.ingame_viewport = (extent, dpr);
+        self.ingame_frame(game)
+    }
+    fn ingame_frame(&mut self, game: &mut crate::game::LocalGame) -> Result<()> {
+        if !game.ingame_menu_open() {
+            return Ok(());
+        }
+        let mut action = None;
+        let (extent, dpr) = self.ingame_viewport;
+        self.egui
+            .frame(extent, dpr, &[crate::ingame_egui::leave_id()], |ctx, _| {
+                action = self.ingame_ui.show(ctx)
+            });
+        self.egui.check_error()?;
+        match action {
+            Some(crate::ingame_egui::Action::Leave) => game.stop(),
+            Some(crate::ingame_egui::Action::Dismiss) => {
+                game.close_ingame_menu();
+                let cursor = self.egui.window.cursor();
+                let area = extent.map(|n| f64::from(n) / dpr);
+                game.pointer(cursor[0], cursor[1], area[0], area[1], false)?;
+            }
+            None => {}
+        }
+        self.observe_game(game)
+    }
+    pub fn ingame_input(
+        &mut self,
+        game: &mut crate::game::LocalGame,
+        mut input: egui::RawInput,
+    ) -> Result<()> {
+        // Keep discrete actions ordered, including press/release in one host batch.
+        let events = std::mem::take(&mut input.events);
+        for event in events {
+            if !game.ingame_menu_open() {
+                break;
+            }
+            let discrete = !matches!(
+                event,
+                egui::Event::PointerMoved(_) | egui::Event::MouseMoved(_)
+            );
+            input.events.push(event);
+            self.egui.input(input.take());
+            if discrete {
+                self.ingame_frame(game)?;
+            }
+        }
         Ok(())
     }
     pub fn sync_return_focus(&mut self, admission: bool) -> Vec<HostEditEffect> {
@@ -801,8 +912,9 @@ impl NativeLogin {
         }
         self.layout = fresh;
         self.area = area;
-        self.egui.set_active(self.state.settings.visible());
-        if self.egui.active() {
+        self.egui
+            .set_active(self.state.settings.visible() || self.ingame_visible);
+        if self.state.settings.visible() {
             self.settings_frame();
             self.egui.check_error()?;
             if self.state.settings.alpha() == 1. {

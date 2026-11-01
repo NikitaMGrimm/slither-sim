@@ -6,8 +6,9 @@ Login, with no pending Play, champion editor, skin studio or picker. Its shared
 modal backdrop replaces login content and the wordmark. Tab wraps Quality →
 World resolution → Done;
 Enter/Space activates the focused control. Done and Escape close and restore
-Settings focus. Outside clicks close on matching release. In-game Escape remains Stop/cancel.
-Settings is the first screen on the shared native egui 0.37 host. Other native
+Settings focus. Outside clicks close on matching release. During play, Escape
+opens the single-action Leave game overlay; it still cancels a pending connection.
+Settings shares the native egui 0.37 host with that overlay. Other native
 menus retain their adapters until ported, and browser hosts retain DOM controls. Settings uses the
 shared picker transition timing: 400 ms in, 320 ms out, with a 40 ms step cap.
 The outgoing panel keeps input until its fade finishes. Keyboard zoom is disabled;

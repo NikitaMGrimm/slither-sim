@@ -13,7 +13,8 @@ npm run dev:desktop
 
 If slither-sim is not on PATH, set SLITHER_SIM or run
 `npm run dev:desktop -- --simulator <path>`.
-Enter starts Play, Escape stops; pointer/arrows/Space and mouse boost feed the
+Enter starts Play, Escape opens the in-game Leave game menu (or cancels connecting);
+pointer/arrows/Space and mouse boost feed the
 shared input policy. Game sessions start only on Play, and reconnect is explicit.
 Use `--server host:port` for a simulator elsewhere (IPv6: `[address]:port`).
 The client builds `ws://host:port/slither` internally.

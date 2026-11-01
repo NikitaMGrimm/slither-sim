@@ -162,6 +162,8 @@ pub struct LocalGame {
     pub bank: Bank,
     session: SessionPolicy,
     input: DesktopInput,
+    #[cfg(not(target_arch = "wasm32"))]
+    ingame_menu: bool,
     cursor: Option<Cursor>,
     zoom_pointer_projected: bool,
     policy: GameplayPolicy,
@@ -215,6 +217,8 @@ impl LocalGame {
             bank: Bank::new()?,
             session,
             input: DesktopInput::new(19.).map_err(|e| e.to_string())?,
+            #[cfg(not(target_arch = "wasm32"))]
+            ingame_menu: false,
             cursor: None,
             zoom_pointer_projected: false,
             policy: GameplayPolicy::new(true, true, true, true, true, false),
@@ -542,6 +546,45 @@ impl LocalGame {
     pub fn stop(&mut self) {
         self.stop_as(false, "Stopped");
     }
+    /// Native menu admission excludes setup, death and returning sessions.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn can_open_ingame_menu(&self) -> bool {
+        self.phase() == Phase::Playing
+            && self.client.control_view().own.is_some_and(|own| !own.dead)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn ingame_menu_open(&self) -> bool {
+        self.ingame_menu && self.can_open_ingame_menu()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn open_ingame_menu(&mut self, now: f64) -> Result<bool> {
+        if !self.can_open_ingame_menu() || self.ingame_menu_open() {
+            return Ok(false);
+        }
+        let release = self
+            .input
+            .release_controls(now)
+            .map_err(|e| e.to_string())?;
+        self.ingame_menu = true;
+        if !release.is_empty() {
+            self.enqueue(EffectKind::Send(release), After::None)?;
+        }
+        Ok(true)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn close_ingame_menu(&mut self) {
+        self.ingame_menu = false;
+    }
+    fn controls_captured(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.ingame_menu_open()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            false
+        }
+    }
     pub fn fail(&mut self, message: &str) {
         latency::generation(self.generation);
         latency::event("game_failed", 0, 0, 0);
@@ -562,6 +605,8 @@ impl LocalGame {
         self.session.commit_control(self.has_socket);
         self.login.fill(0);
         self.login.clear();
+        #[cfg(not(target_arch = "wasm32"))]
+        self.close_ingame_menu();
         self.effects.clear();
         self.work = None;
         self.input.leave_tick();
@@ -1149,6 +1194,7 @@ impl LocalGame {
     }
     fn control(&mut self) -> Result<()> {
         loop {
+            let captured = self.controls_captured();
             let Some(w) = &mut self.work else {
                 return Ok(());
             };
@@ -1156,10 +1202,11 @@ impl LocalGame {
             let phase = w.phase;
             w.phase += 1;
             let packet = match phase {
-                0 => self
+                0 if !captured => self
                     .input
                     .keyboard_phase(now, 0.)
                     .map_err(|e| e.to_string())?,
+                0 => Vec::new(),
                 1 => {
                     if self.session.ping_available() && self.session.ping_due(now) {
                         self.session.commit_ping(now)
@@ -1175,7 +1222,7 @@ impl LocalGame {
                     }
                 }
                 3 => {
-                    if self.input.view().own.is_some() {
+                    if self.input.view().own.is_some() && !captured {
                         self.refresh_zoom_pointer()?;
                         self.input.heading_phase(now).map_err(|e| e.to_string())?
                     } else {
@@ -1433,6 +1480,9 @@ impl LocalGame {
         Ok(())
     }
     pub fn key(&mut self, code: &str, down: bool) -> bool {
+        if self.controls_captured() {
+            return false;
+        }
         latency::generation(self.generation);
         let admitted = self.input.key(code, down);
         if admitted {
@@ -1449,7 +1499,8 @@ impl LocalGame {
     }
     /// Returns whether play consumed the wheel. Menus route their input first.
     pub fn wheel_zoom(&mut self, notches: f64) -> bool {
-        if self.phase() != Phase::Playing
+        if self.controls_captured()
+            || self.phase() != Phase::Playing
             || !notches.is_finite()
             || notches == 0.
             || self.client.control_view().own.is_none_or(|own| own.dead)
@@ -1533,6 +1584,9 @@ impl LocalGame {
         Ok(())
     }
     pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
+        if self.controls_captured() {
+            return self.observe_cursor(x, y, width, height);
+        }
         latency::generation(self.generation);
         let cursor = [x, y, width, height];
         let (mut stock_args, args) = self.pointer_args(cursor)?;

@@ -62,7 +62,7 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape Stop/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
+                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape in-game menu/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
@@ -574,6 +574,15 @@ mod desktop {
                 }
             }
             self.effects()?;
+            if let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref()) {
+                if self.game.ingame_menu_open() {
+                    self.login.ingame_input(&mut self.game, input)?;
+                } else {
+                    self.login.egui.input(input);
+                }
+            }
+            self.login.prepare_ingame(&mut self.game, physical, dpr)?;
+            self.effects()?;
             if self.cursor_generation != Some(self.game.generation())
                 || self.login.zoom_input_available()
             {
@@ -608,9 +617,6 @@ mod desktop {
                 physical.map(|n| f64::from(n) / dpr),
                 self.game.bank.cosmetics.as_mut(),
             )?;
-            if let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref()) {
-                self.login.egui.input(input);
-            }
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
@@ -774,7 +780,7 @@ mod desktop {
             let window = Arc::new(
                 l.create_window(
                     Window::default_attributes()
-                        .with_title("SlitherClient — Enter Play / Escape Stop")
+                        .with_title("SlitherClient — Enter Play / Escape menu")
                         .with_inner_size(winit::dpi::LogicalSize::new(960., 540.)),
                 )
                 .map_err(|e| e.to_string())?,
@@ -895,6 +901,17 @@ mod desktop {
                     .login
                     .egui
                     .window_event(&event, r.window.scale_factor(), || r.window.as_ref());
+                if matches!(
+                    event,
+                    WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
+                ) {
+                    let size = r.window.inner_size();
+                    r.login.prepare_ingame(
+                        &mut r.game,
+                        [size.width, size.height],
+                        r.window.scale_factor(),
+                    )?;
+                }
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
@@ -936,13 +953,39 @@ mod desktop {
                         ))
                         && let Some(input) = r.login.egui.take_window_input(|| r.window.as_ref())
                     {
-                        r.login.settings_input(input);
+                        if r.game.ingame_menu_open() {
+                            r.login.ingame_input(&mut r.game, input)?;
+                            r.effects()?;
+                        } else {
+                            r.login.settings_input(input);
+                        }
                     }
                     if input_event {
                         r.game.mouse_up();
                         r.schedule.invalidate();
                         return Ok(());
                     }
+                }
+                if let WindowEvent::KeyboardInput {
+                    event,
+                    is_synthetic: false,
+                    ..
+                } = &event
+                    && r.login.ingame_key(
+                        &mut r.game,
+                        event.into(),
+                        r.started.elapsed().as_secs_f64() * 1000.,
+                    )?
+                {
+                    let size = r.window.inner_size();
+                    r.login.prepare_ingame(
+                        &mut r.game,
+                        [size.width, size.height],
+                        r.window.scale_factor(),
+                    )?;
+                    r.effects()?;
+                    r.schedule.invalidate();
+                    return Ok(());
                 }
                 let mapped = if r.login.picker.policy.visible() {
                     r.login.picker.event(&event)
@@ -1060,7 +1103,10 @@ mod desktop {
                         let down = event.state == ElementState::Pressed;
                         match event.physical_key {
                             PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
-                            PhysicalKey::Code(KeyCode::Escape) if down => {
+                            PhysicalKey::Code(KeyCode::Escape) if down && !event.repeat => {
+                                if r.game.phase() == Phase::Playing {
+                                    return Ok(());
+                                }
                                 r.login.state.cancel_pending_play();
                                 if let Some(p) = &r.preparation {
                                     p.cancel();

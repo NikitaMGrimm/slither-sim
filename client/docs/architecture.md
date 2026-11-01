@@ -87,7 +87,13 @@ DPI, focus, modifier and held-key bookkeeping precedes input ownership; activati
 synchronizes the adapter from that state. Repeated key-down events are filtered
 before custom Tab traversal and egui processing.
 
-Settings is the first screen on this host. `settings_egui.rs` owns layout and
+Settings and the native in-game Esc overlay use this host. `ingame_egui.rs` owns
+the single Leave game button and outside-click dismissal. `LocalGame` gates
+native steering while the overlay is open, releases held boost/turn debt at entry,
+and keeps the existing ping/presentation flow running. Leave uses the existing
+`stop()` effect and login return path; dismissal samples the current window cursor
+without resetting heading cadence. Browser DOM menus are unchanged.
+`settings_egui.rs` owns layout and
 actions; the shared `settings::SettingsState` owns preferences, fade timing,
 generation checks and persistence. `egui_theme.rs` maps `MenuTheme` and installed
 fonts to egui style, with shared pill buttons, checkbox rows, titles and shadowed
