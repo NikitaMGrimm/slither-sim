@@ -10,6 +10,24 @@ use crate::{
 };
 use slither_client::{presentation::*, state::Point};
 
+/// Passive diagnostic callback; it must not mutate presentation or submit work.
+pub type PreparationObserver = fn(&'static str, u64);
+thread_local! {
+    static PREPARATION_OBSERVER: std::cell::Cell<Option<PreparationObserver>> = const { std::cell::Cell::new(None) };
+}
+/// Install a calling-thread observer for finite profiling, returning the previous
+/// observer for restoration. This does not add records to latency-trace-v1.
+pub fn set_preparation_observer(
+    observer: Option<PreparationObserver>,
+) -> Option<PreparationObserver> {
+    PREPARATION_OBSERVER.with(|slot| slot.replace(observer))
+}
+fn preparation_phase(stage: &'static str, identity: u64) {
+    if let Some(observer) = PREPARATION_OBSERVER.with(|slot| slot.get()) {
+        observer(stage, identity);
+    }
+}
+
 struct PreparationError(String);
 impl From<ClientPresentationError> for PreparationError {
     fn from(e: ClientPresentationError) -> Self {
@@ -777,6 +795,7 @@ pub fn prepare_gameplay(
     applied: QualitySnapshot,
 ) -> Result<PreparedFrame> {
     crate::latency::build("build_begin", identity);
+    preparation_phase("build_begin", identity);
     let announcement = client.announcement_view();
     prepare_composed(
         client,
@@ -832,6 +851,7 @@ fn prepare_composed(
             },
         )
         .map_err(|e| e.0)?;
+    preparation_phase("curves_end", identity);
     let view = BodyPaintView {
         camera: client.camera().position(),
         zoom: client.camera().zoom(),
@@ -893,6 +913,7 @@ fn prepare_composed(
         push_draw(&mut draws, draw)?;
     }
     let [early, late] = std::mem::take(&mut bank.food_commands);
+    preparation_phase("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
     let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
@@ -917,6 +938,7 @@ fn prepare_composed(
             e.to_string()
         }
     })?;
+    preparation_phase("food_end", identity);
     let eaters: Vec<_> = client
         .snake_objects()
         .map(|(token, _, _, snake)| {
@@ -955,6 +977,7 @@ fn prepare_composed(
         }
     })?;
     let families = bank.bodies.clone();
+    preparation_phase("prey_end", identity);
     let palettes: Vec<_> = families
         .iter()
         .map(|p| BodyPalette {
@@ -1094,6 +1117,7 @@ fn prepare_composed(
     draws.extend(food.late.iter().map(Draw::from));
     draws.extend(prey_plan.late.iter().map(prey));
     bank.food_commands = [food.early, food.late];
+    preparation_phase("bodies_end", identity);
     if let Some(boundary) = client.boundary()
         && let Some(edge) = plan_arena_edge_with_zoom(
             ArenaEdgeInput {
@@ -1169,6 +1193,7 @@ fn prepare_composed(
         }
     }
     let mut text_draws = Vec::new();
+    preparation_phase("arena_end", identity);
     let mut text_resources = std::collections::BTreeMap::new();
     let name_zoom = user_zoom;
     for name in client
@@ -1232,6 +1257,7 @@ fn prepare_composed(
         inserted += count;
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
+    preparation_phase("names_end", identity);
     let mut frame = Frame {
         identity,
         extent,
@@ -1252,12 +1278,14 @@ fn prepare_composed(
         snakes: Vec::new(),
     });
     let ui = overlay.as_mut().unwrap_or(&mut frame);
+    preparation_phase("resources_end", identity);
     if let Some(view) = announcement {
         bank.announcement
             .append(view, &mut bank.text, ui, &mut resources)?;
     }
     bank.minimap
         .append(client, &mut bank.text, ui, &mut resources)?;
+    preparation_phase("minimap_end", identity);
     // Mandatory overlays must fit in full; never silently truncate a panel.
     check_draw_count(frame.draws.len() + overlay.as_ref().map_or(0, |f| f.draws.len()))?;
     if resources

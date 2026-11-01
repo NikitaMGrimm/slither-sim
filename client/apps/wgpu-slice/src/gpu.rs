@@ -84,6 +84,7 @@ pub struct Renderer {
     multisample: Option<Multisample>,
     vertices: Vec<VertexChunk>,
     draw_calls: usize,
+    diagnostic_timestamps: Option<wgpu::QuerySet>,
 }
 impl Renderer {
     pub fn supports_native(&self, physical: [u32; 2]) -> bool {
@@ -143,6 +144,30 @@ impl Renderer {
         format: wgpu::TextureFormat,
         max_samples: u32,
         required_features: wgpu::Features,
+    ) -> Result<Self> {
+        Self::from_adapter_options(adapter, format, max_samples, required_features, false).await
+    }
+    /// Finite offscreen diagnostics can opt into pass timestamps. Normal hosts
+    /// request no additional device features and allocate no queries.
+    pub async fn from_adapter_for_diagnostics(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+        timestamps: bool,
+    ) -> Result<Self> {
+        let features = if timestamps {
+            wgpu::Features::TIMESTAMP_QUERY
+        } else {
+            wgpu::Features::empty()
+        };
+        Self::from_adapter_options(adapter, format, max_samples, features, timestamps).await
+    }
+    async fn from_adapter_options(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+        required_features: wgpu::Features,
+        timestamps: bool,
     ) -> Result<Self> {
         if !matches!(max_samples, 1 | 4) {
             return Err("Unsupported sample count".into());
@@ -278,6 +303,13 @@ impl Renderer {
             "fs",
             1,
         );
+        let diagnostic_timestamps = timestamps.then(|| {
+            device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("offscreen pass timings"),
+                ty: wgpu::QueryType::Timestamp,
+                count: 2,
+            })
+        });
         Ok(Self {
             sample_count,
             format,
@@ -296,6 +328,7 @@ impl Renderer {
             multisample: None,
             vertices: Vec::new(),
             draw_calls: 0,
+            diagnostic_timestamps,
         })
     }
     pub fn upload(&mut self, r: &Resource) -> RenderResult<()> {
@@ -472,6 +505,11 @@ impl Renderer {
     pub fn draw_call_count(&self) -> usize {
         self.draw_calls
     }
+    /// The last render pass's start/end queries, before the next render call.
+    /// Resolve/readback belongs to the diagnostic caller, outside CPU timings.
+    pub fn diagnostic_timestamps(&self) -> Option<&wgpu::QuerySet> {
+        self.diagnostic_timestamps.as_ref()
+    }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
     pub fn render_overlay(
         &mut self,
@@ -603,6 +641,13 @@ impl Renderer {
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("offline gameplay"),
+                timestamp_writes: self.diagnostic_timestamps.as_ref().map(|query_set| {
+                    wgpu::RenderPassTimestampWrites {
+                        query_set,
+                        beginning_of_pass_write_index: Some(0),
+                        end_of_pass_write_index: Some(1),
+                    }
+                }),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: msaa_view.unwrap_or(target),
                     depth_slice: None,
