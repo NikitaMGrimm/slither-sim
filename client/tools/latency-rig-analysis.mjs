@@ -42,6 +42,25 @@ export function interpolateTruth(ticks,ns,id) {
     heading:s[5]+angle(e[5],s[5])*phase,speed:s[6]+(e[6]-s[6])*phase,boost:s[7],
     tickGapMs:Number(b.ns-a.ns)/1e6,stepBracketMs:Math.max(a.bracket,b.bracket)};
 }
+const motionForDelta=delta=>delta<=.05?'straight':delta>=.15?'turning':'transition';
+export function truthMotion(ticks,ns,id) {
+  const now=interpolateTruth(ticks,ns,id),past=interpolateTruth(ticks,ns-100_000_000n,id);
+  if(!now||!past||now.life!==past.life)return null;
+  return motionForDelta(Math.abs(angle(now.heading,past.heading)));
+}
+export function sampledMotion(history,ns) {
+  const pivot=ns-100_000_000n,i=lower(history,pivot,r=>r.ns);
+  if(i===history.length)return null;
+  let heading;
+  if(history[i].ns===pivot)heading=history[i].heading;
+  else{
+    if(i===0)return null;
+    const a=history[i-1],b=history[i];
+    if(b.ns-a.ns>50_000_000n)return null;
+    heading=a.heading+angle(b.heading,a.heading)*Number(pivot-a.ns)/Number(b.ns-a.ns);
+  }
+  return motionForDelta(Math.abs(angle(history.at(-1).heading,heading)));
+}
 export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   check(['inner','pit-edge'].includes(region),'unknown analysis region');
   const plan=JSON.parse(await readFile(path.join(directory,'plan.json'),'utf8'));
@@ -126,12 +145,11 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
     const key=`${h[0]}/${life}/${identity}`;
     if(!motionHistory.has(key))motionHistory.set(key,[]);
     const history=motionHistory.get(key);history.push({ns:r.ns,heading});
-    const prevIndex=lower(history,r.ns-100_000_000n,x=>x.ns);
     const warmed=region==='inner'?warm.get(identity):firstSeen.get(identity);
-    if(prevIndex>=history.length-1||r.t-warmed<2_000_000_000n)continue;
+    if(r.t-warmed<2_000_000_000n)continue;
     if(region==='pit-edge'&&plan.zoomNotches!==0&&(zoomStarted===null||r.t-zoomStarted<2_000_000_000n))continue;
-    const delta=Math.abs(angle(heading,history[prevIndex].heading));
-    const motion=delta<=.05?'straight':delta>=.15?'turning':'transition';
+    const motion=hasTruth?truthMotion(ticks,submittedNs,h[0]):sampledMotion(history,r.ns);
+    if(motion===null)continue;
     if(motion==='transition'){coverage.transition++;continue;}
     r.stratum=`${motion}/${boost?'boost':'normal'}`;
     if(!groups.has(r.stratum))groups.set(r.stratum,new Map());const group=groups.get(r.stratum);
@@ -183,7 +201,7 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   const load=JSON.parse(await readFile(path.join(directory,'load.json'),'utf8'));
   check(!load.contaminated,'compiler-contaminated capture');
   const strata=Object.fromEntries([...groups].map(([k,g])=>[k,format(g)]));
-  return {format:'latency-rig-results-v1',analysisScope:region==='inner'?'original-inner-band':'pit-edge-first-observed-reference-v2',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
+  return {format:'latency-rig-results-v1',analysisScope:region==='inner'?'inner-band-exact-motion-window-v3':'pit-edge-exact-motion-window-v3',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
     measurementCoverage:measurementCoverage(strata,hasTruth),
     liveBotPopulation:{allHostTicks:distribution(ticks.map(t=>t.liveBots)),measuredReferenceFrames:distribution(measuredPopulation)},
     clock:{source:'system-time-unix+instant',observedMinPositiveClockStepNs:headHeader.observed_min_positive_clock_step_ns,mappingBracketMs:distribution(maps.map(r=>r.mapWidthMs)),hostStepBracketMs:distribution(clockSteps),nominalWindowsSystemTimeQuantumNs:100},

@@ -97,7 +97,7 @@ export async function run(o) {
       seconds:o.seconds,zoomNotches:o.zoom,truth:o.truth,region:o.region,scriptedReference:Boolean(o.scriptedReference),config,
       reference:o.scriptedReference?'formation-fan-v3: extra bot API client joins first; explicit reference ID only within 1200; 2s straight/turn normal/boost phases from play; 250-unit lateral primary formation target when received; bounded obstacle fan; 120 background Foragers unchanged':'nearest live received bot within 1200 units; hold until disappearance/life change/out of range; ID tie break',
       middle:o.region==='pit-edge'?'measurement head radius <=1.1 live pit; boost arm <0.7 pit; zoom on playing; target orbit0.5 pit; references warm2s from first observation; zoomout waits2s after actual zoom<0.5':'head radius <0.7 current pit; zoom on playing; target orbit0.5 pit; references warm2s from segment entry',
-      strata:'reference normal/boost from host state; straight <=0.05 rad heading change over preceding 100ms, turning >=0.15 rad; remainder transitional',
+      strata:'reference normal/boost from host state (ramps included); straight <=0.05 rad heading change over exact preceding 100ms at submit, turning >=0.15 rad; missing/life-mismatched truth windows excluded; remainder transitional',
       lag:'truth minus actual f32 painter head, tangent/speed lag equivalent; during turns not temporal delay',
       quantiles:'nearest rank p50/p90/p99; descriptive correlated frames; p99 under 1000 samples explicitly sparse',
       limitations:'offscreen serialized GPU, synthetic callbacks, no swapchain/physical input/present/scanout; 200ms compiler sampling plus CIM query gaps',

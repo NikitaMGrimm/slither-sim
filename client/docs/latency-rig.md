@@ -177,6 +177,12 @@ each accepted offscreen picture. This does not certify desktop completeness.
 Report straight/turning, normal/boost and each zoom separately. Straight means
 at most 0.05 radians of reference-heading change over the preceding 100 ms;
 turning means at least 0.15 radians. Intermediate motion is counted separately.
+With truth, compare interpolated headings exactly 100 ms apart at the submission
+endpoint, requiring the same live host life. Interim packet-relative mode needs
+the full 100 ms appearance history and interpolates only across frame gaps at
+most 50 ms. A short history on entering/re-entering the band is not a shorter
+substitute. The v3 analysis scope records this correction; preserve earlier
+analysis files and label new reanalyses separately.
 With truth, use authoritative motion/boost; interim runs use client presentation
 motion as a provisional classifier. Exclude the first two seconds of each
 selected near-middle reference segment for approach/zoom settling. Missing
