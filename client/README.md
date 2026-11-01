@@ -66,6 +66,8 @@ Official play is interactive only: headless runs need `--server` without `--offi
 Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
 that copied the official login.
+The server's Setup selects protocol 13 or 19 for the connection; both use the
+same client core and stock login.
 
 The window opens on login, restoring saved appearance preferences. Explicit
 `--nickname` and `--skin` override restored values for that run. Change Skin opens

@@ -2210,6 +2210,7 @@ dependencies = [
  "scraper",
  "serde_json",
  "slither-client",
+ "slither-protocol",
  "tungstenite",
  "ureq",
  "url",

@@ -452,7 +452,7 @@ impl SessionPolicy {
     }
     /// Admit advertised production protocol without changing the control state.
     pub fn admit_protocol(&self, version: f64) -> Result<()> {
-        if version != 19.0 {
+        if version != 13.0 && version != 19.0 {
             Err(SessionError("Unsupported protocol"))
         } else {
             Ok(())

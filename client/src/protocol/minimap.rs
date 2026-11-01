@@ -2,6 +2,10 @@
 //!
 //! Frame envelopes and aggregate byte limits belong to the existing ingress.
 //! Short grids and bytes beyond the last visited grid are valid.
+//!
+//! v13 re-exports this same decoder. Legacy map meaning (including delta XOR)
+//! is a protocol interpretation; only M was observed in the v13 catalog:
+//! https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-protocol13-catalog/REPORT.md
 
 use std::fmt;
 
