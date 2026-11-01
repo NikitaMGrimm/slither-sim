@@ -964,6 +964,8 @@ fn capture_underlay(
 fn underlay_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
     use slither_wgpu_slice::login_native::NativeLogin;
     for (extent, dpr) in [([960, 720], 1.), ([1440, 1080], 1.5)] {
+        // A new login restarts its handle allocators; drop the previous pass's resources.
+        renderer.sync_resources(&[])?;
         let mut login = NativeLogin::new("Player")?;
         for now in (0..=9600).step_by(16) {
             login.step(now as f64, true, false)?;
