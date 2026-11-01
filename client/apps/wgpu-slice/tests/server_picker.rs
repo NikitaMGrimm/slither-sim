@@ -37,7 +37,9 @@ fn settled(admission: bool) -> NativeLogin {
 /// Open through the shared Server action and finish the entry fade.
 fn opened(official: bool) -> NativeLogin {
     let mut login = settled(true);
-    login.picker.policy.start_directory(official);
+    if official {
+        login.picker.policy.start_directory();
+    }
     login.open_picker();
     login.picker.policy.alpha = 1.;
     login.prepare([960, 720], true, None).unwrap();
@@ -348,7 +350,7 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
     assert_eq!(login.picker.ui.focused(), Some(CLOSE));
     press(&mut login, egui::Key::Tab);
     assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
-    for _ in 0..3 {
+    for _ in 0..2 {
         press(&mut login, egui::Key::Tab);
     }
     assert_eq!(login.picker.ui.focused(), Some(SEARCH));
@@ -599,7 +601,7 @@ fn handoff_round_trip_keeps_login_state_and_reopens_with_a_fresh_search() {
     let mut login = settled(true);
     select_all_and_type(&mut login, "Nick");
     assert_eq!(login.state.view(true).nickname, "Nick");
-    login.picker.policy.start_directory(true);
+    login.picker.policy.start_directory();
     login
         .picker
         .policy

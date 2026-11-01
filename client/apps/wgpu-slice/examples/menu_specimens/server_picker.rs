@@ -143,7 +143,7 @@ pub async fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     let mut states = Vec::new();
     // One resource owner across DPR changes, like the actual native host.
     let mut login = settled()?;
-    login.picker.policy.start_directory(true);
+    login.picker.policy.start_directory();
     login
         .picker
         .policy
@@ -223,7 +223,7 @@ pub async fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     )?);
     login.picker.set_address("");
     login.picker.policy.custom_error.clear();
-    click(&mut login, OFFICIAL)?;
+    login.picker.policy.start_directory();
     login
         .picker
         .policy

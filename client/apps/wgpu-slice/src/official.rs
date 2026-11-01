@@ -43,17 +43,12 @@ pub fn complete_picker_preparation(
     cached: &mut Option<Arc<DirectorySnapshot>>,
     completion: &PreparationOutcome,
     cancelled: bool,
-    directory_pending: bool,
 ) -> Result<()> {
     if let Some(snapshot) = &completion.directory {
         picker
             .update_directory(&snapshot.servers, &snapshot.pings, true)
             .map_err(str::to_owned)?;
         *cached = Some(snapshot.clone());
-    }
-    if directory_pending {
-        // Explicit Play does not own or abandon the picker's ongoing acquisition.
-        return Ok(());
     }
     if cancelled {
         picker.directory_failed("Directory acquisition cancelled");
@@ -71,37 +66,24 @@ pub struct Preparation {
     pub progress: Option<DirectoryProgress>,
 }
 impl Preparation {
-    pub fn start(server: Option<String>) -> Result<Self> {
-        Self::start_selected(server, None)
-    }
-    pub fn start_selected(server: Option<String>, id: Option<u16>) -> Result<Self> {
-        Self::start_with_directory(server, id, None, None)
-    }
     pub fn start_with_directory(
-        server: Option<String>,
         id: Option<u16>,
         cached: Option<Arc<DirectorySnapshot>>,
         pending: Option<DirectoryPreparation>,
     ) -> Result<Self> {
-        Self::start_with(
-            server,
-            id,
-            cached,
-            pending,
-            DirectoryPreparation::start,
-            fetch,
-        )
+        Self::start_with(id, cached, pending, DirectoryPreparation::start, fetch)
     }
     fn start_with(
-        server: Option<String>,
         id: Option<u16>,
         cached: Option<Arc<DirectorySnapshot>>,
         pending: Option<DirectoryPreparation>,
         start_directory: impl FnOnce() -> Result<DirectoryPreparation>,
         get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)> + Send + 'static,
     ) -> Result<Self> {
+        // Custom selection can leave its cancelled startup worker unpolled.
+        let pending = pending.filter(|work| !work.cancel.load(Ordering::SeqCst));
         // Cold Play after a failed startup uses the same streaming acquisition.
-        let pending = if server.is_none() && cached.is_none() && pending.is_none() {
+        let pending = if cached.is_none() && pending.is_none() {
             Some(start_directory()?)
         } else {
             pending
@@ -113,15 +95,9 @@ impl Preparation {
         let worker = thread::Builder::new()
             .name("official-discovery".into())
             .spawn(move || {
-                let completion = prepare_pending_with(
-                    server.as_deref(),
-                    id,
-                    &flag,
-                    pending,
-                    cached,
-                    get,
-                    |_, _| unreachable!("automatic Play has a directory worker or completed cache"),
-                );
+                let completion = prepare_pending_with(id, &flag, pending, cached, get, |_, _| {
+                    unreachable!("automatic Play has a directory worker or completed cache")
+                });
                 let _ = sender.send(completion);
             })
             .map_err(|e| e.to_string())?;
@@ -152,9 +128,9 @@ impl Preparation {
 impl Drop for Preparation {
     fn drop(&mut self) {
         self.cancel();
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
-        }
+        // Network I/O is bounded but may not observe cancellation until it returns.
+        // Detach so closing the window never waits for that deadline.
+        drop(self.worker.take());
     }
 }
 
@@ -190,14 +166,6 @@ pub struct DirectoryPreparation {
     pub progress: DirectoryProgress,
 }
 impl DirectoryPreparation {
-    pub fn take_for_play(explicit: Option<&str>, pending: &mut Option<Self>) -> Option<Self> {
-        // Explicit endpoints need only a profile; the picker keeps its worker.
-        if explicit.is_some() {
-            None
-        } else {
-            pending.take()
-        }
-    }
     fn finish(self, cancel: &AtomicBool) -> Result<DirectorySnapshot> {
         loop {
             if let Err(error) = check_cancel(cancel) {
@@ -261,9 +229,7 @@ impl DirectoryPreparation {
 impl Drop for DirectoryPreparation {
     fn drop(&mut self) {
         self.cancel();
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
-        }
+        drop(self.worker.take());
     }
 }
 #[cfg(test)]
@@ -551,9 +517,6 @@ pub fn explicit_endpoint(server: &str) -> Result<String> {
     Ok(url.into())
 }
 
-fn probe_clusters(servers: &[Server], cancel: &Arc<AtomicBool>) -> BTreeMap<u16, u32> {
-    probe_clusters_with(servers, cancel, &|_| {})
-}
 fn probe_clusters_with(
     servers: &[Server],
     cancel: &Arc<AtomicBool>,
@@ -665,29 +628,24 @@ fn send_ping(socket: &mut native::Socket) -> bool {
     }
 }
 
-pub fn prepare(server: Option<&str>, cancel: &Arc<AtomicBool>) -> Result<Prepared> {
-    prepare_with(server, cancel, fetch, probe_clusters)
-}
-
+#[cfg(test)]
 fn prepare_with(
-    server: Option<&str>,
     cancel: &Arc<AtomicBool>,
     get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
 ) -> Result<Prepared> {
-    prepare_selected_with(server, None, cancel, get, measure)
+    prepare_selected_with(None, cancel, get, measure)
 }
+#[cfg(test)]
 fn prepare_selected_with(
-    server: Option<&str>,
     id: Option<u16>,
     cancel: &Arc<AtomicBool>,
     get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
 ) -> Result<Prepared> {
-    prepare_cached_with(server, id, cancel, get, measure, &mut None)
+    prepare_cached_with(id, cancel, get, measure, &mut None)
 }
 fn prepare_pending_with(
-    server: Option<&str>,
     id: Option<u16>,
     cancel: &Arc<AtomicBool>,
     pending: Option<DirectoryPreparation>,
@@ -700,19 +658,17 @@ fn prepare_pending_with(
         if let Some(pending) = pending {
             directory = Some(Arc::new(pending.finish(cancel)?));
         }
-        prepare_cached_with(server, id, cancel, get, measure, &mut directory)
+        prepare_cached_with(id, cancel, get, measure, &mut directory)
     })();
     PreparationOutcome { result, directory }
 }
 fn prepare_cached_with(
-    server: Option<&str>,
     id: Option<u16>,
     cancel: &Arc<AtomicBool>,
     mut get: impl FnMut(&Url, usize, &AtomicBool) -> Result<(Url, Inert)>,
     measure: impl FnOnce(&[Server], &Arc<AtomicBool>) -> BTreeMap<u16, u32>,
     cached: &mut Option<Arc<DirectorySnapshot>>,
 ) -> Result<Prepared> {
-    let forced = server.map(explicit_endpoint).transpose()?;
     check_cancel(cancel)?;
     let (page_url, page) = get(&Url::parse(PAGE).expect("constant URL"), PAGE_LIMIT, cancel)?;
     let script_url = client_script(
@@ -722,7 +678,7 @@ fn prepare_cached_with(
     drop(page);
     let (_, script) = get(&script_url, SCRIPT_LIMIT, cancel)?;
     let profile = profile(&script.0)?;
-    let directory = if forced.is_none() && cached.is_none() {
+    let directory = if cached.is_none() {
         Some(directory_url(
             std::str::from_utf8(&script.0).map_err(|_| "Invalid script encoding")?,
         )?)
@@ -730,7 +686,7 @@ fn prepare_cached_with(
         None
     };
     drop(script);
-    if forced.is_none() && cached.is_none() {
+    if cached.is_none() {
         let (_, bytes) = get(
             &directory.expect("automatic directory"),
             DIRECTORY_LIMIT,
@@ -742,9 +698,7 @@ fn prepare_cached_with(
         check_cancel(cancel)?;
         *cached = Some(Arc::new(DirectorySnapshot { servers, pings }));
     }
-    let endpoint = if let Some(endpoint) = forced {
-        endpoint
-    } else {
+    let endpoint = {
         let snapshot = cached.as_ref().expect("automatic directory");
         if let Some(id) = id {
             let rows = slither_client::server_picker::ranked(&snapshot.servers, &snapshot.pings);
@@ -777,10 +731,70 @@ mod tests {
         synthetic_ids([24, 42])
     }
     #[test]
+    fn dropping_startup_and_play_acquisition_does_not_wait_for_stalled_fetch() {
+        for profile in [false, true] {
+            let (entered, started) = mpsc::sync_channel(1);
+            let (release, stalled) = mpsc::sync_channel(1);
+            let (finished, completed) = mpsc::sync_channel(1);
+            let get = move |_: &Url, _: usize, cancel: &AtomicBool| {
+                entered.send(()).unwrap();
+                // Model an HTTP call that cannot observe cancel until I/O returns.
+                let _ = stalled.recv_timeout(Duration::from_secs(2));
+                finished.send(cancel.load(Ordering::SeqCst)).unwrap();
+                Err("Injected stalled fetch".into())
+            };
+            let (drop_work, cancel): (Box<dyn FnOnce()>, _) = if profile {
+                let work = Preparation::start_with(
+                    None,
+                    Some(Arc::new(DirectorySnapshot {
+                        servers: Vec::new(),
+                        pings: BTreeMap::new(),
+                    })),
+                    None,
+                    || panic!("cached directory must not start acquisition"),
+                    get,
+                )
+                .unwrap();
+                let cancel = work.cancel.clone();
+                (Box::new(move || drop(work)), cancel)
+            } else {
+                let work = DirectoryPreparation::start_with(get, |_, _, _| {
+                    panic!("cancelled fetch must not reach probes")
+                })
+                .unwrap();
+                let cancel = work.cancel.clone();
+                (Box::new(move || drop(work)), cancel)
+            };
+            started.recv_timeout(Duration::from_secs(2)).unwrap();
+            let now = Instant::now();
+            drop_work();
+            let elapsed = now.elapsed();
+            let early_completion = completed.try_recv().ok();
+            // Always release/observe the injected worker before asserting, even
+            // if an older blocking Drop made this test miss its deadline.
+            let _ = release.send(());
+            let saw_cancel = early_completion
+                .unwrap_or_else(|| completed.recv_timeout(Duration::from_secs(2)).unwrap());
+            assert!(
+                elapsed < Duration::from_millis(250),
+                "profile={profile}: {elapsed:?}"
+            );
+            assert!(
+                early_completion.is_none(),
+                "fetch must still be stalled when Drop returns"
+            );
+            assert!(cancel.load(Ordering::SeqCst));
+            assert!(
+                saw_cancel,
+                "detached request must observe cancellation on return"
+            );
+        }
+    }
+    #[test]
     fn cold_play_after_failed_startup_streams_and_cancellation_clears_provisional_rows() {
         for startup_cancelled in [false, true] {
             let mut picker = slither_client::server_picker::ServerPicker::default();
-            picker.start_directory(true);
+            picker.start_directory();
             assert!(picker.take_directory_request());
             let startup = DirectoryPreparation::start_with(
                 move |url, _, _| {
@@ -813,7 +827,6 @@ mod tests {
             let (continue_tx, continue_rx) = mpsc::sync_channel(1);
             let starts = std::cell::Cell::new(0);
             let play = Preparation::start_with(
-                None,
                 None,
                 None,
                 None,
@@ -874,8 +887,7 @@ mod tests {
                     .unwrap();
             }
             let mut cached = None;
-            complete_picker_preparation(&mut picker, &mut cached, &completion, true, false)
-                .unwrap();
+            complete_picker_preparation(&mut picker, &mut cached, &completion, true).unwrap();
             assert!(cached.is_none());
             assert!(picker.rows.is_empty());
             assert!(progress.take().is_none());
@@ -902,11 +914,107 @@ mod tests {
         ))
     }
     #[test]
+    fn custom_to_automatic_replaces_cancelled_startup_but_reuses_live_work() {
+        use crate::endpoint_login::{Connection, prepare_selection};
+        use slither_client::{
+            menu_controls::*,
+            server_picker::{AUTOMATIC, ServerPicker},
+        };
+        use std::cell::Cell;
+        for custom in [false, true] {
+            let mut picker = ServerPicker::default();
+            picker.start_directory();
+            assert!(picker.take_directory_request());
+            let (old_result, receiver) = mpsc::sync_channel(1);
+            let mut pending = Some(DirectoryPreparation {
+                receiver,
+                cancel: Arc::new(AtomicBool::new(false)),
+                worker: None,
+                progress: DirectoryProgress::default(),
+            });
+            if custom {
+                let intent = |picker: &ServerPicker, control| ControlIntent {
+                    panel: 2,
+                    generation: picker.generation,
+                    control,
+                    activation: Activation::Enter,
+                    checked: None,
+                };
+                picker.add_custom("192.0.2.9:445".into()).unwrap();
+                picker.open();
+                assert!(picker.activate(intent(&picker, ControlId(16))));
+                assert!(!picker.official_context());
+                // Match the native host: cancel, retain the unpolled worker.
+                pending.as_ref().unwrap().cancel();
+                picker.open();
+                assert!(picker.activate(intent(&picker, AUTOMATIC)));
+                assert!(picker.official_context() && picker.can_play());
+                assert!(!picker.take_directory_request());
+            }
+            let starts = Cell::new(0);
+            let Connection::Official(play) = prepare_selection(&picker.selection, |id| {
+                Preparation::start_with(
+                    id,
+                    None,
+                    pending.take(),
+                    || {
+                        starts.set(starts.get() + 1);
+                        DirectoryPreparation::start_with(
+                            |url, _, _| synthetic_fetch(url, [42]),
+                            |_, _, _| BTreeMap::from([(1, 12)]),
+                        )
+                    },
+                    |url, _, _| {
+                        Ok((
+                            url.clone(),
+                            Inert(match url.path() {
+                                "/" => b"<script src='/s/game999.js'></script>".to_vec(),
+                                "/s/game999.js" => SCRIPT.to_vec(),
+                                _ => panic!("profile must use the acquired directory"),
+                            }),
+                        ))
+                    },
+                )
+            })
+            .unwrap() else {
+                panic!("Automatic must acquire an official profile")
+            };
+            // A cancelled HTTP operation may finish only after Play takes it.
+            let _ = old_result.send(if custom {
+                Err("Discovery cancelled".into())
+            } else {
+                Ok(DirectorySnapshot {
+                    servers: decode_directory(&synthetic_ids([24])).unwrap(),
+                    pings: BTreeMap::from([(1, 80)]),
+                })
+            });
+            let completion = play.receiver.recv_timeout(Duration::from_secs(2)).unwrap();
+            let prepared = completion
+                .result
+                .as_ref()
+                .expect("Automatic Play must succeed");
+            assert_eq!(starts.get(), usize::from(custom));
+            assert_eq!(
+                prepared.endpoint,
+                if custom {
+                    "ws://192.0.2.1:442/slither"
+                } else {
+                    "ws://192.0.2.1:424/slither"
+                }
+            );
+            assert_eq!(prepared.profile.client_version, 4242);
+            let mut cached = None;
+            complete_picker_preparation(&mut picker, &mut cached, &completion, false).unwrap();
+            assert!(cached.is_some());
+            assert_eq!(picker.rows[0].server.id, if custom { 42 } else { 24 });
+        }
+    }
+    #[test]
     fn startup_worker_streams_before_completion_and_play_joins_it() {
         let (phase_tx, phase_rx) = mpsc::sync_channel(1);
         let (continue_tx, continue_rx) = mpsc::sync_channel(1);
         let mut picker = slither_client::server_picker::ServerPicker::default();
-        picker.start_directory(true);
+        picker.start_directory();
         assert!(picker.take_directory_request());
         let mut pending = Some(
             DirectoryPreparation::start_with(
@@ -945,12 +1053,11 @@ mod tests {
         assert_eq!(picker.rows.len(), 2);
         assert!(picker.rows.iter().all(|r| r.ping.is_none()));
         assert!(pending.as_mut().unwrap().poll().is_none());
-        let transferred = DirectoryPreparation::take_for_play(None, &mut pending);
+        let transferred = pending.take();
         assert!(pending.is_none());
         let (done_tx, done_rx) = mpsc::sync_channel(1);
         let play = thread::spawn(move || {
             let completion = prepare_pending_with(
-                None,
                 None,
                 &Arc::new(AtomicBool::new(false)),
                 transferred,
@@ -987,7 +1094,7 @@ mod tests {
         assert_eq!(prepared.directory.as_ref().unwrap().pings[&2], 12);
         assert_eq!(prepared.endpoint, "ws://192.0.2.1:442/slither");
         let mut cached = None;
-        complete_picker_preparation(&mut picker, &mut cached, &completion, false, false).unwrap();
+        complete_picker_preparation(&mut picker, &mut cached, &completion, false).unwrap();
         assert_eq!(picker.rows[0].ping, Some(90));
         assert_eq!(picker.rows[1].ping, Some(12));
     }
@@ -1033,7 +1140,7 @@ mod tests {
             ))
         };
         let mut picker = ServerPicker::default();
-        picker.start_directory(true);
+        picker.start_directory();
         picker.open();
         assert!(picker.take_directory_request());
         for _ in 0..3 {
@@ -1064,7 +1171,6 @@ mod tests {
         assert_eq!((fetches.get(), sweeps.get()), (3, 1));
         for choice in [None, Some(42), Some(24)] {
             let prepared = prepare_cached_with(
-                None,
                 choice,
                 &cancel,
                 &mut get,
@@ -1083,118 +1189,9 @@ mod tests {
         assert_eq!((fetches.get(), sweeps.get()), (9, 1)); // Only fresh page/profile script per Play.
     }
     #[test]
-    fn explicit_play_does_not_wait_for_a_pending_directory_that_later_fails() {
-        explicit_play_keeps_picker_acquisition(false);
-    }
-    #[test]
-    fn explicit_play_keeps_a_successful_pending_directory_for_the_picker() {
-        explicit_play_keeps_picker_acquisition(true);
-    }
-    fn explicit_play_keeps_picker_acquisition(directory_succeeds: bool) {
-        let mut picker = slither_client::server_picker::ServerPicker::default();
-        picker.start_directory(true);
-        picker.open();
-        assert!(picker.take_directory_request());
-        picker.close();
-        assert!(!picker.changed());
-        let (sender, receiver) = mpsc::sync_channel(1);
-        let directory_cancel = Arc::new(AtomicBool::new(false));
-        let mut pending = Some(DirectoryPreparation {
-            receiver,
-            cancel: directory_cancel.clone(),
-            worker: None,
-            progress: DirectoryProgress::default(),
-        });
-        let explicit = Some("192.0.2.1:445");
-        let transferred = DirectoryPreparation::take_for_play(explicit, &mut pending);
-        assert!(transferred.is_none());
-        assert!(pending.as_mut().unwrap().poll().is_none());
-        // Directory completion is still withheld: only injected profile effects
-        // may run, and explicit Play must complete before a directory result exists.
-        let mut fetches = 0;
-        let result = prepare_pending_with(
-            explicit,
-            None,
-            &Arc::new(AtomicBool::new(false)),
-            transferred,
-            None,
-            |url, _, _| {
-                fetches += 1;
-                Ok((
-                    url.clone(),
-                    Inert(match url.path() {
-                        "/" => b"<script src='/s/game999.js'></script>".to_vec(),
-                        "/s/game999.js" => SCRIPT.to_vec(),
-                        _ => panic!("explicit Play must not fetch a directory"),
-                    }),
-                ))
-            },
-            |_, _| panic!("explicit Play must not ping"),
-        );
-        assert_eq!(
-            result.result.as_ref().unwrap().endpoint,
-            "ws://192.0.2.1:445/slither"
-        );
-        assert_eq!(fetches, 2);
-        let mut cached = None;
-        complete_picker_preparation(&mut picker, &mut cached, &result, false, pending.is_some())
-            .unwrap();
-        // An unrelated profile failure or cancelled explicit Play cannot re-arm
-        // acquisition while the picker still owns the original worker.
-        for cancelled in [false, true] {
-            complete_picker_preparation(
-                &mut picker,
-                &mut cached,
-                &PreparationOutcome {
-                    result: Err("Profile failed".into()),
-                    directory: None,
-                },
-                cancelled,
-                pending.is_some(),
-            )
-            .unwrap();
-            picker.open();
-            assert!(!picker.take_directory_request());
-            picker.close();
-        }
-        assert!(!directory_cancel.load(Ordering::SeqCst));
-        sender
-            .send(if directory_succeeds {
-                Ok(DirectorySnapshot {
-                    servers: decode_directory(&synthetic_directory()).unwrap(),
-                    pings: BTreeMap::from([(1, 12)]),
-                })
-            } else {
-                Err("Injected directory failure".into())
-            })
-            .unwrap();
-        let directory_result = pending.as_mut().unwrap().poll().unwrap();
-        pending.take();
-        match directory_result {
-            Ok(snapshot) => {
-                picker.replace(&snapshot.servers, &snapshot.pings).unwrap();
-                cached = Some(Arc::new(snapshot));
-            }
-            Err(error) => picker.directory_failed(&error),
-        }
-        assert_eq!(picker.rows.len(), if directory_succeeds { 2 } else { 0 });
-        assert_eq!(cached.is_some(), directory_succeeds);
-        assert_eq!(
-            result.result.unwrap().endpoint,
-            "ws://192.0.2.1:445/slither"
-        );
-        let mut requests = 0;
-        for _ in 0..3 {
-            picker.open();
-            requests += usize::from(picker.take_directory_request());
-            picker.close();
-        }
-        assert_eq!(requests, usize::from(!directory_succeeds));
-    }
-    #[test]
     fn cancelled_play_does_not_strand_picker() {
         let mut picker = slither_client::server_picker::ServerPicker::default();
-        picker.start_directory(true);
+        picker.start_directory();
         picker.open();
         assert!(picker.take_directory_request());
         picker.status = "Measuring server latency...".into();
@@ -1210,8 +1207,7 @@ mod tests {
             worker: None,
             progress: DirectoryProgress::default(),
         };
-        let preparation =
-            Preparation::start_with_directory(None, None, None, Some(pending)).unwrap();
+        let preparation = Preparation::start_with_directory(None, None, Some(pending)).unwrap();
         preparation.cancel();
         let result = preparation
             .receiver
@@ -1220,14 +1216,8 @@ mod tests {
         assert!(preparation.cancelled());
         assert_eq!(result.result.as_ref().err().unwrap(), "Discovery cancelled");
         let mut cached = None;
-        complete_picker_preparation(
-            &mut picker,
-            &mut cached,
-            &result,
-            preparation.cancelled(),
-            false,
-        )
-        .unwrap();
+        complete_picker_preparation(&mut picker, &mut cached, &result, preparation.cancelled())
+            .unwrap();
         drop(preparation);
         assert!(directory_cancel.load(Ordering::SeqCst));
         assert!(cached.is_none());
@@ -1243,7 +1233,7 @@ mod tests {
     #[test]
     fn failed_directory_fetch_retries_once_on_reopen_without_a_loop() {
         let mut picker = slither_client::server_picker::ServerPicker::default();
-        picker.start_directory(true);
+        picker.start_directory();
         let cancel = Arc::new(AtomicBool::new(false));
         let mut fetches = 0;
         picker.open();
@@ -1275,7 +1265,7 @@ mod tests {
             let sweeps = Cell::new(0);
             let cancel = Arc::new(AtomicBool::new(false));
             let mut picker = slither_client::server_picker::ServerPicker::default();
-            picker.start_directory(true);
+            picker.start_directory();
             picker.open();
             assert!(picker.take_directory_request());
             picker.close();
@@ -1310,7 +1300,6 @@ mod tests {
                 progress: DirectoryProgress::default(),
             };
             let completion = prepare_pending_with(
-                None,
                 if profile_fails { None } else { Some(77) },
                 &cancel,
                 Some(pending),
@@ -1334,8 +1323,7 @@ mod tests {
             assert!(completion.result.is_err());
             assert!(completion.directory.is_some());
             let mut cached = None;
-            complete_picker_preparation(&mut picker, &mut cached, &completion, false, false)
-                .unwrap();
+            complete_picker_preparation(&mut picker, &mut cached, &completion, false).unwrap();
             assert_eq!(picker.rows.len(), 2);
             assert_eq!(cached.as_ref().unwrap().pings[&1], 12);
             for _ in 0..3 {
@@ -1350,7 +1338,6 @@ mod tests {
     fn cold_play_retains_completed_directory_when_selection_fails() {
         let mut fetches = 0;
         let completion = prepare_pending_with(
-            None,
             Some(77),
             &Arc::new(AtomicBool::new(false)),
             None,
@@ -1377,9 +1364,9 @@ mod tests {
         );
         assert_eq!(fetches, 3);
         let mut picker = slither_client::server_picker::ServerPicker::default();
-        picker.start_directory(true);
+        picker.start_directory();
         let mut cached = None;
-        complete_picker_preparation(&mut picker, &mut cached, &completion, false, false).unwrap();
+        complete_picker_preparation(&mut picker, &mut cached, &completion, false).unwrap();
         picker.open();
         assert!(!picker.take_directory_request());
         assert_eq!(cached.as_ref().unwrap().servers.len(), 2);
@@ -1388,7 +1375,7 @@ mod tests {
     fn play_completion_keeps_acquisition_on_selection_error_or_late_cancel() {
         for (id, cancelled) in [(Some(77), false), (Some(42), false), (Some(42), true)] {
             let mut picker = slither_client::server_picker::ServerPicker::default();
-            picker.start_directory(true);
+            picker.start_directory();
             picker.open();
             assert!(picker.take_directory_request());
             picker.close();
@@ -1398,7 +1385,6 @@ mod tests {
             });
             // A missing selection fails after acquisition; the samples survive.
             let result = prepare_pending_with(
-                None,
                 id,
                 &Arc::new(AtomicBool::new(false)),
                 None,
@@ -1417,8 +1403,7 @@ mod tests {
             );
             assert_eq!(result.result.is_ok(), id == Some(42));
             let mut cached = None;
-            complete_picker_preparation(&mut picker, &mut cached, &result, cancelled, false)
-                .unwrap();
+            complete_picker_preparation(&mut picker, &mut cached, &result, cancelled).unwrap();
             assert!(Arc::ptr_eq(cached.as_ref().unwrap(), &snapshot));
             assert_eq!(picker.rows.len(), 2);
             // A later failed Play cannot discard completed directory data.
@@ -1429,7 +1414,6 @@ mod tests {
                     result: Err("Profile failed".into()),
                     directory: None,
                 },
-                false,
                 false,
             )
             .unwrap();
@@ -1457,7 +1441,7 @@ mod tests {
             worker: None,
             progress: DirectoryProgress::default(),
         });
-        let transferred = DirectoryPreparation::take_for_play(None, &mut pending).unwrap();
+        let transferred = pending.take().unwrap();
         assert!(pending.is_none());
         assert_eq!(
             transferred
@@ -1501,7 +1485,6 @@ mod tests {
         assert_eq!(snapshot.pings[&1], 12);
         for (id, expected) in [(42, Some("ws://192.0.2.1:442/slither")), (77, None)] {
             let result = prepare_selected_with(
-                None,
                 Some(id),
                 &cancel,
                 |url, limit, cancel| {
@@ -1535,7 +1518,6 @@ mod tests {
     fn automatic_preparation_composes_page_profile_directory_and_selection() {
         let mut calls = Vec::new();
         let prepared = prepare_with(
-            None,
             &Arc::new(AtomicBool::new(false)),
             |url, limit, _| {
                 calls.push((url.to_string(), limit));
@@ -1578,31 +1560,10 @@ mod tests {
         );
     }
     #[test]
-    fn forced_server_fetches_page_profile_only_and_cancel_prevents_all_requests() {
-        let cancel = Arc::new(AtomicBool::new(false));
-        let mut calls = Vec::new();
-        let prepared = prepare_with(
-            Some("127.0.0.1:19491"),
-            &cancel,
-            |url, limit, _| {
-                calls.push((url.to_string(), limit));
-                let bytes = if calls.len() == 1 {
-                    b"<script src='https://slither.io/s/game999.js'></script>".as_slice()
-                } else {
-                    SCRIPT
-                };
-                Ok((url.clone(), Inert(bytes.to_vec())))
-            },
-            |_, _| panic!("forced server must skip probes"),
-        )
-        .unwrap();
-        assert_eq!(calls.len(), 2);
-        assert_eq!(prepared.endpoint, "ws://127.0.0.1:19491/slither");
-        assert_eq!(prepared.profile.client_version, 4242);
-        cancel.store(true, Ordering::SeqCst);
+    fn cancellation_prevents_all_requests() {
+        let cancel = Arc::new(AtomicBool::new(true));
         assert!(
             prepare_with(
-                None,
                 &cancel,
                 |_, _, _| panic!("cancelled"),
                 |_, _| panic!("cancelled")
@@ -1614,7 +1575,6 @@ mod tests {
     fn malformed_profile_never_requests_directory_or_probes() {
         let mut calls = 0;
         let result = prepare_with(
-            None,
             &Arc::new(AtomicBool::new(false)),
             |url, _, _| {
                 calls += 1;

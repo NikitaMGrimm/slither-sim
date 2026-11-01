@@ -33,34 +33,54 @@ fn intent(p: &ServerPicker, id: ControlId) -> ControlIntent {
     }
 }
 #[test]
-fn custom_context_stays_offline_until_explicit_official_opt_in() {
-    for saved in [
-        ServerPreference::Automatic,
-        ServerPreference::Official(42),
-        ServerPreference::Custom("192.0.2.1:445".into()),
-    ] {
-        let mut p = ServerPicker::default();
-        let direct = saved.custom_address().is_some();
-        p.selection = saved;
-        assert_eq!(p.can_play(), direct);
-        for _ in 0..3 {
-            p.open();
-            assert!(!p.take_directory_request());
-            p.close();
-        }
-        p.open();
-        assert!(p.activate(intent(&p, OFFICIAL)));
-        assert!(p.official_context());
-        assert!(p.can_play());
-        assert!(p.take_directory_request());
-        assert!(!p.take_directory_request());
-        p.directory_failed("Injected failure");
-        assert!(p.activate(intent(&p, OFFICIAL)));
-        assert!(!p.take_directory_request());
-        p.close();
-        p.open();
-        assert!(p.take_directory_request());
-    }
+fn startup_discovers_once_and_custom_selection_stays_direct() {
+    let mut p = ServerPicker::default();
+    p.start_directory();
+    assert!(p.can_play() && p.official_context());
+    assert!(p.take_directory_request());
+    p.open();
+    assert!(!p.take_directory_request());
+    p.replace(&[server(42, 1, true)], &BTreeMap::from([(1, 12)]))
+        .unwrap();
+    p.add_custom("192.0.2.9:445".into()).unwrap();
+    assert!(p.activate(intent(&p, ControlId(16))));
+    assert_eq!(p.selection.custom_address(), Some("192.0.2.9:445"));
+    assert!(!p.official_context());
+    assert!(p.can_play());
+    p.open();
+    assert!(!p.take_directory_request());
+    let panel = p.panel([960., 720.]);
+    assert!(
+        panel
+            .controls
+            .iter()
+            .any(|c| matches!(&c.kind, ControlKind::ListRow { .. }) && c.id == ControlId(17))
+    );
+    assert!(p.activate(intent(&p, AUTOMATIC)));
+    assert!(p.official_context() && p.can_play());
+    assert_eq!(p.selection, ServerPreference::Automatic);
+    assert!(!p.take_directory_request()); // Reuse completed directory.
+    p.open();
+    assert!(p.search("42"));
+    assert_eq!(p.selection, ServerPreference::Official(42));
+}
+
+#[test]
+fn automatic_reenters_discovery_from_direct_mode_without_a_load_button() {
+    let mut p = ServerPicker::default();
+    p.add_custom("192.0.2.9:445".into()).unwrap();
+    p.open();
+    assert!(p.activate(intent(&p, ControlId(16))));
+    p.open();
+    assert!(!p.take_directory_request());
+    assert!(p.activate(intent(&p, AUTOMATIC)));
+    assert!(p.take_directory_request());
+    p.directory_failed("Injected failure");
+    p.open();
+    assert!(p.take_directory_request());
+    p.close();
+    p.open();
+    assert!(!p.take_directory_request());
 }
 #[test]
 fn custom_entries_are_bounded_deduplicated_windowed_and_removable() {
@@ -200,11 +220,10 @@ fn dedupe_fastest_address_ties_and_unknown_pings() {
 #[test]
 fn startup_requests_once_and_endpoint_mode_stays_offline() {
     let mut p = ServerPicker::default();
-    p.start_directory(false);
     assert!(!p.take_directory_request());
-    p.start_directory(true);
+    p.start_directory();
     assert!(p.take_directory_request());
-    p.start_directory(true);
+    p.start_directory();
     p.open();
     assert!(!p.take_directory_request());
 }
@@ -212,7 +231,7 @@ fn startup_requests_once_and_endpoint_mode_stays_offline() {
 fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
     let servers: Vec<_> = (1..=20).map(|id| server(id, id, true)).collect();
     let mut p = ServerPicker::default();
-    p.start_directory(true);
+    p.start_directory();
     assert!(p.take_directory_request());
     p.open();
     let mut input = PanelInputState::default();
@@ -264,7 +283,7 @@ fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
 #[test]
 fn provisional_rows_do_not_suppress_retry_after_failure() {
     let mut p = ServerPicker::default();
-    p.start_directory(true);
+    p.start_directory();
     assert!(p.take_directory_request());
     p.open();
     p.update_directory(&[server(1, 1, true)], &BTreeMap::new(), false)
@@ -287,7 +306,7 @@ fn progress_defers_duplicate_membership_changes_and_invalidates_a_new_directory(
         server(8, 2, true),
     ];
     let mut p = ServerPicker::default();
-    p.start_directory(true);
+    p.start_directory();
     p.open();
     p.update_directory(&servers, &BTreeMap::new(), false)
         .unwrap();
@@ -336,7 +355,7 @@ fn numeric_rule_exact_selection_and_inactive_id() {
 #[test]
 fn open_is_only_directory_effect_automatic_is_default_and_preference_roundtrip() {
     let mut p = ServerPicker::default();
-    p.start_directory(true);
+    p.start_directory();
     p.step(0.).unwrap();
     p.open();
     assert_eq!(p.selection, ServerPreference::Automatic);
@@ -376,7 +395,7 @@ fn open_is_only_directory_effect_automatic_is_default_and_preference_roundtrip()
 #[test]
 fn opens_reuse_successful_empty_and_inflight_directory_results() {
     let mut p = ServerPicker::default();
-    p.start_directory(true);
+    p.start_directory();
     p.open();
     assert!(p.take_directory_request());
     for _ in 0..3 {
@@ -399,7 +418,7 @@ fn directory_failure_retries_only_on_next_open_and_preserves_completed_results()
         "Discovery cancelled",
     ] {
         let mut p = ServerPicker::default();
-        p.start_directory(true);
+        p.start_directory();
         p.open();
         // Failure also clears any effect not yet consumed by the adapter.
         p.directory_failed(status);

@@ -39,7 +39,6 @@ mod desktop {
         skin: u8,
         nickname_explicit: bool,
         skin_explicit: bool,
-        official: bool,
         server: Option<String>,
         headless: Option<crate::headless::Options>,
         cosmetics_dir: Option<std::path::PathBuf>,
@@ -62,11 +61,10 @@ mod desktop {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Offline by default.\nslither-wgpu-desktop [--official] [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\n--server connects directly with a fixed official-format login and no website fetch. --official fetches fresh login values and discovers servers when no --server is supplied.\nHeadless requires --server without --official (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape in-game menu/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
+                        "slither-wgpu-desktop [--server host:port] [--nickname NAME] [--skin 0..65] [--cosmetics-dir DIR] [--accessory 0..31]\n[--headless --duration SECONDS --frames NEW_EXTERNAL_DIRECTORY --frame-every SECONDS]\nDefault: discover official servers and measure latency at startup; Play fetches fresh login values and connects. --server connects directly with a fixed login and no website fetch or discovery.\nHeadless requires --server (official play is interactive only): automatic Play, deterministic circles/boost, offscreen PNGs and exit summary. Defaults: duration 30s, frame interval 5s.\nWindow: Enter Play, Escape in-game menu/cancel. Pointer/arrows/Space: existing Rust input.\nNo automatic reconnect. Diagnostic: slither-wgpu-diagnostic."
                     );
                     return Ok(None);
                 }
-                "--official" => o.official = true,
                 "--headless" => headless = true,
                 "--duration" | "--frame-every" => {
                     let value = args
@@ -122,13 +120,10 @@ mod desktop {
                 _ => return Err(format!("Unknown option {arg}")),
             }
         }
-        if o.official {
-            o.endpoint = None;
-        }
         if headless {
             // Owner decision 2026-10-30: official logins only from a person pressing Play.
-            if o.official || o.endpoint.is_none() {
-                return Err("Headless requires --server without --official; official play is interactive only".into());
+            if o.endpoint.is_none() {
+                return Err("Headless requires --server; official play is interactive only".into());
             }
             o.headless = Some(crate::headless::Options::new(
                 duration,
@@ -144,11 +139,19 @@ mod desktop {
             .map_err(|e| e.to_string())?;
         Ok(Some(o))
     }
+    fn configure_picker(
+        server: Option<&str>,
+        picker: &mut slither_client::server_picker::ServerPicker,
+    ) {
+        if let Some(server) = server {
+            picker.selection =
+                slither_client::server_picker::ServerPreference::Custom(server.to_owned());
+        } else {
+            picker.start_directory();
+        }
+    }
     struct Running {
         login: NativeLogin,
-        endpoint: Option<String>,
-        official: bool,
-        server: Option<String>,
         window: Arc<Window>,
         host: SurfaceHost,
         game: LocalGame,
@@ -171,8 +174,7 @@ mod desktop {
     }
     impl Running {
         fn can_play(&self) -> bool {
-            (!self.login.picker.policy.changed() && self.endpoint.is_some())
-                || self.login.picker.policy.can_play()
+            self.login.picker.policy.can_play()
         }
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
@@ -298,21 +300,17 @@ mod desktop {
                 }
                 self.schedule.invalidate();
             }
-            if self.login.picker.policy.take_directory_request() {
-                if self.login.picker.policy.official_context() {
-                    if self.directory.is_none() && self.preparation.is_none() {
-                        match DirectoryPreparation::start() {
-                            Ok(work) => {
-                                self.directory_progress = Some(work.progress.clone());
-                                self.directory = Some(work);
-                                self.login.picker.policy.status =
-                                    "Measuring server latency...".into();
-                            }
-                            Err(error) => self.login.picker.policy.directory_failed(&error),
-                        }
+            if self.login.picker.policy.take_directory_request()
+                && self.directory.is_none()
+                && self.preparation.is_none()
+            {
+                match DirectoryPreparation::start() {
+                    Ok(work) => {
+                        self.directory_progress = Some(work.progress.clone());
+                        self.directory = Some(work);
+                        self.login.picker.policy.status = "Measuring server latency...".into();
                     }
-                } else {
-                    self.login.picker.policy.status = "Directory available in official mode".into();
+                    Err(error) => self.login.picker.policy.directory_failed(&error),
                 }
             }
             let operations = self.login.picker.policy.take_custom_operations();
@@ -350,7 +348,6 @@ mod desktop {
                     &mut self.directory_snapshot,
                     &completion,
                     cancelled,
-                    self.directory.is_some(),
                 )?;
                 if cancelled {
                     self.game.stop();
@@ -531,36 +528,13 @@ mod desktop {
                     if !self.can_play() {
                         continue;
                     }
-                    use slither_client::server_picker::ServerPreference;
                     use slither_wgpu_slice::endpoint_login::{self, Connection};
-                    let cli_target = !self.login.picker.policy.changed() && self.server.is_some();
-                    let selection = if cli_target && !self.official {
-                        ServerPreference::Custom(self.server.clone().expect("CLI server"))
-                    } else if cli_target {
-                        self.login
-                            .picker
-                            .policy
-                            .selection
-                            .official_id()
-                            .map_or(ServerPreference::Automatic, ServerPreference::Official)
-                    } else {
-                        self.login.picker.policy.selection.clone()
-                    };
+                    let selection = self.login.picker.policy.selection.clone();
                     let result = endpoint_login::prepare_selection(&selection, |id| {
-                        let explicit = if cli_target && self.official {
-                            self.server.clone()
-                        } else {
-                            None
-                        };
-                        let pending = DirectoryPreparation::take_for_play(
-                            explicit.as_deref(),
-                            &mut self.directory,
-                        );
                         Preparation::start_with_directory(
-                            explicit,
                             id,
                             self.directory_snapshot.clone(),
-                            pending,
+                            self.directory.take(),
                         )
                     });
                     match result {
@@ -870,23 +844,13 @@ mod desktop {
                 login.picker.policy.selection =
                     slither_wgpu_slice::server_picker_native::read_preference(&path);
             }
-            login.picker.policy.start_directory(options.official);
-            if !options.official
-                && let Some(server) = &options.server
-            {
-                let address = server.clone();
-                login.picker.policy.selection =
-                    slither_client::server_picker::ServerPreference::Custom(address.clone());
-            }
+            configure_picker(options.server.as_deref(), &mut login.picker.policy);
             if let Some(address) = login.picker.policy.selection.custom_address() {
                 let address = address.to_owned();
                 login.picker.set_address(&address);
             }
             Ok(Running {
                 login,
-                endpoint: options.endpoint.clone(),
-                official: options.official,
-                server: options.server.clone(),
                 window,
                 host,
                 game,
@@ -1224,9 +1188,6 @@ mod desktop {
                 cosmetics,
             );
         }
-        if !options.official && options.endpoint.is_none() {
-            eprintln!("Choose a server in Servers, or use --server host:port or --official.");
-        }
         let trace = latency::Run::from_env();
         let event_loop = EventLoop::<TransportWake>::with_user_event()
             .build()
@@ -1251,39 +1212,45 @@ mod desktop {
             parse_options(args.iter().map(|s| s.to_string()))
         }
         #[test]
-        fn cli_modes_are_explicit_and_validate_before_window_or_network() {
-            let official = parse(&[
-                "--official",
-                "--server",
-                "game.example:445",
-                "--nickname",
-                "Player",
-                "--skin",
-                "65",
-            ])
-            .unwrap()
-            .unwrap();
-            assert!(official.official);
-            assert_eq!(official.server.as_deref(), Some("game.example:445"));
-            assert_eq!(official.skin, 65);
-            assert!(official.skin_explicit && official.nickname_explicit);
+        fn default_startup_requests_discovery_and_direct_startup_stays_offline() {
+            use slither_client::server_picker::{ServerPicker, ServerPreference};
             let defaults = parse(&[]).unwrap().unwrap();
+            assert!(defaults.endpoint.is_none() && defaults.server.is_none());
             assert!(!defaults.skin_explicit && !defaults.nickname_explicit);
-            let explicit_defaults = parse(&["--skin", "0", "--nickname", "Player"])
+            for saved in [
+                ServerPreference::Automatic,
+                ServerPreference::Official(42),
+                ServerPreference::Custom("192.0.2.1:445".into()),
+            ] {
+                let mut picker = ServerPicker::default();
+                picker.selection = saved.clone();
+                configure_picker(defaults.server.as_deref(), &mut picker);
+                assert!(picker.official_context() && picker.can_play());
+                assert!(picker.take_directory_request());
+                assert!(!picker.take_directory_request());
+                picker.open();
+                assert!(!picker.take_directory_request());
+                assert_eq!(
+                    picker.selection,
+                    if saved.custom_address().is_some() {
+                        ServerPreference::Automatic
+                    } else {
+                        saved
+                    }
+                );
+                assert!(picker.take_preference().is_none());
+            }
+            let explicit = parse(&["--skin", "0", "--nickname", "Player"])
                 .unwrap()
                 .unwrap();
-            assert!(explicit_defaults.skin_explicit && explicit_defaults.nickname_explicit);
-            assert!(parse(&["--server", "localhost:19491"]).is_ok());
+            assert!(explicit.skin_explicit && explicit.nickname_explicit);
             assert!(parse(&["--help"]).unwrap().is_none());
             for args in [
+                vec!["--official"],
+                vec!["--skin", "66"],
+                vec!["--server"],
                 vec!["--endpoint", "ws://127.0.0.1:19491/slither"],
-                vec!["--official", "--skin", "66"],
-                vec!["--official", "--server"],
-                vec![
-                    "--official",
-                    "--nickname",
-                    "this nickname is too long to encode",
-                ],
+                vec!["--nickname", "this nickname is too long to encode"],
             ] {
                 assert!(parse(&args).is_err());
             }
@@ -1338,19 +1305,7 @@ mod desktop {
             }
         }
         #[test]
-        fn headless_never_uses_the_official_mode() {
-            // Otherwise complete headless runs; only the official mode differs.
-            for mode in [
-                vec!["--official"],
-                vec!["--official", "--server", "game.example:445"],
-            ] {
-                let args = [mode, vec!["--headless", "--frames", "unused"]].concat();
-                let error = parse(&args).err().expect("official headless run");
-                assert!(error.contains("interactive only"), "{error}");
-            }
-        }
-        #[test]
-        fn server_values_preserve_address_properties_and_official_flag_order() {
+        fn server_values_preserve_address_properties() {
             for server in [
                 "127.0.0.1:19491",
                 "game.example:445",
@@ -1358,7 +1313,6 @@ mod desktop {
                 "[2001:db8::1]:443",
             ] {
                 let direct = parse(&["--server", server]).unwrap().unwrap();
-                assert!(!direct.official);
                 let endpoint =
                     slither_wgpu_slice::game::server_endpoint(direct.endpoint.as_deref().unwrap())
                         .unwrap();
@@ -1368,15 +1322,6 @@ mod desktop {
                     endpoint.port_or_known_default(),
                     server.rsplit_once(':').unwrap().1.parse().ok()
                 );
-                for args in [
-                    ["--official", "--server", server],
-                    ["--server", server, "--official"],
-                ] {
-                    let official = parse(&args).unwrap().unwrap();
-                    assert!(official.official);
-                    assert!(official.endpoint.is_none());
-                    assert_eq!(official.server.as_deref(), Some(server));
-                }
             }
             for server in [
                 "",
@@ -1392,24 +1337,18 @@ mod desktop {
                 "host\\x:80",
                 "host :80",
             ] {
-                for official in [false, true] {
-                    let mut args = vec!["--server", server];
-                    if official {
-                        args.push("--official");
-                    }
-                    let error = parse(&args).err().expect("invalid server");
-                    assert!(error.contains("--server"), "{error}");
-                }
+                let error = parse(&["--server", server]).err().expect("invalid server");
+                assert!(error.contains("--server"), "{error}");
             }
         }
         #[test]
         fn server_alone_uses_direct_login_without_official_discovery() {
             for server in ["192.0.2.1:445", "game.example:80", "[2001:db8::1]:446"] {
                 let options = parse(&["--server", server]).unwrap().unwrap();
-                // The startup and Play acquisition gates both use this opt-in.
-                assert!(!options.official);
                 let mut picker = slither_client::server_picker::ServerPicker::default();
-                picker.start_directory(options.official);
+                configure_picker(options.server.as_deref(), &mut picker);
+                assert!(!picker.official_context());
+                assert!(picker.can_play());
                 assert!(!picker.take_directory_request());
                 let mut game = LocalGame::new(0.).unwrap();
                 let endpoint = options.endpoint.as_deref().unwrap();

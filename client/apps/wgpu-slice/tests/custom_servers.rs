@@ -28,6 +28,49 @@ fn opened() -> NativeLogin {
     login.prepare([960, 720], true, None).unwrap();
     login
 }
+
+#[test]
+fn automatic_returns_from_custom_without_a_directory_loading_action() {
+    let mut login = opened();
+    login.picker.policy.start_directory();
+    assert!(login.picker.policy.take_directory_request());
+    login
+        .picker
+        .policy
+        .add_custom("192.0.2.9:445".into())
+        .unwrap();
+    click(&mut login, ControlId(16));
+    assert!(!login.picker.policy.official_context());
+    assert_eq!(
+        login.picker.policy.selection.custom_address(),
+        Some("192.0.2.9:445")
+    );
+    login
+        .picker
+        .policy
+        .directory_failed("Injected cancellation");
+    login.picker.policy.alpha = 0.;
+    login.step(9616., true, false).unwrap();
+    login.open_picker();
+    login.picker.policy.alpha = 1.;
+    login.prepare([960, 720], true, None).unwrap();
+    assert!(
+        !login
+            .picker
+            .panel
+            .controls
+            .iter()
+            .any(|control| control.id == ControlId(11))
+    );
+    click(&mut login, AUTOMATIC);
+    assert!(login.picker.policy.official_context());
+    assert!(login.picker.policy.can_play());
+    assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+    assert!(login.picker.policy.take_directory_request());
+    assert!(!login.picker.policy.take_directory_request());
+    assert!(!login.picker.policy.is_open());
+    assert!(login.step(9632., true, false).unwrap().0.is_empty());
+}
 fn input(login: &mut NativeLogin, event: egui::Event) {
     login.settings_input(egui::RawInput {
         events: vec![event],
