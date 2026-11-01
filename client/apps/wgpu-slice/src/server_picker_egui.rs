@@ -64,10 +64,10 @@ pub struct PickerUi {
     composition: Option<(ControlId, theme::Composition)>,
     request_focus: Option<ControlId>,
     generation: Option<u64>,
-    /// The pointer was down at the end of the last pass.
-    pointer_down: bool,
-    /// A press held across a generation change: its release must not click
-    /// whatever control now reuses the pressed ID.
+    /// The primary button was down at the end of the last pass.
+    primary_down: bool,
+    /// A primary press held across a generation change: its release must not
+    /// click whatever control now reuses the pressed ID.
     stale_press: bool,
 }
 impl PickerUi {
@@ -148,8 +148,24 @@ impl PickerUi {
         if self.generation != Some(panel.generation) {
             self.generation = Some(panel.generation);
             self.request_focus = panel.initial_focus;
-            self.stale_press |= self.pointer_down;
+            self.stale_press |= self.primary_down;
         }
+        // Only the release of that press is suppressed: any primary edge ends
+        // it, so a fresh press starts a new click. Other buttons never count.
+        let mut suppress = false;
+        ctx.input(|i| {
+            for event in &i.events {
+                if let egui::Event::PointerButton {
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    ..
+                } = event
+                {
+                    suppress |= !*pressed && self.stale_press;
+                    self.stale_press = false;
+                }
+            }
+        });
         let focused = ctx.memory(|m| m.focused()).and_then(|id| {
             panel
                 .controls
@@ -219,7 +235,7 @@ impl PickerUi {
                         theme::ink(tokens.backdrop)
                             .gamma_multiply(backdrop.control.alpha as f32 * alpha),
                     );
-                    if interactive && response.clicked() && !self.stale_press {
+                    if interactive && response.clicked() && !suppress {
                         intents.push(intent(BACKDROP, Activation::Pointer));
                     }
                 });
@@ -282,7 +298,7 @@ impl PickerUi {
                     let pointer = response.clicked_by(egui::PointerButton::Primary);
                     if interactive
                         && response.clicked()
-                        && !(pointer && self.stale_press)
+                        && !(pointer && suppress)
                         && rule(control.id).is_none()
                     {
                         intents.push(intent(
@@ -307,8 +323,10 @@ impl PickerUi {
         {
             self.cancel_composition(ctx);
         }
-        self.pointer_down = ctx.input(|i| i.pointer.any_down());
-        if !self.pointer_down {
+        // Resyncing with egui also retires a press the host cancelled (resize,
+        // focus loss) without delivering its release.
+        self.primary_down = ctx.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
+        if !self.primary_down {
             self.stale_press = false;
         }
         if interactive {

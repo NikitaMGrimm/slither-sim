@@ -473,7 +473,9 @@ fn dense_custom_and_mixed_windows_stay_inside_the_window() {
         .replace(&servers, &std::collections::BTreeMap::from([(1, 12)]))
         .unwrap();
     login.picker.set_address(&"a".repeat(512));
-    for dpr in [1., 1.5, 2., 5.] {
+    // Glyphs accumulate per DPR, so the resize history matters: up through
+    // every supported step, then back down.
+    for dpr in [1., 1.5, 2., 3., 4., 5., 3., 1.5, 1.] {
         for logical in [[360., 640.], [960., 720.], [960., 540.]] {
             for offset in [0, 27, 32, 2032] {
                 login.picker.policy.scroll(isize::MIN);
@@ -500,9 +502,13 @@ fn dense_custom_and_mixed_windows_stay_inside_the_window() {
                     );
                 }
                 assert_eq!(ui.address.len(), 512);
-                // The retained toolkit bounded picker rasters (64 resources,
-                // 13 MiB) and draws (512). Picker text now lives in the shared
-                // egui font atlas; the login wordmark textures belong to #418.
+                // An atlas-only budget, not the retained toolkit's total raster
+                // bound. Picker text lives in the shared egui font atlas: 2048
+                // wide (the host leaves max_texture_side at egui's default),
+                // growing in height and cleared above 80% fill. 16 MiB (2048²×4)
+                // is the maximum measured over this history, not a structural
+                // guarantee. The login wordmark textures belong to #418 and are
+                // excluded. Counts keep the old 64-resource/512-draw ceilings.
                 let textures = login.egui.context().unwrap().tex_manager();
                 let textures = textures.read();
                 let atlas: usize = textures
@@ -512,7 +518,7 @@ fn dense_custom_and_mixed_windows_stay_inside_the_window() {
                     .sum();
                 let shapes = login.egui.prepared_shapes().len();
                 assert!(
-                    textures.num_allocated() <= 64 && atlas <= 13 * 1024 * 1024 && shapes <= 512,
+                    textures.num_allocated() <= 64 && atlas <= 16 * 1024 * 1024 && shapes <= 512,
                     "{dpr}, {logical:?}, {offset}: {} textures, {atlas} atlas bytes, {shapes} shapes",
                     textures.num_allocated()
                 );

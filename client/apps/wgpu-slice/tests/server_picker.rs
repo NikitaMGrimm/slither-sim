@@ -932,6 +932,82 @@ fn a_press_held_across_a_generation_change_never_clicks() {
     assert_eq!(login.picker.policy.selection.official_id(), Some(3000));
 }
 
+fn pointer_button(
+    login: &mut NativeLogin,
+    point: [f64; 2],
+    button: egui::PointerButton,
+    pressed: bool,
+) {
+    input(
+        login,
+        egui::Event::PointerButton {
+            pos: egui::pos2(point[0] as f32, point[1] as f32),
+            button,
+            pressed,
+            modifiers: Default::default(),
+        },
+    );
+}
+/// One official row at the first list position; returns its centre.
+fn single_row(login: &mut NativeLogin, id: u16) -> [f64; 2] {
+    replace_row(login, id);
+    login.prepare([960, 720], true, None).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    let r = widget(login, ControlId(16));
+    let p = [f64::from(r.center().x), f64::from(r.center().y)];
+    login.pointer(p, None, true);
+    login.prepare([960, 720], true, None).unwrap();
+    p
+}
+fn replace_row(login: &mut NativeLogin, id: u16) {
+    let row = [Server {
+        id,
+        cluster: 0,
+        address: SocketAddr::from(([192, 0, 2, 2], id)),
+        population: 1,
+        active: true,
+    }];
+    login.picker.policy.replace(&row, &BTreeMap::new()).unwrap();
+}
+
+/// Only a primary press held across the generation is stale: a held secondary
+/// button, or a primary press the host already cancelled, never suppresses a
+/// fresh primary click, with or without a redraw first.
+#[test]
+fn a_fresh_primary_click_after_a_generation_change_acts() {
+    use egui::PointerButton::{Primary, Secondary};
+    for cancelled in [false, true] {
+        for replace in [false, true] {
+            let mut login = opened(true);
+            let p = single_row(&mut login, 2000);
+            if cancelled {
+                pointer_button(&mut login, p, Primary, true);
+                // The native resize path cancels the egui pointer without a
+                // picker pass.
+                login.event(
+                    &winit::event::WindowEvent::Resized(winit::dpi::PhysicalSize::new(960, 720)),
+                    true,
+                );
+            } else {
+                pointer_button(&mut login, p, Secondary, true);
+            }
+            if replace {
+                replace_row(&mut login, 3000);
+                if !cancelled {
+                    login.prepare([960, 720], true, None).unwrap();
+                }
+            }
+            pointer_button(&mut login, p, Primary, true);
+            pointer_button(&mut login, p, Primary, false);
+            assert_eq!(
+                login.picker.policy.selection.official_id(),
+                Some(if replace { 3000 } else { 2000 }),
+                "cancelled={cancelled} replace={replace}"
+            );
+        }
+    }
+}
+
 /// Add reads committed text only: a click that takes focus from a composing
 /// field restores its snapshot before Add runs.
 #[test]

@@ -127,10 +127,11 @@ launch; Play and Quality retain their existing gates.
 scale, wording, the row window and tab order; each egui widget uses its resolved
 control rectangle, so painting and hit-testing share the core geometry. Login
 paints below the modal without input. A new panel generation (open, custom edit,
-directory replacement) focuses the address field and cancels a held pointer press,
-and a focused row that leaves the window loses focus before the next key, as
-with the shared panel input. The opener's keyboard or
-pointer modality decides whether focus is painted.
+directory replacement) focuses the address field and ignores the release of a primary
+press held across it (a fresh press acts normally), and a focused row that
+leaves the window loses focus before the next key, as with the shared panel
+input. The opener's keyboard or pointer modality decides whether focus is
+painted.
 
 Field text follows the same rules: numeric search keeps four ASCII digits and the
 address keeps 512 UTF-16 units with controls replaced by spaces. Inserted text is
