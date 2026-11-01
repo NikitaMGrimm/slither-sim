@@ -131,11 +131,16 @@ pre-acknowledgement camera observation, remain retained separately.
 
 ## Review corrections and current controls
 
+The [current quota audit and policy](https://github.com/NikitaMGrimm/slither-sim/blob/8b800bfd8a1c64ab65aa7f5d83f98b3bbd5255f3/client/docs/snake-capacity.md)
+include the corrections below and the unchanged single presentation envelope.
+
 The corrected compact representation assigns each retained anchor its incoming
 logical interval count. Non-growth and tail removal consume one interval, not
 an entire folded span. A reduced polyline sampler has no terminal extrapolation;
 ingress pins the remaining endpoint to the received tail. The own body keeps
-its complete legacy geometry and correction records. Seeded straight motion,
+its complete legacy geometry and correction records. An exhausted reduced
+body can accept a subsequent absolute growth anchor without requiring retired
+visual ghosts. Seeded straight motion,
 growth, removal and fade sequences require extent/length error at most 0.02 world
 units (including Float32 rounding near 60,000). Smooth curved sequences require
 the same bounds epsilon and at most 10% chord-length loss. Sharp bends can lose
@@ -163,19 +168,34 @@ is byte-identical: 148 samples, 72 pictures, seven commands and zero
 matches at **151,384,002 bytes**, 24,467 draws, with ordered Draw SHA-256
 `ec0724478151f26df1797a2685a4e1fba0c7267553e9956b06da70c0fd3c1551`.
 Main's shadow cut explains why these totals differ from the historical control.
+The [review controls](review-controls.json) bind the updated binaries, replay,
+allocation, accounting and loopback results separately from the old timings.
 
 Default stress fixtures separately cover 512 live IDs and a 17 × 4,096-anchor
 world crossing the same pressure threshold. The latter sends 80 arrivals across
 the 64-envelope deferred limit. Exhaustive 512 × 4,096 cases remain explicit
-ignored variants. The default native capacity binary completes in **2.70 s**
-in a local Windows debug run; core compaction rules take **0.01 s** and state
-rules **0.09 s**. These are test-suite durations, not frame-time captures.
+ignored variants. The default native capacity binary completes in **5.26–6.14 s**
+in local Windows single-threaded debug runs (2.70 s with parallel tests).
+The affected presentation-client, state and new selector binaries take **0.12 s**,
+**0.10 s** and **0.00 s** respectively. The longer release compaction rules take
+**0.02 s**. These are test-suite durations, not frame-time captures.
 
 Corrected frame-time measurements require a new agreed quiet window. The
 11:10 historical capture predates the reported 13:40 disk-full incident; no
 corrected capture was taken during that incident.
 
 ## Reproduction
+
+Corrected/rebased validation: **`npm run check` passed** on Windows, including
+core/native tests and Clippy, real Canvas Wasm smoke, desktop compilation,
+#411's feature-gated observer/shadow controls and WebGPU Wasm Clippy/build.
+The final exhaustion edge fix additionally passed focused core/body/selector
+tests, core Clippy, rebuilt Canvas smoke, release seeded compaction rules,
+both exhaustive native cases, the fast native capacity suite, and fresh native
+feel/allocation/loopback controls. The explicit real-Wasm 512 × 4,096 case passed.
+Root `uv run --locked --only-group tools python tools/test_documentation.py`
+passed all seven tests. Hardware-GPU tests remain ignored; no desktop/browser
+or outside game server was used.
 
 Pre-review local validation: **`npm run check` passed** on Windows with Rust 1.99,
 Node 24 and wasm-bindgen 0.2.129. This includes repository/history guards, Node
@@ -207,7 +227,7 @@ stand in for completed full-population pictures.
 The loopback e2e uses prebuilt binaries, from `client/`:
 
 ```text
-node tools/e2e-local-host.mjs --host-bin <slither-sim> --client-bin <slither-client-e2e> --battledome 500 --seconds 8 --scratch <outside-repository-directory>
+node tools/e2e-local-host.mjs --host-bin <slither-sim> --client-bin <slither-client-e2e> --battledome 500 --seconds 20 --scratch <outside-repository-directory>
 ```
 
 It binds only `127.0.0.1:0`, excludes reserved ports, requests full zoom-out and
@@ -225,9 +245,20 @@ The host's default snake/prey coverage is 1,500 units around the player's head
 (`src/simulator.rs`, `src/client/simulation/broadcast.rs`). A 501-seat Battledome
 scales its arena radius to roughly 14,181 units and spreads spawns across it.
 Client wheel zoom is local and sends no subscription change. An untimed
-same-fixture control at `--vision 1500` reached only **5** received/prepared
+same-fixture controls at `--vision 1500` reached only **5–8** received/prepared
 snakes despite `fullMap=true` and zero skips; the stricter population assertion
 correctly rejects it. This explains the handful-sized census in #411 without
 attributing server subscriptions to the client cap. The simulator lane must
 choose a whole-map interest policy for an ordinary host; this e2e opts into
 40,000-unit coverage explicitly.
+
+The final wide-coverage 20-second session reached **501** received and **501** prepared
+appearances, with zero picture skips, `fullMap=true`, zero best fit overflow and
+a clean requested close. The earlier 8-second session reached only 411 and failed
+the new population gate; that failed attempt is retained. Battledome defaults
+to a 20-second client session (other probes retain eight seconds). The threshold
+remains at least 500 rather than treating a configured population as delivered.
+The final eight-second default-vision control reached eight and closed
+cleanly before the population gate rejected it. A longer default-vision control
+also stayed at five but failed clean close with `Socket is not open`; its error
+is retained and is not counted as successful session validation.
