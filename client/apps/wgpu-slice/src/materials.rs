@@ -8,7 +8,28 @@ pub struct RgbaImage {
     pub width: u32,
     pub height: u32,
     /// Premultiplied, encoded-sRGB components, for Rgba8Unorm (not an sRGB texture).
+    /// Tightly packed mip levels, starting at level zero. A chain may stop early
+    /// to retain the circular contour of small, unpadded food bodies.
     pub pixels: Vec<u8>,
+}
+
+impl RgbaImage {
+    pub(crate) fn mip_level_count(&self) -> Result<u32> {
+        if self.width == 0 || self.height == 0 || self.width > 2048 || self.height > 2048 {
+            return Err("texture raster extent".into());
+        }
+        let (mut width, mut height) = (self.width, self.height);
+        let mut bytes = 0;
+        for level in 1..=self.width.max(self.height).ilog2() + 1 {
+            bytes += width as usize * height as usize * 4;
+            if bytes == self.pixels.len() {
+                return Ok(level);
+            }
+            width = (width / 2).max(1);
+            height = (height / 2).max(1);
+        }
+        Err("incomplete texture mip level".into())
+    }
 }
 
 /// Source-derived ribbon geometry, filled once per path with nonzero winding.

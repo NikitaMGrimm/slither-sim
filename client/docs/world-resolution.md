@@ -81,6 +81,10 @@ and raster cost; source-alpha smoothing stays unchanged.
 
 ## Source textures versus raster resolution
 
+Food gradients now use [denser body rasters and mip filtering](pellet-quality.md)
+without changing their logical sizes. The source audit and measurements below
+describe the earlier world-resolution change, before that food-only refinement.
+
 `bank.rs` materializes only the current picture's used procedural sources and
 shares immutable rasters with retained pictures; this is already demand loading,
 not an eager HD pack. `gpu.rs` uploads premultiplied encoded-sRGB RGBA8 with **one

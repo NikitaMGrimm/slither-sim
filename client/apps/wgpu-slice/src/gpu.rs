@@ -50,6 +50,7 @@ type RenderResult<T> = std::result::Result<T, RenderError>;
 
 struct Texture {
     asset: BodyAsset,
+    bytes: usize,
     _texture: wgpu::Texture,
     bind: wgpu::BindGroup,
     repeat_bind: wgpu::BindGroup,
@@ -382,12 +383,14 @@ impl Renderer {
             || a.height == 0
             || a.width > max_dimension
             || a.height > max_dimension
-            || r.image.width != a.width
-            || r.image.height != a.height
-            || r.image.pixels.len() != a.width as usize * a.height as usize * 4
+            // UVs use logical asset dimensions; food may provide a denser raster.
+            // Admit only the existing raster or the food body's uniform 4x raster.
+            || !([r.image.width, r.image.height] == [a.width, a.height]
+                || [r.image.width, r.image.height] == [a.width * 4, a.height * 4])
         {
             return Err("invalid resource".into());
         }
+        let mip_level_count = r.image.mip_level_count()?;
         if self
             .textures
             .keys()
@@ -402,7 +405,7 @@ impl Renderer {
             .textures
             .values()
             .filter(|t| t.asset.handle != a.handle)
-            .map(|t| t.asset.width as usize * t.asset.height as usize * 4)
+            .map(|t| t.bytes)
             .sum::<usize>();
         if retained + r.image.pixels.len() > crate::bank::PIXEL_BUDGET {
             return Err("Resident GPU pixel budget".into());
@@ -410,42 +413,51 @@ impl Renderer {
         let texture = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("authored RGBA"),
             size: wgpu::Extent3d {
-                width: a.width,
-                height: a.height,
+                width: r.image.width,
+                height: r.image.height,
                 depth_or_array_layers: 1,
             },
-            mip_level_count: 1,
+            mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        self.queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &r.image.pixels,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(a.width * 4),
-                rows_per_image: Some(a.height),
-            },
-            wgpu::Extent3d {
-                width: a.width,
-                height: a.height,
-                depth_or_array_layers: 1,
-            },
-        );
+        let (mut width, mut height) = (r.image.width, r.image.height);
+        let mut offset = 0;
+        for mip_level in 0..mip_level_count {
+            let bytes = width as usize * height as usize * 4;
+            self.queue.write_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &texture,
+                    mip_level,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                &r.image.pixels[offset..offset + bytes],
+                wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(width * 4),
+                    rows_per_image: Some(height),
+                },
+                wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+            );
+            offset += bytes;
+            width = (width / 2).max(1);
+            height = (height / 2).max(1);
+        }
         let view = texture.create_view(&Default::default());
         let binding = |address_mode| {
             let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("Canvas-like linear clamp"),
                 mag_filter: wgpu::FilterMode::Linear,
                 min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::MipmapFilterMode::Linear,
                 address_mode_u: address_mode,
                 address_mode_v: address_mode,
                 ..Default::default()
@@ -473,6 +485,7 @@ impl Renderer {
             key,
             Texture {
                 asset: a,
+                bytes: r.image.pixels.len(),
                 _texture: texture,
                 bind,
                 repeat_bind,

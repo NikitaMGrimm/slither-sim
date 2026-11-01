@@ -7,6 +7,7 @@ pub mod cosmetics;
 pub mod editor_geometry;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod endpoint_login;
+mod food_texture;
 pub mod frame;
 pub mod game;
 pub mod gpu;
