@@ -34,6 +34,8 @@ pub struct Bank {
     pub cosmetics: Option<crate::cosmetics::Cosmetics>,
     pub assets: Vec<BodyAsset>,
     recipes: Vec<CanvasRecipe>,
+    // Zero keeps the ordinary raster; food gradients use filtered mip levels.
+    food_raster_scale: Vec<u32>,
     pub bodies: Vec<Family>,
     pub outline: BodyAssetUse,
     pub shadow: BodyAssetUse,
@@ -97,6 +99,7 @@ impl Bank {
             cosmetics: None,
             assets: Vec::new(),
             recipes: Vec::new(),
+            food_raster_scale: Vec::new(),
             bodies: Vec::new(),
             outline: use_at(0),
             shadow: use_at(0),
@@ -125,22 +128,27 @@ impl Bank {
         b.shadow = b.add(r.body_sources.shadow);
         b.death = b.add(r.body_sources.death_highlight);
         for p in r.food {
-            let mut family = |rs: Vec<CanvasRecipe>| -> Result<Vec<FoodSource>> {
-                rs.into_iter()
-                    .map(|r| {
-                        let w = r.width;
-                        let h = r.height;
-                        let hw = r.half_width;
-                        let hh = r.half_height;
-                        let u = b.add(r);
-                        FoodSource::new(b.assets[u.asset], f64::from(w), f64::from(h), hw, hh)
-                            .map_err(|e| e.to_string())
-                    })
-                    .collect()
-            };
-            let bodies = family(p.bodies)?;
-            let outlines = family(p.outlines)?;
-            let glows = family(p.glows)?;
+            let mut family =
+                |rs: Vec<CanvasRecipe>, raster_scale: u32| -> Result<Vec<FoodSource>> {
+                    rs.into_iter()
+                        .map(|r| {
+                            let w = r.width;
+                            let h = r.height;
+                            let hw = r.half_width;
+                            let hh = r.half_height;
+                            let u = b.add(r);
+                            b.food_raster_scale[u.asset] = raster_scale;
+                            FoodSource::new(b.assets[u.asset], f64::from(w), f64::from(h), hw, hh)
+                                .map_err(|e| e.to_string())
+                        })
+                        .collect()
+                };
+            // The smallest body is only four logical texels across. Refine its
+            // radial edge without changing source metadata or destination size.
+            // See docs/pellet-quality.md for the authored offscreen regression.
+            let bodies = family(p.bodies, 4)?;
+            let outlines = family(p.outlines, 0)?;
+            let glows = family(p.glows, 1)?;
             b.food.push(FoodFactory {
                 random_phase_unit: 0.,
                 random_wobble_unit: 0.,
@@ -187,6 +195,7 @@ impl Bank {
             status: BodyAssetStatus::Ready,
         });
         self.recipes.push(r);
+        self.food_raster_scale.push(0);
         use_at(index)
     }
     pub fn food(&self, raw: u8, units: [f64; 2]) -> FoodFactory {
@@ -237,7 +246,19 @@ impl Bank {
         let text = self.text_frames.remove(&frame.identity).unwrap_or_default();
         let bytes = indices
             .iter()
-            .map(|i| self.assets[*i].width as usize * self.assets[*i].height as usize * 4)
+            .map(|i| {
+                let a = self.assets[*i];
+                let scale = self.food_raster_scale[*i];
+                if scale == 0 {
+                    a.width as usize * a.height as usize * 4
+                } else {
+                    crate::food_texture::byte_len(
+                        a.width * scale,
+                        a.height * scale,
+                        if scale > 1 { 4 } else { 1 },
+                    )
+                }
+            })
             .sum::<usize>()
             + self
                 .cosmetics
@@ -253,7 +274,12 @@ impl Bank {
         self.cache.retain(|i, _| indices.contains(i));
         for i in &indices {
             if !self.cache.contains_key(i) {
-                let image = materialize(&self.recipes[*i])?;
+                let scale = self.food_raster_scale[*i];
+                let image = if scale == 0 {
+                    materialize(&self.recipes[*i])?
+                } else {
+                    crate::food_texture::materialize(&self.recipes[*i], scale)?
+                };
                 self.cache.insert(
                     *i,
                     Resource {
