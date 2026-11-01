@@ -17,6 +17,139 @@ fn settled(nickname: &str) -> NativeLogin {
     }
     login
 }
+
+#[test]
+fn connection_errors_replace_tips_without_covering_controls_and_clear_on_next_attempt() {
+    use slither_wgpu_slice::game::LocalGame;
+    let error = "WebSocket protocol error: Connection reset without closing handshake";
+    for (extent, dpr) in [([360, 640], 1.), ([960, 540], 1.), ([1920, 1080], 2.)] {
+        let mut login = settled("Player");
+        let mut game = LocalGame::new(0.).unwrap();
+        game.fail(error);
+        login.observe_game(&game).unwrap();
+        for _ in 0..2 {
+            login.prepare_host(extent, dpr, true, None).unwrap();
+        }
+        let shape = login.egui.prepared_shapes().iter().find(|shape| {
+            matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == error)
+        }).expect("visible connection error");
+        let logo = login.layout.viewport_rect(E::Logo);
+        let nickname = login.layout.viewport_rect(E::NicknameHolder);
+        assert!(f64::from(shape.clip_rect.top()) >= logo.y + logo.height);
+        assert!(f64::from(shape.clip_rect.bottom()) <= nickname.y);
+        assert!(shape.clip_rect.left() >= 0.);
+        assert!(shape.clip_rect.right() <= extent[0] as f32 / dpr as f32);
+        game.play("ws://127.0.0.1:19491/slither", "Player", 0)
+            .unwrap();
+        login.observe_game(&game).unwrap();
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        assert!(!login.egui.prepared_shapes().iter().any(|shape| {
+            matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == error)
+        }));
+    }
+}
+
+#[test]
+fn connection_error_clears_before_acquisition_and_new_failure_replaces_it() {
+    use slither_wgpu_slice::game::LocalGame;
+    let mut login = settled("Player");
+    let mut game = LocalGame::new(0.).unwrap();
+    game.fail("Previous connection failed");
+    login.observe_game(&game).unwrap();
+    login.begin_play_attempt(&mut game).unwrap();
+    assert!(game.failure.is_none());
+    login.prepare([960, 540], true, None).unwrap();
+    assert!(!login.egui.prepared_shapes().iter().any(|shape| {
+        matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == "Previous connection failed")
+    }));
+    game.fail("New profile acquisition failed");
+    login.observe_game(&game).unwrap();
+    assert_eq!(
+        game.failure.as_deref(),
+        Some("New profile acquisition failed")
+    );
+    login.prepare([960, 540], true, None).unwrap();
+    assert!(login.egui.prepared_shapes().iter().any(|shape| {
+        matches!(&shape.shape, egui::Shape::Text(text) if text.galley.job.text == "New profile acquisition failed")
+    }));
+}
+
+#[test]
+fn complete_bounded_connection_error_is_visible_without_hover_after_play() {
+    use slither_client::menu_layout::{MenuLayout, MenuMetrics};
+    let mut login = settled("Player");
+    let mut view = login.state.view(true);
+    view.tips_visible = false;
+    let error = "Connection reset while acquiring a profile: ".repeat(6);
+    let bounded: String = error.chars().take(256).collect();
+    let ctx = login.egui.context().unwrap().clone();
+    for (width, height, dpr) in [
+        (280., 480., 1.),
+        (360., 640., 1.),
+        (960., 540., 1.),
+        (960., 540., 2.),
+    ] {
+        let layout = MenuLayout::new(
+            width,
+            height,
+            0.,
+            false,
+            MenuMetrics {
+                last_length_line_height: 18.,
+                nickname_baseline_space: 0.,
+                padded_play_label_width: 80.,
+            },
+        )
+        .unwrap();
+        let mut output = ctx.run_pass(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(width as f32, height as f32),
+                )),
+                viewport_id: egui::ViewportId::ROOT,
+                viewports: [(
+                    egui::ViewportId::ROOT,
+                    egui::ViewportInfo {
+                        native_pixels_per_point: Some(dpr),
+                        ..Default::default()
+                    },
+                )]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            },
+            |ctx| {
+                login
+                    .login_ui
+                    .show(ctx, &view, &layout, true, Some(&error))
+                    .unwrap();
+            },
+        );
+        let shape = output
+            .shapes
+            .iter()
+            .find(|shape| {
+                matches!(&shape.shape,
+            egui::Shape::Text(text) if text.galley.job.text == bounded)
+            })
+            .expect("complete bounded message");
+        let egui::Shape::Text(text) = &shape.shape else {
+            unreachable!()
+        };
+        let bounds = text.galley.rect.translate(text.pos.to_vec2());
+        assert!(
+            shape.clip_rect.contains_rect(bounds),
+            "unclipped text at {width}x{height}, DPR {dpr}: {bounds:?}"
+        );
+        let logo = layout.viewport_rect(E::Logo);
+        let nickname = layout.viewport_rect(E::NicknameHolder);
+        assert!(bounds.top() as f64 >= logo.y + logo.height);
+        assert!(bounds.bottom() as f64 <= nickname.y);
+        // This CPU-only pass deliberately has no GPU texture owner.
+        output.textures_delta.clear();
+    }
+}
 fn input(login: &mut NativeLogin, event: egui::Event) {
     login.settings_input(egui::RawInput {
         events: vec![event],

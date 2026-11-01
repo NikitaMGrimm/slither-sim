@@ -230,44 +230,46 @@ impl LoginUi {
                         );
                     }
                 }
-                let last = &view.last_life;
-                let r = rect(layout.viewport_rect(E::LastLength));
-                let mut job = egui::text::LayoutJob::default();
-                for (s, bold, a) in [
-                    (
-                        format!(
-                            "{}{}",
-                            last.label,
-                            if last.label.is_empty() { "" } else { " " }
-                        ),
-                        false,
-                        last.label_alpha,
-                    ),
-                    (last.number.clone(), true, 1.),
-                    (last.suffix.into(), false, 1.),
-                ] {
-                    job.append(
-                        &s,
-                        0.,
-                        egui::TextFormat {
-                            font_id: egui::FontId::new(
-                                15. * scale,
-                                egui::FontFamily::Name(
-                                    if bold { "login-bold" } else { "login-body" }.into(),
-                                ),
+                if status.is_none() {
+                    let last = &view.last_life;
+                    let r = rect(layout.viewport_rect(E::LastLength));
+                    let mut job = egui::text::LayoutJob::default();
+                    for (s, bold, a) in [
+                        (
+                            format!(
+                                "{}{}",
+                                last.label,
+                                if last.label.is_empty() { "" } else { " " }
                             ),
-                            color: egui::Color32::WHITE.gamma_multiply(a as f32),
-                            ..Default::default()
-                        },
+                            false,
+                            last.label_alpha,
+                        ),
+                        (last.number.clone(), true, 1.),
+                        (last.suffix.into(), false, 1.),
+                    ] {
+                        job.append(
+                            &s,
+                            0.,
+                            egui::TextFormat {
+                                font_id: egui::FontId::new(
+                                    15. * scale,
+                                    egui::FontFamily::Name(
+                                        if bold { "login-bold" } else { "login-body" }.into(),
+                                    ),
+                                ),
+                                color: egui::Color32::WHITE.gamma_multiply(a as f32),
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    let galley = ui.fonts_mut(|f| f.layout_job(job));
+                    ui.painter().galley(
+                        r.center() - galley.size() / 2.,
+                        galley,
+                        egui::Color32::WHITE,
                     );
                 }
-                let galley = ui.fonts_mut(|f| f.layout_job(job));
-                ui.painter().galley(
-                    r.center() - galley.size() / 2.,
-                    galley,
-                    egui::Color32::WHITE,
-                );
-                if view.tips_visible {
+                if view.tips_visible && status.is_none() {
                     let r = rect(layout.viewport_rect(E::Tips));
                     ui.painter().text(
                         r.center_top(),
@@ -459,13 +461,32 @@ impl LoginUi {
                     }
                 }
                 if let Some(status) = status {
-                    ui.painter().text(
-                        pos2(area.center().x, area.bottom() - 18.),
-                        egui::Align2::CENTER_CENTER,
-                        status,
-                        egui::FontId::new(18., egui::FontFamily::Name("body".into())),
-                        theme::ink(MenuTheme::default().text),
+                    let logo = rect(layout.viewport_rect(E::Logo));
+                    let nickname = rect(layout.viewport_rect(E::NicknameHolder));
+                    let message = Rect::from_min_max(
+                        pos2(12., logo.bottom() + 4. * scale),
+                        pos2(area.right() - 12., nickname.top() - 4. * scale),
                     );
+                    if message.is_positive() {
+                        let text: String = status.chars().take(256).collect();
+                        let mut font = egui::FontId::new(
+                            14. * scale,
+                            egui::FontFamily::Name("login-body".into()),
+                        );
+                        let color = theme::ink(MenuTheme::default().text).gamma_multiply(0.7);
+                        let mut galley =
+                            ui.painter()
+                                .layout(text.clone(), font.clone(), color, message.width());
+                        if galley.size().y > message.height() {
+                            font.size *= 0.98 * message.height() / galley.size().y;
+                            galley = ui.painter().layout(text, font, color, message.width());
+                        }
+                        ui.painter().with_clip_rect(message).galley(
+                            pos2(message.center().x - galley.size().x / 2., message.top()),
+                            galley,
+                            color,
+                        );
+                    }
                 }
                 if view.spinner_visible && view.spinner_scale > 0. {
                     let density = dpr * view.spinner_scale;

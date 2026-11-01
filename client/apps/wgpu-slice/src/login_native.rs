@@ -23,6 +23,7 @@ pub struct NativeLogin {
     egui_effects: Vec<HostEditEffect>,
     cancel_requested: bool,
     render_error: Option<String>,
+    connection_error: Option<String>,
     pub ingame_ui: crate::ingame_egui::InGameUi,
     ingame_visible: bool,
     ingame_viewport: ([u32; 2], f64),
@@ -110,6 +111,7 @@ impl NativeLogin {
             egui_effects: Vec::new(),
             cancel_requested: false,
             render_error: None,
+            connection_error: None,
             ingame_ui: Default::default(),
             ingame_visible: false,
             ingame_viewport: ([960, 540], 1.),
@@ -211,7 +213,13 @@ impl NativeLogin {
     pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
         self.state.attempt_ended(phase)
     }
+    pub fn begin_play_attempt(&mut self, game: &mut crate::game::LocalGame) -> Result<()> {
+        game.begin_play_attempt()?;
+        self.connection_error = None;
+        Ok(())
+    }
     pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        self.connection_error.clone_from(&game.failure);
         self.closing = game.stopping();
         let opened = game.ingame_menu_open() && !self.ingame_visible;
         self.ingame_visible = game.ingame_menu_open();
@@ -658,8 +666,10 @@ impl NativeLogin {
                 {
                     self.cancel_requested = true;
                 }
-                let status = (self.studio.status == "Saved for this run")
-                    .then_some(self.studio.status.as_str());
+                let status = self.connection_error.as_deref().or_else(|| {
+                    (self.studio.status == "Saved for this run")
+                        .then_some(self.studio.status.as_str())
+                });
                 match self.login_ui.show(
                     ctx,
                     &view,

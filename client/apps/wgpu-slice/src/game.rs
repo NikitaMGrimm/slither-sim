@@ -180,6 +180,7 @@ pub struct LocalGame {
     effects: VecDeque<Pending>,
     next_effect: u64,
     generation: u32,
+    own_death_seen: bool,
     has_socket: bool,
     work: Option<Work>,
     packet_frames: VecDeque<Picture<PreparedFrame>>,
@@ -237,6 +238,7 @@ impl LocalGame {
             effects: VecDeque::new(),
             next_effect: 1,
             generation: 0,
+            own_death_seen: false,
             has_socket: false,
             work: None,
             packet_frames: VecDeque::new(),
@@ -367,6 +369,14 @@ impl LocalGame {
             && self.work.is_none()
             && self.inflight == 0
     }
+    /// Clear the previous diagnostic before asynchronous profile acquisition.
+    pub fn begin_play_attempt(&mut self) -> Result<()> {
+        if !self.can_play() {
+            return Err("Explicit Play unavailable".into());
+        }
+        self.failure = None;
+        Ok(())
+    }
     pub fn play(&mut self, endpoint: &str, nickname: &str, skin: u8) -> Result<()> {
         self.play_with_profile(endpoint, nickname, skin, &LoginProfile::default())
     }
@@ -418,6 +428,7 @@ impl LocalGame {
             .checked_add(1)
             .ok_or("Generation exhausted")?;
         latency::connection(self.generation);
+        self.own_death_seen = false;
         self.login = login;
         self.nickname = nickname.into();
         self.endpoint = endpoint.into();
@@ -672,9 +683,41 @@ impl LocalGame {
     }
     pub fn closed(&mut self, generation: u32) {
         if self.active(generation) {
+            if let Err(error) = self.drain_terminal_ingress() {
+                self.fail(&error);
+                return;
+            }
             self.has_socket = false;
             self.stop_as(false, "Socket closed");
         }
+    }
+    /// A server may drop TCP without a WebSocket close after game-over.
+    /// Keep this separate from `fail`: rendering/protocol failures still fail.
+    pub fn transport_failed(&mut self, generation: u32, message: &str) -> Result<()> {
+        if !self.active(generation) {
+            return Ok(());
+        }
+        self.drain_terminal_ingress()?;
+        if self.session.view().outcome.is_some() || self.own_death_seen {
+            self.closed(generation);
+        } else {
+            self.fail(message);
+        }
+        Ok(())
+    }
+    fn drain_terminal_ingress(&mut self) -> Result<()> {
+        if self.session.view().connected {
+            // The socket has ended. Cancel pending output/presentation just as
+            // stop_as does, without publishing its unacknowledged world candidate.
+            // Already received packets must still commit before classifying EOF.
+            self.session.commit_control(self.has_socket);
+            self.effects.clear();
+            self.work = None;
+            self.input.leave_tick();
+            self.inflight = 0;
+        }
+        self.release_stalled_presentation()?;
+        self.service_ingress()
     }
     pub fn receive(&mut self, generation: u32, bytes: &[u8], now: f64) -> Result<()> {
         latency::generation(generation);
@@ -806,6 +849,11 @@ impl LocalGame {
     fn apply_message(&mut self, bytes: &[u8], now: f64, message: u64) -> Result<()> {
         latency::applying(message);
         let result = self.ingest(bytes, now);
+        if result.is_ok() && self.session.view().connected {
+            // Own removal can report death before v. Retain it even after the
+            // corpse retires; play_with_appearance resets it for each connection.
+            self.own_death_seen |= self.client.control_view().own.is_some_and(|own| own.dead);
+        }
         latency::event(
             if result.is_ok() {
                 "apply_end"

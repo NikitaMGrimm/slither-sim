@@ -36,6 +36,21 @@ steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.
 
+After a committed own-death removal or game-over, socket resets and abnormal
+closes end the native session quietly. Death observations belong to one connection;
+rival deaths and removals without the death flag do not hide failures. Received
+terminal packets are drained before EOF classification, including packets fenced
+by pending sends or presentation. Unacknowledged frame candidates are discarded.
+Earlier transport failures remain visible as bounded, wrapped text between the
+logo and nickname field, replacing the last-length and hint rows while present.
+The complete message is visible without hover; narrow layouts reduce its text
+size only when needed to fit. The next admitted Play clears
+the diagnostic before asynchronous profile acquisition, so a later acquisition
+failure reports its own error.
+The stock reference keeps WebSocket errors silent and has no visible error label;
+this native diagnostic uses the existing login typography and fade. Browser
+connection-message presentation is unchanged.
+
 `tests/login_native.rs` exercises the real CPU widget tree: unique focus,
 keyboard reachability, pointer actions, containment at small/large sizes and
 DPR 1/1.5/2, nickname limits/save restoration, composition/commit/cancellation,
