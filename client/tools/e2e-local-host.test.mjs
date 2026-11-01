@@ -77,6 +77,5 @@ test('summary assertions require every observed stage, including server response
     assert.throws(() => assertSummary({ ...complete(), [key]: 0 }), { stage });
   }
   assert.throws(() => assertSummary({ ...complete(), protocol: 13 }), { stage: 'setup' });
-  assert.equal(assertSummary({ ...complete(), protocol: 13 }, 13).protocol, 13);
   assert.throws(() => assertSummary({ ...complete(), steeringCommands: Infinity }), { stage: 'steering' });
 });

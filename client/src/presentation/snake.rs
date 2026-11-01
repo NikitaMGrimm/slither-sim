@@ -141,7 +141,7 @@ impl SnakePresentation {
     /// Refresh global configuration without replacing appearance-time state or metrics.
     pub(crate) fn apply_setup(&mut self, setup: &Setup) -> Result<(), PresentationError> {
         finite(&[setup.mamu, setup.spangdv, setup.nsp1, setup.nsp2])?;
-        if !matches!(setup.protocol, 13 | 19)
+        if setup.protocol != 19
             || setup.mamu < 0.
             || setup.spangdv <= 0.
             || setup.nsp1 < 0.
@@ -157,7 +157,7 @@ impl SnakePresentation {
         Ok(())
     }
 
-    /// Initialize absolute geometry and effective heading from validated wire inputs.
+    /// Initialize absolute geometry and effective heading from validated protocol 19 inputs.
     /// Initial length is constructed at zero mass before scheduling the wire mass,
     /// so its first displayed value excludes that mass even when it is nonzero.
     pub fn from_appearance(
@@ -233,7 +233,7 @@ impl SnakePresentation {
             appearance.speed_per_32ms,
             appearance.speed_per_32ms / setup.spangdv,
         ])?;
-        if !matches!(setup.protocol, 13 | 19)
+        if setup.protocol != 19
             || appearance.custom_skin.len() > 255
             || setup.grid_center <= 0.
             || setup.radius <= 0.

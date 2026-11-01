@@ -7,10 +7,6 @@
 //! validation is linear with constant auxiliary storage; each row consumes at
 //! least seven bytes. Announcement validation and field access take constant
 //! work. Views borrow immutable input and retain no owned packet queue.
-//!
-//! The v13 reader re-exports these identical HUD layouts. Their legacy field
-//! meanings are protocol interpretations, as labelled in the catalog:
-//! https://github.com/NikitaMGrimm/slither-sim/blob/main/research/fidelity/2026-10-26-protocol13-catalog/REPORT.md
 
 use std::fmt;
 

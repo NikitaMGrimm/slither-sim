@@ -69,7 +69,6 @@ fn phase_and_canonical_control_admission_are_closed() {
     }
     assert!(p.command_requires_version(97, 25).unwrap());
     assert!(p.admit_protocol(19.0).is_ok());
-    assert!(p.admit_protocol(13.0).is_ok());
     assert!(p.admit_protocol(18.0).is_err());
     assert!(p.admit_protocol(f64::NAN).is_err());
 }

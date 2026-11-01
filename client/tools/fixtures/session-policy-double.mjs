@@ -22,7 +22,7 @@ export class TestSessionPolicy {
   receive_bytes(size){if(!this.connected){this.handshakeFrames++;this.handshakeBytes+=size;if(this.handshakeFrames>16||this.handshakeBytes>1048576)fail('Handshake receive budget exceeded');}}
   receive_header(count,first){if(this.phase==='challenge'){if(count!==1||first!==54)fail('Expected one challenge command');return true;}if(!this.connected&&this.phase!=='setup')fail('Unexpected protocol frame');if(this.phase==='setup'&&first!==97)fail('Expected Setup after login');return false;}
   command_requires_version(opcode,length){if(opcode===54)fail('Repeated challenge');if(opcode===112&&length!==1)fail('Invalid pong');if(opcode===118&&length!==2)fail('Invalid life control');return opcode===97;}
-  admit_protocol(version){if(version!==13&&version!==19)fail('Unsupported protocol');}
+  admit_protocol(version){if(version!==19)fail('Unsupported protocol');}
   challenged(){this.launch=false;this.phase='setup';}
   prepare_controls(pairs,now){const commands=Array.from({length:pairs.length/2},(_,i)=>[pairs[2*i],pairs[2*i+1]]);const initial={};for(const key of ['phase','connected','playing','lifeEnded','outcome','lagging','pingPending','closeRequested','deathMs','previousUiMs','uiPhase','actions','actionRevision'])initial[key]=this[key];this.staged={...stageControls(commands,now,initial,this.hudSchema),commands};return this.staged.plan;}
   match_report(values,setups){const names=['setup','setup-draw','leaderboard','final-score','own-length-scheduled'];const events=Array.from({length:values.length/3},(_,i)=>({commandIndex:values[i*3],kind:names[values[i*3+1]],deathPending:!!values[i*3+2]}));matchHudReport({events,setupDraws:setups},this.staged.commands,this.staged.plan);}

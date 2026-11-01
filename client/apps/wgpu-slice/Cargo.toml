@@ -37,7 +37,6 @@ wgpu = { version = "=30.0.1", default-features = false, features = ["std", "wgsl
 feel-trace = ["slither-client/feel-trace"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-slither-protocol = { path = "../../../crates/slither-protocol" }
 mio = { version = "=1.2.4", features = ["os-poll", "net"] }
 pollster = "=0.4.0"
 tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
