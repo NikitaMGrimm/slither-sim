@@ -185,13 +185,10 @@ impl NativeLogin {
                 slither_client::menu_theme::MenuTheme::default(),
             )
             .map_err(str::to_owned)?;
-        let picker_visible = self.picker.panel.visible || self.picker.policy.visible();
-        let picker_effects = self.picker.step(now)?;
-        if picker_visible {
-            effects = picker_effects;
-            if !self.picker.policy.visible() {
-                effects.extend(self.focus(NICKNAME));
-            }
+        self.picker.step(now)?;
+        if self.picker.take_closed() {
+            effects.extend(self.picker_modal(false));
+            effects.extend(self.focus(NICKNAME));
         }
         if self.champion.policy.visible() || self.champion.policy.finished() {
             self.champion.step(
@@ -500,6 +497,53 @@ impl NativeLogin {
         }
         effects
     }
+    /// Shared Server icon entry: the picker takes the opener's input modality
+    /// and owns the egui host before the next input arrives.
+    pub fn open_picker(&mut self) -> Vec<HostEditEffect> {
+        if !slither_client::server_picker::available(&self.state.view(self.admission))
+            || self.picker.policy.visible()
+        {
+            return Vec::new();
+        }
+        self.picker.ui.keyboard_focus = self.login_ui.keyboard_focus;
+        self.picker.viewport = self.area;
+        self.cancel_picker_composition();
+        self.picker.open();
+        self.refresh_egui();
+        self.egui.begin_screen();
+        let mut effects = self.picker_modal(true);
+        effects.extend(self.sync_controls(self.admission));
+        // egui's initial Area sizing pass must settle before input reaches fields.
+        self.settings_frame();
+        self.settings_frame();
+        effects
+    }
+    /// A pointer close can end the native composition without an IME event the
+    /// picker sees: `set_ime_allowed(false)` need not report Disabled. Restore
+    /// the snapshot so a stale composition cannot outlive the picker.
+    fn cancel_picker_composition(&mut self) {
+        if let Some(ctx) = self.egui.context() {
+            self.picker.ui.cancel_composition(ctx);
+        }
+    }
+    /// Release held gameplay input on entry, like other modals. egui-winit owns
+    /// IME admission for the picker's fields and the nickname it returns to; a
+    /// legacy IME effect here would desynchronize its cached state.
+    fn picker_modal(&mut self, modal: bool) -> Vec<HostEditEffect> {
+        let mut effects = self.input.state.apply(EditIntent::Modal(modal));
+        effects.retain(|e| {
+            !matches!(
+                e,
+                HostEditEffect::ImeAllowed(_)
+                    | HostEditEffect::ImePurposeNormal
+                    | HostEditEffect::ImeCursorArea { .. }
+            )
+        });
+        effects
+    }
+    fn picker_owns_input(&self) -> bool {
+        self.picker.policy.visible() && !self.state.settings.visible()
+    }
     pub fn login_owns_input(&self) -> bool {
         let view = self.state.view(self.admission);
         (view.visible || view.spinner_visible)
@@ -514,6 +558,7 @@ impl NativeLogin {
             return false;
         }
         self.state.settings.visible()
+            || self.picker.policy.visible()
             || self.ingame_visible
             || self.closing
             || matches!(
@@ -524,8 +569,10 @@ impl NativeLogin {
             )
     }
     fn refresh_egui(&mut self) {
-        let active =
-            self.login_owns_input() || self.state.settings.visible() || self.ingame_visible;
+        let active = self.login_owns_input()
+            || self.state.settings.visible()
+            || self.picker.policy.visible()
+            || self.ingame_visible;
         let opened = active && !self.egui.active();
         self.egui.set_active(active);
         if opened && self.login_owns_input() {
@@ -553,24 +600,35 @@ impl NativeLogin {
             self.login_ui.nickname.clone_from(&view.nickname);
         }
         view.login_alpha *= 1. - self.state.settings.alpha();
+        let picker = !settings && self.picker.policy.visible();
+        if picker {
+            self.picker.viewport = self.area;
+            self.picker.sync();
+        }
         let order = if settings {
             crate::settings_egui::focus_order().to_vec()
+        } else if picker {
+            crate::server_picker_egui::focus_order(&self.picker.panel)
         } else {
             crate::login_egui::focus_order(&view)
         };
         let mut action = None;
+        let mut intents = Vec::new();
         self.egui.frame(
             self.area.map(|n| (n * self.pixel_scale).round() as u32),
             self.pixel_scale,
             &order,
             |ctx, reveal| {
+                // While open, the picker owns Enter and Escape.
                 if self.closing
+                    && !picker
                     && !self.login_ui.composing
                     && ctx.input(|i| i.key_pressed(egui::Key::Enter))
                 {
                     self.replay_after_close = true;
                 }
                 if !settings
+                    && !picker
                     && !self.login_ui.composing
                     && ctx.input(|i| i.key_pressed(egui::Key::Escape))
                 {
@@ -580,7 +638,7 @@ impl NativeLogin {
                     .then_some(self.studio.status.as_str());
                 match self
                     .login_ui
-                    .show(ctx, &view, &self.layout, !settings, status)
+                    .show(ctx, &view, &self.layout, !settings && !picker, status)
                 {
                     Ok(value) => action = value,
                     Err(error) => self.render_error = Some(error),
@@ -588,8 +646,25 @@ impl NativeLogin {
                 if settings {
                     self.settings_ui.show(ctx, &mut self.state.settings, reveal);
                 }
+                if picker {
+                    match self.picker.ui.show(
+                        ctx,
+                        &self.picker.panel,
+                        self.picker.viewport,
+                        self.picker.policy.is_open(),
+                    ) {
+                        Ok(value) => intents = value,
+                        Err(error) => self.render_error = Some(error),
+                    }
+                }
             },
         );
+        if picker {
+            self.picker.apply(intents);
+            if !self.picker.policy.is_open() {
+                self.cancel_picker_composition();
+            }
+        }
         if !self.login_ui.composing && !settings {
             self.state
                 .edit_nickname(&self.login_ui.nickname.encode_utf16().collect::<Vec<_>>());
@@ -610,7 +685,6 @@ impl NativeLogin {
             opener.keyboard_navigation();
         }
         self.controls.inherit_modality(&opener);
-        self.picker.controls.inherit_modality(&opener);
         let effects = match id {
             PLAY => {
                 self.state.action(
@@ -624,15 +698,11 @@ impl NativeLogin {
                 Vec::new()
             }
             SETTINGS => self.open_settings(self.admission),
-            SERVER
-                if slither_client::server_picker::available(&self.state.view(self.admission)) =>
-            {
-                self.picker.open()
-            }
+            SERVER => self.open_picker(),
             CHANGE_SKIN => self.open_studio(),
             _ => Vec::new(),
         };
-        if matches!(id, SERVER | CHANGE_SKIN) {
+        if id == CHANGE_SKIN {
             self.egui_effects.push(HostEditEffect::ImeAllowed(false));
         }
         self.egui_effects.extend(effects);
@@ -643,16 +713,33 @@ impl NativeLogin {
         if !self.egui.active() {
             return;
         }
-        if self.egui.take_ime_cancellation() && self.login_owns_input() {
-            if let Some(ctx) = self.egui.context() {
-                self.login_ui.cancel_composition(ctx);
+        if self.egui.take_ime_cancellation() {
+            if self.login_owns_input() {
+                if let Some(ctx) = self.egui.context() {
+                    self.login_ui.cancel_composition(ctx);
+                }
+                self.settings_frame();
+            } else if self.picker_owns_input() {
+                if let Some(ctx) = self.egui.context() {
+                    self.picker.ui.cancel_composition(ctx);
+                }
+                self.settings_frame();
             }
-            self.settings_frame();
         }
         let events = std::mem::take(&mut input.events);
         for mut event in events {
             if !self.egui.active() {
                 break;
+            }
+            if self.picker_owns_input() {
+                match self.picker_event(&mut event) {
+                    PickerEvent::Forward => {}
+                    PickerEvent::Handled => continue,
+                    PickerEvent::Pass => {
+                        self.settings_frame();
+                        continue;
+                    }
+                }
             }
             if self.login_owns_input() {
                 if matches!(event, egui::Event::Key { pressed: true, .. }) {
@@ -723,12 +810,7 @@ impl NativeLogin {
                     active_range_chars,
                 }) = &mut event
             {
-                *text = slither_client::menu_input::bounded_preedit(text);
-                if let Some(range) = active_range_chars {
-                    let len = text.chars().count();
-                    range.start = range.start.min(len);
-                    range.end = range.end.min(len);
-                }
+                bound_preedit(text, active_range_chars);
                 if !text.is_empty()
                     && let Some(ctx) = self.egui.context()
                 {
@@ -754,6 +836,97 @@ impl NativeLogin {
             if discrete {
                 self.settings_frame();
             }
+        }
+    }
+    /// Picker-owned events that egui must not see: list navigation, keys egui
+    /// would turn into directional focus moves, and the bounded list wheel.
+    fn picker_event(&mut self, event: &mut egui::Event) -> PickerEvent {
+        use crate::server_picker_egui::{focusable, rule, widget_id};
+        use egui::Key as K;
+        let focus = self
+            .picker
+            .ui
+            .focused()
+            .filter(|id| focusable(&self.picker.panel, *id));
+        let field = focus.and_then(rule);
+        match event {
+            egui::Event::Key { key, pressed, .. } => {
+                if *pressed {
+                    self.picker.ui.keyboard_focus = true;
+                }
+                if self.picker.ui.composing {
+                    // Composition owns traversal and Escape cancels it.
+                    return match key {
+                        K::Tab if *pressed => PickerEvent::Handled,
+                        K::Escape if *pressed => {
+                            self.egui.cancel_pointer();
+                            if let Some(ctx) = self.egui.context() {
+                                self.picker.ui.cancel_composition(ctx);
+                            }
+                            PickerEvent::Pass
+                        }
+                        _ => PickerEvent::Forward,
+                    };
+                }
+                match key {
+                    K::ArrowDown | K::ArrowUp | K::PageDown | K::PageUp | K::Home | K::End => {
+                        if field.is_some() && matches!(key, K::Home | K::End) {
+                            return PickerEvent::Forward;
+                        }
+                        if *pressed && let Some(target) = self.picker.navigate(focus, *key) {
+                            self.picker.ui.request_focus(target);
+                            self.egui.focus(widget_id(target));
+                            return PickerEvent::Pass;
+                        }
+                        // The address field has no vertical caret movement.
+                        PickerEvent::Handled
+                    }
+                    K::ArrowLeft | K::ArrowRight if field.is_none() => PickerEvent::Handled,
+                    _ => PickerEvent::Forward,
+                }
+            }
+            egui::Event::WindowFocused(false) => {
+                self.egui.cancel_pointer();
+                if let Some(ctx) = self.egui.context() {
+                    self.picker.ui.cancel_composition(ctx);
+                }
+                PickerEvent::Forward
+            }
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text,
+                active_range_chars,
+            }) => {
+                bound_preedit(text, active_range_chars);
+                if let Some(ctx) = self.egui.context() {
+                    if text.is_empty() {
+                        self.picker.ui.cancel_composition(ctx);
+                    } else if let Some(field) = focus.filter(|_| field.is_some()) {
+                        self.picker.ui.begin_composition(ctx, field);
+                    }
+                }
+                PickerEvent::Forward
+            }
+            // Normalize inserted UTF-16 units first; the complete value is
+            // then truncated by the same field rule after the pass.
+            egui::Event::Text(text)
+            | egui::Event::Paste(text)
+            | egui::Event::Ime(egui::ImeEvent::Commit(text)) => {
+                if let Some(rule) = field {
+                    *text = rule.normalize_units(&text.encode_utf16().collect::<Vec<_>>());
+                }
+                PickerEvent::Forward
+            }
+            egui::Event::MouseWheel { unit, delta, .. } => {
+                let y = f64::from(delta.y);
+                self.picker.wheel(match unit {
+                    egui::MouseWheelUnit::Line => -y,
+                    // egui-winit divides physical pixels by the window scale.
+                    egui::MouseWheelUnit::Point => -y * self.pixel_scale / 46.,
+                    egui::MouseWheelUnit::Page => -y * 6.,
+                });
+                PickerEvent::Handled
+            }
+            _ => PickerEvent::Forward,
         }
     }
     fn settings_key(&mut self, key: egui::Key) {
@@ -1007,12 +1180,6 @@ impl NativeLogin {
             });
             return self.take_egui_effects();
         }
-        if self.picker.policy.visible() {
-            return self
-                .picker
-                .pointer_scaled(&mut self.text, point, down, self.pixel_scale)
-                .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
-        }
         if self.champion.policy.visible() {
             return self
                 .champion
@@ -1082,7 +1249,8 @@ impl NativeLogin {
         self.area = area;
         self.refresh_egui();
         self.admission = admission;
-        if self.login_owns_input() || self.state.settings.visible() {
+        if self.login_owns_input() || self.state.settings.visible() || self.picker.policy.visible()
+        {
             if let Some(ctx) = self.egui.context() {
                 self.login_ui.sync_art(ctx, cosmetics);
             }
@@ -1161,17 +1329,6 @@ impl NativeLogin {
                 scroll: &mut self.champion.scroll,
                 theme: slither_client::menu_theme::MenuTheme::default(),
             })
-        } else if self.picker.policy.visible() {
-            self.picker.viewport = area;
-            self.picker.panel = self.picker.policy.panel(area);
-            Some(crate::menu::PanelPaint {
-                thumbnails: None,
-                panel: &self.picker.panel,
-                input: &self.picker.controls,
-                edit: &self.picker.input.state,
-                scroll: &mut self.picker.scroll,
-                theme: slither_client::menu_theme::MenuTheme::default(),
-            })
         } else {
             Some(crate::menu::PanelPaint {
                 thumbnails: None,
@@ -1197,12 +1354,28 @@ impl NativeLogin {
         self.login_ui.nickname.clone()
     }
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
-        if self.picker.policy.visible() {
-            return self.picker.cursor_area(&mut self.text, self.pixel_scale);
-        }
         if self.champion.policy.visible() {
             return self.champion.cursor_area(&mut self.text, self.pixel_scale);
         }
         Ok(Vec::new())
+    }
+}
+
+enum PickerEvent {
+    /// Continue through the shared egui event path.
+    Forward,
+    /// Consumed without a pass.
+    Handled,
+    /// Consumed; run one ordered pass for its focus or state change.
+    Pass,
+}
+
+/// Provisional Unicode is bounded separately from each field's committed limit.
+fn bound_preedit(text: &mut String, range: &mut Option<std::ops::Range<usize>>) {
+    *text = slither_client::menu_input::bounded_preedit(text);
+    if let Some(range) = range {
+        let len = text.chars().count();
+        range.start = range.start.min(len);
+        range.end = range.end.min(len);
     }
 }

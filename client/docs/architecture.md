@@ -83,13 +83,17 @@ semantic local art. The [server picker](server-picker.md) uses shared directory
 and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
 
-Native login, Settings and the in-game menu use one lazy `egui_native::NativeEguiHost`. It owns
+Native login, Settings, the server picker and the in-game menu use one lazy
+`egui_native::NativeEguiHost`. It owns
 the context, egui-winit adapter, ordered input, texture deltas, meshes and
 egui-wgpu renderer.
 Closed screens bypass translation, draining and context mutation. Window cursor,
 DPI, focus, modifier and held-key bookkeeping precedes input ownership; activation
 synchronizes the adapter from that state. Repeated key-down events are filtered
-before custom Tab traversal and egui processing.
+before custom Tab traversal and egui processing. Keyboard, pointer, wheel, touch
+and IME events reach the owning screen at once, in order
+(`egui_native::immediate_menu_input`); leftover adapter input takes the same
+ordered route on the next frame, never one raw egui batch.
 
 The [native login](login-egui.md) uses `login_egui.rs` for editable nickname,
 Play and menu entry points, including the after-death result. Adjacent IME
@@ -105,11 +109,15 @@ that effect and running the existing session teardown/login return. Frames keep
 presenting while closing, with no new game sends; Enter retains a Play request
 until the old socket has been released. Dismissal samples the current window cursor
 without resetting heading cadence. Browser DOM menus are unchanged.
+`server_picker_egui.rs` paints the shared `ServerPicker` panel at its resolved
+control rectangles; the core keeps choices, list windows and validation, and
+`server_picker_native.rs` keeps preference and custom-server storage.
 `settings_egui.rs` owns layout and
 actions; the shared `settings::SettingsState` owns preferences, fade timing,
 generation checks and persistence. `egui_theme.rs` maps `MenuTheme` and installed
-fonts to egui style, with shared pill buttons, checkbox rows, titles and shadowed
-panel frames. Other screens will use the same host/frame callback and widgets
+fonts to egui style, with shared pill buttons, checkbox rows, titles, shadowed
+panel frames and the IME composition snapshot. Other screens will use the same
+host/frame callback and widgets
 after they are ported, without another context, input adapter or render pass
 integration. The host paints
 after existing composition and before presentation on the same device and queue.

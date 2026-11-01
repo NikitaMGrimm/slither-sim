@@ -22,8 +22,9 @@ Committed edits keep their undo history without provisional candidates. Windows
 clipboard access uses the existing clipboard dependency, since egui-winit's
 optional system clipboard is disabled.
 
-Settings shares the egui context during its fade. Server picker, skin studio and
-champion retain their existing toolkit, input adapters and transition composition
+Settings and the [server picker](server-picker.md) share the egui context during
+their fades; login paints below them without input. Skin studio and champion
+retain their existing toolkit, input adapters and transition composition
 until their own ports. The outgoing login fade still paints while gameplay owns
 steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
