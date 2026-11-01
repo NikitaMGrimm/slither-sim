@@ -227,6 +227,66 @@ fn v19_single_food_flood_keeps_allocation_cost_independent_of_world_size() {
     }
 }
 
+#[test]
+fn empty_v19_sector_fallback_preserves_controls_and_lifecycle_admission() {
+    use slither_client::{
+        presentation::ClientPresentationError, protocol::ElapsedHeader, session_policy::Phase,
+    };
+    let empty = [b'F', 20, 20];
+    let mut negotiating = host::negotiating();
+    assert!(!negotiating.champion_session().connected);
+    assert_eq!(
+        negotiating
+            .receive(negotiating.generation(), &empty, 3.)
+            .unwrap_err(),
+        "Expected Setup after login"
+    );
+    assert_eq!(negotiating.phase(), Phase::Setup);
+    assert_eq!(negotiating.client().received().frames_applied, 0);
+
+    let mut g = ready(19, 64);
+    let mut core = g.client().clone();
+    assert!(
+        core.try_apply_single_food::<ClientPresentationError, _>(
+            &empty,
+            ElapsedHeader::Absent,
+            |_, _| panic!("an empty sector must not invoke the food factory"),
+        )
+        .unwrap()
+        .is_none()
+    );
+    assert_eq!(&core, g.client());
+    let mut expected = g.client().received().clone();
+    let foods = g.client().foods().clone();
+    let session = g.champion_session();
+    assert!(session.connected && session.ping_pending);
+    g.receive(g.generation(), &empty, 301.).unwrap();
+    expected.frames_applied += 1;
+    expected.commands_applied += 1;
+    expected.last_elapsed_ms = None;
+    assert_eq!(g.client().received(), &expected);
+    assert_eq!(g.client().foods(), &foods);
+    assert_eq!(
+        format!("{:?}", g.champion_session()),
+        format!("{session:?}")
+    );
+    g.receive(g.generation(), b"p", 302.).unwrap();
+    assert!(!g.champion_session().ping_pending);
+    g.receive(g.generation(), &own_move(19), 303.).unwrap();
+    g.receive(g.generation(), &wire::board(), 304.).unwrap();
+    assert!(host::pump(&mut g, 600.).contains(&vec![251]));
+
+    // A closed transport can retain Setup until its later world-reset frame.
+    g.closed(g.generation());
+    assert_eq!(g.phase(), Phase::Disconnected);
+    assert!(!g.champion_session().connected);
+    assert!(g.client().received().setup.is_some());
+    let closed = g.client().received().clone();
+    g.receive(g.generation(), &empty, 601.).unwrap();
+    assert_eq!(g.client().received(), &closed);
+    assert_eq!(g.phase(), Phase::Disconnected);
+}
+
 fn drain_18852(protocol: u8) {
     let mut g = ready(protocol, 6000);
     let frames = g.client().received().frames_applied;
