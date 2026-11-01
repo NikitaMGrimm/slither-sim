@@ -1246,3 +1246,165 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
         }
     }
 }
+
+/// Login text egui paints: string, origin and galley bounds. The cycling tip
+/// changes on its own clock, so its row is left out.
+fn login_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
+    let tips = login.layout.viewport_rect(E::Tips);
+    login
+        .egui
+        .prepared_shapes()
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Text(t)
+                if !(tips.y..tips.y + tips.height).contains(&f64::from(t.pos.y)) =>
+            {
+                Some((t.galley.job.text.clone(), t.pos, t.galley.rect))
+            }
+            _ => None,
+        })
+        .collect()
+}
+/// While the login is meaningfully visible the whole settled login is on
+/// egui at its settled place; once faded out, any text left is still there.
+fn assert_stable(
+    login: &NativeLogin,
+    settled: &[(String, egui::Pos2, egui::Rect)],
+    visible: bool,
+    at: &str,
+) {
+    let text = login_text(login);
+    if visible {
+        assert_eq!(text, settled, "{at}");
+    } else {
+        assert!(text.iter().all(|t| settled.contains(t)), "{at}: {text:?}");
+    }
+}
+
+/// The skin studio still draws on the old toolkit, but the login below it
+/// stays on egui through entry, the fades and exit: its links and captions
+/// never change renderer, so they never shift.
+#[test]
+fn login_text_stays_put_while_the_skin_studio_enters_and_leaves() {
+    use slither_client::skin_studio::CANCEL;
+    for dpr in [1., 1.5] {
+        let mut login = settled("Player");
+        let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        let settled = login_text(&login);
+        for caption in ["Change Skin", "Choose Server", "Settings"] {
+            assert!(settled.iter().any(|t| t.0 == caption), "{dpr}: {settled:?}");
+        }
+        let r = login
+            .login_ui
+            .controls
+            .iter()
+            .find(|c| c.0 == CHANGE_SKIN)
+            .unwrap()
+            .1;
+        let p = [r.center().x as f64, r.center().y as f64];
+        login.pointer(p, Some(true), true);
+        login.pointer(p, Some(false), true);
+        assert!(login.studio.state.visible());
+        let frame = |login: &mut NativeLogin, now: u32, phase: &str| {
+            login.step(f64::from(now), true, false).unwrap();
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            let visible = 1. - login.studio.state.alpha() > 0.05;
+            assert_stable(login, &settled, visible, &format!("{dpr} {phase} {now}"));
+        };
+        for now in (9616..=10400).step_by(16) {
+            frame(&mut login, now, "enter");
+        }
+        assert!(login.studio.state.alpha() >= 1.);
+        let cancel = login
+            .panel
+            .resolve([960., 720.])
+            .unwrap()
+            .into_iter()
+            .find(|c| c.control.id == CANCEL)
+            .unwrap()
+            .rect;
+        let p = [cancel.x + cancel.width / 2., cancel.y + cancel.height / 2.];
+        login.pointer(p, Some(true), true);
+        login.pointer(p, Some(false), true);
+        for now in (10416..=11200).step_by(16) {
+            frame(&mut login, now, "leave");
+        }
+        assert!(!login.studio.state.visible());
+        frame(&mut login, 11216, "closed");
+        // egui owns input again; the host's post-present sync returns focus
+        // to the opener.
+        assert!(login.egui_owns_input());
+        login.sync_return_focus(true);
+        assert_eq!(login.focused(), Some(CHANGE_SKIN));
+    }
+}
+
+/// The champion editor still draws on the old toolkit. The returning login
+/// below it is on egui throughout, so the final length stays put when the
+/// editor exits and the ordinary controls return.
+#[test]
+fn login_text_stays_put_while_the_champion_editor_exits() {
+    use endpoint_tape::{bundle, effects, pump};
+    for dpr in [1., 1.5] {
+        let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+        let mut game = endpoint_tape::playing();
+        let mut login = NativeLogin::new("Player").unwrap();
+        login.step(0., true, false).unwrap();
+        login.activate(true);
+        login.step(16., true, false).unwrap();
+        pump(&mut game, 600.);
+        login.observe_game(&game).unwrap();
+        let mut first = endpoint_tape::board();
+        first[2..4].copy_from_slice(&1u16.to_be_bytes());
+        game.receive(game.generation(), &bundle(&[first]), 650.)
+            .unwrap();
+        game.receive(game.generation(), &bundle(&[vec![b'v', 1]]), 700.)
+            .unwrap();
+        let mut frames = Vec::new();
+        for frame in 0..=1300 {
+            let now = 700. + f64::from(frame) * 16.;
+            // Close only once the returning login has settled below the editor.
+            if frame == 800 {
+                game.closed(game.generation());
+                effects(&mut game);
+            }
+            pump(&mut game, now);
+            login.observe_game(&game).unwrap();
+            login.step(now, game.can_play(), false).unwrap();
+            login
+                .prepare_host(extent, dpr, game.can_play(), None)
+                .unwrap();
+            let view = login.state.view(true);
+            frames.push((
+                frame,
+                login.champion.policy.visible(),
+                view.visible && view.login_alpha >= 1.,
+                login_text(&login),
+            ));
+        }
+        let (.., settled) = frames.last().unwrap().clone();
+        let length = settled
+            .iter()
+            .find(|t| t.0.starts_with("Your final length"))
+            .unwrap()
+            .clone();
+        assert!(
+            frames.iter().any(|f| f.1 && f.2),
+            "{dpr}: settled under the editor"
+        );
+        assert!(frames.iter().any(|f| !f.1), "{dpr}: the editor exits");
+        for (frame, editor, settled_login, text) in &frames {
+            if *settled_login {
+                assert!(
+                    text.contains(&length),
+                    "{dpr} {frame} editor={editor}: {text:?}"
+                );
+                assert!(
+                    text.iter().all(|t| settled.contains(t)),
+                    "{dpr} {frame} editor={editor}: {text:?}"
+                );
+            }
+        }
+    }
+}
