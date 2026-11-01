@@ -1,0 +1,569 @@
+{
+  "baseline_commit": "3de1ebcfba4b87bc942de4fc893f1440747b4b58",
+  "fixture": "authored offline Settings; High quality, Original resolution; no cosmetics; initial Quality focus",
+  "production_source_sha256": {
+    "client/apps/wgpu-slice/src/gpu.rs": "dfd589b5ecbe118141d274f10e03489a3db08427320a92eb24548da58d308c60",
+    "client/apps/wgpu-slice/src/lib.rs": "cff6c0fbe52918ebd2ca15312087ad2c9813d351f5a7d8ba12c0e34abf3db2d2",
+    "client/apps/wgpu-slice/src/login_native.rs": "20636d3d293f1078696e6ff80701852b45a30e7b6cfa0894480b9a85476c3910",
+    "client/apps/wgpu-slice/src/main.rs": "13f44c9847b0c2d4c679ac3e9bcd7f2cba7b0a057a1036dbaa0fd80d959df3d4",
+    "client/apps/wgpu-slice/src/menu.rs": "72439156cfc4062d238cdea83075f2e0f807474978d0aac62a1c7cf859db132f",
+    "client/apps/wgpu-slice/src/menu/focus.rs": "76797dfd141d5a5b10b613201965d7a80aa9f7a7bb874a6d356b40921877acd6",
+    "client/apps/wgpu-slice/src/settings_egui.rs": "4d2c327d4860af269116a897b1d91d07e6d37f3648b1fc992c933141f802ffee",
+    "client/apps/wgpu-slice/src/text.rs": "d3d95686ce6716d3ff143f2c716c41050d43a73a440ad6e2d517defd3e8db0fa",
+    "client/apps/wgpu-slice/src/text_native.rs": "1a71433d6b9e811d9b77629bcb963f7a20eac340e731ad5771c5774d8f24a22a",
+    "client/src/menu_controls.rs": "f103dbaf3fe37c972116293944e058844340e19610a05ec557a0fffb1e32129a",
+    "client/src/menu_theme.rs": "4a50ef7895cf85caeb43e387b554184a17fd83adfbc089b5dc04c314d3c00399",
+    "client/src/settings.rs": "c0c2ea9d171e12c44a958ccbd7b858b0b2861644f996cee14b022a64e190ce3d",
+    "Cargo.lock": "603ac8a5ec39876710d6799b8c637b8985fb124074e1cfc6938322c8b0465f16",
+    "client/apps/wgpu-slice/Cargo.toml": "31b05a866ff224a2f43a53d3ce98a12324d2ea7510525e0564e911fd03713b38",
+    "client/apps/wgpu-slice/examples/menu_specimens.rs": "bcf7c5162f9a971dfc9268659e225725ccc02178576ca34b1d2afe7cf992bbbc"
+  },
+  "code_diff_lines_including_comments_and_blank_lines": {
+    "added": 781,
+    "removed": 520,
+    "files": [
+      {
+        "path": "client/apps/wgpu-slice/src/gpu.rs",
+        "added": 23,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/lib.rs",
+        "added": 2,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/login_native.rs",
+        "added": 107,
+        "removed": 89
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/main.rs",
+        "added": 60,
+        "removed": 1
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/menu.rs",
+        "added": 0,
+        "removed": 171
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/menu/focus.rs",
+        "added": 4,
+        "removed": 10
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/settings_egui.rs",
+        "added": 543,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/text.rs",
+        "added": 6,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/text_native.rs",
+        "added": 12,
+        "removed": 7
+      },
+      {
+        "path": "client/src/menu_controls.rs",
+        "added": 3,
+        "removed": 35
+      },
+      {
+        "path": "client/src/menu_theme.rs",
+        "added": 0,
+        "removed": 14
+      },
+      {
+        "path": "client/src/settings.rs",
+        "added": 21,
+        "removed": 193
+      }
+    ]
+  },
+  "incremental_seconds": {
+    "before": 7.270157,
+    "after": 5.655255,
+    "runs_per_side": 1,
+    "profile": "dev, debug info off, warmed incremental cache; width 560 -> 568; restored afterward"
+  },
+  "sizes": [
+    {
+      "kind": "native_exe",
+      "before": {
+        "raw_bytes": 12798464,
+        "gzip9_bytes": 5176431,
+        "sha256": "fac927b1924e5f021619306ef456cceb8785ba064731d82dbbebe14f3b934e8c"
+      },
+      "after": {
+        "raw_bytes": 16403968,
+        "gzip9_bytes": 6729418,
+        "sha256": "0a7c78fef55df1a4964d17e0b68acc23586f46d0f08c101c53f270372f9f9967"
+      },
+      "raw_delta_bytes": 3605504,
+      "gzip9_delta_bytes": 1552987
+    },
+    {
+      "kind": "webgpu_wasm_post_bindgen",
+      "before": {
+        "raw_bytes": 3199830,
+        "gzip9_bytes": 1051337,
+        "sha256": "99fa6624638ba3ad21ce7a1d62eb710f21ca449000606ce07bdc14d209bc4c6b"
+      },
+      "after": {
+        "raw_bytes": 3193574,
+        "gzip9_bytes": 1049640,
+        "sha256": "7c0c9695893f0eb4459a27a0e88f2d973145eaa5e830da579b4e386be36bea9e"
+      },
+      "raw_delta_bytes": -6256,
+      "gzip9_delta_bytes": -1697
+    },
+    {
+      "kind": "webgpu_wasm_compiler_output",
+      "before": {
+        "raw_bytes": 4571367,
+        "gzip9_bytes": 1309295,
+        "sha256": "40cb1b04304380625a464b40fc7d642599328af5be26fd5b65c1f07bacc93d40"
+      },
+      "after": {
+        "raw_bytes": 4564922,
+        "gzip9_bytes": 1307229,
+        "sha256": "f80037ad35b1b71934908232e8595967a0a5ec21c01a696e0669d8eaee25abd2"
+      },
+      "raw_delta_bytes": -6445,
+      "gzip9_delta_bytes": -2066
+    }
+  ],
+  "runs": [
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 118400,
+          "frame_cpu_p95_ns": 221700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 21500,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 68000,
+          "frame_cpu_p95_ns": 128600,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 35200,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 152900,
+          "frame_cpu_p95_ns": 250300,
+          "frame_samples": 120,
+          "prepare_median_ns": 22700,
+          "prepare_p95_ns": 25100,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 150600,
+          "frame_cpu_p95_ns": 319700,
+          "frame_samples": 120,
+          "prepare_median_ns": 21600,
+          "prepare_p95_ns": 39000,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 117500,
+          "frame_cpu_p95_ns": 230100,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 34400,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 76900,
+          "frame_cpu_p95_ns": 177100,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 48800,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 160300,
+          "frame_cpu_p95_ns": 230400,
+          "frame_samples": 120,
+          "prepare_median_ns": 21500,
+          "prepare_p95_ns": 32300,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 113700,
+          "frame_cpu_p95_ns": 210400,
+          "frame_samples": 120,
+          "prepare_median_ns": 22100,
+          "prepare_p95_ns": 32400,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 116900,
+          "frame_cpu_p95_ns": 155700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 28800,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 73700,
+          "frame_cpu_p95_ns": 156700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19500,
+          "prepare_p95_ns": 20400,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 156400,
+          "frame_cpu_p95_ns": 284200,
+          "frame_samples": 120,
+          "prepare_median_ns": 21600,
+          "prepare_p95_ns": 33300,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 152900,
+          "frame_cpu_p95_ns": 242400,
+          "frame_samples": 120,
+          "prepare_median_ns": 21200,
+          "prepare_p95_ns": 27600,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 116500,
+          "frame_cpu_p95_ns": 216600,
+          "frame_samples": 120,
+          "prepare_median_ns": 19300,
+          "prepare_p95_ns": 38300,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 71300,
+          "frame_cpu_p95_ns": 218000,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 23400,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 159300,
+          "frame_cpu_p95_ns": 267000,
+          "frame_samples": 120,
+          "prepare_median_ns": 21900,
+          "prepare_p95_ns": 32000,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 157900,
+          "frame_cpu_p95_ns": 269700,
+          "frame_samples": 120,
+          "prepare_median_ns": 22200,
+          "prepare_p95_ns": 26100,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 72800,
+          "frame_cpu_p95_ns": 133300,
+          "frame_samples": 120,
+          "prepare_median_ns": 19300,
+          "prepare_p95_ns": 25200,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 71200,
+          "frame_cpu_p95_ns": 160700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19500,
+          "prepare_p95_ns": 29300,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 149900,
+          "frame_cpu_p95_ns": 190900,
+          "frame_samples": 120,
+          "prepare_median_ns": 22400,
+          "prepare_p95_ns": 66100,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 139800,
+          "frame_cpu_p95_ns": 223200,
+          "frame_samples": 120,
+          "prepare_median_ns": 21700,
+          "prepare_p95_ns": 22000,
+          "samples": 1000
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "size": "960x540",
+      "before": {
+        "prepare_median_ns": {
+          "median": 19400,
+          "min": 19300,
+          "max": 19400
+        },
+        "prepare_p95_ns": {
+          "median": 28800,
+          "min": 21500,
+          "max": 38300
+        },
+        "frame_cpu_median_ns": {
+          "median": 116900,
+          "min": 72800,
+          "max": 118400
+        },
+        "frame_cpu_p95_ns": {
+          "median": 216600,
+          "min": 133300,
+          "max": 230100
+        }
+      },
+      "after": {
+        "prepare_median_ns": {
+          "median": 21900,
+          "min": 21500,
+          "max": 22700
+        },
+        "prepare_p95_ns": {
+          "median": 32300,
+          "min": 25100,
+          "max": 66100
+        },
+        "frame_cpu_median_ns": {
+          "median": 156400,
+          "min": 149900,
+          "max": 160300
+        },
+        "frame_cpu_p95_ns": {
+          "median": 250300,
+          "min": 190900,
+          "max": 284200
+        }
+      }
+    },
+    {
+      "size": "360x640",
+      "before": {
+        "prepare_median_ns": {
+          "median": 19400,
+          "min": 19400,
+          "max": 19500
+        },
+        "prepare_p95_ns": {
+          "median": 29300,
+          "min": 20400,
+          "max": 48800
+        },
+        "frame_cpu_median_ns": {
+          "median": 71300,
+          "min": 68000,
+          "max": 76900
+        },
+        "frame_cpu_p95_ns": {
+          "median": 160700,
+          "min": 128600,
+          "max": 218000
+        }
+      },
+      "after": {
+        "prepare_median_ns": {
+          "median": 21700,
+          "min": 21200,
+          "max": 22200
+        },
+        "prepare_p95_ns": {
+          "median": 27600,
+          "min": 22000,
+          "max": 39000
+        },
+        "frame_cpu_median_ns": {
+          "median": 150600,
+          "min": 113700,
+          "max": 157900
+        },
+        "frame_cpu_p95_ns": {
+          "median": 242400,
+          "min": 210400,
+          "max": 319700
+        }
+      }
+    }
+  ],
+  "images_sha256": {
+    "before-960x540.png": "a24eb70b437ecc8dd62cb4adbc5f341442f1b85cf775613a80f75e83e1e3e582",
+    "before-360x640.png": "1c449aa17e08b6b1d57d4dc24a461a3c38c25b9ba9e5ab53c77991cec44821a3",
+    "after-960x540.png": "bb811641a4e3df3266f57c15000853b1d83faf8e9efa5ac02d039a9bd9bfa332",
+    "after-360x640.png": "15fca08588127a846593f6fdba718f26d951d5e77c3ca15170b1edb99f5ea3f3"
+  },
+  "images_access": "Comparison figures are public GitHub user attachments; raw source PNGs remain local-only",
+  "method": {
+    "runs_per_side": 5,
+    "order": "A1 B1 A2 B2 A3 B3 A4 B4 A5 B5",
+    "preparation_samples_per_run": 1000,
+    "submission_samples_per_run": 120,
+    "warmup": "25 frames after settled login and Settings entry",
+    "gpu_completion": "wait after every CPU submission sample, outside its timed region",
+    "target": "x86_64-pc-windows-msvc; Rust 1.99.0; release thin LTO; one codegen unit",
+    "dpi": 1,
+    "gpu_class": "IntegratedGpu",
+    "gpu_timestamp_duration": "not measured; production device does not request timestamp features",
+    "limiter": "not profiled; descriptive shared-host timings, not a general performance or adoption conclusion",
+    "host_activity": "Shared Windows host; required checks and other work may be active; alternating runs are descriptive, not an exclusive-machine benchmark"
+  },
+  "baseline_harness_patch_sha256": "387b19d155921044eafc69ca697e585d0c2462e6a9cb704beceaf75dc52fcd0c",
+  "benchmark_binaries_sha256": {
+    "before": "7a484d1824036d12599d474ff4043f835ee462f3e02ba80e1ef50a39ec9d37f4",
+    "after": "413bb525cd033cc2011421a0f46bc247edc5e179dca60bb2c6d181d185bf34f8"
+  },
+  "figure_attachments": {
+    "960x540": {
+      "url": "https://github.com/user-attachments/assets/c30405f1-ae70-4b78-acf1-2e41df9b02c6",
+      "sha256": "9b17f45e7c842f54bb82e884f97e184089bcb688b0c92de63bf13bc23ffe23a9"
+    },
+    "360x640": {
+      "url": "https://github.com/user-attachments/assets/928d495d-8679-427a-ac1d-09adc726c4d8",
+      "sha256": "9140852a505e7b6904e04db49ec3faba47bc7a6d9d983403cc9abd953b0bdead"
+    }
+  },
+  "checks": {
+    "full_client_check": "All checks passed on the rebased production code; check-5-dpi.log retained locally",
+    "independent_review": "Automated CodeRabbit review; no separately commissioned agent or maintainer review",
+    "gpu_scope": "offscreen authored Settings at two sizes; no physical window or game server"
+  }
+}

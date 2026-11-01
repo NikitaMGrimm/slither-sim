@@ -79,6 +79,25 @@ semantic local art. The [server picker](server-picker.md) uses shared directory
 and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
 
+Native Settings currently uses one lazy `egui_native::NativeEguiHost`. It owns
+the context, egui-winit adapter, ordered input, texture deltas, meshes and
+egui-wgpu renderer.
+Closed screens bypass translation, draining and context mutation. Window cursor,
+DPI, focus, modifier and held-key bookkeeping precedes input ownership; activation
+synchronizes the adapter from that state. Repeated key-down events are filtered
+before custom Tab traversal and egui processing.
+
+Settings is the first screen on this host. `settings_egui.rs` owns layout and
+actions; the shared `settings::SettingsState` owns preferences, fade timing,
+generation checks and persistence. `egui_theme.rs` maps `MenuTheme` and installed
+fonts to egui style, with shared pill buttons, checkbox rows, titles and shadowed
+panel frames. Other screens will use the same host/frame callback and widgets
+after they are ported, without another context, input adapter or render pass
+integration. The host paints
+after existing composition and before presentation on the same device and queue.
+Other native menus retain their adapters until ported; browser menus retain DOM
+controls. See [Settings](settings.md) and [dependency licences](egui-licenses.md).
+
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
 

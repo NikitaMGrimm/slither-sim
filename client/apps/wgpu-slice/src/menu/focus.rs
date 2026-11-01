@@ -268,10 +268,6 @@ mod tests {
                 cosmetic: None,
                 selected: true,
             },
-            ControlKind::Toggle {
-                label: "Focus".into(),
-                checked: true,
-            },
         ] {
             for keyboard in [false, true] {
                 let mut target = control().control;
@@ -313,12 +309,10 @@ mod tests {
                     None,
                 )
                 .unwrap();
-                let outlined = c.materials.keys().any(|key| {
-                    matches!(
-                        key,
-                        MaterialKey::Focus(..) | MaterialKey::Indicator(_, _, _, _, true)
-                    )
-                });
+                let outlined = c
+                    .materials
+                    .keys()
+                    .any(|key| matches!(key, MaterialKey::Focus(..)));
                 assert_eq!(outlined, keyboard);
             }
         }

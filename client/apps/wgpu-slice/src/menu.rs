@@ -41,7 +41,6 @@ const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 enum MaterialKey {
     Focus([u32; 2], u64, u64, [u8; 3], u32),
     Thumbnail(frame::ResourceKey),
-    Indicator(u32, SurfaceTokens, [u8; 3], bool, bool),
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
@@ -360,56 +359,6 @@ struct WordmarkRequest {
     draw_index: usize,
     label_index: usize,
 }
-// One bounded indicator tile includes both the rounded fill and authored tick.
-fn toggle_indicator(
-    size: u32,
-    fill: [u8; 3],
-    ink: [u8; 3],
-    checked: bool,
-    focused: bool,
-) -> materials::RgbaImage {
-    let scale = f64::from(size) / 24.;
-    let mut pixels = Vec::with_capacity(size as usize * size as usize * 4);
-    for y in 0..size {
-        for x in 0..size {
-            let p = [(f64::from(x) + 0.5) / scale, (f64::from(y) + 0.5) / scale];
-            let q = [(p[0] - 12.).abs() - 8., (p[1] - 12.).abs() - 8.];
-            let distance = q[0].max(0.).hypot(q[1].max(0.)) + q[0].max(q[1]).min(0.) - 4.;
-            let alpha = (0.5 - distance * scale).clamp(0., 1.);
-            let mut tick = 0_f64;
-            // Share the existing indicator slot to preserve Settings' 32-slot envelope.
-            if focused && alpha > 0. {
-                let inner = (0.5 - distance * scale - scale).clamp(0., 1.);
-                tick = 1. - inner / alpha;
-            }
-            if checked {
-                for (a, b) in [([6., 12.], [10., 16.]), ([10., 16.], [18., 7.])] {
-                    let v = [b[0] - a[0], b[1] - a[1]];
-                    let t = (((p[0] - a[0]) * v[0] + (p[1] - a[1]) * v[1])
-                        / (v[0] * v[0] + v[1] * v[1]))
-                        .clamp(0., 1.);
-                    let d = (p[0] - a[0] - t * v[0]).hypot(p[1] - a[1] - t * v[1]);
-                    tick = tick.max((0.5 + (1.5 - d) * scale).clamp(0., 1.));
-                }
-            }
-            pixels.extend(
-                fill.into_iter()
-                    .zip(ink)
-                    // Menu textures use premultiplied production pixels, including edge coverage.
-                    .map(|(a, b)| {
-                        ((f64::from(a) * (1. - tick) + f64::from(b) * tick) * alpha).round() as u8
-                    }),
-            );
-            pixels.push((alpha * 255.).round() as u8);
-        }
-    }
-    materials::RgbaImage {
-        width: size,
-        height: size,
-        pixels,
-    }
-}
-
 struct Composition<'a> {
     component: MenuComponent,
     attribution: MenuAttribution,
@@ -912,83 +861,6 @@ impl Composition<'_> {
                     }
                     ControlKind::Label { text: value } => {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
-                    }
-                    ControlKind::Toggle { label, checked } => {
-                        let [hover, press] = input.progress(control.id);
-                        let indicator = MenuRect {
-                            x: r.rect.x + 16. * r.scale,
-                            y: r.rect.y + (r.rect.height - 24. * r.scale) / 2.,
-                            width: 24. * r.scale,
-                            height: 24. * r.scale,
-                        };
-                        let feedback = MenuRect {
-                            x: indicator.x - 8. * r.scale,
-                            y: indicator.y - 8. * r.scale,
-                            width: 40. * r.scale,
-                            height: 40. * r.scale,
-                        };
-                        // Checkboxes keep hover/focus/press paint beside the indicator;
-                        // a wide row needs no additional full-width capsule textures.
-                        for (state, opacity) in [
-                            (
-                                ControlState::Hovered,
-                                if enabled {
-                                    hover.max(if input.visible_focus() == Some(control.id) {
-                                        0.33
-                                    } else {
-                                        0.
-                                    })
-                                } else {
-                                    0.
-                                },
-                            ),
-                            (ControlState::Pressed, if enabled { press } else { 0. }),
-                        ] {
-                            let mut tokens = theme.surface(control.style, state);
-                            tokens.recipe = SurfaceRecipe::Compact;
-                            self.sliced(feedback, tokens, alpha * opacity, surface_clip, r.scale)?;
-                        }
-                        let tokens = theme.toggle_indicator(*checked);
-                        let focused = input.visible_focus() == Some(control.id) && enabled;
-                        let size = (indicator.width * self.scale).round().max(1.) as u32;
-                        if size > 512 {
-                            return Err(MENU_RASTER_AXIS_QUOTA.into());
-                        }
-                        let resource = self.cached_material(
-                            MaterialKey::Indicator(size, tokens, theme.text, *checked, focused),
-                            || {
-                                Ok(toggle_indicator(
-                                    size,
-                                    tokens.colors[0],
-                                    theme.text,
-                                    *checked,
-                                    focused,
-                                ))
-                            },
-                        )?;
-                        let mut draw = image(&resource, indicator, alpha);
-                        draw.source = Some(BodyRect {
-                            x: 0.,
-                            y: 0.,
-                            width: f64::from(resource.asset.width),
-                            height: f64::from(resource.asset.height),
-                        });
-                        // Modal scaling need not map the rounded raster to 1:1 pixels.
-                        if clip_scaled_draw(&mut draw, r.clip, self.scale) {
-                            self.push(draw)?;
-                        }
-                        add_label(
-                            self,
-                            label.clone(),
-                            MenuRect {
-                                x: r.rect.x + 54. * r.scale,
-                                width: r.rect.width - 70. * r.scale,
-                                ..r.rect
-                            },
-                            style,
-                            Align::Left,
-                            r.clip,
-                        );
                     }
                     ControlKind::Button { label } | ControlKind::SectionTab { label, .. } => {
                         if control.style == ControlStyle::ChangeSkin {
@@ -3218,49 +3090,6 @@ mod quota_tests {
             .unwrap();
         assert_eq!(retried.attribution.total(), retried.frame.draws.len());
         assert_eq!(retried.draw_counts(0).admitted_menu(), 512);
-    }
-
-    #[test]
-    fn toggle_indicator_corners_and_edges_are_premultiplied() {
-        let theme = MenuTheme::default();
-        for size in [24, 36, 48, 120] {
-            for (checked, focused) in [(false, false), (false, true), (true, false), (true, true)] {
-                let indicator = toggle_indicator(
-                    size,
-                    theme.toggle_indicator(checked).colors[0],
-                    theme.text,
-                    checked,
-                    focused,
-                );
-                if focused {
-                    let plain = toggle_indicator(
-                        size,
-                        theme.toggle_indicator(checked).colors[0],
-                        theme.text,
-                        checked,
-                        false,
-                    );
-                    assert_ne!(indicator.pixels, plain.pixels);
-                }
-                for (x, y) in [(0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)] {
-                    let offset = ((y * size + x) * 4) as usize;
-                    assert_eq!(
-                        &indicator.pixels[offset..offset + 4],
-                        &[0; 4],
-                        "{size} {checked} corner {x},{y}"
-                    );
-                }
-                assert!(
-                    indicator
-                        .pixels
-                        .as_chunks::<4>()
-                        .0
-                        .iter()
-                        .all(|p| p[..3].iter().all(|c| *c <= p[3])),
-                    "{size} {checked}: RGB must not exceed alpha"
-                );
-            }
-        }
     }
 
     #[test]

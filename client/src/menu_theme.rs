@@ -124,20 +124,6 @@ impl Default for MenuTheme {
     }
 }
 impl MenuTheme {
-    /// Small cached check indicator using the existing compact surface recipe.
-    pub fn toggle_indicator(self, checked: bool) -> SurfaceTokens {
-        SurfaceTokens {
-            colors: if checked {
-                [self.selection; 2]
-            } else {
-                // Two-row settings leaves one toggle unfocused; its empty box
-                // must remain visible against the panel's field colour.
-                [self.backdrop; 2]
-            },
-            radius: 4,
-            recipe: SurfaceRecipe::Compact,
-        }
-    }
     /// Font raster tokens. Native Lucida bold currently resolves to Arial Bold.
     pub fn text_style(self, role: ControlStyle) -> TextStyle {
         use ControlStyle::*;
