@@ -586,6 +586,54 @@ fn adapter_format_repeated_down_does_not_repeat_activation_or_traversal() {
 }
 
 #[test]
+fn genuine_adapter_callbacks_preserve_activation_order_before_redraw() {
+    let mut login = settled();
+    login.open_settings(true);
+    // No step/prepare/redraw between these genuine egui-winit-format callbacks.
+    for key in [egui::Key::Space, egui::Key::Tab, egui::Key::Space] {
+        adapter_key(&mut login, key, true, false);
+        adapter_key(&mut login, key, false, false);
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    assert_eq!(
+        login.state.settings.preferences().resolution,
+        slither_client::settings::WorldResolution::Native
+    );
+    // Two more complete presses must toggle twice, even without a redraw.
+    for _ in 0..2 {
+        adapter_key(&mut login, egui::Key::Space, true, false);
+        adapter_key(&mut login, egui::Key::Space, false, false);
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    assert_eq!(
+        login.state.settings.preferences().resolution,
+        slither_client::settings::WorldResolution::Native
+    );
+}
+
+#[test]
+fn motion_callbacks_wait_for_one_redraw_pass() {
+    let mut login = settled();
+    login.open_settings(true);
+    let passes = || login.egui.context().unwrap().cumulative_pass_nr();
+    let before = passes();
+    for x in 0..100 {
+        login.settings_input(egui::RawInput {
+            events: vec![egui::Event::PointerMoved(egui::pos2(x as f32, 100.))],
+            ..Default::default()
+        });
+    }
+    assert_eq!(login.egui.context().unwrap().cumulative_pass_nr(), before);
+    login.prepare([960, 540], true, None).unwrap();
+    assert_eq!(
+        login.egui.context().unwrap().cumulative_pass_nr(),
+        before + 1
+    );
+}
+
+#[test]
 fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
     let mut login = settled();
     assert!(!login.egui.initialized());

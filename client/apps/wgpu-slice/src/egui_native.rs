@@ -83,6 +83,7 @@ struct Session {
     output: Option<egui::PlatformOutput>,
     textures: egui::TexturesDelta,
     meshes: Vec<egui::ClippedPrimitive>,
+    shapes: Option<(Vec<egui::epaint::ClippedShape>, f32)>,
     renderer: Option<egui_wgpu::Renderer>,
     held: [bool; 4],
     reveal_focus: bool,
@@ -135,6 +136,7 @@ impl NativeEguiHost {
             s.context.memory_mut(|m| m.stop_text_input());
             if !active {
                 s.meshes.clear();
+                s.shapes = None;
                 s.output = None;
             }
         }
@@ -159,6 +161,7 @@ impl NativeEguiHost {
                 output: None,
                 textures: Default::default(),
                 meshes: Vec::new(),
+                shapes: None,
                 renderer: None,
                 held: self.window.held,
                 reveal_focus: true,
@@ -381,9 +384,9 @@ impl NativeEguiHost {
         let mut output = s.context.run_pass(input, |ctx| draw(ctx, reveal));
         s.textures
             .append(std::mem::take(&mut output.textures_delta));
-        s.meshes = s
-            .context
-            .tessellate(std::mem::take(&mut output.shapes), output.pixels_per_point);
+        // Discrete callbacks may need ordered layout/action passes before redraw.
+        // Only the final shapes need tessellation when that redraw is painted.
+        s.shapes = Some((std::mem::take(&mut output.shapes), output.pixels_per_point));
         s.output = Some(output.platform_output);
     }
     pub fn paint(&mut self, gpu: &gpu::Renderer, target: &wgpu::TextureView) {
@@ -393,6 +396,9 @@ impl NativeEguiHost {
         let Some(s) = &mut self.session else {
             return;
         };
+        if let Some((shapes, pixels_per_point)) = s.shapes.take() {
+            s.meshes = s.context.tessellate(shapes, pixels_per_point);
+        }
         let renderer = s.renderer.get_or_insert_with(|| {
             egui_wgpu::Renderer::new(
                 &gpu.device,

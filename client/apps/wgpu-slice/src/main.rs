@@ -1,11 +1,11 @@
 #![forbid(unsafe_code)]
 #[cfg(target_arch = "wasm32")]
 fn main() {}
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod headless;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod scheduling;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod desktop {
     use crate::scheduling::Schedule;
     use slither_client::session_policy::Phase;
@@ -1337,11 +1337,20 @@ mod desktop {
         }
     }
 }
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn main() {
     let result = desktop::options().and_then(|o| o.map_or(Ok(()), desktop::run));
     if let Err(e) = result {
         eprintln!("{e}");
         std::process::exit(1);
     }
+}
+
+// Linux intentionally has no winit backend; slither-client-e2e remains headless.
+#[cfg(target_os = "linux")]
+fn main() {
+    eprintln!(
+        "The desktop client is not supported on Linux; use slither-client-e2e for offline probes."
+    );
+    std::process::exit(1);
 }

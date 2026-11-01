@@ -339,8 +339,20 @@ impl NativeLogin {
     }
     /// Authored input and the native egui-winit adapter feed the same widget tree.
     pub fn settings_input(&mut self, input: egui::RawInput) {
+        let discrete = input.events.iter().any(|event| {
+            !matches!(
+                event,
+                egui::Event::PointerMoved(_)
+                    | egui::Event::MouseMoved(_)
+                    | egui::Event::PointerGone
+            )
+        });
         self.egui.input(input);
-        self.settings_frame();
+        // Queue motion/modifier-only callbacks for redraw. Discrete actions must
+        // stay ordered: batching Space -> Tab -> Space retargets the first press.
+        if discrete {
+            self.settings_frame();
+        }
     }
     fn settings_key(&mut self, key: egui::Key) {
         let modifiers = egui::Modifiers {

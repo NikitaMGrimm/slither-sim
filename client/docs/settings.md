@@ -54,6 +54,11 @@ without an unfocused frame. Blur, resize, DPI changes and a new mount cancel
 pointer capture. Nickname composition blocks entry; the modal releases gameplay
 holds and disables nickname IME. Native accessibility bridging remains separate.
 
+Pointer motion and modifier-only callbacks queue for the next frame. Discrete
+actions run layout/action passes in callback order: batching Space, Tab, Space
+into one pass would retarget the first activation to the final focus. Only the
+final shapes are tessellated at paint, once per redraw.
+
 Offline tests cover record precedence, write failures, entry/return focus,
 modality, capture cancellation and Play snapshots. Layout tests check containment,
 non-overlap and keyboard reachability across narrow/wide windows and DPR 1–8;
