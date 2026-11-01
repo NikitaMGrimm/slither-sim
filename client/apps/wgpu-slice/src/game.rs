@@ -570,6 +570,9 @@ impl LocalGame {
         }
         self.close_ingame_menu();
         self.stop_requested = true;
+        // Cancel a retained picture's session revision without publishing its
+        // world candidate, just as terminal teardown does before discarding work.
+        self.session.commit_control(self.has_socket);
         self.effects.clear();
         self.work = None;
         self.input.leave_tick();

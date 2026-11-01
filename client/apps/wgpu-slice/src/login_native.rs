@@ -214,7 +214,7 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
-        if self.replay_after_close && game.can_play() {
+        if self.replay_after_close && game.can_play() && !self.state.view(true).play_disabled {
             self.replay_after_close = false;
             self.state.action(MenuAction::Play, true);
         }

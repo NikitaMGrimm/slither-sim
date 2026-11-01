@@ -469,6 +469,9 @@ fn unadmitted_playing_escape_uses_the_same_pending_close_and_retains_replay() {
     assert!(game.client().control_view().own.is_none());
     let mut login = login(&game);
     assert!(!escape(&mut login, &mut game, false));
+    game.begin_redraw(25., [960, 540], 1.).unwrap();
+    let retained = game.take_frame().unwrap();
+    game.retry_frame(retained).unwrap();
     login.cancel_game(&mut game); // The desktop's unconsumed Esc fallback.
     assert!(game.stopping());
     let close = game.effect().unwrap();
@@ -510,6 +513,57 @@ fn unadmitted_playing_escape_uses_the_same_pending_close_and_retains_replay() {
         1
     );
     assert!(!game.stopping());
+}
+
+#[test]
+fn replay_during_close_waits_for_the_existing_death_return_admission() {
+    let mut game = playing();
+    let mut login = login(&game);
+    game.receive(game.generation(), &[b'v', 0], 30.).unwrap();
+    login.observe_game(&game).unwrap();
+    login.cancel_game(&mut game);
+    let enter = NativeKey::Named(NamedKey::Enter);
+    assert!(
+        login
+            .ingame_key(
+                &mut game,
+                KeyInput {
+                    logical: &enter,
+                    physical: PhysicalKey::Code(KeyCode::Enter),
+                    text: None,
+                    state: ElementState::Pressed,
+                    repeat: false,
+                },
+                31.
+            )
+            .unwrap()
+    );
+    let close = game.effect().unwrap();
+    game.acknowledge(close.generation, close.id, true).unwrap();
+    login.observe_game(&game).unwrap();
+    assert!(login.state.view(true).play_disabled);
+    assert!(
+        login
+            .step(40., game.can_play(), false)
+            .unwrap()
+            .0
+            .iter()
+            .all(|i| !matches!(i, slither_client::start_page::StartMenuIntent::Play { .. }))
+    );
+    for now in (40..=4000).step_by(40) {
+        pump(&mut game, f64::from(now));
+        login.observe_game(&game).unwrap();
+    }
+    assert_eq!(
+        login
+            .step(4001., game.can_play(), false)
+            .unwrap()
+            .0
+            .iter()
+            .filter(|i| matches!(i, slither_client::start_page::StartMenuIntent::Play { .. }))
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -593,13 +647,21 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
         }
         panic!("effect budget");
     }
-    fn tick(game: &mut LocalGame, transport: &mut Transport, started: Instant) -> bool {
+    fn tick(
+        game: &mut LocalGame,
+        transport: &mut Transport,
+        started: Instant,
+        close_acks: &mut Vec<u32>,
+    ) -> bool {
         let now = started.elapsed().as_secs_f64() * 1000.;
         for event in transport.poll() {
             match event {
                 NetworkEvent::Opened(g) => game.opened(g, now).unwrap(),
                 NetworkEvent::Binary(g, bytes) => game.receive(g, &bytes, now).unwrap(),
-                NetworkEvent::Closed(g) => game.closed(g),
+                NetworkEvent::Closed(g) => {
+                    close_acks.push(g);
+                    game.closed(g);
+                }
                 NetworkEvent::Failed(_, e) => panic!("transport: {e}"),
             }
             drain(game, transport, now);
@@ -617,12 +679,13 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
     let started = Instant::now();
     let mut game = LocalGame::new(0.).unwrap();
     let mut transport = Transport::default();
+    let mut close_acks = Vec::new();
     game.play(&endpoint, "Player", 44).unwrap();
     for round in 0..2 {
         let deadline = Instant::now() + Duration::from_secs(10);
         while game.phase() != Phase::Playing || game.client().control_view().own.is_none() {
             assert!(Instant::now() < deadline, "playing deadline");
-            tick(&mut game, &mut transport, started);
+            tick(&mut game, &mut transport, started, &mut close_acks);
             thread::sleep(Duration::from_millis(1));
         }
         assert_eq!(game.generation(), round + 1);
@@ -647,7 +710,7 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
             round
         );
         for _ in 0..3 {
-            assert!(tick(&mut game, &mut transport, started));
+            assert!(tick(&mut game, &mut transport, started, &mut close_acks));
             login.observe_game(&game).unwrap();
             assert_ne!(login.state.view(false).phase, MenuPhase::Login);
             assert!(!game.can_play());
@@ -674,10 +737,15 @@ fn loopback_leave_waits_for_normal_close_ack_keeps_frames_and_starts_second_game
         let deadline = Instant::now() + Duration::from_secs(10);
         while !game.can_play() {
             assert!(Instant::now() < deadline, "close completion deadline");
-            tick(&mut game, &mut transport, started);
+            tick(&mut game, &mut transport, started, &mut close_acks);
             thread::sleep(Duration::from_millis(1));
         }
         assert!(transport.close_deadline().is_none());
+        assert_eq!(
+            close_acks,
+            (1..=round + 1).collect::<Vec<_>>(),
+            "deadline fallback is not a completed handshake"
+        );
         login.observe_game(&game).unwrap();
         if round == 0 {
             assert!(
