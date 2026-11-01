@@ -1,6 +1,6 @@
 //! Owned desktop food instances and fractional animation, without packet or asset loading.
 
-use std::{error::Error, f64::consts::PI, fmt, num::NonZeroU64};
+use std::{error::Error, f64::consts::PI, fmt, num::NonZeroU64, sync::Arc};
 
 use crate::state::Point;
 
@@ -430,7 +430,9 @@ fn create(
 /// No connection, camera, quality or packet clock is owned by this world.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FoodWorld {
-    foods: Vec<FoodPresentation>,
+    // Snake-only packet transactions retain the same food state. Detach only
+    // when food changes, preserving independent rollback snapshots.
+    foods: Arc<Vec<FoodPresentation>>,
     last_instance_serial: u64,
 }
 
@@ -460,10 +462,9 @@ impl FoodWorld {
             .ok_or(FoodError::SerialExhausted)?;
         let instance = FoodInstance(serial);
         let food = create(instance, spawn, input)?;
-        self.foods
-            .try_reserve(1)
-            .map_err(|_| FoodError::Allocation)?;
-        self.foods.push(food);
+        let foods = Arc::make_mut(&mut self.foods);
+        foods.try_reserve(1).map_err(|_| FoodError::Allocation)?;
+        foods.push(food);
         self.last_instance_serial = serial;
         Ok(instance)
     }
@@ -473,12 +474,13 @@ impl FoodWorld {
     pub fn consume(&mut self, key: u32, consume: FoodConsume) -> Option<FoodInstance> {
         let index = self.foods.iter().rposition(|f| f.state.key == key)?;
         let instance = self.foods[index].state.instance;
+        let foods = Arc::make_mut(&mut self.foods);
         match consume {
             FoodConsume::Immediate => {
-                self.foods.swap_remove(index);
+                foods.swap_remove(index);
             }
             FoodConsume::Eaten(eater) => {
-                let food = &mut self.foods[index].state;
+                let food = &mut foods[index].state;
                 food.eaten = true;
                 food.eater = eater;
                 food.consumption_progress = 0.;
@@ -493,7 +495,7 @@ impl FoodWorld {
         let mut count = 0;
         for index in (0..self.foods.len()).rev() {
             if self.foods[index].state.sector == sector {
-                self.foods.swap_remove(index);
+                Arc::make_mut(&mut self.foods).swap_remove(index);
                 count += 1;
             }
         }
@@ -503,7 +505,11 @@ impl FoodWorld {
     /// Explicit world reset, releasing all source/token references. Caller-owned
     /// retained cull bounds and the serial sequence survive. Setup must not call this.
     pub fn clear(&mut self) {
-        self.foods.clear();
+        if let Some(foods) = Arc::get_mut(&mut self.foods) {
+            foods.clear();
+        } else {
+            self.foods = Arc::default();
+        }
     }
 
     /// Captured eater tokens for parent GC, including duplicates. Keep detached
@@ -515,7 +521,13 @@ impl FoodWorld {
     /// Under parent object pressure, retire only the consumed visual flights.
     /// Received food keys and snake anchors belong to the separate state owner.
     pub(crate) fn retire_eater(&mut self, token: SnakeObjectToken) {
-        self.foods.retain(|food| food.state.eater != Some(token));
+        if self
+            .foods
+            .iter()
+            .any(|food| food.state.eater == Some(token))
+        {
+            Arc::make_mut(&mut self.foods).retain(|food| food.state.eater != Some(token));
+        }
     }
 
     /// Advance atomically using only step.delta, including zero or disconnected
@@ -540,8 +552,9 @@ impl FoodWorld {
     where
         F: FnMut(SnakeObjectToken) -> Result<FoodEaterPose, FoodError>,
     {
-        for index in (0..self.foods.len()).rev() {
-            let f = &mut self.foods[index].state;
+        let foods = Arc::make_mut(&mut self.foods);
+        for index in (0..foods.len()).rev() {
+            let f = &mut foods[index].state;
             f.animation_phase += delta * f.animation_rate;
             if !f.animation_phase.is_finite() {
                 return Err(FoodError::Arithmetic);
@@ -549,7 +562,7 @@ impl FoodWorld {
             if f.eaten {
                 f.consumption_progress += delta / 41.;
                 if f.consumption_progress >= 1. || f.eater.is_none() {
-                    self.foods.swap_remove(index);
+                    foods.swap_remove(index);
                     continue;
                 }
                 let eater = pose(f.eater.expect("checked captured eater"))?;
@@ -614,7 +627,7 @@ mod tests {
     #[test]
     fn checked_serial_never_wraps_even_after_clear() {
         let mut world = FoodWorld {
-            foods: Vec::new(),
+            foods: Arc::default(),
             last_instance_serial: u64::MAX,
         };
         world.clear();

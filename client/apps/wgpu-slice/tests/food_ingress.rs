@@ -82,6 +82,32 @@ fn own_move(protocol: u8) -> Vec<u8> {
     }
 }
 
+#[test]
+fn retained_food_is_not_recopied_by_read_only_world_snapshots() {
+    use slither_client::presentation::FoodPresentation;
+
+    let game = ready(13, 6000);
+    let mut snapshots = Vec::with_capacity(3);
+    let food_bytes = game.client().foods().foods().len() * std::mem::size_of::<FoodPresentation>();
+    BYTES.set(0);
+    ENABLED.set(true);
+    for _ in 0..3 {
+        snapshots.push(game.client().clone());
+    }
+    ENABLED.set(false);
+    let allocated = BYTES.get();
+    // Received maps and snake channels still copy. The three transaction
+    // snapshots together must allocate less than one full retained-food array.
+    assert!(
+        allocated < food_bytes,
+        "snapshots={allocated}, food={food_bytes}"
+    );
+    for snapshot in snapshots {
+        assert_eq!(&snapshot, game.client());
+    }
+    println!("6000 foods, 3 snapshots: allocated_bytes={allocated}, food_bytes={food_bytes}");
+}
+
 fn factory(
     spawn: &slither_client::state::FoodSpawnInput,
     _: f64,

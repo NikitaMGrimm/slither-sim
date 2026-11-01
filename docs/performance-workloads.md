@@ -374,6 +374,24 @@ so new profiling must start from current source.
 
 ## Retained client workload
 
+### Food presentation snapshot allocation control
+
+The authored `slither-wgpu-slice` `food_ingress` workload
+`retained_food_is_not_recopied_by_read_only_world_snapshots` stages three complete
+client snapshots after 6,000 foods. It reports requested allocation bytes and
+asserts that all three snapshots together allocate less than one retained-food
+array, while preserving the complete client value. It opens no socket or GPU:
+
+```sh
+cargo test --locked -p slither-wgpu-slice --test food_ingress retained_food_is_not_recopied_by_read_only_world_snapshots -- --exact --nocapture
+```
+
+This is an allocation regression, not an FPS benchmark. The
+[dense community-input study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-01-food-snapshots/REPORT.md)
+separately records matched release pipeline timing on restricted external input.
+
+### Simulator retained clients
+
 `examples/perf_client_retained.rs` extends the catalog's short portable and
 protocol fixtures: a seed-7 synthetic world run for up to 384 decisions of six
 7 ms ticks (16.128 virtual seconds). Eight slots keep their connections and
