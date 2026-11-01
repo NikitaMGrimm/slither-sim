@@ -6,6 +6,9 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame, loopback_endpoint},
     render,
 };
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+#[path = "session_cases/ingame.rs"]
+mod ingame;
 #[path = "../src/scheduling.rs"]
 mod native_scheduling;
 

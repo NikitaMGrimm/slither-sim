@@ -68,6 +68,9 @@ fn closed_callbacks(host: &mut NativeEguiHost) {
         host.synthetic_key(&Key::Named(NamedKey::Space), ElementState::Released);
         host.cancel_pointer();
         host.step(i as f64);
+        host.frame([960, 540], 1.75, &[], |_, _| {
+            panic!("inactive frame entered egui")
+        });
     }
     TRACK.with(|track| track.set(false));
     assert_eq!(COUNT.with(Cell::get), 0);

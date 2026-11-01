@@ -231,7 +231,7 @@ mod probe {
             self.transport
                 .begin_close()
                 .map_err(|e| format!("close: {e}"))?;
-            let deadline = Instant::now() + Duration::from_secs(5);
+            let deadline = Instant::now() + slither_wgpu_slice::native::CLOSE_TIMEOUT;
             while Instant::now() < deadline {
                 for event in self.transport.poll() {
                     match event {

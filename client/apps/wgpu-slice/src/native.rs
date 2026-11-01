@@ -17,10 +17,13 @@ use std::{
     time::{Duration, Instant},
 };
 use tungstenite::{
-    Error, Message, WebSocket, client::IntoClientRequest, protocol::WebSocketConfig,
+    Error, Message, WebSocket,
+    client::IntoClientRequest,
+    protocol::{CloseFrame, WebSocketConfig, frame::coding::CloseCode},
 };
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SlitherClient/0.1";
 pub const ORIGIN: &str = "http://slither.io";
+pub const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 pub enum Event {
     Opened(u32),
     Binary(u32, Vec<u8>),
@@ -236,6 +239,7 @@ pub struct Transport {
     wake: Option<Arc<dyn Fn() + Send + Sync>>,
     writable: bool,
     messages: std::collections::VecDeque<u64>,
+    closing: Option<(u32, u64, Instant)>,
 }
 fn would_block(e: &Error) -> bool {
     matches!(e,Error::Io(e)if e.kind()==ErrorKind::WouldBlock)
@@ -345,6 +349,7 @@ impl Transport {
             } else {
                 0
             }),
+            closing: None,
         }
     }
     fn interest(&mut self) -> Result<()> {
@@ -447,6 +452,36 @@ impl Transport {
                 Ok(())
             }
         }
+    }
+    /// Desktop effect execution: Close is acknowledged only after polling the
+    /// peer's reply or reaching the same bounded timeout as the e2e probe.
+    pub fn execute_pending(&mut self, effect: &Effect, now: Instant) -> Result<bool> {
+        if effect.kind != EffectKind::Close {
+            self.execute(effect)?;
+            return Ok(true);
+        }
+        if let Some((generation, id, deadline)) = self.closing {
+            if (effect.generation, effect.id) != (generation, id) {
+                return Err("Stale close effect".into());
+            }
+            if self.socket.is_none() || now >= deadline {
+                self.close();
+                return Ok(true);
+            }
+            return Ok(false);
+        }
+        if self.socket.is_none() {
+            self.close();
+            return Ok(true);
+        }
+        latency::generation(effect.generation);
+        latency::writing(effect.id);
+        self.begin_close()?;
+        self.closing = Some((effect.generation, effect.id, now + CLOSE_TIMEOUT));
+        Ok(false)
+    }
+    pub fn close_deadline(&self) -> Option<Instant> {
+        self.closing.map(|(_, _, deadline)| deadline)
     }
     pub fn message_id(&mut self) -> u64 {
         self.messages.pop_front().unwrap_or(0)
@@ -584,7 +619,10 @@ impl Transport {
     /// Unlike close(), this retains the socket to observe the peer's acknowledgement.
     pub fn begin_close(&mut self) -> Result<()> {
         let socket = self.socket.as_mut().ok_or("Socket is not open")?;
-        match socket.close(None) {
+        match socket.close(Some(CloseFrame {
+            code: CloseCode::Normal,
+            reason: "".into(),
+        })) {
             Ok(()) => {}
             Err(error) if would_block(&error) => {}
             Err(error) => return Err(error.to_string()),
@@ -592,6 +630,7 @@ impl Transport {
         self.interest()
     }
     pub fn close(&mut self) {
+        self.closing = None;
         latency::generation(self.generation);
         if let Some(mut c) = self.connector.take() {
             c.cancel.store(true, Ordering::SeqCst);
@@ -747,7 +786,9 @@ mod tests {
                 .set_read_timeout(Some(Duration::from_secs(3)))
                 .unwrap();
             let mut socket = tungstenite::accept(stream).unwrap();
-            assert!(matches!(socket.read().unwrap(), Message::Close(None)));
+            assert!(
+                matches!(socket.read().unwrap(), Message::Close(Some(frame)) if frame.code == CloseCode::Normal)
+            );
             closed.send(()).unwrap();
             replies.recv_timeout(Duration::from_secs(3)).unwrap();
             match socket.flush() {
@@ -763,7 +804,14 @@ mod tests {
             .get_mut()
             .test_io
             .block_writes = true;
-        transport.begin_close().unwrap();
+        let effect = Effect {
+            generation: 1,
+            id: 2,
+            kind: EffectKind::Close,
+        };
+        let started = Instant::now();
+        assert!(!transport.execute_pending(&effect, started).unwrap());
+        assert_eq!(transport.close_deadline(), Some(started + CLOSE_TIMEOUT));
         assert!(transport.writable);
         assert!(transport.socket.is_some());
         transport
@@ -775,6 +823,7 @@ mod tests {
             .block_writes = false;
         assert!(transport.poll().is_empty());
         observed.recv_timeout(Duration::from_secs(3)).unwrap();
+        assert!(!transport.execute_pending(&effect, started).unwrap());
         assert!(transport.poll().is_empty());
         reply.send(()).unwrap();
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -782,10 +831,54 @@ mod tests {
             let events = wake_and_poll(&mut transport, &wakes, deadline);
             if !events.is_empty() {
                 assert!(matches!(events.as_slice(), [Event::Closed(1)]));
+                assert!(transport.execute_pending(&effect, Instant::now()).unwrap());
                 break;
             }
         }
         assert!(transport.socket.is_none());
+        peer.join().unwrap();
+    }
+
+    #[test]
+    fn pending_close_deadline_releases_a_silent_peer_without_blocking() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("ws://{}/slither", listener.local_addr().unwrap());
+        let (sent, received) = mpsc::channel();
+        let (finish, finished) = mpsc::channel();
+        let peer = thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(3)))
+                .unwrap();
+            let mut socket = tungstenite::accept(stream).unwrap();
+            assert!(
+                matches!(socket.read().unwrap(), Message::Close(Some(frame)) if frame.code == CloseCode::Normal)
+            );
+            sent.send(()).unwrap();
+            finished.recv_timeout(Duration::from_secs(3)).unwrap();
+        });
+        let (mut transport, _) = waking_connection(endpoint);
+        let effect = Effect {
+            generation: 1,
+            id: 2,
+            kind: EffectKind::Close,
+        };
+        let now = Instant::now();
+        assert!(!transport.execute_pending(&effect, now).unwrap());
+        received.recv_timeout(Duration::from_secs(3)).unwrap();
+        assert!(
+            !transport
+                .execute_pending(&effect, now + CLOSE_TIMEOUT - Duration::from_millis(1))
+                .unwrap()
+        );
+        assert!(
+            transport
+                .execute_pending(&effect, now + CLOSE_TIMEOUT)
+                .unwrap()
+        );
+        assert!(transport.socket.is_none());
+        assert!(transport.close_deadline().is_none());
+        finish.send(()).unwrap();
         peer.join().unwrap();
     }
 
