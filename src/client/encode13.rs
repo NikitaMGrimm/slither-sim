@@ -424,8 +424,5 @@ fn minimap(map: &Minimap) -> Vec<u8> {
 #[cfg(test)]
 mod tests;
 
-// Root-owned cross-crate tests can access the private encoder without exposing
-// it publicly or introducing a simulator dependency in slither-protocol.
 #[cfg(test)]
-#[path = "../../tests/protocol13_roundtrip/mod.rs"]
 mod shared_reader_tests;

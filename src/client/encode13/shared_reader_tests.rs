@@ -1,7 +1,6 @@
-//! Root-owned round trips through the independent simulator encoders. Loaded
-//! as a unit-test module to reach the private encode13 adapter without sockets
-//! or a production API. The shared crate separately checks fixed catalog bytes
-//! and authored synthetic expectations; these round trips do not replace them.
+//! Round trips through the independent simulator encoders, without sockets or
+//! a production API. Root integration tests separately check fixed catalog
+//! bytes, and slither-protocol's own tests use authored synthetic inputs.
 use crate::{
     client::{
         Minimap, encode,

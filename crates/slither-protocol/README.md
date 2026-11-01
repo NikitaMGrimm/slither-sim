@@ -155,6 +155,12 @@ rules, the exact bytes of client messages and challenge replies, the bits of
 every numeric conversion, and zero allocations while reading frames, messages,
 HUD rows and iterators.
 
+The crate's packet tests use authored synthetic inputs only. Catalog-backed
+protocol-13 checks stay in the simulator's root integration test
+`tests/protocol13_catalog.rs`, reading the historical fixture in place. Encoder
+round trips live in `src/client/encode13/shared_reader_tests.rs`. Captured data
+is not included in this crate's package.
+
 The numeric expectations come from the desktop client itself.
 `tools/protocol_client_oracle.py` in the repository feeds the same inputs
 through the client and this crate and compares `f64` bits. Don't regenerate the

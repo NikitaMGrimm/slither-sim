@@ -1,5 +1,6 @@
 //! Retained, redacted official catalog bytes and independent Python-decoder
 //! expectations. No simulator encoder or production JSON parsing is involved.
+#![cfg(feature = "networking")]
 use serde_json::{Value, json};
 use slither_protocol::{DecodeAdmission::*, frame::*, scalar, v13::*};
 
@@ -142,14 +143,5 @@ fn all_33_catalog_records_match_independent_expectations_under_each_admission() 
                 }
             }
         }
-    }
-}
-
-#[test]
-fn packaged_catalog_copy_matches_the_historical_fixture_in_a_checkout() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/protocol-catalog-13.json");
-    if root.is_file() {
-        assert_eq!(std::fs::read(root).unwrap(), CATALOG.as_bytes());
     }
 }

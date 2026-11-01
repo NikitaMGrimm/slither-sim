@@ -11,6 +11,3 @@ keywords = ["slither", "protocol", "parser", "wasm"]
 categories = ["parsing", "games", "no-std"]
 include = ["/src", "/tests", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 publish = ["crates-io"]
-
-[dev-dependencies]
-serde_json = { version = "1", features = ["float_roundtrip"] }
