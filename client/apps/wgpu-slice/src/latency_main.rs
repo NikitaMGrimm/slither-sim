@@ -45,7 +45,7 @@ mod rig {
             let mut seconds = None;
             let mut zoom = None;
             let mut reference_id = None;
-            for pair in args.chunks_exact(2) {
+            for pair in args.as_chunks::<2>().0 {
                 match pair[0].as_str() {
                     "--server" if server.is_none() => {
                         let endpoint = format!("ws://{}/slither", pair[1]);
