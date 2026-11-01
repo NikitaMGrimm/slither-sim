@@ -209,6 +209,9 @@ unaffected GPU controls also increase in the table, including 120/4K/full-map
 31.38 → 33.48 ms. The final candidate cannot claim zero GPU regressions.
 The AMD integrated adapter is the only weak-GPU measurement here; other iGPUs,
 thermal states, asynchronous gameplay and sustained frame pacing are unmeasured.
+The [GPU-input audit and A/A plan](CONTROL-AUDIT.md) record the unchanged pipelines,
+resource metadata, buffer sizes and derived upload work. They do not yet explain
+the timing increase or replace the requested A/A and reversed-order comparison.
 
 ## Local host cross-check
 
