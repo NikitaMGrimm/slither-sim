@@ -6,6 +6,13 @@ baseline `181bc01f21441d3447cad7acefec1f683b347e29` with measured candidate
 `583c502478fce0e576c82af1de5103bd21bc46ff`. It uses source and retained CPU draw
 snapshots/CSVs, with no new GPU execution. It does not explain the timing gap.
 
+The table below uses baseline executable SHA-256
+`82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd` and
+candidate SHA-256 `42fe9aa38ab6effd10abf32d83b7053bc0af03675e3aa3665bfdaabff173eb32`,
+from those exact source commits. The [completed A/A and reversed B/A results](CONTROL-RESULTS.md)
+retain the merge blocker; the gap was not reproduced by the identical-binary
+control and persists when execution order is reversed.
+
 ## Inputs and source paths
 
 | Input | Baseline | Candidate | Evidence |
@@ -55,23 +62,22 @@ are derived from the public size policy and measured history, not a capture of
 GPU allocation events. Warmup pictures are absent from the CSV; unobserved driver
 heaps, cache state, clocks and scheduling remain outside this audit.
 
-## Next measurement
+## Completed follow-up
 
-Use the original retained executables, with redundant PNGs disabled, for five
-alternating A/A pairs (baseline executable for both labels), followed by five
-reversed B/A pairs. Keep the complete workload history and both adapters so the
-control has the same predecessor scenes. Record labels, executable SHA-256,
-compiler-overlap monitor and system load; retain failures and compare per-run
-medians/ranges for **every unaffected AMD cell**, at both sample counts, before
-deciding whether the increase is an order/state artefact. Also record GPU clock
-state if a non-admin telemetry API is available; report unsupported readings.
-The booked window is 08:00–08:25 local, with compiler-exit extension capped at
-08:40. No A/A result is claimed yet; the merge blocker remains open.
+The follow-up used the original retained executables with redundant PNGs
+disabled: five alternating A/A pairs (baseline executable for both labels),
+followed by five reversed B/A pairs. The complete workload history and both
+adapters retain the same predecessor scenes. Executable hashes, compiler
+overlap, system load and clock context are recorded. The result compares
+**every unaffected AMD cell** at both sample counts.
+The booked window was 08:00–08:25 local, with compiler-exit extension capped at
+08:40. All 20 captures completed by 08:20:15. See the linked results for every
+unaffected cell and clock limitations; the merge blocker remains open.
 
 A non-admin probe of the installed AMD ADL read-only telemetry getter succeeded:
 graphics, memory and SoC clock fields are supported. The control-run supervisor
-will sample them about every 200 ms, also when a new `PLAN` line arrives, and
-retain NVIDIA clock/P-state queries about once per second. These are observers
+sampled them about every 200 ms, also when a new `PLAN` line arrived, and
+retained NVIDIA clock/P-state queries about once per second. These are observers
 shared by all follow-up arms; their possible influence must be reported. The
 retained benchmark has one `PLAN` bracket for both sequential MSAA cases, so
 clock context cannot be assigned to an individual timed frame or sample count.

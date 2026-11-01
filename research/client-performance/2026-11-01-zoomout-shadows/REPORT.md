@@ -218,8 +218,12 @@ unaffected GPU controls also increase in the table, including 120/4K/full-map
 The AMD integrated adapter is the only weak-GPU measurement here; other iGPUs,
 thermal states, asynchronous gameplay and sustained frame pacing are unmeasured.
 The [GPU-input audit and A/A plan](CONTROL-AUDIT.md) record the unchanged pipelines,
-resource metadata, buffer sizes and derived upload work. They do not yet explain
-the timing increase or replace the requested A/A and reversed-order comparison.
+resource metadata, buffer sizes and derived upload work. They do not by
+themselves explain the timing increase.
+The [completed retained-binary A/A and reversed B/A comparison](CONTROL-RESULTS.md)
+covers all 18 unaffected AMD cells and records exact source/binary provenance.
+The candidate's 500-model/default/1080p/4x gap persists when order is reversed
+and exceeds its A/A paired variation. The merge blocker remains open.
 
 ## Local host cross-check
 
