@@ -1173,6 +1173,58 @@ impl AnimatedClient {
             .map(Some)
     }
 
+    /// Apply a singleton snake-motion frame by staging only the affected snake.
+    /// Returns `None` for other families, batches, or an unconfigured protocol.
+    /// Canonical decoding and fallible presentation changes precede both commits.
+    pub fn try_apply_single_motion(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+    ) -> Result<Option<FrameReport>, ClientPresentationError> {
+        let decoded = crate::protocol::read_frame(bytes, header).map_err(StateError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let Some(prepared) = self
+            .received
+            .prepare_single_motion(decoded.commands().next().expect("one command"))?
+        else {
+            return Ok(None);
+        };
+        let mut changed = None;
+        if let Some(PresentationEvent::SnakeMotion {
+            target,
+            heading,
+            wanted_heading,
+            direction,
+            speed_per_32ms,
+        }) = &prepared.event
+            && let Some(index) = self.target_index(*target)
+        {
+            let entry = &self.entries[index];
+            let mut snake = entry.snake.clone();
+            snake.set_motion(*heading, *wanted_heading, *direction, *speed_per_32ms)?;
+            if !entry.own
+                && let Some(wanted) = wanted_heading
+            {
+                snake.set_gaze_heading(*wanted)?;
+            }
+            changed = Some((index, snake));
+        }
+        self.received
+            .commit_single_motion(prepared, decoded.prefix());
+        if let Some((index, snake)) = changed {
+            self.entries[index].snake = snake;
+        }
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(Some(FrameReport {
+            commands: 1,
+            ignored: 0,
+        }))
+    }
+
     fn apply_prepared_food<E, G>(
         &mut self,
         prepared: crate::state::PreparedFood,
@@ -2824,15 +2876,23 @@ impl AnimatedClient {
             event_start = boundary.event_end;
         }
         next.received = received;
-        if next.detail_pressure {
-            let center = next.received.setup.as_ref().map_or(0., |s| s.grid_center);
-            for entry in &mut next.entries {
+        next.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        next.trace_boundary("update", None, None, None, None);
+        *self = next;
+        Ok((applied.report, journal))
+    }
+
+    fn sync_received_visual_tails(&mut self) {
+        if self.detail_pressure {
+            let center = self.received.setup.as_ref().map_or(0., |s| s.grid_center);
+            for entry in &mut self.entries {
                 if !entry.own
                     && entry.addressed
                     && entry.snake.body().detail_reduced()
                     && let Some(tail) = entry
                         .wire_id
-                        .and_then(|id| next.received.snakes.get(&id))
+                        .and_then(|id| self.received.snakes.get(&id))
                         .and_then(|s| s.body.last())
                 {
                     entry.snake.sync_received_visual_tail(Point {
@@ -2842,10 +2902,6 @@ impl AnimatedClient {
                 }
             }
         }
-        #[cfg(feature = "feel-trace")]
-        next.trace_boundary("update", None, None, None, None);
-        *self = next;
-        Ok((applied.report, journal))
     }
 
     /// Advance the boundary and current draw collection, then retire completed deaths.

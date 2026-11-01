@@ -221,3 +221,19 @@ insertions before its first ordinary draw, also matched its complete JSON bytes:
 `feel-perceptual-v1` reported zero mismatches/errors. This is native CPU history
 and draw-list exactness, not fresh Canvas/GPU perceptual acceptance. Full CSVs,
 counter receipts and binaries remain outside Git.
+
+## Dense singleton motion ingress
+
+The `food_ingress` test `singleton_motion_allocation_is_independent_of_retained_food`
+is an authored, socket/GPU-free allocation workload. For both protocols it sends
+100 scalar-motion packets with 64 and 6,000 retained foods, then checks allocation
+growth and the received/presentation world. It exercises production LocalGame,
+including session admission and the canonical decoder:
+
+```sh
+cargo test --locked -p slither-wgpu-slice --test food_ingress singleton_motion_allocation_is_independent_of_retained_food -- --exact --nocapture
+```
+
+This bounds copying regressions without a wall-time test gate. The
+[2026-11-01 motion study](../../research/client-performance/2026-11-01-motion-transactions/REPORT.md)
+records the separate restricted-input replay comparison and its remaining limits.
