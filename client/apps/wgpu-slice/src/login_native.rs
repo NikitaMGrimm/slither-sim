@@ -49,10 +49,11 @@ impl NativeLogin {
     /// The host calls this only after menu event routing has declined the wheel.
     /// A visible list/menu keeps exclusive ownership even over a retained game.
     pub fn wheel_zoom(&self, game: &mut crate::game::LocalGame, notches: f64) -> bool {
-        !self.blocks_gameplay()
-            && !self.state.settings.visible()
-            && !self.studio.state.visible()
-            && game.wheel_zoom(notches)
+        self.zoom_input_available() && game.wheel_zoom(notches)
+    }
+    /// Menus retain ownership; zoom observes the host cursor when play takes it.
+    pub fn zoom_input_available(&self) -> bool {
+        !self.blocks_gameplay() && !self.state.settings.visible() && !self.studio.state.visible()
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
         self.blocks_gameplay()

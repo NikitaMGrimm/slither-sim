@@ -23,6 +23,9 @@ fn factor_one_stationary_and_repeated_cursor_match_pinned_main_pictures_and_comm
             if !stationary || index == 0 {
                 game.pointer(850., 130., 960., 540., false).unwrap();
             }
+            // Host observations are not admitted pointer callbacks.
+            game.observe_cursor(100. + index as f64, 420., 960., 540.)
+                .unwrap();
             game.begin_frame(time, [960, 540], 1.).unwrap();
             assert_eq!(
                 serde_json::to_value(tape::effects(&mut game)).unwrap(),
@@ -230,6 +233,80 @@ fn stationary_cursor_tracks_wheel_camera_and_zoom_smoothing_through_the_heading_
             held_heading, 0.,
             "factor one restores the stock rightward command"
         );
+        game.pointer(cursor[0], cursor[1], 800., 800., false)
+            .unwrap();
+        game.begin_frame(2340., extent, 1.).unwrap();
+        assert_eq!(
+            heading(&tape::effects(&mut game)),
+            215,
+            "a real callback uses the resized centre"
+        );
+        tape::pictures(&mut game);
+    }
+}
+
+#[test]
+fn host_handoff_seeds_empty_or_stale_zoom_cursor_and_reprojects_physical_position_at_new_dpr() {
+    use slither_client::settings::WorldResolution::{Native, Original};
+    use slither_wgpu_slice::world_resolution::WorldWindow;
+    use std::f64::consts::{PI, TAU};
+    for previous_game_cursor in [false, true] {
+        for requested in [Original, Native] {
+            let mut game = tape::playing();
+            let mut window = WorldWindow {
+                physical: [1920, 1080],
+                dpr: 2.,
+                requested,
+            };
+            let extent = window.viewport(&mut game).unwrap();
+            inject_camera_corrections(&mut game, extent);
+            if previous_game_cursor {
+                game.pointer(850., 130., 960., 540., false).unwrap();
+            }
+            // The menu consumed the latest physical move. No gameplay pointer
+            // callback accompanies Play or the later change from DPR 2 to 1.
+            let physical_cursor = [1010., 540.];
+            window.observe_cursor(&mut game, physical_cursor).unwrap();
+            assert!(game.wheel_zoom(-8.));
+            let mut fresh_sent = false;
+            let mut after_dpr_sent = false;
+            for index in 0..90 {
+                if index == 8 {
+                    window.dpr = 1.;
+                }
+                let extent = window.viewport(&mut game).unwrap();
+                window.observe_cursor(&mut game, physical_cursor).unwrap();
+                let css = if index < 8 {
+                    [960., 540.]
+                } else {
+                    [1920., 1080.]
+                };
+                let cursor = if index < 8 {
+                    [505., 270.]
+                } else {
+                    [1010., 540.]
+                };
+                let head = displayed_head(&game, css, extent);
+                let expected = (cursor[1] - head[1]).atan2(cursor[0] - head[0]);
+                let zoomed = game.client().camera().user_zoom_factor() != 1.;
+                game.begin_frame(100. + f64::from(index) * 10., extent, 1.)
+                    .unwrap();
+                for packet in tape::effects(&mut game) {
+                    if zoomed && packet.len() == 1 && packet[0] < 251 {
+                        let sent = f64::from(packet[0]) * TAU / 251.;
+                        let error = (sent - expected + PI).rem_euclid(TAU) - PI;
+                        assert!(
+                            error.abs() <= TAU / 251. + 1e-10,
+                            "stale handoff/DPR cursor: {packet:?}, {error}"
+                        );
+                        fresh_sent = true;
+                        after_dpr_sent |= index >= 8;
+                    }
+                }
+                tape::pictures(&mut game);
+            }
+            assert!(fresh_sent && after_dpr_sent);
+        }
     }
 }
 

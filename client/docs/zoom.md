@@ -44,8 +44,12 @@ CSS transform. Factor one preserves the stock centre/raw-head policy exactly.
 The client retains admitted cursor coordinates and refreshes their nondefault
 projection before each existing heading phase, so a stationary cursor follows
 wheel interpolation, camera corrections and viewport changes. It emits no
-synthetic input event or direct send. Returning to factor one restores the stock
-projection once; otherwise factor one never reprojects a stationary cursor.
+synthetic input event or direct send. The native host retains physical cursor
+positions even when a menu consumes the move, and converts them with current DPR
+at the next gameplay handoff/frame. This observation only seeds zoom's source;
+it never admits a stock pointer event. Returning to factor one restores the last
+admitted CSS displacement, including stock's resize/centre quirks. A real pointer
+callback is required to change that stock displacement.
 The CSS dead zone and command cadence are unchanged. No wheel event
 emits a command.
 

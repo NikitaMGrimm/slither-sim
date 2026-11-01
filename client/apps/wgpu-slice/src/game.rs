@@ -7,7 +7,7 @@ use crate::{
 };
 use slither_client::{
     challenge::solve_challenge,
-    desktop_input::{DesktopInput, OwnInput},
+    desktop_input::{DesktopInput, OwnInput, Point as InputPoint},
     gameplay_policy::GameplayPolicy,
     presentation::*,
     protocol::{self, ElapsedHeader},
@@ -148,7 +148,7 @@ impl Drop for LoginProfile {
 #[derive(Clone, Copy)]
 struct Cursor {
     source: [f64; 4],
-    stock: [f64; 11],
+    stock: InputPoint,
 }
 
 pub struct LocalGame {
@@ -1484,33 +1484,64 @@ impl LocalGame {
         if (zoomed || self.zoom_pointer_projected)
             && let Some(cursor) = self.cursor
         {
-            let args = if zoomed {
-                self.pointer_args(cursor.source)?.1
+            if zoomed {
+                let args = self.pointer_args(cursor.source)?.1;
+                self.input.pointer(&args).map_err(|e| e.to_string())?;
             } else {
-                cursor.stock
-            };
+                self.input
+                    .restore_pointer(cursor.stock)
+                    .map_err(|e| e.to_string())?;
+            }
             // This updates displacement only: the existing heading phase owns
             // comparison, dead zone, quantization and cadence (docs/zoom.md).
-            self.input.pointer(&args).map_err(|e| e.to_string())?;
             self.zoom_pointer_projected = zoomed;
         }
+        Ok(())
+    }
+    /// Observe the host cursor at gameplay handoff, without admitting a stock
+    /// pointer callback or changing boost/cadence. Menus may own its movement.
+    pub fn observe_cursor(&mut self, x: f64, y: f64, width: f64, height: f64) -> Result<()> {
+        slither_client::desktop_input::project_pointer(&[
+            x, y, width, height, 1., 0., 0., 0., 0., 0., 1.,
+        ])
+        .map_err(|e| e.to_string())?;
+        self.cursor = Some(Cursor {
+            source: [x, y, width, height],
+            stock: self
+                .cursor
+                .map_or(self.input.view().pointer, |cursor| cursor.stock),
+        });
         Ok(())
     }
     pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
         latency::generation(self.generation);
         let cursor = [x, y, width, height];
-        let (stock, args) = self.pointer_args(cursor)?;
+        let (mut stock_args, args) = self.pointer_args(cursor)?;
+        let admitted = !down || self.input.view().own.is_some();
+        let zoomed = self.client.camera().user_zoom_factor() != 1.;
+        let stock = if zoomed && admitted {
+            if self.input.view().own.is_none() {
+                stock_args[5] = 0.;
+            }
+            Some(
+                slither_client::desktop_input::project_pointer(&stock_args)
+                    .map_err(|e| e.to_string())?
+                    .point,
+            )
+        } else {
+            None
+        };
         if down {
             self.input.mouse_down(&args).map_err(|e| e.to_string())?;
         } else {
             self.input.pointer(&args).map_err(|e| e.to_string())?;
         }
-        if !down || self.input.view().own.is_some() {
+        if admitted {
             self.cursor = Some(Cursor {
                 source: cursor,
-                stock,
+                stock: stock.unwrap_or(self.input.view().pointer),
             });
-            self.zoom_pointer_projected = self.client.camera().user_zoom_factor() != 1.;
+            self.zoom_pointer_projected = zoomed;
             latency::admitted(0);
         }
         if down && self.input.view().own.is_some() {

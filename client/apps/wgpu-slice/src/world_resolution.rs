@@ -14,6 +14,20 @@ pub struct WorldWindow {
     pub requested: WorldResolution,
 }
 impl WorldWindow {
+    /// Refresh zoom's host observation using current DPR and Blink's mouse CSS
+    /// conversion, without admitting a stock pointer event or a boost press.
+    pub fn observe_cursor(
+        &self,
+        game: &mut crate::game::LocalGame,
+        physical: [f64; 2],
+    ) -> Result<()> {
+        if self.physical.contains(&0) {
+            return Ok(());
+        }
+        let [x, y] = slither_client::desktop_input::mouse_client_position(physical, self.dpr);
+        let [width, height] = self.css_size();
+        game.observe_cursor(x, y, width, height)
+    }
     pub fn css_size(self) -> [f64; 2] {
         self.physical.map(|n| f64::from(n) / self.dpr)
     }

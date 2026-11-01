@@ -155,6 +155,8 @@ mod desktop {
         transport: Transport,
         started: Instant,
         cursor: [f64; 2],
+        cursor_physical: Option<[f64; 2]>,
+        cursor_generation: Option<u32>,
         preparation: Option<Preparation>,
         directory: Option<DirectoryPreparation>,
         directory_progress: Option<official::DirectoryProgress>,
@@ -574,9 +576,26 @@ mod desktop {
                 }
             }
             self.effects()?;
+            if self.cursor_generation != Some(self.game.generation())
+                || self.login.zoom_input_available()
+            {
+                // Menu callbacks need not reach Game::pointer. Seed the zoom
+                // source at ownership handoff, re-normalizing physical position
+                // with current DPR; leave admitted stock input untouched.
+                if let Some(cursor) = self.cursor_physical {
+                    window.observe_cursor(&mut self.game, cursor)?;
+                } else {
+                    let [width, height] = window.css_size();
+                    self.game
+                        .observe_cursor(self.cursor[0], self.cursor[1], width, height)?;
+                }
+            }
             self.game
                 .begin_redraw(self.started.elapsed().as_secs_f64() * 1000., extent, 1.)?;
             self.effects()?;
+            if self.game.phase() == Phase::Playing {
+                self.cursor_generation = Some(self.game.generation());
+            }
             // A fresh official acquisition still refers to the previous session.
             if self.preparation.is_none() {
                 self.login.observe_game(&self.game)?;
@@ -819,6 +838,8 @@ mod desktop {
                 }),
                 started: Instant::now(),
                 cursor: [480., 270.],
+                cursor_physical: None,
+                cursor_generation: None,
                 preparation: None,
                 directory: None,
                 directory_progress: None,
@@ -867,6 +888,11 @@ mod desktop {
             )
             .then(latency::callback);
             let result = (|| -> Result<()> {
+                // Capture even when the menu consumes the event below. Physical
+                // coordinates can be converted again after a DPR change.
+                if let WindowEvent::CursorMoved { position, .. } = &event {
+                    r.cursor_physical = Some([position.x, position.y]);
+                }
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
