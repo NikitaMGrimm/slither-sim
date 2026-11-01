@@ -881,6 +881,7 @@ fn prepare_composed(
         half_width: f64::from(extent[0]) / scale / 2.,
         half_height: f64::from(extent[1]) / scale / 2.,
     };
+    let body_pixels_per_unit = body_logical_scale(extent, scale, bank.overlay_viewport)?;
     let quality = BodyPaintQuality {
         high_quality: applied.high_quality,
         blend: applied.quality_blend,
@@ -1050,7 +1051,7 @@ fn prepare_composed(
                 quality
             };
             let body_storage = std::mem::take(&mut bank.body_commands);
-            let body = plan_standard_body_with_storage(
+            let body = plan_standard_body_with_zoom_and_storage(
                 BodyPaintInput {
                     geometry: geometry.as_paint_geometry(),
                     recipe: BodyPaintRecipe {
@@ -1090,6 +1091,12 @@ fn prepare_composed(
                     .as_ref()
                     .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                 body_storage,
+                if cfg!(feature = "frame-profile-no-shadow-cut") {
+                    1.
+                } else {
+                    user_zoom
+                },
+                body_pixels_per_unit,
             )
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
