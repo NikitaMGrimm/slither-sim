@@ -247,7 +247,10 @@ fn terminal_transport_before_ack_ends_editor_without_resend_or_early_login() {
             assert!(!view.champion_pending && view.ordinary_controls_visible && !view.disabled);
             assert_eq!(view.last_life, last);
             login.sync_return_focus(game.can_play());
-            assert_eq!(login.input.state.focus(), Some(EditorId::Nickname));
+            assert_eq!(
+                login.focused(),
+                Some(slither_client::login_controls::NICKNAME)
+            );
             assert!(login.champion.take_submission().is_none());
             login
                 .prepare_host([960, 720], 1., game.can_play(), None)

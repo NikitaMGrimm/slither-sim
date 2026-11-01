@@ -217,6 +217,10 @@ async fn run(output: &Path) -> Result<()> {
             .await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--login") {
+        return login_specimens(output, &mut renderer);
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--settings-trial") {
         return settings_trial(output, &mut renderer);
     }
@@ -1117,4 +1121,39 @@ fn capture_settings(
         image::ColorType::Rgba8,
     )
     .map_err(|e| e.to_string())
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+fn login_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_wgpu_slice::login_native::NativeLogin;
+    for (extent, dpr) in [([960, 540], 1.), ([360, 640], 1.), ([720, 1280], 2.)] {
+        let mut login = NativeLogin::new("Player")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        login.prepare_host(extent, dpr, true, None)?;
+        let after = login.prepare_host(extent, dpr, true, None)?;
+        // The retained toolkit's authored specimen remains the baseline for
+        // screens awaiting their port. Both sides use the same shared projection.
+        let before = Menu::default().prepare(
+            &mut TextCache::menu(),
+            &login.state.view(true),
+            &login.layout,
+            extent,
+            dpr,
+            None,
+        )?;
+        capture(
+            renderer,
+            &before,
+            &output.join(format!("login-before-{}x{}.png", extent[0], extent[1])),
+        )?;
+        capture_settings(
+            renderer,
+            &after,
+            &mut login,
+            &output.join(format!("login-after-{}x{}.png", extent[0], extent[1])),
+        )?;
+    }
+    Ok(())
 }

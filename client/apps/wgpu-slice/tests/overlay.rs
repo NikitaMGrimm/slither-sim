@@ -419,34 +419,20 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
         .map(|r| (r.asset.into(), r.asset))
         .collect();
     menu.frame.validate(&resident).unwrap();
-    let logo = login
-        .layout
-        .viewport_rect(slither_client::menu_layout::MenuElement::Logo);
-    let widest = menu
-        .resources
-        .iter()
-        .filter(|r| {
-            r.asset.handle >> 60 == 7
-                && menu.frame.draws.iter().any(|d| {
-                    d.asset == r.asset
-                        && (d.destination.y < logo.y - 1.
-                            || d.destination.y + d.destination.height > logo.y + logo.height + 1.)
-                })
-        })
-        .max_by_key(|r| r.asset.width)
-        .unwrap();
-    // Controls use sliced 512px storage; stroke atlases share the 2048px
-    // all-resource limit below. Physical source/destination sizes stay exact.
-    assert!(widest.asset.width <= 512);
+    // Login controls now paint through egui. Retain the physical texture and
+    // byte bounds against the host's actual allocations, including logo tiles.
+    assert!(menu.frame.draws.is_empty());
+    let textures = login.egui.context().unwrap().tex_manager();
+    let textures = textures.read();
     assert!(
-        menu.resources
-            .iter()
-            .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
+        textures
+            .allocated()
+            .all(|(_, meta)| meta.size.into_iter().all(|side| side <= 2048))
     );
     assert!(
-        menu.resources
-            .iter()
-            .map(|r| r.image.pixels.len())
+        textures
+            .allocated()
+            .map(|(_, meta)| meta.bytes_used())
             .sum::<usize>()
             <= slither_wgpu_slice::text::MENU_CACHE_BYTES
     );

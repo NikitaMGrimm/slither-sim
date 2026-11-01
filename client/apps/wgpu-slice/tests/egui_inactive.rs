@@ -54,6 +54,7 @@ fn closed_callbacks(host: &mut NativeEguiHost) {
             },
             WindowEvent::Resized(PhysicalSize::new(960, 540)),
         ] {
+            host.observe_only(&event, 1.75);
             let response = host.window_event(&event, 1.75, || {
                 panic!("inactive adapter reached the window")
             });

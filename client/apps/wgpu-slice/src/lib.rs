@@ -28,6 +28,8 @@ pub mod egui_theme;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod ingame_egui;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod login_egui;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod login_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod menu_input_native;

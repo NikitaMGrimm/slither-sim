@@ -10,7 +10,7 @@ use slither_client::{
     login_controls::{self, CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
     menu_controls::{ControlId, PanelInputState, PanelView},
     menu_input::{EditIntent, HostEditEffect, TextField},
-    menu_layout::{MenuElement as E, MenuLayout},
+    menu_layout::MenuLayout,
     menu_preferences::MenuQuality,
     start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
 };
@@ -18,10 +18,16 @@ use slither_client::{
 pub struct NativeLogin {
     pub egui: crate::egui_native::NativeEguiHost,
     pub settings_ui: crate::settings_egui::SettingsUi,
+    pub login_ui: crate::login_egui::LoginUi,
+    admission: bool,
+    egui_effects: Vec<HostEditEffect>,
+    cancel_requested: bool,
+    render_error: Option<String>,
     pub ingame_ui: crate::ingame_egui::InGameUi,
     ingame_visible: bool,
     ingame_viewport: ([u32; 2], f64),
     replay_after_close: bool,
+    closing: bool,
     settings_storage: crate::menu_storage::SettingsStorage,
     pub studio: crate::skin_studio_native::SkinStudioNative,
     pub input: NativeMenuInput,
@@ -63,6 +69,14 @@ impl NativeLogin {
         !self.blocks_gameplay() && !self.state.settings.visible() && !self.studio.state.visible()
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
+        if self.egui.active() {
+            return self.egui_owns_input()
+                || self
+                    .login_ui
+                    .controls
+                    .iter()
+                    .any(|(_, r, _)| r.contains(egui::pos2(point[0] as f32, point[1] as f32)));
+        }
         self.blocks_gameplay()
             || self.controls.capture().is_some()
             || (self.state.view(true).visible
@@ -94,10 +108,16 @@ impl NativeLogin {
         Ok(Self {
             egui: Default::default(),
             settings_ui: Default::default(),
+            login_ui: crate::login_egui::LoginUi::new(nickname.clone()),
+            admission: true,
+            egui_effects: Vec::new(),
+            cancel_requested: false,
+            render_error: None,
             ingame_ui: Default::default(),
             ingame_visible: false,
             ingame_viewport: ([960, 540], 1.),
             replay_after_close: false,
+            closing: false,
             settings_storage: crate::menu_storage::SettingsStorage::at(None),
             studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
@@ -117,18 +137,21 @@ impl NativeLogin {
             champion_session: slither_client::session_policy::SessionPolicy::new().view(),
         })
     }
+    pub fn set_admission(&mut self, admission: bool) {
+        self.admission = admission;
+    }
     pub fn step(
         &mut self,
         now: f64,
         admission: bool,
         playing: bool,
     ) -> Result<(Vec<StartMenuIntent>, Vec<HostEditEffect>)> {
+        self.admission = admission;
         self.studio.step(now);
         let settings_visible = self.state.settings.visible();
         self.state.settings.step(now).map_err(str::to_owned)?;
         self.egui.step(now);
-        self.egui
-            .set_active(self.state.settings.visible() || self.ingame_visible);
+        self.refresh_egui();
         if let Some(record) = self.state.settings.take_write() {
             self.state
                 .settings
@@ -138,6 +161,7 @@ impl NativeLogin {
             .state
             .step_with_admission(now, false, admission)
             .map_err(str::to_owned)?;
+        self.refresh_egui();
         self.input.state.step_caret(now);
         if playing {
             self.state.begin_outgoing();
@@ -146,7 +170,7 @@ impl NativeLogin {
             && !self.studio.state.visible()
             && intents.contains(&StartMenuIntent::FocusNickname)
         {
-            self.controls.set_focus(NICKNAME);
+            self.focus(NICKNAME);
         }
         let mut effects = self
             .input
@@ -186,17 +210,20 @@ impl NativeLogin {
         if !self.champion.policy.visible() {
             effects.extend(std::mem::take(&mut self.champion.effects));
         }
+        effects.extend(self.take_egui_effects());
+        self.refresh_egui();
         Ok((intents, effects))
     }
     pub fn observe_session(&mut self, phase: slither_client::session_policy::Phase) -> bool {
         self.state.attempt_ended(phase)
     }
     pub fn observe_game(&mut self, game: &crate::game::LocalGame) -> Result<()> {
+        self.closing = game.stopping();
         let opened = game.ingame_menu_open() && !self.ingame_visible;
         self.ingame_visible = game.ingame_menu_open();
-        self.egui
-            .set_active(self.state.settings.visible() || self.ingame_visible);
+        self.refresh_egui();
         if opened {
+            self.egui.begin_screen();
             self.controls.blur();
             self.panel.visible = false;
             self.egui.focus(crate::ingame_egui::leave_id());
@@ -218,12 +245,14 @@ impl NativeLogin {
             self.replay_after_close = false;
             self.state.action(MenuAction::Play, true);
         }
+        self.refresh_egui();
         Ok(())
     }
     pub fn cancel_game(&mut self, game: &mut crate::game::LocalGame) {
         self.replay_after_close = false;
         self.state.cancel_pending_play();
         game.request_stop();
+        self.closing = game.stopping();
     }
     /// Esc admission is shared by the desktop callback and CPU-only session tests.
     pub fn ingame_key(
@@ -334,8 +363,6 @@ impl NativeLogin {
         if self.studio.state.take_return_focus()
             && self.state.view(true).phase == slither_client::start_page::MenuPhase::Login
         {
-            self.menu.skin_hovered = false;
-            self.menu.skin_pressed = false;
             self.controls.blur();
             let mut effects = self.sync_controls(admission);
             effects.extend(self.focus(CHANGE_SKIN));
@@ -346,7 +373,7 @@ impl NativeLogin {
         }
         let intents: Vec<_> = self.state.take_focus_intent().into_iter().collect();
         if !intents.is_empty() {
-            self.controls.set_focus(NICKNAME);
+            self.focus(NICKNAME);
         }
         let mut effects = self
             .input
@@ -400,8 +427,7 @@ impl NativeLogin {
             && !self.picker.policy.visible()
             && !self.state.settings.visible();
         if self.studio.open(admitted) {
-            self.menu.skin_hovered = false;
-            self.menu.skin_pressed = false;
+            self.refresh_egui();
             self.state.play_pointer(false, false, true);
             self.controls.blur();
             self.sync_controls(true)
@@ -409,11 +435,27 @@ impl NativeLogin {
             Vec::new()
         }
     }
+    pub fn focused(&self) -> Option<ControlId> {
+        if self.login_owns_input() {
+            let focused = self.egui.context()?.memory(|m| m.focused());
+            [NICKNAME, PLAY, CHANGE_SKIN, SERVER, SETTINGS]
+                .into_iter()
+                .find(|id| Some(crate::login_egui::widget_id(*id)) == focused)
+        } else {
+            self.controls.focus()
+        }
+    }
     pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
         if self.state.settings.visible() {
             self.settings_ui.request_focus(focus);
             self.egui.focus(crate::settings_egui::widget_id(focus));
             self.settings_frame();
+            return Vec::new();
+        }
+        self.refresh_egui();
+        if self.login_owns_input() {
+            self.login_ui.request_focus(focus);
+            self.egui.focus(crate::login_egui::widget_id(focus));
             return Vec::new();
         }
         self.controls.set_focus(focus);
@@ -428,13 +470,14 @@ impl NativeLogin {
         if self.studio.state.visible()
             || self.picker.policy.visible()
             || self.champion.policy.visible()
-            || self.input.state.editor(TextField::Nickname).composing()
+            || self.login_ui.composing
         {
             return Vec::new();
         }
         let view = self.state.view(admission);
         if self.state.settings.open(&view) {
-            self.egui.set_active(self.state.settings.visible());
+            self.refresh_egui();
+            self.egui.begin_screen();
             self.settings_ui
                 .request_focus(slither_client::settings::QUALITY);
             self.egui.focus(crate::settings_egui::widget_id(
@@ -451,7 +494,7 @@ impl NativeLogin {
     }
     pub fn close_settings(&mut self, admission: bool) -> Vec<HostEditEffect> {
         self.state.settings.close();
-        self.egui.set_active(self.state.settings.visible());
+        self.refresh_egui();
         let mut effects = Vec::new();
         if !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
@@ -460,55 +503,254 @@ impl NativeLogin {
         }
         effects
     }
+    pub fn login_owns_input(&self) -> bool {
+        let view = self.state.view(self.admission);
+        (view.visible || view.spinner_visible)
+            && !self.state.settings.visible()
+            && !self.studio.state.visible()
+            && !self.picker.policy.visible()
+            && !self.champion.policy.visible()
+            && !self.ingame_visible
+    }
+    pub fn egui_owns_input(&self) -> bool {
+        if !self.egui.active() {
+            return false;
+        }
+        self.state.settings.visible()
+            || self.ingame_visible
+            || self.closing
+            || matches!(
+                self.state.view(self.admission).phase,
+                slither_client::start_page::MenuPhase::Login
+                    | slither_client::start_page::MenuPhase::Connecting
+                    | slither_client::start_page::MenuPhase::Returning
+            )
+    }
+    fn refresh_egui(&mut self) {
+        let active =
+            self.login_owns_input() || self.state.settings.visible() || self.ingame_visible;
+        let opened = active && !self.egui.active();
+        self.egui.set_active(active);
+        if opened && self.login_owns_input() {
+            self.login_ui.request_focus(NICKNAME);
+            self.egui.focus(crate::login_egui::widget_id(NICKNAME));
+        }
+    }
+    pub fn take_cancel_request(&mut self) -> bool {
+        std::mem::take(&mut self.cancel_requested)
+    }
+    pub fn take_egui_effects(&mut self) -> Vec<HostEditEffect> {
+        std::mem::take(&mut self.egui_effects)
+    }
     fn settings_frame(&mut self) {
         let open = self.state.settings.is_open();
+        let settings = self.state.settings.visible();
+        let mut view = self.state.view(self.admission);
+        if self.champion.policy.finished() {
+            let alpha = self.champion.policy.ordinary_alpha();
+            view.nickname_alpha *= alpha;
+            view.play_alpha *= alpha;
+            view.skin_alpha *= alpha;
+        }
+        if !self.login_ui.composing {
+            self.login_ui.nickname.clone_from(&view.nickname);
+        }
+        view.login_alpha *= 1. - self.state.settings.alpha();
+        let order = if settings {
+            crate::settings_egui::focus_order().to_vec()
+        } else {
+            crate::login_egui::focus_order(&view)
+        };
+        let mut action = None;
         self.egui.frame(
             self.area.map(|n| (n * self.pixel_scale).round() as u32),
             self.pixel_scale,
-            &crate::settings_egui::focus_order(),
-            |ctx, reveal| self.settings_ui.show(ctx, &mut self.state.settings, reveal),
+            &order,
+            |ctx, reveal| {
+                if self.closing
+                    && !self.login_ui.composing
+                    && ctx.input(|i| i.key_pressed(egui::Key::Enter))
+                {
+                    self.replay_after_close = true;
+                }
+                if !settings
+                    && !self.login_ui.composing
+                    && ctx.input(|i| i.key_pressed(egui::Key::Escape))
+                {
+                    self.cancel_requested = true;
+                }
+                let status = (self.studio.status == "Saved for this run")
+                    .then_some(self.studio.status.as_str());
+                match self
+                    .login_ui
+                    .show(ctx, &view, &self.layout, !settings, status)
+                {
+                    Ok(value) => action = value,
+                    Err(error) => self.render_error = Some(error),
+                }
+                if settings {
+                    self.settings_ui.show(ctx, &mut self.state.settings, reveal);
+                }
+            },
         );
-        if open && !self.state.settings.is_open() {
-            self.close_settings(true);
+        if !self.login_ui.composing && !settings {
+            self.state
+                .edit_nickname(&self.login_ui.nickname.encode_utf16().collect::<Vec<_>>());
         }
+        if let Some((id, enter)) = action {
+            self.activate_login(id, enter);
+        }
+        if open && !self.state.settings.is_open() {
+            self.close_settings(self.admission);
+        }
+    }
+    fn activate_login(&mut self, id: ControlId, enter: bool) {
+        if self.login_ui.composing {
+            return;
+        }
+        let mut opener = PanelInputState::default();
+        if self.login_ui.keyboard_focus {
+            opener.keyboard_navigation();
+        }
+        self.controls.inherit_modality(&opener);
+        self.picker.controls.inherit_modality(&opener);
+        let effects = match id {
+            PLAY => {
+                self.state.action(
+                    if enter {
+                        MenuAction::Enter { composing: false }
+                    } else {
+                        MenuAction::Play
+                    },
+                    self.admission,
+                );
+                Vec::new()
+            }
+            SETTINGS => self.open_settings(self.admission),
+            SERVER
+                if slither_client::server_picker::available(&self.state.view(self.admission)) =>
+            {
+                self.picker.open()
+            }
+            CHANGE_SKIN => self.open_studio(),
+            _ => Vec::new(),
+        };
+        if matches!(id, SERVER | CHANGE_SKIN) {
+            self.egui_effects.push(HostEditEffect::ImeAllowed(false));
+        }
+        self.egui_effects.extend(effects);
+        self.refresh_egui();
     }
     /// Authored input and the native egui-winit adapter feed the same widget tree.
     pub fn settings_input(&mut self, mut input: egui::RawInput) {
-        // egui clears a pending drag on release before deciding whether motion
-        // started it. Preserve each button boundary, including within a batch.
-        while let Some(index) = input
-            .events
-            .iter()
-            .position(|event| matches!(event, egui::Event::PointerButton { .. }))
-        {
-            let mut tail = input.events.split_off(index);
-            self.egui.input(input.take());
-            if self.egui.has_pending_events() {
+        if !self.egui.active() {
+            return;
+        }
+        let events = std::mem::take(&mut input.events);
+        for mut event in events {
+            if !self.egui.active() {
+                break;
+            }
+            if self.login_owns_input() {
+                if matches!(event, egui::Event::Key { pressed: true, .. }) {
+                    self.login_ui.keyboard_focus = true;
+                }
+                if self.login_ui.composing
+                    && matches!(
+                        event,
+                        egui::Event::Key {
+                            key: egui::Key::Tab,
+                            pressed: true,
+                            ..
+                        }
+                    )
+                {
+                    continue;
+                }
+                if self.focused() == Some(NICKNAME)
+                    && !self.state.view(self.admission).disabled
+                    && matches!(
+                        event,
+                        egui::Event::Key {
+                            key: egui::Key::Escape,
+                            pressed: true,
+                            ..
+                        }
+                    )
+                {
+                    self.egui.cancel_pointer();
+                    if let Some(ctx) = self.egui.context() {
+                        self.login_ui.cancel_composition(ctx);
+                    }
+                    self.settings_frame();
+                    continue;
+                }
+            }
+            if self.login_owns_input()
+                && (matches!(&event, egui::Event::WindowFocused(false))
+                    || matches!(&event, egui::Event::Ime(egui::ImeEvent::Preedit { text, .. }) if text.is_empty()))
+            {
+                if matches!(event, egui::Event::WindowFocused(false)) {
+                    self.egui.cancel_pointer();
+                }
+                if let Some(ctx) = self.egui.context() {
+                    self.login_ui.cancel_composition(ctx);
+                }
+            }
+            // Normalize inserted UTF-16 units first; the complete value is then
+            // truncated by the shared rule. Surrogate pairs consume two spaces.
+            if self.login_owns_input() {
+                match &mut event {
+                    egui::Event::Text(text)
+                    | egui::Event::Paste(text)
+                    | egui::Event::Ime(egui::ImeEvent::Commit(text)) => {
+                        *text = slither_client::start_page::normalize_nickname(text);
+                    }
+                    _ => {}
+                }
+            }
+            let preedit = matches!(event, egui::Event::Ime(egui::ImeEvent::Preedit { .. }));
+            let button = matches!(event, egui::Event::PointerButton { .. });
+            if button && self.egui.has_pending_events() {
                 self.settings_frame();
             }
-            input.events.push(tail.remove(0));
-            self.egui.input(input.take());
-            self.settings_frame();
-            input.events = tail;
-            if input.events.is_empty() {
-                return;
+            if self.login_owns_input()
+                && let egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text,
+                    active_range_chars,
+                }) = &mut event
+            {
+                *text = slither_client::menu_input::bounded_preedit(text);
+                if let Some(range) = active_range_chars {
+                    let len = text.chars().count();
+                    range.start = range.start.min(len);
+                    range.end = range.end.min(len);
+                }
+                if !text.is_empty()
+                    && let Some(ctx) = self.egui.context()
+                {
+                    self.login_ui.begin_composition(ctx);
+                }
             }
-        }
-        let discrete = input.events.iter().any(|event| {
-            !matches!(
+            // Adjacent preedit replacements are one provisional value. The host
+            // keeps only the latest until redraw or an ordered discrete boundary.
+            if preedit {
+                self.egui.replace_preedit(event);
+                continue;
+            }
+            let discrete = !matches!(
                 event,
                 egui::Event::PointerMoved(_)
                     | egui::Event::MouseMoved(_)
                     | egui::Event::PointerGone
                     | egui::Event::ModifiersChanged(_)
                     | egui::Event::MouseWheel { .. }
-            )
-        });
-        self.egui.input(input);
-        // Queue motion/modifier/wheel callbacks for redraw. Discrete actions must
-        // stay ordered: batching Space -> Tab -> Space retargets the first press.
-        if discrete {
-            self.settings_frame();
+            );
+            input.events.push(event);
+            self.egui.input(input.take());
+            if discrete {
+                self.settings_frame();
+            }
         }
     }
     fn settings_key(&mut self, key: egui::Key) {
@@ -545,40 +787,20 @@ impl NativeLogin {
             }
             return;
         }
-        let composing = self.input.state.editor(TextField::Nickname).composing();
-        let view = self.state.view(admission);
-        if view.phase == slither_client::start_page::MenuPhase::Returning && !view.play_disabled {
-            self.state
-                .action(MenuAction::Enter { composing }, admission);
-            return;
-        }
-        if composing {
-            return;
-        }
-        match self.controls.focus().or(self.panel.initial_focus) {
-            Some(NICKNAME | PLAY) => {
-                self.state
-                    .action(MenuAction::Enter { composing: false }, admission);
-            }
-            Some(SETTINGS) => {
-                self.open_settings(admission);
-            }
-            Some(SERVER) if slither_client::server_picker::available(&view) => {
-                self.picker.controls.inherit_modality(&self.controls);
-                self.picker.policy.open();
-                self.picker
-                    .input
-                    .state
-                    .reset_editor(slither_client::server_picker::SEARCH_EDITOR, "");
-            }
-            Some(CHANGE_SKIN) => {
-                let admitted = self.state.action(MenuAction::Skin, true)
-                    == Some(StartMenuIntent::OpenSkinChooser)
-                    && !self.champion.policy.visible();
-                self.studio.open(admitted);
-            }
-            _ => {}
-        }
+        self.admission = admission;
+        self.login_ui.keyboard_focus = true;
+        self.refresh_egui();
+        let focus = self
+            .egui
+            .context()
+            .and_then(|ctx| ctx.memory(|m| m.focused()))
+            .and_then(|id| {
+                [NICKNAME, PLAY, CHANGE_SKIN, SERVER, SETTINGS]
+                    .into_iter()
+                    .find(|c| crate::login_egui::widget_id(*c) == id)
+            })
+            .unwrap_or(NICKNAME);
+        self.activate_login(if focus == NICKNAME { PLAY } else { focus }, true);
     }
     pub fn event(
         &mut self,
@@ -608,6 +830,14 @@ impl NativeLogin {
         if let WindowEvent::KeyboardInput { event, .. } = event {
             return self.key(event.into(), admission);
         }
+        if self.egui_owns_input() {
+            // Keep legacy focus bookkeeping for its next screen, without letting
+            // its IME effects overwrite egui's current owner on window refocus.
+            if matches!(event, WindowEvent::Focused(_)) {
+                self.input.window_event(event);
+            }
+            return Default::default();
+        }
         if self.studio.state.visible()
             && let WindowEvent::MouseWheel { delta, .. } = event
         {
@@ -633,12 +863,12 @@ impl NativeLogin {
         event: crate::menu_input_native::KeyInput<'_>,
         admission: bool,
     ) -> crate::menu_input_native::NativeInputResult {
+        self.admission = admission;
         use crate::menu_input_native::NativeInputResult;
         use winit::{
             event::ElementState,
             keyboard::{Key, NamedKey},
         };
-        let view = self.state.view(admission);
         if event.state == ElementState::Pressed
             && matches!(
                 event.logical,
@@ -657,7 +887,7 @@ impl NativeLogin {
         {
             self.controls.keyboard_navigation();
         }
-        if self.egui.active() || self.state.settings.visible() {
+        if self.egui_owns_input() {
             if event.state == ElementState::Pressed && !event.repeat {
                 let key = match event.logical {
                     Key::Named(NamedKey::Escape) => Some(egui::Key::Escape),
@@ -672,10 +902,11 @@ impl NativeLogin {
             }
             return NativeInputResult {
                 consumed: true,
-                effects: Vec::new(),
+                effects: self.take_egui_effects(),
             };
         }
         if self.studio.state.visible() {
+            let view = self.state.view(admission);
             use slither_client::skin_studio::Navigation;
             let mut effects = Vec::new();
             if event.state == ElementState::Pressed && !event.repeat {
@@ -747,50 +978,6 @@ impl NativeLogin {
                 effects,
             };
         }
-        if event.state == ElementState::Pressed {
-            // #363: consume Enter through the existing terminal-session guard;
-            // it must not become a control packet on the old live connection.
-            if !event.repeat
-                && event.logical == &Key::Named(NamedKey::Enter)
-                && view.phase == slither_client::start_page::MenuPhase::Returning
-                && !view.play_disabled
-            {
-                self.activate(admission);
-                return NativeInputResult {
-                    consumed: true,
-                    effects: Vec::new(),
-                };
-            }
-            if (!view.disabled || slither_client::server_picker::available(&view))
-                && !self.input.state.editor(TextField::Nickname).composing()
-            {
-                if event.logical == &Key::Named(NamedKey::Tab) {
-                    self.controls.tab(&self.panel, self.input.shift_key());
-                    return NativeInputResult {
-                        consumed: true,
-                        effects: self.controls.sync_focus(&self.panel, &mut self.input.state),
-                    };
-                }
-                if matches!(
-                    self.controls.focus(),
-                    Some(PLAY | SETTINGS | SERVER | CHANGE_SKIN)
-                ) && !event.repeat
-                    && matches!(event.logical, Key::Named(NamedKey::Enter | NamedKey::Space))
-                {
-                    if self.controls.focus() == Some(SETTINGS) {
-                        return NativeInputResult {
-                            consumed: true,
-                            effects: self.open_settings(admission),
-                        };
-                    }
-                    self.activate(admission);
-                    return NativeInputResult {
-                        consumed: true,
-                        effects: self.sync_controls(admission),
-                    };
-                }
-            }
-        }
         self.input.key(event)
     }
     pub fn pointer(
@@ -799,7 +986,8 @@ impl NativeLogin {
         down: Option<bool>,
         admission: bool,
     ) -> Vec<HostEditEffect> {
-        if self.egui.active() || self.state.settings.visible() {
+        self.admission = admission;
+        if self.egui_owns_input() {
             let pos = egui::pos2(point[0] as f32, point[1] as f32);
             let mut events = vec![egui::Event::PointerMoved(pos)];
             if let Some(pressed) = down {
@@ -814,7 +1002,7 @@ impl NativeLogin {
                 events,
                 ..Default::default()
             });
-            return Vec::new();
+            return self.take_egui_effects();
         }
         if self.picker.policy.visible() {
             return self
@@ -840,54 +1028,7 @@ impl NativeLogin {
             effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
             return effects;
         }
-        let view = self.state.view(admission);
-        self.menu.skin_hovered = view.visible && self.layout.hit_test(E::Skin, point[0], point[1]);
-        if let Some(down) = down {
-            self.menu.skin_pressed = down && self.menu.skin_hovered;
-        }
-        let mut effects = self.sync_controls(admission);
-        let result = self.input.panel_pointer(
-            &mut self.controls,
-            &self.panel,
-            &mut self.scroll,
-            &mut self.text,
-            self.area,
-            point,
-            down,
-            self.pixel_scale,
-        );
-        match result {
-            Ok((editing, intent)) => {
-                effects.extend(editing);
-                if let Some(intent) = intent {
-                    match intent.control {
-                        PLAY => {
-                            self.state.action(MenuAction::Play, admission);
-                        }
-                        SETTINGS => effects.extend(self.open_settings(admission)),
-                        SERVER => {
-                            self.picker.controls.inherit_modality(&self.controls);
-                            effects.extend(self.input.state.apply(EditIntent::Focus(None)));
-                            effects.extend(self.picker.open());
-                        }
-                        CHANGE_SKIN => effects.extend(self.open_studio()),
-                        _ => {}
-                    }
-                }
-            }
-            Err(error) => effects.push(HostEditEffect::ClipboardFailed(error)),
-        }
-        let hovered = self.panel.resolve(self.area).is_ok_and(|controls| {
-            controls
-                .iter()
-                .any(|r| r.control.id == PLAY && r.hit(point))
-        });
-        self.state.play_pointer(
-            hovered,
-            self.controls.capture() == Some(PLAY) && hovered,
-            admission,
-        );
-        effects
+        Vec::new()
     }
     pub fn prepare(
         &mut self,
@@ -936,18 +1077,27 @@ impl NativeLogin {
         }
         self.layout = fresh;
         self.area = area;
-        self.egui
-            .set_active(self.state.settings.visible() || self.ingame_visible);
-        if self.state.settings.visible() {
-            self.settings_frame();
-            self.egui.check_error()?;
-            if self.state.settings.alpha() == 1. {
-                return MenuFrame::world_crossfade(extent, dpr, 0.);
+        self.refresh_egui();
+        self.admission = admission;
+        if self.login_owns_input() || self.state.settings.visible() {
+            if let Some(ctx) = self.egui.context() {
+                self.login_ui.sync_art(ctx, cosmetics);
             }
-            view.login_alpha *= 1. - self.state.settings.alpha();
-            return self
-                .menu
-                .prepare(&mut self.text, &view, &self.layout, extent, dpr, cosmetics);
+            let first = self
+                .egui
+                .context()
+                .is_some_and(|ctx| ctx.cumulative_pass_nr() == 0);
+            self.settings_frame();
+            // egui's initial Area sizing pass must settle before input can
+            // traverse the field and buttons, just as on Settings entry.
+            if first {
+                self.settings_frame();
+            }
+            self.egui.check_error()?;
+            if let Some(error) = self.render_error.take() {
+                return Err(error);
+            }
+            return MenuFrame::world_crossfade(extent, dpr, view.world_alpha);
         }
         if self.studio.state.visible() {
             if resized && let Some(focus) = self.controls.focus() {
@@ -1041,41 +1191,15 @@ impl NativeLogin {
         )
     }
     pub fn displayed_nickname(&self) -> String {
-        let editor = self.input.state.editor(TextField::Nickname);
-        let mut text = editor.text().to_owned();
-        if let Some(preedit) = editor.preedit() {
-            let (anchor, caret) = editor.selection();
-            text.replace_range(anchor.min(caret)..anchor.max(caret), &preedit.text);
-        }
-        text
+        self.login_ui.nickname.clone()
     }
     pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
         if self.picker.policy.visible() {
             return self.picker.cursor_area(&mut self.text, self.pixel_scale);
         }
-        if self.studio.state.visible() || self.state.settings.visible() {
-            return Ok(Vec::new());
-        }
         if self.champion.policy.visible() {
             return self.champion.cursor_area(&mut self.text, self.pixel_scale);
         }
-        let resolved = self.panel.resolve(self.area).map_err(str::to_owned)?;
-        let Some(r) = resolved.iter().find(|r| r.control.id == NICKNAME) else {
-            return Ok(Vec::new());
-        };
-        let Some((_, geometry)) = crate::editor_geometry::field_geometry(
-            &mut self.text,
-            r,
-            &self.input.state,
-            &mut self.scroll,
-        )?
-        else {
-            return Ok(Vec::new());
-        };
-        let r = geometry.snapped_cursor_rect(self.pixel_scale);
-        Ok(self.input.state.apply(EditIntent::CursorArea {
-            position: [r.x, r.y],
-            size: [r.width, r.height],
-        }))
+        Ok(Vec::new())
     }
 }

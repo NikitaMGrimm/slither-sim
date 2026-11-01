@@ -58,7 +58,17 @@ impl WindowInput {
                     self.modifiers = ModifiersState::empty();
                 }
             }
-            WindowEvent::KeyboardInput { event, .. } => self.key(&event.logical_key, event.state),
+            WindowEvent::KeyboardInput { event, .. } => {
+                self.key(&event.logical_key, event.state);
+                if matches!(
+                    event.physical_key,
+                    winit::keyboard::PhysicalKey::Code(
+                        winit::keyboard::KeyCode::Enter | winit::keyboard::KeyCode::NumpadEnter
+                    )
+                ) {
+                    self.held[1] = event.state == ElementState::Pressed;
+                }
+            }
             _ => {}
         }
     }
@@ -115,6 +125,30 @@ impl NativeEguiHost {
     }
     pub fn context(&self) -> Option<&egui::Context> {
         self.session.as_ref().map(|s| &s.context)
+    }
+    pub fn output(&self) -> Option<&egui::PlatformOutput> {
+        self.session.as_ref()?.output.as_ref()
+    }
+    pub fn prepared_shapes(&self) -> &[egui::epaint::ClippedShape] {
+        self.session
+            .as_ref()
+            .and_then(|s| s.shapes.as_ref())
+            .map_or(&[], |(shapes, _)| shapes)
+    }
+    /// A new screen can take ownership while the previous one is still fading.
+    pub fn begin_screen(&mut self) {
+        let held = self.window.held;
+        if let Some(s) = self.ensure() {
+            for (current, native) in s.held.iter_mut().zip(held) {
+                *current |= native;
+            }
+            s.input.events.clear();
+            s.context.input_mut(|i| {
+                i.pointer = Default::default();
+                i.keys_down.clear();
+            });
+            s.context.memory_mut(|m| m.stop_text_input());
+        }
     }
     pub fn step(&mut self, now: f64) {
         self.now = now;
@@ -194,6 +228,19 @@ impl NativeEguiHost {
             s.input.append(input);
         }
     }
+    pub fn replace_preedit(&mut self, event: egui::Event) {
+        if let Some(s) = self.ensure() {
+            if s.input
+                .events
+                .last()
+                .is_some_and(|e| matches!(e, egui::Event::Ime(egui::ImeEvent::Preedit { .. })))
+            {
+                *s.input.events.last_mut().unwrap() = event;
+            } else {
+                s.input.events.push(event);
+            }
+        }
+    }
     pub fn has_pending_events(&self) -> bool {
         self.active
             && self
@@ -210,6 +257,35 @@ impl NativeEguiHost {
         {
             s.held = self.window.held;
         }
+    }
+    /// winit's Windows VK_PROCESSKEY can carry text; only IME Commit may insert it.
+    pub fn process_key(&mut self, event: crate::menu_input_native::KeyInput<'_>) -> bool {
+        if event.logical != &NativeKey::Named(NamedKey::Process) {
+            return false;
+        }
+        if matches!(
+            event.physical,
+            winit::keyboard::PhysicalKey::Code(
+                winit::keyboard::KeyCode::Enter | winit::keyboard::KeyCode::NumpadEnter
+            )
+        ) {
+            self.window.held[1] = event.state == ElementState::Pressed;
+            if self.active
+                && let Some(s) = &mut self.session
+            {
+                s.held[1] = self.window.held[1];
+                if event.state == ElementState::Released {
+                    s.input.events.push(egui::Event::Key {
+                        key: Key::Enter,
+                        physical_key: None,
+                        pressed: false,
+                        repeat: false,
+                        modifiers: Default::default(),
+                    });
+                }
+            }
+        }
+        true
     }
     fn adapter(&mut self, window: &Window) -> Option<&mut egui_winit::State> {
         let modifiers = self.window.modifiers;
@@ -251,6 +327,14 @@ impl NativeEguiHost {
         dpr: f64,
         translate: impl FnOnce(&mut Self) -> R,
     ) -> Option<R> {
+        self.observe(event, dpr);
+        if self.active {
+            Some(translate(self))
+        } else {
+            None
+        }
+    }
+    fn observe(&mut self, event: &WindowEvent, dpr: f64) {
         self.window.observe(event, dpr);
         if let WindowEvent::KeyboardInput {
             event,
@@ -260,10 +344,14 @@ impl NativeEguiHost {
         {
             self.synthetic_key(&event.logical_key, event.state);
         }
-        if self.active {
-            Some(translate(self))
-        } else {
-            None
+    }
+    /// A fading screen may paint while gameplay owns input. Re-seed the adapter
+    /// from window state when an interactive screen next takes ownership.
+    pub fn observe_only(&mut self, event: &WindowEvent, dpr: f64) {
+        self.observe(event, dpr);
+        if let Some(s) = &mut self.session {
+            s.adapter = None;
+            s.held = self.window.held;
         }
     }
     pub fn window_event<'a>(
@@ -273,6 +361,10 @@ impl NativeEguiHost {
         window: impl FnOnce() -> &'a Window,
     ) -> egui_winit::EventResponse {
         self.route_window_event(event, dpr, |host| {
+            if let WindowEvent::KeyboardInput { event, .. } = event
+                && host.process_key(event.into()) {
+                return egui_winit::EventResponse { consumed:true, repaint:false };
+            }
             let window = window();
             if matches!(
                 event,
@@ -282,12 +374,18 @@ impl NativeEguiHost {
             ) {
                 host.cancel_pointer();
             }
+            #[cfg(windows)]
+            let paste = matches!(event, WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed && ((host.window.modifiers.control_key() && matches!(&event.logical_key, NativeKey::Character(text) if text.eq_ignore_ascii_case("v"))) || (host.window.modifiers.shift_key() && event.logical_key == NativeKey::Named(NamedKey::Insert))));
             host.adapter(window).map_or(
                 egui_winit::EventResponse {
                     consumed: true,
                     repaint: true,
                 },
-                |adapter| adapter.on_window_event(window, event),
+                |adapter| {
+                    #[cfg(windows)]
+                    if paste { adapter.set_clipboard_text(clipboard_win::get_clipboard_string().unwrap_or_default()); }
+                    adapter.on_window_event(window, event)
+                },
             )
         })
         .unwrap_or(egui_winit::EventResponse {
@@ -318,6 +416,12 @@ impl NativeEguiHost {
         let Some(output) = s.output.take() else {
             return;
         };
+        #[cfg(windows)]
+        for command in &output.commands {
+            if let egui::OutputCommand::CopyText(text) = command {
+                let _ = clipboard_win::set_clipboard_string(text);
+            }
+        }
         if let Some(adapter) = &mut s.adapter {
             adapter.handle_platform_output(window, output);
         }
@@ -412,7 +516,14 @@ impl NativeEguiHost {
         // Discrete callbacks may need ordered layout/action passes before redraw.
         // Only the final shapes need tessellation when that redraw is painted.
         s.shapes = Some((std::mem::take(&mut output.shapes), output.pixels_per_point));
-        s.output = Some(output.platform_output);
+        if let Some(pending) = &mut s.output {
+            let ime = output.platform_output.ime;
+            pending.append(output.platform_output);
+            // Commands survive intervening passes; IME follows the current owner.
+            pending.ime = ime;
+        } else {
+            s.output = Some(output.platform_output);
+        }
     }
     pub fn paint(&mut self, gpu: &gpu::Renderer, target: &wgpu::TextureView) {
         if !self.active {

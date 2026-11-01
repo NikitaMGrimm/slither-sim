@@ -160,14 +160,14 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
     assert!(game.ingame_menu_open());
     escape(&mut login, &mut game, false);
     assert!(!game.ingame_menu_open());
-    assert!(!login.egui.active());
+    assert_eq!(login.egui.active(), login.state.view(true).visible);
     release_escape(&mut login, &mut game);
     escape(&mut login, &mut game, false);
     release_escape(&mut login, &mut game);
     click(&mut login, &mut game, pos2(2., 2.));
     assert!(!game.ingame_menu_open());
     assert_eq!(game.phase(), Phase::Playing);
-    assert!(!login.egui.active());
+    assert_eq!(login.egui.active(), login.state.view(true).visible);
 }
 
 #[test]
@@ -212,20 +212,97 @@ fn overlay_geometry_is_centred_bounded_and_has_one_control_across_dpi() {
 fn inactive_desktop_menu_path_never_runs_an_egui_pass() {
     let mut game = playing();
     let mut login = login(&game);
-    for now in 21..30 {
+    for now in (600..1000).step_by(16) {
+        pump(&mut game, now as f64);
+        login.observe_game(&game).unwrap();
+        login.step(now as f64, false, true).unwrap();
+    }
+    assert!(!login.egui.active(), "{:?}", login.state.view(false));
+    let initial_passes = login.egui.context().unwrap().cumulative_pass_nr();
+    for now in 1001..1010 {
         login.step(f64::from(now), false, true).unwrap();
         login.prepare_ingame(&mut game, [960, 540], 1.).unwrap();
     }
-    assert!(!login.egui.initialized());
+    assert_eq!(
+        login.egui.context().unwrap().cumulative_pass_nr(),
+        initial_passes
+    );
     escape(&mut login, &mut game, false);
     release_escape(&mut login, &mut game);
     escape(&mut login, &mut game, false);
     let passes = login.egui.context().unwrap().cumulative_pass_nr();
-    for now in 31..100 {
+    for now in 1011..1080 {
         login.step(f64::from(now), false, true).unwrap();
         login.prepare_ingame(&mut game, [960, 540], 1.).unwrap();
     }
     assert_eq!(login.egui.context().unwrap().cumulative_pass_nr(), passes);
+}
+
+#[test]
+fn retained_login_egui_input_keeps_enter_during_socket_close() {
+    let mut game = playing();
+    let mut login = login(&game);
+    assert!(login.egui.active());
+    login.cancel_game(&mut game);
+    assert!(game.stopping());
+    login.settings_input(RawInput {
+        events: vec![
+            key_event(Key::Enter, true, false),
+            key_event(Key::Enter, false, false),
+        ],
+        ..Default::default()
+    });
+    let close = game.effect().unwrap();
+    assert_eq!(close.kind, EffectKind::Close);
+    game.acknowledge(close.generation, close.id, true).unwrap();
+    pump(&mut game, 40.);
+    login.observe_game(&game).unwrap();
+    let intents = login.step(40., game.can_play(), false).unwrap().0;
+    assert!(matches!(
+        intents.as_slice(),
+        [slither_client::start_page::StartMenuIntent::Play { .. }]
+    ));
+    assert!(login.step(48., false, false).unwrap().0.is_empty());
+}
+
+#[test]
+fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() {
+    use slither_client::{
+        login_controls::PLAY,
+        menu_input::{GameplayKey, HostEditEffect},
+    };
+    let mut game = playing();
+    let mut login = login(&game);
+    login.prepare([960, 540], false, None).unwrap();
+    assert!(login.egui.active());
+    assert!(!login.egui_owns_input());
+    let result = login.key(
+        KeyInput {
+            logical: &NativeKey::Named(NamedKey::ArrowLeft),
+            physical: PhysicalKey::Code(KeyCode::ArrowLeft),
+            text: None,
+            state: ElementState::Pressed,
+            repeat: false,
+        },
+        false,
+    );
+    assert!(result.effects.contains(&HostEditEffect::Gameplay {
+        key: GameplayKey::Left,
+        pressed: true
+    }));
+    assert!(!login.intercepts_pointer([0., 0.]));
+    let r = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == PLAY)
+        .unwrap()
+        .1;
+    assert!(login.intercepts_pointer([r.center().x as f64, r.center().y as f64]));
+    assert!(login.wheel_zoom(&mut game, -1.));
+    assert!(escape(&mut login, &mut game, false));
+    assert!(game.ingame_menu_open());
+    assert!(login.egui_owns_input());
 }
 
 #[test]
@@ -300,7 +377,10 @@ fn death_while_open_retires_the_overlay_and_esc_cannot_reopen_it() {
     game.receive(game.generation(), &[b'v', 0], 31.).unwrap();
     login.observe_game(&game).unwrap();
     assert_eq!(game.phase(), Phase::Dead);
-    assert!(!login.egui.active());
+    assert_eq!(
+        login.egui.active(),
+        login.state.view(true).visible || login.state.view(true).spinner_visible
+    );
     assert!(!game.ingame_menu_open());
     assert!(!escape(&mut login, &mut game, false));
 }
@@ -332,7 +412,7 @@ fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
         login.observe_game(&game).unwrap();
         login.step(40., game.can_play(), false).unwrap();
         assert_eq!(login.state.view(true).phase, MenuPhase::Login);
-        assert!(!login.egui.active());
+        assert!(login.egui.active());
         assert!(game.can_play());
         let old_generation = game.generation();
         login.activate(true);
@@ -395,7 +475,7 @@ fn esc_does_not_open_on_login_picker_settings_connecting_dead_or_terminal() {
     let mut start = NativeLogin::new("Player").unwrap();
     start.step(0., true, false).unwrap();
     assert!(!escape(&mut start, &mut ready, false));
-    assert!(!start.egui.initialized());
+    assert!(start.egui.initialized());
     start.picker.open();
     assert!(!escape(&mut start, &mut ready, false));
     let mut start = NativeLogin::new("Player").unwrap();
@@ -454,7 +534,7 @@ fn esc_does_not_open_on_login_picker_settings_connecting_dead_or_terminal() {
         start.observe_game(&game).unwrap();
         assert!(!escape(&mut start, &mut game, false));
         assert!(!game.ingame_menu_open());
-        assert!(!start.egui.initialized());
+        assert!(start.egui.initialized());
     }
 }
 

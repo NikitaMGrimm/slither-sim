@@ -16,8 +16,17 @@ pub fn install(context: &egui::Context) -> Result<()> {
     let theme = MenuTheme::default();
     let mut fonts = egui::FontDefinitions::empty();
     for (name, role) in [
+        ("link", slither_client::menu_theme::ControlStyle::MenuLink),
         ("body", slither_client::menu_theme::ControlStyle::HelpText),
         ("bold", slither_client::menu_theme::ControlStyle::Heading),
+        (
+            "login-body",
+            slither_client::menu_theme::ControlStyle::Nickname,
+        ),
+        (
+            "login-bold",
+            slither_client::menu_theme::ControlStyle::LoginPlay,
+        ),
     ] {
         let bytes = crate::text::TextCache::native_font_bytes(theme.text_style(role))?;
         fonts
@@ -110,6 +119,32 @@ fn pill(
     // Reserve the complete focus/shadow footprint inside scroll clipping.
     let (slot, _) = ui.allocate_exact_size(vec2(width, 52.), Sense::hover());
     let rect = Rect::from_center_size(slot.center(), vec2((slot.width() - 12.).max(1.), 40.));
+    painted_pill(ui, id, label, checked, rect, primary, 20., true)
+}
+
+pub fn pill_at(
+    ui: &mut egui::Ui,
+    id: Id,
+    label: &str,
+    rect: Rect,
+    primary: bool,
+    font_size: f32,
+    focus_visible: bool,
+) -> egui::Response {
+    painted_pill(ui, id, label, None, rect, primary, font_size, focus_visible)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn painted_pill(
+    ui: &mut egui::Ui,
+    id: Id,
+    label: &str,
+    checked: Option<bool>,
+    rect: Rect,
+    primary: bool,
+    font_size: f32,
+    focus_visible: bool,
+) -> egui::Response {
     let response = ui.interact(rect, id, Sense::click());
     response.widget_info(|| {
         if let Some(checked) = checked {
@@ -149,7 +184,7 @@ fn pill(
             1.
         },
     );
-    if response.has_focus() {
+    if response.has_focus() && focus_visible {
         ui.painter().rect_stroke(
             rect.expand(3.),
             23.,
@@ -159,7 +194,7 @@ fn pill(
     }
     let galley = ui.painter().layout_no_wrap(
         label.into(),
-        egui::FontId::new(20., egui::FontFamily::Name("bold".into())),
+        egui::FontId::new(font_size, egui::FontFamily::Name("bold".into())),
         Color32::WHITE,
     );
     let extra = if checked.is_some() { 34. } else { 0. };
@@ -190,6 +225,57 @@ fn pill(
         Color32::WHITE,
     );
     response
+}
+
+pub fn link_icon(ui: &egui::Ui, rect: Rect, id: slither_client::menu_controls::ControlId) {
+    use slither_client::login_controls::{CHANGE_SKIN, SERVER};
+    let center = pos2(rect.center().x, rect.top() + 46.);
+    let tokens = MenuTheme::default();
+    if id == CHANGE_SKIN {
+        capsule(
+            ui,
+            Rect::from_center_size(center, vec2(48., 25.)),
+            tokens
+                .surface(
+                    slither_client::menu_theme::ControlStyle::PrimaryButton,
+                    slither_client::menu_theme::ControlState::Idle,
+                )
+                .colors
+                .map(ink),
+            1.,
+        );
+    } else {
+        let icon = Rect::from_min_size(
+            pos2(rect.center().x - 24., rect.top() + 37.),
+            vec2(48., 22.),
+        );
+        for (row, knob) in [(0, 12.), (1, 32.), (2, 22.)] {
+            let y = icon.top() + row as f32 * 8.;
+            if id == SERVER {
+                ui.painter().rect_filled(
+                    Rect::from_min_size(pos2(icon.left(), y), vec2(48., 6.)),
+                    0.,
+                    ink(tokens.field),
+                );
+                ui.painter().rect_filled(
+                    Rect::from_min_size(pos2(icon.left() + 4., y + 2.), vec2(2., 2.)),
+                    0.,
+                    ink(tokens.selection),
+                );
+            } else {
+                ui.painter().rect_filled(
+                    Rect::from_min_size(pos2(icon.left(), y), vec2(48., 2.)),
+                    0.,
+                    ink(tokens.field),
+                );
+                ui.painter().rect_filled(
+                    Rect::from_min_size(pos2(icon.left() + knob, y - 2.), vec2(5., 6.)),
+                    0.,
+                    ink(tokens.selection),
+                );
+            }
+        }
+    }
 }
 
 // A capsule mesh carries the existing theme's two colour stops; its outer ring
