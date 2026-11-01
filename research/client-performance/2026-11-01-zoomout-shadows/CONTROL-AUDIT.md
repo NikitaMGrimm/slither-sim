@@ -62,6 +62,8 @@ alternating A/A pairs (baseline executable for both labels), followed by five
 reversed B/A pairs. Keep the complete workload history and both adapters so the
 control has the same predecessor scenes. Record labels, executable SHA-256,
 compiler-overlap monitor and system load; retain failures and compare per-run
-control medians/ranges before deciding whether the increase is an order/state
-artefact. A 25-minute quiet window after 07:55 was requested. No such A/A result
-is claimed yet; the merge blocker remains open.
+medians/ranges for **every unaffected AMD cell**, at both sample counts, before
+deciding whether the increase is an order/state artefact. Also record GPU clock
+state if a non-admin telemetry API is available; report unsupported readings.
+The booked window is 08:00–08:25 local, with compiler-exit extension capped at
+08:40. No A/A result is claimed yet; the merge blocker remains open.

@@ -31,6 +31,25 @@ contains the complete selected matrix, phase results, exactness checks,
 loopback-host cross-check and unresolved RTX/AMD limits. The ordinary renderer
 does not request timestamp features or allocate query storage.
 
+## Battledome live cross-check
+
+`--battledome` above is the deterministic, socket-free synthetic matrix.
+`--battledome-live HOST:PORT NEW_DIRECTORY` instead connects a finite headless
+client to a **separately running local simulator**, settles maximum wheel
+zoom-out, and saves a whole-map PNG and received/prepared-picture summary.
+It does not start the simulator or produce frozen A/B timing data.
+
+Start the simulator with `slither-sim host --config YOUR_LOCAL_CONFIG`, using a
+Battledome configuration as described in the [server guide](../../docs/raw-server.md#presets).
+Replace `HOST:PORT` below with that simulator's literal loopback IP and listening
+port. This path is loopback-only: remote hosts and hostnames are rejected.
+Choose a free port other than the reserved 8766, 18884 and 18885. Do not use an
+outside game server. The output directory must be new and remain outside Git.
+
+```powershell
+& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --battledome-live HOST:PORT C:/new/external/output
+```
+
 ## General frame workload
 
 Run the finite Windows offscreen workload from the repository root:

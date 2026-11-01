@@ -292,7 +292,9 @@ fn main() {
     let mut args = std::env::args_os().skip(1);
     let first = args
         .next()
-        .expect("[--cpu-food|--zoom] new external output directory");
+        .expect(
+            "[--cpu-food|--zoom|--battledome|--battledome-live HOST:PORT] new external output directory",
+        );
     let result = if first == "--cpu-food" {
         food::run()
     } else if first == "--battledome-live" {
