@@ -53,6 +53,7 @@ export async function analyzePoses(directory) {
   analyze(traceText,{cpu:true});
   const trace=parse(traceText);
   const heads=parse(await evidenceText(path.join(directory,'client/heads.jsonl')));
+  check(heads[0].format==='client-latency-heads-v1'&&heads[0].complete&&heads[0].dropped===0&&heads.at(-1).end&&heads.at(-1).records===heads.length-2,'incomplete head journal');
   const poses=parse(await evidenceText(path.join(directory,'client/heads.poses.jsonl')));
   const header=poses.shift(),end=poses.pop();
   check(header.format==='client-latency-poses-v1'&&header.complete&&header.dropped===0&&end.end&&end.records===poses.length,'incomplete pose journal');
