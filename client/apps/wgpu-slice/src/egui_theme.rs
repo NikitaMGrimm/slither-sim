@@ -278,9 +278,79 @@ pub fn link_icon(ui: &egui::Ui, rect: Rect, id: slither_client::menu_controls::C
     }
 }
 
+/// Installed family for a shared text-style token.
+pub fn family(style: slither_client::presentation::TextStyle) -> egui::FontFamily {
+    use slither_client::presentation::{TextFamily, TextWeight};
+    egui::FontFamily::Name(
+        match (style.family, style.weight) {
+            (TextFamily::Arial, TextWeight::Bold) => "login-bold",
+            (TextFamily::Arial, TextWeight::Normal) => "link",
+            (TextFamily::Lucida, TextWeight::Bold) => "bold",
+            (TextFamily::Lucida, TextWeight::Normal) => "body",
+        }
+        .into(),
+    )
+}
+
+type Undoer = egui::util::undoer::Undoer<(egui::text::CCursorRange, String)>;
+
+/// Committed field value, caret and history from before an IME composition.
+pub struct Composition {
+    text: String,
+    state: egui::text_edit::TextEditState,
+    undoer: Undoer,
+}
+impl Composition {
+    pub fn begin(ctx: &egui::Context, id: Id, text: &str) -> Self {
+        let state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+        // TextEditState clones share their undoer through an Arc. Copy the
+        // history by value so provisional redraws cannot change the snapshot.
+        let undoer = state.undoer();
+        Self {
+            text: text.to_owned(),
+            state,
+            undoer,
+        }
+    }
+    /// Restore the pre-composition text, selection and undo history.
+    pub fn cancel(mut self, ctx: &egui::Context, id: Id) -> String {
+        self.state.set_undoer(self.undoer);
+        self.state.store(ctx, id);
+        self.text
+    }
+}
+
+/// Keep a normalized value's caret inside its chars. After a composition,
+/// keep the committed edit while discarding every provisional undo/redo entry.
+pub fn settle_text(ctx: &egui::Context, id: Id, text: &str, composition: Option<Composition>) {
+    let Some(mut state) = egui::TextEdit::load_state(ctx, id) else {
+        return;
+    };
+    if let Some(mut range) = state.cursor.char_range() {
+        // CCursor indices count chars, not UTF-8 bytes.
+        let chars = text.chars().count();
+        range.primary.index.0 = range.primary.index.0.min(chars);
+        range.secondary.index.0 = range.secondary.index.0.min(chars);
+        state.cursor.set_char_range(Some(range));
+    }
+    if let Some(mut snapshot) = composition {
+        if let Some(range) = state.cursor.char_range() {
+            let committed = (range, text.to_owned());
+            // Feeding the edit also invalidates a redo branch from before
+            // composition; adding a point alone does not.
+            snapshot
+                .undoer
+                .feed_state(ctx.input(|i| i.time), &committed);
+            snapshot.undoer.add_undo(&committed);
+        }
+        state.set_undoer(snapshot.undoer);
+    }
+    state.store(ctx, id);
+}
+
 // A capsule mesh carries the existing theme's two colour stops; its outer ring
 // feathers one physical pixel, avoiding a raster atlas or clipped image shadow.
-fn capsule(ui: &egui::Ui, rect: Rect, colors: [Color32; 2], brightness: f32) {
+pub fn capsule(ui: &egui::Ui, rect: Rect, colors: [Color32; 2], brightness: f32) {
     let mut mesh = egui::epaint::Mesh::default();
     let color = |y: f32| {
         let t = ((y - rect.top()) / rect.height()).clamp(0., 1.);

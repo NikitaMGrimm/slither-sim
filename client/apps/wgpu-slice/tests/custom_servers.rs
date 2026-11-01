@@ -1,11 +1,11 @@
 //! Authored synthetic addresses, in-memory inputs and isolated files. No game/network effects.
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-use slither_client::{menu_controls::*, menu_input::*, server_picker::*};
+use slither_client::{menu_controls::*, server_picker::*};
 use slither_wgpu_slice::{
     endpoint_login::{self, Connection},
+    login_native::NativeLogin,
     menu_input_native::KeyInput,
     server_picker_native::*,
-    text::TextCache,
 };
 use std::{
     cell::Cell,
@@ -16,41 +16,75 @@ use winit::{
     keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
 };
 
-fn key(p: &mut NativeServerPicker, logical: Key, code: KeyCode, state: ElementState) {
-    let result = p.key(KeyInput {
-        logical: &logical,
-        physical: PhysicalKey::Code(code),
-        text: None,
-        state,
-        repeat: false,
-    });
-    p.commit_effects(result.effects);
+/// A settled login with the picker opened through its shared action.
+fn opened() -> NativeLogin {
+    let mut login = NativeLogin::new("Player").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    login.prepare([960, 720], true, None).unwrap();
+    login.open_picker();
+    login.picker.policy.alpha = 1.;
+    login.prepare([960, 720], true, None).unwrap();
+    login
 }
-fn click(p: &mut NativeServerPicker, text: &mut TextCache, id: ControlId) {
-    p.sync();
-    let controls = p.panel.resolve(p.viewport).unwrap();
-    let r = controls.iter().find(|r| r.control.id == id).unwrap();
-    let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
-    for down in [true, false] {
-        let effects = p.pointer(text, point, Some(down)).unwrap();
-        p.commit_effects(effects);
+fn input(login: &mut NativeLogin, event: egui::Event) {
+    login.settings_input(egui::RawInput {
+        events: vec![event],
+        ..Default::default()
+    });
+}
+fn key(login: &mut NativeLogin, key: egui::Key, pressed: bool, modifiers: egui::Modifiers) {
+    input(
+        login,
+        egui::Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed,
+            repeat: false,
+            modifiers,
+        },
+    );
+}
+fn press(login: &mut NativeLogin, k: egui::Key) {
+    key(login, k, true, Default::default());
+    key(login, k, false, Default::default());
+}
+fn click(login: &mut NativeLogin, id: ControlId) {
+    login.prepare([960, 720], true, None).unwrap();
+    let r = login
+        .picker
+        .ui
+        .controls
+        .iter()
+        .find(|c| c.0 == id)
+        .unwrap_or_else(|| panic!("missing picker control {id:?}"))
+        .1;
+    let p = [f64::from(r.center().x), f64::from(r.center().y)];
+    login.pointer(p, Some(true), true);
+    login.pointer(p, Some(false), true);
+}
+/// Replace the address through the field's ordinary select-all editing path.
+fn address(login: &mut NativeLogin, value: &str) {
+    click(login, ADDRESS);
+    let command = egui::Modifiers {
+        ctrl: true,
+        command: true,
+        ..Default::default()
+    };
+    key(login, egui::Key::A, true, command);
+    key(login, egui::Key::A, false, command);
+    press(login, egui::Key::Delete);
+    assert_eq!(login.picker.ui.address, "");
+    if !value.is_empty() {
+        input(login, egui::Event::Text(value.into()));
     }
 }
-fn address(p: &mut NativeServerPicker, value: &str) {
-    p.input.state.reset_editor(ADDRESS_EDITOR, "");
-    p.controls.focus_control(&p.panel, ADDRESS);
-    p.controls.sync_focus(&p.panel, &mut p.input.state);
-    let effects = p.input.state.apply(EditIntent::KeyText(value.into()));
-    p.commit_effects(effects);
-}
+
 #[test]
 fn add_validate_select_and_remove_custom_servers_without_acquisition() {
-    let mut p = NativeServerPicker::default();
-    let mut text = TextCache::menu();
-    p.open();
-    p.policy.alpha = 1.;
-    p.sync();
-    assert!(!p.policy.take_directory_request());
+    let mut login = opened();
+    assert!(!login.picker.policy.take_directory_request());
     for invalid in [
         "",
         "host",
@@ -61,12 +95,14 @@ fn add_validate_select_and_remove_custom_servers_without_acquisition() {
         "host:80/path",
         "bad host:445",
     ] {
-        address(&mut p, invalid);
-        click(&mut p, &mut text, ADD_CUSTOM);
-        assert!(p.policy.custom.is_empty());
-        assert!(!p.policy.custom_error.is_empty());
-        assert!(p.policy.is_open());
-        assert!(!p.policy.take_directory_request());
+        address(&mut login, invalid);
+        click(&mut login, ADD_CUSTOM);
+        assert!(login.picker.policy.custom.is_empty());
+        assert!(!login.picker.policy.custom_error.is_empty());
+        assert!(login.picker.policy.is_open());
+        assert!(!login.picker.policy.take_directory_request());
+        // A rejected address stays editable.
+        assert_eq!(login.picker.ui.address, invalid);
     }
     for valid in [
         "192.0.2.1:445",
@@ -74,23 +110,26 @@ fn add_validate_select_and_remove_custom_servers_without_acquisition() {
         "[2001:db8::1]:446",
         "bücher.example:443",
     ] {
-        address(&mut p, valid);
-        click(&mut p, &mut text, ADD_CUSTOM);
+        address(&mut login, valid);
+        click(&mut login, ADD_CUSTOM);
         assert!(
-            p.policy
+            login
+                .picker
+                .policy
                 .custom
                 .contains(&normalize_custom_server(valid).unwrap())
         );
-        assert!(p.policy.custom_error.is_empty());
+        assert!(login.picker.policy.custom_error.is_empty());
+        assert_eq!(login.picker.ui.address, "");
     }
-    let old = p.policy.custom.clone();
-    address(&mut p, "192.0.2.1:80");
-    click(&mut p, &mut text, ADD_CUSTOM);
-    assert_eq!(p.policy.custom, old);
-    p.policy.scroll(isize::MIN);
-    click(&mut p, &mut text, ControlId(16));
+    let old = login.picker.policy.custom.clone();
+    address(&mut login, "192.0.2.1:80");
+    click(&mut login, ADD_CUSTOM);
+    assert_eq!(login.picker.policy.custom, old);
+    login.picker.policy.scroll(isize::MIN);
+    click(&mut login, ControlId(16));
     let fetches = Cell::new(0);
-    let work = endpoint_login::prepare_selection::<()>(&p.policy.selection, |_| {
+    let work = endpoint_login::prepare_selection::<()>(&login.picker.policy.selection, |_| {
         fetches.set(fetches.get() + 1);
         Err("unexpected official fetch/probe".into())
     })
@@ -102,23 +141,33 @@ fn add_validate_select_and_remove_custom_servers_without_acquisition() {
     assert_eq!(url.host_str(), Some("192.0.2.1"));
     assert_eq!(url.port(), Some(445));
     assert_eq!(fetches.get(), 0);
-    assert!(!p.policy.official_context());
-    p.open();
-    assert!(!p.policy.take_directory_request());
-    let remove = p.panel.controls.iter().find(|c| c.id.0 >= 8192).unwrap().id;
-    click(&mut p, &mut text, remove);
-    assert_eq!(p.policy.custom.len(), 3);
-    assert!(p.policy.is_open());
-    assert_eq!(p.policy.selection, ServerPreference::Automatic);
-    assert!(!p.policy.take_directory_request());
+    assert!(!login.picker.policy.official_context());
+    login.picker.policy.alpha = 0.;
+    login.step(9616., true, false).unwrap();
+    login.open_picker();
+    login.picker.policy.alpha = 1.;
+    assert!(!login.picker.policy.take_directory_request());
+    let remove = login
+        .picker
+        .panel
+        .controls
+        .iter()
+        .find(|c| c.id.0 >= 8192)
+        .unwrap()
+        .id;
+    click(&mut login, remove);
+    assert_eq!(login.picker.policy.custom.len(), 3);
+    assert!(login.picker.policy.is_open());
+    assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+    assert!(!login.picker.policy.take_directory_request());
+    // Removal changes the generation: focus returns to the initial field.
+    login.prepare([960, 720], true, None).unwrap();
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
 }
+
 #[test]
 fn pasted_address_trims_outer_whitespace_but_rejects_it_inside() {
-    let mut p = NativeServerPicker::default();
-    let mut text = TextCache::menu();
-    p.open();
-    p.policy.alpha = 1.;
-    p.sync();
+    let mut login = opened();
     for value in [
         "192.0.2.9:445\n",
         " \r\n192.0.2.9:445\t",
@@ -126,77 +175,78 @@ fn pasted_address_trims_outer_whitespace_but_rejects_it_inside() {
         "192.0.2.\n9:445",
         "192.0.2.9 :445",
     ] {
-        address(&mut p, "");
-        let effects = p.input.state.apply(EditIntent::Paste);
-        let token = effects
-            .iter()
-            .find_map(|effect| match effect {
-                HostEditEffect::ReadClipboard(token) => Some(*token),
-                _ => None,
-            })
-            .unwrap();
-        let effects = p.input.state.apply(EditIntent::ClipboardRead {
-            token,
-            result: Ok(value.into()),
-        });
-        p.commit_effects(effects);
-        click(&mut p, &mut text, ADD_CUSTOM);
-        assert_eq!(p.policy.custom, ["192.0.2.9:445"]);
+        address(&mut login, "");
+        input(&mut login, egui::Event::Paste(value.into()));
+        assert!(!login.picker.ui.address.chars().any(char::is_control));
+        click(&mut login, ADD_CUSTOM);
+        assert_eq!(login.picker.policy.custom, ["192.0.2.9:445"]);
         assert_eq!(
-            p.policy.custom_error.is_empty(),
+            login.picker.policy.custom_error.is_empty(),
             !value.trim().chars().any(char::is_whitespace)
         );
-        assert!(!p.policy.take_directory_request());
+        assert!(!login.picker.policy.take_directory_request());
     }
 }
+
+#[test]
+fn address_field_is_bounded_in_utf16_units_with_its_caret_in_chars() {
+    let mut login = opened();
+    address(&mut login, &"\u{1F600}".repeat(300));
+    // 512 UTF-16 units: each surrogate pair consumes two.
+    assert_eq!(login.picker.ui.address.encode_utf16().count(), 512);
+    assert_eq!(login.picker.ui.address.chars().count(), 256);
+    input(&mut login, egui::Event::Text("x".into()));
+    assert_eq!(login.picker.ui.address.chars().count(), 256);
+    // The caret was clamped in chars; Home and an insert still edit in place.
+    press(&mut login, egui::Key::Home);
+    input(&mut login, egui::Event::Text("ab".into()));
+    assert!(login.picker.ui.address.starts_with("ab"));
+    assert_eq!(login.picker.ui.address.encode_utf16().count(), 512);
+}
+
 #[test]
 fn address_field_keyboard_mouse_and_visible_focus_share_normal_editing() {
-    let mut p = NativeServerPicker::default();
-    let mut text = TextCache::menu();
-    p.open();
-    p.policy.alpha = 1.;
-    p.sync();
-    assert_eq!(p.input.state.focus(), Some(ADDRESS_EDITOR));
-    address(&mut p, "192.0.2.8:445");
-    key(
-        &mut p,
-        Key::Named(NamedKey::Home),
-        KeyCode::Home,
-        ElementState::Pressed,
-    );
-    let effects = p.input.state.apply(EditIntent::KeyText("x".into()));
-    p.commit_effects(effects);
-    assert!(p.input.state.editor(ADDRESS_EDITOR).text().starts_with('x'));
-    address(&mut p, "192.0.2.8:445");
-    click(&mut p, &mut text, ADDRESS);
-    assert_eq!(p.controls.focus(), Some(ADDRESS));
-    assert!(p.controls.visible_focus().is_none());
-    assert_eq!(p.input.state.focus(), Some(ADDRESS_EDITOR));
-    key(
-        &mut p,
-        Key::Named(NamedKey::Tab),
-        KeyCode::Tab,
-        ElementState::Pressed,
-    );
-    assert_eq!(p.controls.focus(), Some(ADD_CUSTOM));
-    assert_eq!(p.controls.visible_focus(), Some(ADD_CUSTOM));
-    click(&mut p, &mut text, ADDRESS);
-    key(
-        &mut p,
-        Key::Named(NamedKey::Enter),
-        KeyCode::Enter,
-        ElementState::Pressed,
-    );
-    key(
-        &mut p,
-        Key::Named(NamedKey::Enter),
-        KeyCode::Enter,
-        ElementState::Released,
-    );
-    assert_eq!(p.policy.custom.len(), 1);
-    assert!(p.policy.is_open());
-    assert!(p.input.state.editor(ADDRESS_EDITOR).text().is_empty());
-    assert!(!p.policy.take_directory_request());
+    let mut login = opened();
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    address(&mut login, "192.0.2.8:445");
+    press(&mut login, egui::Key::Home);
+    input(&mut login, egui::Event::Text("x".into()));
+    assert!(login.picker.ui.address.starts_with('x'));
+    address(&mut login, "192.0.2.8:445");
+    click(&mut login, ADDRESS);
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    assert!(!login.picker.ui.keyboard_focus);
+    press(&mut login, egui::Key::Tab);
+    assert_eq!(login.picker.ui.focused(), Some(ADD_CUSTOM));
+    assert!(login.picker.ui.keyboard_focus);
+    click(&mut login, ADDRESS);
+    press(&mut login, egui::Key::Enter);
+    assert_eq!(login.picker.policy.custom.len(), 1);
+    assert!(login.picker.policy.is_open());
+    assert_eq!(login.picker.ui.address, "");
+    // Enter adds without surrendering the field.
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    assert!(!login.picker.policy.take_directory_request());
+    // A held Enter's repeats cannot add the next typed entry.
+    address(&mut login, "192.0.2.9:445");
+    key(&mut login, egui::Key::Enter, true, Default::default());
+    assert_eq!(login.picker.policy.custom.len(), 2);
+    address(&mut login, "192.0.2.10:445");
+    for _ in 0..3 {
+        input(
+            &mut login,
+            egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: Some(egui::Key::Enter),
+                pressed: true,
+                repeat: true,
+                modifiers: Default::default(),
+            },
+        );
+    }
+    key(&mut login, egui::Key::Enter, false, Default::default());
+    assert_eq!(login.picker.policy.custom.len(), 2);
+    assert_eq!(login.picker.ui.address, "192.0.2.10:445");
 }
 #[test]
 fn official_choices_keep_the_existing_acquisition_arguments() {
@@ -398,13 +448,9 @@ fn cosmetics_arrow_focus_uses_shared_modality() {
     }
 }
 #[test]
-fn dense_custom_and_mixed_windows_fit_the_existing_native_menu_limits() {
+fn dense_custom_and_mixed_windows_stay_inside_the_window() {
     use slither_client::server_directory::Server;
-    use slither_wgpu_slice::login_native::NativeLogin;
-    let mut login = NativeLogin::new("Player").unwrap();
-    for now in (0..=9600).step_by(16) {
-        login.step(now as f64, true, false).unwrap();
-    }
+    let mut login = opened();
     for n in 1..=32 {
         login
             .picker
@@ -426,47 +472,34 @@ fn dense_custom_and_mixed_windows_fit_the_existing_native_menu_limits() {
         .policy
         .replace(&servers, &std::collections::BTreeMap::from([(1, 12)]))
         .unwrap();
-    login.picker.open();
-    login.picker.policy.alpha = 1.;
-    login
-        .picker
-        .input
-        .state
-        .reset_editor(ADDRESS_EDITOR, &"a".repeat(512));
+    login.picker.set_address(&"a".repeat(512));
     for dpr in [1., 1.5, 2., 5.] {
         for logical in [[360., 640.], [960., 720.], [960., 540.]] {
             for offset in [0, 27, 32, 2032] {
                 login.picker.policy.scroll(isize::MIN);
                 login.picker.policy.scroll(offset);
-                let picture = login
+                login
                     .prepare_host(logical.map(|v| (v * dpr) as u32), dpr, true, None)
                     .unwrap();
-                assert!(picture.frame.draws.len() <= 512);
-                assert!(
-                    picture.resources.len() <= 64,
-                    "{dpr}, {logical:?}, {offset}: {} resources ({} distinct), {} draws, {} bytes",
-                    picture.resources.len(),
-                    picture
-                        .resources
-                        .iter()
-                        .map(|r| slither_wgpu_slice::frame::ResourceKey::from(r.asset))
-                        .collect::<std::collections::BTreeSet<_>>()
-                        .len(),
-                    picture.frame.draws.len(),
-                    picture
-                        .resources
-                        .iter()
-                        .map(|r| r.image.pixels.len())
-                        .sum::<usize>()
+                let window = egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(logical[0] as f32, logical[1] as f32),
                 );
-                assert!(
-                    picture
-                        .resources
+                let ui = &login.picker.ui;
+                assert_eq!(
+                    ui.controls
                         .iter()
-                        .map(|r| r.image.pixels.len())
-                        .sum::<usize>()
-                        <= 13 * 1024 * 1024
+                        .filter(|c| (16..8192).contains(&c.0.0))
+                        .count(),
+                    6
                 );
+                for (id, r, _) in &ui.controls {
+                    assert!(
+                        window.expand(0.01).contains_rect(*r),
+                        "{dpr}, {logical:?}, {offset}: {id:?} {r:?}"
+                    );
+                }
+                assert_eq!(ui.address.len(), 512);
             }
         }
     }

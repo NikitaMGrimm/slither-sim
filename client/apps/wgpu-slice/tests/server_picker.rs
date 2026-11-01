@@ -1,18 +1,18 @@
 //! Authored synthetic directory/ping injection; no windows, GPU, or sockets.
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use slither_client::{
-    desktop_input::mouse_client_position, menu_controls::*, menu_input::*,
-    menu_layout::MenuElement as E, server_directory::Server, server_picker::*,
+    desktop_input::mouse_client_position,
+    login_controls::{NICKNAME, SERVER},
+    menu_controls::*,
+    menu_input::HostEditEffect,
+    menu_layout::MenuElement as E,
+    server_directory::Server,
+    server_picker::*,
     start_page::StartMenuIntent,
 };
-use slither_wgpu_slice::{
-    login_native::NativeLogin, menu_input_native::KeyInput, server_picker_native::*,
-};
+use slither_wgpu_slice::{login_native::NativeLogin, server_picker_native::*};
 use std::{collections::BTreeMap, net::SocketAddr};
-use winit::{
-    event::ElementState,
-    keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
-};
+
 fn servers() -> Vec<Server> {
     (1..=2000)
         .map(|id| Server {
@@ -24,17 +24,72 @@ fn servers() -> Vec<Server> {
         })
         .collect()
 }
-fn key(p: &mut NativeServerPicker, key: NamedKey, code: KeyCode) -> Vec<HostEditEffect> {
-    let logical = Key::Named(key);
-    p.key(KeyInput {
-        logical: &logical,
-        physical: PhysicalKey::Code(code),
-        text: None,
-        state: ElementState::Pressed,
-        repeat: false,
-    })
-    .effects
+fn settled(admission: bool) -> NativeLogin {
+    let mut login = NativeLogin::new("Player").unwrap();
+    for now in (0..=9600).step_by(16) {
+        login.step(now as f64, admission, false).unwrap();
+    }
+    for _ in 0..2 {
+        login.prepare([960, 720], admission, None).unwrap();
+    }
+    login
 }
+/// Open through the shared Server action and finish the entry fade.
+fn opened(official: bool) -> NativeLogin {
+    let mut login = settled(true);
+    login.picker.policy.start_directory(official);
+    login.open_picker();
+    login.picker.policy.alpha = 1.;
+    login.prepare([960, 720], true, None).unwrap();
+    login
+}
+fn input(login: &mut NativeLogin, event: egui::Event) {
+    login.settings_input(egui::RawInput {
+        events: vec![event],
+        ..Default::default()
+    });
+}
+fn key(login: &mut NativeLogin, key: egui::Key, pressed: bool) {
+    input(
+        login,
+        egui::Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed,
+            repeat: false,
+            modifiers: Default::default(),
+        },
+    );
+}
+fn press(login: &mut NativeLogin, k: egui::Key) {
+    key(login, k, true);
+    key(login, k, false);
+}
+fn widget(login: &NativeLogin, id: ControlId) -> egui::Rect {
+    login
+        .picker
+        .ui
+        .controls
+        .iter()
+        .find(|c| c.0 == id)
+        .unwrap_or_else(|| panic!("missing picker control {id:?}"))
+        .1
+}
+fn click_at(login: &mut NativeLogin, point: [f64; 2]) -> Vec<HostEditEffect> {
+    let mut effects = login.pointer(point, Some(true), true);
+    effects.extend(login.pointer(point, Some(false), true));
+    effects
+}
+fn click(login: &mut NativeLogin, id: ControlId) {
+    let r = widget(login, id);
+    click_at(login, [f64::from(r.center().x), f64::from(r.center().y)]);
+}
+fn fade(login: &mut NativeLogin, from: u32, to: u32) {
+    for now in (from..=to).step_by(16) {
+        login.step(f64::from(now), true, false).unwrap();
+    }
+}
+
 #[test]
 fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
     for dpr in [1., 1.5, 2.] {
@@ -44,13 +99,17 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         login.prepare_host(extent, dpr, true, None).unwrap();
         let r = login.layout.viewport_rect(E::Server);
         let physical = [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr];
-        let point = mouse_client_position(physical, dpr);
-        login.pointer(point, Some(true), true);
-        let effects = login.pointer(point, Some(false), true);
+        let effects = click_at(&mut login, mouse_client_position(physical, dpr));
         assert!(effects.contains(&HostEditEffect::ReleasePointerBoost));
+        // egui-winit owns IME admission for the picker field it focuses next.
+        assert!(
+            !effects
+                .iter()
+                .any(|e| matches!(e, HostEditEffect::ImeAllowed(_)))
+        );
         assert!(login.picker.policy.is_open());
         assert!(!login.picker.policy.take_directory_request());
-        assert_eq!(login.picker.controls.focus(), Some(ADDRESS));
+        assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
         login
             .picker
             .policy
@@ -73,21 +132,22 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
         let point =
             mouse_client_position([(row.rect.x + 12.) * dpr, (row.rect.y + 12.) * dpr], dpr);
         assert!(row.hit(point));
-        assert!(!row.hit([row.rect.x + row.rect.width, row.rect.y]));
-        login.pointer(point, Some(true), true);
-        login.pointer(point, Some(false), true);
+        // The egui row covers exactly the shared hit rectangle.
+        let painted = widget(&login, row.control.id);
+        assert!(painted.contains(egui::pos2(point[0] as f32, point[1] as f32)));
+        assert!(!painted.contains(egui::pos2(
+            (row.rect.x + row.rect.width) as f32 + 0.5,
+            row.rect.y as f32
+        )));
+        click_at(&mut login, point);
         assert_eq!(login.picker.policy.selection.official_id(), Some(5));
-        for now in (656..=1200).step_by(16) {
-            login.step(now as f64, true, false).unwrap();
-        }
+        fade(&mut login, 656, 1200);
         assert!(!login.picker.policy.visible());
-        assert_eq!(
-            login.focused(),
-            Some(slither_client::login_controls::NICKNAME)
-        );
+        assert_eq!(login.focused(), Some(NICKNAME));
         assert!(!login.state.view(true).spinner_visible);
     }
 }
+
 #[test]
 fn picker_is_available_without_a_play_route_and_immediate_close_restores_focus() {
     let mut login = NativeLogin::new("").unwrap();
@@ -101,15 +161,18 @@ fn picker_is_available_without_a_play_route_and_immediate_close_restores_focus()
     login.picker.policy.close();
     login.step(16., false, false).unwrap();
     assert!(!login.picker.policy.visible());
-    assert_eq!(
-        login.focused(),
-        Some(slither_client::login_controls::NICKNAME)
-    );
+    assert_eq!(login.focused(), Some(NICKNAME));
     assert!(!login.state.view(false).spinner_visible);
 }
+
 #[test]
 fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_play() {
-    use slither_client::login_controls::{CHANGE_SKIN, PLAY, SERVER, SETTINGS};
+    use slither_client::login_controls::{CHANGE_SKIN, PLAY, SETTINGS};
+    use slither_wgpu_slice::menu_input_native::KeyInput;
+    use winit::{
+        event::ElementState,
+        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
+    };
     let mut login = NativeLogin::new("").unwrap();
     for now in (0..=9600).step_by(16) {
         login.step(now as f64, false, false).unwrap();
@@ -117,28 +180,16 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     login.prepare([960, 720], false, None).unwrap();
     let unfocused = login.egui.prepared_shapes().len();
     let logical = Key::Named(NamedKey::Tab);
-    let result = login.key(
-        KeyInput {
-            logical: &logical,
-            physical: PhysicalKey::Code(KeyCode::Tab),
-            text: None,
-            state: ElementState::Pressed,
-            repeat: false,
-        },
-        false,
-    );
-    assert!(result.consumed);
+    let tab = KeyInput {
+        logical: &logical,
+        physical: PhysicalKey::Code(KeyCode::Tab),
+        text: None,
+        state: ElementState::Pressed,
+        repeat: false,
+    };
+    assert!(login.key(tab.clone(), false).consumed);
     assert_eq!(login.focused(), Some(CHANGE_SKIN));
-    login.key(
-        KeyInput {
-            logical: &logical,
-            physical: PhysicalKey::Code(KeyCode::Tab),
-            text: None,
-            state: ElementState::Pressed,
-            repeat: false,
-        },
-        false,
-    );
+    login.key(tab.clone(), false);
     assert_eq!(login.focused(), Some(SERVER));
     login.prepare([960, 720], false, None).unwrap();
     assert_eq!(login.focused(), Some(SERVER));
@@ -150,19 +201,17 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     }
     assert!(login.state.view(false).play_disabled);
 }
+
 #[test]
-fn retained_picker_resize_stays_within_quotas_at_supported_dprs() {
+fn picker_controls_and_ime_cursor_stay_inside_windows_at_supported_dprs() {
     for dpr in [1., 1.5, 2., 3., 4., 5.] {
-        let mut login = NativeLogin::new("").unwrap();
-        for now in (0..=9600).step_by(16) {
-            login.step(now as f64, true, false).unwrap();
-        }
+        let mut login = settled(true);
         login
             .picker
             .policy
             .replace(&servers(), &BTreeMap::from([(0, 12), (1, 65)]))
             .unwrap();
-        login.picker.open();
+        login.open_picker();
         login.picker.policy.alpha = 1.;
         for logical in [
             [320., 240.],
@@ -170,7 +219,6 @@ fn retained_picker_resize_stays_within_quotas_at_supported_dprs() {
             [960., 540.],
             [960., 720.],
             [1280., 720.],
-            [1600., 900.],
             [1920., 1080.],
             [960., 540.],
         ] {
@@ -182,169 +230,140 @@ fn retained_picker_resize_stays_within_quotas_at_supported_dprs() {
                 assert!(slither_wgpu_slice::render::dimensions(extent, dpr).is_err());
                 continue; // The physical backing is outside the supported contract.
             }
-            login.picker.policy.scroll(isize::MAX);
-            login.picker.sync();
-            let p = login
-                .prepare_host(extent, dpr, true, None)
-                .unwrap_or_else(|e| panic!("DPR {dpr}, {logical:?}: {e}"));
-            let bytes = p
-                .resources
-                .iter()
-                .map(|r| r.image.pixels.len())
-                .sum::<usize>();
-            assert!(
-                p.resources.len() <= 64 && bytes <= 13 * 1024 * 1024,
-                "DPR {dpr}, {logical:?}: {} resources, {bytes} bytes",
-                p.resources.len()
-            );
-            assert!(
-                p.frame.draws.len()
-                    + usize::from(p.backdrop.is_some())
-                    + usize::from(p.world_cover.is_some())
-                    <= 512
-            );
-        }
-    }
-}
-#[test]
-fn list_window_raster_and_draw_cost_stays_bounded_across_refresh_and_scrolling() {
-    for dpr in [1., 1.5, 2.] {
-        let mut login = NativeLogin::new("").unwrap();
-        login
-            .picker
-            .policy
-            .replace(&servers(), &BTreeMap::from([(0, 12), (1, 55), (2, 160)]))
-            .unwrap();
-        login.step(0., true, false).unwrap();
-        login.picker.open();
-        for now in (16..=9600).step_by(16) {
-            login.step(now as f64, true, false).unwrap();
-        }
-        for offset in [0, 994, 2000, -2000] {
-            login.picker.policy.scroll(offset);
-            login.picker.sync();
-            let picture = login
-                .prepare_host([(960. * dpr) as u32, (720. * dpr) as u32], dpr, true, None)
-                .unwrap();
-            let bytes = picture
-                .resources
-                .iter()
-                .map(|r| r.image.pixels.len())
-                .sum::<usize>();
-            assert!(bytes <= 13 * 1024 * 1024, "{dpr}: {bytes}");
-            assert!(picture.resources.len() <= 64);
-            assert!(picture.frame.draws.len() <= 512);
-            let backdrop = picture
-                .frame
-                .draws
-                .iter()
-                .position(|d| {
-                    picture
-                        .resources
-                        .iter()
-                        .any(|r| r.asset == d.asset && r.image.pixels == [24, 34, 48, 255])
-                })
-                .unwrap();
-            let logo = picture
-                .frame
-                .draws
-                .iter()
-                .enumerate()
-                .filter(|(_, d)| {
-                    picture.resources.iter().any(|r| {
-                        r.asset == d.asset
-                            && r.image.pixels.as_chunks::<4>().0.iter().any(|p| {
-                                p[3] == 255
-                                    && (p[..3] == slither_wgpu_slice::menu::WORDMARK_GREEN
-                                        || (p[1] > 180 && p[0] < 140 && p[2] < 170))
-                            })
-                    })
-                })
-                .map(|(i, _)| i)
-                .collect::<Vec<_>>();
-            assert!(!logo.is_empty());
-            assert!(
-                logo.iter().all(|i| *i < backdrop),
-                "Login text must be below modal dimming and surface"
-            );
-            assert_eq!(
+            for offset in [isize::MAX, isize::MIN] {
+                login.picker.policy.scroll(offset);
                 login
+                    .prepare_host(extent, dpr, true, None)
+                    .unwrap_or_else(|e| panic!("DPR {dpr}, {logical:?}: {e}"));
+                let window = egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(logical[0] as f32, logical[1] as f32),
+                );
+                let rows = login
                     .picker
-                    .panel
+                    .ui
                     .controls
                     .iter()
-                    .filter(|c| matches!(c.kind, ControlKind::ListRow { .. }))
-                    .count(),
-                6
-            );
+                    .filter(|c| c.0.0 >= 16 && c.0.0 < 8192)
+                    .count();
+                assert_eq!(rows, 6, "DPR {dpr}, {logical:?}");
+                for (id, r, _) in &login.picker.ui.controls {
+                    assert!(
+                        r.is_positive() && window.expand(0.01).contains_rect(*r),
+                        "DPR {dpr}, {logical:?}, {id:?} {r:?}"
+                    );
+                }
+                assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+                let ime = login.egui.output().and_then(|o| o.ime).unwrap();
+                assert!(
+                    widget(&login, ADDRESS)
+                        .expand(0.01)
+                        .contains_rect(ime.cursor_rect),
+                    "DPR {dpr}, {logical:?}, {ime:?}"
+                );
+            }
         }
     }
 }
+
 #[test]
-fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
-    let mut picker = NativeServerPicker::default();
-    picker.policy.replace(&[], &BTreeMap::new()).unwrap();
-    picker.open();
-    picker.policy.alpha = 1.;
-    picker.sync();
-    let mut text = slither_wgpu_slice::text::TextCache::menu();
-    let resolved = picker.panel.resolve(picker.viewport).unwrap();
-    let search = resolved.iter().find(|r| r.control.id == SEARCH).unwrap();
-    let point = [search.rect.x + 20., search.rect.y + search.rect.height / 2.];
-    picker.pointer(&mut text, point, Some(true)).unwrap();
-    picker.pointer(&mut text, point, Some(false)).unwrap();
-    for query in ["909", "808"] {
-        let effects = picker.input.state.apply(EditIntent::KeyText(query.into()));
-        picker.commit_effects(effects);
-        assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), query);
-        assert_eq!(picker.controls.focus(), Some(SEARCH));
-        let effects = picker.pointer(&mut text, point, Some(true)).unwrap();
-        picker.commit_effects(effects);
-        let effects = picker.pointer(&mut text, point, Some(false)).unwrap();
-        picker.commit_effects(effects);
-        assert_eq!(picker.input.state.editor(SEARCH_EDITOR).text(), "");
-        assert_eq!(picker.policy.search, "");
-        assert!(picker.policy.is_open());
-        assert_eq!(picker.policy.selection, ServerPreference::Automatic);
+fn login_paints_below_modal_dimming_and_only_the_window_has_rows() {
+    let mut login = settled(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::from([(0, 12), (1, 55), (2, 160)]))
+        .unwrap();
+    login.open_picker();
+    fade(&mut login, 9616, 10000);
+    for offset in [0, 994, 2000, -2000] {
+        login.picker.policy.scroll(offset);
+        login.prepare([960, 720], true, None).unwrap();
+        let shapes = login.egui.prepared_shapes();
+        let backdrop = egui::Color32::from_rgb(24, 34, 48).gamma_multiply(0.88);
+        let dim = shapes
+            .iter()
+            .position(|s| {
+                matches!(&s.shape, egui::Shape::Rect(r)
+                    if r.fill == backdrop && r.rect.size() == egui::vec2(960., 720.))
+            })
+            .expect("modal dimming");
+        // Login art (wordmark tiles, skin) is the only textured content.
+        let textured = |s: &egui::epaint::ClippedShape| match &s.shape {
+            egui::Shape::Rect(r) => r.fill_texture_id() != egui::TextureId::default(),
+            egui::Shape::Mesh(m) => m.texture_id != egui::TextureId::default(),
+            _ => false,
+        };
+        assert!(shapes[..dim].iter().any(textured), "login wordmark");
+        assert!(
+            !shapes[dim..].iter().any(textured),
+            "Login art must be below modal dimming and surface"
+        );
+        assert_eq!(
+            login
+                .picker
+                .panel
+                .controls
+                .iter()
+                .filter(|c| matches!(c.kind, ControlKind::ListRow { .. }))
+                .count(),
+            6
+        );
     }
 }
+
+#[test]
+fn clicking_numeric_search_deliberately_clears_it_even_when_already_focused() {
+    let mut login = opened(true);
+    login.picker.policy.replace(&[], &BTreeMap::new()).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    click(&mut login, SEARCH);
+    for query in ["909", "808"] {
+        input(&mut login, egui::Event::Text(query.into()));
+        assert_eq!(login.picker.ui.search, query);
+        assert_eq!(login.picker.ui.focused(), Some(SEARCH));
+        click(&mut login, SEARCH);
+        assert_eq!(login.picker.ui.search, "");
+        assert_eq!(login.picker.policy.search, "");
+        assert!(login.picker.policy.is_open());
+        assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+    }
+}
+
 #[test]
 fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_memory() {
-    let mut p = NativeServerPicker::default();
-    p.policy.replace(&servers(), &BTreeMap::new()).unwrap();
-    p.open();
-    p.controls.focus_control(&p.panel, SEARCH);
-    p.controls.sync_focus(&p.panel, &mut p.input.state);
-    let effects = key(&mut p, NamedKey::ArrowDown, KeyCode::ArrowDown);
-    p.commit_effects(effects);
-    assert_eq!(p.controls.focus(), Some(ControlId(16)));
-    let effects = key(&mut p, NamedKey::End, KeyCode::End);
-    p.commit_effects(effects);
-    assert_eq!(p.controls.focus(), Some(ControlId(2015)));
-    let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
-    p.commit_effects(effects);
-    assert_eq!(p.controls.focus(), Some(CLOSE));
-    let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
-    p.commit_effects(effects);
-    assert_eq!(p.controls.focus(), Some(ADDRESS));
+    let mut login = opened(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    click(&mut login, SEARCH);
+    press(&mut login, egui::Key::ArrowDown);
+    assert_eq!(login.picker.ui.focused(), Some(ControlId(16)));
+    press(&mut login, egui::Key::End);
+    assert_eq!(login.picker.ui.focused(), Some(ControlId(2015)));
+    press(&mut login, egui::Key::Tab);
+    assert_eq!(login.picker.ui.focused(), Some(CLOSE));
+    press(&mut login, egui::Key::Tab);
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
     for _ in 0..3 {
-        let effects = key(&mut p, NamedKey::Tab, KeyCode::Tab);
-        p.commit_effects(effects);
+        press(&mut login, egui::Key::Tab);
     }
-    assert_eq!(p.controls.focus(), Some(SEARCH));
-    let effects = p.input.state.apply(EditIntent::KeyText("19x99".into()));
-    p.commit_effects(effects);
-    assert_eq!(p.policy.selection.official_id(), Some(1999));
-    assert!(!p.policy.is_open());
+    assert_eq!(login.picker.ui.focused(), Some(SEARCH));
+    input(&mut login, egui::Event::Text("19x99".into()));
+    assert_eq!(login.picker.policy.selection.official_id(), Some(1999));
+    assert!(!login.picker.policy.is_open());
     let directory =
         std::env::temp_dir().join(format!("slither-server-pref-{}", std::process::id()));
     std::fs::create_dir(&directory).unwrap();
     let path = directory.join("choice");
     assert_eq!(read_preference(&path), ServerPreference::Automatic);
-    write_preference(&path, &p.policy.take_preference().unwrap()).unwrap();
+    write_preference(&path, &login.picker.policy.take_preference().unwrap()).unwrap();
     assert_eq!(read_preference(&path), ServerPreference::Official(1999));
     assert!(write_preference(&directory, "1:auto").is_err());
-    assert_eq!(p.policy.selection.official_id(), Some(1999));
+    assert_eq!(login.picker.policy.selection.official_id(), Some(1999));
     std::fs::write(&path, "1:77".repeat(1000)).unwrap();
     assert_eq!(read_preference(&path), ServerPreference::Automatic);
     std::fs::remove_file(path).unwrap();
@@ -352,53 +371,23 @@ fn keyboard_traps_focus_numeric_edits_cannot_play_and_preference_failure_is_in_m
 }
 
 #[test]
-fn open_picker_with_stroke_logo_never_drops_at_dpr_five_to_eight() {
-    let mut failures = Vec::new();
+fn open_picker_rows_stay_clickable_at_dpr_five_to_eight() {
     for height in [720., 540.] {
-        let mut login = NativeLogin::new("").unwrap();
-        for now in (0..=9600).step_by(16) {
-            login.step(now as f64, true, false).unwrap();
-        }
+        let mut login = settled(true);
         login
             .picker
             .policy
             .replace(&servers(), &BTreeMap::from([(0, 12), (1, 65)]))
             .unwrap();
-        login.picker.open();
+        login.open_picker();
         login.picker.policy.alpha = 1.;
         for dpr in [5., 6., 7., 8., 5.] {
             for offset in [0, isize::MAX, isize::MIN] {
                 login.picker.policy.scroll(offset);
-                login.picker.sync();
-                let picture = login.prepare_host(
-                    [(960. * dpr) as u32, (height * dpr) as u32],
-                    dpr,
-                    true,
-                    None,
-                );
-                let picture = match picture {
-                    Ok(picture) => picture,
-                    Err(error) => {
-                        failures.push(format!("picker 960x{height}, DPR {dpr}: {error}"));
-                        break;
-                    }
-                };
-                let draws = picture.frame.draws.len()
-                    + usize::from(picture.backdrop.is_some())
-                    + usize::from(picture.world_cover.is_some());
-                let bytes = picture
-                    .resources
-                    .iter()
-                    .map(|r| r.image.pixels.len())
-                    .sum::<usize>();
-                assert!(draws <= 512);
-                assert!(bytes <= 13 * 1024 * 1024);
-                assert!(
-                    picture
-                        .resources
-                        .iter()
-                        .all(|r| r.asset.width <= 2048 && r.asset.height <= 2048)
-                );
+                let extent = [(960. * dpr) as u32, (height * dpr) as u32];
+                let picture = login
+                    .prepare_host(extent, dpr, true, None)
+                    .unwrap_or_else(|e| panic!("picker 960x{height}, DPR {dpr}: {e}"));
                 assert_eq!(picture.frame.viewport_scale, dpr);
                 let resolved = login.picker.panel.resolve([960., height]).unwrap();
                 let row = resolved
@@ -409,107 +398,399 @@ fn open_picker_with_stroke_logo_never_drops_at_dpr_five_to_eight() {
                 let point = mouse_client_position([(r.x + 12.) * dpr, (r.y + 12.) * dpr], dpr);
                 assert!(row.hit(point));
                 assert!(
-                    picture
-                        .frame
-                        .draws
-                        .iter()
-                        .any(|d| point[0] >= d.destination.x
-                            && point[0] < d.destination.x + d.destination.width
-                            && point[1] >= d.destination.y
-                            && point[1] < d.destination.y + d.destination.height)
+                    widget(&login, row.control.id)
+                        .contains(egui::pos2(point[0] as f32, point[1] as f32))
                 );
-                let mut hits = PanelInputState::default();
-                hits.sync(&login.picker.panel, &mut MenuInputState::default());
-                hits.pointer(&login.picker.panel, &resolved, point, Some(true));
-                assert_eq!(
-                    hits.pointer(&login.picker.panel, &resolved, point, Some(false))
-                        .unwrap()
-                        .control,
-                    row.control.id
-                );
-                eprintln!("picker 960x{height}, DPR {dpr}: {draws} draws, {bytes} bytes");
             }
         }
+        // The last window is the top one; its first row is the fastest server.
+        let resolved = login.picker.panel.resolve([960., height]).unwrap();
+        let row = resolved
+            .iter()
+            .find(|r| matches!(r.control.kind, ControlKind::ListRow { .. }))
+            .unwrap();
+        let point = mouse_client_position([(row.rect.x + 12.) * 5., (row.rect.y + 12.) * 5.], 5.);
+        click_at(&mut login, point);
+        assert_eq!(login.picker.policy.selection.official_id(), Some(5));
     }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[test]
 fn picker_reopening_inherits_the_current_opener_modality() {
-    use slither_client::login_controls::SERVER;
-    let mut login = NativeLogin::new("Focus").unwrap();
-    for now in (0..=9600).step_by(16) {
-        login.step(now as f64, false, false).unwrap();
-    }
-    login.prepare([960, 720], false, None).unwrap();
-    login.controls.keyboard_navigation();
+    let mut login = settled(false);
+    press(&mut login, egui::Key::Tab);
     login.focus(SERVER);
-    login.activate(false);
-    login.step(9616., false, false).unwrap();
-    assert!(login.picker.controls.focus().is_some());
-    assert_eq!(
-        login.picker.controls.visible_focus(),
-        login.picker.controls.focus()
-    );
+    press(&mut login, egui::Key::Enter);
+    assert!(login.picker.policy.is_open());
+    assert!(login.picker.ui.keyboard_focus);
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
     login.picker.policy.close();
-    for now in (9632..=10000).step_by(16) {
-        login.step(now as f64, false, false).unwrap();
-    }
+    fade(&mut login, 9616, 10000);
     assert!(!login.picker.policy.visible());
     login.prepare([960, 720], false, None).unwrap();
-    let controls = login.panel.resolve([960., 720.]).unwrap();
-    let r = controls.iter().find(|r| r.control.id == SERVER).unwrap();
-    let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
-    login.pointer(point, Some(true), false);
-    login.pointer(point, Some(false), false);
-    assert!(login.picker.policy.is_open());
-    assert!(login.picker.controls.focus().is_some());
-    assert!(login.picker.controls.visible_focus().is_none());
-    login.picker.controls.tab(&login.picker.panel, false);
-    assert_eq!(
-        login.picker.controls.visible_focus(),
-        login.picker.controls.focus()
+    let r = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == SERVER)
+        .unwrap()
+        .1;
+    click_at(
+        &mut login,
+        [f64::from(r.center().x), f64::from(r.center().y)],
     );
+    assert!(login.picker.policy.is_open());
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    assert!(!login.picker.ui.keyboard_focus);
+    press(&mut login, egui::Key::Tab);
+    assert!(login.picker.ui.keyboard_focus);
+    assert_eq!(login.picker.ui.focused(), Some(ADD_CUSTOM));
 }
 
 #[test]
 fn text_navigation_reveals_pointer_focused_fields_without_activating() {
-    for (field, editor, value, official) in [
-        (SEARCH, SEARCH_EDITOR, "123", true),
-        (ADDRESS, ADDRESS_EDITOR, "192.0.2.9:445", false),
-    ] {
-        for (navigation, code) in [
-            (NamedKey::ArrowLeft, KeyCode::ArrowLeft),
-            (NamedKey::ArrowRight, KeyCode::ArrowRight),
-            (NamedKey::Home, KeyCode::Home),
-            (NamedKey::End, KeyCode::End),
+    for (field, value, official) in [(SEARCH, "123", true), (ADDRESS, "192.0.2.9:445", false)] {
+        for navigation in [
+            egui::Key::ArrowLeft,
+            egui::Key::ArrowRight,
+            egui::Key::Home,
+            egui::Key::End,
         ] {
-            let mut p = NativeServerPicker::default();
-            p.policy.start_directory(official);
-            p.open();
-            p.policy.alpha = 1.;
-            p.sync();
-            let resolved = p.panel.resolve(p.viewport).unwrap();
-            let r = resolved.iter().find(|r| r.control.id == field).unwrap();
-            let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
-            let mut text = slither_wgpu_slice::text::TextCache::menu();
-            p.pointer(&mut text, point, Some(true)).unwrap();
-            p.pointer(&mut text, point, Some(false)).unwrap();
-            p.input.state.apply(EditIntent::KeyText(value.into()));
-            assert_eq!(p.controls.focus(), Some(field));
-            assert_eq!(p.controls.visible_focus(), None);
-            let effects = key(&mut p, navigation, code);
-            assert!(
-                effects
-                    .iter()
-                    .all(|e| !matches!(e, HostEditEffect::Activate(_)))
-            );
-            assert_eq!(p.controls.visible_focus(), Some(field));
-            assert_eq!(p.input.state.editor(editor).text(), value);
-            assert!(p.policy.is_open());
-            assert_eq!(p.policy.selection, ServerPreference::Automatic);
-            assert!(p.policy.custom.is_empty());
-            assert_eq!(p.policy.take_directory_request(), official);
+            let mut login = opened(official);
+            click(&mut login, field);
+            input(&mut login, egui::Event::Text(value.into()));
+            assert_eq!(login.picker.ui.focused(), Some(field));
+            assert!(!login.picker.ui.keyboard_focus);
+            press(&mut login, navigation);
+            assert_eq!(login.picker.ui.focused(), Some(field));
+            assert!(login.picker.ui.keyboard_focus);
+            assert_eq!(login.picker.ui.text(field), Some(value));
+            assert!(login.picker.policy.is_open());
+            assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+            assert!(login.picker.policy.custom.is_empty());
+            assert_eq!(login.picker.policy.take_directory_request(), official);
         }
     }
+}
+
+#[test]
+fn arrows_never_move_focus_out_of_the_address_or_between_buttons() {
+    let mut login = opened(false);
+    for key in [
+        egui::Key::ArrowUp,
+        egui::Key::ArrowDown,
+        egui::Key::PageUp,
+        egui::Key::PageDown,
+    ] {
+        press(&mut login, key);
+        assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    }
+    press(&mut login, egui::Key::Tab);
+    for key in [egui::Key::ArrowLeft, egui::Key::ArrowRight] {
+        press(&mut login, key);
+        assert_eq!(login.picker.ui.focused(), Some(ADD_CUSTOM));
+    }
+    // Without rows, list navigation reaches the address in custom context.
+    press(&mut login, egui::Key::ArrowDown);
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+}
+
+#[test]
+fn wheel_bursts_scroll_without_a_pass_per_event_and_keep_fractions() {
+    let mut login = opened(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    let context = login.egui.context().unwrap().clone();
+    let passes = context.cumulative_pass_nr();
+    let wheel = |unit, y| egui::Event::MouseWheel {
+        unit,
+        delta: egui::vec2(0., y),
+        phase: egui::TouchPhase::Move,
+        modifiers: Default::default(),
+        source: egui::MouseWheelSource::Unknown,
+    };
+    login.settings_input(egui::RawInput {
+        events: (0..100)
+            .map(|_| wheel(egui::MouseWheelUnit::Line, -1.))
+            .collect(),
+        ..Default::default()
+    });
+    assert_eq!(context.cumulative_pass_nr(), passes);
+    assert_eq!(login.picker.policy.list.window(2000).start, 100);
+    // Point deltas are logical; one row is 46 physical pixels at any DPR.
+    for _ in 0..3 {
+        input(&mut login, wheel(egui::MouseWheelUnit::Point, -23.));
+    }
+    assert_eq!(context.cumulative_pass_nr(), passes);
+    assert_eq!(login.picker.policy.list.window(2000).start, 101);
+    login.prepare([960, 720], true, None).unwrap();
+    assert!(
+        login
+            .picker
+            .ui
+            .controls
+            .iter()
+            .any(|c| c.0 == ControlId(16 + 101))
+    );
+}
+
+#[test]
+fn backdrop_and_escape_close_while_blank_panel_space_shields() {
+    for close in ["backdrop", "escape", "close"] {
+        let mut login = opened(false);
+        let surface = login.picker.panel.resolve([960., 720.]).unwrap()[1].rect;
+        click_at(
+            &mut login,
+            [surface.x + 4., surface.y + surface.height - 4.],
+        );
+        assert!(login.picker.policy.is_open());
+        match close {
+            "backdrop" => {
+                click_at(&mut login, [4., 4.]);
+            }
+            "escape" => press(&mut login, egui::Key::Escape),
+            _ => click(&mut login, CLOSE),
+        }
+        assert!(!login.picker.policy.is_open(), "{close}");
+        // Outgoing controls are disabled: clicks during the fade cannot act.
+        click(&mut login, ADD_CUSTOM);
+        assert!(login.picker.policy.custom_error.is_empty());
+        assert!(login.intercepts_pointer([4., 4.]));
+        fade(&mut login, 9616, 10000);
+        assert!(!login.picker.policy.visible());
+        assert_eq!(login.focused(), Some(NICKNAME));
+        assert!(!login.state.settings.visible());
+    }
+}
+
+#[test]
+fn intercepts_pointer_agrees_with_dispatch_through_open_and_close() {
+    let mut login = settled(true);
+    for now in [9616, 9632] {
+        assert_eq!(
+            login.intercepts_pointer([480., 360.]),
+            login.egui_owns_input()
+        );
+        login.step(f64::from(now), true, false).unwrap();
+    }
+    login.open_picker();
+    for now in (9648..=10400).step_by(16) {
+        if now == 10000 {
+            login.picker.policy.close();
+        }
+        login.step(f64::from(now), true, false).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        assert!(login.egui.active());
+        assert_eq!(
+            login.intercepts_pointer([480., 360.]),
+            login.egui_owns_input()
+        );
+        assert!(login.egui_owns_input());
+    }
+    assert!(!login.picker.policy.visible());
+}
+
+#[test]
+fn handoff_round_trip_keeps_login_state_and_reopens_with_a_fresh_search() {
+    let mut login = settled(true);
+    select_all_and_type(&mut login, "Nick");
+    assert_eq!(login.state.view(true).nickname, "Nick");
+    login.picker.policy.start_directory(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.focus(SERVER);
+    let effects = {
+        press(&mut login, egui::Key::Enter);
+        login.take_egui_effects()
+    };
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, HostEditEffect::ImeAllowed(_)))
+    );
+    assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+    input(&mut login, egui::Event::Text("192.0.2.3:445".into()));
+    click(&mut login, SEARCH);
+    // No directory ID matches, so search neither selects nor closes.
+    input(&mut login, egui::Event::Text("9999".into()));
+    assert!(login.picker.policy.is_open());
+    press(&mut login, egui::Key::Escape);
+    for now in (9616..=10000).step_by(16) {
+        let (_, effects) = login.step(f64::from(now), true, false).unwrap();
+        // egui-winit keeps IME admission for the nickname it refocuses.
+        assert!(
+            !effects
+                .iter()
+                .any(|e| matches!(e, HostEditEffect::ImeAllowed(_)))
+        );
+    }
+    assert!(!login.picker.policy.visible());
+    assert_eq!(login.focused(), Some(NICKNAME));
+    login.prepare([960, 720], true, None).unwrap();
+    assert!(login.egui.output().unwrap().ime.is_some());
+    assert_eq!(login.displayed_nickname(), "Nick");
+    input(&mut login, egui::Event::Text("!".into()));
+    assert_eq!(login.state.view(true).nickname, "Nick!");
+    login.focus(SERVER);
+    press(&mut login, egui::Key::Enter);
+    assert!(login.picker.policy.is_open());
+    assert_eq!(login.picker.ui.address, "192.0.2.3:445");
+    assert_eq!(login.picker.ui.search, "");
+    assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+    // Choosing a custom server closes and makes direct Play available.
+    press(&mut login, egui::Key::Enter);
+    click(&mut login, ControlId(16));
+    assert_eq!(
+        login.picker.policy.selection.custom_address(),
+        Some("192.0.2.3:445")
+    );
+    assert!(login.picker.policy.can_play());
+    fade(&mut login, 10016, 10400);
+    press(&mut login, egui::Key::Enter);
+    assert!(matches!(
+        login.step(10416., true, false).unwrap().0.as_slice(),
+        [StartMenuIntent::Play { nickname, .. }] if nickname == "Nick!"
+    ));
+}
+
+fn select_all_and_type(login: &mut NativeLogin, text: &str) {
+    for pressed in [true, false] {
+        input(
+            login,
+            egui::Event::Key {
+                key: egui::Key::A,
+                physical_key: Some(egui::Key::A),
+                pressed,
+                repeat: false,
+                modifiers: egui::Modifiers {
+                    ctrl: true,
+                    command: true,
+                    ..Default::default()
+                },
+            },
+        );
+    }
+    input(login, egui::Event::Text(text.into()));
+}
+
+#[test]
+fn address_ime_is_bounded_cancellable_and_outside_undo_history() {
+    for cancel in ["disabled", "empty", "focus", "escape", "commit"] {
+        let mut login = opened(false);
+        input(&mut login, egui::Event::Text("192.0.2.1:80".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        let context = login.egui.context().unwrap().clone();
+        let passes = context.cumulative_pass_nr();
+        for n in 0..200 {
+            input(
+                &mut login,
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: format!("候補{n}"),
+                    active_range_chars: Some(0..1),
+                }),
+            );
+        }
+        // Adjacent preedits coalesce until redraw.
+        assert_eq!(context.cumulative_pass_nr(), passes);
+        login.prepare([960, 720], true, None).unwrap();
+        assert!(login.picker.ui.composing);
+        assert!(login.picker.ui.address.ends_with("候補199"));
+        // Composition owns Enter and Tab.
+        press(&mut login, egui::Key::Enter);
+        press(&mut login, egui::Key::Tab);
+        assert!(login.picker.policy.custom.is_empty());
+        assert_eq!(login.picker.ui.focused(), Some(ADDRESS));
+        match cancel {
+            "disabled" => {
+                let response = login.egui.window_event(
+                    &winit::event::WindowEvent::Ime(winit::event::Ime::Disabled),
+                    1.,
+                    || panic!("native Disabled must be handled before the window adapter"),
+                );
+                assert!(response.repaint);
+                login.settings_input(egui::RawInput::default());
+            }
+            "empty" => input(
+                &mut login,
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: String::new(),
+                    active_range_chars: None,
+                }),
+            ),
+            "focus" => {
+                input(&mut login, egui::Event::WindowFocused(false));
+                input(&mut login, egui::Event::WindowFocused(true));
+            }
+            "escape" => press(&mut login, egui::Key::Escape),
+            _ => input(
+                &mut login,
+                egui::Event::Ime(egui::ImeEvent::Commit("\u{7f}x".into())),
+            ),
+        }
+        login.prepare([960, 720], true, None).unwrap();
+        assert!(!login.picker.ui.composing, "{cancel}");
+        assert!(login.picker.policy.is_open(), "{cancel}");
+        let committed = if cancel == "commit" {
+            "192.0.2.1:80 x"
+        } else {
+            "192.0.2.1:80"
+        };
+        assert_eq!(login.picker.ui.address, committed, "{cancel}");
+        let command = egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        };
+        for _ in 0..4 {
+            input(
+                &mut login,
+                egui::Event::Key {
+                    key: egui::Key::Z,
+                    physical_key: Some(egui::Key::Z),
+                    pressed: true,
+                    repeat: false,
+                    modifiers: command,
+                },
+            );
+            let text = login.picker.ui.address.clone();
+            assert!(!text.contains('候'), "{cancel}: {text:?}");
+        }
+        assert_eq!(login.picker.ui.address, "", "{cancel}");
+    }
+}
+
+#[test]
+fn numeric_search_ime_commit_uses_the_digit_rule_and_selects_once() {
+    let mut login = opened(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    click(&mut login, SEARCH);
+    input(
+        &mut login,
+        egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "４２".into(),
+            active_range_chars: None,
+        }),
+    );
+    login.prepare([960, 720], true, None).unwrap();
+    // Provisional text never selects a server.
+    assert!(login.picker.policy.is_open());
+    input(
+        &mut login,
+        egui::Event::Ime(egui::ImeEvent::Commit("４2a7".into())),
+    );
+    assert_eq!(login.picker.policy.selection.official_id(), Some(27));
+    assert!(!login.picker.policy.is_open());
 }

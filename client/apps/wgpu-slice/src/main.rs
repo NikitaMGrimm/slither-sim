@@ -176,14 +176,7 @@ mod desktop {
         }
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            let effects = if self.login.picker.policy.visible() {
-                let effects = self
-                    .login
-                    .picker
-                    .input
-                    .execute(effects, &mut WindowEditHost(&self.window));
-                self.login.picker.commit_effects(effects)
-            } else if self.login.champion.policy.visible() {
+            let effects = if self.login.champion.policy.visible() {
                 let effects = self
                     .login
                     .champion
@@ -841,11 +834,8 @@ mod desktop {
                     slither_client::server_picker::ServerPreference::Custom(address.clone());
             }
             if let Some(address) = login.picker.policy.selection.custom_address() {
-                login
-                    .picker
-                    .input
-                    .state
-                    .reset_editor(slither_client::server_picker::ADDRESS_EDITOR, address);
+                let address = address.to_owned();
+                login.picker.set_address(&address);
             }
             Ok(Running {
                 login,
@@ -934,23 +924,17 @@ mod desktop {
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
-                    r.login.picker.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play() && r.preparation.is_none() && r.can_play();
                 let champion = r.login.champion.policy.visible();
                 if let WindowEvent::Focused(_) = &event {
-                    if r.login.picker.policy.visible() {
-                        r.login.input.window_event(&event);
-                        r.login.champion.input.window_event(&event);
+                    // The mapped owner below receives this event; keep the other informed.
+                    let inactive = if champion {
+                        &mut r.login.input
                     } else {
-                        r.login.picker.input.window_event(&event);
-                        let inactive = if champion {
-                            &mut r.login.input
-                        } else {
-                            &mut r.login.champion.input
-                        };
-                        inactive.window_event(&event);
-                    }
+                        &mut r.login.champion.input
+                    };
+                    inactive.window_event(&event);
                 }
                 if r.login.egui_owns_input() {
                     if response.repaint {
@@ -1011,9 +995,7 @@ mod desktop {
                     r.schedule.invalidate();
                     return Ok(());
                 }
-                let mapped = if r.login.picker.policy.visible() {
-                    r.login.picker.event(&event)
-                } else if champion {
+                let mapped = if champion {
                     r.login.champion.event(&event)
                 } else {
                     r.login.event(&event, admission)

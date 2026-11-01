@@ -45,6 +45,8 @@ pub mod panel_native;
 pub mod render;
 pub mod scene;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod server_picker_egui;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod server_picker_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod settings_egui;

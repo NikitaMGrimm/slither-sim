@@ -106,9 +106,10 @@ An explicit or forced endpoint leaves pending discovery with the picker; Play
 does not wait on it, and its success or failure is handled independently.
 
 The shared `ScrollList` admits six server rows per window, independent of directory
-size. Only these `ListRow` controls have text rasters and draws. Wheel, arrows,
+size. Only these `ListRow` controls become widgets. Wheel, arrows,
 Page Up/Down and Home/End navigate the bounded window; Tab wraps within the
-modal.
+modal. The address field keeps Home/End and horizontal caret keys; numeric
+search keeps Home/End. Other arrows never move focus between buttons.
 Backdrop click and Escape close; blank panel space shields the backdrop.
 Gameplay presses stay suspended, releases still propagate, and nickname focus
 returns after the exit fade. Geometry, hit-testing and IME placement remain in
@@ -119,23 +120,38 @@ matching Change Skin's caption placement and .7/1/.5 normal/hover/press opacity.
 Its shared admission/focus gate depends on picker availability, including offline
 launch; Play and Quality retain their existing gates.
 
-Modal materials use the shared theme with centre strips measured in logical pixels. Login
-text is explicitly ordered below modal dimming and surfaces. Existing ceilings
-remain 64 menu resources, 13 MiB and 512 menu draws. Synthetic tests cover 2,000
-servers at DPR 1 through 5 over narrow, large and resized viewports, including
-scrolling to both ends, exact numeric
-selection, stale captures, storage failure and no Play on open.
+## Native egui screen
+
+`server_picker_egui.rs` draws the modal in the shared `NativeEguiHost`
+([native login](login-egui.md)). `ServerPicker::panel` still owns placement,
+scale, wording, the row window and tab order; each egui widget uses its resolved
+control rectangle, so painting and hit-testing share the core geometry. Login
+paints below the modal without input. A new panel generation (open, custom edit,
+directory replacement) focuses the address field, and a focused row that leaves
+the window loses focus, as with the shared panel input. The opener's keyboard or
+pointer modality decides whether focus is painted.
+
+Field text follows the same rules: numeric search keeps four ASCII digits and the
+address keeps 512 UTF-16 units with controls replaced by spaces. Inserted text is
+normalized first, then the whole value; carets are clamped in chars. Enter in the
+address adds it and keeps focus; held Enter repeats are ignored. Wheel events are
+queued into row scrolling without an egui pass per event; pixel deltas use 46
+physical pixels per row. IME follows the login rules: adjacent preedits coalesce
+until redraw, composition owns Enter and Tab, and cancellation (including native
+IME Disabled, Escape, focus loss and an empty preedit) restores the field text,
+caret and copied undo history. Provisional search text never selects a server.
+egui-winit owns IME admission; opening and closing the picker emit no legacy IME
+effects. While open, the picker owns Enter and Escape even if an old socket is
+still closing.
 
 From `client/`, with `CARGO_BUILD_JOBS=2`, run the core `server_directory` and
 `server_picker` integration tests and app `server_picker` / `custom_servers`
-tests. The finite `menu_specimens <new-external-directory> --picker-panel`
-example emits art-free panel specimens using synthetic addresses and no
-preference-file or network effects. The older finite
-`menu_specimens <new-external-directory> --server-picker` example emits login,
-picker and scrolled PNGs at 1x/1.5x/2x, plus the retained 960x540 to 960x720
-logical resize at DPR 3 and resource counts. It uses authored
-synthetic addresses and injected ping results; it opens no window or socket.
-Full verification remains `npm run check`.
+tests. The finite `menu_specimens <new-external-directory> --server-picker`
+example emits before/after PNGs for official, scrolled, DPR 3 resize, custom,
+pointer/keyboard focus, invalid and mixed states. The before side is the retained
+toolkit painter fed the same panel, field values and focus; it is not a desktop
+capture. It uses authored synthetic addresses and injected ping results and opens
+no window, socket or preference file. Full verification remains `npm run check`.
 
 These checks establish synthetic behavior and offscreen rendering only. Live
 discovery/play, physical input/IME, OS accessibility and owner appearance/feel
