@@ -15,9 +15,8 @@ pub use forager::ForagerBot;
 pub mod hud;
 pub mod latency;
 #[cfg(feature = "latency-rig")]
-// The binary compiles this module locally to keep CLI plumbing crate-private.
-#[allow(dead_code)]
-pub(crate) mod latency_truth;
+#[doc(hidden)]
+pub mod latency_truth;
 pub mod minimap;
 pub mod network;
 mod presentation;

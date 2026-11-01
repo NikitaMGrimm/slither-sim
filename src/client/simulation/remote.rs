@@ -22,7 +22,6 @@ pub(crate) struct RawSimulator {
 
 impl RawSimulator {
     #[cfg(feature = "latency-rig")]
-    #[allow(dead_code)] // Constructor plumbing for the private measurement binary.
     pub(crate) fn set_latency_truth(&mut self, recorder: crate::client::latency_truth::Recorder) {
         self.backend.latency_truth = Some(recorder);
     }

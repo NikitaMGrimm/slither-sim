@@ -64,7 +64,7 @@ networking = ["bot", "dep:tungstenite", "dep:slither-protocol"]
 parallel = ["dep:rayon"]
 # Benchmark harness only: hidden internals with no stability or semver promise.
 perf-internals = ["networking"]
-# Unstable, measurement-only host instrumentation; never enabled by default.
+# Unstable, measurement-only host instrumentation; no stability or semver promise.
 latency-rig = ["networking"]
 
 [[bin]]

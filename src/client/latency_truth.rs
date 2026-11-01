@@ -11,12 +11,14 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-pub(crate) const DEFAULT_SECONDS: f64 = 60.;
+#[doc(hidden)]
+pub const DEFAULT_SECONDS: f64 = 60.;
 const MAX_SECONDS: f64 = 180.;
 const MAX_BYTES: usize = 256 << 20;
 const MAX_TICKS: usize = 1_000_000;
 
-pub(crate) fn duration(seconds: f64) -> Result<Duration, String> {
+#[doc(hidden)]
+pub fn duration(seconds: f64) -> Result<Duration, String> {
     if !seconds.is_finite() || seconds <= 0. || seconds > MAX_SECONDS {
         return Err("--latency-seconds must be finite, positive and at most 180".into());
     }
@@ -34,7 +36,8 @@ pub(crate) fn loopback(bind: SocketAddr) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn validate(
+#[doc(hidden)]
+pub fn validate(
     path: &Path,
     bind: SocketAddr,
     seconds: Duration,

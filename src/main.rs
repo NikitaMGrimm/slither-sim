@@ -1,19 +1,10 @@
-#[cfg(feature = "latency-rig")]
-use crate as sim;
-#[cfg(not(feature = "latency-rig"))]
-use slither_sim as sim;
-
 use std::io::{self, Write};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "latency-rig")]
-include!("latency_host_root.rs");
-
-#[cfg(feature = "latency-rig")]
-use crate::client::{Host, HostConfig, RunningHost, latency_truth};
-#[cfg(not(feature = "latency-rig"))]
-use sim::client::{Host, HostConfig, RunningHost};
+use slither_sim::client::latency_truth;
+use slither_sim::client::{Host, HostConfig, RunningHost};
 
 const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS]\n\n\
     Binary protocol-19 WebSocket server at /slither. Defaults bind loopback.\n\
@@ -286,7 +277,7 @@ fn serve(args: &[&str]) -> ExitCode {
             return ExitCode::from(2);
         }
     }
-    command_exit(sim::transport::serve(
+    command_exit(slither_sim::transport::serve(
         io::stdin().lock(),
         io::stdout().lock(),
     ))
@@ -309,8 +300,8 @@ fn main() -> ExitCode {
                  --version  Print the package version.\n\n\
                  Protocols: {}, {}\nSee docs/bot-api.md and docs/client-api.md.",
                 env!("CARGO_PKG_VERSION"),
-                sim::transport::PROTOCOL,
-                sim::client::transport::PROTOCOL
+                slither_sim::transport::PROTOCOL,
+                slither_sim::client::transport::PROTOCOL
             );
             ExitCode::SUCCESS
         }
@@ -319,7 +310,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         ["serve", args @ ..] => serve(args),
-        ["client"] => command_exit(sim::client::transport::serve(
+        ["client"] => command_exit(slither_sim::client::transport::serve(
             io::stdin().lock(),
             io::stdout().lock(),
         )),
@@ -417,12 +408,12 @@ mod tests {
             let path = truth_path();
             let config = HostConfig {
                 bind: "127.0.0.1:0".parse().unwrap(),
-                bots: sim::client::BotConfig {
+                bots: slither_sim::client::BotConfig {
                     count: 0,
                     ..Default::default()
                 },
-                simulation: sim::client::SimulationConfig {
-                    world: sim::Config::sandbox(),
+                simulation: slither_sim::client::SimulationConfig {
+                    world: slither_sim::Config::sandbox(),
                     ..Default::default()
                 },
                 max_tick,
@@ -512,12 +503,12 @@ mod tests {
     fn host_stats_report_a_running_loopback_host_and_propagate_output_errors() {
         let config = HostConfig {
             bind: "127.0.0.1:0".parse().unwrap(),
-            bots: sim::client::BotConfig {
+            bots: slither_sim::client::BotConfig {
                 count: 0,
                 ..Default::default()
             },
-            simulation: sim::client::SimulationConfig {
-                world: sim::Config::sandbox(),
+            simulation: slither_sim::client::SimulationConfig {
+                world: slither_sim::Config::sandbox(),
                 ..Default::default()
             },
             ..Default::default()

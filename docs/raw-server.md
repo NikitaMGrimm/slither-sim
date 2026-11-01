@@ -82,8 +82,8 @@ The nondefault `latency-rig` feature enables an unstable, local measurement tool
 a loopback bind and fresh file; seconds default to 60 and must be in `(0, 180]`.
 Tick/slot bounds are checked before allocating at most 256 MiB of scalar storage,
 which is touched before startup. No recorder allocation, lock or file I/O occurs
-in a tick. The feature binary compiles the library modules locally to keep all
-recorder plumbing crate-private; default binaries use the library normally.
+in a tick. The feature's hidden host constructor and validation helpers have no
+stability or semver promise.
 
 JSONL begins with `type: "metadata"`, `schema: "host-latency-truth-v1"`,
 `complete: false`, `duration_seconds`, `configured_dt`, `slot_count`,

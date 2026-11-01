@@ -461,8 +461,8 @@ impl Host {
     }
 
     #[cfg(feature = "latency-rig")]
-    #[allow(dead_code)] // Used only by the binary's private copy of the host.
-    pub(crate) fn with_latency_truth(
+    #[doc(hidden)]
+    pub fn with_latency_truth(
         mut self,
         path: &std::path::Path,
         seconds: Duration,
