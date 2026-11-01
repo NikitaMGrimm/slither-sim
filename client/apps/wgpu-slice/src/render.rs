@@ -1027,7 +1027,7 @@ fn prepare_composed(
                 quality
             };
             let body_storage = std::mem::take(&mut bank.body_commands);
-            let body = plan_standard_body_with_storage(
+            let body = plan_standard_body_with_zoom_and_storage(
                 BodyPaintInput {
                     geometry: geometry.as_paint_geometry(),
                     recipe: BodyPaintRecipe {
@@ -1067,6 +1067,7 @@ fn prepare_composed(
                     .as_ref()
                     .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                 body_storage,
+                user_zoom,
             )
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
