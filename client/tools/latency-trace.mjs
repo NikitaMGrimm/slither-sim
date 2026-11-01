@@ -223,7 +223,7 @@ export function analyze(text, { cpu = false } = {}) {
   for (const [name, values] of intervals) {
     values.sort((a, b) => a - b);
     const q = p => values[Math.ceil(p * values.length) - 1];
-    distributions[name] = { count: values.length, p50Ms: q(.5), p95Ms: q(.95), maxMs: values.at(-1) };
+    distributions[name] = { count: values.length, p50Ms: q(.5), p90Ms: q(.9), p95Ms: q(.95), p99Ms: q(.99), maxMs: values.at(-1) };
   }
   return { format: header.format, run: header.run, sourceRevision: header.sourceRevision,
     complete: true, closedUnflushed: each('closed_unflushed').length,

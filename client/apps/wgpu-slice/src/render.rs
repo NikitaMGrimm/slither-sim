@@ -875,6 +875,8 @@ fn prepare_composed(
         )
         .map_err(|e| e.0)?;
     preparation_phase!("curves_end", identity);
+    #[cfg(all(feature = "latency-rig", not(target_arch = "wasm32")))]
+    let rig_sample = crate::latency_rig::snapshot(identity, &prepared, client);
     let view = BodyPaintView {
         camera: client.camera().position(),
         zoom: client.camera().zoom(),
@@ -1326,6 +1328,8 @@ fn prepare_composed(
     {
         return Err("Whole-frame draw/pixel budget".into());
     }
+    #[cfg(all(feature = "latency-rig", not(target_arch = "wasm32")))]
+    crate::latency_rig::commit(rig_sample);
     Ok(PreparedFrame {
         frame,
         overlay,
