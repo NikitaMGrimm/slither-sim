@@ -149,6 +149,10 @@ impl SessionPolicy {
             .command_requires_version(opcode, length as usize)
             .map_err(error)
     }
+    /// Extract a control argument through the shared wire reader.
+    pub fn command_argument(command: &[u8]) -> Result<u8, JsValue> {
+        Policy::command_argument(command).map_err(error)
+    }
     /// Admit advertised protocol.
     pub fn admit_protocol(&self, version: f64) -> Result<(), JsValue> {
         self.inner.admit_protocol(version).map_err(error)

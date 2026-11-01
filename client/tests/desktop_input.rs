@@ -213,6 +213,23 @@ fn signed_zero_heading_and_inclusive_small_pointer_dead_zone_are_retained() {
 }
 
 #[test]
+fn negative_subnormal_heading_keeps_the_existing_out_of_range_byte() {
+    let mut input = fixture(19.0);
+    input
+        .set_own(
+            OwnInput {
+                wanted_heading: -f64::from_bits(1),
+                ..own()
+            },
+            false,
+        )
+        .unwrap();
+    input.pointer(&pointer(401., 300.)).unwrap();
+    assert_eq!(input.heading_phase(34.).unwrap(), [251]);
+    assert_eq!(input.view().last_quantized_heading, 251.);
+}
+
+#[test]
 fn direct_phase_invalid_times_reject_without_commit() {
     let mut input = fixture(19.0);
     input.key("Space", true);

@@ -1,14 +1,13 @@
 //! Validated login construction and bounded frame splitting without network I/O.
 
+pub use slither_protocol::frame::{CommandRef, Header as ElapsedHeader};
+use slither_protocol::{DecodeAdmission, ErrorKind, frame, v19};
 use std::fmt;
 
 pub mod hud;
 pub mod minimap;
 
-/// Maximum frame bytes, including any elapsed header.
-pub const MAX_FRAME_BYTES: usize = 1 << 20;
-/// Maximum commands in one frame.
-pub const MAX_FRAME_COMMANDS: usize = 4096;
+pub use slither_protocol::frame::{MAX_FRAME_BYTES, MAX_FRAME_COMMANDS};
 
 /// Validation failures for the prototype protocol boundary.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -76,14 +75,20 @@ pub fn encode_login(
     if custom_skin.len() > 255 {
         return Err(ProtocolError::CustomSkin);
     }
-    let mut bytes = Vec::with_capacity(28 + nickname.len() + custom_skin.len());
-    bytes.extend([b's', 30]);
-    bytes.extend(client_version.to_be_bytes());
-    bytes.extend(page_echo);
-    bytes.extend([skin, nickname.len() as u8]);
-    bytes.extend(nickname.as_bytes());
-    bytes.extend([0, 255]);
-    bytes.extend(custom_skin);
+    let mut bytes = vec![0; 28 + nickname.len() + custom_skin.len()];
+    v19::client::write_login(
+        v19::client::ModernLogin {
+            client_version,
+            page_echo,
+            nickname: nickname.as_bytes(),
+            skin,
+            custom_skin,
+        },
+        &mut bytes,
+    )
+    // The local checks prove the encoder preconditions. Keep invariant failures
+    // static so this adapter does not retain the shared error's Debug formatter.
+    .unwrap_or_else(|_| panic!("validated login and exact output capacity"));
     Ok(bytes)
 }
 
@@ -92,19 +97,10 @@ pub fn encode_login(
 /// Substitute per UTF-16 unit before truncation, including isolated surrogates.
 pub fn encode_champion(units: &[u16]) -> Vec<u8> {
     let text = crate::menu_input::TextRule::Champion.normalize_units(units);
-    let mut bytes = Vec::with_capacity(2 + text.len());
-    bytes.extend([255, b'v']);
-    bytes.extend(text.bytes());
+    let mut bytes = vec![0; 2 + text.len()];
+    v19::client::write_champion(text.as_bytes(), &mut bytes)
+        .unwrap_or_else(|_| panic!("normalized champion text and exact output capacity"));
     bytes
-}
-
-/// Explicit connection framing mode; this is never inferred from packet data.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ElapsedHeader {
-    /// Header-free mode, requested by the caller's separate negotiation.
-    Absent,
-    /// A big-endian two-byte elapsed header precedes the payload.
-    TwoBytes,
 }
 
 /// A structurally validated frame borrowing its complete command slices.
@@ -113,89 +109,99 @@ pub struct DecodedFrame<'a> {
     /// Elapsed header, only in the explicitly selected timed mode.
     pub elapsed_ms: Option<u16>,
     /// Complete command bytes, including each command byte.
-    pub commands: Vec<&'a [u8]>,
+    pub commands: CommandSlices<'a>,
+}
+impl<'a> std::ops::Deref for DecodedFrame<'a> {
+    type Target = frame::DecodedFrame<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.commands.0
+    }
 }
 
-/// Validate a complete frame before returning any commands.
-///
-/// A first payload byte of at least 32 denotes a single bare command. Otherwise
-/// bundling uses a two-byte big-endian length when the prefix is below 32, or a
-/// one-byte length minus 32 for subsequent short prefixes. Empty commands and
-/// malformed trailing records reject the entire frame. Setup field lengths are
-/// checked; other command bodies remain opaque, not gameplay-validated.
+/// Repeatable borrowed command slices for the public framing façade.
+#[derive(Clone, Copy, Debug)]
+pub struct CommandSlices<'a>(frame::DecodedFrame<'a>);
+impl<'a> CommandSlices<'a> {
+    /// Number of validated commands.
+    pub fn len(self) -> usize {
+        self.0.command_count()
+    }
+    /// Whether this view contains no commands.
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+    /// Traverse complete command slices without allocating a command list.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &'a [u8]> + Clone {
+        self.0.commands().map(|c| c.bytes)
+    }
+}
+impl PartialEq for CommandSlices<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+impl Eq for CommandSlices<'_> {}
+impl<T: AsRef<[u8]>, const N: usize> PartialEq<[T; N]> for CommandSlices<'_> {
+    fn eq(&self, other: &[T; N]) -> bool {
+        self.iter().eq(other.iter().map(AsRef::as_ref))
+    }
+}
+impl std::ops::Index<usize> for CommandSlices<'_> {
+    type Output = [u8];
+    fn index(&self, index: usize) -> &Self::Output {
+        self.0
+            .commands()
+            .nth(index)
+            .expect("command index out of bounds")
+            .bytes
+    }
+}
+
+/// Allocation-free reader used by production ingress. The complete envelope is
+/// validated before any repeatable, message-relative command view is returned.
+pub fn read_frame(
+    bytes: &[u8],
+    header: ElapsedHeader,
+) -> Result<frame::DecodedFrame<'_>, ProtocolError> {
+    frame::decode_frame(
+        bytes,
+        header,
+        frame::Limits::CLIENT,
+        frame::FrameAdmission::Bounded,
+    )
+    .map_err(|error| match error.kind {
+        ErrorKind::TooLarge => ProtocolError::FrameTooLarge,
+        ErrorKind::TooManyCommands => ProtocolError::TooManyCommands,
+        ErrorKind::Empty => ProtocolError::EmptyFrame,
+        ErrorKind::InvalidCommand => ProtocolError::InvalidCommand,
+        _ if error.opcode == Some(b'a') => ProtocolError::TruncatedSetup,
+        ErrorKind::Truncated if header == ElapsedHeader::TwoBytes && bytes.len() < 2 => {
+            ProtocolError::TruncatedElapsed
+        }
+        ErrorKind::Truncated => ProtocolError::TruncatedLength,
+        _ => ProtocolError::InvalidLength,
+    })
+}
+
+/// Borrowed slice façade for callers that do not need command offsets/indices.
 pub fn decode_frame(
     bytes: &[u8],
     header: ElapsedHeader,
 ) -> Result<DecodedFrame<'_>, ProtocolError> {
-    if bytes.len() > MAX_FRAME_BYTES {
-        return Err(ProtocolError::FrameTooLarge);
-    }
-    let (elapsed_ms, payload) = match header {
-        ElapsedHeader::Absent => (None, bytes),
-        ElapsedHeader::TwoBytes => {
-            let raw = bytes.get(..2).ok_or(ProtocolError::TruncatedElapsed)?;
-            (Some(u16::from_be_bytes([raw[0], raw[1]])), &bytes[2..])
-        }
-    };
-    let first = *payload.first().ok_or(ProtocolError::EmptyFrame)?;
-    let mut commands = Vec::new();
-    if first >= 32 {
-        validate_command(payload)?;
-        commands.push(payload);
-    } else {
-        let mut offset = 0;
-        while offset < payload.len() {
-            if commands.len() == MAX_FRAME_COMMANDS {
-                return Err(ProtocolError::TooManyCommands);
-            }
-            let prefix = payload[offset];
-            offset += 1;
-            let length = if prefix < 32 {
-                let low = *payload.get(offset).ok_or(ProtocolError::TruncatedLength)?;
-                offset += 1;
-                usize::from(u16::from_be_bytes([prefix, low]))
-            } else {
-                usize::from(prefix - 32)
-            };
-            if length == 0 || length > payload.len() - offset {
-                return Err(ProtocolError::InvalidLength);
-            }
-            let command = &payload[offset..offset + length];
-            validate_command(command)?;
-            commands.push(command);
-            offset += length;
-        }
-    }
+    let frame = read_frame(bytes, header)?;
     Ok(DecodedFrame {
-        elapsed_ms,
-        commands,
+        elapsed_ms: frame.prefix(),
+        commands: CommandSlices(frame),
     })
 }
 
-fn validate_command(command: &[u8]) -> Result<(), ProtocolError> {
-    if command[0] < 32 {
-        return Err(ProtocolError::InvalidCommand);
-    }
-    if command[0] == b'a' {
-        setup_protocol_version(command)?;
-    }
-    Ok(())
-}
-
-/// Return the advertised setup protocol without asserting its compatibility.
-///
-/// The 25-byte base may be followed by a complete two-byte server ID, three-byte
-/// radius, and opaque extensions. This only validates field boundaries.
+/// Return the advertised setup protocol after validating field boundaries.
 pub fn setup_protocol_version(command: &[u8]) -> Result<u8, ProtocolError> {
-    if command.first() != Some(&b'a') {
-        return Err(ProtocolError::NotSetup);
-    }
-    if command.len() < 25 || matches!(command.len(), 26 | 28 | 29) {
-        return Err(ProtocolError::TruncatedSetup);
-    }
-    // Team mode adds one mandatory team byte after its mode byte.
-    if command.len() == 31 && command[30] == 2 {
-        return Err(ProtocolError::TruncatedSetup);
-    }
-    Ok(command[23])
+    v19::setup_protocol_version(command, DecodeAdmission::ClientReceived).map_err(|error| {
+        if error.kind == ErrorKind::WrongOpcode {
+            ProtocolError::NotSetup
+        } else {
+            ProtocolError::TruncatedSetup
+        }
+    })
 }

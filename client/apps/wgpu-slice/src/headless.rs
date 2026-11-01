@@ -435,8 +435,8 @@ impl Host<'_> {
                 }
                 Event::Binary(g, bytes) => {
                     self.summary.received_frames += 1;
-                    if let Ok(decoded) = protocol::decode_frame(&bytes, ElapsedHeader::Absent) {
-                        self.summary.received_commands += decoded.commands.len() as u64;
+                    if let Ok(decoded) = protocol::read_frame(&bytes, ElapsedHeader::Absent) {
+                        self.summary.received_commands += decoded.command_count() as u64;
                     }
                     self.game.receive(g, &bytes, now)?;
                 }

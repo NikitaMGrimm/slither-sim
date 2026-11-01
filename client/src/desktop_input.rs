@@ -405,7 +405,9 @@ impl DesktopInput {
             self.view.right_steps = right - if increasing { count } else { 0 };
             self.view.own.as_mut().expect("retained own").gaze_heading = gaze;
             Ok(if self.view.protocol >= 5 {
-                vec![252, (if increasing { count + 128 } else { count }) as u8]
+                slither_protocol::v19::client::turn(increasing, count as u8)
+                    .unwrap_or_else(|_| panic!("bounded turn count"))
+                    .to_vec()
             } else {
                 vec![if increasing { 114 } else { 108 }, count as u8]
             })
@@ -425,7 +427,7 @@ impl DesktopInput {
             own.sent_boost = own.requested_boost;
             self.view.last_boost_ms = now_ms;
             Ok(if self.view.protocol >= 5 {
-                vec![if own.sent_boost { 253 } else { 254 }]
+                slither_protocol::v19::client::boost(own.sent_boost).to_vec()
             } else {
                 vec![109, u8::from(own.sent_boost)]
             })
@@ -470,7 +472,15 @@ impl DesktopInput {
                 self.view.last_quantized_heading = quantized;
                 let q = quantized as u32;
                 return Ok(if self.view.protocol >= 5 {
-                    vec![q as u8]
+                    // Adding TAU to a negative subnormal can round to TAU, so
+                    // the existing pointer quantizer emits 251 (not a clamp).
+                    if q == 251 {
+                        slither_protocol::v19::client::PING.to_vec()
+                    } else {
+                        slither_protocol::v19::client::heading_byte(q as u8)
+                            .unwrap_or_else(|_| panic!("ordinary pointer heading is in 0..=250"))
+                            .to_vec()
+                    }
                 } else {
                     vec![101, (q >> 16) as u8, (q >> 8) as u8, q as u8]
                 });

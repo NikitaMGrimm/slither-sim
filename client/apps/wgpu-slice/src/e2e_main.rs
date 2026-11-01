@@ -173,9 +173,10 @@ mod probe {
                             .receive(g, &bytes, self.now())
                             .map_err(|e| format!("ingress: {e}"))?;
                         self.flush()?;
-                        let decoded = protocol::decode_frame(&bytes, ElapsedHeader::Absent)
+                        let decoded = protocol::read_frame(&bytes, ElapsedHeader::Absent)
                             .map_err(|e| format!("decode: {e}"))?;
-                        for c in decoded.commands {
+                        for c in decoded.commands() {
+                            let c = c.bytes;
                             self.summary.challenge |= c[0] == b'6';
                             self.summary.leaderboard |= c[0] == b'l';
                             self.summary.minimap |= matches!(c[0], b'M' | b'V' | b'U');

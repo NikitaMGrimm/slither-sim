@@ -12,6 +12,13 @@ test('production session requires explicit Rust owner and contains no lifecycle 
 
 import {sessionPolicySmoke,sessionProtocolDouble} from './session-policy-smoke.mjs';
 test('staged session matches full retained authored session effects and callback observations',()=>{const result=sessionPolicySmoke({...sessionProtocolDouble(),SessionPolicy:TestSessionPolicy});assert.ok(result.comparisons>1000);});
+test('ordinary packet bodies do not round-trip through the Wasm control reader',()=>{
+  class LifeControlOnly extends TestSessionPolicy {
+    static command_argument(command){assert.equal(command[0],118);return super.command_argument(command);}
+  }
+  const result=sessionPolicySmoke({...sessionProtocolDouble(),SessionPolicy:LifeControlOnly});
+  assert.ok(result.comparisons>1000);
+});
 test('negative control rejects lifecycle commit before packet success',()=>{class Early extends TestSessionPolicy{prepare_controls(...args){const result=super.prepare_controls(...args);super.commit_controls();return result;}}assert.throws(()=>sessionPolicySmoke({...sessionProtocolDouble(),SessionPolicy:Early}));});
 test('negative control rejects a ping intent without its pre-callback commit',()=>{class Dropped extends TestSessionPolicy{commit_ping(){}}assert.throws(()=>sessionPolicySmoke({...sessionProtocolDouble(),SessionPolicy:Dropped}));});
 
