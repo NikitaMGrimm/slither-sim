@@ -106,6 +106,7 @@ mod probe {
         summary: Summary,
         started: Instant,
         playing: Option<Instant>,
+        legacy: bool,
     }
     impl Host {
         fn now(&self) -> f64 {
@@ -116,9 +117,19 @@ mod probe {
         }
         fn effects(&mut self) -> Result<()> {
             for _ in 0..64 {
-                let Some(e) = self.game.effect() else {
+                let Some(mut e) = self.game.effect() else {
                     return Ok(());
                 };
+                // Test harness only: the simulator chooses 13 on a legacy login.
+                // Production LocalGame keeps its stock login for every server.
+                if self.legacy
+                    && let EffectKind::Send(bytes) = &mut e.kind
+                    && bytes.starts_with(&[b's', 30])
+                {
+                    let mut login = vec![b's', 12];
+                    login.extend_from_slice(&bytes[24..]);
+                    *bytes = login;
+                }
                 if matches!(e.kind, EffectKind::Connect(_)) {
                     self.game.construct(e.generation, e.id, self.now())?;
                 }
@@ -260,6 +271,11 @@ mod probe {
     }
     pub fn run() -> Result<()> {
         let (endpoint, seconds) = arguments(&std::env::args().skip(1).collect::<Vec<_>>())?;
+        let legacy = match std::env::var("SLITHER_CLIENT_E2E_PROTOCOL").as_deref() {
+            Err(std::env::VarError::NotPresent) | Ok("19") => false,
+            Ok("13") => true,
+            _ => return Err("SLITHER_CLIENT_E2E_PROTOCOL must be 13 or 19".into()),
+        };
         let started = Instant::now();
         let mut host = Host {
             game: LocalGame::new(0.)?,
@@ -267,6 +283,7 @@ mod probe {
             summary: Summary::default(),
             started,
             playing: None,
+            legacy,
         };
         host.game.play(&endpoint, "Local E2E", 0)?;
         let result = host.run(seconds);

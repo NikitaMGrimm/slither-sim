@@ -1,4 +1,4 @@
-//! Bounded received scene state for a documented subset of protocol 19.
+//! Bounded received scene state for documented subsets of protocols 13 and 19.
 //!
 //! This original presentation model reads transmitted anchors, not authoritative
 //! physics. Bodies are head-to-tail; coordinates are centered on setup's grid
@@ -20,6 +20,9 @@ use slither_protocol::{
     scalar,
     v19::{self, Message},
 };
+
+mod v13;
+use v13::AppearanceHeader;
 
 /// Maximum simultaneously retained snakes.
 pub const MAX_SNAKES: usize = 256;
@@ -44,7 +47,7 @@ pub struct Point {
 /// Typed transmitted world configuration. No physics constants are inferred.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Setup {
-    /// Advertised protocol; this module accepts only 19.
+    /// Advertised protocol, 13 or 19, selected for the connection by Setup.
     pub protocol: u8,
     /// Offset subtracted from wire positions on both axes.
     pub grid_center: f64,
@@ -193,7 +196,7 @@ pub struct Appearance {
 /// One food creation, independent of the lossy unique-key received map.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FoodSpawnInput {
-    /// Packed sector and offset bytes, preserving the complete wire bit pattern.
+    /// Packed sector/offset bytes in 19, or absolute x16/y16 in 13.
     pub key: u32,
     /// Original sector coordinates, independent of later animation.
     pub sector: (u8, u8),
@@ -434,7 +437,7 @@ pub struct ClientState {
     pub setup: Option<Setup>,
     /// Current snakes, in wire identifier order.
     pub snakes: BTreeMap<u16, Snake>,
-    /// Lossy unique-key projection in packed sector/offset order. Creation replaces
+    /// Lossy unique-key projection in protocol-specific key order. Creation replaces
     /// the latest value and consumption removes it immediately. This map cannot
     /// represent duplicate instances, insertion order, or consumption animation.
     pub foods: BTreeMap<u32, Food>,
@@ -452,6 +455,8 @@ pub struct ClientState {
     eaten_sector: Option<(u8, u8)>,
     added_color: u8,
     eater_id: Option<u16>,
+    // Absolute v13 front anchors also retain the dying own object's relative base.
+    legacy_fronts: BTreeMap<u16, Point>,
 }
 
 impl ClientState {
@@ -751,6 +756,19 @@ impl ClientState {
         } else {
             DecodeAdmission::ClientReceived
         };
+        let version = if code == b'a' {
+            let version = v19::setup_protocol_version(p, admission)
+                .map_err(|_| StateError::InvalidPacket(code))?;
+            if self.setup.as_ref().is_some_and(|s| s.protocol != version) {
+                return Err(StateError::UnsupportedProtocol(version));
+            }
+            version
+        } else {
+            self.setup.as_ref().map_or(19, |s| s.protocol)
+        };
+        if version == 13 {
+            return self.apply_v13(command, admission, events);
+        }
         let message = v19::decode_command(command, admission).map_err(|error| {
             if error.kind == ErrorKind::UnsupportedVersion {
                 StateError::UnsupportedProtocol(
@@ -761,6 +779,15 @@ impl ClientState {
                 StateError::InvalidPacket(code)
             }
         })?;
+        self.apply_message(message, code, events)
+    }
+
+    fn apply_message(
+        &mut self,
+        message: Message<'_>,
+        code: u8,
+        events: Option<&mut Vec<PresentationEvent>>,
+    ) -> Result<bool, StateError> {
         if let Message::ScoreAdjustment(value) = message {
             if let Some(events) = events {
                 events.push(PresentationEvent::OwnScoreAdjustment(value));
@@ -797,7 +824,13 @@ impl ClientState {
         }
         let setup = self.setup.as_ref().ok_or(StateError::MissingSetup)?.clone();
         match message {
-            Message::SnakeAppearance(raw) => self.appearance(raw, &setup, events)?,
+            Message::SnakeAppearance(raw) => self.appearance(
+                raw.into(),
+                raw.body.first,
+                raw.body.deltas(),
+                &setup,
+                events,
+            )?,
             Message::SnakeRemoval(raw) => {
                 self.snakes.remove(&raw.id);
                 if let Some(events) = events {
@@ -935,7 +968,9 @@ impl ClientState {
 
     fn appearance(
         &mut self,
-        raw: v19::SnakeAppearanceRef<'_>,
+        raw: AppearanceHeader<'_>,
+        first: Option<[u32; 2]>,
+        deltas: impl Iterator<Item = v19::BodyDelta>,
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
@@ -953,7 +988,7 @@ impl ClientState {
         let mut absolute_body = events.as_ref().map(|_| Vec::new());
         let mut anchor_direction = None;
         let mut effective_heading = scalar::angle24(raw.heading);
-        if let Some([x, y]) = raw.body.first {
+        if let Some([x, y]) = first {
             let mut absolute_point = Point {
                 x: scalar::position5(x),
                 y: scalar::position5(y),
@@ -963,7 +998,7 @@ impl ClientState {
             if let Some(body) = &mut absolute_body {
                 body.push(absolute_point);
             }
-            for delta in raw.body.deltas() {
+            for delta in deltas {
                 match delta {
                     v19::BodyDelta::FinalDirection(direction) => {
                         point = advance(point, direction, setup.body_spacing)?;
@@ -1059,13 +1094,23 @@ impl ClientState {
         setup: &Setup,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
-        let own = raw.target == v19::Target::Own;
-        let grow = raw.grew;
-        let direction = raw.direction;
         let absolute_position = raw.absolute.map(|[x, y]| Point {
             x: f64::from(x),
             y: f64::from(y),
         });
+        self.anchor_at(raw, setup, events, absolute_position)
+    }
+
+    fn anchor_at(
+        &mut self,
+        raw: v19::AnchorRef,
+        setup: &Setup,
+        events: Option<&mut Vec<PresentationEvent>>,
+        absolute_position: Option<Point>,
+    ) -> Result<(), StateError> {
+        let own = raw.target == v19::Target::Own;
+        let grow = raw.grew;
+        let direction = raw.direction;
         let position = absolute_position
             .map(|point| centered(setup, point.x, point.y))
             .transpose()?;

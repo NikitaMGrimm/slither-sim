@@ -238,7 +238,7 @@ export function createStockSession({ wasm, createSocket, now, maxBufferedBytes =
     // Controls are deliberately canonical; Rust additionally validates the entire world transaction.
     for (const command of commands) {
       if (command[0] === 54) throw new Error('Repeated challenge');
-      if (command[0] === 97 && wasm.setup_protocol_version(command) !== 19) throw new Error('Unsupported protocol');
+      if (command[0] === 97 && ![13, 19].includes(wasm.setup_protocol_version(command))) throw new Error('Unsupported protocol');
       if (command[0] === 112 && command.length !== 1) throw new Error('Invalid pong');
       if (command[0] === 118 && command.length !== 2) throw new Error('Invalid life control');
     }

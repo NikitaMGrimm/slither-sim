@@ -155,6 +155,26 @@ export function stockSessionSmoke(wasm) {
   }
 
   try {
+    // Authored protocol-13 session through the real Canvas Wasm core and the
+    // same session adapter/login as 19. The final body pair is a delta in 13.
+    const legacy = harness();
+    const legacySocket = legacy.start();
+    const setup13 = setup.slice(); setup13[23] = 13;
+    const own13 = appearance.slice(); own13.set([211, 127], own13.length - 2);
+    legacySocket.receive(bundle(setup13, own13,
+      [70, 7, 3, 232, 3, 232, 20], [102, 8, 3, 233, 3, 232, 25]));
+    assert.equal(legacy.session.snapshot().phase, 'playing');
+    assert.equal(JSON.parse(legacy.scene.snapshot()).protocol, 13);
+    assert.equal(JSON.parse(legacy.scene.snapshot()).foods, 2);
+    legacySocket.receive(bundle([103, 0, 0, 3, 232, 3, 232], [78, 0, 0, 170, 128, 128, 0, 0],
+      [99, 3, 232, 3, 232, 0, 0], [69, 0, 0, 64, 96]));
+    legacy.control(100);
+    assert.equal(JSON.parse(legacy.scene.snapshot()).foods, 1);
+    assert.deepEqual(legacy.errors, []);
+    legacySocket.receive(bundle([115, 0, 0, 1], [118, 0]));
+    assert.equal(legacy.session.snapshot().phase, 'dead');
+    cases.push('protocol 13 stock login, coordinate motion, food, presentation and death');
+
     const main = harness(true);
     assert.ok(main.scene.control_view().own);
     const socket = main.start();

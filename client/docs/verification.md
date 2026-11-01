@@ -43,6 +43,14 @@ It covers direct selection without fetching, input/focus and malformed storage.
 The `menu_specimens --picker-panel` mode captures only the shared modal, without
 art, a game session, a window or network work.
 
+The authored `protocol13` core/app tests cover explicit IDs, coordinate motion,
+appearance deltas, absolute food, HUD and death. The real Canvas Wasm session
+smoke also exercises 13. For the loopback e2e harness only, set
+`SLITHER_CLIENT_E2E_PROTOCOL=13` to replace its outgoing login with selector 12;
+run `node tools/e2e-local-host.mjs --host-bin PATH --client-bin PATH` with the
+prebuilt simulator and `slither-client-e2e`. The default remains 19. This hook is
+absent from the production desktop/browser login path.
+
 The ABI smoke helpers are shared regression coverage, not standalone network
 probes. Tests use explicit authored doubles or real generated Wasm as labelled.
 Run the ABI suite again after changing Rust/browser boundaries. For wgpu, the

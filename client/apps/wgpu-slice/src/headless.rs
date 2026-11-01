@@ -136,6 +136,10 @@ struct Summary {
     negotiated: bool,
     login_sent: bool,
     setup: bool,
+    playing: bool,
+    protocol: Option<u8>,
+    foods: usize,
+    foods_max: usize,
     received_frames: u64,
     received_commands: u64,
     sent: u64,
@@ -153,6 +157,11 @@ impl Summary {
         self.negotiated |= game.phase() == Phase::Challenge;
         self.login_sent |= game.phase() == Phase::Setup;
         self.setup |= game.client().score_view().table_max.is_some();
+        self.playing |= game.phase() == Phase::Playing;
+        let state = game.client().received();
+        self.protocol = state.setup.as_ref().map(|s| s.protocol);
+        self.foods = state.foods.len();
+        self.foods_max = self.foods_max.max(self.foods);
     }
     fn sample(&mut self, game: &LocalGame, seconds: f64) {
         let view = game.client().score_view();
@@ -205,6 +214,10 @@ impl Summary {
             .collect::<Vec<_>>()
             .join(", ");
         println!("own_length=[{samples}]");
+        println!(
+            "playing={} protocol={:?} food_count={} food_max={}",
+            self.playing, self.protocol, self.foods, self.foods_max
+        );
         self.encounters.print();
         println!("exit={}", self.reason);
     }
