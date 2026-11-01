@@ -507,6 +507,7 @@ impl NativeLogin {
         }
         self.picker.ui.keyboard_focus = self.login_ui.keyboard_focus;
         self.picker.viewport = self.area;
+        self.cancel_picker_composition();
         self.picker.open();
         self.refresh_egui();
         self.egui.begin_screen();
@@ -516,6 +517,14 @@ impl NativeLogin {
         self.settings_frame();
         self.settings_frame();
         effects
+    }
+    /// A pointer close can end the native composition without an IME event the
+    /// picker sees: `set_ime_allowed(false)` need not report Disabled. Restore
+    /// the snapshot so a stale composition cannot outlive the picker.
+    fn cancel_picker_composition(&mut self) {
+        if let Some(ctx) = self.egui.context() {
+            self.picker.ui.cancel_composition(ctx);
+        }
     }
     /// Release held gameplay input on entry, like other modals. egui-winit owns
     /// IME admission for the picker's fields and the nickname it returns to; a
@@ -652,6 +661,9 @@ impl NativeLogin {
         );
         if picker {
             self.picker.apply(intents);
+            if !self.picker.policy.is_open() {
+                self.cancel_picker_composition();
+            }
         }
         if !self.login_ui.composing && !settings {
             self.state

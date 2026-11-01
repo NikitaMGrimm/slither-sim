@@ -794,3 +794,46 @@ fn numeric_search_ime_commit_uses_the_digit_rule_and_selects_once() {
     assert_eq!(login.picker.policy.selection.official_id(), Some(27));
     assert!(!login.picker.policy.is_open());
 }
+
+/// A pointer close can end the native composition without any IME event the
+/// picker sees (`set_ime_allowed(false)` need not report Disabled). The closed
+/// picker restores the snapshot, and the next open starts without composition.
+#[test]
+fn closing_while_composing_restores_the_field_and_reopens_clean() {
+    for close in ["backdrop", "close"] {
+        let mut login = opened(false);
+        input(&mut login, egui::Event::Text("192.0.2.1:80".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: Some(0..1),
+            }),
+        );
+        login.prepare([960, 720], true, None).unwrap();
+        assert!(login.picker.ui.composing, "{close}");
+        match close {
+            "backdrop" => {
+                click_at(&mut login, [4., 4.]);
+            }
+            _ => click(&mut login, CLOSE),
+        }
+        assert!(!login.picker.policy.is_open(), "{close}");
+        assert!(!login.picker.ui.composing, "{close}");
+        assert_eq!(login.picker.ui.address, "192.0.2.1:80", "{close}");
+        fade(&mut login, 11216, 12000);
+        assert!(!login.picker.policy.visible(), "{close}");
+        login.open_picker();
+        login.picker.policy.alpha = 1.;
+        login.prepare([960, 720], true, None).unwrap();
+        assert!(!login.picker.ui.composing, "{close}");
+        assert_eq!(login.picker.ui.focused(), Some(ADDRESS), "{close}");
+        // Enter adds, and Escape closes, as in any fresh open.
+        press(&mut login, egui::Key::Enter);
+        assert_eq!(login.picker.policy.custom, ["192.0.2.1:80"], "{close}");
+        press(&mut login, egui::Key::Escape);
+        assert!(!login.picker.policy.is_open(), "{close}");
+    }
+}
