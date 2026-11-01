@@ -1043,9 +1043,15 @@ impl SurfaceHost {
         overlay: Option<&Frame>,
         requested: slither_client::settings::WorldResolution,
         menus: &mut crate::egui_native::NativeEguiHost,
+        top: Option<&Frame>,
     ) -> RenderResult<bool> {
+        if top.is_some_and(|f| f.extent != self.extent) {
+            return Err("menu layer/surface extent mismatch".into());
+        }
         self.present_inner_with(frame, true, overlay, requested, |renderer, view| {
-            menus.paint(renderer, view)
+            menus.paint(renderer, view);
+            // An old-toolkit screen stays above the egui login it covers.
+            top.map_or(Ok(()), |top| renderer.render_overlay(top, view))
         })
     }
     fn present_inner(
@@ -1055,7 +1061,7 @@ impl SurfaceHost {
         overlay: Option<&Frame>,
         requested: slither_client::settings::WorldResolution,
     ) -> RenderResult<bool> {
-        self.present_inner_with(frame, scale, overlay, requested, |_, _| {})
+        self.present_inner_with(frame, scale, overlay, requested, |_, _| Ok(()))
     }
     fn present_inner_with(
         &mut self,
@@ -1063,7 +1069,7 @@ impl SurfaceHost {
         scale: bool,
         overlay: Option<&Frame>,
         requested: slither_client::settings::WorldResolution,
-        paint: impl FnOnce(&Renderer, &wgpu::TextureView),
+        paint: impl FnOnce(&mut Renderer, &wgpu::TextureView) -> RenderResult<()>,
     ) -> RenderResult<bool> {
         if overlay.is_some_and(|f| f.extent != self.extent) {
             return Err("overlay/surface extent mismatch".into());
@@ -1095,7 +1101,7 @@ impl SurfaceHost {
             self.extent,
             requested,
         )?;
-        paint(&self.renderer, &view);
+        paint(&mut self.renderer, &view)?;
         crate::latency::picture("present_begin");
         self.renderer.queue.present(texture);
         crate::latency::picture("present_end");

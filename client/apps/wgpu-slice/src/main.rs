@@ -631,17 +631,23 @@ mod desktop {
                 self.game.bank.cosmetics.as_mut(),
             )?;
             let view = self.login.state.view(admission);
+            // Where an old-toolkit screen's draws start in the composed UI frame.
+            let mut top_at = None;
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
-                    let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(
-                        self.login.prepare_host(
-                            physical,
-                            dpr,
-                            admission,
-                            self.game.menu_cosmetics(),
-                        ),
-                        &p,
-                    )?;
+                    let menu = self.login.prepare_host(
+                        physical,
+                        dpr,
+                        admission,
+                        self.game.menu_cosmetics(),
+                    );
+                    let menu_draws = menu.as_ref().map_or(0, |m| m.frame.draws.len());
+                    let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(menu, &p)?;
+                    if self.login.egui.paint_only()
+                        && let Some(picture) = &picture
+                    {
+                        top_at = Some(picture.ui_frame().draws.len() - menu_draws);
+                    }
                     let effects = self.login.cursor_area()?;
                     self.edit_effects(effects);
                     picture
@@ -662,6 +668,22 @@ mod desktop {
             {
                 return self.skip_bad_frame(p.frame.identity, error);
             }
+            // The skin studio or champion editor (with the preview) presents
+            // above egui, which paints the login below it.
+            let top = match (top_at, &mut composed) {
+                (Some(at), Some(picture)) => {
+                    let ui = picture.ui_frame_mut();
+                    Some(slither_wgpu_slice::frame::Frame {
+                        identity: ui.identity,
+                        extent: ui.extent,
+                        viewport_scale: ui.viewport_scale,
+                        tick: ui.tick,
+                        draws: ui.draws.split_off(at),
+                        snakes: Vec::new(),
+                    })
+                }
+                _ => None,
+            };
             let picture = composed.as_ref().unwrap_or(&p);
             let synced = {
                 let _sync = latency::PictureSpan::new("sync_begin", "sync_end");
@@ -683,6 +705,7 @@ mod desktop {
                 picture.overlay.as_ref(),
                 window.requested,
                 &mut self.login.egui,
+                top.as_ref(),
             ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {

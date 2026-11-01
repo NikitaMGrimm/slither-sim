@@ -52,7 +52,7 @@ fn readback_with(
     frame: &Frame,
     resources: &[Resource],
     physical: Option<[u32; 2]>,
-    paint: impl FnOnce(&Renderer, &wgpu::TextureView),
+    paint: impl FnOnce(&mut Renderer, &wgpu::TextureView),
 ) -> Result<Vec<u8>> {
     renderer.sync_resources(resources)?;
     let [width, height] = physical.unwrap_or(frame.extent);
@@ -234,6 +234,10 @@ async fn run(output: &Path) -> Result<()> {
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--server-picker") {
         return server_picker::specimens(&mut renderer, output).await;
+    }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    if std::env::args().nth(2).as_deref() == Some("--underlay") {
+        return underlay_specimens(output, &mut renderer);
     }
     #[cfg(not(target_os = "linux"))]
     if std::env::args().nth(2).as_deref() == Some("--studio") {
@@ -913,6 +917,79 @@ fn capture_settings(
         image::ColorType::Rgba8,
     )
     .map_err(|e| e.to_string())
+}
+
+/// The desktop host's order below an old-toolkit screen: page, egui login,
+/// then that screen's draws above it.
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+fn capture_underlay(
+    renderer: &mut Renderer,
+    picture: &MenuFrame,
+    login: &mut slither_wgpu_slice::login_native::NativeLogin,
+    path: &Path,
+) -> Result<()> {
+    let mut frame = picture.frame.clone();
+    let top = Frame {
+        draws: std::mem::take(&mut frame.draws),
+        snakes: Vec::new(),
+        ..frame.clone()
+    };
+    if let Some(backdrop) = &picture.backdrop {
+        frame.draws.insert(0, backdrop.clone());
+    }
+    let mut layer = Ok(());
+    let pixels = readback_with(renderer, &frame, &picture.resources, None, |r, v| {
+        login.egui.paint(r, v);
+        layer = r.render_overlay(&top, v);
+    })?;
+    layer?;
+    image::save_buffer(
+        path,
+        &pixels,
+        frame.extent[0],
+        frame.extent[1],
+        image::ColorType::Rgba8,
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// Skin studio entry over the egui login, mid-fade and open, as presented.
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+fn underlay_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_wgpu_slice::login_native::NativeLogin;
+    for (extent, dpr) in [([960, 720], 1.), ([1440, 1080], 1.5)] {
+        let mut login = NativeLogin::new("Player")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        login.prepare_host(extent, dpr, true, None)?;
+        let picture = login.prepare_host(extent, dpr, true, None)?;
+        capture_settings(
+            renderer,
+            &picture,
+            &mut login,
+            &output.join(format!("login-{dpr}x.png")),
+        )?;
+        login.open_studio();
+        let mut now = 9616;
+        for (name, alpha) in [("entering", 0.5), ("open", 1.)] {
+            while login.studio.state.alpha() < alpha {
+                login.step(f64::from(now), true, false)?;
+                now += 16;
+            }
+            let picture = login.prepare_host(extent, dpr, true, None)?;
+            if !login.egui.paint_only() {
+                return Err("The studio must keep the egui login below it".into());
+            }
+            capture_underlay(
+                renderer,
+                &picture,
+                &mut login,
+                &output.join(format!("studio-{name}-{dpr}x.png")),
+            )?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]

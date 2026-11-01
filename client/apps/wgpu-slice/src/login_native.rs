@@ -69,7 +69,7 @@ impl NativeLogin {
         !self.blocks_gameplay() && !self.state.settings.visible() && !self.studio.state.visible()
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
-        if self.egui.active() {
+        if self.egui.active() && !self.egui.paint_only() {
             // Outgoing controls are disabled by shared policy. Their fading
             // rectangles must not swallow pointer input owned by gameplay.
             return self.egui_owns_input();
@@ -377,7 +377,7 @@ impl NativeLogin {
         effects
     }
     fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
-        if self.egui.active() || self.state.settings.visible() {
+        if (self.egui.active() && !self.egui.paint_only()) || self.state.settings.visible() {
             if self.state.settings.visible() {
                 self.controls.blur();
             }
@@ -554,7 +554,7 @@ impl NativeLogin {
             && !self.ingame_visible
     }
     pub fn egui_owns_input(&self) -> bool {
-        if !self.egui.active() {
+        if !self.egui.active() || self.egui.paint_only() {
             return false;
         }
         self.state.settings.visible()
@@ -569,12 +569,25 @@ impl NativeLogin {
             )
     }
     fn refresh_egui(&mut self) {
-        let active = self.login_owns_input()
+        let owns = self.login_owns_input()
             || self.state.settings.visible()
             || self.picker.policy.visible()
             || self.ingame_visible;
-        let opened = active && !self.egui.active();
-        self.egui.set_active(active);
+        // The skin studio and champion editor still own input on the old
+        // toolkit; egui keeps painting the login below them, so no screen
+        // transition swaps the login's renderer.
+        let underlay = !owns && (self.studio.state.visible() || self.champion.policy.visible());
+        let opened = owns && !(self.egui.active() && !self.egui.paint_only());
+        self.egui.set_active(owns || underlay);
+        self.egui.set_paint_only(underlay);
+        if underlay && let Some(ctx) = self.egui.context() {
+            // The old toolkit blurred the opener; no focus ring stays below.
+            ctx.memory_mut(|m| {
+                if let Some(id) = m.focused() {
+                    m.surrender_focus(id);
+                }
+            });
+        }
         if opened && self.login_owns_input() {
             self.login_ui.request_focus(NICKNAME);
             self.egui.focus(crate::login_egui::widget_id(NICKNAME));
@@ -596,6 +609,15 @@ impl NativeLogin {
             view.play_alpha *= alpha;
             view.skin_alpha *= alpha;
         }
+        // Below an old-toolkit screen: the login's fade and wording match what
+        // that toolkit painted, without input.
+        let underlay = self.egui.paint_only();
+        if self.studio.state.visible() {
+            view.login_alpha *= 1. - self.studio.state.alpha();
+        }
+        if self.champion.policy.visible() {
+            view.champion_pending = false;
+        }
         if !self.login_ui.composing {
             self.login_ui.nickname.clone_from(&view.nickname);
         }
@@ -605,7 +627,9 @@ impl NativeLogin {
             self.picker.viewport = self.area;
             self.picker.sync();
         }
-        let order = if settings {
+        let order = if underlay {
+            Vec::new()
+        } else if settings {
             crate::settings_egui::focus_order().to_vec()
         } else if picker {
             crate::server_picker_egui::focus_order(&self.picker.panel)
@@ -636,10 +660,13 @@ impl NativeLogin {
                 }
                 let status = (self.studio.status == "Saved for this run")
                     .then_some(self.studio.status.as_str());
-                match self
-                    .login_ui
-                    .show(ctx, &view, &self.layout, !settings && !picker, status)
-                {
+                match self.login_ui.show(
+                    ctx,
+                    &view,
+                    &self.layout,
+                    !settings && !picker && !underlay,
+                    status,
+                ) {
                     Ok(value) => action = value,
                     Err(error) => self.render_error = Some(error),
                 }
@@ -1251,24 +1278,13 @@ impl NativeLogin {
         self.admission = admission;
         if self.login_owns_input() || self.state.settings.visible() || self.picker.policy.visible()
         {
-            if let Some(ctx) = self.egui.context() {
-                self.login_ui.sync_art(ctx, cosmetics);
-            }
-            let first = self
-                .egui
-                .context()
-                .is_some_and(|ctx| ctx.cumulative_pass_nr() == 0);
-            self.settings_frame();
-            // egui's initial Area sizing pass must settle before input can
-            // traverse the field and buttons, just as on Settings entry.
-            if first {
-                self.settings_frame();
-            }
-            self.egui.check_error()?;
-            if let Some(error) = self.render_error.take() {
-                return Err(error);
-            }
+            self.egui_pass(cosmetics)?;
             return MenuFrame::world_crossfade(extent, dpr, view.world_alpha);
+        }
+        // Old-toolkit screens: egui paints the login below them and the host
+        // presents their draws above egui, so the login never changes renderer.
+        if self.egui.paint_only() {
+            self.egui_pass(cosmetics)?;
         }
         if self.studio.state.visible() {
             if resized && let Some(focus) = self.controls.focus() {
@@ -1276,7 +1292,8 @@ impl NativeLogin {
             }
             self.sync_controls(admission);
             view.login_alpha *= 1. - self.studio.state.alpha();
-            view.visible = view.login_alpha > 0.;
+            let login = view.login_alpha > 0.;
+            view.visible = login && !self.egui.paint_only();
             let mut picture = self.menu.prepare_with_panel(
                 &mut self.text,
                 &view,
@@ -1295,8 +1312,13 @@ impl NativeLogin {
                 }),
             )?;
             if picture.backdrop.is_none() {
-                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
+                // The login's page and world cover, as its old composition drew them.
+                let world = if login { 1. - view.login_alpha } else { 0. };
+                let page = MenuFrame::world_crossfade(extent, dpr, world)?;
                 picture.backdrop = page.backdrop;
+                if login {
+                    picture.world_cover = page.world_cover;
+                }
                 picture.resources.extend(page.resources);
             }
             return Ok(picture);
@@ -1339,7 +1361,14 @@ impl NativeLogin {
                 theme: slither_client::menu_theme::MenuTheme::default(),
             })
         };
-        self.menu.prepare_with_panel(
+        // Under the champion editor egui paints the login; keep only the page
+        // and world cover its old composition drew.
+        let login = view.visible.then_some(view.login_alpha);
+        let underlay = self.egui.paint_only();
+        if underlay {
+            view.visible = false;
+        }
+        let mut picture = self.menu.prepare_with_panel(
             &mut self.text,
             &view,
             &self.layout,
@@ -1348,7 +1377,35 @@ impl NativeLogin {
             cosmetics,
             Some(&self.input.state),
             panel,
-        )
+        )?;
+        if underlay && let Some(alpha) = login {
+            let page = MenuFrame::world_crossfade(extent, dpr, 1. - alpha)?;
+            picture.backdrop = page.backdrop;
+            picture.world_cover = page.world_cover;
+            picture.resources.extend(page.resources);
+        }
+        Ok(picture)
+    }
+    /// One egui pass for the login and the screen that owns it, if any.
+    fn egui_pass(&mut self, cosmetics: Option<&Cosmetics>) -> Result<()> {
+        if let Some(ctx) = self.egui.context() {
+            self.login_ui.sync_art(ctx, cosmetics);
+        }
+        let first = self
+            .egui
+            .context()
+            .is_some_and(|ctx| ctx.cumulative_pass_nr() == 0);
+        self.settings_frame();
+        // egui's initial Area sizing pass must settle before input can
+        // traverse the field and buttons, just as on Settings entry.
+        if first {
+            self.settings_frame();
+        }
+        self.egui.check_error()?;
+        if let Some(error) = self.render_error.take() {
+            return Err(error);
+        }
+        Ok(())
     }
     pub fn displayed_nickname(&self) -> String {
         self.login_ui.nickname.clone()

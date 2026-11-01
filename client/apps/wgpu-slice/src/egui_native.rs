@@ -129,6 +129,9 @@ pub struct NativeEguiHost {
     pub window: WindowInput,
     session: Option<Session>,
     active: bool,
+    /// Paints below an old-toolkit screen that owns input: no translation,
+    /// platform output or text input until ownership returns.
+    paint_only: bool,
     now: f64,
     error: Option<String>,
     restore_cursor: bool,
@@ -136,6 +139,31 @@ pub struct NativeEguiHost {
 impl NativeEguiHost {
     pub fn active(&self) -> bool {
         self.active
+    }
+    pub fn paint_only(&self) -> bool {
+        self.active && self.paint_only
+    }
+    /// Entering or leaving paint-only resets input exactly like activation.
+    pub fn set_paint_only(&mut self, paint_only: bool) {
+        if self.paint_only == paint_only {
+            return;
+        }
+        self.paint_only = paint_only;
+        self.restore_cursor |= paint_only;
+        self.reset_input();
+    }
+    fn reset_input(&mut self) {
+        if let Some(s) = &mut self.session {
+            s.adapter = None;
+            s.input.events.clear();
+            s.cancel_ime = false;
+            s.held = self.window.held;
+            s.context.input_mut(|i| {
+                i.pointer = Default::default();
+                i.keys_down.clear();
+            });
+            s.context.memory_mut(|m| m.stop_text_input());
+        }
     }
     pub fn initialized(&self) -> bool {
         self.session.is_some()
@@ -177,21 +205,11 @@ impl NativeEguiHost {
         }
         self.active = active;
         self.restore_cursor = !active;
-        if let Some(s) = &mut self.session {
-            s.adapter = None;
-            s.input.events.clear();
-            s.cancel_ime = false;
-            s.held = self.window.held;
-            s.context.input_mut(|i| {
-                i.pointer = Default::default();
-                i.keys_down.clear();
-            });
-            s.context.memory_mut(|m| m.stop_text_input());
-            if !active {
-                s.meshes.clear();
-                s.shapes = None;
-                s.output = None;
-            }
+        self.reset_input();
+        if !active && let Some(s) = &mut self.session {
+            s.meshes.clear();
+            s.shapes = None;
+            s.output = None;
         }
         if active {
             let _ = self.ensure();
@@ -355,7 +373,7 @@ impl NativeEguiHost {
         translate: impl FnOnce(&mut Self) -> R,
     ) -> Option<R> {
         self.observe(event, dpr);
-        if self.active {
+        if self.active && !self.paint_only {
             Some(translate(self))
         } else {
             None
@@ -435,16 +453,20 @@ impl NativeEguiHost {
         &mut self,
         window: impl FnOnce() -> &'a Window,
     ) -> Option<egui::RawInput> {
-        if !self.active {
+        if !self.active || self.paint_only {
             return None;
         }
         let window = window();
         Some(self.adapter(window)?.take_egui_input(window))
     }
     pub fn platform_output(&mut self, window: &Window) {
-        if !self.active {
+        if !self.active || self.paint_only {
             if std::mem::take(&mut self.restore_cursor) {
                 window.set_cursor(winit::window::CursorIcon::Default);
+            }
+            // The screen above owns the cursor and IME; drop the underlay's.
+            if let Some(s) = &mut self.session {
+                s.output = None;
             }
             return;
         }
