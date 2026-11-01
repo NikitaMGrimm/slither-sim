@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup } from './e2e-local-host.mjs';
+import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup, waitForHostFill } from './e2e-local-host.mjs';
 
 test('arguments require a host, accept bounded seconds and prebuilt paths, reject ambiguous input', () => {
   assert.equal(argumentsFor(['--host-bin', 'host']).seconds, 8);
@@ -96,6 +96,30 @@ test('cleanup is awaited after success and surfaces its own error only without a
   const cleanupError = new Error('cleanup failed');
   await assert.rejects(runWithCleanup(async () => result, async () => { throw cleanupError; }), error => error === cleanupError);
   await assert.rejects(runWithCleanup(async () => { throw undefined; }, async () => { throw cleanupError; }), error => error === undefined);
+});
+
+test('host fill leaves no pending timers after early exit, abort or completion', async t => {
+  const pending = new Map();
+  t.mock.method(globalThis, 'setTimeout', (callback, ms) => {
+    const handle = { callback, ms }; pending.set(handle, handle); return handle;
+  });
+  t.mock.method(globalThis, 'clearTimeout', handle => pending.delete(handle));
+  await assert.rejects(waitForHostFill({ done: Promise.resolve({ code: 1 }) }), { stage: 'host-fill' });
+  assert.equal(pending.size, 0, 'early host exit releases both fill and deadline timers');
+
+  const host = { done: new Promise(() => {}) };
+  const controller = new AbortController();
+  const aborted = waitForHostFill(host, controller.signal);
+  controller.abort();
+  await assert.rejects(aborted, { stage: 'interrupted' });
+  assert.equal(pending.size, 0, 'abort releases both timers');
+
+  const completed = waitForHostFill(host);
+  const fill = [...pending.values()].find(timer => timer.ms === 15000);
+  assert.ok(fill);
+  pending.delete(fill); fill.callback();
+  await completed;
+  assert.equal(pending.size, 0, 'normal fill completion releases the deadline timer');
 });
 
 test('summary assertions require every observed stage, including server responses and close', () => {

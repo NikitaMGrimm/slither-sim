@@ -146,6 +146,15 @@ export async function runWithCleanup(session, cleanup) {
   return result;
 }
 
+export async function waitForHostFill(host, signal) {
+  let timer;
+  try {
+    await bounded(Promise.race([new Promise(resolve => { timer = setTimeout(resolve, 15000); }), host.done.then(result => {
+      throw fail('host-fill', `Host exited while filling: ${JSON.stringify(result)}`);
+    })]), 17000, 'host-fill', signal);
+  } finally { clearTimeout(timer); }
+}
+
 export async function runLocalHost(options) {
   const protocol = Number(process.env.SLITHER_CLIENT_E2E_PROTOCOL ?? 19);
   if (![13, 19].includes(protocol)) throw fail('arguments', 'SLITHER_CLIENT_E2E_PROTOCOL must be 13 or 19');
@@ -170,11 +179,7 @@ export async function runLocalHost(options) {
     // Host owns the port-0 listener throughout startup: no reserve/release race.
     host = launch(options.hostBin, ['host', '--config', config, '--bind', '127.0.0.1:0']);
     const endpoint = await readiness(host, controller.signal);
-    if (options.battledome) {
-      await bounded(Promise.race([new Promise(resolve => setTimeout(resolve, 15000)), host.done.then(result => {
-        throw fail('host-fill', `Host exited while filling: ${JSON.stringify(result)}`);
-      })]), 17000, 'host-fill', controller.signal);
-    }
+    if (options.battledome) await waitForHostFill(host, controller.signal);
     const server = endpoint.slice('ws://'.length, -'/slither'.length);
     client = launch(options.clientBin, ['--server', server, '--seconds', String(options.seconds)],
       { ...process.env, ...(options.battledome ? { SLITHER_CLIENT_E2E_FULL_MAP: '1' } : {}) });
