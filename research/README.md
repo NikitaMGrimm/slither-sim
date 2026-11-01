@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Singleton motion transactions](client-performance/2026-11-01-motion-transactions/REPORT.md) | Stage only the touched motion object; exact protocol/output and allocation controls, with incremental replay p95 attribution on top of food COW. |
 | Client performance | [Dense food transaction snapshots](client-performance/2026-11-01-food-snapshots/REPORT.md) | Restricted community-input replay and bounded offscreen diagnostics; share unchanged food snapshots, with allocation/output controls and remaining frame-budget costs. |
 | Client | [Bounded 512-snake capacity](client-performance/2026-11-01-snake-capacity/REPORT.md) | Authored admission, maximum-body storage, full-map draw and legacy replay controls; headless elapsed-time/allocation workload, with loopback subscriptions reported separately. |
 | Client | [Native egui Settings trial](client/2026-11-01-egui-settings-trial/REPORT.md) | Historical head ee203f6: authored two-size renders, bounded CPU/size/rebuild measurements and their limits. Owner subsequently chose native egui; shared-host correctness fixes are separate from these measurements. |

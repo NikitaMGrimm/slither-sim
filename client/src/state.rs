@@ -136,6 +136,15 @@ pub(crate) struct PreparedFood {
     update_added_cache: bool,
 }
 
+/// Validated scalar motion awaiting the touched presentation object's admission.
+pub(crate) struct PreparedMotion {
+    pub event: Option<PresentationEvent>,
+    id: Option<u16>,
+    heading: Option<f64>,
+    wanted_heading: Option<f64>,
+    speed_per_32ms: Option<f64>,
+}
+
 /// Outcome of one committed frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FrameReport {
@@ -1181,13 +1190,30 @@ impl ClientState {
         raw: v19::MotionRef<'_>,
         events: Option<&mut Vec<PresentationEvent>>,
     ) -> Result<(), StateError> {
+        let prepared = self.prepare_motion(raw)?;
+        if let Some(event) = prepared.event.clone()
+            && let Some(events) = events
+        {
+            events.push(event);
+        }
+        self.commit_motion(prepared);
+        Ok(())
+    }
+
+    fn prepare_motion(&self, raw: v19::MotionRef<'_>) -> Result<PreparedMotion, StateError> {
         // The admitted single-field 5 command changes no fields or events.
         if raw.heading.is_none()
             && raw.wanted_heading.is_none()
             && raw.speed.is_none()
             && raw.direction.is_none()
         {
-            return Ok(());
+            return Ok(PreparedMotion {
+                event: None,
+                id: None,
+                heading: None,
+                wanted_heading: None,
+                speed_per_32ms: None,
+            });
         }
         let own = raw.target == v19::Target::Own;
         let heading = raw.heading.map(scalar::angle8);
@@ -1199,11 +1225,9 @@ impl ClientState {
             v19::Target::Id(id) => Some(id),
             _ => return Err(StateError::InvalidPacket(raw.command[0])),
         };
-        if let Some(id) = id
-            && (own || self.snakes.contains_key(&id))
-            && let Some(events) = events
-        {
-            events.push(PresentationEvent::SnakeMotion {
+        let event = id
+            .filter(|id| own || self.snakes.contains_key(id))
+            .map(|id| PresentationEvent::SnakeMotion {
                 target: if own {
                     SnakeTarget::Own
                 } else {
@@ -1214,19 +1238,72 @@ impl ClientState {
                 direction,
                 speed_per_32ms,
             });
-        }
-        if let Some(snake) = id.and_then(|id| self.snakes.get_mut(&id)) {
-            if let Some(value) = heading {
+        Ok(PreparedMotion {
+            event,
+            id,
+            heading,
+            wanted_heading,
+            speed_per_32ms,
+        })
+    }
+
+    fn commit_motion(&mut self, prepared: PreparedMotion) {
+        if let Some(snake) = prepared.id.and_then(|id| self.snakes.get_mut(&id)) {
+            if let Some(value) = prepared.heading {
                 snake.heading = value;
             }
-            if let Some(value) = wanted_heading {
+            if let Some(value) = prepared.wanted_heading {
                 snake.wanted_heading = value;
             }
-            if let Some(value) = speed_per_32ms {
+            if let Some(value) = prepared.speed_per_32ms {
                 snake.speed = value / 0.032;
             }
         }
-        Ok(())
+    }
+
+    pub(crate) fn prepare_single_motion(
+        &self,
+        command: CommandRef<'_>,
+    ) -> Result<Option<PreparedMotion>, StateError> {
+        if !matches!(
+            command.bytes[0],
+            b'e' | b'E' | b'3' | b'4' | b'5' | b'd' | b'7'
+        ) {
+            return Ok(None);
+        }
+        let Some(setup) = &self.setup else {
+            return Ok(None);
+        };
+        let raw = match setup.protocol {
+            13 => {
+                let message = slither_protocol::v13::decode_command(
+                    command,
+                    DecodeAdmission::ClientPresentation,
+                )
+                .map_err(|_| StateError::InvalidPacket(command.bytes[0]))?;
+                let slither_protocol::v13::Message::Motion(raw) = message else {
+                    return Ok(None);
+                };
+                self.legacy_motion(raw)
+            }
+            19 => {
+                let message = v19::decode_command(command, DecodeAdmission::ClientPresentation)
+                    .map_err(|_| StateError::InvalidPacket(command.bytes[0]))?;
+                let Message::Motion(raw) = message else {
+                    return Ok(None);
+                };
+                raw
+            }
+            _ => return Ok(None),
+        };
+        self.prepare_motion(raw).map(Some)
+    }
+
+    pub(crate) fn commit_single_motion(&mut self, prepared: PreparedMotion, elapsed: Option<u16>) {
+        self.commit_motion(prepared);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
     }
 
     pub(crate) fn prepare_single_food(

@@ -158,14 +158,7 @@ impl ClientState {
                 self.legacy_fronts.insert(raw.id, point);
                 return Ok(true);
             }
-            Legacy::Motion(raw) => Message::Motion(v19::MotionRef {
-                command: raw.command,
-                target: self.legacy_target(raw.id),
-                heading: raw.heading,
-                wanted_heading: raw.wanted_heading,
-                speed: raw.speed,
-                direction: raw.direction,
-            }),
+            Legacy::Motion(raw) => Message::Motion(self.legacy_motion(raw)),
             Legacy::FoodBatch(raw) => {
                 for food in raw.foods() {
                     let input = self.insert_legacy_food(
@@ -230,6 +223,17 @@ impl ClientState {
             _ => return Ok(false),
         };
         self.apply_message(common, code, events)
+    }
+
+    pub(super) fn legacy_motion<'a>(&self, raw: v13::MotionRef<'a>) -> v19::MotionRef<'a> {
+        v19::MotionRef {
+            command: raw.command,
+            target: self.legacy_target(raw.id),
+            heading: raw.heading,
+            wanted_heading: raw.wanted_heading,
+            speed: raw.speed,
+            direction: raw.direction,
+        }
     }
 
     fn legacy_target(&self, id: u16) -> v19::Target {

@@ -155,6 +155,66 @@ fn failed_shared_food_detach_preserves_the_staged_packet_and_snapshot() {
     }
 }
 
+#[test]
+fn singleton_motion_allocation_is_independent_of_retained_food() {
+    for protocol in [13, 19] {
+        let mut bytes = Vec::new();
+        for initial_count in [64, 6000] {
+            let mut game = ready(protocol, initial_count);
+            let packet = if protocol == 13 {
+                vec![b'3', 0, 7, 32, 64]
+            } else {
+                vec![b'3', 32, 64]
+            };
+            BYTES.set(0);
+            ENABLED.set(true);
+            for i in 0..100 {
+                game.receive(game.generation(), &packet, 301. + f64::from(i))
+                    .unwrap();
+            }
+            ENABLED.set(false);
+            bytes.push(BYTES.get());
+            assert_eq!(
+                game.client().received().foods.len(),
+                usize::from(initial_count)
+            );
+            assert_eq!(
+                game.client().foods().foods().len(),
+                usize::from(initial_count)
+            );
+            assert_eq!(
+                game.client().received().snakes[&7].wanted_heading,
+                slither_protocol::scalar::angle8(64)
+            );
+        }
+        assert!(
+            bytes[1] <= bytes[0] * 2 + 64 * 1024,
+            "protocol={protocol}, bytes={bytes:?}"
+        );
+        println!("protocol={protocol}, 100 motion messages, 64/6000 food bytes={bytes:?}");
+    }
+}
+
+#[test]
+fn motion_fallback_and_decode_failure_preserve_the_session_and_world() {
+    let mut game = ready(13, 64);
+    let ignored = game.client().received().ignored_commands;
+    // Protocol 13 ignores this family; the singleton optimization declines it.
+    game.receive(game.generation(), &[b'd', 0, 7], 301.)
+        .unwrap();
+    assert_eq!(game.client().received().ignored_commands, ignored + 1);
+    let before = game.client().clone();
+    assert!(game.receive(game.generation(), b"E", 302.).is_err());
+    assert_eq!(game.client(), &before);
+    game.receive(game.generation(), &[b'3', 0, 7, 32, 64], 303.)
+        .unwrap();
+    assert_eq!(
+        game.client().received().snakes[&7].wanted_heading,
+        slither_protocol::scalar::angle8(64)
+    );
+    assert_eq!(game.phase(), slither_client::session_policy::Phase::Playing);
+}
+
 fn factory(
     spawn: &slither_client::state::FoodSpawnInput,
     _: f64,
