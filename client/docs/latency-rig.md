@@ -68,7 +68,12 @@ Select the nearest received, living drawn bot within 1,200 world units, breaking
 distance ties by wire ID. Keep it until disappearance, life replacement or
 leaving that radius, then start another segment. Captures store wire ID and
 appearance token; authoritative interpolation requires matching live host life
-counters on both ticks. Reused wire IDs never bridge host lives. Missing,
+counters on both ticks. Each client token is bound once to a unique host life
+whose head comes within three units of its latest packet head in the preceding
+500 ms of truth. This accounts for integer wire quantization and tick spacing;
+missing or ambiguous matches are excluded. The lookback is an acquisition bound,
+not a claim about maximum network delay. Later host lives cannot rebind an old
+client token. Reused wire IDs never bridge host lives. Missing,
 offscreen-culled or retained dead appearances produce no head sample.
 
 The rig routes a synthetic pointer callback immediately before each scheduled

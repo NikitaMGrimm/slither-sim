@@ -69,6 +69,7 @@ export async function analyzeCapture(directory) {
       if(r.type==='metadata'){check(!truthMetadata,'duplicate truth header');truthMetadata=r;continue;}
       if(r.type==='summary'){summary=r;continue;}
       check(r.type==='tick'&&truthMetadata&&!summary,'invalid truth order');
+      check(r.tick===ticks.length+1&&r.heads.length===truthMetadata.slot_count&&r.heads.every((h,i)=>h[0]===i&&Number.isSafeInteger(h[1])),'invalid truth tick/slot/life identity');
       const ns=BigInt(r.unix_after_ns),mono=BigInt(r.monotonic_after_ns);
       const before=BigInt(r.unix_before_ns);
       check(ns>=before,'reversed host step');
@@ -76,25 +77,33 @@ export async function analyzeCapture(directory) {
       ticks.push({ns,mono,bracket:Number(ns-before)/1e6,heads:new Map(r.heads.filter(h=>needed.has(h[0])).map(h=>[h[0],h]))});
       clockSteps.push(Number(ns-before)/1e6);prev={ns,mono};
     }
-    check(truthMetadata?.schema==='host-latency-truth-v1'&&summary?.complete===true&&summary.ticks===ticks.length,'incomplete host truth');
+    check(truthMetadata?.schema==='host-latency-truth-v1'&&summary?.complete===true&&summary.ticks===ticks.length&&summary.heads===ticks.length*truthMetadata.slot_count,'incomplete host truth');
   }
   const controls=rows(await readFile(path.join(directory,'client/controls.jsonl'),'utf8'));
   const controlMap=new Map(controls.map(r=>[`${r.generation}/${r.effect}`,r.bytes]));
   const groups=new Map(),total=new Map(),coverage={issued:selected.length,prepared:headRows.length,nearMiddle:0,withReference:0,truthMatched:0,transition:0};
   const push=(group,metric,value)=>{if(!Number.isFinite(value))return;if(!group.has(metric))group.set(metric,[]);group.get(metric).push(value);};
-  const warm=new Map(), motionHistory=new Map();let activeIdentity=null;
+  const warm=new Map(), motionHistory=new Map(),tokenLives=new Map();let activeIdentity=null;
   for(const r of selected){
     const h=r.heads.find(h=>!h[2]);
     if(!r.middle){activeIdentity=null;continue;}coverage.nearMiddle++;
     if(!h){activeIdentity=null;continue;}coverage.withReference++;
     const identity=`${r.generation}/${h[1]}`;
     if(activeIdentity!==identity){warm.set(identity,r.t);activeIdentity=identity;}
+    if(hasTruth&&!tokenLives.has(identity)) {
+      // Wire IDs are reused. Bind this client token once, only to a unique host
+      // life whose recent head trajectory agrees with its admitted packet head.
+      const lives=new Set();
+      const begin=lower(ticks,r.ns-500_000_000n,t=>t.ns),end=lower(ticks,r.ns,t=>t.ns);
+      for(let i=begin;i<end;i++){const p=ticks[i].heads.get(h[0]);if(p?.[2]&&Math.hypot(p[3]-h[7],p[4]-h[8])<=3)lives.add(p[1]);}
+      if(lives.size===1)tokenLives.set(identity,[...lives][0]);
+    }
     const submit=byStage.get('submit_end')?.get(`${r.generation}/${r.frame}`);
     check(submit&&submit.t>=r.t,'missing/reversed offscreen head submission');
     const submittedNs=r.ns+(submit.t-r.t);
     const preparedTruth=hasTruth?interpolateTruth(ticks,r.ns,h[0]):null;
     const truth=hasTruth?interpolateTruth(ticks,submittedNs,h[0]):null;
-    if(hasTruth&&!truth)continue;
+    if(hasTruth&&(!truth||tokenLives.get(identity)!==truth.life))continue;
     const heading=truth?.heading??h[9],speed=truth?.speed??h[10],boost=truth?.boost??h[11];
     const life=truth?.life??h[1];
     const key=`${h[0]}/${life}/${identity}`;
