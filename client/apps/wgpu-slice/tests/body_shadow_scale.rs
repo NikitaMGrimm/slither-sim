@@ -219,7 +219,8 @@ fn native_viewport_metadata_reaches_shadow_eligibility_through_gameplay_preparat
                                 .count();
                             assert_eq!(
                                 body_shadows > 0,
-                                target_diameter > 4.,
+                                cfg!(feature = "frame-profile-no-shadow-cut")
+                                    || target_diameter > 4.,
                                 "{physical:?} DPR {dpr} {requested:?}: {diameter} logical px"
                             );
                         }
