@@ -61,9 +61,20 @@ export function sampledMotion(history,ns) {
   }
   return motionForDelta(Math.abs(angle(history.at(-1).heading,heading)));
 }
+export async function detectTruthEvidence(directory,planned,accessFile=access) {
+  check(typeof planned==='boolean','plan.truth must be a boolean');
+  const exists=async file=>{
+    try{await accessFile(file);return true;}
+    catch(error){if(error.code!=='ENOENT')throw error;return false;}
+  };
+  const detected=await exists(path.join(directory,'truth.jsonl'))||await exists(path.join(directory,'truth.jsonl.gz'));
+  check(detected===planned,'truth evidence does not match the frozen plan');
+  return detected;
+}
 export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   check(['inner','pit-edge'].includes(region),'unknown analysis region');
   const plan=JSON.parse(await readFile(path.join(directory,'plan.json'),'utf8'));
+  const hasTruth=await detectTruthEvidence(directory,plan.truth);
   const traceText=await evidenceText(path.join(directory,'latency.jsonl'));
   const validation=analyze(traceText,{cpu:true}); // Offscreen has no acquire/present. Strengthen transport/submission below.
   const trace=rows(traceText).slice(1,-1);
@@ -89,7 +100,6 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   const selected=headRows.filter(r=>presented.has(`${r.generation}/${r.frame}`));
   const needed=new Set(selected.flatMap(r=>r.heads.filter(h=>!h[2]).map(h=>h[0])));
   const ticks=[];let truthMetadata=null,summary=null,clockSteps=[];
-  let hasTruth=true;try{await access(path.join(directory,'truth.jsonl'));}catch{try{await access(path.join(directory,'truth.jsonl.gz'));}catch{hasTruth=false;}}
   if(hasTruth){
     const input=createInterface({input:await evidenceStream(path.join(directory,'truth.jsonl')),crlfDelay:Infinity});
     let prev;

@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,unlink,rm} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { optionsFor } from './latency-rig.mjs';
-import { distribution, lagError, interpolateTruth, measurementCoverage, truthMotion, sampledMotion } from './latency-rig-analysis.mjs';
+import { distribution, lagError, interpolateTruth, measurementCoverage, truthMotion, sampledMotion, detectTruthEvidence, analyzeCapture } from './latency-rig-analysis.mjs';
 
 test('manual rig arguments are finite and bounded without acquisition',()=>{
   const base=['--host-bin','host.exe','--client-bin','client.exe','--output','unused'];
@@ -44,4 +47,32 @@ test('motion labels use the full 100ms window instead of a short history after b
   assert.equal(sampledMotion(complete,150_000_000n),'turning');
   ticks[5].heads.get(7)[1]=2;assert.equal(truthMotion(ticks,150_000_000n,7),null);
   assert.equal(sampledMotion([{ns:0n,heading:0},{ns:150_000_000n,heading:.3}],150_000_000n),null);
+});
+
+test('truth evidence must match the frozen plan, including archived evidence and legitimate interim runs',async()=>{
+  const dir=await mkdtemp(path.join(os.tmpdir(),'latency-truth-plan-'));
+  try{
+    assert.equal(await detectTruthEvidence(dir,false),false);
+    await writeFile(path.join(dir,'plan.json'),JSON.stringify({truth:true}));
+    await assert.rejects(analyzeCapture(dir),/truth evidence does not match/);
+    await writeFile(path.join(dir,'truth.jsonl'),'');
+    assert.equal(await detectTruthEvidence(dir,true),true);
+    await writeFile(path.join(dir,'plan.json'),JSON.stringify({truth:false}));
+    await assert.rejects(analyzeCapture(dir),/truth evidence does not match/);
+    await unlink(path.join(dir,'truth.jsonl'));
+    await writeFile(path.join(dir,'truth.jsonl.gz'),'');
+    assert.equal(await detectTruthEvidence(dir,true),true);
+    await assert.rejects(detectTruthEvidence(dir,false),/truth evidence does not match/);
+  }finally{await rm(dir,{recursive:true});}
+});
+
+test('non-ENOENT truth access errors propagate unchanged from either candidate',async()=>{
+  const denied=Object.assign(new Error('access denied'),{code:'EACCES'});
+  await assert.rejects(detectTruthEvidence('synthetic',true,async()=>{throw denied;}),e=>e===denied);
+  let calls=0;
+  await assert.rejects(detectTruthEvidence('synthetic',false,async()=>{
+    if(calls++===0)throw Object.assign(new Error('absent'),{code:'ENOENT'});
+    throw denied;
+  }),e=>e===denied);
+  assert.equal(calls,2);
 });
