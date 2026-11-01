@@ -521,3 +521,19 @@ fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
             .is_positive()
     );
 }
+
+#[test]
+fn fractional_dpi_preserves_the_physical_viewport() {
+    let mut login = settled();
+    login.open_settings(true);
+    for (extent, dpr) in [([453, 945], 1.75), ([951, 1200], 1.1)] {
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        let logical = login
+            .settings_ui
+            .context
+            .input(|input| input.viewport_rect().size());
+        let physical = [logical.x, logical.y].map(|n| (n * dpr as f32).round() as u32);
+        assert_eq!(physical, extent);
+        assert!(logical.is_finite());
+    }
+}

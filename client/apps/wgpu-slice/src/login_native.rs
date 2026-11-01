@@ -319,7 +319,7 @@ impl NativeLogin {
         let open = self.state.settings.is_open();
         self.settings_ui.frame(
             &mut self.state.settings,
-            self.area.map(|n| (n * self.pixel_scale) as u32),
+            self.area.map(|n| (n * self.pixel_scale).round() as u32),
             self.pixel_scale,
         );
         if open && !self.state.settings.is_open() {
