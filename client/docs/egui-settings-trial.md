@@ -1,7 +1,5 @@
 # Native egui Settings trial — 2026-11-01
 
-> Pre-rebase measurements and checks. PR #398 landed during final verification; integration and refreshed results are in progress.
-
 This trial replaces one native screen while retaining the existing settings
 model, record format, immediate preference updates, persistence adapter and Play
 snapshot. Other native menus retain the old toolkit; browser menus retain their
@@ -16,8 +14,8 @@ responses, with authored pill/check/shadow painting using the existing theme and
 installed font bytes. No official-derived source, image pack or art directory was
 read or rendered. All selected images contain this project's geometry/text only.
 
-The trial adds 800 and removes 498 production Rust diff lines
-(net +302, including comments/blank lines), counting the
+The trial adds 781 and removes 520 production Rust diff lines
+(net +261, including comments/blank lines), counting the
 Settings model/view changes and native input, font and GPU integration together.
 The Settings-only layout and legacy Toggle rendering/input plumbing are removed.
 The old panel slicer remains because the server picker uses it. Dependencies,
@@ -26,7 +24,7 @@ the per-file counts are in [measurements.json](egui-settings-trial/measurements.
 charges all egui integration/custom chrome to this screen; it does not remove the
 roughly 9k-line toolkit still used by other menus.
 
-The release executable grows by 3,602,432 bytes. The warmed
+The release executable grows by 3,605,504 bytes. The warmed
 rebuild measurements do not establish a useful speed improvement: one timed
 layout edit per side is insufficient. These results and the two-size captures
 support reviewing the trial; broader migration remains inconclusive without
@@ -36,14 +34,15 @@ owner appearance/feel acceptance and an editable-text/weak-GPU trial.
 
 | Metric | Before | After |
 | --- | ---: | ---: |
-| Warm dev rebuild after width 560 → 568 (seconds, one run) | 6.269 | 6.920 |
-| Native release executable (bytes) | 12,793,856 | 16,396,288 |
-| WebGPU Wasm after bindgen, raw bytes | 3,192,161 | 3,186,064 |
-| WebGPU Wasm after bindgen, gzip-9 bytes | 1,048,927 | 1,046,919 |
+| Warm dev rebuild after width 560 → 568 (seconds, one run) | 7.270 | 5.655 |
+| Native release executable (bytes) | 12,798,464 | 16,403,968 |
+| Native executable, gzip-9 bytes | 5,176,431 | 6,729,418 |
+| WebGPU Wasm after bindgen, raw bytes | 3,199,830 | 3,193,574 |
+| WebGPU Wasm after bindgen, gzip-9 bytes | 1,051,337 | 1,049,640 |
 | GPU-only menu time | Not measured | Not measured |
 
-The WebGPU shipping-Wasm deltas are -6,097 bytes raw and
--2,008 bytes gzip. gzip uses level 9 and mtime 0 on both
+The WebGPU shipping-Wasm deltas are -6,256 bytes raw and
+-1,697 bytes gzip. gzip uses level 9 and mtime 0 on both
 artifacts. Compiler-output Wasm sizes/digests are also retained in the data;
 the table uses the post-bindgen `_bg.wasm`, excluding JS glue. This does not
 claim a separately measured Canvas Wasm size delta.
@@ -54,12 +53,12 @@ the median of the five run statistics, followed by their minimum/maximum.
 
 | Menu timing | Before: median [range] | After: median [range] |
 | --- | ---: | ---: |
-| 960x540 prepare median (ms) | 0.0196 [0.0194, 0.0202] | 0.0216 [0.0214, 0.0311] |
-| 960x540 frame cpu median (ms) | 0.1180 [0.0693, 0.1246] | 0.1569 [0.1037, 0.1682] |
-| 960x540 frame cpu p95 (ms) | 0.1652 [0.1287, 0.1854] | 0.2465 [0.1781, 0.2973] |
-| 360x640 prepare median (ms) | 0.0199 [0.0196, 0.0199] | 0.0213 [0.0207, 0.0225] |
-| 360x640 frame cpu median (ms) | 0.1180 [0.0615, 0.1242] | 0.1529 [0.1001, 0.1701] |
-| 360x640 frame cpu p95 (ms) | 0.1544 [0.1254, 0.1911] | 0.2183 [0.1673, 0.2740] |
+| 960x540 prepare median (ms) | 0.0194 [0.0193, 0.0194] | 0.0219 [0.0215, 0.0227] |
+| 960x540 frame cpu median (ms) | 0.1169 [0.0728, 0.1184] | 0.1564 [0.1499, 0.1603] |
+| 960x540 frame cpu p95 (ms) | 0.2166 [0.1333, 0.2301] | 0.2503 [0.1909, 0.2842] |
+| 360x640 prepare median (ms) | 0.0194 [0.0194, 0.0195] | 0.0217 [0.0212, 0.0222] |
+| 360x640 frame cpu median (ms) | 0.0713 [0.0680, 0.0769] | 0.1506 [0.1137, 0.1579] |
+| 360x640 frame cpu p95 (ms) | 0.1607 [0.1286, 0.2180] | 0.2424 [0.2104, 0.3197] |
 
 The frame timer includes `NativeLogin::prepare_host`, resource synchronization,
 encoding and queue submission, including the egui pass. GPU completion is waited
@@ -84,14 +83,16 @@ one outline. That is the actual initial-open behavior, not an injected pixel
 change. These are appearance specimens, not pixel-golden tests or reproduction
 of every historical focus/shadow bug.
 
-![960×540 comparison](https://github.com/user-attachments/assets/c30405f1-ae70-4b78-acf1-2e41df9b02c6)
+![960x540 comparison](https://github.com/user-attachments/assets/c30405f1-ae70-4b78-acf1-2e41df9b02c6)
 
-![360×640 comparison](https://github.com/user-attachments/assets/928d495d-8679-427a-ac1d-09adc726c4d8)
+![360x640 comparison](https://github.com/user-attachments/assets/928d495d-8679-427a-ac1d-09adc726c4d8)
 
-The two comparison PNGs are GitHub user attachments in the authorized repository;
-no PR-only media is committed. Original offscreen PNGs, binaries, full run
-directories and failed-attempt logs remain local-only and are supplied in the
-task handoff. Figure and raw-image digests are recorded with the measurements.
+The two comparison PNGs are public GitHub user attachments in the authorized
+repository; no PR-only media is committed. Original offscreen PNGs, binaries,
+full run directories and failed-attempt logs remain local-only in the task
+scratch directory. Figure and raw-image digests are recorded with the measurements.
+The refreshed baseline and trial PNGs match the source images for those figures
+byte for byte after rebasing over PR #398.
 
 ## Layout-edit example
 
@@ -128,15 +129,21 @@ reorder also updates the explicit modal Tab list.
   bundling fonts. egui's text rasterizer differs from fontdue; visual similarity
   in these specimens is not a text-quality or physical-DPI acceptance result.
 - egui's own area fade and keyboard zoom are disabled. The screen uses the
-  shared `menu_transition::step` timing (nominally 400 ms in, 320 ms out,
-  with a 40 ms step cap), extracted without changing the picker equations.
-  PR #398 was still open at the final main check; its proposed timing matches
-  this same picker timing. The initial 230 ms choice was corrected before the
-  final measurements and verification.
+  shared `menu_transition::step` timing from merged PR #398: nominally
+  400 ms in, 320 ms out, with a 40 ms step cap. Its SettingsState remains the
+  transition owner. The initial 230 ms choice was corrected before measurements;
+  all reported measurements were refreshed after rebasing over #398.
+- Fractional DPI could reconstruct a 453-pixel viewport as 452 pixels at 1.75x.
+  The conversion now rounds, with a regression that fails on the old code and
+  passes on the correction.
 - Settings has no editable field. The nickname IME composition gate is tested,
   but this trial does not establish egui nickname/champion editing, clipboard or
   platform IME behavior. Native OS accessibility bridging remains unimplemented,
   as before; checkbox/button widget metadata is present.
+- Browser menus still use their DOM adapters; this trial does not validate egui
+  browser input or rendering. A future browser migration also needs a licensed
+  font-byte source: this native adapter reads installed fonts, while the existing
+  browser uses platform text.
 - Stock egui widgets do not reproduce this theme's pills. Custom capsule mesh,
   check and shadow painting is still needed. No needed Settings behavior proved
   impossible; maintenance savings for the remaining menus are unmeasured.
@@ -146,8 +153,9 @@ reorder also updates the explicit modal Tab list.
 ## Dependencies and checks
 
 `egui`, `egui-wgpu` and `egui-winit` are exactly `=0.37.0`, all with defaults off,
-on the existing native winit targets. No bundled fonts, clipboard, link handling,
-X11/Wayland or second wgpu/winit version is enabled. `cargo tree` confirms one
+on the existing native winit targets. The new egui dependencies enable no bundled
+fonts, clipboard, link handling, X11/Wayland or second wgpu/winit version.
+`cargo tree` confirms one
 wgpu 30.0.1 and one winit 0.30.13. Their published license is MIT OR Apache-2.0:
 [egui](https://docs.rs/crate/egui/0.37.0),
 [egui-wgpu](https://docs.rs/crate/egui-wgpu/0.37.0),
@@ -160,19 +168,21 @@ notices. Apple-only lockfile additions were checked from their crate manifests.
 There is no separate client dependency/license-check command; the existing
 repository guards and full client check command were run.
 
-Focused shared-model Settings (5), picker (15) and native Settings (11) tests,
+Focused shared-model Settings (5), picker (15) and native Settings (13) tests,
 strict native all-target Clippy, headless hardware-GPU specimens, and final
-`npm run check` pass. The seven documentation checks also pass. The full command
+`npm run check` pass. That command
 covers JS tests, core Rust tests/Clippy, both Wasm builds and real Canvas Wasm ABI,
 native wgpu tests/Clippy/desktop build, and strict Wasm Clippy. Repository source
 guards are run again against the staged report/data before commit. Hardware-GPU tests
 marked ignored by the standard suite remain ignored; the explicit specimen path
 is the GPU check here. No outside game server, original client, desktop window,
-computer-use session or banned port was used. No independent review is claimed.
+computer-use session or banned port was used. Automated CodeRabbit review
+identified the fractional-DPI correction; no separate agent or maintainer review
+was commissioned.
 
 ## Reproduce and source pins
 
-Baseline: `4347d710322263b6892e0292a0464f708b758956` plus the selected
+Baseline: `3de1ebcfba4b87bc942de4fc893f1440747b4b58` plus the selected
 [baseline instrumentation patch](egui-settings-trial/baseline-harness.patch). The final implementation
 and build-input file digests, binary digests, per-file line counts, all ten run
 summaries and PNG digests are in [measurements.json](egui-settings-trial/measurements.json).

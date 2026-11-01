@@ -1,9 +1,9 @@
 --- a/client/apps/wgpu-slice/examples/menu_specimens.rs
 +++ b/client/apps/wgpu-slice/examples/menu_specimens.rs
-@@ -205,6 +205,10 @@
-         let reference = std::env::args_os().nth(3);
-         return studio_panel::specimens(&mut renderer, output, reference.as_deref().map(Path::new))
-             .await;
+@@ -209,6 +209,10 @@
+     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+     if std::env::args().nth(2).as_deref() == Some("--settings-fade") {
+         return settings_fade::specimens(&mut renderer, output).await;
 +    }
 +    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 +    if std::env::args().nth(2).as_deref() == Some("--settings-trial") {
@@ -11,7 +11,7 @@
      }
      #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
      if std::env::args().nth(2).as_deref() == Some("--settings") {
-@@ -622,6 +626,73 @@
+@@ -626,6 +630,73 @@
      }
      Ok(())
  }
