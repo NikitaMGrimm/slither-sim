@@ -13,6 +13,14 @@ export function distribution(values) {
   const q=p=>v[Math.ceil(p*v.length)-1];
   return {count:v.length,p50:q(.5),p90:q(.9),p99:q(.99),min:v[0],max:v.at(-1),sparseP99:v.length<1000};
 }
+export function measurementCoverage(strata,truth) {
+  const metric=truth?'authoritativeLagEquivalentAtSubmitMs':'packetRelativeLagEquivalentMs';
+  const labels=['straight/normal','turning/normal','straight/boost','turning/boost'];
+  const counts=Object.fromEntries(labels.map(label=>[label,strata[label]?.[metric]?.count??0]));
+  const missingStrata=labels.filter(label=>counts[label]===0);
+  return {authoritative:truth,counts,missingStrata,allFourStrataPresent:missingStrata.length===0,
+    allStrataHave1000Frames:labels.every(label=>counts[label]>=1000)};
+}
 export function lagError(truth,head,heading,speed) {
   const x=truth[0]-head[0],y=truth[1]-head[1];
   const tangent=x*Math.cos(heading)+y*Math.sin(heading);
@@ -174,11 +182,13 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   for(const motion of ['straight','turning'])for(const speed of ['normal','boost'])if(!groups.has(`${motion}/${speed}`))groups.set(`${motion}/${speed}`,new Map());
   const load=JSON.parse(await readFile(path.join(directory,'load.json'),'utf8'));
   check(!load.contaminated,'compiler-contaminated capture');
+  const strata=Object.fromEntries([...groups].map(([k,g])=>[k,format(g)]));
   return {format:'latency-rig-results-v1',analysisScope:region==='inner'?'original-inner-band':'pit-edge-first-observed-reference-v2',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
+    measurementCoverage:measurementCoverage(strata,hasTruth),
     liveBotPopulation:{allHostTicks:distribution(ticks.map(t=>t.liveBots)),measuredReferenceFrames:distribution(measuredPopulation)},
     clock:{source:'system-time-unix+instant',observedMinPositiveClockStepNs:headHeader.observed_min_positive_clock_step_ns,mappingBracketMs:distribution(maps.map(r=>r.mapWidthMs)),hostStepBracketMs:distribution(clockSteps),nominalWindowsSystemTimeQuantumNs:100},
     machineCpuPercent:distribution(load.samples.map(s=>s.cpuPercent).filter(v=>v!==null)),
-    stages:format(total),strata:Object.fromEntries([...groups].map(([k,g])=>[k,format(g)])),
+    stages:format(total),strata,
     traceValidation:{complete:validation.complete,closedUnflushed:validation.closedUnflushed,mode:'offscreen: CPU lifecycle validation plus real raw-read and submit checks'},
     limitations:['No surface acquire, present, scanout or physical input. GPU waits are serialized.','UNIX/QPC storage precision is not clock accuracy. System-time jumps over 1ms per adjacent sample reject capture.','Authoritative truth is linearly interpolated between post-step samples (gap <=30ms). Lag equivalent during turns is spatial error divided by speed, not temporal delay.','Frame quantiles are correlated descriptive observations; sparse p99 is flagged. Missing strata remain missing.']};
 }
