@@ -107,13 +107,6 @@ A WebGPU-capable browser is required. There is no Canvas fallback.
 On Windows, from this app directory, `cargo run --release --example sprite_parity -- <private-pack-dir>`
 compares authored sprites against an external private pack.
 
-Background uses the shared phase/zoom plan and Canvas-authored tile/backdrop by
-default. With `--cosmetics-dir`, valid local `s/bg54.jpg` and `s/gbg.jpg` replace
-the hex tile and backdrop independently. The tile retains its decoded dimensions;
-the backdrop uses the original's 512x512 source region, cropped once at load time.
-Missing, invalid or over-budget art keeps the authored fallback. The backdrop
-draws at 0.3 alpha over black while high quality or its blend is active, followed
-by the repeating tile at alpha 1. Team backgrounds are not integrated.
 `LocalGame` shares Canvas's adaptive quality owner and capped desktop backing
 policy, without DPR multiplication. Native scales the world backing to the window,
 then paints DOM-style HUD, minimap and menus in CSS coordinates at physical resolution.
@@ -176,7 +169,16 @@ Set `--cosmetics-dir <artwork-dir>` on the desktop executable to use a local
 directory containing the original `s/` and `s2/` image paths. `--accessory 0..31`
 selects an accessory for the own snake only. Image faces, antennas and dense/swell
 styles reuse the shared core; unavailable images fall back locally with one warning.
-Without a directory, rendering stays plain. Artwork and captures remain outside Git.
+Artwork and captures remain outside Git.
+
+The world clears to solid black without local background art; no background
+texture is created. With `--cosmetics-dir`, valid local `s/bg54.jpg` and
+`s/gbg.jpg` supply the repeating tile and backdrop independently, using the
+shared camera phase/zoom plan. The tile retains its decoded dimensions;
+the backdrop uses the original's 512x512 source region, cropped once at load time.
+Missing, invalid or over-budget art leaves that layer absent. The backdrop
+draws at 0.3 alpha over black while high quality or its blend is active, followed
+by the repeating tile at alpha 1. Team backgrounds are not integrated.
 
 For WebGPU, copy this app's web files beside the generated pkg directory, then run
 `node apps/wgpu-slice/dev-server.mjs --web-dir dist/wgpu-slice --port 19087 --simulator-port 19086 --cosmetics-dir <artwork-dir> --accessory 30`.

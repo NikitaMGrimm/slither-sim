@@ -303,9 +303,7 @@ fn over(target: &mut [f64; 4], c: [f64; 4], coverage: f64, alpha: f64, destinati
 /// with native Canvas is deliberately not claimed.
 pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
     let (w, h) = (recipe.width as usize, recipe.height as usize);
-    // The authored hexagonal background has 600 operations; source dimensions
-    // and the per-frame pixel budget remain bounded independently.
-    if w == 0 || h == 0 || w > 512 || h > 512 || recipe.commands.len() > 1024 {
+    if w == 0 || h == 0 || w > 512 || h > 512 || recipe.commands.len() > 128 {
         return Err("recipe extent/budget".into());
     }
     let mut pixels = vec![[0.; 4]; w * h];
@@ -355,7 +353,6 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
             {
                 polygon.push(*p)
             }
-            PaintCommand::ClosePath if polygon.len() >= 3 => {}
             PaintCommand::Arc(c)
                 if c.iter().all(|v| v.is_finite())
                     && c[2] > 0.
@@ -429,7 +426,7 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
                     if rect.is_some() {
                         return 1.;
                     }
-                    // Avoid supersampling every pixel of every hexagon in the tile.
+                    // Skip samples outside the path bounds.
                     if circle.is_none()
                         && (x + 1. < bounds[0]
                             || y + 1. < bounds[1]

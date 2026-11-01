@@ -31,11 +31,11 @@ export async function compareAuthoredSourceEffects(raw) {
   for (let palette = 0; palette < 9; palette++) assert.deepEqual(metadata(prey({ palette }), current), metadata(oldPrey({ palette }), prior));
   assert.deepEqual(current.events, prior.events, 'allocation, dimensions, paint, encode/decode and random order');
   assert.deepEqual(current.canvases.map(canvas => canvas.commands), prior.canvases.map(canvas => canvas.commands));
-  assert.equal(current.canvases.length, 335); assert.equal(current.images.length, 2);
+  assert.equal(current.canvases.length, 333); assert.equal(current.images.length, 0);
   for (const [key, old] of [['palettes', b.palettes], ['bodySources', b.bodySources]]) assert.deepEqual(metadata(a[key], current), metadata(old, prior));
   assert(a.palettes.every(source => current.canvases.includes(source)));
-  assert.notEqual(a.background, a.backgroundImage);
-  return { canvases: 335, images: 2, commands: current.events.length, randomCalls: current.events.filter(e => e[0] === 'random').length };
+  assert.equal(a.background, undefined); assert.equal(a.backgroundImage, undefined);
+  return { canvases: 333, images: 0, commands: current.events.length, randomCalls: current.events.filter(e => e[0] === 'random').length };
 }
 
 /** Actual current binding/source graph with inert native objects; never raster proof. */
@@ -59,7 +59,7 @@ export async function compareStandardSourceEffects(raw, resolveSkin) {
     }
   }
   assert.equal(randomCalls,38,'two retained factory units per selected entity');
-  assert.equal(f.canvases.length,1258);assert.equal(f.images.length,2);
+  assert.equal(f.canvases.length,1256);assert.equal(f.images.length,0);
   assert(assets.bodySources.palettes.every(p=>p.variants.every(s=>f.canvases.includes(s))));
   return {canvases:f.canvases.length,images:f.images.length,randomCalls,sourceBinding:true,pixels:false};
 }

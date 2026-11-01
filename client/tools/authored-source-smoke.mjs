@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import { copyAuthoredSourceRecipes } from '../web/authored-source-recipes.mjs';
-import { authoredSourceRecipesDouble } from './fixtures/authored-source-fixture.mjs';
 import { compareStandardSourceEffects } from './authored-source-effects.mjs';
 
 /** Run only at the approved fresh-build checkpoint. Logical sources, never browser pixels. */
 export async function authoredSourcesSmoke(wasm) {
   const raw = wasm.authored_source_recipes();
   const copied = copyAuthoredSourceRecipes(raw);
-  const legacy=copyAuthoredSourceRecipes(authoredSourceRecipesDouble());
-  assert.deepEqual(copied.tile,legacy.tile,'intended background remains unchanged');
-  assert.deepEqual(copied.backdrop,legacy.backdrop);assert.equal(copied.paletteRgb.length,42);
+  assert.equal(copied.tile,undefined); assert.equal(copied.backdrop,undefined);
+  assert.equal(copied.paletteRgb.length,42);
   assert.deepEqual(copied.paletteRgb[0],[192,128,255]);assert.deepEqual(copied.paletteRgb[39],[104,40,170]);
   const sample=(recipe,x,y)=>{const c=recipe.commands[0];assert.equal(c[0],'pixels');return [...c[3].slice((y*c[1]+x)*4,(y*c[1]+x)*4+4)];};
   assert.deepEqual(sample(copied.bodySources.palettes[0].variants[0],24,24),[234,156,255,255]);

@@ -836,7 +836,7 @@ impl AnimatedScene {
         &mut self,
         target: HtmlCanvasElement,
         sprites: [HtmlCanvasElement; 3],
-        background: HtmlImageElement,
+        background: Option<HtmlImageElement>,
         lane: DrawLane<'_>,
         applied: QualitySnapshot,
     ) -> Result<(), JsValue> {
@@ -849,7 +849,7 @@ impl AnimatedScene {
         let context = SceneDrawContext::committed(
             &prepared,
             size,
-            &background,
+            background.as_ref(),
             self.background_backdrop.as_ref(),
         );
         let mut sources = BorrowedSources::default();
@@ -870,7 +870,7 @@ impl AnimatedScene {
         let frame = CanvasPreflight::new(
             &target,
             &sprites,
-            &background,
+            background.as_ref(),
             size.width,
             size.height,
             plan.camera.x - context.center,
@@ -905,7 +905,7 @@ impl AnimatedScene {
         resolve_prey: Option<&js_sys::Function>,
         target: HtmlCanvasElement,
         sprites: [HtmlCanvasElement; 3],
-        background: HtmlImageElement,
+        background: Option<HtmlImageElement>,
         size: DrawSize,
         lane: DrawLane<'_>,
         applied: QualitySnapshot,
@@ -977,7 +977,7 @@ impl AnimatedScene {
                     client,
                     size,
                     Some(setup),
-                    &background,
+                    background.as_ref(),
                     self.background_backdrop.as_ref(),
                 );
                 // Finish host callbacks before borrowing the food registry.
@@ -1062,7 +1062,7 @@ impl AnimatedScene {
             plans,
             &target,
             &sprites,
-            &background,
+            background.as_ref(),
             self.background_backdrop.as_ref(),
             entry,
             &sources,
@@ -1082,7 +1082,7 @@ impl AnimatedScene {
         &mut self,
         target: HtmlCanvasElement,
         sprites: [HtmlCanvasElement; 3],
-        background: HtmlImageElement,
+        background: Option<HtmlImageElement>,
         size: DrawSize,
         lane: DrawLane<'_>,
         applied: QualitySnapshot,
@@ -1097,7 +1097,7 @@ impl AnimatedScene {
         let context = SceneDrawContext::committed(
             &prepared,
             size,
-            &background,
+            background.as_ref(),
             self.background_backdrop.as_ref(),
         );
         let mut sources = BorrowedSources::default();
@@ -1121,7 +1121,7 @@ impl AnimatedScene {
             plans,
             &target,
             &sprites,
-            &background,
+            background.as_ref(),
             self.background_backdrop.as_ref(),
             entry,
             &sources,
@@ -1162,7 +1162,7 @@ impl AnimatedScene {
         &mut self,
         target: HtmlCanvasElement,
         sprites: [HtmlCanvasElement; 3],
-        background: HtmlImageElement,
+        background: Option<HtmlImageElement>,
         quality_scale: f64,
         detailed_style: bool,
         resolve_face: Option<&js_sys::Function>,
@@ -1179,7 +1179,7 @@ impl AnimatedScene {
         let context = SceneDrawContext::committed(
             &prepared,
             size,
-            &background,
+            background.as_ref(),
             self.background_backdrop.as_ref(),
         );
         let mut sources = BorrowedSources::default();
@@ -1250,7 +1250,7 @@ impl AnimatedScene {
         let frame = CanvasPreflight::new(
             &target,
             &sprites,
-            &background,
+            background.as_ref(),
             size.width,
             size.height,
             camera.x - context.center,

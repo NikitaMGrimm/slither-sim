@@ -21,13 +21,11 @@ extern "C" {
 pub(crate) struct PatternRectangle(Path2d);
 
 impl PatternRectangle {
-    pub(crate) fn new(rect: Option<[f64; 4]>) -> Result<Self, JsValue> {
+    pub(crate) fn new([x, y, width, height]: [f64; 4]) -> Result<Self, JsValue> {
         let path = Path2d::new()?;
-        if let Some([x, y, width, height]) = rect {
-            // Populate every path during preflight, before any target is cleared.
-            path.unchecked_ref::<CheckedPath>()
-                .checked_rect(x, y, width, height)?;
-        }
+        // Populate every path during preflight, before any target is cleared.
+        path.unchecked_ref::<CheckedPath>()
+            .checked_rect(x, y, width, height)?;
         Ok(Self(path))
     }
 

@@ -7,7 +7,6 @@ import { createSyntheticFoodResolver } from '../web/synthetic-food.mjs';
 import { createSyntheticPreyResolver } from '../web/synthetic-prey.mjs';
 import { resolveLocalSkinDouble } from './stock-skin-policy-double.mjs';
 import { standardSourceRecipesDouble, standardRgb } from './fixtures/standard-source-fixture.mjs';
-import { authoredSourceRecipesDouble, authoredSourceRealm } from './fixtures/authored-source-fixture.mjs';
 
 // All native effects and numeric policy here are explicitly tools-only doubles.
 // This tests the real source/recipe/default-host glue, not Rust or browser pixels.
@@ -31,8 +30,6 @@ test('standard source topology reaches existing local binder without modulo-thre
   const assets=await createClientAssetMap({realm:f.realm,sourceRecipes:copied});
   assert.equal(assets.bodySources.palettes.length,42);assert.equal(assets.bodySources.palettes[36].variants.length,60);
   assert.equal(assets.palettes.length,3,'legacy context sources are separate from full body palette');
-  assert.deepEqual(copied.tile,copyAuthoredSourceRecipes(authoredSourceRecipesDouble()).tile);
-  assert.deepEqual(copied.backdrop,copyAuthoredSourceRecipes(authoredSourceRecipesDouble()).backdrop);
   const bind=createLocalBodyResolver(assets.bodySources,f.realm,resolveLocalSkinDouble);
   const expected=[[10,[9,1,7]],[15,[0,1,2,3,4,5,6,7,8]],[29,[11,4,11,4,11]],[62,[17,39]]];
   for(const [skin,palettes]of expected){const {recipe}=bind({skin,customBytes:new Uint8Array()});assert.deepEqual(recipe.runs.map(r=>r.palette),palettes);for(const r of recipe.runs)assert.equal(recipe.palettes[r.palette].variants[0].asset.source,assets.bodySources.palettes[r.palette].variants[0]);}

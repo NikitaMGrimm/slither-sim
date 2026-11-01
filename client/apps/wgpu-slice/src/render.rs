@@ -899,31 +899,19 @@ fn prepare_composed(
             width: logical[0],
             height: logical[1],
             zoom: view.zoom,
-            image_size: Some([backdrop.width, backdrop.height]),
-            pattern_available: true,
+            image_size: backdrop.map(|art| [art.width, art.height]),
+            pattern_available: tile.is_some(),
             quality: applied,
-            tile_width: f64::from(tile.width),
-            tile_height: f64::from(tile.height),
+            tile_width: tile.map_or(1., |art| f64::from(art.width)),
+            tile_height: tile.map_or(1., |art| f64::from(art.height)),
         })
         .map_err(|e| e.to_string())?;
-    let [x, y, w, h] = background.clear.rect;
     let mut draws = bank.take_draws(false);
-    push_draw(
-        &mut draws,
-        image(
-            bank.solid(background.clear.color),
-            x,
-            y,
-            w,
-            h,
-            background.clear.alpha,
-        ),
-    )?;
-    if let Some(layer) = background.image {
+    if let (Some(layer), Some(backdrop)) = (background.image, backdrop) {
         let [x, y, w, h] = layer.destination;
         push_draw(&mut draws, image(backdrop, x, y, w, h, layer.alpha))?;
     }
-    if let Some(layer) = background.pattern {
+    if let (Some(layer), Some(tile)) = (background.pattern, tile) {
         // Clip the oversized Canvas fill to the viewport; keep its pattern-space
         // coordinates so translation, zoom and fractional phase remain identical.
         let mut draw = image(

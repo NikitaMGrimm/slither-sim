@@ -136,7 +136,6 @@ pub fn effects(g: &mut LocalGame) -> Vec<Vec<u8>> {
 pub fn pictures(g: &mut LocalGame) {
     for _ in 0..16 {
         let Some(p) = g.take_frame() else { return };
-        assert!(!p.resources.is_empty());
         let r = p
             .resources
             .iter()

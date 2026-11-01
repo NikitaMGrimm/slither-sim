@@ -29,8 +29,8 @@ pub(crate) struct CanvasFrame {
 /// Native capabilities acquired before any planned frame clears the target.
 pub(crate) struct CanvasPreflight {
     context: CanvasRenderingContext2d,
-    pattern: CanvasPattern,
-    pattern_rectangle: PatternRectangle,
+    pattern: Option<CanvasPattern>,
+    pattern_rectangle: Option<PatternRectangle>,
     width: u32,
     height: u32,
     camera_x: f64,
@@ -42,7 +42,7 @@ pub(crate) struct CanvasPreflight {
 fn validate(
     target: &HtmlCanvasElement,
     sprites: &[HtmlCanvasElement; 3],
-    background: &HtmlImageElement,
+    background: Option<&HtmlImageElement>,
     width: u32,
     height: u32,
     camera_x: f64,
@@ -72,7 +72,9 @@ fn validate(
             "scene sprites must be nonempty source canvases distinct from target",
         ));
     }
-    validate_background_image(background)?;
+    if let Some(background) = background {
+        validate_background_image(background)?;
+    }
     Ok(())
 }
 
@@ -89,7 +91,7 @@ impl CanvasPreflight {
     pub(crate) fn new(
         target: &HtmlCanvasElement,
         sprites: &[HtmlCanvasElement; 3],
-        background: &HtmlImageElement,
+        background: Option<&HtmlImageElement>,
         width: u32,
         height: u32,
         camera_x: f64,
@@ -105,10 +107,17 @@ impl CanvasPreflight {
             validate_background_image(backdrop)?;
         }
         let context = context(target)?;
-        let pattern = context
-            .create_pattern_with_html_image_element(background, "repeat")?
-            .ok_or_else(|| error("could not create background pattern"))?;
-        let pattern_rectangle = PatternRectangle::new(plan.pattern.map(|layer| layer.fill))?;
+        let pattern = background
+            .map(|background| {
+                context
+                    .create_pattern_with_html_image_element(background, "repeat")?
+                    .ok_or_else(|| error("could not create background pattern"))
+            })
+            .transpose()?;
+        let pattern_rectangle = plan
+            .pattern
+            .map(|layer| PatternRectangle::new(layer.fill))
+            .transpose()?;
         Ok(Self {
             context,
             pattern,
@@ -145,7 +154,12 @@ impl CanvasPreflight {
             camera_y: self.camera_y,
             zoom: self.zoom,
         };
-        frame.paint_background_plan(&self.pattern, self.pattern_rectangle, plan, backdrop)?;
+        frame.paint_background_plan(
+            self.pattern.as_ref(),
+            self.pattern_rectangle,
+            plan,
+            backdrop,
+        )?;
         Ok(frame)
     }
 }
@@ -153,8 +167,8 @@ impl CanvasPreflight {
 impl CanvasFrame {
     fn paint_background_plan(
         &self,
-        pattern: &CanvasPattern,
-        rectangle: PatternRectangle,
+        pattern: Option<&CanvasPattern>,
+        rectangle: Option<PatternRectangle>,
         plan: &BackgroundPlan,
         backdrop: Option<&HtmlImageElement>,
     ) -> Result<(), JsValue> {
@@ -173,13 +187,15 @@ impl CanvasFrame {
                 source, sx, sy, sw, sh, dx, dy, dw, dh,
             )?;
         }
-        if let Some(layer) = plan.pattern {
+        if let (Some(layer), Some(rectangle)) = (plan.pattern, rectangle) {
             context.save();
             let result = (|| {
                 context.translate(layer.center.x, layer.center.y)?;
                 context.scale(layer.zoom, layer.zoom)?;
                 context.translate(layer.translation.x, layer.translation.y)?;
-                context.set_fill_style_canvas_pattern(pattern);
+                context.set_fill_style_canvas_pattern(
+                    pattern.ok_or_else(|| error("background pattern source required"))?,
+                );
                 context.set_global_alpha(layer.alpha);
                 rectangle.fill(context);
                 Ok::<_, JsValue>(())
@@ -197,11 +213,11 @@ impl CanvasFrame {
         Ok(())
     }
 
-    /// Reset the target, paint the borrowed tile, and leave world coordinates active.
+    /// Clear black, paint an optional borrowed tile, and leave world coordinates active.
     pub(crate) fn new(
         target: &HtmlCanvasElement,
         sprites: &[HtmlCanvasElement; 3],
-        background: &HtmlImageElement,
+        background: Option<&HtmlImageElement>,
         camera_x: f64,
         camera_y: f64,
         zoom: f64,
@@ -221,11 +237,15 @@ impl CanvasFrame {
         target.set_width(target.width());
         let width = f64::from(target.width());
         let height = f64::from(target.height());
-        context.set_fill_style_str("#111820");
+        context.set_fill_style_str("#000000");
         context.fill_rect(0., 0., width, height);
-        let pattern = context
-            .create_pattern_with_html_image_element(background, "repeat")?
-            .ok_or_else(|| error("could not create background pattern"))?;
+        let pattern = background
+            .map(|background| {
+                context
+                    .create_pattern_with_html_image_element(background, "repeat")?
+                    .ok_or_else(|| error("could not create background pattern"))
+            })
+            .transpose()?;
         context.save();
         let frame = Self {
             context,
@@ -235,20 +255,22 @@ impl CanvasFrame {
             camera_y,
             zoom,
         };
-        frame.paint_background(&pattern)?;
+        frame.paint_background(pattern.as_ref())?;
         Ok(frame)
     }
 
-    fn paint_background(&self, pattern: &CanvasPattern) -> Result<(), JsValue> {
+    fn paint_background(&self, pattern: Option<&CanvasPattern>) -> Result<(), JsValue> {
         self.context.translate(
             self.width / 2. - self.camera_x * self.zoom,
             self.height / 2. - self.camera_y * self.zoom,
         )?;
         self.context.scale(self.zoom, self.zoom)?;
-        self.context.set_fill_style_canvas_pattern(pattern);
-        let [left, top, _, _] = self.visible_bounds();
-        self.context
-            .fill_rect(left, top, self.width / self.zoom, self.height / self.zoom);
+        if let Some(pattern) = pattern {
+            self.context.set_fill_style_canvas_pattern(pattern);
+            let [left, top, _, _] = self.visible_bounds();
+            self.context
+                .fill_rect(left, top, self.width / self.zoom, self.height / self.zoom);
+        }
         Ok(())
     }
 

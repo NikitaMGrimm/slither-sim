@@ -38,7 +38,7 @@ pub(super) struct SceneDrawContext {
     pub(super) size: DrawSize,
     pub(super) center: f64,
     pub(super) boundary: Option<f64>,
-    pub(super) tile_size: Point,
+    pub(super) tile_size: Option<Point>,
     pub(super) image_size: Option<[u32; 2]>,
 }
 
@@ -47,24 +47,24 @@ impl SceneDrawContext {
         client: &AnimatedClient,
         size: DrawSize,
         setup: Option<&Setup>,
-        tile: &HtmlImageElement,
+        tile: Option<&HtmlImageElement>,
         backdrop: Option<&HtmlImageElement>,
     ) -> Self {
         Self {
             size,
             center: setup.map_or(0., |s| s.grid_center),
             boundary: setup.and(client.boundary()).map(|b| b.displayed()),
-            tile_size: Point {
+            tile_size: tile.map(|tile| Point {
                 x: f64::from(tile.natural_width()),
                 y: f64::from(tile.natural_height()),
-            },
+            }),
             image_size: backdrop.map(|image| [image.natural_width(), image.natural_height()]),
         }
     }
     pub(super) fn committed(
         client: &AnimatedClient,
         size: DrawSize,
-        tile: &HtmlImageElement,
+        tile: Option<&HtmlImageElement>,
         backdrop: Option<&HtmlImageElement>,
     ) -> Self {
         Self::at_setup(
@@ -87,10 +87,10 @@ impl SceneDrawContext {
                 height: self.size.height,
                 zoom: prepared.camera().zoom(),
                 image_size: self.image_size,
-                pattern_available: true,
+                pattern_available: self.tile_size.is_some(),
                 quality,
-                tile_width: self.tile_size.x,
-                tile_height: self.tile_size.y,
+                tile_width: self.tile_size.map_or(1., |size| size.x),
+                tile_height: self.tile_size.map_or(1., |size| size.y),
             })
             .map_err(error)
     }
@@ -1297,7 +1297,7 @@ pub(super) fn submit_plans(
     plans: Vec<PlannedScene>,
     target: &HtmlCanvasElement,
     sprites: &[HtmlCanvasElement; 3],
-    background: &HtmlImageElement,
+    background: Option<&HtmlImageElement>,
     backdrop: Option<&HtmlImageElement>,
     entry: DrawSize,
     sources: &BorrowedSources,

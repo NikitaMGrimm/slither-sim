@@ -1,0 +1,76 @@
+{
+  "format": "Frame/overlay Debug, Rust 1.99.0, FNV-1a64",
+  "input": "announcement_tape::playing; pointer(850,130,960,540,false); begin_frame(times,960x540,1); effect acknowledgements and successful presents",
+  "platform": "x86_64-pc-windows-msvc",
+  "rows": [
+    {
+      "canonicalFnv1a64": "cc8af9320ef63480",
+      "draws": 269,
+      "frameFnv1a64": "fae2a36a5449ba4a",
+      "packets": [
+        [
+          236
+        ]
+      ],
+      "timeMs": 60.0
+    },
+    {
+      "canonicalFnv1a64": "c3debee15aa91b70",
+      "draws": 269,
+      "frameFnv1a64": "bedc819f511d0c26",
+      "packets": [],
+      "timeMs": 100.0
+    },
+    {
+      "canonicalFnv1a64": "e468076ba201b76b",
+      "draws": 269,
+      "frameFnv1a64": "ef8a6de022f56a7d",
+      "packets": [],
+      "timeMs": 140.0
+    }
+  ],
+  "baseline": "3209d873d318b102c19521acaea6f8799a1bee4b",
+  "baselineFixture": "zoom-stock-main.json",
+  "derivation": "Pristine baseline reproduces every original frame hash. Remove exactly its first three background draws; replace each remaining asset handle with FNV-1a64(width LE u32, height LE u32, premultiplied RGBA bytes). Baseline and candidate canonical Frame/overlay Debug bytes and ordered material extents/pixels match exactly at every row. Candidate raw hashes retain validation of actual handle allocation.",
+  "canonicalByteControls": [
+    {
+      "timeMs": 60,
+      "file": "canonical.txt",
+      "bytes": 118993,
+      "sha256": "19a9559bf372320521287114ddca32dd957b2812fe5dcc436a8175486a4c3523"
+    },
+    {
+      "timeMs": 60,
+      "file": "materials.raw",
+      "bytes": 2546556,
+      "sha256": "0639c4ade9ef75d638cb9bce6b069ab1d109256841f4ddd36c1e30c8fd29107b"
+    },
+    {
+      "timeMs": 100,
+      "file": "canonical.txt",
+      "bytes": 118933,
+      "sha256": "f53855118b8479b903a710c4702c4cfdd61bf8eb57ba825cd6eb4e8f7669e48d"
+    },
+    {
+      "timeMs": 100,
+      "file": "materials.raw",
+      "bytes": 2546556,
+      "sha256": "0639c4ade9ef75d638cb9bce6b069ab1d109256841f4ddd36c1e30c8fd29107b"
+    },
+    {
+      "timeMs": 140,
+      "file": "canonical.txt",
+      "bytes": 118293,
+      "sha256": "0e0d1d28b3ce4198fc0115d8bdfe8c222a23d416c4b250db603a58e346afbfd8"
+    },
+    {
+      "timeMs": 140,
+      "file": "materials.raw",
+      "bytes": 2546556,
+      "sha256": "0639c4ade9ef75d638cb9bce6b069ab1d109256841f4ddd36c1e30c8fd29107b"
+    }
+  ],
+  "dataOrigin": "AUTHORED SYNTHETIC; paired pristine-baseline projection and candidate capture; no art, window, GPU or game server",
+  "wireProtocol": 19,
+  "toolchain": "Rust 1.99.0"
+}

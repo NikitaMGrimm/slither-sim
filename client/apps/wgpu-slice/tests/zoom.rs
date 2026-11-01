@@ -7,13 +7,13 @@ use slither_client::{presentation::*, session_policy::Phase, state::Point};
 use slither_wgpu_slice::{frame::MAX_DRAWS, game::LocalGame, render};
 
 // Native trig/Debug float text is platform-specific. This independent golden was
-// captured on the product Windows target at the source revision in the fixture;
-// the cross-revision feel comparator separately checks numeric presentation.
+// captured on Windows and paired with a pristine-main projection excluding only
+// the removed background draws. The original full-frame fixture remains unchanged.
 #[cfg(windows)]
 #[test]
-fn factor_one_stationary_and_repeated_cursor_match_pinned_main_pictures_and_commands() {
+fn factor_one_stationary_and_repeated_cursor_preserve_entity_pictures_and_commands() {
     let pin: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/zoom-stock-main.json")).unwrap();
+        serde_json::from_str(include_str!("fixtures/zoom-stock-black.json")).unwrap();
     for stationary in [false, true] {
         let mut game = tape::playing();
         assert!(!game.wheel_zoom(0.));
