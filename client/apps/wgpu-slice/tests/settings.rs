@@ -621,7 +621,10 @@ fn motion_callbacks_wait_for_one_redraw_pass() {
     let before = passes();
     for x in 0..100 {
         login.settings_input(egui::RawInput {
-            events: vec![egui::Event::PointerMoved(egui::pos2(x as f32, 100.))],
+            events: vec![
+                egui::Event::PointerMoved(egui::pos2(x as f32, 100.)),
+                egui::Event::ModifiersChanged(egui::Modifiers::SHIFT),
+            ],
             ..Default::default()
         });
     }
@@ -630,6 +633,13 @@ fn motion_callbacks_wait_for_one_redraw_pass() {
     assert_eq!(
         login.egui.context().unwrap().cumulative_pass_nr(),
         before + 1
+    );
+    assert!(
+        login
+            .egui
+            .context()
+            .unwrap()
+            .input(|input| input.modifiers.shift)
     );
 }
 

@@ -365,6 +365,7 @@ impl NativeLogin {
                 egui::Event::PointerMoved(_)
                     | egui::Event::MouseMoved(_)
                     | egui::Event::PointerGone
+                    | egui::Event::ModifiersChanged(_)
             )
         });
         self.egui.input(input);
