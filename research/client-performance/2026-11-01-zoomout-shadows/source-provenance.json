@@ -253,5 +253,40 @@
       }
     }
   },
-  "rebased_08_status": "binaries built; shared-history validation and timings booked 12:00-12:40; production-history pair included"
+  "rebased_08_status": "binaries built; shared-history validation and timings booked 12:00-12:40; production-history pair included",
+  "final_08_result_files": {
+    "pair_id": "rebased-08-stock-candidate",
+    "baseline_commit": "10e553d299fb1666a2ca2fe59952958f4a455259",
+    "candidate_commit": "095449709fc68cb9bdc28c489008fe12c3a5979e",
+    "baseline_binary_sha256": "8542432cf1730e2803bb95abaa054b073e656c63d156e5793e137b54e0783cbd",
+    "candidate_binary_sha256": "b81c925413acedcabf4f3f36623d5a961aab3b84c77912b9dcc2db69bbdcb8c2",
+    "files": {
+      "final08-capacities.csv": {
+        "rows": 576,
+        "sha256": "8f7e586744ab9b0b2d484185a69615d25d3f04245187f861944f22580e4c95f5"
+      },
+      "final08-clocks.csv": {
+        "rows": 12,
+        "sha256": "f8a39c7118aa7e31b030a8353200454a3f5f410e92241859887d2ac41c54fd6d"
+      },
+      "final08-comparisons.csv": {
+        "rows": 192,
+        "sha256": "433077ce387ba34ee895f0cbb7cdebc098f8549c06bc96fa31281dca085d56d3"
+      },
+      "final08-per-run.csv": {
+        "rows": 1152,
+        "sha256": "da0a81f0198e73646216a68032170ddb3fa81b199cb86e204bf4b242b18056d8"
+      },
+      "final08-phases.csv": {
+        "rows": 1920,
+        "sha256": "6fec236e23adce17c803b54053c0ef7b664e6824b32e9208a6bf48ecfd9fafec"
+      },
+      "final08-selected.csv": {
+        "rows": 384,
+        "sha256": "a80f73bf1f09a49ae5e6b5919187f1d7febe4aa3d1d4fedad3932eb5bd6bf11c"
+      }
+    },
+    "full_manifest": "final08-provenance.json",
+    "report": "FINAL-RESULTS.md"
+  }
 }

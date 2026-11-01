@@ -1,16 +1,22 @@
 # Distant snake shadows at whole-map zoom (2026-11-01)
 
-**Historical retained-binary study; new measurements pending.** See the
+**Historical retained-binary study.** Corrected presented-history measurements,
+all 36 unaffected controls per GPU, the production-history pair and the new
+placeholder-only full-map crop are published in [FINAL-RESULTS.md](FINAL-RESULTS.md).
+Their round-08 CSVs name their new exact commit/binary pair; none of the tables
+below is relabelled. The old AMD regression remains unexplained historically;
+the corrected candidate does not reproduce its persistent approximately 1 ms gap.
+See the
 [actual GPU-input and forced-off results](INPUT-RESULTS.md): all 72 unaffected
 controls upload identical bytes, but 56 have resource-history differences;
 the 20 matched stock/forced-off runs do not reproduce a persistent 1 ms effect.
-Candidate A/B remains blocked until the booked controlled-history comparison.
+That round-04 input mismatch is preserved; round-08 controlled inputs match.
 
 The logical-pixel conversion and non-default observer feature have focused
 regressions. The completed 10:10 diagnostic found buffer-history differences;
-matched stock/forced-off timings are published separately. The booked 12:00
-comparison will condition both pools and include one production-history pair.
-No production cache-sizing decision has been made.
+matched stock/forced-off timings are published separately. The completed 12:00
+comparison conditions both pools and includes one production-history pair.
+Neither reproduces the old persistent gap; the production cache remains unchanged.
 
 All tables below, `selected.csv` and `phases.csv` use **retained-02**: baseline
 commit `181bc01f21441d3447cad7acefec1f683b347e29`, executable SHA-256
@@ -28,9 +34,10 @@ uncommitted source trees; exact recorded trees are preserved as honestly labelle
 exist at build time and are not the later retained-02 commits. Both original
 binary hashes and tree IDs remain unchanged.
 
-The same manifest pins the three new binaries: stock baseline `d1f4b031`,
+The same manifest pins the three round-04 binaries: stock baseline `d1f4b031`,
 candidate `804f20c3`, and the candidate's forced-off diagnostic feature build.
-Their new CPU/GPU numbers will be published separately after validation.
+Their input/forced-off results remain separate from the final round-08 comparison
+of stock `10e553d2` and candidate `09544970`.
 
 Dropping interleaved body shadows below four logical pixels reduces CPU render
 submission and GPU state changes in the authored Battledome workload. The native
