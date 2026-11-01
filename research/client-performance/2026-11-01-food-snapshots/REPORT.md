@@ -209,8 +209,10 @@ GPU were not tested. Windows socket aborts remain unattributed.
 - Native food-ingress tests: 5 passed; 2 manual timing cases intentionally ignored.
   The new 6,000-food/three-snapshot allocation regression requests 1,395,471 bytes,
   below one full 2,544,000-byte food array, with exact client-value equality.
-- `npm test` and seven documentation checks passed. Full `npm run check` is
-  progressing through its remaining checks; completed stages passed.
+- `npm test`, seven documentation checks and the full `npm run check` sequence
+  passed. The sequence began on the initial COW source; review corrections landed
+  before its final native Clippy/desktop/Wasm steps. Focused core/ingress tests
+  and the separate exact CI Clippy command rechecked the corrected source.
 - The exact Windows CI strict Clippy command passes locally:
   `cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --features latency-rig --all-targets -- -D warnings`,
   with CI dev optimization/debug settings and this task's dedicated target/two-job limit.
