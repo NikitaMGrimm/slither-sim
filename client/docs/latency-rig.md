@@ -87,7 +87,9 @@ and optional raw Windows QPC. The client joins UNIX to UNIX and checks adjacent
 UNIX spacing against monotonic spacing in both processes; a discrepancy above
 1 ms rejects the capture. QPC in the host is retained but is not required for
 this join. Nanosecond strings parse as BigInt; no epoch passes through a JS
-Number. Windows' nominal system-time storage quantum is 100 ns; recorded
+Number. Startup also retains the smallest positive system-time increment from
+10,000 consecutive reads as an empirical granularity observation. Windows'
+nominal system-time storage quantum is 100 ns; recorded
 bracket widths and clock variation bound the observations, not timestamp
 accuracy or synchronization accuracy.
 

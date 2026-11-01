@@ -47,9 +47,19 @@ struct Journal {
     middle: bool,
     rows: Vec<Sample>,
     dropped: u64,
+    clock_step_ns: u128,
 }
 
 pub fn start() {
+    let mut clock_step_ns = u128::MAX;
+    let mut previous = unix_ns();
+    for _ in 0..10_000 {
+        let next = unix_ns();
+        if next > previous {
+            clock_step_ns = clock_step_ns.min(next - previous);
+        }
+        previous = next;
+    }
     let mut rows = vec![Sample::default(); CAPACITY];
     for row in &mut rows {
         row.frame = std::hint::black_box(1);
@@ -63,6 +73,11 @@ pub fn start() {
             middle: false,
             rows,
             dropped: 0,
+            clock_step_ns: if clock_step_ns == u128::MAX {
+                0
+            } else {
+                clock_step_ns
+            },
         });
     });
 }
@@ -152,7 +167,8 @@ pub fn finish(path: &Path, complete: bool) -> Result<()> {
     let result = (|| -> std::io::Result<()> {
         writeln!(
             out,
-            "{{\"format\":\"client-latency-heads-v1\",\"clock_source\":\"system-time-unix+process-instant\",\"complete\":{},\"dropped\":{}}}",
+            "{{\"format\":\"client-latency-heads-v1\",\"clock_source\":\"system-time-unix+process-instant\",\"observed_min_positive_clock_step_ns\":\"{}\",\"complete\":{},\"dropped\":{}}}",
+            j.clock_step_ns,
             complete && j.dropped == 0,
             j.dropped
         )?;
@@ -202,6 +218,7 @@ mod tests {
                 middle: false,
                 rows: Vec::with_capacity(1),
                 dropped: 0,
+                clock_step_ns: 0,
             })
         });
         commit(Some(Sample::default()));

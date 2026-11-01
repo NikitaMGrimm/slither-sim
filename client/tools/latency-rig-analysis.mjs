@@ -82,13 +82,13 @@ export async function analyzeCapture(directory) {
   const controlMap=new Map(controls.map(r=>[`${r.generation}/${r.effect}`,r.bytes]));
   const groups=new Map(),total=new Map(),coverage={issued:selected.length,prepared:headRows.length,nearMiddle:0,withReference:0,truthMatched:0,transition:0};
   const push=(group,metric,value)=>{if(!Number.isFinite(value))return;if(!group.has(metric))group.set(metric,[]);group.get(metric).push(value);};
-  const warm=new Map(), motionHistory=new Map();
+  const warm=new Map(), motionHistory=new Map();let activeIdentity=null;
   for(const r of selected){
     const h=r.heads.find(h=>!h[2]);
-    if(!r.middle)continue;coverage.nearMiddle++;
-    if(!h)continue;coverage.withReference++;
+    if(!r.middle){activeIdentity=null;continue;}coverage.nearMiddle++;
+    if(!h){activeIdentity=null;continue;}coverage.withReference++;
     const identity=`${r.generation}/${h[1]}`;
-    if(!warm.has(identity))warm.set(identity,r.t);
+    if(activeIdentity!==identity){warm.set(identity,r.t);activeIdentity=identity;}
     const submit=byStage.get('submit_end')?.get(`${r.generation}/${r.frame}`);
     check(submit&&submit.t>=r.t,'missing/reversed offscreen head submission');
     const submittedNs=r.ns+(submit.t-r.t);
@@ -138,7 +138,7 @@ export async function analyzeCapture(directory) {
   const load=JSON.parse(await readFile(path.join(directory,'load.json'),'utf8'));
   check(!load.contaminated,'compiler-contaminated capture');
   return {format:'latency-rig-results-v1',sourceRevision:validation.sourceRevision,truth:hasTruth,coverage,
-    clock:{source:'system-time-unix+instant',mappingBracketMs:distribution(maps.map(r=>r.mapWidthMs)),hostStepBracketMs:distribution(clockSteps),nominalWindowsSystemTimeQuantumNs:100},
+    clock:{source:'system-time-unix+instant',observedMinPositiveClockStepNs:headHeader.observed_min_positive_clock_step_ns,mappingBracketMs:distribution(maps.map(r=>r.mapWidthMs)),hostStepBracketMs:distribution(clockSteps),nominalWindowsSystemTimeQuantumNs:100},
     machineCpuPercent:distribution(load.samples.map(s=>s.cpuPercent).filter(v=>v!==null)),
     stages:format(total),strata:Object.fromEntries([...groups].map(([k,g])=>[k,format(g)])),
     traceValidation:{complete:validation.complete,closedUnflushed:validation.closedUnflushed,mode:'offscreen: CPU lifecycle validation plus real raw-read and submit checks'},

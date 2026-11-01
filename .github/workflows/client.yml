@@ -82,7 +82,7 @@ jobs:
           CARGO_PROFILE_DEV_DEBUG: 0
           CARGO_PROFILE_DEV_OPT_LEVEL: 1
           RUST_TEST_THREADS: 1
-        run: cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
+        run: cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --features latency-rig --lib --tests --bin slither-client-latency
       - name: Check shared wgpu Windows host
         if: matrix.os == 'windows-latest'
         env:
@@ -90,7 +90,7 @@ jobs:
           CARGO_TARGET_DIR: target/wgpu-slice-ci
           CARGO_PROFILE_DEV_DEBUG: 0
           CARGO_PROFILE_DEV_OPT_LEVEL: 1
-        run: cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --all-targets -- -D warnings
+        run: cargo clippy --manifest-path apps/wgpu-slice/Cargo.toml --locked --features latency-rig --all-targets -- -D warnings
       - name: Build shared wgpu Windows executable
         if: matrix.os == 'windows-latest'
         env:

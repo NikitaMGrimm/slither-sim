@@ -18,12 +18,13 @@ export function optionsFor(args) {
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     if (flag === '--without-truth') { o.truth = false; continue; }
-    const key = { '--host-bin':'hostBin','--client-bin':'clientBin','--output':'output','--seconds':'seconds','--zoom':'zoom','--build-host-root':'hostRoot' }[flag];
+    const key = { '--host-bin':'hostBin','--client-bin':'clientBin','--output':'output','--seconds':'seconds','--zoom':'zoom','--build-host-root':'hostRoot','--host-revision':'hostRevision' }[flag];
     check(key && !seen.has(key) && args[i+1] !== undefined, 'unknown/repeated/missing rig option');
-    seen.add(key); const value = args[++i]; o[key] = ['seconds','zoom'].includes(key) ? Number(value) : path.resolve(value);
+    seen.add(key); const value = args[++i]; o[key] = ['seconds','zoom'].includes(key) ? Number(value) : key==='hostRevision'?value:path.resolve(value);
   }
   check(o.output && (o.hostBin || o.hostRoot) && (o.clientBin || o.hostRoot), 'need --output, --host-bin/--client-bin or --build-host-root');
   check(Number.isFinite(o.seconds) && o.seconds >= 10 && o.seconds <= 120 && [0,-17].includes(o.zoom), 'seconds 10..120; zoom 0 or -17');
+  check(!o.hostRevision||/^[a-f0-9]{40}$/i.test(o.hostRevision),'invalid host source revision');
   return o;
 }
 export async function directoryBytes(dir) {
@@ -77,6 +78,7 @@ export async function run(o) {
       execFileSync('cargo',['build','--release','--locked','-p','slither-wgpu-slice','--features','latency-rig','--bin','slither-client-latency'],{cwd:root,env,stdio:'inherit',windowsHide:true});
       o.hostBin = path.join(target,'release/slither-sim.exe');
       o.clientBin = path.join(target,'release/slither-client-latency.exe');
+      o.hostRevision=execFileSync('git',['rev-parse','HEAD'],{cwd:o.hostRoot,encoding:'utf8',windowsHide:true}).trim();
     }
     await mkdir(path.join(o.output,'binaries'));
     for (const [key,name] of [['hostBin','host.exe'],['clientBin','client.exe']]) {
@@ -87,6 +89,7 @@ export async function run(o) {
     await writeFile(path.join(o.output,'plan.json'),JSON.stringify({
       format:'latency-rig-plan-v1',sourceRevision:git(['rev-parse','HEAD']),
       clientDiff:git(['diff','--','client']),hostBinarySha256:await hash(o.hostBin),clientBinarySha256:await hash(o.clientBin),
+      hostSourceRevision:o.hostRevision??null,
       seconds:o.seconds,zoomNotches:o.zoom,truth:o.truth,config,
       reference:'nearest live received bot within 1200 units; hold until disappearance/life change/out of range; ID tie break',
       middle:'head radius < 0.7 current pit; target orbit 0.5 pit; normal approach; never command exit after entry',

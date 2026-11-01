@@ -71,6 +71,10 @@ LocalGame driver tests and the same native/Wasm perceptual comparator; it opens 
 The wgpu [draw-chunk contract](draw-chunks.md) documents the draw-memory bound,
 recoverable picture skips and native/browser correctness evidence limits.
 
+The opt-in [latency rig](latency-rig.md) adds synthetic argument, bounded-journal
+and analysis tests. Native checks compile its measurement feature and run those
+tests without launching a host, window or GPU. Acquisition remains manual.
+
 ## Offline host/client end-to-end run
 
 Build from the repository root with `CARGO_BUILD_JOBS=2` (and
