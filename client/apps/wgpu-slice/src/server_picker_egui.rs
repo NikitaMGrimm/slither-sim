@@ -21,6 +21,14 @@ fn available(panel: &PanelView, control: &Control) -> bool {
         && control.enabled
         && !matches!(control.kind, ControlKind::Label { .. })
 }
+/// Whether `id` can hold focus in the current panel. Cached focus can lag a
+/// queued wheel scroll until redraw; a row that left the window has none.
+pub fn focusable(panel: &PanelView, id: ControlId) -> bool {
+    panel
+        .controls
+        .iter()
+        .any(|c| c.id == id && c.tab_order.is_some() && available(panel, c))
+}
 /// Tab wraps within the modal in the core's tab order, skipping disabled controls.
 pub fn focus_order(panel: &PanelView) -> Vec<Id> {
     let mut order: Vec<_> = panel
@@ -56,6 +64,11 @@ pub struct PickerUi {
     composition: Option<(ControlId, theme::Composition)>,
     request_focus: Option<ControlId>,
     generation: Option<u64>,
+    /// The pointer was down at the end of the last pass.
+    pointer_down: bool,
+    /// A press held across a generation change: its release must not click
+    /// whatever control now reuses the pressed ID.
+    stale_press: bool,
 }
 impl PickerUi {
     pub fn focused(&self) -> Option<ControlId> {
@@ -135,6 +148,7 @@ impl PickerUi {
         if self.generation != Some(panel.generation) {
             self.generation = Some(panel.generation);
             self.request_focus = panel.initial_focus;
+            self.stale_press |= self.pointer_down;
         }
         let focused = ctx.memory(|m| m.focused()).and_then(|id| {
             panel
@@ -205,7 +219,7 @@ impl PickerUi {
                         theme::ink(tokens.backdrop)
                             .gamma_multiply(backdrop.control.alpha as f32 * alpha),
                     );
-                    if interactive && response.clicked() {
+                    if interactive && response.clicked() && !self.stale_press {
                         intents.push(intent(BACKDROP, Activation::Pointer));
                     }
                 });
@@ -265,10 +279,15 @@ impl PickerUi {
                     }
                     self.controls
                         .push((control.id, bounds.intersect(clip), response.has_focus()));
-                    if interactive && response.clicked() && rule(control.id).is_none() {
+                    let pointer = response.clicked_by(egui::PointerButton::Primary);
+                    if interactive
+                        && response.clicked()
+                        && !(pointer && self.stale_press)
+                        && rule(control.id).is_none()
+                    {
                         intents.push(intent(
                             control.id,
-                            if response.clicked_by(egui::PointerButton::Primary) {
+                            if pointer {
                                 Activation::Pointer
                             } else {
                                 Activation::Enter
@@ -278,6 +297,20 @@ impl PickerUi {
                 }
             });
         self.request_focus = None;
+        // The field that owns a composition lost focus (a click elsewhere, a
+        // generation reset or closing): restore its snapshot before this
+        // pass's actions run, so Add never reads provisional text.
+        if self
+            .composition
+            .as_ref()
+            .is_some_and(|c| ctx.memory(|m| m.focused()) != Some(widget_id(c.0)))
+        {
+            self.cancel_composition(ctx);
+        }
+        self.pointer_down = ctx.input(|i| i.pointer.any_down());
+        if !self.pointer_down {
+            self.stale_press = false;
+        }
         if interactive {
             ctx.input(|i| {
                 for event in &i.events {

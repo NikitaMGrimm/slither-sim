@@ -841,9 +841,13 @@ impl NativeLogin {
     /// Picker-owned events that egui must not see: list navigation, keys egui
     /// would turn into directional focus moves, and the bounded list wheel.
     fn picker_event(&mut self, event: &mut egui::Event) -> PickerEvent {
-        use crate::server_picker_egui::{rule, widget_id};
+        use crate::server_picker_egui::{focusable, rule, widget_id};
         use egui::Key as K;
-        let focus = self.picker.ui.focused();
+        let focus = self
+            .picker
+            .ui
+            .focused()
+            .filter(|id| focusable(&self.picker.panel, *id));
         let field = focus.and_then(rule);
         match event {
             egui::Event::Key { key, pressed, .. } => {

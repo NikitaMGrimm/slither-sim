@@ -837,3 +837,180 @@ fn closing_while_composing_restores_the_field_and_reopens_clean() {
         assert!(!login.picker.policy.is_open(), "{close}");
     }
 }
+
+fn undo(login: &mut NativeLogin) {
+    let command = egui::Modifiers {
+        ctrl: true,
+        command: true,
+        ..Default::default()
+    };
+    input(
+        login,
+        egui::Event::Key {
+            key: egui::Key::Z,
+            physical_key: Some(egui::Key::Z),
+            pressed: true,
+            repeat: false,
+            modifiers: command,
+        },
+    );
+}
+fn preedit(login: &mut NativeLogin, text: &str) {
+    input(
+        login,
+        egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: text.into(),
+            active_range_chars: None,
+        }),
+    );
+    login.prepare([960, 720], true, None).unwrap();
+}
+
+/// A press held across a panel generation change cannot click the control
+/// that now reuses its ID, as the shared panel input cancelled capture.
+#[test]
+fn a_press_held_across_a_generation_change_never_clicks() {
+    // Keyboard Remove while the mouse holds the same Remove button.
+    for redraw in [false, true] {
+        let mut login = opened(false);
+        for address in ["192.0.2.1:80", "192.0.2.2:80"] {
+            login.picker.policy.add_custom(address.into()).unwrap();
+        }
+        login.prepare([960, 720], true, None).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        for _ in 0..12 {
+            if login.picker.ui.focused() == Some(ControlId(8192)) {
+                break;
+            }
+            press(&mut login, egui::Key::Tab);
+        }
+        assert_eq!(login.picker.ui.focused(), Some(ControlId(8192)));
+        let r = widget(&login, ControlId(8192));
+        let p = [f64::from(r.center().x), f64::from(r.center().y)];
+        login.pointer(p, Some(true), true);
+        press(&mut login, egui::Key::Space);
+        assert_eq!(login.picker.policy.custom, ["192.0.2.2:80"]);
+        if redraw {
+            login.prepare([960, 720], true, None).unwrap();
+        }
+        login.pointer(p, Some(false), true);
+        assert_eq!(login.picker.policy.custom, ["192.0.2.2:80"], "{redraw}");
+        // The next ordinary click on the same button acts.
+        login.prepare([960, 720], true, None).unwrap();
+        click(&mut login, ControlId(8192));
+        assert!(login.picker.policy.custom.is_empty(), "{redraw}");
+    }
+    // Directory replacement under a held row press.
+    let mut login = opened(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    let r = widget(&login, ControlId(16));
+    let p = [f64::from(r.center().x), f64::from(r.center().y)];
+    login.pointer(p, Some(true), true);
+    let replacement = [Server {
+        id: 3000,
+        cluster: 0,
+        address: SocketAddr::from(([192, 0, 2, 2], 3000)),
+        population: 1,
+        active: true,
+    }];
+    login
+        .picker
+        .policy
+        .replace(&replacement, &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    login.pointer(p, Some(false), true);
+    assert!(login.picker.policy.is_open());
+    login.prepare([960, 720], true, None).unwrap();
+    click(&mut login, ControlId(16));
+    assert_eq!(login.picker.policy.selection.official_id(), Some(3000));
+}
+
+/// Add reads committed text only: a click that takes focus from a composing
+/// field restores its snapshot before Add runs.
+#[test]
+fn add_during_composition_uses_only_committed_text() {
+    for committed in ["", "192.0.2.1:80"] {
+        let mut login = opened(false);
+        if !committed.is_empty() {
+            input(&mut login, egui::Event::Text(committed.into()));
+        }
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        preedit(&mut login, "192.0.2.99:445");
+        assert!(login.picker.ui.composing);
+        click(&mut login, ADD_CUSTOM);
+        assert!(!login.picker.ui.composing, "{committed:?}");
+        let saved: &[&str] = if committed.is_empty() {
+            &[]
+        } else {
+            &[committed]
+        };
+        assert_eq!(login.picker.policy.custom, saved, "{committed:?}");
+        assert!(
+            !login.picker.policy.custom.iter().any(|c| c.contains("99")),
+            "{committed:?}"
+        );
+        assert!(!login.picker.ui.address.contains("99"), "{committed:?}");
+    }
+}
+
+/// Moving focus to the other field cancels the composition like any other
+/// cancellation: committed text, no candidate in undo history.
+#[test]
+fn focus_moving_to_another_field_cancels_the_composition() {
+    let mut login = opened(true);
+    input(&mut login, egui::Event::Text("192.0.2.1:80".into()));
+    login.step(11200., true, false).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    preedit(&mut login, "候補");
+    assert!(login.picker.ui.address.contains('候'));
+    click(&mut login, SEARCH);
+    assert!(!login.picker.ui.composing);
+    assert_eq!(login.picker.ui.address, "192.0.2.1:80");
+    assert_eq!(login.picker.ui.focused(), Some(SEARCH));
+    click(&mut login, ADDRESS);
+    for _ in 0..3 {
+        undo(&mut login);
+        assert!(!login.picker.ui.address.contains('候'));
+    }
+    assert_eq!(login.picker.ui.address, "");
+}
+
+/// Queued wheel input moves the row window before redraw; the next key must
+/// not navigate from a row that has already left it.
+#[test]
+fn keys_after_a_queued_wheel_use_the_current_row_window() {
+    let mut login = opened(true);
+    login
+        .picker
+        .policy
+        .replace(&servers(), &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    click(&mut login, SEARCH);
+    press(&mut login, egui::Key::ArrowDown);
+    press(&mut login, egui::Key::End);
+    assert_eq!(login.picker.ui.focused(), Some(ControlId(2015)));
+    input(
+        &mut login,
+        egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0., 1.),
+            phase: egui::TouchPhase::Move,
+            modifiers: Default::default(),
+            source: egui::MouseWheelSource::Unknown,
+        },
+    );
+    assert_eq!(login.picker.policy.list.window(2000).start, 1993);
+    // The focused last row left the window: ArrowDown starts from the top,
+    // as the shared panel input did after dropping that focus.
+    press(&mut login, egui::Key::ArrowDown);
+    assert_eq!(login.picker.ui.focused(), Some(ControlId(16)));
+}

@@ -500,6 +500,22 @@ fn dense_custom_and_mixed_windows_stay_inside_the_window() {
                     );
                 }
                 assert_eq!(ui.address.len(), 512);
+                // The retained toolkit bounded picker rasters (64 resources,
+                // 13 MiB) and draws (512). Picker text now lives in the shared
+                // egui font atlas; the login wordmark textures belong to #418.
+                let textures = login.egui.context().unwrap().tex_manager();
+                let textures = textures.read();
+                let atlas: usize = textures
+                    .allocated()
+                    .filter(|(_, m)| m.name == "egui_font_texture")
+                    .map(|(_, m)| m.bytes_used())
+                    .sum();
+                let shapes = login.egui.prepared_shapes().len();
+                assert!(
+                    textures.num_allocated() <= 64 && atlas <= 13 * 1024 * 1024 && shapes <= 512,
+                    "{dpr}, {logical:?}, {offset}: {} textures, {atlas} atlas bytes, {shapes} shapes",
+                    textures.num_allocated()
+                );
             }
         }
     }

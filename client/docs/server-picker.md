@@ -127,8 +127,9 @@ launch; Play and Quality retain their existing gates.
 scale, wording, the row window and tab order; each egui widget uses its resolved
 control rectangle, so painting and hit-testing share the core geometry. Login
 paints below the modal without input. A new panel generation (open, custom edit,
-directory replacement) focuses the address field, and a focused row that leaves
-the window loses focus, as with the shared panel input. The opener's keyboard or
+directory replacement) focuses the address field and cancels a held pointer press,
+and a focused row that leaves the window loses focus before the next key, as
+with the shared panel input. The opener's keyboard or
 pointer modality decides whether focus is painted.
 
 Field text follows the same rules: numeric search keeps four ASCII digits and the
@@ -138,8 +139,9 @@ address adds it and keeps focus; held Enter repeats are ignored. Wheel events ar
 queued into row scrolling without an egui pass per event; pixel deltas use 46
 physical pixels per row. IME follows the login rules: adjacent preedits coalesce
 until redraw, composition owns Enter and Tab, and cancellation (including native
-IME Disabled, Escape, focus loss and an empty preedit) restores the field text,
-caret and copied undo history. Provisional search text never selects a server.
+IME Disabled, Escape, window or field focus loss, closing and an empty preedit)
+restores the field text, caret and copied undo history. Provisional text never
+selects a server or reaches Add.
 egui-winit owns IME admission; opening and closing the picker emit no legacy IME
 effects. While open, the picker owns Enter and Escape even if an old socket is
 still closing.

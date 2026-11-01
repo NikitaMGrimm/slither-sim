@@ -72,7 +72,8 @@ impl NativeServerPicker {
         if !self.ui.composing {
             self.policy.search(&self.ui.search);
         }
-        if self.policy.take_add_request() {
+        // Add never saves provisional IME text.
+        if self.policy.take_add_request() && !self.ui.composing {
             let result = normalize_custom_server(self.ui.address.trim())
                 .and_then(|address| self.policy.add_custom(address).map_err(str::to_owned));
             match result {
