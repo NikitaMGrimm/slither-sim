@@ -62,11 +62,42 @@ pre-rebase run, not relabelled as an execution on the combined head.
 
 ## Matched incremental timing
 
-Twenty-eight alternating pairs were retained. Observed compile overlaps excluded
-23 control and 16 candidate samples individually, leaving **5 COW controls and
-12 motion+COW samples**. More pairs were added because background compilation
-invalidated many controls. The same exclusion rule applied to both sides; no
-sample was removed for being slow. CPU-load snapshots ranged from 29% to 100%.
+[runs.csv](runs.csv) contains one bounded summary row for each of the 56
+retained runs, including exclusions. It was reduced from the existing frame CSVs,
+launcher receipts and process observations; no replay or new measurement was run.
+It contains no packets, player identities, positions, server address or recordings.
+
+From the repository root, Python 3.11+ and only its standard library recompute all
+rows, counts, medians, ranges and reductions in the timing block below, and check
+that the published block matches:
+
+```sh
+python research/client-performance/2026-11-01-motion-transactions/recompute.py --check
+```
+
+The command also reproduces the pair-9 tail diagnostic used under Remaining cost.
+`recompute.py` reads only the adjacent CSV and report. Each arm is bound to its
+measured binary SHA-256 and source base commit; the base commit does not include
+the diagnostic overlays described under Provenance. Each row includes the retained
+frame/process-log hashes, per-run compiler-observation count, acceptance reason,
+callback count/quantiles, complete-history requested allocation bytes, launcher
+elapsed/process CPU and before/after CPU-load snapshots. Raw outputs stay external.
+The script rejects missing/duplicate pair-arm rows, arm/binary mismatches,
+incomplete workloads and acceptance flags inconsistent with compiler observations.
+
+Per-run p50 is the median of the 302 selected callback values. Per-run p95 is the
+sorted value at zero-based index `floor(0.95 * (N - 1))`; the CSV stores both in
+nanoseconds. Selection is model time >=1 second and >=10,000 received food keys.
+The table uses medians of accepted per-run values; its p95 is not a pooled
+percentile. Exclusion is individual: a clean arm remains in its arm's aggregates
+even when its paired arm overlapped compilation. The paired table includes only
+pairs with both arms accepted. A rustc observation means any sampled process list
+contained rustc; a zero count means none was observed, not continuous proof of
+absence between samples.
+
+<!-- BEGIN RECOMPUTED RUN AGGREGATES -->
+Twenty-eight pairs: accepted control/motion **5 / 12**; excluded **23 / 16** for observed rustc.
+CPU-load snapshot range: **29-100%**.
 
 | Fixed 6.1 s history | COW control | Motion + COW |
 | --- | ---: | ---: |
@@ -77,16 +108,7 @@ sample was removed for being slow. CPU-load snapshots ranged from 29% to 100%.
 | Populated ingress, p95 | 133.92 ms | 54.91 ms |
 | Populated redraw preparation, median / p95 | 24.24 / 33.97 ms | 21.58 / 26.58 ms |
 
-This series has **50.8% lower callback p95**, 40.4% lower median launcher elapsed
-and 49.8% fewer requested allocation bytes. Callback entries are medians of
-per-run quantiles, not pooled quantiles. Populated callbacks select model time
->=1 second and >=10,000 received food keys, matching the first study. The
-unbalanced accepted counts and broad host-load range limit precision; these
-figures must not be compared directly with the earlier, quieter COW-only series.
-Launcher elapsed includes process startup/output and exit-observation delay in
-the external process monitor. Per-callback durations are measured inside the
-replay process; process CPU comes from the Windows process counter. Four complete
-adjacent pairs had no observed compile overlap on either side:
+Reductions: callback p95 **50.8%**; median launcher elapsed **40.4%**; requested allocation bytes **49.8%**.
 
 | Pair | COW control | Motion + COW | Elapsed reduction |
 | --- | ---: | ---: | ---: |
@@ -95,11 +117,22 @@ adjacent pairs had no observed compile overlap on either side:
 | 19 | 28.856 s | 14.413 s | 50.1% |
 | 28 | 16.875 s | 12.750 s | 24.4% |
 
-The accepted controls are pairs 1, 2, 9, 19 and 28. Accepted motion samples are
-1, 3, 4, 5, 7, 9, 12, 19, 21, 26, 27 and 28. Every other sample remains in the
-external receipts/process logs with its compilation flag. All 56 processes
-completed the same 32,106 messages without skips and with matching command digest.
+Accepted cow_control pairs: 1, 2, 9, 19, 28.
+Accepted motion_cow pairs: 1, 3, 4, 5, 7, 9, 12, 19, 21, 26, 27, 28.
 
+Motion pair 9: ingress is **83.5%** of the slowest 16 populated callbacks' wall time.
+Its largest populated callback has **724 messages**, **816.7 ms** wall and **788.0 ms** ingress.
+
+<!-- END RECOMPUTED RUN AGGREGATES -->
+
+More pairs were added because background compilation invalidated many controls.
+The same exclusion rule applied to both sides; no sample was removed for being
+slow. The unbalanced accepted counts and broad host-load range limit precision;
+these figures must not be compared directly with the earlier, quieter COW-only
+series. Launcher elapsed includes startup/output and exit-observation delay in
+the external process monitor. Callback durations are measured inside the replay
+process; process CPU comes from the Windows process counter. All 56 processes
+completed the same 32,106 messages without skips and with matching command digest.
 
 Both binaries use release profiles and the same fixed 60 Hz model schedule,
 Original/default quality, 960x540 procedural presentation and CPU completion.
@@ -162,3 +195,14 @@ raw traces, executables, all samples and failed attempts remain outside Git.
   message and a separate test expected the heading byte to be wanted-heading.
   Canonical decoders and the full transaction exposed those fixture mistakes;
   corrected tests retain the ignored-family fallback and second-field semantics.
+
+### Earlier-study evidence gap
+
+The merged [food snapshot study from #420](../2026-11-01-food-snapshots/REPORT.md)
+has the same retained-data gap: it publishes rounded elapsed pairs but does not
+include the per-run callback quantiles, allocation/CPU summaries or a command to
+recompute its aggregate table. Its underlying files remain owner-local. That
+study and its historical claims are unchanged here. Figures cited from it and
+its diagnostic profiles are prior-study context, not results recomputed from
+this motion-series CSV. Test counts and fixed workload constants are validation
+or provenance facts, rather than aggregates of these 56 timing runs.
