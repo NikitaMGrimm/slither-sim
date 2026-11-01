@@ -1,10 +1,115 @@
 # Native frame workload
 
+## Battledome zoom-out matrix
+
+The finite headless `frame_perf --battledome NEW_DIRECTORY` driver uses authored
+packets and procedural placeholder art at default, mid and whole-map wheel zoom,
+1080p/4K, and 1x/4x MSAA on each DX12 hardware adapter. It models 120/500-bot arena
+sizes, retaining 121/256 live snakes respectively under the current client cap.
+The 500 model is not 500 admitted live snakes. It opens no socket or window.
+
+```powershell
+$env:CARGO_TARGET_DIR = 'D:/CargoTargets/zoomout-perf'
+$env:CARGO_BUILD_JOBS = '2'
+cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
+& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --battledome C:/new/external/output
+```
+
+Retain each release executable and alternate five runs per side, with no
+Cargo/rustc process active during captures. Each cell warms 10 rendered pictures
+and measures 30. GPU pass timestamps, CPU prepare/HUD/sync/submit phases, calling
+thread allocation bytes, draw calls, vertices and an unclipped quad-area proxy
+are recorded. Waits/readbacks are outside CPU timing; this is not gameplay FPS.
+`FRAME_PERF_PHASES=1` enables a separate render preparation observer for diagnostic
+runs excluded from timing comparisons. It does not extend `latency-trace-v1`.
+`FRAME_PERF_NO_PNG=1` omits redundant PNGs; default draw snapshots remain.
+`FRAME_PERF_WHOLE_MAP_PNG_ONLY=1` limits presented PNGs to whole-map views while
+retaining the full CSV/profile matrix.
+`FRAME_PERF_PLAN_ONLY=1` performs workload/budget preflight without timing frames
+(adapter/device setup still occurs). All output directories must be new.
+
+The [2026-11-01 shadow study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
+contains the complete selected matrix, phase results, exactness checks,
+loopback-host cross-check and unresolved RTX/AMD limits. The ordinary renderer
+does not request timestamp features or allocate query storage.
+
+The non-default `frame-profile` feature enables this example and its render
+observer/API-trace instrumentation. Ordinary builds compile every observer
+lookup and phase call out. `--battledome` requires `TIMESTAMP_QUERY` and encoder
+timestamps (`TIMESTAMP_QUERY_INSIDE_ENCODERS`) for its diagnostic renderer.
+An adapter without the required features stops the invocation with exit status
+1 and is not measured. A failed invocation retains its newly created output
+under a unique `frame-perf-failed-*` directory, freeing the original path for
+retry; a pre-existing output directory is never cleaned or overwritten.
+
+### Presented native viewport and GPU-input diagnostics
+
+`--battledome-presented NEW_DIRECTORY` uses the native window-to-backing mapping
+and the complete `WorldPresenter`, headlessly, for both Original and Native.
+It records physical/backing/attachment extents, DPR, requested/effective mode
+and MSAA, plus separate world/blit/overlay GPU timestamps. Native's effective
+sample count follows the current shared policy; a requested 4x cell at 4K can
+be effective 1x. Compare matching modes/sample counts rather than assuming the
+request is the effective result. `FRAME_PERF_DPR` selects DPR (default 1).
+
+`FRAME_PERF_GPU_TRACE_DIR` selects a separately created, empty external trace
+root for a **validation-only** run. The pinned wgpu API tracer records actual
+buffer/texture write bytes, all resource/pipeline/bind-group descriptors and
+ordered pass/draw commands, including the blitter. It runs below the Draw layer.
+Payloads are losslessly archived and verified byte-for-byte before retiring
+their uncompressed copies. `gpu-trace-json` streams the typed trace for offline
+SHA-256 analysis. Trace-enabled timings are excluded from performance tables;
+timing runs leave this variable unset. All frame markers and trace hooks are
+behind `frame-profile`. Trace validation records one complete rendered picture
+per cell, including all preceding resource creation and upload actions; it does
+not use the timing run's 10/30 warmup/sample counts.
+
+`FRAME_PERF_FRESH_CONTROL=1`, with `FRAME_PERF_WIDTH` set to 1920 or 3840 and
+`FRAME_PERF_MODE` to Original or Native, isolates the 500-model/default control
+in a fresh process/device for each chosen case. `FRAME_PERF_CONTROL_ONLY=1`
+selects default 500-model cases without the strict one-case isolation.
+The diagnostic build feature `frame-profile-no-shadow-cut` forces the candidate
+renderer to retain shadows, for the third-binary comparison; it is not a user
+quality setting. Record this feature and each executable hash in provenance.
+
+`FRAME_PERF_SHARED_HISTORY=1` runs the same authored one-pixel geometry upload
+before each presented cell, outside preparation/submission timing. It fills nine
+full vertex chunks (73,728 quads; 8.4375 MiB of GPU vertex capacity) and waits for
+completion. Each real frame must fit that fixture ceiling. This conditions both
+capacity and unused mutable-buffer contents, so unaffected controls enter with
+matching GPU inputs despite different earlier LOD work. CSVs label it
+`shared-9-chunks`. Leave it unset for the additional production-history pair
+(`sequence`). This is diagnostic setup, not a production cache-sizing change.
+Presented CSVs also record retained vertex-buffer capacities for every measured
+picture, sampled outside the reported CPU phases.
+
+## Battledome live cross-check
+
+`--battledome` above is the deterministic, socket-free synthetic matrix.
+`--battledome-live HOST:PORT NEW_DIRECTORY` instead connects a finite headless
+client to a **separately running local simulator**, settles maximum wheel
+zoom-out, and saves a whole-map PNG and received/prepared-picture summary.
+It does not start the simulator or produce frozen A/B timing data.
+
+Start the simulator with `slither-sim host --config YOUR_LOCAL_CONFIG`, using a
+Battledome configuration as described in the [server guide](../../docs/raw-server.md#presets).
+Replace `HOST:PORT` below with `127.0.0.1:PORT`, using the simulator's listening
+port. The validator accepts only `127.0.0.1`; other loopback IPs, remote hosts
+and hostnames are rejected.
+Choose a free port other than the reserved 8766, 18884 and 18885. Do not use an
+outside game server. The output directory must be new and remain outside Git.
+
+```powershell
+& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --battledome-live HOST:PORT C:/new/external/output
+```
+
+## General frame workload
+
 Run the finite Windows offscreen workload from the repository root:
 
 ```powershell
 $env:CARGO_BUILD_JOBS = '2'
-cargo build --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 target/release/examples/frame_perf.exe C:/new/external/output
 ```
 
@@ -54,7 +159,7 @@ The `frame_perf` driver also has a GPU-free food-validation workload:
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'
 $env:CARGO_BUILD_JOBS = '1'
-cargo build --offline --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --offline --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 & "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --cpu-food C:/new/external/output
 ```
 

@@ -84,6 +84,9 @@ pub struct Renderer {
     multisample: Option<Multisample>,
     vertices: Vec<VertexChunk>,
     draw_calls: usize,
+    diagnostic_timestamps: Option<wgpu::QuerySet>,
+    #[cfg(feature = "frame-profile")]
+    diagnostic_passes: Option<Vec<(&'static str, u32)>>,
 }
 impl Renderer {
     pub fn supports_native(&self, physical: [u32; 2]) -> bool {
@@ -144,6 +147,61 @@ impl Renderer {
         max_samples: u32,
         required_features: wgpu::Features,
     ) -> Result<Self> {
+        Self::from_adapter_options(
+            adapter,
+            format,
+            max_samples,
+            required_features,
+            false,
+            wgpu::Trace::Off,
+        )
+        .await
+    }
+    /// Finite offscreen diagnostics can opt into pass timestamps. Normal hosts
+    /// request no additional device features and allocate no queries.
+    pub async fn from_adapter_for_diagnostics(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+        timestamps: bool,
+    ) -> Result<Self> {
+        let features = if timestamps {
+            wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS
+        } else {
+            wgpu::Features::empty()
+        };
+        #[cfg(feature = "frame-profile")]
+        let trace = if let Some(root) = std::env::var_os("FRAME_PERF_GPU_TRACE_DIR") {
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let info = adapter.get_info();
+            let path = std::path::PathBuf::from(root).join(format!(
+                "{:04x}-{:04x}-{}",
+                info.vendor,
+                info.device,
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&path).map_err(|e| format!("GPU trace directory: {e}"))?;
+            std::fs::write(
+                path.join(".frame-perf-gpu-trace"),
+                b"owned diagnostic trace\n",
+            )
+            .map_err(|e| e.to_string())?;
+            wgpu::Trace::Directory(path)
+        } else {
+            wgpu::Trace::Off
+        };
+        #[cfg(not(feature = "frame-profile"))]
+        let trace = wgpu::Trace::Off;
+        Self::from_adapter_options(adapter, format, max_samples, features, timestamps, trace).await
+    }
+    async fn from_adapter_options(
+        adapter: wgpu::Adapter,
+        format: wgpu::TextureFormat,
+        max_samples: u32,
+        required_features: wgpu::Features,
+        timestamps: bool,
+        trace: wgpu::Trace,
+    ) -> Result<Self> {
         if !matches!(max_samples, 1 | 4) {
             return Err("Unsupported sample count".into());
         }
@@ -165,6 +223,7 @@ impl Renderer {
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("synthetic-gameplay-slice"),
                 required_features,
+                trace,
                 // Every backend validates against WebGL2 so native runs reject what
                 // the planned WebGL2 extension cannot create. Surfaces and offscreen
                 // targets keep the adapter's resolution; uploads have their own cap.
@@ -278,6 +337,13 @@ impl Renderer {
             "fs",
             1,
         );
+        let diagnostic_timestamps = timestamps.then(|| {
+            device.create_query_set(&wgpu::QuerySetDescriptor {
+                label: Some("offscreen pass timings"),
+                ty: wgpu::QueryType::Timestamp,
+                count: 8,
+            })
+        });
         Ok(Self {
             sample_count,
             format,
@@ -296,6 +362,9 @@ impl Renderer {
             multisample: None,
             vertices: Vec::new(),
             draw_calls: 0,
+            diagnostic_timestamps,
+            #[cfg(feature = "frame-profile")]
+            diagnostic_passes: None,
         })
     }
     pub fn upload(&mut self, r: &Resource) -> RenderResult<()> {
@@ -472,6 +541,82 @@ impl Renderer {
     pub fn draw_call_count(&self) -> usize {
         self.draw_calls
     }
+    /// The last render pass's start/end queries, before the next render call.
+    /// Resolve/readback belongs to the diagnostic caller, outside CPU timings.
+    pub fn diagnostic_timestamps(&self) -> Option<&wgpu::QuerySet> {
+        self.diagnostic_timestamps.as_ref()
+    }
+    /// Retained allocation sizes, sampled outside reported preparation/submission.
+    #[cfg(feature = "frame-profile")]
+    pub fn diagnostic_vertex_capacities(&self) -> Vec<u64> {
+        self.vertices
+            .iter()
+            .filter_map(|chunk| chunk.buffer.as_ref().map(wgpu::Buffer::size))
+            .collect()
+    }
+    /// Start a multi-pass diagnostic picture; timing callers resolve after the
+    /// complete presenter. Legacy single-pass callers still use queries 0/1.
+    #[cfg(feature = "frame-profile")]
+    pub fn begin_diagnostic_frame(&mut self) {
+        self.diagnostic_passes = Some(Vec::with_capacity(3));
+    }
+    #[cfg(feature = "frame-profile")]
+    pub fn diagnostic_passes(&self) -> &[(&'static str, u32)] {
+        self.diagnostic_passes.as_deref().unwrap_or(&[])
+    }
+    #[cfg(feature = "frame-profile")]
+    fn diagnostic_pass(&mut self, name: &'static str) -> RenderResult<(u32, u32)> {
+        let Some(passes) = &mut self.diagnostic_passes else {
+            return Ok((0, 1));
+        };
+        let start = passes.len() as u32 * 2;
+        if start + 1 >= 8 {
+            return Err("diagnostic pass query limit".into());
+        }
+        passes.push((name, start));
+        Ok((start, start + 1))
+    }
+    #[cfg(feature = "frame-profile")]
+    pub fn begin_diagnostic_encoder_pass(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        name: &'static str,
+    ) -> RenderResult<Option<u32>> {
+        if self.diagnostic_passes.is_none() || self.diagnostic_timestamps.is_none() {
+            return Ok(None);
+        }
+        let (start, end) = self.diagnostic_pass(name)?;
+        encoder.write_timestamp(
+            self.diagnostic_timestamps
+                .as_ref()
+                .expect("diagnostic queries"),
+            start,
+        );
+        Ok(Some(end))
+    }
+    #[cfg(feature = "frame-profile")]
+    pub fn end_diagnostic_encoder_pass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        end: Option<u32>,
+    ) {
+        if let Some(end) = end {
+            encoder.write_timestamp(
+                self.diagnostic_timestamps
+                    .as_ref()
+                    .expect("diagnostic queries"),
+                end,
+            );
+        }
+    }
+    /// Delimit actual wgpu API-trace input frames. Used only in a separate
+    /// validation run, never in CPU/GPU timing captures.
+    #[cfg(feature = "frame-profile")]
+    pub fn diagnostic_trace_marker(&self, label: &str) {
+        let mut encoder = self.device.create_command_encoder(&Default::default());
+        encoder.insert_debug_marker(label);
+        self.queue.submit([encoder.finish()]);
+    }
     /// DOM siblings paint over the blit with the same quads, without a window-sized MSAA target.
     pub fn render_overlay(
         &mut self,
@@ -591,6 +736,10 @@ impl Renderer {
         } else {
             None
         };
+        #[cfg(feature = "frame-profile")]
+        let query_indices = self.diagnostic_pass(if overlay { "overlay" } else { "world" })?;
+        #[cfg(not(feature = "frame-profile"))]
+        let query_indices = (0, 1);
         let msaa_view = (samples > 1).then(|| {
             &replacement
                 .as_ref()
@@ -603,6 +752,13 @@ impl Renderer {
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("offline gameplay"),
+                timestamp_writes: self.diagnostic_timestamps.as_ref().map(|query_set| {
+                    wgpu::RenderPassTimestampWrites {
+                        query_set,
+                        beginning_of_pass_write_index: Some(query_indices.0),
+                        end_of_pass_write_index: Some(query_indices.1),
+                    }
+                }),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: msaa_view.unwrap_or(target),
                     depth_slice: None,

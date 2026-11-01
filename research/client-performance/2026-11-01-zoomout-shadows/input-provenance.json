@@ -1,0 +1,96 @@
+{
+  "schema": "zoomout-input-controls-v1",
+  "pairs": {
+    "baseline": {
+      "commit": "d1f4b031d3f9c863944791023063af28dd51b97f",
+      "tree": "3259c7ffffd1e6c33dab6dd19b5036b654e3b1b4",
+      "features": "frame-profile,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "frame_perf_sha256": "998f0ef0ea72e886ecbc9cdc270eb7fbc59fccaba1c12282006ed35e7a0020b9"
+    },
+    "candidate": {
+      "commit": "804f20c39442d1eccb8eea2074c2dc2e3e58c04b",
+      "tree": "d817c57e29ed2d82516f419a0925ef8ecc6f6e0e",
+      "features": "frame-profile,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "frame_perf_sha256": "5e57734ea0cd2754729b3290c2be6915bf6718fced8b6f8ac5401ea873a8439e"
+    },
+    "forced_off": {
+      "commit": "804f20c39442d1eccb8eea2074c2dc2e3e58c04b",
+      "tree": "d817c57e29ed2d82516f419a0925ef8ecc6f6e0e",
+      "features": "frame-profile-no-shadow-cut,feel-trace",
+      "command": "cargo build --release --locked -p slither-wgpu-slice --features frame-profile-no-shadow-cut,feel-trace --example frame_perf --example feel-replay --example gpu-trace-json",
+      "frame_perf_sha256": "5eaaace4f6a540a3b1fe0cc58b145e32314843d94a2cb2dcd3e5dc39aecdc754"
+    }
+  },
+  "hasher_source": "client/tools/gpu-trace-hashes.mjs",
+  "hasher_sha256": "efedac1f209d63f92a36b9b416e2e281ce056c531131f1c4b3d747b48c6427a7",
+  "converter_binary_sha256": "6a8406ad139e6692f939148d693602e3e4b99bb6ec9ea064aaf966491c531dda",
+  "raw_hash_outputs": [
+    {
+      "side": "baseline",
+      "path": "measurements-presented-04\\baseline-trace\\1002-13c0-2\\inputs-resumed05.jsonl",
+      "sha256": "2c8259b1c8d0fd272fea0a42ea39b3c0bff8763b95dec0cefde224c5b451b0d3"
+    },
+    {
+      "side": "baseline",
+      "path": "measurements-presented-04\\baseline-trace\\1002-13c0-3\\inputs-resumed05.jsonl",
+      "sha256": "50a52ca62f8691fdf64933dbb72a140af56fa6535fc7bd74fb8a17386870e69d"
+    },
+    {
+      "side": "baseline",
+      "path": "measurements-presented-04\\baseline-trace\\10de-2c05-0\\inputs-resumed05.jsonl",
+      "sha256": "2c8259b1c8d0fd272fea0a42ea39b3c0bff8763b95dec0cefde224c5b451b0d3"
+    },
+    {
+      "side": "baseline",
+      "path": "measurements-presented-04\\baseline-trace\\10de-2c05-1\\inputs-resumed05.jsonl",
+      "sha256": "50a52ca62f8691fdf64933dbb72a140af56fa6535fc7bd74fb8a17386870e69d"
+    },
+    {
+      "side": "candidate",
+      "path": "measurements-presented-05\\candidate-trace\\1002-13c0-2\\inputs-resumed05.jsonl",
+      "sha256": "ac430d35a624ab6ec00f6b6170bb7656d02c5533d88162ded3fd330a2fc6dfa0"
+    },
+    {
+      "side": "candidate",
+      "path": "measurements-presented-05\\candidate-trace\\1002-13c0-3\\inputs-resumed05.jsonl",
+      "sha256": "12d8ded93a1c7f5ad74ca4aed734b6177fb5f26cfdcab2e598aaa57253d84d8b"
+    },
+    {
+      "side": "candidate",
+      "path": "measurements-presented-05\\candidate-trace\\10de-2c05-0\\inputs-resumed05.jsonl",
+      "sha256": "ac430d35a624ab6ec00f6b6170bb7656d02c5533d88162ded3fd330a2fc6dfa0"
+    },
+    {
+      "side": "candidate",
+      "path": "measurements-presented-05\\candidate-trace\\10de-2c05-1\\inputs-resumed05.jsonl",
+      "sha256": "12d8ded93a1c7f5ad74ca4aed734b6177fb5f26cfdcab2e598aaa57253d84d8b"
+    },
+    {
+      "side": "forced_off",
+      "path": "measurements-presented-06\\forced_off-trace\\1002-13c0-2\\inputs-forced06.jsonl",
+      "sha256": "2c8259b1c8d0fd272fea0a42ea39b3c0bff8763b95dec0cefde224c5b451b0d3"
+    },
+    {
+      "side": "forced_off",
+      "path": "measurements-presented-06\\forced_off-trace\\1002-13c0-3\\inputs-forced06.jsonl",
+      "sha256": "50a52ca62f8691fdf64933dbb72a140af56fa6535fc7bd74fb8a17386870e69d"
+    },
+    {
+      "side": "forced_off",
+      "path": "measurements-presented-06\\forced_off-trace\\10de-2c05-0\\inputs-forced06.jsonl",
+      "sha256": "2c8259b1c8d0fd272fea0a42ea39b3c0bff8763b95dec0cefde224c5b451b0d3"
+    },
+    {
+      "side": "forced_off",
+      "path": "measurements-presented-06\\forced_off-trace\\10de-2c05-1\\inputs-forced06.jsonl",
+      "sha256": "50a52ca62f8691fdf64933dbb72a140af56fa6535fc7bd74fb8a17386870e69d"
+    }
+  ],
+  "coverage": "one complete API-input validation picture per cell; all prior resource creation and uploads retained",
+  "timing": "candidate A/B not run; separate matched stock/forced-off controls only",
+  "timing_pair_id": "rebased-07-stock-forced-off",
+  "exact_control_input_frames": 16,
+  "exact_default_draw_pairs": 80
+}

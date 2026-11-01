@@ -1,0 +1,32 @@
+{
+  "datasets": {
+    "AA": {
+      "pair_id": "retained-02-AA",
+      "baseline_commit": "181bc01f21441d3447cad7acefec1f683b347e29",
+      "candidate_commit": "181bc01f21441d3447cad7acefec1f683b347e29",
+      "baseline_binary_sha256": "82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd",
+      "candidate_binary_sha256": "82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd",
+      "execution_order": "baseline-left,baseline-right",
+      "presentation_mode": "direct-offscreen"
+    },
+    "BA": {
+      "pair_id": "retained-02-BA",
+      "baseline_commit": "181bc01f21441d3447cad7acefec1f683b347e29",
+      "candidate_commit": "583c502478fce0e576c82af1de5103bd21bc46ff",
+      "baseline_binary_sha256": "82fda4f9c33e4f56b0b23d4e81857a174856cd0202f9aef45dc9da59436559bd",
+      "candidate_binary_sha256": "42fe9aa38ab6effd10abf32d83b7053bc0af03675e3aa3665bfdaabff173eb32",
+      "execution_order": "candidate,baseline",
+      "presentation_mode": "direct-offscreen"
+    }
+  },
+  "source_files": {
+    "control-per-run.csv": "all 20 retained runs, both adapters and all cells",
+    "control-unaffected.csv": "18 unaffected cells per adapter, both experiments",
+    "control-clock-context.csv": "AMD PLAN-bracket clock context; both MSAA cases/warmup combined"
+  },
+  "started": "2026-11-01T08:00:00.307935+01:00",
+  "ended": "2026-11-01T08:20:14.895227+01:00",
+  "runs": 20,
+  "compiler_overlaps": 0,
+  "exact_default_draw_pairs": 80
+}

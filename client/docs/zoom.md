@@ -65,6 +65,16 @@ one pixel are omitted before text rasterization. Bodies narrower than two logica
 pixels use the existing low-quality passes: omit outline/shadow/inner shimmer,
 retaining the body, outer boost and death passes. These rules are opt-in to
 zoom-out; default output remains exact.
+The interleaved body-shadow layer is also omitted when the wheel factor is below
+one and `29 * scale * camera_zoom * backing_to_logical < 4` displayed logical
+pixels. Native presentation derives `backing_to_logical` from window physical
+size/DPR and the unchanged projection, conservatively using the larger axis.
+Original/Native attachment resolution and MSAA do not change that conversion.
+This preserves curve
+samples, palette ordinals, other pass order and distance-cursor visits, including
+the antenna/death boundary. Factor one retains every command. The
+[Battledome study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
+records CPU/GPU measurements, default-view equality and unresolved GPU controls.
 The background already uses one repeating-texture quad regardless of tile count.
 Native food planning combines this zoom policy with the retained catalog index
 from [frame performance](frame-performance.md#retained-food-cpu-preparation).
@@ -87,7 +97,7 @@ From the repository root, in PowerShell (one Cargo process at a time):
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'
 $env:CARGO_BUILD_JOBS = '1'
-cargo build --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 & "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --zoom C:/new/external/output
 ```
 
