@@ -18,18 +18,26 @@ and blend arithmetic?
 Baseline is main `7ce9569285e2b6aec22f725675865ee5b3fe9a08` with passive
 `frame-profile` markers around the control probe, snapshot and advance.
 
+[excluded-diagnostics.csv](excluded-diagnostics.csv) retains the four original
+per-run summaries behind the following table, including CPU/GPU quantiles, peak
+quads, counts, allocation totals and host-load/compile flags. No measurement was
+rerun for this addition. `python recompute.py --check` regenerates and verifies
+this table as well as the existing retained-data controls.
+
 One excluded diagnostic invocation per cell uses production LocalGame,
 procedural artwork, 960x540 Original/MSAA4, and offscreen DX12 timestamps on
 AMD Radeon(TM) Graphics (IntegratedGpu), driver 32.0.21001.9024. No window,
 socket, outside website or stock artwork is used. The host was busy with other
 compilation; these figures rank candidates and are not the A/B result.
 
+<!-- BEGIN EXCLUDED DIAGNOSTIC BASELINE -->
 | Workload / view | CPU prepare median / p95 ms | GPU passes median / p95 ms | Peak prepared quads |
 | --- | ---: | ---: | ---: |
 | Restricted replay / default | 22.938 / 27.760 | 42.376 / 66.884 | 118,747 |
 | Restricted replay / whole map | 12.473 / 18.218 | 0.705 / 0.783 | 1,196 |
 | Authored 30,000 food, 40 snakes / default | 11.425 / 14.273 | 30.303 / 54.676 | 35,870 |
 | Authored 30,000 food, 40 snakes / whole map | 28.611 / 35.017 | 82.173 / 87.637 | 218,273 |
+<!-- END EXCLUDED DIAGNOSTIC BASELINE -->
 
 The synthetic arena is small enough that whole-map food remains above existing
 LOD thresholds; the restricted replay's much larger map culls most subpixel food.
@@ -235,6 +243,18 @@ excluded from the timing series; restricted pictures are not published.
   corrected after checking every journal; no filter, sample or timing changed.
 
 ## Remaining limits
+
+### Rebase validation (2026-11-02)
+
+The implementation was rebased onto `d325df3b`, retaining the received-snapshot
+and pellet-raster/mip changes. The measurements, digests and full `npm run check`
+above remain historical evidence for the original implementation revision;
+they were not rerun or relabelled. On the rebased source, 79 core library,
+4 allocation, 8 control-boundary, 7 minimap, 9 food-ingress, 1 pellet-quality and
+1 feel-trace tests pass. Strict core/native/profiling/Wasm Clippy and seven
+documentation tests pass. `recompute.py --check` now also verifies the excluded
+diagnostic baseline table from its four retained per-run CSV summaries. This
+documentation correction adds no measurements.
 
 This fixes part of frame preparation. Default CPU preparation p95 still exceeds
 16.7 ms, and default GPU p95 is about 67 ms on this replay. Entity advance, food

@@ -1,10 +1,46 @@
 """Recompute bounded per-run aggregate tables; Python standard library only."""
+import argparse
 import csv
 from pathlib import Path
 from statistics import median
 
 
+def excluded_baseline_table():
+    rows = list(csv.DictReader(Path(__file__).with_name("excluded-diagnostics.csv").open(encoding="utf-8")))
+    assert len(rows) == 4
+    cells = {(r["workload"], r["zoom"]): r for r in rows}
+    assert len(cells) == 4
+    lines = [
+        "| Workload / view | CPU prepare median / p95 ms | GPU passes median / p95 ms | Peak prepared quads |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    for workload, label in (("replay", "Restricted replay"), ("synthetic", "Authored 30,000 food, 40 snakes")):
+        for zoom, view in (("0", "default"), ("-120", "whole map")):
+            row = cells[workload, zoom]
+            assert row["exit"] == "0" and row["side"] == "before"
+            cpu = [float(row[f"redraw_ns_{q}_ms"]) for q in ("median", "p95")]
+            gpu = [float(row[f"gpu_ns_{q}_ms"]) for q in ("median", "p95")]
+            lines.append(f"| {label} / {view} | {cpu[0]:.3f} / {cpu[1]:.3f} | {gpu[0]:.3f} / {gpu[1]:.3f} | {int(row['max_draws']):,} |")
+    return "\n".join(lines)
+
+
+def check_excluded_table(report, expected):
+    start = "<!-- BEGIN EXCLUDED DIAGNOSTIC BASELINE -->\n"
+    end = "\n<!-- END EXCLUDED DIAGNOSTIC BASELINE -->"
+    assert report.count(start) == report.count(end) == 1, "missing/duplicate diagnostic table markers"
+    actual = report.split(start, 1)[1].split(end, 1)[0]
+    assert actual == expected, "excluded diagnostic baseline table differs from retained CSV"
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="verify retained-data controls and the excluded diagnostic report table")
+    args = parser.parse_args()
+    diagnostic = excluded_baseline_table()
+    print("Excluded diagnostic baseline (original retained runs):")
+    print(diagnostic)
+    if args.check:
+        check_excluded_table(Path(__file__).with_name("REPORT.md").read_text(encoding="utf-8"), diagnostic)
     stages = list(csv.DictReader(Path(__file__).with_name("stages.csv").open(encoding="utf-8")))
     assert len(stages) == 96
     print("Diagnostic stages (observer runs, excluded from primary timing):")
@@ -49,6 +85,8 @@ def main():
             print(f"  paired median savings: {median(deltas):.4f} ms, range {min(deltas):.4f}..{max(deltas):.4f}; lower in {sum(d > 0 for d in deltas)}/5 pairs")
     loads = [float(r[k]) for r in rows for k in ("loadMin", "loadMax")]
     print(f"\nCPU-load snapshot range: {min(loads):.0f}..{max(loads):.0f}%")
+    if args.check:
+        print("PASS: retained-data controls and excluded diagnostic table match.")
 
 
 if __name__ == "__main__":
