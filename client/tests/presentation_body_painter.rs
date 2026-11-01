@@ -40,6 +40,8 @@ struct Fixture {
     eligible: bool,
     entry_alpha: f64,
     limit: usize,
+    zoom_factor: Option<f64>,
+    logical_pixels_per_unit: f64,
 }
 
 impl Fixture {
@@ -109,6 +111,8 @@ impl Fixture {
             eligible: true,
             entry_alpha: 1.,
             limit: MAX_BODY_PAINT_COMMANDS,
+            zoom_factor: None,
+            logical_pixels_per_unit: 1.,
         }
     }
 
@@ -155,6 +159,15 @@ impl Fixture {
             entry_alpha: self.entry_alpha,
             command_limit: self.limit,
         };
+        if let Some(zoom_factor) = self.zoom_factor {
+            return slither_client::presentation::plan_standard_body_with_zoom_and_storage(
+                input,
+                slither_client::presentation::AntennaBarrierEffect::Disabled,
+                storage.unwrap_or_default(),
+                zoom_factor,
+                self.logical_pixels_per_unit,
+            );
+        }
         match storage {
             None => plan_standard_body(input),
             Some(commands) => slither_client::presentation::plan_standard_body_with_storage(
@@ -1005,4 +1018,96 @@ fn mixed_runs_do_not_need_an_unused_base_palette_glow() {
     f.visual.smoothed_speed = 8.;
     f.glows[0] = None;
     assert!(f.plan().is_ok());
+}
+
+#[test]
+fn distant_shadow_lod_preserves_other_passes_and_scratch_with_mixed_flags_and_fades() {
+    for quality in [false, true] {
+        let mut f = Fixture::new(24);
+        f.view.zoom = 0.08;
+        f.mixed();
+        f.visual.smoothed_speed = 9.;
+        f.visual.dead = true;
+        f.visual.death = 0.2;
+        f.samples[3].flag = 0;
+        f.samples[11].flag = 1;
+        if !quality {
+            f.low_quality();
+        }
+        let stock = f.plan().unwrap();
+        f.zoom_factor = Some(1.);
+        assert_eq!(
+            f.plan().unwrap(),
+            stock,
+            "factor one must retain every command"
+        );
+        f.zoom_factor = Some(0.1);
+        let distant = f.plan().unwrap();
+        assert_eq!(distant.final_distance_cursor, stock.final_distance_cursor);
+        let removed = stock
+            .commands
+            .iter()
+            .filter(|c| c.pass == BodyShadow)
+            .count();
+        assert!(removed > 0);
+        assert_eq!(distant.antenna_barrier, stock.antenna_barrier - removed);
+        let mut expected: Vec<_> = stock
+            .commands
+            .into_iter()
+            .filter(|c| c.pass != BodyShadow)
+            .collect();
+        for (sequence, command) in expected.iter_mut().enumerate() {
+            command.sequence = sequence;
+        }
+        assert_eq!(distant.commands, expected);
+        f.limit = distant.commands.len();
+        assert_eq!(
+            f.plan().unwrap(),
+            distant,
+            "budget must count only emitted commands"
+        );
+        f.limit -= 1;
+        assert_eq!(f.plan(), Err(BodyPaintError::CommandLimit));
+    }
+}
+
+#[test]
+fn shadow_lod_requires_zoom_out_and_strictly_less_than_four_projected_pixels() {
+    let mut f = Fixture::new(12);
+    for zoom in [4. / 29., 0.5] {
+        f.view.zoom = zoom;
+        let stock = f.plan().unwrap();
+        f.zoom_factor = Some(0.2);
+        assert_eq!(f.plan().unwrap(), stock);
+        f.zoom_factor = None;
+    }
+    f.view.zoom = 0.01;
+    let stock = f.plan().unwrap();
+    for factor in [1., 1.25] {
+        f.zoom_factor = Some(factor);
+        assert_eq!(f.plan().unwrap(), stock);
+    }
+    for factor in [0., -1., f64::NAN, f64::INFINITY] {
+        f.zoom_factor = Some(factor);
+        assert_eq!(f.plan(), Err(BodyPaintError::InvalidView));
+    }
+}
+
+#[test]
+fn shadow_lod_checks_displayed_scale_and_validates_it() {
+    let mut f = Fixture::new(12);
+    f.view.zoom = 3.9 / 29.;
+    f.zoom_factor = Some(0.2);
+    for scale in [0.64, 1., 1.28, 2.56] {
+        f.logical_pixels_per_unit = scale;
+        let plan = f.plan().unwrap();
+        assert_eq!(
+            plan.commands.iter().any(|c| c.pass == BodyShadow),
+            3.9 * scale >= 4.
+        );
+    }
+    for scale in [0., -1., f64::NAN, f64::INFINITY] {
+        f.logical_pixels_per_unit = scale;
+        assert_eq!(f.plan(), Err(BodyPaintError::InvalidView));
+    }
 }
