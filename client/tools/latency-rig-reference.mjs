@@ -6,22 +6,49 @@ import {performance} from 'node:perf_hooks';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 export class ReferencePolicy {
-  constructor(){this.life=null;this.entered=null;this.phase=-1;this.heading=0;}
+  constructor(){this.life=null;this.started=0;this.phase=-1;this.heading=0;}
   decide(frame){
-    if(frame.life!==this.life){this.life=frame.life;this.entered=null;this.phase=-1;}
-    const own=frame.observation.self,{x,y}=own.head;
-    const pit=frame.rules?.pitRadius;
-    if(!(pit>0))throw Error('controlled reference needs reported pit geometry');
-    const radius=Math.hypot(x,y);
-    if(this.entered===null&&radius<pit*.6)this.entered=frame.time;
-    if(this.entered===null||radius>pit*.8){
-      this.phase=-1;
-      const inward=Math.max(-2,Math.min(8,(radius-pit*.4)/250));
-      return {heading:Math.atan2(x/radius-inward*y/radius,-y/radius-inward*x/radius),boost:false};
+    if(frame.life!==this.life){this.life=frame.life;this.started=frame.time;this.phase=-1;}
+    const view=frame.observation,own=view.self,{x,y}=own.head;
+    // The runner freezes Battledome: match the primary rig's live-wall ratio.
+    const pit=view.arena.radius*1784/3584,radius=Math.hypot(x,y);
+    const primary=view.opponents.find(s=>String(s.id)==='1');
+    let target=primary?{
+      x:primary.head.x-Math.sin(primary.heading)*600,
+      y:primary.head.y+Math.cos(primary.heading)*600,
+    }:{x:0,y:0};
+    if(radius<pit&&Math.hypot(target.x,target.y)>pit*.85){
+      const scale=pit*.85/Math.hypot(target.x,target.y);target={x:target.x*scale,y:target.y*scale};
     }
-    const elapsed=frame.time-this.entered,phase=Math.floor(elapsed/2)%4,within=elapsed%2;
-    if(phase!==this.phase){this.phase=phase;this.heading=radius>20?Math.atan2(-y,-x):own.heading;}
-    return {heading:this.heading+(phase%2?within*2.5:0),boost:phase>=2};
+    const goal=Math.atan2(target.y-y,target.x-x),elapsed=frame.time-this.started;
+    const phase=Math.floor(elapsed/2)%4,within=elapsed%2;
+    if(phase!==this.phase){this.phase=phase;this.heading=goal;}
+    const catching=primary&&Math.hypot(primary.head.x-x,primary.head.y-y)>950;
+    let desired=radius>pit*.92||catching?goal:this.heading+(phase%2?within*2.5:0);
+    let boost=phase>=2;
+    const speed=boost?437.5:Math.max(184,own.speed);
+    // A bounded heuristic over received obstacles; it does not guarantee survival.
+    const nearby=view.opponents.map(s=>({s,d:Math.hypot(s.head.x-x,s.head.y-y)}))
+      .sort((a,b)=>a.d-b.d).slice(0,24).map(r=>r.s);
+    const obstacles=nearby.flatMap(s=>s.body.slice(0,32).map(p=>({...p,r:(s.radius??20)+(own.radius??20)+28})));
+    const wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+    let best={score:-Infinity,heading:desired,clearance:-Infinity};
+    for(const offset of [0,.25,-.25,.5,-.5,.8,-.8,1.2,-1.2]){
+      const heading=desired+offset;let clearance=Infinity;
+      for(const t of [.2,.4,.6]){
+        const direction=own.heading+wrap(heading-own.heading)*Math.min(1,t/.4);
+        const px=x+Math.cos(direction)*speed*t,py=y+Math.sin(direction)*speed*t;
+        clearance=Math.min(clearance,view.arena.radius-Math.hypot(px,py)-100);
+        if(radius<pit-60)clearance=Math.min(clearance,pit-Math.hypot(px,py)-60);
+        for(const p of obstacles)clearance=Math.min(clearance,Math.hypot(px-p.x,py-p.y)-p.r);
+        for(const s of nearby)clearance=Math.min(clearance,Math.hypot(px-s.head.x-Math.cos(s.heading)*s.speed*t,py-s.head.y-Math.sin(s.heading)*s.speed*t)-(s.radius??20)-(own.radius??20)-28);
+      }
+      const score=Math.min(clearance,100)-Math.abs(offset)*25;
+      if(score>best.score)best={score,heading,clearance};
+    }
+    desired=best.heading;
+    if(best.clearance<0)boost=false;
+    return {heading:desired,boost};
   }
 }
 
@@ -65,7 +92,7 @@ export async function startReference(binary,endpoint,output){
           if(Number(frame.observation.self.id)!==id)throw Error('reference slot changed after reconnect');
           action=policy.decide(frame);
           if(journal.length>=8192)throw Error('reference control journal overflow');
-          journal.push({time:frame.time,life:frame.life,id,head:frame.observation.self.head,action});
+          journal.push({time:frame.time,life:frame.life,id,head:frame.observation.self.head,reportedPit:frame.rules?.pitRadius,receivedWall:frame.observation.arena.radius,action});
         }
         frame=await request({op:'step',...(action?{action}:{})});
         await sleep(Math.max(0,42-(performance.now()-start)));
@@ -74,7 +101,7 @@ export async function startReference(binary,endpoint,output){
   })();
   return {id,get failure(){return failure;},finished,async stop(){
     stopping=true;child.stdin.end();child.kill();await finished;
-    await writeFile(output,JSON.stringify({format:'latency-rig-scripted-reference-v1',complete:!failure,id,failure:String(failure??''),journal,stderr},null,2),{flag:'wx'});
+    await writeFile(output,JSON.stringify({format:'latency-rig-scripted-reference-v2',complete:!failure,id,failure:String(failure??''),journal,stderr},null,2),{flag:'wx'});
     if(failure)throw failure;
   }};
 }
