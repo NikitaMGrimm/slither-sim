@@ -53,6 +53,34 @@ impl<'a> From<v13::SnakeAppearanceRef<'a>> for AppearanceHeader<'a> {
 }
 
 impl ClientState {
+    pub(crate) fn prepare_single_v13_food(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedFood>, StateError> {
+        if self.setup.as_ref().is_none_or(|s| s.protocol != 13)
+            || !matches!(command.first(), Some(b'F' | b'f' | b'b'))
+        {
+            return Ok(None);
+        }
+        let raw = v13::decode(command, DecodeAdmission::ClientPresentation)
+            .map_err(|_| StateError::InvalidPacket(command[0]))?;
+        let setup = self.setup.as_ref().expect("selected protocol");
+        match raw {
+            Legacy::FoodSpawn(raw) => {
+                let mut prepared =
+                    self.prepare_legacy_food(setup, raw.position, raw.size, raw.color, raw.rapid)?;
+                prepared.update_added_cache = true;
+                Ok(Some(prepared))
+            }
+            Legacy::FoodBatch(raw) if raw.foods().len() == 1 => {
+                let food = raw.foods().next().expect("one food");
+                self.prepare_legacy_food(setup, food.position, food.size, food.color, true)
+                    .map(Some)
+            }
+            _ => Ok(None),
+        }
+    }
+
     pub(super) fn apply_v13(
         &mut self,
         command: CommandRef<'_>,
@@ -220,6 +248,19 @@ impl ClientState {
         color: u8,
         rapid: bool,
     ) -> Result<FoodSpawnInput, StateError> {
+        let prepared = self.prepare_legacy_food(setup, xy, size, color, rapid)?;
+        self.foods.insert(prepared.spawn.key, prepared.food);
+        Ok(prepared.spawn)
+    }
+
+    fn prepare_legacy_food(
+        &self,
+        setup: &Setup,
+        xy: [u16; 2],
+        size: u8,
+        color: u8,
+        rapid: bool,
+    ) -> Result<PreparedFood, StateError> {
         // Keep exact integer coordinates as keys: quantizing onto 19's 256-cell
         // sector grid can merge distinct 13 pellets in a 300-unit sector.
         let key = legacy_food_key(xy);
@@ -231,23 +272,23 @@ impl ClientState {
             x: f64::from(xy[0]),
             y: f64::from(xy[1]),
         };
-        self.foods.insert(
-            key,
-            Food {
+        Ok(PreparedFood {
+            update_added_cache: false,
+            food: Food {
                 position: centered(setup, absolute_position.x, absolute_position.y)?,
                 size: f64::from(size) / 5.,
                 color,
                 sector,
             },
-        );
-        Ok(FoodSpawnInput {
-            key,
-            sector,
-            absolute_position,
-            size_byte: size,
-            base_size: f64::from(size) / 5.,
-            raw_color: color,
-            rapid,
+            spawn: FoodSpawnInput {
+                key,
+                sector,
+                absolute_position,
+                size_byte: size,
+                base_size: f64::from(size) / 5.,
+                raw_color: color,
+                rapid,
+            },
         })
     }
 }

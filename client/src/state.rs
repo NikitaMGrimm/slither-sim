@@ -128,6 +128,13 @@ pub struct Food {
     pub sector: (u8, u8),
 }
 
+/// Validated received value awaiting presentation admission before publication.
+pub(crate) struct PreparedFood {
+    pub spawn: FoodSpawnInput,
+    food: Food,
+    update_added_cache: bool,
+}
+
 /// Outcome of one committed frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FrameReport {
@@ -1221,6 +1228,69 @@ impl ClientState {
         Ok(())
     }
 
+    pub(crate) fn prepare_single_food(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedFood>, StateError> {
+        let Some(setup) = self.setup.as_ref() else {
+            return Ok(None);
+        };
+        if !matches!(command.first(), Some(b'F' | b'f' | b'b')) {
+            return Ok(None);
+        }
+        match setup.protocol {
+            13 => self.prepare_single_v13_food(command),
+            19 => {
+                let raw = v19::decode(command, DecodeAdmission::ClientPresentation)
+                    .map_err(|_| StateError::InvalidPacket(command[0]))?;
+                match raw {
+                    Message::FoodSpawn(raw) => {
+                        let sector = raw
+                            .sector
+                            .map(|s| (s[0], s[1]))
+                            .or(self.added_sector)
+                            .ok_or(StateError::MissingSector)?;
+                        let mut prepared = self.prepare_food(
+                            setup,
+                            sector,
+                            (raw.offset[0], raw.offset[1]),
+                            raw.size,
+                            raw.color.unwrap_or(self.added_color),
+                            raw.rapid,
+                        )?;
+                        prepared.update_added_cache = true;
+                        Ok(Some(prepared))
+                    }
+                    Message::FoodSector(raw) if raw.foods().len() == 1 => {
+                        let food = raw.foods().next().expect("one food");
+                        self.prepare_food(
+                            setup,
+                            (raw.sector[0], raw.sector[1]),
+                            (food.offset[0], food.offset[1]),
+                            food.size,
+                            food.color,
+                            true,
+                        )
+                        .map(Some)
+                    }
+                    _ => Ok(None),
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+
+    pub(crate) fn commit_single_food(&mut self, prepared: PreparedFood, elapsed: Option<u16>) {
+        if prepared.update_added_cache {
+            self.added_sector = Some(prepared.spawn.sector);
+            self.added_color = prepared.spawn.raw_color;
+        }
+        self.foods.insert(prepared.spawn.key, prepared.food);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
     fn insert_food(
         &mut self,
         setup: &Setup,
@@ -1230,6 +1300,20 @@ impl ClientState {
         color: u8,
         rapid: bool,
     ) -> Result<FoodSpawnInput, StateError> {
+        let prepared = self.prepare_food(setup, sector, offset, size, color, rapid)?;
+        self.foods.insert(prepared.spawn.key, prepared.food);
+        Ok(prepared.spawn)
+    }
+
+    fn prepare_food(
+        &self,
+        setup: &Setup,
+        sector: (u8, u8),
+        offset: (u8, u8),
+        size: u8,
+        color: u8,
+        rapid: bool,
+    ) -> Result<PreparedFood, StateError> {
         let (rx, ry) = offset;
         let key = food_key(sector, rx, ry);
         if !self.foods.contains_key(&key) && self.foods.len() >= MAX_FOODS {
@@ -1241,26 +1325,26 @@ impl ClientState {
             (f64::from(sector.0) + f64::from(rx) / 256.) * unit,
             (f64::from(sector.1) + f64::from(ry) / 256.) * unit,
         )?;
-        self.foods.insert(
-            key,
-            Food {
+        Ok(PreparedFood {
+            update_added_cache: false,
+            food: Food {
                 position,
                 size: f64::from(size) / 5.,
                 color,
                 sector,
             },
-        );
-        Ok(FoodSpawnInput {
-            key,
-            sector,
-            absolute_position: Point {
-                x: f64::from(rx) * (unit / 256.) + f64::from(sector.0) * unit,
-                y: f64::from(ry) * (unit / 256.) + f64::from(sector.1) * unit,
+            spawn: FoodSpawnInput {
+                key,
+                sector,
+                absolute_position: Point {
+                    x: f64::from(rx) * (unit / 256.) + f64::from(sector.0) * unit,
+                    y: f64::from(ry) * (unit / 256.) + f64::from(sector.1) * unit,
+                },
+                size_byte: size,
+                base_size: f64::from(size) / 5.,
+                raw_color: color,
+                rapid,
             },
-            size_byte: size,
-            base_size: f64::from(size) / 5.,
-            raw_color: color,
-            rapid,
         })
     }
 

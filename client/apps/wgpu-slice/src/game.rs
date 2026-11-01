@@ -770,6 +770,52 @@ impl LocalGame {
             })
             .collect::<Result<_>>()?;
         let plan = session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        if decoded.command_count() == 1
+            && matches!(commands[0].opcode, b'F' | b'f' | b'b')
+            && self
+                .client
+                .received()
+                .setup
+                .as_ref()
+                .is_some_and(|s| matches!(s.protocol, 13 | 19))
+        {
+            // A single food spawn has no HUD/Setup output. Admit its empty
+            // session journal before the core's atomic append; HUD histories
+            // remain unchanged. See tests/food_ingress.rs for the flood
+            // regression: copying the growing world blocks later moves/pongs.
+            session.match_report(&[], 0).map_err(|e| e.0)?;
+            session.commit_controls().map_err(|e| e.0)?;
+            let rng = Cell::new(self.rng);
+            let applied = self
+                .client
+                .try_apply_single_food::<Ingress, _>(bytes, ElapsedHeader::Absent, |spawn, _| {
+                    let unit = || {
+                        let state =
+                            rng.get().wrapping_mul(1664525).wrapping_add(1013904223) & 0xffff_ffff;
+                        rng.set(state);
+                        #[cfg(feature = "feel-trace")]
+                        if let Some(trace) = &self.trace {
+                            trace.random("factory-unit", state as f64 / 4294967296.);
+                        }
+                        state as f64 / 4294967296.
+                    };
+                    Ok(self.bank.food(spawn.raw_color, [unit(), unit()]))
+                })
+                .map_err(|e| e.0)?;
+            if applied.is_some() {
+                self.session = session;
+                self.rng = rng.get();
+                #[cfg(feature = "feel-trace")]
+                if self.trace.is_some() {
+                    self.ingress_observations.push(now);
+                }
+                return Ok(());
+            }
+            // Batches and compositions without retained food use the ordinary
+            // transaction, including its complete session plan.
+            session = self.session.clone();
+            session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        }
         let guards: Vec<_> = plan
             .guards
             .iter()

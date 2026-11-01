@@ -953,6 +953,86 @@ impl AnimatedClient {
         }
     }
 
+    /// Apply a singleton F/f/b frame without copying the existing world. Returns
+    /// `None` for batches, other commands/protocols or a disabled factory lane.
+    /// Framing, coordinates and received capacity are checked before the factory;
+    /// a failed factory or presentation spawn leaves all model state unchanged.
+    /// Individual food floods otherwise copy every retained food per message,
+    /// delaying movement and pongs behind the initial listing.
+    pub fn try_apply_single_food<E, G>(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+        mut resolve_food: G,
+    ) -> Result<Option<FrameReport>, E>
+    where
+        E: From<ClientPresentationError>,
+        G: FnMut(&FoodSpawnInput, f64) -> Result<FoodFactory, E>,
+    {
+        if !self.food_enabled
+            || self
+                .received
+                .setup
+                .as_ref()
+                .is_none_or(|s| !matches!(s.protocol, 13 | 19))
+        {
+            return Ok(None);
+        }
+        let decoded = crate::protocol::read_frame(bytes, header)
+            .map_err(StateError::from)
+            .map_err(ClientPresentationError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let command = decoded.commands().next().expect("one command");
+        let Some(prepared) = self
+            .received
+            .prepare_single_food(command.bytes)
+            .map_err(ClientPresentationError::from)?
+        else {
+            return Ok(None);
+        };
+        self.apply_prepared_food(prepared, decoded.prefix(), &mut resolve_food)
+            .map(Some)
+    }
+
+    fn apply_prepared_food<E, G>(
+        &mut self,
+        prepared: crate::state::PreparedFood,
+        elapsed: Option<u16>,
+        mut resolve_food: G,
+    ) -> Result<FrameReport, E>
+    where
+        E: From<ClientPresentationError>,
+        G: FnMut(&FoodSpawnInput, f64) -> Result<FoodFactory, E>,
+    {
+        let spawn = &prepared.spawn;
+        let zoom = self.camera.automatic_zoom();
+        let factory = resolve_food(spawn, zoom)?;
+        // FoodWorld::spawn validates and reserves before its atomic append.
+        // Publishing the already validated received value cannot fail afterward.
+        self.foods
+            .spawn(
+                FoodSpawn {
+                    key: spawn.key,
+                    sector: spawn.sector,
+                    position: spawn.absolute_position,
+                    base_size: spawn.base_size,
+                    raw_color: spawn.raw_color,
+                    rapid: spawn.rapid,
+                },
+                factory.input(zoom),
+            )
+            .map_err(ClientPresentationError::from)?;
+        self.received.commit_single_food(prepared, elapsed);
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(FrameReport {
+            commands: 1,
+            ignored: 0,
+        })
+    }
+
     /// Commit a complete received frame and its presentation events together.
     /// Elapsed headers are retained by received state; anchor extrapolation is zero.
     /// Setup updates configuration without clearing the world, camera or fractional clock.
@@ -1968,6 +2048,53 @@ impl AnimatedClient {
     {
         if plan.is_some() && !self.score_enabled {
             return Err(ClientPresentationError::ScoreTrackingRequired.into());
+        }
+        // The ordinary factory APIs (including Canvas) share the same atomic
+        // append. A mode change or multi-command packet retains full staging.
+        if self.food_enabled
+            && (!enable_appearance || self.appearance_enabled)
+            && (!enable_face_presentation || self.face_presentation_enabled)
+            && (!enable_accessory_presentation || self.accessory_presentation_enabled)
+            && (!enable_prey || self.prey_enabled)
+        {
+            let decoded = crate::protocol::read_frame(bytes, header)
+                .map_err(StateError::from)
+                .map_err(ClientPresentationError::from)?;
+            if decoded.command_count() == 1 {
+                let command = decoded.commands().next().expect("one command");
+                if matches!(command.bytes[0], b'F' | b'f' | b'b') {
+                    if let Some(plan) = plan {
+                        plan.validate(decoded.commands())
+                            .map_err(StateError::Hud)
+                            .map_err(ClientPresentationError::from)?;
+                    }
+                    if let Some(prepared) = self
+                        .received
+                        .prepare_single_food(command.bytes)
+                        .map_err(ClientPresentationError::from)?
+                    {
+                        let report = FrameReport {
+                            commands: 1,
+                            ignored: 0,
+                        };
+                        let journal = plan
+                            .map(|p| HudIngressReport::new(report, p.schema, 0))
+                            .transpose()
+                            .map_err(StateError::Hud)
+                            .map_err(ClientPresentationError::from)?;
+                        let report = self.apply_prepared_food::<E, _>(
+                            prepared,
+                            decoded.prefix(),
+                            |spawn, zoom| {
+                                resolve_food(spawn, zoom)?.ok_or_else(|| {
+                                    ClientPresentationError::FoodFactoryRequired.into()
+                                })
+                            },
+                        )?;
+                        return Ok((report, journal));
+                    }
+                }
+            }
         }
         let mut collector = plan.map(|plan| HudCommandCollector {
             plan,
@@ -4476,6 +4603,184 @@ mod resolved_draw_tests {
         assert_eq!(actual, expected);
         // Debug also distinguishes finite signed zero throughout the owned state.
         assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+    }
+
+    #[test]
+    fn single_v13_food_matches_the_full_transaction_including_duplicates_and_elapsed() {
+        let mut p = setup();
+        p[23] = 13;
+        let mut fast = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut fast, &p);
+        let mut ordinary = fast.clone();
+        for (i, code) in b"FfbFfb".iter().copied().enumerate() {
+            let command = vec![code, 41, 4, 76, 3, 232, (20 + i) as u8];
+            assert_single_food_matches_transaction(&mut fast, &mut ordinary, &command, i % 2 == 1);
+        }
+        assert_eq!(fast.received.foods.len(), 1);
+        assert_eq!(fast.foods.foods().len(), 6);
+    }
+
+    fn assert_single_food_matches_transaction(
+        fast: &mut AnimatedClient,
+        ordinary: &mut AnimatedClient,
+        command: &[u8],
+        timed: bool,
+    ) {
+        let mut bytes = bundle(&[command.to_vec()]);
+        // The opaque tail forces the existing multi-command transaction. Only
+        // its documented bookkeeping differs, so normalize those two counters.
+        let mut reference = bundle(&[command.to_vec(), vec![b'?']]);
+        let header = if timed {
+            bytes.splice(..0, [0x12, 0x34]);
+            reference.splice(..0, [0x12, 0x34]);
+            ElapsedHeader::TwoBytes
+        } else {
+            ElapsedHeader::Absent
+        };
+        let report = fast
+            .try_apply_single_food(&bytes, header, factory)
+            .unwrap()
+            .unwrap();
+        let expected = ordinary
+            .apply_frame_with_factories(
+                &reference,
+                header,
+                |_| Ok(PairedFaceGeometry::default()),
+                factory,
+            )
+            .unwrap();
+        assert_eq!(
+            expected,
+            FrameReport {
+                commands: 2,
+                ignored: 1
+            }
+        );
+        assert_eq!(
+            report,
+            FrameReport {
+                commands: 1,
+                ignored: 0
+            }
+        );
+        ordinary.received.commands_applied -= 1;
+        ordinary.received.ignored_commands -= 1;
+        assert_exact_client(fast, ordinary);
+    }
+
+    #[test]
+    fn single_v19_food_matches_all_compact_cache_forms_and_duplicate_spawns() {
+        let mut fast = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut fast, &setup());
+        let mut ordinary = fast.clone();
+        for (i, command) in [
+            vec![b'F', 31, 32, 8, 2, 3, 25],
+            vec![b'f', 11, 12, 10, 20, 41, 20],
+            vec![b'b', 11, 12, 11, 21, 21],
+            vec![b'F', 41, 42, 3, 4, 5, 26],
+            vec![b'f', 12, 22, 5, 22],
+            vec![b'b', 12, 22, 23],
+            vec![b'f', 13, 14, 12, 22, 9, 24],
+            vec![b'f', 12, 22, 0],
+            vec![b'b', 12, 22, 255],
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert_single_food_matches_transaction(&mut fast, &mut ordinary, &command, i % 2 == 1);
+        }
+        assert_eq!(fast.foods.foods().len(), 9);
+        assert_eq!(fast.received.foods.len(), 6);
+    }
+
+    #[test]
+    fn single_v13_food_rejects_before_publish_and_declines_other_transactions() {
+        let mut p = setup();
+        p[23] = 13;
+        let mut client = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut client, &p);
+        let before = client.clone();
+        let food = vec![b'f', 7, 4, 76, 3, 232, 20];
+        assert!(
+            client
+                .try_apply_single_food(&food, ElapsedHeader::Absent, |_, _| Err(
+                    ClientPresentationError::FoodFactoryRequired
+                ))
+                .is_err()
+        );
+        assert_exact_client(&client, &before);
+        assert!(
+            client
+                .try_apply_single_food::<ClientPresentationError, _>(
+                    &food,
+                    ElapsedHeader::Absent,
+                    |spawn, zoom| {
+                        let mut result = factory(spawn, zoom)?;
+                        result.random_phase_unit = f64::NAN;
+                        Ok(result)
+                    }
+                )
+                .is_err()
+        );
+        assert_exact_client(&client, &before);
+        let mut calls = 0;
+        assert!(
+            client
+                .try_apply_single_food(b"f", ElapsedHeader::Absent, |s, z| {
+                    calls += 1;
+                    factory(s, z)
+                })
+                .is_err()
+        );
+        assert_eq!(calls, 0);
+        assert_exact_client(&client, &before);
+        assert!(
+            client
+                .try_apply_single_food(
+                    &[b'f', 7, 255, 255, 255, 255, 20],
+                    ElapsedHeader::Absent,
+                    |s, z| {
+                        calls += 1;
+                        factory(s, z)
+                    }
+                )
+                .is_err()
+        );
+        assert_eq!(calls, 0);
+        assert_exact_client(&client, &before);
+        for bytes in [bundle(&[food.clone(), food.clone()]), b"p".to_vec()] {
+            assert!(
+                client
+                    .try_apply_single_food(&bytes, ElapsedHeader::Absent, factory)
+                    .unwrap()
+                    .is_none()
+            );
+            assert_exact_client(&client, &before);
+        }
+        let mut disabled = AnimatedClient::new(0.).unwrap();
+        apply(&mut disabled, &setup());
+        let saved = disabled.clone();
+        assert!(
+            disabled
+                .try_apply_single_food(&food, ElapsedHeader::Absent, factory)
+                .unwrap()
+                .is_none()
+        );
+        assert_exact_client(&disabled, &saved);
+        let mut uncached = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut uncached, &setup());
+        apply_factories(&mut uncached, &[b'F', 31, 32, 8, 2, 3, 25]);
+        let saved = uncached.clone();
+        assert!(
+            uncached
+                .try_apply_single_food(&[b'f', 12, 22, 20], ElapsedHeader::Absent, |s, z| {
+                    calls += 1;
+                    factory(s, z)
+                })
+                .is_err()
+        );
+        assert_eq!(calls, 0);
+        assert_exact_client(&uncached, &saved);
     }
 
     #[test]
