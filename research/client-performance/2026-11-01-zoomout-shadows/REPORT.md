@@ -3,7 +3,7 @@
 **Historical retained-binary study; new measurements pending.** The logical-pixel
 conversion and non-default observer feature are now implemented and have focused
 regressions. The 08:00 A/A and reversed B/A data did **not** clear the AMD merge
-blocker. Three newly built, #412-based binaries await the booked 10:10�10:50
+blocker. Three newly built, #412-based binaries await the booked 10:10–10:50
 validation/remeasure window; compiler wait may extend it only to 11:05. Input
 validation precedes timing and any unequal unaffected input stops timing.
 
