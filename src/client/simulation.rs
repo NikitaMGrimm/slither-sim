@@ -142,6 +142,8 @@ pub struct SimulatorBackend {
     /// Connections opened so far; numbers session IDs.
     connections: u32,
     session_key: u32,
+    #[cfg(feature = "latency-rig")]
+    latency_truth: Option<super::latency_truth::Recorder>,
 }
 
 /// Only hosted socket slots override the simulation's link model. Native
@@ -234,6 +236,8 @@ impl SimulatorBackend {
             record: None,
             connections: 0,
             session_key: seed.rotate_left(16) ^ 0x5e55_1d00,
+            #[cfg(feature = "latency-rig")]
+            latency_truth: None,
         };
         backend
             .food_presentation

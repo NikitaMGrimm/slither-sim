@@ -21,6 +21,26 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
+    #[cfg(feature = "latency-rig")]
+    pub(crate) fn set_latency_truth(&mut self, recorder: crate::client::latency_truth::Recorder) {
+        self.backend.latency_truth = Some(recorder);
+    }
+
+    #[cfg(feature = "latency-rig")]
+    pub(crate) fn start_latency_truth(&mut self, epoch: std::time::Instant) {
+        if let Some(recorder) = &mut self.backend.latency_truth {
+            recorder.start(epoch);
+        }
+    }
+
+    #[cfg(feature = "latency-rig")]
+    pub(crate) fn latency_truth_finished(&mut self, now: std::time::Instant) -> bool {
+        self.backend
+            .latency_truth
+            .as_mut()
+            .is_some_and(|r| r.finished(now))
+    }
+
     /// Called by the host before any slots connect; bot slots keep config.latency.
     pub(crate) fn set_player_latency(&mut self, slots: usize, config: LatencyConfig) {
         self.backend.player_latency = PlayerLatency { slots, config };

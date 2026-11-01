@@ -14,6 +14,9 @@ mod forager;
 pub use forager::ForagerBot;
 pub mod hud;
 pub mod latency;
+#[cfg(feature = "latency-rig")]
+#[doc(hidden)]
+pub mod latency_truth;
 pub mod minimap;
 pub mod network;
 mod presentation;

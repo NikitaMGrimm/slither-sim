@@ -2,6 +2,8 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "latency-rig")]
+use slither_sim::client::latency_truth;
 use slither_sim::client::{Host, HostConfig, RunningHost};
 
 const HOST_USAGE: &str = "Usage: slither-sim host [--bind IP:PORT] [--config FILE] [--stats SECONDS]\n\n\
@@ -23,12 +25,33 @@ fn command_exit(result: Result<(), impl std::fmt::Display>) -> ExitCode {
 struct HostOptions {
     config: HostConfig,
     stats_interval: Option<Duration>,
+    #[cfg(feature = "latency-rig")]
+    latency: Option<LatencyOptions>,
+}
+
+#[cfg(feature = "latency-rig")]
+struct LatencyOptions {
+    path: std::path::PathBuf,
+    seconds: Duration,
+}
+
+fn host_usage() -> String {
+    #[cfg(feature = "latency-rig")]
+    return format!(
+        "{HOST_USAGE}\n    Measurement only: --latency-truth NEWFILE [--latency-seconds SECONDS (default 60, max 180)]."
+    );
+    #[cfg(not(feature = "latency-rig"))]
+    HOST_USAGE.to_owned()
 }
 
 fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     let mut bind = None;
     let mut file = None;
     let mut stats_interval = None;
+    #[cfg(feature = "latency-rig")]
+    let mut latency_path = None;
+    #[cfg(feature = "latency-rig")]
+    let mut latency_seconds = None;
     let mut args = args.iter().copied();
     while let Some(arg) = args.next() {
         match arg {
@@ -61,6 +84,25 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
                 }
                 stats_interval = Some(interval);
             }
+            #[cfg(feature = "latency-rig")]
+            "--latency-truth" => {
+                if latency_path.is_some() {
+                    return Err("Repeated --latency-truth".into());
+                }
+                latency_path = Some(args.next().ok_or("--latency-truth needs a new file")?);
+            }
+            #[cfg(feature = "latency-rig")]
+            "--latency-seconds" => {
+                if latency_seconds.is_some() {
+                    return Err("Repeated --latency-seconds".into());
+                }
+                let seconds = args
+                    .next()
+                    .ok_or("--latency-seconds needs seconds")?
+                    .parse::<f64>()
+                    .map_err(|_| "--latency-seconds needs seconds")?;
+                latency_seconds = Some(latency_truth::duration(seconds)?);
+            }
             _ => return Err(format!("Unknown host argument: {arg}")),
         }
     }
@@ -75,9 +117,33 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
         config.bind = bind.parse().map_err(|_| "--bind needs a literal IP:PORT")?;
     }
     config.validate()?;
+    #[cfg(feature = "latency-rig")]
+    let latency = match latency_path {
+        Some(path) => {
+            let seconds =
+                latency_seconds.unwrap_or(latency_truth::duration(latency_truth::DEFAULT_SECONDS)?);
+            latency_truth::validate(
+                std::path::Path::new(path),
+                config.bind,
+                seconds,
+                config.simulation.world.dt,
+                config.players.max + config.bots.count,
+            )?;
+            Some(LatencyOptions {
+                path: path.into(),
+                seconds,
+            })
+        }
+        None if latency_seconds.is_some() => {
+            return Err("--latency-seconds requires --latency-truth".into());
+        }
+        None => None,
+    };
     Ok(Some(HostOptions {
         config,
         stats_interval,
+        #[cfg(feature = "latency-rig")]
+        latency,
     }))
 }
 
@@ -157,11 +223,11 @@ fn host(args: &[&str]) -> ExitCode {
     let options = match parse_host_args(args) {
         Ok(Some(options)) => options,
         Ok(None) => {
-            println!("{HOST_USAGE}");
+            println!("{}", host_usage());
             return ExitCode::SUCCESS;
         }
         Err(error) => {
-            eprintln!("{error}\n{HOST_USAGE}");
+            eprintln!("{error}\n{}", host_usage());
             return ExitCode::from(2);
         }
     };
@@ -170,6 +236,12 @@ fn host(args: &[&str]) -> ExitCode {
     }
     let bot_slots = options.config.bots.count;
     let result = Host::bind(options.config).and_then(|host| {
+        #[cfg(feature = "latency-rig")]
+        let host = if let Some(latency) = options.latency {
+            host.with_latency_truth(&latency.path, latency.seconds)?
+        } else {
+            host
+        };
         eprintln!("Listening on ws://{}/slither", host.local_addr()?);
         if let Some(interval) = options.stats_interval {
             let running = host.start()?;
@@ -253,6 +325,125 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "latency-rig")]
+    fn truth_path() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "slither-truth-args-{}-{}.jsonl",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    #[cfg(feature = "latency-rig")]
+    #[test]
+    fn latency_args_are_opt_in_bounded_and_loopback_only() {
+        assert!(parse_host_args(&[]).unwrap().unwrap().latency.is_none());
+        let path = truth_path();
+        let file = path.to_str().unwrap();
+        let options = parse_host_args(&["--latency-truth", file])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.latency.unwrap().seconds, Duration::from_secs(60));
+        let options = parse_host_args(&[
+            "--latency-truth",
+            file,
+            "--latency-seconds",
+            "180",
+            "--bind",
+            "[::1]:0",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(options.latency.unwrap().seconds, Duration::from_secs(180));
+        assert!(
+            !path.exists(),
+            "argument validation must not create an artifact"
+        );
+        for bind in ["0.0.0.0:0", "[::]:0", "192.0.2.1:0"] {
+            assert!(parse_host_args(&["--latency-truth", file, "--bind", bind]).is_err());
+        }
+        for value in ["0", "-1", "NaN", "inf", "180.1", "1e-100", "bad"] {
+            assert!(
+                parse_host_args(&["--latency-truth", file, "--latency-seconds", value]).is_err()
+            );
+        }
+        for args in [
+            vec!["--latency-truth"],
+            vec!["--latency-seconds"],
+            vec!["--latency-seconds", "1"],
+            vec!["--latency-truth", file, "--latency-truth", file],
+            vec![
+                "--latency-truth",
+                file,
+                "--latency-seconds",
+                "1",
+                "--latency-seconds",
+                "2",
+            ],
+        ] {
+            assert!(parse_host_args(&args).is_err());
+        }
+        std::fs::write(&path, b"preserve me").unwrap();
+        assert!(parse_host_args(&["--latency-truth", file]).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"preserve me");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(not(feature = "latency-rig"))]
+    #[test]
+    fn default_binary_has_no_latency_arguments() {
+        assert!(parse_host_args(&["--latency-truth", "unused.jsonl"]).is_err());
+        assert!(parse_host_args(&["--latency-seconds", "1"]).is_err());
+        assert!(!host_usage().contains("latency"));
+    }
+
+    #[cfg(feature = "latency-rig")]
+    #[test]
+    fn finite_latency_host_stops_joins_and_exports_without_connections() {
+        for max_tick in [None, Some(0.014)] {
+            let path = truth_path();
+            let config = HostConfig {
+                bind: "127.0.0.1:0".parse().unwrap(),
+                bots: slither_sim::client::BotConfig {
+                    count: 0,
+                    ..Default::default()
+                },
+                simulation: slither_sim::client::SimulationConfig {
+                    world: slither_sim::Config::sandbox(),
+                    ..Default::default()
+                },
+                max_tick,
+                ..Default::default()
+            };
+            let running = Host::bind(config)
+                .unwrap()
+                .with_latency_truth(&path, Duration::from_millis(40))
+                .unwrap()
+                .start()
+                .unwrap();
+            running.wait().unwrap();
+            let text = std::fs::read_to_string(&path).unwrap();
+            let rows: Vec<serde_json::Value> = text
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+            assert_eq!(rows[0]["schema"], "host-latency-truth-v1");
+            assert_eq!(rows.last().unwrap()["complete"], true);
+            assert!(rows.last().unwrap()["ticks"].as_u64().unwrap() > 0);
+            assert_eq!(rows.last().unwrap()["ticks"], rows.len() - 2);
+            for row in &rows[1..rows.len() - 1] {
+                assert_eq!(row["heads"].as_array().unwrap().len(), 4);
+                assert_eq!(row["heads"][0][0], 0);
+                assert_eq!(row["heads"][0][1], 0);
+                assert_eq!(row["heads"][0][2], false);
+            }
+            std::fs::remove_file(path).unwrap();
+        }
+    }
 
     #[test]
     fn host_stats_are_opt_in_and_accept_fractional_seconds() {

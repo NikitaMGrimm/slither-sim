@@ -73,6 +73,44 @@ reason sent to the client. HTTP failures use fixed labels because there is no
 WebSocket close frame. Counts contain no addresses, nicknames or request data;
 client-initiated disconnects and rejections after login are excluded.
 
+### Measurement-only head truth
+
+The nondefault `latency-rig` feature enables an unstable, local measurement tool:
+`cargo build --release --locked --features latency-rig --bin slither-sim`, then
+`slither-sim host --bind 127.0.0.1:0 --config arena.json --latency-truth NEWFILE
+--latency-seconds 60`. Normal builds expose neither argument. Recording requires
+a loopback bind and fresh file; seconds default to 60 and must be in `(0, 180]`.
+Tick/slot bounds are checked before allocating at most 256 MiB of scalar storage,
+which is touched before startup. No recorder allocation, lock or file I/O occurs
+in a tick. The feature's hidden host constructor and validation helpers have no
+stability or semver promise.
+
+JSONL begins with `type: "metadata"`, `schema: "host-latency-truth-v1"`,
+`complete: false`, `duration_seconds`, `configured_dt`, `slot_count`,
+`tick_capacity`, `buffer_bytes`, `clock_source` and `qpc_frequency` (decimal string
+on Windows, otherwise null). The clock source is `system-time-unix+instant`,
+with `+windows-qpc` on Windows. Each `type: "tick"` row has `tick` (one-based),
+`simulation_time` (seconds), `wall_radius`, nullable `pit_radius`,
+`unix_before_ns`, `unix_after_ns`, `monotonic_before_ns`, `monotonic_after_ns`,
+nullable `qpc_before`/`qpc_after`, and `heads`. All clock integers are decimal
+strings. Monotonic offsets start at host startup. Each sample reads Instant,
+SystemTime, then optional QPC; before/after samples bracket `world.step`.
+UNIX time can jump; use monotonic offsets for spacing and shared QPC for Windows
+cross-process comparisons, retaining clock-mapping uncertainty.
+
+Immediately after each successful step, before presentation/encoding, `heads`
+copies every slot as `[wire_slot_id, life, alive, x, y, heading, speed, boost]`.
+Wire IDs are zero-based; `life` is the current slot life counter, including after
+reuse. Coordinates/radii use world units about the origin, heading is radians,
+speed is world units/second, and boost is actual active boost. Dead/unoccupied
+slots remain present. Food, bodies, names and packets are excluded.
+At the finite wall-duration boundary the host stops and joins all its threads,
+then exports tick rows and a final `type: "summary"` with `complete`, `reason`,
+`ticks` and total `heads`. Only a final `complete: true` makes a full capture;
+early stop, overflow, clock/tick loss or host/export failure leaves an incomplete
+prefix or summary. Store full recordings outside Git. Synthetic tests establish
+the recorder contract; instrumentation overhead and latency are unmeasured.
+
 ### Presets
 
 Select a world with `simulation.world.preset`; see

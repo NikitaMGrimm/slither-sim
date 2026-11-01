@@ -226,9 +226,24 @@ impl SimulatorBackend {
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
         let radius = self.world.radius();
+        #[cfg(feature = "latency-rig")]
+        let truth_before = self.latency_truth.as_mut().map(|r| r.stamp()).transpose()?;
         self.world
             .step(&actions)
             .map_err(|error| error.to_string())?;
+        #[cfg(feature = "latency-rig")]
+        if let Some(recorder) = &mut self.latency_truth {
+            let after = recorder.stamp()?;
+            // Capture the successful physics result before presentation or encoding.
+            // Slot life, not connection generation, identifies a reused wire ID.
+            recorder.record(
+                self.tick + 1,
+                truth_before.unwrap(),
+                after,
+                &self.world,
+                self.slots.iter().map(|s| s.life),
+            )?;
+        }
         // Mirror update_radius's food removal before births and pickups,
         // including the smaller live pit edge in pit-only food worlds.
         if (self.world.config().food_only_inside_pit && self.world.radius() != radius)
