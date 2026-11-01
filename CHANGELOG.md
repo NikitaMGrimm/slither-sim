@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.9.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.2...v0.9.0) - 2026-11-01
+
 ### Changed
 
 - The simulator's networking code now reads messages through
