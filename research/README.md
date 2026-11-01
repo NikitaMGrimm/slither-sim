@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Received snapshots in packet transactions](client-performance/2026-11-01-received-snapshots/REPORT.md) | Share immutable received state and stage it once per transaction; exact replay/rollback controls, bounded per-run summaries and remaining burst costs. |
 | Client performance | [Singleton motion transactions](client-performance/2026-11-01-motion-transactions/REPORT.md) | Stage only the touched motion object; exact protocol/output and allocation controls, with incremental replay p95 attribution on top of food COW. |
 | Client performance | [Dense food transaction snapshots](client-performance/2026-11-01-food-snapshots/REPORT.md) | Restricted community-input replay and bounded offscreen diagnostics; share unchanged food snapshots, with allocation/output controls and remaining frame-budget costs. |
 | Client | [Bounded 512-snake capacity](client-performance/2026-11-01-snake-capacity/REPORT.md) | Authored admission, maximum-body storage, full-map draw and legacy replay controls; headless elapsed-time/allocation workload, with loopback subscriptions reported separately. |

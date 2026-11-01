@@ -786,7 +786,9 @@ pub struct AnimatedClient {
     trace: Option<crate::feel_trace::Recorder>,
     #[cfg(feature = "feel-trace")]
     trace_setup_heads: Option<crate::feel_trace::PacketHeads>,
-    received: ClientState,
+    // Keep the pre-transaction received state for rollback and callbacks without
+    // copying every retained food key in each nested ingress snapshot.
+    received: Arc<ClientState>,
     announcements_enabled: bool,
     announcements: AnnouncementState,
     minimap_enabled: bool,
@@ -840,7 +842,7 @@ impl AnimatedClient {
             trace: None,
             #[cfg(feature = "feel-trace")]
             trace_setup_heads: None,
-            received: ClientState::default(),
+            received: Arc::default(),
             announcements_enabled: false,
             announcements: AnnouncementState::default(),
             minimap_enabled: false,
@@ -879,7 +881,7 @@ impl AnimatedClient {
     /// camera position, background phase/baseline, caller follow preference and shared body-painter flag history. Use `new`
     /// to start a fresh timeline.
     pub fn reset(&mut self) {
-        self.received = ClientState::default();
+        self.received = Arc::default();
         self.clock.reset_lag();
         self.reset_camera();
         self.connected = false;
@@ -1211,8 +1213,7 @@ impl AnimatedClient {
             }
             changed = Some((index, snake));
         }
-        self.received
-            .commit_single_motion(prepared, decoded.prefix());
+        Arc::make_mut(&mut self.received).commit_single_motion(prepared, decoded.prefix());
         if let Some((index, snake)) = changed {
             self.entries[index].snake = snake;
         }
@@ -1253,7 +1254,7 @@ impl AnimatedClient {
                 factory.input(zoom),
             )
             .map_err(ClientPresentationError::from)?;
-        self.received.commit_single_food(prepared, elapsed);
+        Arc::make_mut(&mut self.received).commit_single_food(prepared, elapsed);
         #[cfg(feature = "feel-trace")]
         self.trace_boundary("update", None, None, None, None);
         Ok(FrameReport {
@@ -2330,47 +2331,26 @@ impl AnimatedClient {
             announcements: self.announcements_enabled,
             boundaries: Vec::new(),
         });
-        let mut received = self.received.clone();
         #[cfg(feature = "feel-trace")]
         let mut setup_heads = self
             .trace
             .as_ref()
             .and_then(|r| r.geometry_ids())
             .map(|ids| (ids, Vec::new()));
-        #[cfg(feature = "feel-trace")]
-        let traced = if let Some(heads) = &mut setup_heads {
-            Some(received.apply_frame_with_setup_packet_heads(
+        // The received reducer already builds an atomic candidate. Retain the
+        // committed snapshot for factory/Setup callbacks until presentation succeeds.
+        let (received, applied) = self
+            .received
+            .stage_frame_with_events(
                 bytes,
                 header,
                 self.score_enabled,
                 self.minimap_enabled,
                 collector.as_mut(),
-                heads,
-            ))
-        } else {
-            None
-        };
-        // Geometry alone opts into command-boundary snapshots. Ordinary callbacks
-        // must continue seeing the pre-transaction received state.
-        #[cfg(not(feature = "feel-trace"))]
-        let traced: Option<Result<crate::state::AppliedFrame, StateError>> = None;
-        let applied = if let Some(traced) = traced {
-            traced
-        } else if self.minimap_enabled {
-            received.apply_frame_with_minimap_events(
-                bytes,
-                header,
-                self.score_enabled,
-                collector.as_mut(),
+                #[cfg(feature = "feel-trace")]
+                setup_heads.as_mut(),
             )
-        } else if let Some(collector) = &mut collector {
-            received.apply_frame_with_hud_events(bytes, header, collector)
-        } else if self.score_enabled {
-            received.apply_frame_with_score_events(bytes, header)
-        } else {
-            received.apply_frame_with_events(bytes, header)
-        }
-        .map_err(ClientPresentationError::from)?;
+            .map_err(ClientPresentationError::from)?;
         #[cfg(feature = "feel-trace")]
         let mut setup_heads = setup_heads.into_iter().flat_map(|(_, heads)| heads);
         if self.minimap_enabled {
@@ -2413,7 +2393,7 @@ impl AnimatedClient {
             return Err(ClientPresentationError::PreyModeRequiresReset.into());
         }
         if applied.events.is_empty() && collector.is_none() {
-            self.received = received;
+            self.received = Arc::new(received);
             self.food_enabled |= enable_food;
             self.prey_enabled |= enable_prey;
             self.appearance_enabled |= enable_appearance;
@@ -2875,7 +2855,7 @@ impl AnimatedClient {
             }
             event_start = boundary.event_end;
         }
-        next.received = received;
+        next.received = Arc::new(received);
         next.sync_received_visual_tails();
         #[cfg(feature = "feel-trace")]
         next.trace_boundary("update", None, None, None, None);
@@ -5035,8 +5015,8 @@ mod resolved_draw_tests {
                 ignored: 0
             }
         );
-        ordinary.received.commands_applied -= 1;
-        ordinary.received.ignored_commands -= 1;
+        Arc::make_mut(&mut ordinary.received).commands_applied -= 1;
+        Arc::make_mut(&mut ordinary.received).ignored_commands -= 1;
         assert_exact_client(fast, ordinary);
     }
 
@@ -5313,12 +5293,12 @@ mod resolved_draw_tests {
             foods[0].snapshot().sources.indices,
             foods[1].snapshot().sources.indices
         );
-        let mut expected_received = draws[0].2.received.clone();
+        let mut expected_received = draws[0].2.received.as_ref().clone();
         expected_received
             .apply_frame(&bundle(&commands), ElapsedHeader::Absent)
             .unwrap();
-        assert_eq!(client.received, expected_received);
-        control.received = expected_received;
+        assert_eq!(*client.received, expected_received);
+        control.received = Arc::new(expected_received);
         assert_exact_client(&client, &control);
     }
 

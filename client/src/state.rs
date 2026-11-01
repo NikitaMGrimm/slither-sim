@@ -516,54 +516,34 @@ impl ClientState {
         Ok(AppliedFrame { report, events })
     }
 
-    /// Canonical score admission is private to the explicitly enabled native client.
-    pub(crate) fn apply_frame_with_score_events(
-        &mut self,
-        bytes: &[u8],
-        header: ElapsedHeader,
-    ) -> Result<AppliedFrame, StateError> {
-        let mut events = Vec::new();
-        let report = self.apply_transaction(bytes, header, Some(&mut events), true, false, None)?;
-        Ok(AppliedFrame { report, events })
-    }
-
-    pub(crate) fn apply_frame_with_hud_events(
-        &mut self,
-        bytes: &[u8],
-        header: ElapsedHeader,
-        collector: &mut HudCommandCollector<'_>,
-    ) -> Result<AppliedFrame, StateError> {
-        let mut events = Vec::new();
-        let report = self.apply_transaction(
-            bytes,
-            header,
-            Some(&mut events),
-            true,
-            false,
-            Some(collector),
-        )?;
-        Ok(AppliedFrame { report, events })
-    }
-
-    /// Minimap admission shares ordinary/score/HUD staging and event positions.
-    /// Selecting minimaps never implicitly admits score-adjustment commands.
-    pub(crate) fn apply_frame_with_minimap_events(
-        &mut self,
+    /// Build the received candidate once; the presentation transaction owns its
+    /// later commit or rejection. Command events and boundary captures stay ordered.
+    /// Minimap admission does not implicitly enable score-adjustment commands.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn stage_frame_with_events(
+        &self,
         bytes: &[u8],
         header: ElapsedHeader,
         score_enabled: bool,
-        collector: Option<&mut HudCommandCollector<'_>>,
-    ) -> Result<AppliedFrame, StateError> {
+        minimap_enabled: bool,
+        hud: Option<&mut HudCommandCollector<'_>>,
+        #[cfg(feature = "feel-trace")] setup_heads: Option<&mut (
+            [u16; 2],
+            Vec<crate::feel_trace::PacketHeads>,
+        )>,
+    ) -> Result<(Self, AppliedFrame), StateError> {
         let mut events = Vec::new();
-        let report = self.apply_transaction(
+        let (staged, report) = self.stage_transaction(
             bytes,
             header,
             Some(&mut events),
             score_enabled,
-            true,
-            collector,
+            minimap_enabled,
+            hud,
+            #[cfg(feature = "feel-trace")]
+            setup_heads,
         )?;
-        Ok(AppliedFrame { report, events })
+        Ok((staged, AppliedFrame { report, events }))
     }
 
     fn apply_transaction(
@@ -575,7 +555,7 @@ impl ClientState {
         minimap_enabled: bool,
         hud: Option<&mut HudCommandCollector<'_>>,
     ) -> Result<FrameReport, StateError> {
-        self.apply_transaction_inner(
+        let (staged, report) = self.stage_transaction(
             bytes,
             header,
             events,
@@ -584,36 +564,14 @@ impl ClientState {
             hud,
             #[cfg(feature = "feel-trace")]
             None,
-        )
-    }
-
-    #[cfg(feature = "feel-trace")]
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn apply_frame_with_setup_packet_heads(
-        &mut self,
-        bytes: &[u8],
-        header: ElapsedHeader,
-        score_enabled: bool,
-        minimap_enabled: bool,
-        hud: Option<&mut HudCommandCollector<'_>>,
-        heads: &mut ([u16; 2], Vec<crate::feel_trace::PacketHeads>),
-    ) -> Result<AppliedFrame, StateError> {
-        let mut events = Vec::new();
-        let report = self.apply_transaction_inner(
-            bytes,
-            header,
-            Some(&mut events),
-            score_enabled,
-            minimap_enabled,
-            hud,
-            Some(heads),
         )?;
-        Ok(AppliedFrame { report, events })
+        *self = staged;
+        Ok(report)
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn apply_transaction_inner(
-        &mut self,
+    fn stage_transaction(
+        &self,
         bytes: &[u8],
         header: ElapsedHeader,
         mut events: Option<&mut Vec<PresentationEvent>>,
@@ -624,7 +582,7 @@ impl ClientState {
             [u16; 2],
             Vec<crate::feel_trace::PacketHeads>,
         )>,
-    ) -> Result<FrameReport, StateError> {
+    ) -> Result<(Self, FrameReport), StateError> {
         let decoded = protocol::decode_frame(bytes, header)?;
         if let Some(collector) = hud.as_ref() {
             collector
@@ -719,8 +677,7 @@ impl ClientState {
             commands: decoded.command_count(),
             ignored,
         };
-        *self = staged;
-        Ok(report)
+        Ok((staged, report))
     }
 
     fn apply_command(

@@ -116,8 +116,8 @@ fn retained_food_is_not_recopied_by_read_only_world_snapshots() {
     }
     ENABLED.set(false);
     let allocated = BYTES.get();
-    // Received maps and snake channels still copy. The three transaction
-    // snapshots together must allocate less than one full retained-food array.
+    // Snake channels still copy. The three transaction snapshots together
+    // must allocate less than one full retained-food presentation array.
     assert!(
         allocated < food_bytes,
         "snapshots={allocated}, food={food_bytes}"
@@ -126,6 +126,82 @@ fn retained_food_is_not_recopied_by_read_only_world_snapshots() {
         assert_eq!(&snapshot, game.client());
     }
     println!("6000 foods, 3 snapshots: allocated_bytes={allocated}, food_bytes={food_bytes}");
+}
+
+#[test]
+fn received_history_is_not_recopied_by_ingress_snapshots() {
+    for protocol in [13, 19] {
+        let mut bytes = Vec::new();
+        for count in [64, 6000] {
+            let game = ready(protocol, count);
+            let mut snapshots = Vec::with_capacity(3);
+            BYTES.set(0);
+            ENABLED.set(true);
+            for _ in 0..3 {
+                snapshots.push(game.client().clone());
+            }
+            ENABLED.set(false);
+            bytes.push(BYTES.get());
+            for snapshot in snapshots {
+                assert_eq!(&snapshot, game.client());
+            }
+        }
+        assert!(
+            bytes[1] <= bytes[0] + 4096,
+            "protocol={protocol}, bytes={bytes:?}"
+        );
+    }
+}
+
+#[test]
+fn frozen_received_snapshots_survive_fast_and_full_ingress_and_rollback() {
+    for protocol in [13, 19] {
+        let mut game = ready(protocol, 64);
+        let frozen = game.client().clone();
+        let frozen_debug = format!("{frozen:?}");
+        let received = frozen.received().clone();
+        let motion = if protocol == 13 {
+            vec![b'3', 0, 7, 32, 64]
+        } else {
+            vec![b'3', 32, 64]
+        };
+        let growth = if protocol == 13 {
+            wire::anchor(b'n', 7, &[4, 177, 4, 77], Some(0x123456))
+        } else {
+            vec![b'+', 0, 7, 4, 177, 4, 77, 0x12, 0x34, 0x56]
+        };
+        let consume = if protocol == 13 {
+            wire::eaten(1000, 1000, Some(7))
+        } else {
+            vec![b'<', 10, 10, 0, 0, 0, 7]
+        };
+        let packets = [
+            motion,
+            food(protocol, b'f', 0),
+            own_move(protocol),
+            growth,
+            consume,
+            vec![b'h', 0, 7, 0x12, 0x34, 0x57],
+            wire::snake(300),
+        ];
+        for (i, packet) in packets.iter().enumerate() {
+            game.receive(game.generation(), packet, 301. + i as f64)
+                .unwrap();
+            assert_eq!(frozen.received(), &received);
+            assert_eq!(format!("{frozen:?}"), frozen_debug);
+        }
+        let before = game.client().clone();
+        let before_debug = format!("{before:?}");
+        let invalid = wire::bundle(&[own_move(protocol), vec![b'h', 0, 7, 0]]);
+        assert!(game.receive(game.generation(), &invalid, 320.).is_err());
+        assert_eq!(format!("{:?}", game.client()), before_debug);
+        assert_eq!(game.client(), &before);
+        let mut reset = game.client().clone();
+        reset.reset();
+        assert!(reset.received().setup.is_none());
+        assert_eq!(frozen.received(), &received);
+        assert_eq!(format!("{frozen:?}"), frozen_debug);
+    }
 }
 
 #[test]
