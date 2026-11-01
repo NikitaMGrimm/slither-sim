@@ -34,7 +34,8 @@ endpoint and in-game suites retain their integration rules. The inactive-host
 allocation regression remains in `tests/egui_inactive.rs`.
 
 The finite `menu_specimens OUTPUT --login` example renders authored offscreen
-PNGs without a window or connection. Its before side is the retained toolkit
-specimen fed the same state/layout; it is not a desktop capture. These checks
+before/after PNGs without a window or connection. It replaces the old retained-login
+export and rejects its former art-directory argument. Its before side is the retained
+toolkit specimen fed the same state/layout; it is not a desktop capture. These checks
 establish synthetic behavior and offscreen rendering, not physical IME or
 perceptual parity acceptance.

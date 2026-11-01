@@ -514,8 +514,9 @@ impl LoginUi {
                     && let Some(range) = state.cursor.char_range()
                 {
                     let mut range = range;
-                    range.primary.index.0 = range.primary.index.0.min(self.nickname.len());
-                    range.secondary.index.0 = range.secondary.index.0.min(self.nickname.len());
+                    let chars = self.nickname.chars().count();
+                    range.primary.index.0 = range.primary.index.0.min(chars);
+                    range.secondary.index.0 = range.secondary.index.0.min(chars);
                     state.cursor.set_char_range(Some(range));
                     state.store(ctx, widget_id(NICKNAME));
                 }

@@ -135,6 +135,25 @@ fn nickname_uses_utf16_substitution_and_full_value_truncation_before_play() {
 }
 
 #[test]
+fn normalized_cjk_and_emoji_pastes_keep_both_caret_endpoints_within_text() {
+    for text in ["日".repeat(32), "😀".repeat(32), "日😀".repeat(16)] {
+        let mut login = settled("12345678901234567890123");
+        press(&mut login, egui::Key::End, egui::Modifiers::NONE);
+        input(&mut login, egui::Event::Paste(text));
+        assert_eq!(login.state.view(true).nickname, "12345678901234567890123 ");
+        let ctx = login.egui.context().unwrap();
+        let state =
+            egui::TextEdit::load_state(ctx, slither_wgpu_slice::login_egui::widget_id(NICKNAME))
+                .unwrap();
+        let range = state.cursor.char_range().unwrap();
+        let chars = login.login_ui.nickname.chars().count();
+        assert_eq!(chars, 24);
+        assert!(range.primary.index.0 <= chars, "{range:?}");
+        assert!(range.secondary.index.0 <= chars, "{range:?}");
+    }
+}
+
+#[test]
 fn sustained_ime_coalesces_before_redraw_and_commit_does_not_play() {
     let mut login = settled("Initial");
     select_all(&mut login);

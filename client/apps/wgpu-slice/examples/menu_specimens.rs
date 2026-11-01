@@ -218,6 +218,9 @@ async fn run(output: &Path) -> Result<()> {
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--login") {
+        if std::env::args_os().nth(3).is_some() {
+            return Err("--login no longer accepts an art directory".into());
+        }
         return login_specimens(output, &mut renderer);
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
@@ -445,131 +448,6 @@ async fn run(output: &Path) -> Result<()> {
     }
     if std::env::args().nth(2).as_deref() == Some("--stroke") {
         return stroke_specimens(output, &mut renderer);
-    }
-    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    if std::env::args().nth(2).as_deref() == Some("--login") {
-        use slither_client::menu_layout::MenuElement as E;
-        use slither_wgpu_slice::login_native::NativeLogin;
-        let art = std::env::args_os()
-            .nth(3)
-            .map(|dir| Cosmetics::directory(Path::new(&dir), None))
-            .transpose()?;
-        let mut login = NativeLogin::new("")?;
-        for now in (0..=9600).step_by(16) {
-            login.step(now as f64, true, false)?;
-        }
-        let mut measurements = Vec::new();
-        let mut text = TextCache::default();
-        let mut text_widths = Vec::new();
-        for (label, size, bold) in [
-            ("slither", 40., true),
-            ("Nickname", 15., false),
-            ("Play", 20., true),
-            ("Change Skin", 14., false),
-            ("High quality", 14., false),
-            ("When longer, hold the mouse for a speed boost!", 14., false),
-        ] {
-            let style = slither_wgpu_slice::text::TextStyle {
-                size,
-                weight: if bold {
-                    slither_wgpu_slice::text::Weight::Bold
-                } else {
-                    slither_wgpu_slice::text::Weight::Normal
-                },
-                family: slither_wgpu_slice::text::Family::Arial,
-                slant: slither_wgpu_slice::text::Slant::Normal,
-                color: [255; 3],
-            };
-            text_widths.push(serde_json::json!({"text":label,"size":size,"bold":bold,"advance":text.measure_panel(label,style)?.advance}));
-        }
-        std::fs::write(
-            output.join("text-widths.json"),
-            serde_json::to_vec_pretty(&text_widths).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        for (logical, dpr) in [
-            ([960, 540], 1.),
-            ([1920, 1080], 1.),
-            ([1280, 720], 1.),
-            ([640, 360], 1.),
-            ([960, 540], 1.5),
-            ([960, 540], 2.),
-            ([1920, 1080], 2.),
-        ] {
-            let extent = logical.map(|n| (f64::from(n) * dpr) as u32);
-            let picture = login.prepare_host(extent, dpr, true, art.as_ref())?;
-            capture(
-                &mut renderer,
-                &picture,
-                &output.join(format!(
-                    "native-{}x{}-dpr-{dpr}.png",
-                    logical[0], logical[1]
-                )),
-            )?;
-            let rects: Vec<_> = [
-                E::Logo,
-                E::NicknameHolder,
-                E::Nickname,
-                E::Play,
-                E::Skin,
-                E::Quality,
-                E::Spinner,
-            ]
-            .into_iter()
-            .map(|e| {
-                let r = login.layout.viewport_rect(e);
-                vec![r.x, r.y, r.width, r.height]
-            })
-            .collect();
-            measurements.push(serde_json::json!({"extent":extent,"logical":logical,"dpr":dpr,"backing":picture.frame.extent,"rects":rects,"clock":9600,"draws":picture.frame.draws.len() + usize::from(picture.backdrop.is_some()),"pixelBytes":picture.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()}));
-        }
-        for (name, time) in [("on", 9600.), ("off", 10130.)] {
-            if name == "on" {
-                login.focus(slither_client::login_controls::NICKNAME);
-            }
-            login.step(time, true, false)?;
-            let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
-            capture(
-                &mut renderer,
-                &picture,
-                &output.join(format!("caret-{name}.png")),
-            )?;
-        }
-        login.focus(slither_client::login_controls::PLAY);
-        login.activate(true);
-        for now in (10146..=10930).step_by(16) {
-            login.step(f64::from(now), true, false)?;
-        }
-        let picture = login.prepare_host([960, 540], 1., true, art.as_ref())?;
-        capture(&mut renderer, &picture, &output.join("native-spinner.png"))?;
-        for without_icons in [false, true] {
-            // Each independent producer starts its own material revision sequence.
-            let mut intro_renderer =
-                Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
-            let mut intro = NativeLogin::new("")?;
-            for now in (0..=768).step_by(16) {
-                intro.step(f64::from(now), true, false)?;
-                if [128, 256, 512, 768].contains(&now) {
-                    let picture = intro.prepare_host(
-                        [960, 540],
-                        1.,
-                        true,
-                        if without_icons { None } else { art.as_ref() },
-                    )?;
-                    capture(
-                        &mut intro_renderer,
-                        &picture,
-                        &output.join(format!("reveal-{now}-without-icons-{without_icons}.png")),
-                    )?;
-                }
-            }
-        }
-        std::fs::write(
-            output.join("native.json"),
-            serde_json::to_vec_pretty(&measurements).map_err(|e| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?;
-        return Ok(());
     }
     println!(
         "adapter={:?} samples={}",
