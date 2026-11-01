@@ -22,9 +22,9 @@ try {
   // Same app tests and concurrency as CI; several start loopback servers.
   node('--test', '--test-concurrency=1', 'apps/wgpu-slice/tests/*.test.mjs');
   cargo('fmt', '-p', 'slither-client', '--check');
-  cargo('test', '--all-targets', '--locked');
+  cargo('test', '--all-targets', '--locked', '--features', 'latency-rig');
   cargo('test', '--doc', '--locked');
-  cargo('clippy', '--all-targets', '--locked', '--', '-D', 'warnings');
+  cargo('clippy', '--all-targets', '--locked', '--features', 'latency-rig', '--', '-D', 'warnings');
   node('tools/build-web.mjs');
   node('tools/wasm-smoke.mjs');
   gpu('fmt', '--check');

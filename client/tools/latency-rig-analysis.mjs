@@ -1,9 +1,9 @@
 import { readFile, access } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { analyze } from './latency-trace.mjs';
+import { evidenceText, evidenceStream } from './latency-rig-storage.mjs';
 
 const check=(ok,message)=>{if(!ok)throw Error(message);};
 const angle=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
@@ -37,7 +37,7 @@ export function interpolateTruth(ticks,ns,id) {
 export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   check(['inner','pit-edge'].includes(region),'unknown analysis region');
   const plan=JSON.parse(await readFile(path.join(directory,'plan.json'),'utf8'));
-  const traceText=await readFile(path.join(directory,'latency.jsonl'),'utf8');
+  const traceText=await evidenceText(path.join(directory,'latency.jsonl'));
   const validation=analyze(traceText,{cpu:true}); // Offscreen has no acquire/present. Strengthen transport/submission below.
   const trace=rows(traceText).slice(1,-1);
   check(trace.filter(r=>r.stage==='message').every(r=>r.related!=='0'&&r.detail!=='0'),'offscreen message missing raw transport reads');
@@ -45,7 +45,7 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   for(const r of trace){r.t=BigInt(r.ns);const k=`${r.generation}/${r.id}`;if(!byStage.has(r.stage))byStage.set(r.stage,new Map());byStage.get(r.stage).set(k,r);}
   const get=(stage,r,id=r.id)=>byStage.get(stage)?.get(`${r.generation}/${id}`);
   for(const r of trace.filter(r=>r.stage==='presented'))check(get('submit_end',r),'offscreen picture missing real GPU submit');
-  const headRows=rows(await readFile(path.join(directory,'client/heads.jsonl'),'utf8'));
+  const headRows=rows(await evidenceText(path.join(directory,'client/heads.jsonl')));
   const headHeader=headRows.shift(),tail=headRows.pop();
   check(headHeader.format==='client-latency-heads-v1'&&headHeader.complete&&headHeader.dropped===0&&tail.end&&tail.records===headRows.length,'incomplete head journal');
   let previous;
@@ -62,9 +62,9 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
   const selected=headRows.filter(r=>presented.has(`${r.generation}/${r.frame}`));
   const needed=new Set(selected.flatMap(r=>r.heads.filter(h=>!h[2]).map(h=>h[0])));
   const ticks=[];let truthMetadata=null,summary=null,clockSteps=[];
-  let hasTruth=true;try{await access(path.join(directory,'truth.jsonl'));}catch{hasTruth=false;}
+  let hasTruth=true;try{await access(path.join(directory,'truth.jsonl'));}catch{try{await access(path.join(directory,'truth.jsonl.gz'));}catch{hasTruth=false;}}
   if(hasTruth){
-    const input=createInterface({input:createReadStream(path.join(directory,'truth.jsonl')),crlfDelay:Infinity});
+    const input=createInterface({input:await evidenceStream(path.join(directory,'truth.jsonl')),crlfDelay:Infinity});
     let prev;
     for await(const line of input){
       const r=JSON.parse(line);
@@ -76,13 +76,13 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
       const before=BigInt(r.unix_before_ns);
       check(ns>=before,'reversed host step');
       if(prev)check(ns>=prev.ns&&mono>=prev.mono&&Math.abs(Number((ns-prev.ns)-(mono-prev.mono)))/1e6<1,'host wall clock jump/drift');
-      ticks.push({ns,mono,pit:r.pit_radius,liveBots:r.heads.slice(1).filter(h=>h[2]).length,bracket:Number(ns-before)/1e6,heads:new Map(r.heads.filter(h=>needed.has(h[0])).map(h=>[h[0],h]))});
+      ticks.push({ns,mono,pit:r.pit_radius,liveBots:r.heads.slice(plan.config.players.max).filter(h=>h[2]).length,bracket:Number(ns-before)/1e6,heads:new Map(r.heads.filter(h=>needed.has(h[0])).map(h=>[h[0],h]))});
       clockSteps.push(Number(ns-before)/1e6);prev={ns,mono};
     }
     check(truthMetadata?.schema==='host-latency-truth-v1'&&summary?.complete===true&&summary.ticks===ticks.length&&summary.heads===ticks.length*truthMetadata.slot_count,'incomplete host truth');
   }
   check(region!=='pit-edge'||hasTruth,'pit-edge analysis needs host geometry');
-  const controls=rows(await readFile(path.join(directory,'client/controls.jsonl'),'utf8'));
+  const controls=rows(await evidenceText(path.join(directory,'client/controls.jsonl')));
   const controlMap=new Map(controls.map(r=>[`${r.generation}/${r.effect}`,r.bytes]));
   const groups=new Map(),total=new Map(),measuredPopulation=[],coverage={issued:selected.length,prepared:headRows.length,innerBand:0,nearMiddle:0,withReference:0,truthMatched:0,transition:0};
   const push=(group,metric,value)=>{if(!Number.isFinite(value))return;if(!group.has(metric))group.set(metric,[]);group.get(metric).push(value);};
@@ -128,6 +128,7 @@ export async function analyzeCapture(directory, { region = 'inner' } = {}) {
     r.stratum=`${motion}/${boost?'boost':'normal'}`;
     if(!groups.has(r.stratum))groups.set(r.stratum,new Map());const group=groups.get(r.stratum);
     if(world)measuredPopulation.push(world.liveBots);
+    if(truth)push(group,'authoritativeSpeedUnitsPerSecond',truth.speed);
     const packet=lagError([h[7],h[8]],[h[3],h[4]],heading,speed);
     push(group,'packetRelativeLagEquivalentMs',packet.lagMs);push(group,'packetRelativeHeadErrorUnits',packet.distance);
     if(truth){coverage.truthMatched++;const e=lagError(truth.position,[h[3],h[4]],heading,speed);push(group,'authoritativeLagEquivalentAtSubmitMs',e.lagMs);push(group,'authoritativeHeadErrorAtSubmitUnits',e.distance);push(group,'truthInterpolationGapMs',truth.tickGapMs);if(preparedTruth)push(group,'authoritativeLagEquivalentAtPrepareMs',lagError(preparedTruth.position,[h[3],h[4]],preparedTruth.heading,preparedTruth.speed).lagMs);}

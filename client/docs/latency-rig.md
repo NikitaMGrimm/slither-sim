@@ -14,7 +14,7 @@ The host hook may be built from its unmerged topic branch. From the repository
 root, this command builds release binaries sequentially, then captures one run:
 
 ```powershell
-node client/tools/latency-rig.mjs --build-host-root C:/path/to/host-checkout --output C:/external/evidence/baseline-default --seconds 60 --zoom 0
+node client/tools/latency-rig.mjs --build-host-root C:/path/to/host-checkout --output C:/external/evidence/baseline-default --seconds 120 --zoom 0 --region pit-edge
 ```
 
 The output parent must exist; the output directory must be new and outside the
@@ -30,7 +30,7 @@ Do not use the build option during a reserved measurement window. Prebuild with:
 Run prebuilt binaries with one command:
 
 ```powershell
-node client/tools/latency-rig.mjs --host-bin D:/CargoTargets/latency-rig/release/slither-sim.exe --client-bin D:/CargoTargets/latency-rig/release/slither-client-latency.exe --output C:/external/evidence/baseline-default --seconds 60 --zoom 0
+node client/tools/latency-rig.mjs --host-bin D:/CargoTargets/latency-rig/release/slither-sim.exe --client-bin D:/CargoTargets/latency-rig/release/slither-client-latency.exe --output C:/external/evidence/baseline-default --seconds 120 --zoom 0 --region pit-edge
 ```
 
 Repeat in a fresh directory with `--zoom -17` for zoom-out. Sixty seconds is the
@@ -62,7 +62,10 @@ the requested safe pit-edge alternative. It warms a reference for two seconds
 from its first observation, including approach observations. Zoom-out samples
 also wait two seconds after actual camera zoom falls below 0.5; a requested zoom
 that never activates produces no zoom-out geometry samples. Control still aims
-at 0.5 pit and arms zoom/boost at 0.7 pit. Region choice is frozen in each new
+at 0.5 pit and arms boost at 0.7 pit. Zoom is requested as soon as play and own
+state exist, independently of approach success. The first baseline binary armed
+zoom only at 0.7 pit; retain that distinction when comparing attempts.
+Region choice is frozen in each new
 capture's plan. Retrospective pit-edge results must be labelled supplemental and
 kept alongside the original results, never overwrite them.
 
@@ -93,6 +96,21 @@ only after reaching the middle. These enter production input policy; no direct
 heading/boost bytes are invented. Source coordinates, callback timestamps,
 decision dependencies and exact sent bytes remain independently auditable.
 These are callback-to-wire observations, not physical input-device latency.
+
+For deliberate boost coverage, add `--scripted-reference`. This is a separate
+workload, not a replacement for the natural Forager baseline. It reserves a
+second player seat and starts one extra bot through the host binary's existing
+`slither-client-json-v2` network API, before the measured client joins. All 120
+background Foragers remain. No host changes or takeover are needed. The probe
+accepts only this bot's reported wire ID within the same 1,200-unit distance;
+missing reference exposure remains missing. The bot approaches the pit without
+boost, then alternates two-second straight normal, turning normal, straight
+boost and turning boost requests, using only received positions and reported pit
+geometry. Outward excursions trigger inward steering without boost. Requested
+actions do not establish actual strata: authoritative headings and boost remain
+the classifier. Deaths reconnect explicitly and retained control journals carry
+life IDs. This extra JSON client adds CPU/load; compare such runs separately.
+The host recorder runs for client duration + 24 seconds in this mode.
 
 ## Clocks and endpoints
 
@@ -134,7 +152,9 @@ each accepted offscreen picture. This does not certify desktop completeness.
 `results.json` includes nearest-rank median/p90/p99 for:
 
 - Receive to apply, apply duration, preparation duration, preparation end to
-  last submit, receive to last submit, and submit to offscreen acknowledgement.
+  last submit, receive to **first** consuming submit, and submit to offscreen
+  acknowledgement. `latestMessageAgeAtSubmitMs` separately retains watermark age:
+  repeated frames reusing a watermark do not create new pipeline observations.
 - Admitted pointer/boost callback to successfully flushed heading/boost effect.
   Flush is transport/OS acceptance, not server receipt; suppressed/coalesced
   callbacks do not become invented sends.
@@ -170,8 +190,29 @@ Reanalyze retained evidence without launching any process or game connection:
 ```powershell
 node client/tools/latency-rig-analysis.mjs C:/external/evidence/baseline-default
 node client/tools/latency-rig-analysis.mjs C:/external/evidence/baseline-default --pit-edge
+node client/tools/latency-rig-audit.mjs C:/external/evidence/baseline-default
+node client/tools/latency-rig-poses.mjs C:/external/evidence/baseline-default
 node --test client/tools/latency-rig.test.mjs client/tools/latency-trace.test.mjs
 ```
+
+`heads.poses.jsonl` is a separate bounded scalar receipt journal. The header is
+`client-latency-poses-v1` with `complete` and `dropped`; each row contains
+`generation`, decimal-string native `message` ID, command index, wire snake `id`
+and `kind` (0 appearance, 1 removal, 2 position anchor, 3 heading/target/speed).
+The final row has `end:true` and the exact `records` count. It uses the production
+borrowed command reader; no payload bytes or replacement position decoder are
+recorded. Message IDs join original `message` and `apply_end` latency stamps.
+`reference-cadence.json` separates reference-specific anchor, motion and any-pose
+intervals at both endpoints, deduplicating bundled commands per message/channel.
+Intervals never bridge selection gaps, removals or replacement appearances.
+The initial baseline binary lacks this sidecar: its head-cache refresh cadence
+is only frame-observed, with endpoint bounds in the independent anomaly audit.
+
+For storage, `node client/tools/latency-rig-storage.mjs FULLPATH.jsonl ...`
+creates new gzip files, verifies decompression against the original SHA-256 and
+byte count, writes a receipt, then reclaims the uncompressed duplicate. The
+analyzers read either form. A failure retains the original; an existing archive
+is never overwritten. Retain the archive and its receipt with the run.
 
 ## Latency levers
 

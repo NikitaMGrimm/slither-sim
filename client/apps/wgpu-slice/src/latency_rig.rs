@@ -10,6 +10,7 @@ use std::{
 };
 
 const CAPACITY: usize = 32_768;
+const POSE_CAPACITY: usize = 262_144;
 thread_local! { static JOURNAL: RefCell<Option<Journal>> = const { RefCell::new(None) }; }
 
 pub fn unix_ns() -> u128 {
@@ -48,6 +49,17 @@ struct Journal {
     rows: Vec<Sample>,
     dropped: u64,
     clock_step_ns: u128,
+    poses: Vec<PoseReceipt>,
+    pose_dropped: u64,
+}
+
+#[derive(Clone, Copy, Default)]
+struct PoseReceipt {
+    generation: u32,
+    message: u64,
+    command: u32,
+    id: u16,
+    kind: u8,
 }
 
 pub fn start() {
@@ -66,6 +78,11 @@ pub fn start() {
     }
     std::hint::black_box(&mut rows);
     rows.clear();
+    let mut poses = vec![PoseReceipt::default(); POSE_CAPACITY];
+    for pose in &mut poses {
+        pose.message = std::hint::black_box(1);
+    }
+    poses.clear();
     JOURNAL.with_borrow_mut(|j| {
         assert!(j.is_none(), "one measurement per process");
         *j = Some(Journal {
@@ -78,8 +95,44 @@ pub fn start() {
             } else {
                 clock_step_ns
             },
+            poses,
+            pose_dropped: 0,
         });
     });
+}
+/// Wire message IDs join the original transport receipt and apply timestamps.
+/// Position anchors and heading/speed reports are intentionally separate classes.
+pub fn received(generation: u32, message: u64, bytes: &[u8], own: Option<u16>) -> Result<()> {
+    JOURNAL.with_borrow_mut(|journal| {
+        let Some(journal) = journal else {
+            return Ok(());
+        };
+        let frame = slither_client::protocol::read_frame(
+            bytes,
+            slither_client::protocol::ElapsedHeader::Absent,
+        )
+        .map_err(|e| e.to_string())?;
+        for command in frame.commands() {
+            let Some(pose) = slither_client::protocol::latency::pose_packet(command) else {
+                continue;
+            };
+            let Some(id) = pose.id.or(own) else {
+                continue;
+            };
+            if journal.poses.len() == journal.poses.capacity() {
+                journal.pose_dropped += 1;
+            } else {
+                journal.poses.push(PoseReceipt {
+                    generation,
+                    message,
+                    command: command.index as u32,
+                    id,
+                    kind: pose.kind as u8,
+                });
+            }
+        }
+        Ok(())
+    })
 }
 pub fn select(own: Option<(u16, u64)>, reference: Option<(u16, u64)>, middle: bool) {
     JOURNAL.with_borrow_mut(|j| {
@@ -157,6 +210,30 @@ pub fn finish(path: &Path, complete: bool) -> Result<()> {
     let j = JOURNAL
         .with_borrow_mut(Option::take)
         .ok_or("no rig recorder")?;
+    let complete = complete && j.dropped == 0 && j.pose_dropped == 0;
+    let mut poses = std::io::BufWriter::new(
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path.with_extension("poses.jsonl"))
+            .map_err(|e| e.to_string())?,
+    );
+    writeln!(
+        poses,
+        "{{\"format\":\"client-latency-poses-v1\",\"complete\":{complete},\"dropped\":{}}}",
+        j.pose_dropped
+    )
+    .map_err(|e| e.to_string())?;
+    for p in &j.poses {
+        writeln!(
+            poses,
+            "{{\"generation\":{},\"message\":\"{}\",\"command\":{},\"id\":{},\"kind\":{}}}",
+            p.generation, p.message, p.command, p.id, p.kind
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    writeln!(poses, "{{\"end\":true,\"records\":{}}}", j.poses.len()).map_err(|e| e.to_string())?;
+    poses.flush().map_err(|e| e.to_string())?;
     let mut out = std::io::BufWriter::new(
         std::fs::OpenOptions::new()
             .write(true)
@@ -219,10 +296,14 @@ mod tests {
                 rows: Vec::with_capacity(1),
                 dropped: 0,
                 clock_step_ns: 0,
+                poses: Vec::with_capacity(1),
+                pose_dropped: 0,
             })
         });
         commit(Some(Sample::default()));
         commit(Some(Sample::default()));
+        received(1, 1, &[b'g', 0, 9], None).unwrap();
+        received(1, 2, &[b'g', 0, 9], None).unwrap();
         let path = std::env::temp_dir().join(format!(
             "slither-rig-{}-{}.jsonl",
             std::process::id(),
@@ -231,9 +312,14 @@ mod tests {
         finish(&path, true).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("\"complete\":false,\"dropped\":1"));
+        let pose_text = std::fs::read_to_string(path.with_extension("poses.jsonl")).unwrap();
+        assert!(pose_text.contains("\"complete\":false,\"dropped\":1"));
+        assert!(pose_text.contains("\"message\":\"1\""));
+        assert!(!pose_text.contains("\"message\":\"2\""));
         start();
         assert!(finish(&path, true).is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+        std::fs::remove_file(path.with_extension("poses.jsonl")).unwrap();
         std::fs::remove_file(path).unwrap();
     }
 }

@@ -31,10 +31,11 @@ mod rig {
         output: PathBuf,
         seconds: f64,
         zoom: f64,
+        reference_id: Option<u16>,
     }
     impl Options {
         fn parse(args: &[String]) -> Result<Self> {
-            if args.len() != 8 {
+            if args.len() != 8 && args.len() != 10 {
                 return Err(
                     "--server 127.0.0.1:PORT --output NEWDIR --seconds 5..150 --zoom 0|-17".into(),
                 );
@@ -43,6 +44,7 @@ mod rig {
             let mut output = None;
             let mut seconds = None;
             let mut zoom = None;
+            let mut reference_id = None;
             for pair in args.chunks_exact(2) {
                 match pair[0].as_str() {
                     "--server" if server.is_none() => {
@@ -53,6 +55,10 @@ mod rig {
                     "--output" if output.is_none() => output = Some(PathBuf::from(&pair[1])),
                     "--seconds" if seconds.is_none() => seconds = pair[1].parse::<f64>().ok(),
                     "--zoom" if zoom.is_none() => zoom = pair[1].parse::<f64>().ok(),
+                    "--reference-id" if reference_id.is_none() => {
+                        reference_id =
+                            Some(pair[1].parse::<u16>().map_err(|_| "invalid reference ID")?);
+                    }
                     _ => return Err("unknown/repeated measurement option".into()),
                 }
             }
@@ -75,6 +81,7 @@ mod rig {
                 output: output.ok_or("missing output")?,
                 seconds,
                 zoom,
+                reference_id,
             })
         }
     }
@@ -160,6 +167,7 @@ mod rig {
         gpu: Offscreen,
         started: Instant,
         reference: Option<(u16, u64)>,
+        reference_id: Option<u16>,
         zoomed: bool,
         zoom: f64,
         middle: bool,
@@ -213,6 +221,12 @@ mod rig {
                     Event::Opened(g) => self.game.opened(g, self.now())?,
                     Event::Binary(g, b) => {
                         let id = self.transport.message_id();
+                        latency_rig::received(
+                            g,
+                            id,
+                            &b,
+                            self.game.client().received().own_snake_id,
+                        )?;
                         self.game.receive_message(g, &b, self.now(), id)?;
                     }
                     Event::Closed(g) => self.game.closed(g),
@@ -247,11 +261,12 @@ mod rig {
                     let m = s.metrics();
                     let p = state.snakes.get(&m.id)?;
                     let distance = (p.head.x - head.x).hypot(p.head.y - head.y);
-                    (!own && drawn && m.alive && distance <= 1200.).then_some((
-                        m.id,
-                        t.serial(),
-                        distance,
-                    ))
+                    (!own
+                        && drawn
+                        && m.alive
+                        && distance <= 1200.
+                        && self.reference_id.is_none_or(|id| id == m.id))
+                    .then_some((m.id, t.serial(), distance))
                 })
                 .collect();
             if !candidates
@@ -282,9 +297,8 @@ mod rig {
                     self.middle && (4. ..6.).contains(&(self.started.elapsed().as_secs_f64() % 8.)),
                 );
             }
-            if !self.zoomed && self.middle {
-                self.game.wheel_zoom(self.zoom);
-                self.zoomed = true;
+            if !self.zoomed {
+                self.zoomed = self.zoom == 0. || self.game.wheel_zoom(self.zoom);
             }
             Ok(())
         }
@@ -348,6 +362,7 @@ mod rig {
             gpu: Offscreen::new()?,
             started,
             reference: None,
+            reference_id: options.reference_id,
             zoomed: false,
             zoom: options.zoom,
             middle: false,
@@ -424,6 +439,23 @@ mod rig {
                 .map(String::from);
                 assert!(Options::parse(&args).is_err());
             }
+            let base = [
+                "--server",
+                "127.0.0.1:19090",
+                "--output",
+                "unused",
+                "--seconds",
+                "60",
+                "--zoom",
+                "0",
+                "--reference-id",
+                "7",
+            ]
+            .map(String::from);
+            assert_eq!(Options::parse(&base).unwrap().reference_id, Some(7));
+            let mut invalid = base;
+            invalid[9] = "65536".into();
+            assert!(Options::parse(&invalid).is_err());
         }
     }
 }
