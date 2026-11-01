@@ -41,7 +41,9 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # Windows already takes up to ~14.5 min on main (uncached wgpu target, slow
+    # linker); 15 left no headroom and cancelled #416's run mid-test.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 25 || 15 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
