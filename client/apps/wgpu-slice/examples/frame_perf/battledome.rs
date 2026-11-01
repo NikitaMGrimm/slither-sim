@@ -226,8 +226,8 @@ pub fn run(output: &Path) -> Result<()> {
                     if plan_only {
                         continue;
                     }
-                    // Compare 4x with 1x to isolate fill/MSAA sensitivity. CPU
-                    // preparation and projection are identical in both cases.
+                    // Compare fill/MSAA sensitivity. Projection and ingress match,
+                    // but the draw clock continues between these sequential cases.
                     for samples in [4, 1] {
                         for frame in 0..40_u64 {
                             let recording = profile.then(|| {

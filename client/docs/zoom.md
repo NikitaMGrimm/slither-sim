@@ -65,6 +65,12 @@ one pixel are omitted before text rasterization. Bodies narrower than two logica
 pixels use the existing low-quality passes: omit outline/shadow/inner shimmer,
 retaining the body, outer boost and death passes. These rules are opt-in to
 zoom-out; default output remains exact.
+The interleaved body-shadow layer is also omitted when the wheel factor is below
+one and `29 * scale * camera_zoom < 4` logical pixels. This preserves curve
+samples, palette ordinals, other pass order and distance-cursor visits, including
+the antenna/death boundary. Factor one retains every command. The
+[Battledome study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
+records CPU/GPU measurements, default-view equality and unresolved GPU controls.
 The background already uses one repeating-texture quad regardless of tile count.
 Native food planning combines this zoom policy with the retained catalog index
 from [frame performance](frame-performance.md#retained-food-cpu-preparation).

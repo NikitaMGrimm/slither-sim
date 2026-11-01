@@ -1,0 +1,961 @@
+adapter,side,bots,width,zoom,msaa,stage,median_ms
+RTX 5070 Ti,before,120,1920,default,4,curves_end,0.3423
+RTX 5070 Ti,before,120,1920,default,4,background_end,0.0008
+RTX 5070 Ti,before,120,1920,default,4,food_end,0.1121
+RTX 5070 Ti,before,120,1920,default,4,prey_end,0.1852
+RTX 5070 Ti,before,120,1920,default,4,bodies_end,0.0447
+RTX 5070 Ti,before,120,1920,default,4,arena_end,0.00205
+RTX 5070 Ti,before,120,1920,default,4,names_end,0.00695
+RTX 5070 Ti,before,120,1920,default,4,resources_end,0.0355
+RTX 5070 Ti,before,120,1920,default,4,minimap_end,0.01755
+RTX 5070 Ti,before,120,1920,default,4,build_end,0.0711
+RTX 5070 Ti,before,120,1920,default,1,curves_end,0.37495
+RTX 5070 Ti,before,120,1920,default,1,background_end,0.0008
+RTX 5070 Ti,before,120,1920,default,1,food_end,0.12525
+RTX 5070 Ti,before,120,1920,default,1,prey_end,0.2646
+RTX 5070 Ti,before,120,1920,default,1,bodies_end,0.05705
+RTX 5070 Ti,before,120,1920,default,1,arena_end,0.0028
+RTX 5070 Ti,before,120,1920,default,1,names_end,0.0094
+RTX 5070 Ti,before,120,1920,default,1,resources_end,0.0422
+RTX 5070 Ti,before,120,1920,default,1,minimap_end,0.0262
+RTX 5070 Ti,before,120,1920,default,1,build_end,0.0961
+RTX 5070 Ti,before,120,1920,mid,4,curves_end,0.4347
+RTX 5070 Ti,before,120,1920,mid,4,background_end,0.00085
+RTX 5070 Ti,before,120,1920,mid,4,food_end,0.17825
+RTX 5070 Ti,before,120,1920,mid,4,prey_end,0.1864
+RTX 5070 Ti,before,120,1920,mid,4,bodies_end,0.2866
+RTX 5070 Ti,before,120,1920,mid,4,arena_end,0.0038
+RTX 5070 Ti,before,120,1920,mid,4,names_end,0.03795
+RTX 5070 Ti,before,120,1920,mid,4,resources_end,0.2559
+RTX 5070 Ti,before,120,1920,mid,4,minimap_end,0.02035
+RTX 5070 Ti,before,120,1920,mid,4,build_end,0.51425
+RTX 5070 Ti,before,120,1920,mid,1,curves_end,0.43285
+RTX 5070 Ti,before,120,1920,mid,1,background_end,0.0009
+RTX 5070 Ti,before,120,1920,mid,1,food_end,0.17575
+RTX 5070 Ti,before,120,1920,mid,1,prey_end,0.1752
+RTX 5070 Ti,before,120,1920,mid,1,bodies_end,0.27855
+RTX 5070 Ti,before,120,1920,mid,1,arena_end,0.0037
+RTX 5070 Ti,before,120,1920,mid,1,names_end,0.0414
+RTX 5070 Ti,before,120,1920,mid,1,resources_end,0.24945
+RTX 5070 Ti,before,120,1920,mid,1,minimap_end,0.0204
+RTX 5070 Ti,before,120,1920,mid,1,build_end,0.50915
+RTX 5070 Ti,before,120,1920,out,4,curves_end,0.7661
+RTX 5070 Ti,before,120,1920,out,4,background_end,0.00145
+RTX 5070 Ti,before,120,1920,out,4,food_end,0.0343
+RTX 5070 Ti,before,120,1920,out,4,prey_end,0.17605
+RTX 5070 Ti,before,120,1920,out,4,bodies_end,1.41285
+RTX 5070 Ti,before,120,1920,out,4,arena_end,0.0063
+RTX 5070 Ti,before,120,1920,out,4,names_end,1.22505
+RTX 5070 Ti,before,120,1920,out,4,resources_end,0.559
+RTX 5070 Ti,before,120,1920,out,4,minimap_end,0.0216
+RTX 5070 Ti,before,120,1920,out,4,build_end,1.9684
+RTX 5070 Ti,before,120,1920,out,1,curves_end,0.681
+RTX 5070 Ti,before,120,1920,out,1,background_end,0.0011
+RTX 5070 Ti,before,120,1920,out,1,food_end,0.0331
+RTX 5070 Ti,before,120,1920,out,1,prey_end,0.17495
+RTX 5070 Ti,before,120,1920,out,1,bodies_end,1.38975
+RTX 5070 Ti,before,120,1920,out,1,arena_end,0.0058
+RTX 5070 Ti,before,120,1920,out,1,names_end,1.2026
+RTX 5070 Ti,before,120,1920,out,1,resources_end,0.5414
+RTX 5070 Ti,before,120,1920,out,1,minimap_end,0.02065
+RTX 5070 Ti,before,120,1920,out,1,build_end,1.96035
+RTX 5070 Ti,before,120,3840,default,4,curves_end,0.32535
+RTX 5070 Ti,before,120,3840,default,4,background_end,0.0007
+RTX 5070 Ti,before,120,3840,default,4,food_end,0.1031
+RTX 5070 Ti,before,120,3840,default,4,prey_end,0.1734
+RTX 5070 Ti,before,120,3840,default,4,bodies_end,0.1214
+RTX 5070 Ti,before,120,3840,default,4,arena_end,0.00195
+RTX 5070 Ti,before,120,3840,default,4,names_end,0.01455
+RTX 5070 Ti,before,120,3840,default,4,resources_end,0.0866
+RTX 5070 Ti,before,120,3840,default,4,minimap_end,0.0168
+RTX 5070 Ti,before,120,3840,default,4,build_end,0.182
+RTX 5070 Ti,before,120,3840,default,1,curves_end,0.33215
+RTX 5070 Ti,before,120,3840,default,1,background_end,0.0006
+RTX 5070 Ti,before,120,3840,default,1,food_end,0.1019
+RTX 5070 Ti,before,120,3840,default,1,prey_end,0.1732
+RTX 5070 Ti,before,120,3840,default,1,bodies_end,0.1215
+RTX 5070 Ti,before,120,3840,default,1,arena_end,0.0019
+RTX 5070 Ti,before,120,3840,default,1,names_end,0.0142
+RTX 5070 Ti,before,120,3840,default,1,resources_end,0.0854
+RTX 5070 Ti,before,120,3840,default,1,minimap_end,0.01635
+RTX 5070 Ti,before,120,3840,default,1,build_end,0.1804
+RTX 5070 Ti,before,120,3840,mid,4,curves_end,0.49675
+RTX 5070 Ti,before,120,3840,mid,4,background_end,0.0009
+RTX 5070 Ti,before,120,3840,mid,4,food_end,0.3565
+RTX 5070 Ti,before,120,3840,mid,4,prey_end,0.1736
+RTX 5070 Ti,before,120,3840,mid,4,bodies_end,0.69825
+RTX 5070 Ti,before,120,3840,mid,4,arena_end,0.01
+RTX 5070 Ti,before,120,3840,mid,4,names_end,0.10945
+RTX 5070 Ti,before,120,3840,mid,4,resources_end,0.4631
+RTX 5070 Ti,before,120,3840,mid,4,minimap_end,0.01995
+RTX 5070 Ti,before,120,3840,mid,4,build_end,1.5449
+RTX 5070 Ti,before,120,3840,mid,1,curves_end,0.49115
+RTX 5070 Ti,before,120,3840,mid,1,background_end,0.00075
+RTX 5070 Ti,before,120,3840,mid,1,food_end,0.3631
+RTX 5070 Ti,before,120,3840,mid,1,prey_end,0.1736
+RTX 5070 Ti,before,120,3840,mid,1,bodies_end,0.72715
+RTX 5070 Ti,before,120,3840,mid,1,arena_end,0.01
+RTX 5070 Ti,before,120,3840,mid,1,names_end,0.1103
+RTX 5070 Ti,before,120,3840,mid,1,resources_end,0.4721
+RTX 5070 Ti,before,120,3840,mid,1,minimap_end,0.0196
+RTX 5070 Ti,before,120,3840,mid,1,build_end,1.6863
+RTX 5070 Ti,before,120,3840,out,4,curves_end,0.7532
+RTX 5070 Ti,before,120,3840,out,4,background_end,0.0014
+RTX 5070 Ti,before,120,3840,out,4,food_end,0.41685
+RTX 5070 Ti,before,120,3840,out,4,prey_end,0.1777
+RTX 5070 Ti,before,120,3840,out,4,bodies_end,1.53115
+RTX 5070 Ti,before,120,3840,out,4,arena_end,0.00855
+RTX 5070 Ti,before,120,3840,out,4,names_end,1.43785
+RTX 5070 Ti,before,120,3840,out,4,resources_end,0.82535
+RTX 5070 Ti,before,120,3840,out,4,minimap_end,0.0228
+RTX 5070 Ti,before,120,3840,out,4,build_end,2.8675
+RTX 5070 Ti,before,120,3840,out,1,curves_end,0.7309
+RTX 5070 Ti,before,120,3840,out,1,background_end,0.0014
+RTX 5070 Ti,before,120,3840,out,1,food_end,0.41285
+RTX 5070 Ti,before,120,3840,out,1,prey_end,0.17685
+RTX 5070 Ti,before,120,3840,out,1,bodies_end,1.5285
+RTX 5070 Ti,before,120,3840,out,1,arena_end,0.00845
+RTX 5070 Ti,before,120,3840,out,1,names_end,1.36135
+RTX 5070 Ti,before,120,3840,out,1,resources_end,0.7984
+RTX 5070 Ti,before,120,3840,out,1,minimap_end,0.0227
+RTX 5070 Ti,before,120,3840,out,1,build_end,2.8079
+RTX 5070 Ti,before,500,1920,default,4,curves_end,0.9466
+RTX 5070 Ti,before,500,1920,default,4,background_end,0.00075
+RTX 5070 Ti,before,500,1920,default,4,food_end,0.4288
+RTX 5070 Ti,before,500,1920,default,4,prey_end,0.1807
+RTX 5070 Ti,before,500,1920,default,4,bodies_end,0.0337
+RTX 5070 Ti,before,500,1920,default,4,arena_end,0.00195
+RTX 5070 Ti,before,500,1920,default,4,names_end,0.0059
+RTX 5070 Ti,before,500,1920,default,4,resources_end,0.0262
+RTX 5070 Ti,before,500,1920,default,4,minimap_end,0.01625
+RTX 5070 Ti,before,500,1920,default,4,build_end,0.0535
+RTX 5070 Ti,before,500,1920,default,1,curves_end,0.95295
+RTX 5070 Ti,before,500,1920,default,1,background_end,0.00095
+RTX 5070 Ti,before,500,1920,default,1,food_end,0.42925
+RTX 5070 Ti,before,500,1920,default,1,prey_end,0.1805
+RTX 5070 Ti,before,500,1920,default,1,bodies_end,0.03355
+RTX 5070 Ti,before,500,1920,default,1,arena_end,0.002
+RTX 5070 Ti,before,500,1920,default,1,names_end,0.006
+RTX 5070 Ti,before,500,1920,default,1,resources_end,0.0253
+RTX 5070 Ti,before,500,1920,default,1,minimap_end,0.0158
+RTX 5070 Ti,before,500,1920,default,1,build_end,0.0528
+RTX 5070 Ti,before,500,1920,mid,4,curves_end,1.06245
+RTX 5070 Ti,before,500,1920,mid,4,background_end,0.0008
+RTX 5070 Ti,before,500,1920,mid,4,food_end,0.43325
+RTX 5070 Ti,before,500,1920,mid,4,prey_end,0.18085
+RTX 5070 Ti,before,500,1920,mid,4,bodies_end,0.17115
+RTX 5070 Ti,before,500,1920,mid,4,arena_end,0.0028
+RTX 5070 Ti,before,500,1920,mid,4,names_end,0.0229
+RTX 5070 Ti,before,500,1920,mid,4,resources_end,0.13045
+RTX 5070 Ti,before,500,1920,mid,4,minimap_end,0.01785
+RTX 5070 Ti,before,500,1920,mid,4,build_end,0.26155
+RTX 5070 Ti,before,500,1920,mid,1,curves_end,1.0725
+RTX 5070 Ti,before,500,1920,mid,1,background_end,0.0008
+RTX 5070 Ti,before,500,1920,mid,1,food_end,0.4319
+RTX 5070 Ti,before,500,1920,mid,1,prey_end,0.1808
+RTX 5070 Ti,before,500,1920,mid,1,bodies_end,0.17045
+RTX 5070 Ti,before,500,1920,mid,1,arena_end,0.0028
+RTX 5070 Ti,before,500,1920,mid,1,names_end,0.0229
+RTX 5070 Ti,before,500,1920,mid,1,resources_end,0.1294
+RTX 5070 Ti,before,500,1920,mid,1,minimap_end,0.0181
+RTX 5070 Ti,before,500,1920,mid,1,build_end,0.2597
+RTX 5070 Ti,before,500,1920,out,4,curves_end,2.21915
+RTX 5070 Ti,before,500,1920,out,4,background_end,0.0014
+RTX 5070 Ti,before,500,1920,out,4,food_end,0.1987
+RTX 5070 Ti,before,500,1920,out,4,prey_end,0.1834
+RTX 5070 Ti,before,500,1920,out,4,bodies_end,2.3392
+RTX 5070 Ti,before,500,1920,out,4,arena_end,0.00725
+RTX 5070 Ti,before,500,1920,out,4,names_end,0.0017
+RTX 5070 Ti,before,500,1920,out,4,resources_end,0.76095
+RTX 5070 Ti,before,500,1920,out,4,minimap_end,0.0247
+RTX 5070 Ti,before,500,1920,out,4,build_end,2.525
+RTX 5070 Ti,before,500,1920,out,1,curves_end,2.36295
+RTX 5070 Ti,before,500,1920,out,1,background_end,0.0015
+RTX 5070 Ti,before,500,1920,out,1,food_end,0.21405
+RTX 5070 Ti,before,500,1920,out,1,prey_end,0.18405
+RTX 5070 Ti,before,500,1920,out,1,bodies_end,2.3739
+RTX 5070 Ti,before,500,1920,out,1,arena_end,0.00755
+RTX 5070 Ti,before,500,1920,out,1,names_end,0.0017
+RTX 5070 Ti,before,500,1920,out,1,resources_end,0.76715
+RTX 5070 Ti,before,500,1920,out,1,minimap_end,0.0259
+RTX 5070 Ti,before,500,1920,out,1,build_end,2.5224
+RTX 5070 Ti,before,500,3840,default,4,curves_end,0.9863
+RTX 5070 Ti,before,500,3840,default,4,background_end,0.0008
+RTX 5070 Ti,before,500,3840,default,4,food_end,0.42635
+RTX 5070 Ti,before,500,3840,default,4,prey_end,0.18035
+RTX 5070 Ti,before,500,3840,default,4,bodies_end,0.07055
+RTX 5070 Ti,before,500,3840,default,4,arena_end,0.0019
+RTX 5070 Ti,before,500,3840,default,4,names_end,0.00895
+RTX 5070 Ti,before,500,3840,default,4,resources_end,0.05195
+RTX 5070 Ti,before,500,3840,default,4,minimap_end,0.01615
+RTX 5070 Ti,before,500,3840,default,4,build_end,0.1054
+RTX 5070 Ti,before,500,3840,default,1,curves_end,0.99315
+RTX 5070 Ti,before,500,3840,default,1,background_end,0.0008
+RTX 5070 Ti,before,500,3840,default,1,food_end,0.42815
+RTX 5070 Ti,before,500,3840,default,1,prey_end,0.1804
+RTX 5070 Ti,before,500,3840,default,1,bodies_end,0.07105
+RTX 5070 Ti,before,500,3840,default,1,arena_end,0.0019
+RTX 5070 Ti,before,500,3840,default,1,names_end,0.00925
+RTX 5070 Ti,before,500,3840,default,1,resources_end,0.0516
+RTX 5070 Ti,before,500,3840,default,1,minimap_end,0.0162
+RTX 5070 Ti,before,500,3840,default,1,build_end,0.1056
+RTX 5070 Ti,before,500,3840,mid,4,curves_end,1.3536
+RTX 5070 Ti,before,500,3840,mid,4,background_end,0.00115
+RTX 5070 Ti,before,500,3840,mid,4,food_end,0.6778
+RTX 5070 Ti,before,500,3840,mid,4,prey_end,0.182
+RTX 5070 Ti,before,500,3840,mid,4,bodies_end,0.57235
+RTX 5070 Ti,before,500,3840,mid,4,arena_end,0.012
+RTX 5070 Ti,before,500,3840,mid,4,names_end,0.0834
+RTX 5070 Ti,before,500,3840,mid,4,resources_end,0.459
+RTX 5070 Ti,before,500,3840,mid,4,minimap_end,0.0193
+RTX 5070 Ti,before,500,3840,mid,4,build_end,1.161
+RTX 5070 Ti,before,500,3840,mid,1,curves_end,1.32495
+RTX 5070 Ti,before,500,3840,mid,1,background_end,0.0011
+RTX 5070 Ti,before,500,3840,mid,1,food_end,0.7007
+RTX 5070 Ti,before,500,3840,mid,1,prey_end,0.1817
+RTX 5070 Ti,before,500,3840,mid,1,bodies_end,0.5759
+RTX 5070 Ti,before,500,3840,mid,1,arena_end,0.0118
+RTX 5070 Ti,before,500,3840,mid,1,names_end,0.0865
+RTX 5070 Ti,before,500,3840,mid,1,resources_end,0.4677
+RTX 5070 Ti,before,500,3840,mid,1,minimap_end,0.0193
+RTX 5070 Ti,before,500,3840,mid,1,build_end,1.15005
+RTX 5070 Ti,before,500,3840,out,4,curves_end,2.4422
+RTX 5070 Ti,before,500,3840,out,4,background_end,0.0035
+RTX 5070 Ti,before,500,3840,out,4,food_end,0.2738
+RTX 5070 Ti,before,500,3840,out,4,prey_end,0.1856
+RTX 5070 Ti,before,500,3840,out,4,bodies_end,3.4379
+RTX 5070 Ti,before,500,3840,out,4,arena_end,0.0093
+RTX 5070 Ti,before,500,3840,out,4,names_end,1.7743
+RTX 5070 Ti,before,500,3840,out,4,resources_end,1.2134
+RTX 5070 Ti,before,500,3840,out,4,minimap_end,0.0247
+RTX 5070 Ti,before,500,3840,out,4,build_end,4.3005
+RTX 5070 Ti,before,500,3840,out,1,curves_end,2.2817
+RTX 5070 Ti,before,500,3840,out,1,background_end,0.0039
+RTX 5070 Ti,before,500,3840,out,1,food_end,0.27
+RTX 5070 Ti,before,500,3840,out,1,prey_end,0.18555
+RTX 5070 Ti,before,500,3840,out,1,bodies_end,3.3489
+RTX 5070 Ti,before,500,3840,out,1,arena_end,0.0092
+RTX 5070 Ti,before,500,3840,out,1,names_end,1.67445
+RTX 5070 Ti,before,500,3840,out,1,resources_end,1.12465
+RTX 5070 Ti,before,500,3840,out,1,minimap_end,0.0243
+RTX 5070 Ti,before,500,3840,out,1,build_end,4.25415
+AMD integrated,before,120,1920,default,4,curves_end,0.3061
+AMD integrated,before,120,1920,default,4,background_end,0.0007
+AMD integrated,before,120,1920,default,4,food_end,0.10155
+AMD integrated,before,120,1920,default,4,prey_end,0.174
+AMD integrated,before,120,1920,default,4,bodies_end,0.0429
+AMD integrated,before,120,1920,default,4,arena_end,0.002
+AMD integrated,before,120,1920,default,4,names_end,0.0066
+AMD integrated,before,120,1920,default,4,resources_end,0.0333
+AMD integrated,before,120,1920,default,4,minimap_end,0.01695
+AMD integrated,before,120,1920,default,4,build_end,0.06715
+AMD integrated,before,120,1920,default,1,curves_end,0.30315
+AMD integrated,before,120,1920,default,1,background_end,0.0006
+AMD integrated,before,120,1920,default,1,food_end,0.1018
+AMD integrated,before,120,1920,default,1,prey_end,0.1729
+AMD integrated,before,120,1920,default,1,bodies_end,0.04195
+AMD integrated,before,120,1920,default,1,arena_end,0.0019
+AMD integrated,before,120,1920,default,1,names_end,0.0065
+AMD integrated,before,120,1920,default,1,resources_end,0.0289
+AMD integrated,before,120,1920,default,1,minimap_end,0.01565
+AMD integrated,before,120,1920,default,1,build_end,0.06485
+AMD integrated,before,120,1920,mid,4,curves_end,0.3959
+AMD integrated,before,120,1920,mid,4,background_end,0.0007
+AMD integrated,before,120,1920,mid,4,food_end,0.15815
+AMD integrated,before,120,1920,mid,4,prey_end,0.17415
+AMD integrated,before,120,1920,mid,4,bodies_end,0.2665
+AMD integrated,before,120,1920,mid,4,arena_end,0.0031
+AMD integrated,before,120,1920,mid,4,names_end,0.03595
+AMD integrated,before,120,1920,mid,4,resources_end,0.2445
+AMD integrated,before,120,1920,mid,4,minimap_end,0.019
+AMD integrated,before,120,1920,mid,4,build_end,0.49545
+AMD integrated,before,120,1920,mid,1,curves_end,0.3948
+AMD integrated,before,120,1920,mid,1,background_end,0.0007
+AMD integrated,before,120,1920,mid,1,food_end,0.16535
+AMD integrated,before,120,1920,mid,1,prey_end,0.1743
+AMD integrated,before,120,1920,mid,1,bodies_end,0.26885
+AMD integrated,before,120,1920,mid,1,arena_end,0.0031
+AMD integrated,before,120,1920,mid,1,names_end,0.038
+AMD integrated,before,120,1920,mid,1,resources_end,0.2478
+AMD integrated,before,120,1920,mid,1,minimap_end,0.0192
+AMD integrated,before,120,1920,mid,1,build_end,0.49745
+AMD integrated,before,120,1920,out,4,curves_end,0.68185
+AMD integrated,before,120,1920,out,4,background_end,0.0013
+AMD integrated,before,120,1920,out,4,food_end,0.03915
+AMD integrated,before,120,1920,out,4,prey_end,0.1779
+AMD integrated,before,120,1920,out,4,bodies_end,1.4613
+AMD integrated,before,120,1920,out,4,arena_end,0.0061
+AMD integrated,before,120,1920,out,4,names_end,1.2483
+AMD integrated,before,120,1920,out,4,resources_end,0.32055
+AMD integrated,before,120,1920,out,4,minimap_end,0.0214
+AMD integrated,before,120,1920,out,4,build_end,1.98075
+AMD integrated,before,120,1920,out,1,curves_end,0.7802
+AMD integrated,before,120,1920,out,1,background_end,0.0015
+AMD integrated,before,120,1920,out,1,food_end,0.0507
+AMD integrated,before,120,1920,out,1,prey_end,0.1803
+AMD integrated,before,120,1920,out,1,bodies_end,1.53465
+AMD integrated,before,120,1920,out,1,arena_end,0.00665
+AMD integrated,before,120,1920,out,1,names_end,1.2812
+AMD integrated,before,120,1920,out,1,resources_end,0.33315
+AMD integrated,before,120,1920,out,1,minimap_end,0.0227
+AMD integrated,before,120,1920,out,1,build_end,1.99565
+AMD integrated,before,120,3840,default,4,curves_end,0.5782
+AMD integrated,before,120,3840,default,4,background_end,0.00135
+AMD integrated,before,120,3840,default,4,food_end,0.1052
+AMD integrated,before,120,3840,default,4,prey_end,0.17755
+AMD integrated,before,120,3840,default,4,bodies_end,0.13805
+AMD integrated,before,120,3840,default,4,arena_end,0.00285
+AMD integrated,before,120,3840,default,4,names_end,0.01865
+AMD integrated,before,120,3840,default,4,resources_end,0.0955
+AMD integrated,before,120,3840,default,4,minimap_end,0.021
+AMD integrated,before,120,3840,default,4,build_end,0.18545
+AMD integrated,before,120,3840,default,1,curves_end,0.3843
+AMD integrated,before,120,3840,default,1,background_end,0.0007
+AMD integrated,before,120,3840,default,1,food_end,0.10165
+AMD integrated,before,120,3840,default,1,prey_end,0.1741
+AMD integrated,before,120,3840,default,1,bodies_end,0.1238
+AMD integrated,before,120,3840,default,1,arena_end,0.002
+AMD integrated,before,120,3840,default,1,names_end,0.0148
+AMD integrated,before,120,3840,default,1,resources_end,0.08905
+AMD integrated,before,120,3840,default,1,minimap_end,0.01735
+AMD integrated,before,120,3840,default,1,build_end,0.18145
+AMD integrated,before,120,3840,mid,4,curves_end,0.7415
+AMD integrated,before,120,3840,mid,4,background_end,0.00185
+AMD integrated,before,120,3840,mid,4,food_end,0.38075
+AMD integrated,before,120,3840,mid,4,prey_end,0.17965
+AMD integrated,before,120,3840,mid,4,bodies_end,0.8187
+AMD integrated,before,120,3840,mid,4,arena_end,0.01205
+AMD integrated,before,120,3840,mid,4,names_end,0.17545
+AMD integrated,before,120,3840,mid,4,resources_end,0.4911
+AMD integrated,before,120,3840,mid,4,minimap_end,0.02515
+AMD integrated,before,120,3840,mid,4,build_end,1.52485
+AMD integrated,before,120,3840,mid,1,curves_end,0.5573
+AMD integrated,before,120,3840,mid,1,background_end,0.00085
+AMD integrated,before,120,3840,mid,1,food_end,0.35985
+AMD integrated,before,120,3840,mid,1,prey_end,0.17485
+AMD integrated,before,120,3840,mid,1,bodies_end,0.7386
+AMD integrated,before,120,3840,mid,1,arena_end,0.01095
+AMD integrated,before,120,3840,mid,1,names_end,0.11375
+AMD integrated,before,120,3840,mid,1,resources_end,0.4777
+AMD integrated,before,120,3840,mid,1,minimap_end,0.02075
+AMD integrated,before,120,3840,mid,1,build_end,1.56225
+AMD integrated,before,120,3840,out,4,curves_end,0.81
+AMD integrated,before,120,3840,out,4,background_end,0.0015
+AMD integrated,before,120,3840,out,4,food_end,0.41835
+AMD integrated,before,120,3840,out,4,prey_end,0.1796
+AMD integrated,before,120,3840,out,4,bodies_end,1.61585
+AMD integrated,before,120,3840,out,4,arena_end,0.0087
+AMD integrated,before,120,3840,out,4,names_end,1.3692
+AMD integrated,before,120,3840,out,4,resources_end,0.84685
+AMD integrated,before,120,3840,out,4,minimap_end,0.0232
+AMD integrated,before,120,3840,out,4,build_end,2.75755
+AMD integrated,before,120,3840,out,1,curves_end,0.7496
+AMD integrated,before,120,3840,out,1,background_end,0.0011
+AMD integrated,before,120,3840,out,1,food_end,0.4135
+AMD integrated,before,120,3840,out,1,prey_end,0.1792
+AMD integrated,before,120,3840,out,1,bodies_end,1.54835
+AMD integrated,before,120,3840,out,1,arena_end,0.0083
+AMD integrated,before,120,3840,out,1,names_end,1.3515
+AMD integrated,before,120,3840,out,1,resources_end,0.8218
+AMD integrated,before,120,3840,out,1,minimap_end,0.0215
+AMD integrated,before,120,3840,out,1,build_end,2.8364
+AMD integrated,before,500,1920,default,4,curves_end,0.98495
+AMD integrated,before,500,1920,default,4,background_end,0.0007
+AMD integrated,before,500,1920,default,4,food_end,0.4268
+AMD integrated,before,500,1920,default,4,prey_end,0.1805
+AMD integrated,before,500,1920,default,4,bodies_end,0.0342
+AMD integrated,before,500,1920,default,4,arena_end,0.002
+AMD integrated,before,500,1920,default,4,names_end,0.0057
+AMD integrated,before,500,1920,default,4,resources_end,0.0257
+AMD integrated,before,500,1920,default,4,minimap_end,0.01625
+AMD integrated,before,500,1920,default,4,build_end,0.0527
+AMD integrated,before,500,1920,default,1,curves_end,1.0237
+AMD integrated,before,500,1920,default,1,background_end,0.0008
+AMD integrated,before,500,1920,default,1,food_end,0.42665
+AMD integrated,before,500,1920,default,1,prey_end,0.1803
+AMD integrated,before,500,1920,default,1,bodies_end,0.03435
+AMD integrated,before,500,1920,default,1,arena_end,0.002
+AMD integrated,before,500,1920,default,1,names_end,0.0058
+AMD integrated,before,500,1920,default,1,resources_end,0.0253
+AMD integrated,before,500,1920,default,1,minimap_end,0.0161
+AMD integrated,before,500,1920,default,1,build_end,0.05275
+AMD integrated,before,500,1920,mid,4,curves_end,1.1502
+AMD integrated,before,500,1920,mid,4,background_end,0.0008
+AMD integrated,before,500,1920,mid,4,food_end,0.4382
+AMD integrated,before,500,1920,mid,4,prey_end,0.1812
+AMD integrated,before,500,1920,mid,4,bodies_end,0.17195
+AMD integrated,before,500,1920,mid,4,arena_end,0.0028
+AMD integrated,before,500,1920,mid,4,names_end,0.0224
+AMD integrated,before,500,1920,mid,4,resources_end,0.13405
+AMD integrated,before,500,1920,mid,4,minimap_end,0.01815
+AMD integrated,before,500,1920,mid,4,build_end,0.2597
+AMD integrated,before,500,1920,mid,1,curves_end,1.12365
+AMD integrated,before,500,1920,mid,1,background_end,0.0008
+AMD integrated,before,500,1920,mid,1,food_end,0.44515
+AMD integrated,before,500,1920,mid,1,prey_end,0.1814
+AMD integrated,before,500,1920,mid,1,bodies_end,0.172
+AMD integrated,before,500,1920,mid,1,arena_end,0.0029
+AMD integrated,before,500,1920,mid,1,names_end,0.0223
+AMD integrated,before,500,1920,mid,1,resources_end,0.13365
+AMD integrated,before,500,1920,mid,1,minimap_end,0.0183
+AMD integrated,before,500,1920,mid,1,build_end,0.2602
+AMD integrated,before,500,1920,out,4,curves_end,1.9555
+AMD integrated,before,500,1920,out,4,background_end,0.00265
+AMD integrated,before,500,1920,out,4,food_end,0.24435
+AMD integrated,before,500,1920,out,4,prey_end,0.1843
+AMD integrated,before,500,1920,out,4,bodies_end,2.30485
+AMD integrated,before,500,1920,out,4,arena_end,0.00715
+AMD integrated,before,500,1920,out,4,names_end,0.0014
+AMD integrated,before,500,1920,out,4,resources_end,0.67955
+AMD integrated,before,500,1920,out,4,minimap_end,0.024
+AMD integrated,before,500,1920,out,4,build_end,2.55425
+AMD integrated,before,500,1920,out,1,curves_end,2.08515
+AMD integrated,before,500,1920,out,1,background_end,0.0035
+AMD integrated,before,500,1920,out,1,food_end,0.2332
+AMD integrated,before,500,1920,out,1,prey_end,0.1847
+AMD integrated,before,500,1920,out,1,bodies_end,2.3124
+AMD integrated,before,500,1920,out,1,arena_end,0.0074
+AMD integrated,before,500,1920,out,1,names_end,0.002
+AMD integrated,before,500,1920,out,1,resources_end,0.68045
+AMD integrated,before,500,1920,out,1,minimap_end,0.0246
+AMD integrated,before,500,1920,out,1,build_end,2.542
+AMD integrated,before,500,3840,default,4,curves_end,2.0522
+AMD integrated,before,500,3840,default,4,background_end,0.0015
+AMD integrated,before,500,3840,default,4,food_end,0.4289
+AMD integrated,before,500,3840,default,4,prey_end,0.1882
+AMD integrated,before,500,3840,default,4,bodies_end,0.08875
+AMD integrated,before,500,3840,default,4,arena_end,0.00295
+AMD integrated,before,500,3840,default,4,names_end,0.0129
+AMD integrated,before,500,3840,default,4,resources_end,0.0636
+AMD integrated,before,500,3840,default,4,minimap_end,0.02135
+AMD integrated,before,500,3840,default,4,build_end,0.1114
+AMD integrated,before,500,3840,default,1,curves_end,1.112
+AMD integrated,before,500,3840,default,1,background_end,0.001
+AMD integrated,before,500,3840,default,1,food_end,0.43745
+AMD integrated,before,500,3840,default,1,prey_end,0.18165
+AMD integrated,before,500,3840,default,1,bodies_end,0.0732
+AMD integrated,before,500,3840,default,1,arena_end,0.002
+AMD integrated,before,500,3840,default,1,names_end,0.0098
+AMD integrated,before,500,3840,default,1,resources_end,0.0571
+AMD integrated,before,500,3840,default,1,minimap_end,0.01695
+AMD integrated,before,500,3840,default,1,build_end,0.10725
+AMD integrated,before,500,3840,mid,4,curves_end,1.3736
+AMD integrated,before,500,3840,mid,4,background_end,0.002
+AMD integrated,before,500,3840,mid,4,food_end,0.67905
+AMD integrated,before,500,3840,mid,4,prey_end,0.1821
+AMD integrated,before,500,3840,mid,4,bodies_end,0.543
+AMD integrated,before,500,3840,mid,4,arena_end,0.01245
+AMD integrated,before,500,3840,mid,4,names_end,0.07595
+AMD integrated,before,500,3840,mid,4,resources_end,0.4574
+AMD integrated,before,500,3840,mid,4,minimap_end,0.0207
+AMD integrated,before,500,3840,mid,4,build_end,1.14915
+AMD integrated,before,500,3840,mid,1,curves_end,1.3271
+AMD integrated,before,500,3840,mid,1,background_end,0.00115
+AMD integrated,before,500,3840,mid,1,food_end,0.67975
+AMD integrated,before,500,3840,mid,1,prey_end,0.1815
+AMD integrated,before,500,3840,mid,1,bodies_end,0.53135
+AMD integrated,before,500,3840,mid,1,arena_end,0.012
+AMD integrated,before,500,3840,mid,1,names_end,0.07485
+AMD integrated,before,500,3840,mid,1,resources_end,0.46345
+AMD integrated,before,500,3840,mid,1,minimap_end,0.0194
+AMD integrated,before,500,3840,mid,1,build_end,1.15525
+AMD integrated,before,500,3840,out,4,curves_end,3.13735
+AMD integrated,before,500,3840,out,4,background_end,0.00255
+AMD integrated,before,500,3840,out,4,food_end,0.3349
+AMD integrated,before,500,3840,out,4,prey_end,0.1962
+AMD integrated,before,500,3840,out,4,bodies_end,3.79585
+AMD integrated,before,500,3840,out,4,arena_end,0.0101
+AMD integrated,before,500,3840,out,4,names_end,2.03925
+AMD integrated,before,500,3840,out,4,resources_end,1.42405
+AMD integrated,before,500,3840,out,4,minimap_end,0.0273
+AMD integrated,before,500,3840,out,4,build_end,4.4085
+AMD integrated,before,500,3840,out,1,curves_end,2.70795
+AMD integrated,before,500,3840,out,1,background_end,0.0045
+AMD integrated,before,500,3840,out,1,food_end,0.38565
+AMD integrated,before,500,3840,out,1,prey_end,0.18825
+AMD integrated,before,500,3840,out,1,bodies_end,3.7534
+AMD integrated,before,500,3840,out,1,arena_end,0.0099
+AMD integrated,before,500,3840,out,1,names_end,1.9115
+AMD integrated,before,500,3840,out,1,resources_end,1.1537
+AMD integrated,before,500,3840,out,1,minimap_end,0.02565
+AMD integrated,before,500,3840,out,1,build_end,4.29905
+RTX 5070 Ti,after,120,1920,default,4,curves_end,0.2876
+RTX 5070 Ti,after,120,1920,default,4,background_end,0.0005
+RTX 5070 Ti,after,120,1920,default,4,food_end,0.10125
+RTX 5070 Ti,after,120,1920,default,4,prey_end,0.1722
+RTX 5070 Ti,after,120,1920,default,4,bodies_end,0.04085
+RTX 5070 Ti,after,120,1920,default,4,arena_end,0.0018
+RTX 5070 Ti,after,120,1920,default,4,names_end,0.0059
+RTX 5070 Ti,after,120,1920,default,4,resources_end,0.02955
+RTX 5070 Ti,after,120,1920,default,4,minimap_end,0.0153
+RTX 5070 Ti,after,120,1920,default,4,build_end,0.06425
+RTX 5070 Ti,after,120,1920,default,1,curves_end,0.3621
+RTX 5070 Ti,after,120,1920,default,1,background_end,0.0008
+RTX 5070 Ti,after,120,1920,default,1,food_end,0.1088
+RTX 5070 Ti,after,120,1920,default,1,prey_end,0.1901
+RTX 5070 Ti,after,120,1920,default,1,bodies_end,0.0438
+RTX 5070 Ti,after,120,1920,default,1,arena_end,0.002
+RTX 5070 Ti,after,120,1920,default,1,names_end,0.0073
+RTX 5070 Ti,after,120,1920,default,1,resources_end,0.03695
+RTX 5070 Ti,after,120,1920,default,1,minimap_end,0.0173
+RTX 5070 Ti,after,120,1920,default,1,build_end,0.08145
+RTX 5070 Ti,after,120,1920,mid,4,curves_end,0.4733
+RTX 5070 Ti,after,120,1920,mid,4,background_end,0.00095
+RTX 5070 Ti,after,120,1920,mid,4,food_end,0.1981
+RTX 5070 Ti,after,120,1920,mid,4,prey_end,0.211
+RTX 5070 Ti,after,120,1920,mid,4,bodies_end,0.3147
+RTX 5070 Ti,after,120,1920,mid,4,arena_end,0.0044
+RTX 5070 Ti,after,120,1920,mid,4,names_end,0.04685
+RTX 5070 Ti,after,120,1920,mid,4,resources_end,0.2728
+RTX 5070 Ti,after,120,1920,mid,4,minimap_end,0.0213
+RTX 5070 Ti,after,120,1920,mid,4,build_end,0.58655
+RTX 5070 Ti,after,120,1920,mid,1,curves_end,0.46955
+RTX 5070 Ti,after,120,1920,mid,1,background_end,0.0009
+RTX 5070 Ti,after,120,1920,mid,1,food_end,0.18255
+RTX 5070 Ti,after,120,1920,mid,1,prey_end,0.1764
+RTX 5070 Ti,after,120,1920,mid,1,bodies_end,0.28545
+RTX 5070 Ti,after,120,1920,mid,1,arena_end,0.00415
+RTX 5070 Ti,after,120,1920,mid,1,names_end,0.0434
+RTX 5070 Ti,after,120,1920,mid,1,resources_end,0.2602
+RTX 5070 Ti,after,120,1920,mid,1,minimap_end,0.02005
+RTX 5070 Ti,after,120,1920,mid,1,build_end,0.5865
+RTX 5070 Ti,after,120,1920,out,4,curves_end,0.93565
+RTX 5070 Ti,after,120,1920,out,4,background_end,0.0016
+RTX 5070 Ti,after,120,1920,out,4,food_end,0.05375
+RTX 5070 Ti,after,120,1920,out,4,prey_end,0.17775
+RTX 5070 Ti,after,120,1920,out,4,bodies_end,1.4785
+RTX 5070 Ti,after,120,1920,out,4,arena_end,0.0071
+RTX 5070 Ti,after,120,1920,out,4,names_end,1.399
+RTX 5070 Ti,after,120,1920,out,4,resources_end,0.33245
+RTX 5070 Ti,after,120,1920,out,4,minimap_end,0.0233
+RTX 5070 Ti,after,120,1920,out,4,build_end,1.76205
+RTX 5070 Ti,after,120,1920,out,1,curves_end,0.88405
+RTX 5070 Ti,after,120,1920,out,1,background_end,0.00155
+RTX 5070 Ti,after,120,1920,out,1,food_end,0.0515
+RTX 5070 Ti,after,120,1920,out,1,prey_end,0.17805
+RTX 5070 Ti,after,120,1920,out,1,bodies_end,1.3756
+RTX 5070 Ti,after,120,1920,out,1,arena_end,0.00695
+RTX 5070 Ti,after,120,1920,out,1,names_end,1.35295
+RTX 5070 Ti,after,120,1920,out,1,resources_end,0.33565
+RTX 5070 Ti,after,120,1920,out,1,minimap_end,0.02265
+RTX 5070 Ti,after,120,1920,out,1,build_end,1.6114
+RTX 5070 Ti,after,120,3840,default,4,curves_end,0.3771
+RTX 5070 Ti,after,120,3840,default,4,background_end,0.00075
+RTX 5070 Ti,after,120,3840,default,4,food_end,0.10305
+RTX 5070 Ti,after,120,3840,default,4,prey_end,0.17445
+RTX 5070 Ti,after,120,3840,default,4,bodies_end,0.1266
+RTX 5070 Ti,after,120,3840,default,4,arena_end,0.0021
+RTX 5070 Ti,after,120,3840,default,4,names_end,0.01515
+RTX 5070 Ti,after,120,3840,default,4,resources_end,0.09255
+RTX 5070 Ti,after,120,3840,default,4,minimap_end,0.01795
+RTX 5070 Ti,after,120,3840,default,4,build_end,0.1873
+RTX 5070 Ti,after,120,3840,default,1,curves_end,0.4655
+RTX 5070 Ti,after,120,3840,default,1,background_end,0.0009
+RTX 5070 Ti,after,120,3840,default,1,food_end,0.13125
+RTX 5070 Ti,after,120,3840,default,1,prey_end,0.27225
+RTX 5070 Ti,after,120,3840,default,1,bodies_end,0.175
+RTX 5070 Ti,after,120,3840,default,1,arena_end,0.0029
+RTX 5070 Ti,after,120,3840,default,1,names_end,0.02165
+RTX 5070 Ti,after,120,3840,default,1,resources_end,0.1115
+RTX 5070 Ti,after,120,3840,default,1,minimap_end,0.02335
+RTX 5070 Ti,after,120,3840,default,1,build_end,0.2905
+RTX 5070 Ti,after,120,3840,mid,4,curves_end,0.53055
+RTX 5070 Ti,after,120,3840,mid,4,background_end,0.001
+RTX 5070 Ti,after,120,3840,mid,4,food_end,0.3606
+RTX 5070 Ti,after,120,3840,mid,4,prey_end,0.1743
+RTX 5070 Ti,after,120,3840,mid,4,bodies_end,0.72135
+RTX 5070 Ti,after,120,3840,mid,4,arena_end,0.0103
+RTX 5070 Ti,after,120,3840,mid,4,names_end,0.11245
+RTX 5070 Ti,after,120,3840,mid,4,resources_end,0.504
+RTX 5070 Ti,after,120,3840,mid,4,minimap_end,0.0201
+RTX 5070 Ti,after,120,3840,mid,4,build_end,1.5698
+RTX 5070 Ti,after,120,3840,mid,1,curves_end,0.49015
+RTX 5070 Ti,after,120,3840,mid,1,background_end,0.0007
+RTX 5070 Ti,after,120,3840,mid,1,food_end,0.3626
+RTX 5070 Ti,after,120,3840,mid,1,prey_end,0.1736
+RTX 5070 Ti,after,120,3840,mid,1,bodies_end,0.72525
+RTX 5070 Ti,after,120,3840,mid,1,arena_end,0.0102
+RTX 5070 Ti,after,120,3840,mid,1,names_end,0.11235
+RTX 5070 Ti,after,120,3840,mid,1,resources_end,0.4939
+RTX 5070 Ti,after,120,3840,mid,1,minimap_end,0.0189
+RTX 5070 Ti,after,120,3840,mid,1,build_end,1.59695
+RTX 5070 Ti,after,120,3840,out,4,curves_end,0.9118
+RTX 5070 Ti,after,120,3840,out,4,background_end,0.0015
+RTX 5070 Ti,after,120,3840,out,4,food_end,0.4429
+RTX 5070 Ti,after,120,3840,out,4,prey_end,0.17945
+RTX 5070 Ti,after,120,3840,out,4,bodies_end,1.64525
+RTX 5070 Ti,after,120,3840,out,4,arena_end,0.00955
+RTX 5070 Ti,after,120,3840,out,4,names_end,1.5195
+RTX 5070 Ti,after,120,3840,out,4,resources_end,0.89405
+RTX 5070 Ti,after,120,3840,out,4,minimap_end,0.0237
+RTX 5070 Ti,after,120,3840,out,4,build_end,2.8763
+RTX 5070 Ti,after,120,3840,out,1,curves_end,0.82905
+RTX 5070 Ti,after,120,3840,out,1,background_end,0.0015
+RTX 5070 Ti,after,120,3840,out,1,food_end,0.43215
+RTX 5070 Ti,after,120,3840,out,1,prey_end,0.1804
+RTX 5070 Ti,after,120,3840,out,1,bodies_end,1.6158
+RTX 5070 Ti,after,120,3840,out,1,arena_end,0.0096
+RTX 5070 Ti,after,120,3840,out,1,names_end,1.4366
+RTX 5070 Ti,after,120,3840,out,1,resources_end,0.87845
+RTX 5070 Ti,after,120,3840,out,1,minimap_end,0.0234
+RTX 5070 Ti,after,120,3840,out,1,build_end,2.7985
+RTX 5070 Ti,after,500,1920,default,4,curves_end,0.92345
+RTX 5070 Ti,after,500,1920,default,4,background_end,0.0008
+RTX 5070 Ti,after,500,1920,default,4,food_end,0.4314
+RTX 5070 Ti,after,500,1920,default,4,prey_end,0.18025
+RTX 5070 Ti,after,500,1920,default,4,bodies_end,0.034
+RTX 5070 Ti,after,500,1920,default,4,arena_end,0.002
+RTX 5070 Ti,after,500,1920,default,4,names_end,0.00565
+RTX 5070 Ti,after,500,1920,default,4,resources_end,0.0256
+RTX 5070 Ti,after,500,1920,default,4,minimap_end,0.01575
+RTX 5070 Ti,after,500,1920,default,4,build_end,0.0532
+RTX 5070 Ti,after,500,1920,default,1,curves_end,0.9249
+RTX 5070 Ti,after,500,1920,default,1,background_end,0.0007
+RTX 5070 Ti,after,500,1920,default,1,food_end,0.42995
+RTX 5070 Ti,after,500,1920,default,1,prey_end,0.1838
+RTX 5070 Ti,after,500,1920,default,1,bodies_end,0.0335
+RTX 5070 Ti,after,500,1920,default,1,arena_end,0.0019
+RTX 5070 Ti,after,500,1920,default,1,names_end,0.0056
+RTX 5070 Ti,after,500,1920,default,1,resources_end,0.0252
+RTX 5070 Ti,after,500,1920,default,1,minimap_end,0.01575
+RTX 5070 Ti,after,500,1920,default,1,build_end,0.05295
+RTX 5070 Ti,after,500,1920,mid,4,curves_end,1.02955
+RTX 5070 Ti,after,500,1920,mid,4,background_end,0.0009
+RTX 5070 Ti,after,500,1920,mid,4,food_end,0.44145
+RTX 5070 Ti,after,500,1920,mid,4,prey_end,0.18105
+RTX 5070 Ti,after,500,1920,mid,4,bodies_end,0.1769
+RTX 5070 Ti,after,500,1920,mid,4,arena_end,0.0029
+RTX 5070 Ti,after,500,1920,mid,4,names_end,0.024
+RTX 5070 Ti,after,500,1920,mid,4,resources_end,0.13645
+RTX 5070 Ti,after,500,1920,mid,4,minimap_end,0.0184
+RTX 5070 Ti,after,500,1920,mid,4,build_end,0.27105
+RTX 5070 Ti,after,500,1920,mid,1,curves_end,1.05065
+RTX 5070 Ti,after,500,1920,mid,1,background_end,0.0007
+RTX 5070 Ti,after,500,1920,mid,1,food_end,0.437
+RTX 5070 Ti,after,500,1920,mid,1,prey_end,0.1803
+RTX 5070 Ti,after,500,1920,mid,1,bodies_end,0.17335
+RTX 5070 Ti,after,500,1920,mid,1,arena_end,0.0028
+RTX 5070 Ti,after,500,1920,mid,1,names_end,0.02375
+RTX 5070 Ti,after,500,1920,mid,1,resources_end,0.13535
+RTX 5070 Ti,after,500,1920,mid,1,minimap_end,0.0182
+RTX 5070 Ti,after,500,1920,mid,1,build_end,0.2709
+RTX 5070 Ti,after,500,1920,out,4,curves_end,1.71915
+RTX 5070 Ti,after,500,1920,out,4,background_end,0.00125
+RTX 5070 Ti,after,500,1920,out,4,food_end,0.22105
+RTX 5070 Ti,after,500,1920,out,4,prey_end,0.18135
+RTX 5070 Ti,after,500,1920,out,4,bodies_end,1.96975
+RTX 5070 Ti,after,500,1920,out,4,arena_end,0.00625
+RTX 5070 Ti,after,500,1920,out,4,names_end,0.0009
+RTX 5070 Ti,after,500,1920,out,4,resources_end,0.33195
+RTX 5070 Ti,after,500,1920,out,4,minimap_end,0.01985
+RTX 5070 Ti,after,500,1920,out,4,build_end,1.64575
+RTX 5070 Ti,after,500,1920,out,1,curves_end,1.7186
+RTX 5070 Ti,after,500,1920,out,1,background_end,0.00175
+RTX 5070 Ti,after,500,1920,out,1,food_end,0.2018
+RTX 5070 Ti,after,500,1920,out,1,prey_end,0.18115
+RTX 5070 Ti,after,500,1920,out,1,bodies_end,1.95435
+RTX 5070 Ti,after,500,1920,out,1,arena_end,0.0064
+RTX 5070 Ti,after,500,1920,out,1,names_end,0.001
+RTX 5070 Ti,after,500,1920,out,1,resources_end,0.41625
+RTX 5070 Ti,after,500,1920,out,1,minimap_end,0.02055
+RTX 5070 Ti,after,500,1920,out,1,build_end,1.6261
+RTX 5070 Ti,after,500,3840,default,4,curves_end,0.96965
+RTX 5070 Ti,after,500,3840,default,4,background_end,0.0009
+RTX 5070 Ti,after,500,3840,default,4,food_end,0.42975
+RTX 5070 Ti,after,500,3840,default,4,prey_end,0.18015
+RTX 5070 Ti,after,500,3840,default,4,bodies_end,0.0716
+RTX 5070 Ti,after,500,3840,default,4,arena_end,0.00195
+RTX 5070 Ti,after,500,3840,default,4,names_end,0.0094
+RTX 5070 Ti,after,500,3840,default,4,resources_end,0.05585
+RTX 5070 Ti,after,500,3840,default,4,minimap_end,0.01645
+RTX 5070 Ti,after,500,3840,default,4,build_end,0.107
+RTX 5070 Ti,after,500,3840,default,1,curves_end,0.95525
+RTX 5070 Ti,after,500,3840,default,1,background_end,0.0008
+RTX 5070 Ti,after,500,3840,default,1,food_end,0.42635
+RTX 5070 Ti,after,500,3840,default,1,prey_end,0.18
+RTX 5070 Ti,after,500,3840,default,1,bodies_end,0.07045
+RTX 5070 Ti,after,500,3840,default,1,arena_end,0.0019
+RTX 5070 Ti,after,500,3840,default,1,names_end,0.0093
+RTX 5070 Ti,after,500,3840,default,1,resources_end,0.0533
+RTX 5070 Ti,after,500,3840,default,1,minimap_end,0.0159
+RTX 5070 Ti,after,500,3840,default,1,build_end,0.10555
+RTX 5070 Ti,after,500,3840,mid,4,curves_end,1.2344
+RTX 5070 Ti,after,500,3840,mid,4,background_end,0.0018
+RTX 5070 Ti,after,500,3840,mid,4,food_end,0.6793
+RTX 5070 Ti,after,500,3840,mid,4,prey_end,0.1808
+RTX 5070 Ti,after,500,3840,mid,4,bodies_end,0.5422
+RTX 5070 Ti,after,500,3840,mid,4,arena_end,0.0122
+RTX 5070 Ti,after,500,3840,mid,4,names_end,0.0792
+RTX 5070 Ti,after,500,3840,mid,4,resources_end,0.4933
+RTX 5070 Ti,after,500,3840,mid,4,minimap_end,0.01915
+RTX 5070 Ti,after,500,3840,mid,4,build_end,1.1547
+RTX 5070 Ti,after,500,3840,mid,1,curves_end,1.19075
+RTX 5070 Ti,after,500,3840,mid,1,background_end,0.00145
+RTX 5070 Ti,after,500,3840,mid,1,food_end,0.6783
+RTX 5070 Ti,after,500,3840,mid,1,prey_end,0.1806
+RTX 5070 Ti,after,500,3840,mid,1,bodies_end,0.5363
+RTX 5070 Ti,after,500,3840,mid,1,arena_end,0.0118
+RTX 5070 Ti,after,500,3840,mid,1,names_end,0.0789
+RTX 5070 Ti,after,500,3840,mid,1,resources_end,0.4747
+RTX 5070 Ti,after,500,3840,mid,1,minimap_end,0.01895
+RTX 5070 Ti,after,500,3840,mid,1,build_end,1.17075
+RTX 5070 Ti,after,500,3840,out,4,curves_end,1.9638
+RTX 5070 Ti,after,500,3840,out,4,background_end,0.00255
+RTX 5070 Ti,after,500,3840,out,4,food_end,0.2454
+RTX 5070 Ti,after,500,3840,out,4,prey_end,0.18215
+RTX 5070 Ti,after,500,3840,out,4,bodies_end,2.85735
+RTX 5070 Ti,after,500,3840,out,4,arena_end,0.00825
+RTX 5070 Ti,after,500,3840,out,4,names_end,1.53695
+RTX 5070 Ti,after,500,3840,out,4,resources_end,1.0012
+RTX 5070 Ti,after,500,3840,out,4,minimap_end,0.022
+RTX 5070 Ti,after,500,3840,out,4,build_end,3.2141
+RTX 5070 Ti,after,500,3840,out,1,curves_end,1.95455
+RTX 5070 Ti,after,500,3840,out,1,background_end,0.0021
+RTX 5070 Ti,after,500,3840,out,1,food_end,0.22395
+RTX 5070 Ti,after,500,3840,out,1,prey_end,0.182
+RTX 5070 Ti,after,500,3840,out,1,bodies_end,2.8539
+RTX 5070 Ti,after,500,3840,out,1,arena_end,0.0081
+RTX 5070 Ti,after,500,3840,out,1,names_end,1.54535
+RTX 5070 Ti,after,500,3840,out,1,resources_end,1.01915
+RTX 5070 Ti,after,500,3840,out,1,minimap_end,0.02115
+RTX 5070 Ti,after,500,3840,out,1,build_end,3.1941
+AMD integrated,after,120,1920,default,4,curves_end,0.3047
+AMD integrated,after,120,1920,default,4,background_end,0.0007
+AMD integrated,after,120,1920,default,4,food_end,0.10295
+AMD integrated,after,120,1920,default,4,prey_end,0.1733
+AMD integrated,after,120,1920,default,4,bodies_end,0.04165
+AMD integrated,after,120,1920,default,4,arena_end,0.002
+AMD integrated,after,120,1920,default,4,names_end,0.0064
+AMD integrated,after,120,1920,default,4,resources_end,0.0305
+AMD integrated,after,120,1920,default,4,minimap_end,0.0163
+AMD integrated,after,120,1920,default,4,build_end,0.06645
+AMD integrated,after,120,1920,default,1,curves_end,0.29705
+AMD integrated,after,120,1920,default,1,background_end,0.0007
+AMD integrated,after,120,1920,default,1,food_end,0.10275
+AMD integrated,after,120,1920,default,1,prey_end,0.17305
+AMD integrated,after,120,1920,default,1,bodies_end,0.0414
+AMD integrated,after,120,1920,default,1,arena_end,0.002
+AMD integrated,after,120,1920,default,1,names_end,0.0068
+AMD integrated,after,120,1920,default,1,resources_end,0.03055
+AMD integrated,after,120,1920,default,1,minimap_end,0.01605
+AMD integrated,after,120,1920,default,1,build_end,0.066
+AMD integrated,after,120,1920,mid,4,curves_end,0.3753
+AMD integrated,after,120,1920,mid,4,background_end,0.0007
+AMD integrated,after,120,1920,mid,4,food_end,0.16
+AMD integrated,after,120,1920,mid,4,prey_end,0.17355
+AMD integrated,after,120,1920,mid,4,bodies_end,0.26575
+AMD integrated,after,120,1920,mid,4,arena_end,0.0031
+AMD integrated,after,120,1920,mid,4,names_end,0.03645
+AMD integrated,after,120,1920,mid,4,resources_end,0.25085
+AMD integrated,after,120,1920,mid,4,minimap_end,0.0188
+AMD integrated,after,120,1920,mid,4,build_end,0.49215
+AMD integrated,after,120,1920,mid,1,curves_end,0.36725
+AMD integrated,after,120,1920,mid,1,background_end,0.0007
+AMD integrated,after,120,1920,mid,1,food_end,0.16285
+AMD integrated,after,120,1920,mid,1,prey_end,0.17355
+AMD integrated,after,120,1920,mid,1,bodies_end,0.2667
+AMD integrated,after,120,1920,mid,1,arena_end,0.0031
+AMD integrated,after,120,1920,mid,1,names_end,0.0373
+AMD integrated,after,120,1920,mid,1,resources_end,0.25175
+AMD integrated,after,120,1920,mid,1,minimap_end,0.01865
+AMD integrated,after,120,1920,mid,1,build_end,0.49625
+AMD integrated,after,120,1920,out,4,curves_end,0.72295
+AMD integrated,after,120,1920,out,4,background_end,0.0009
+AMD integrated,after,120,1920,out,4,food_end,0.03675
+AMD integrated,after,120,1920,out,4,prey_end,0.1751
+AMD integrated,after,120,1920,out,4,bodies_end,1.2594
+AMD integrated,after,120,1920,out,4,arena_end,0.00585
+AMD integrated,after,120,1920,out,4,names_end,1.17585
+AMD integrated,after,120,1920,out,4,resources_end,0.3083
+AMD integrated,after,120,1920,out,4,minimap_end,0.0194
+AMD integrated,after,120,1920,out,4,build_end,1.60735
+AMD integrated,after,120,1920,out,1,curves_end,0.66825
+AMD integrated,after,120,1920,out,1,background_end,0.0008
+AMD integrated,after,120,1920,out,1,food_end,0.03535
+AMD integrated,after,120,1920,out,1,prey_end,0.1764
+AMD integrated,after,120,1920,out,1,bodies_end,1.27285
+AMD integrated,after,120,1920,out,1,arena_end,0.0059
+AMD integrated,after,120,1920,out,1,names_end,1.18715
+AMD integrated,after,120,1920,out,1,resources_end,0.3068
+AMD integrated,after,120,1920,out,1,minimap_end,0.01965
+AMD integrated,after,120,1920,out,1,build_end,1.56225
+AMD integrated,after,120,3840,default,4,curves_end,0.36125
+AMD integrated,after,120,3840,default,4,background_end,0.0007
+AMD integrated,after,120,3840,default,4,food_end,0.1027
+AMD integrated,after,120,3840,default,4,prey_end,0.1738
+AMD integrated,after,120,3840,default,4,bodies_end,0.1232
+AMD integrated,after,120,3840,default,4,arena_end,0.0021
+AMD integrated,after,120,3840,default,4,names_end,0.0147
+AMD integrated,after,120,3840,default,4,resources_end,0.0928
+AMD integrated,after,120,3840,default,4,minimap_end,0.0174
+AMD integrated,after,120,3840,default,4,build_end,0.185
+AMD integrated,after,120,3840,default,1,curves_end,0.36985
+AMD integrated,after,120,3840,default,1,background_end,0.0007
+AMD integrated,after,120,3840,default,1,food_end,0.10265
+AMD integrated,after,120,3840,default,1,prey_end,0.173
+AMD integrated,after,120,3840,default,1,bodies_end,0.1242
+AMD integrated,after,120,3840,default,1,arena_end,0.0021
+AMD integrated,after,120,3840,default,1,names_end,0.0148
+AMD integrated,after,120,3840,default,1,resources_end,0.0942
+AMD integrated,after,120,3840,default,1,minimap_end,0.0175
+AMD integrated,after,120,3840,default,1,build_end,0.18455
+AMD integrated,after,120,3840,mid,4,curves_end,0.55025
+AMD integrated,after,120,3840,mid,4,background_end,0.0011
+AMD integrated,after,120,3840,mid,4,food_end,0.36705
+AMD integrated,after,120,3840,mid,4,prey_end,0.17545
+AMD integrated,after,120,3840,mid,4,bodies_end,0.7311
+AMD integrated,after,120,3840,mid,4,arena_end,0.0109
+AMD integrated,after,120,3840,mid,4,names_end,0.11475
+AMD integrated,after,120,3840,mid,4,resources_end,0.51825
+AMD integrated,after,120,3840,mid,4,minimap_end,0.0205
+AMD integrated,after,120,3840,mid,4,build_end,1.6122
+AMD integrated,after,120,3840,mid,1,curves_end,0.5428
+AMD integrated,after,120,3840,mid,1,background_end,0.00085
+AMD integrated,after,120,3840,mid,1,food_end,0.366
+AMD integrated,after,120,3840,mid,1,prey_end,0.17385
+AMD integrated,after,120,3840,mid,1,bodies_end,0.72015
+AMD integrated,after,120,3840,mid,1,arena_end,0.01105
+AMD integrated,after,120,3840,mid,1,names_end,0.11485
+AMD integrated,after,120,3840,mid,1,resources_end,0.5008
+AMD integrated,after,120,3840,mid,1,minimap_end,0.02
+AMD integrated,after,120,3840,mid,1,build_end,1.6127
+AMD integrated,after,120,3840,out,4,curves_end,0.79805
+AMD integrated,after,120,3840,out,4,background_end,0.0015
+AMD integrated,after,120,3840,out,4,food_end,0.4178
+AMD integrated,after,120,3840,out,4,prey_end,0.17705
+AMD integrated,after,120,3840,out,4,bodies_end,1.54595
+AMD integrated,after,120,3840,out,4,arena_end,0.00845
+AMD integrated,after,120,3840,out,4,names_end,1.3989
+AMD integrated,after,120,3840,out,4,resources_end,0.8474
+AMD integrated,after,120,3840,out,4,minimap_end,0.02325
+AMD integrated,after,120,3840,out,4,build_end,2.7543
+AMD integrated,after,120,3840,out,1,curves_end,0.98965
+AMD integrated,after,120,3840,out,1,background_end,0.00195
+AMD integrated,after,120,3840,out,1,food_end,0.4466
+AMD integrated,after,120,3840,out,1,prey_end,0.1856
+AMD integrated,after,120,3840,out,1,bodies_end,1.9139
+AMD integrated,after,120,3840,out,1,arena_end,0.0103
+AMD integrated,after,120,3840,out,1,names_end,1.72815
+AMD integrated,after,120,3840,out,1,resources_end,0.91765
+AMD integrated,after,120,3840,out,1,minimap_end,0.02615
+AMD integrated,after,120,3840,out,1,build_end,2.8756
+AMD integrated,after,500,1920,default,4,curves_end,1.0464
+AMD integrated,after,500,1920,default,4,background_end,0.0008
+AMD integrated,after,500,1920,default,4,food_end,0.4381
+AMD integrated,after,500,1920,default,4,prey_end,0.18355
+AMD integrated,after,500,1920,default,4,bodies_end,0.03565
+AMD integrated,after,500,1920,default,4,arena_end,0.0021
+AMD integrated,after,500,1920,default,4,names_end,0.00625
+AMD integrated,after,500,1920,default,4,resources_end,0.0291
+AMD integrated,after,500,1920,default,4,minimap_end,0.01715
+AMD integrated,after,500,1920,default,4,build_end,0.0547
+AMD integrated,after,500,1920,default,1,curves_end,0.98065
+AMD integrated,after,500,1920,default,1,background_end,0.0008
+AMD integrated,after,500,1920,default,1,food_end,0.43125
+AMD integrated,after,500,1920,default,1,prey_end,0.1805
+AMD integrated,after,500,1920,default,1,bodies_end,0.0343
+AMD integrated,after,500,1920,default,1,arena_end,0.002
+AMD integrated,after,500,1920,default,1,names_end,0.0059
+AMD integrated,after,500,1920,default,1,resources_end,0.02625
+AMD integrated,after,500,1920,default,1,minimap_end,0.0162
+AMD integrated,after,500,1920,default,1,build_end,0.05345
+AMD integrated,after,500,1920,mid,4,curves_end,1.14555
+AMD integrated,after,500,1920,mid,4,background_end,0.0008
+AMD integrated,after,500,1920,mid,4,food_end,0.4494
+AMD integrated,after,500,1920,mid,4,prey_end,0.1855
+AMD integrated,after,500,1920,mid,4,bodies_end,0.1719
+AMD integrated,after,500,1920,mid,4,arena_end,0.0029
+AMD integrated,after,500,1920,mid,4,names_end,0.0237
+AMD integrated,after,500,1920,mid,4,resources_end,0.14025
+AMD integrated,after,500,1920,mid,4,minimap_end,0.0183
+AMD integrated,after,500,1920,mid,4,build_end,0.27105
+AMD integrated,after,500,1920,mid,1,curves_end,1.088
+AMD integrated,after,500,1920,mid,1,background_end,0.0008
+AMD integrated,after,500,1920,mid,1,food_end,0.44455
+AMD integrated,after,500,1920,mid,1,prey_end,0.1851
+AMD integrated,after,500,1920,mid,1,bodies_end,0.17155
+AMD integrated,after,500,1920,mid,1,arena_end,0.0029
+AMD integrated,after,500,1920,mid,1,names_end,0.02345
+AMD integrated,after,500,1920,mid,1,resources_end,0.1386
+AMD integrated,after,500,1920,mid,1,minimap_end,0.0182
+AMD integrated,after,500,1920,mid,1,build_end,0.27095
+AMD integrated,after,500,1920,out,4,curves_end,1.71875
+AMD integrated,after,500,1920,out,4,background_end,0.0014
+AMD integrated,after,500,1920,out,4,food_end,0.1978
+AMD integrated,after,500,1920,out,4,prey_end,0.1807
+AMD integrated,after,500,1920,out,4,bodies_end,1.91565
+AMD integrated,after,500,1920,out,4,arena_end,0.0055
+AMD integrated,after,500,1920,out,4,names_end,0.001
+AMD integrated,after,500,1920,out,4,resources_end,0.3689
+AMD integrated,after,500,1920,out,4,minimap_end,0.01945
+AMD integrated,after,500,1920,out,4,build_end,1.623
+AMD integrated,after,500,1920,out,1,curves_end,1.7028
+AMD integrated,after,500,1920,out,1,background_end,0.0019
+AMD integrated,after,500,1920,out,1,food_end,0.20375
+AMD integrated,after,500,1920,out,1,prey_end,0.18115
+AMD integrated,after,500,1920,out,1,bodies_end,1.92695
+AMD integrated,after,500,1920,out,1,arena_end,0.00555
+AMD integrated,after,500,1920,out,1,names_end,0.001
+AMD integrated,after,500,1920,out,1,resources_end,0.2867
+AMD integrated,after,500,1920,out,1,minimap_end,0.01955
+AMD integrated,after,500,1920,out,1,build_end,1.62995
+AMD integrated,after,500,3840,default,4,curves_end,1.05085
+AMD integrated,after,500,3840,default,4,background_end,0.0008
+AMD integrated,after,500,3840,default,4,food_end,0.4272
+AMD integrated,after,500,3840,default,4,prey_end,0.1801
+AMD integrated,after,500,3840,default,4,bodies_end,0.0716
+AMD integrated,after,500,3840,default,4,arena_end,0.002
+AMD integrated,after,500,3840,default,4,names_end,0.0096
+AMD integrated,after,500,3840,default,4,resources_end,0.05595
+AMD integrated,after,500,3840,default,4,minimap_end,0.01675
+AMD integrated,after,500,3840,default,4,build_end,0.10765
+AMD integrated,after,500,3840,default,1,curves_end,1.00485
+AMD integrated,after,500,3840,default,1,background_end,0.0008
+AMD integrated,after,500,3840,default,1,food_end,0.4319
+AMD integrated,after,500,3840,default,1,prey_end,0.18035
+AMD integrated,after,500,3840,default,1,bodies_end,0.07215
+AMD integrated,after,500,3840,default,1,arena_end,0.002
+AMD integrated,after,500,3840,default,1,names_end,0.0099
+AMD integrated,after,500,3840,default,1,resources_end,0.0573
+AMD integrated,after,500,3840,default,1,minimap_end,0.0169
+AMD integrated,after,500,3840,default,1,build_end,0.1077
+AMD integrated,after,500,3840,mid,4,curves_end,1.456
+AMD integrated,after,500,3840,mid,4,background_end,0.002
+AMD integrated,after,500,3840,mid,4,food_end,0.7534
+AMD integrated,after,500,3840,mid,4,prey_end,0.1834
+AMD integrated,after,500,3840,mid,4,bodies_end,0.5504
+AMD integrated,after,500,3840,mid,4,arena_end,0.0124
+AMD integrated,after,500,3840,mid,4,names_end,0.07965
+AMD integrated,after,500,3840,mid,4,resources_end,0.5066
+AMD integrated,after,500,3840,mid,4,minimap_end,0.0202
+AMD integrated,after,500,3840,mid,4,build_end,1.16325
+AMD integrated,after,500,3840,mid,1,curves_end,1.3097
+AMD integrated,after,500,3840,mid,1,background_end,0.0011
+AMD integrated,after,500,3840,mid,1,food_end,0.78235
+AMD integrated,after,500,3840,mid,1,prey_end,0.1817
+AMD integrated,after,500,3840,mid,1,bodies_end,0.54365
+AMD integrated,after,500,3840,mid,1,arena_end,0.0118
+AMD integrated,after,500,3840,mid,1,names_end,0.07765
+AMD integrated,after,500,3840,mid,1,resources_end,0.53335
+AMD integrated,after,500,3840,mid,1,minimap_end,0.0193
+AMD integrated,after,500,3840,mid,1,build_end,1.1761
+AMD integrated,after,500,3840,out,4,curves_end,2.29415
+AMD integrated,after,500,3840,out,4,background_end,0.0017
+AMD integrated,after,500,3840,out,4,food_end,0.2313
+AMD integrated,after,500,3840,out,4,prey_end,0.1832
+AMD integrated,after,500,3840,out,4,bodies_end,2.9735
+AMD integrated,after,500,3840,out,4,arena_end,0.0079
+AMD integrated,after,500,3840,out,4,names_end,1.6125
+AMD integrated,after,500,3840,out,4,resources_end,1.13105
+AMD integrated,after,500,3840,out,4,minimap_end,0.02175
+AMD integrated,after,500,3840,out,4,build_end,3.2465
+AMD integrated,after,500,3840,out,1,curves_end,2.35305
+AMD integrated,after,500,3840,out,1,background_end,0.00175
+AMD integrated,after,500,3840,out,1,food_end,0.23215
+AMD integrated,after,500,3840,out,1,prey_end,0.18285
+AMD integrated,after,500,3840,out,1,bodies_end,2.9562
+AMD integrated,after,500,3840,out,1,arena_end,0.00785
+AMD integrated,after,500,3840,out,1,names_end,1.62435
+AMD integrated,after,500,3840,out,1,resources_end,1.1159
+AMD integrated,after,500,3840,out,1,minimap_end,0.02185
+AMD integrated,after,500,3840,out,1,build_end,3.2534

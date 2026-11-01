@@ -1,5 +1,38 @@
 # Native frame workload
 
+## Battledome zoom-out matrix
+
+The finite headless `frame_perf --battledome NEW_DIRECTORY` driver uses authored
+packets and procedural placeholder art at default, mid and whole-map wheel zoom,
+1080p/4K, and 1x/4x MSAA on each DX12 hardware adapter. It models 120/500-bot arena
+sizes, retaining 121/256 live snakes respectively under the current client cap.
+The 500 model is not 500 admitted live snakes. It opens no socket or window.
+
+```powershell
+$env:CARGO_TARGET_DIR = 'D:/CargoTargets/zoomout-perf'
+$env:CARGO_BUILD_JOBS = '2'
+cargo build --release --locked -p slither-wgpu-slice --example frame_perf
+& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --battledome C:/new/external/output
+```
+
+Retain each release executable and alternate five runs per side, with no
+Cargo/rustc process active during captures. Each cell warms 10 rendered pictures
+and measures 30. GPU pass timestamps, CPU prepare/HUD/sync/submit phases, calling
+thread allocation bytes, draw calls, vertices and an unclipped quad-area proxy
+are recorded. Waits/readbacks are outside CPU timing; this is not gameplay FPS.
+`FRAME_PERF_PHASES=1` enables a separate render preparation observer for diagnostic
+runs excluded from timing comparisons. It does not extend `latency-trace-v1`.
+`FRAME_PERF_NO_PNG=1` omits redundant PNGs; default draw snapshots remain.
+`FRAME_PERF_PLAN_ONLY=1` performs workload/budget preflight without timing frames
+(adapter/device setup still occurs). All output directories must be new.
+
+The [2026-11-01 shadow study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
+contains the complete selected matrix, phase results, exactness checks,
+loopback-host cross-check and unresolved RTX/AMD limits. The ordinary renderer
+does not request timestamp features or allocate query storage.
+
+## General frame workload
+
 Run the finite Windows offscreen workload from the repository root:
 
 ```powershell
