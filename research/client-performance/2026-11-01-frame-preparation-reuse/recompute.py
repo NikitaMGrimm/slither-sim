@@ -1,15 +1,29 @@
 """Recompute bounded per-run aggregate tables; Python standard library only."""
 import argparse
 import csv
+from collections import Counter
 from pathlib import Path
 from statistics import median
+
+EXPECTED_CELLS = {(workload, zoom) for workload in ("replay", "synthetic") for zoom in ("0", "-120")}
+
+
+def validate_cells(rows, per_cell):
+    counts = Counter((r["workload"], r["zoom"]) for r in rows)
+    assert counts == Counter({cell: per_cell for cell in EXPECTED_CELLS}), ("incomplete/extra workload-view cells", counts)
+
+
+def validate_primary(rows):
+    validate_cells(rows, 10)
+    expected = Counter((workload, zoom, side, str(pair)) for workload, zoom in EXPECTED_CELLS for side in ("before", "after") for pair in range(1, 6))
+    actual = Counter((r["workload"], r["zoom"], r["side"], r["pair"]) for r in rows)
+    assert actual == expected, "missing/duplicate/extra primary pair-arm rows"
 
 
 def excluded_baseline_table():
     rows = list(csv.DictReader(Path(__file__).with_name("excluded-diagnostics.csv").open(encoding="utf-8")))
-    assert len(rows) == 4
+    validate_cells(rows, 1)
     cells = {(r["workload"], r["zoom"]): r for r in rows}
-    assert len(cells) == 4
     lines = [
         "| Workload / view | CPU prepare median / p95 ms | GPU passes median / p95 ms | Peak prepared quads |",
         "| --- | ---: | ---: | ---: |",
@@ -36,6 +50,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="verify retained-data controls and the excluded diagnostic report table")
     args = parser.parse_args()
+    rows = list(csv.DictReader(Path(__file__).with_name("runs.csv").open(encoding="utf-8")))
+    validate_primary(rows)
     diagnostic = excluded_baseline_table()
     print("Excluded diagnostic baseline (original retained runs):")
     print(diagnostic)
@@ -52,13 +68,10 @@ def main():
             for row in before:
                 other = after[row["stage"]]
                 print(f"    {row['stage']}: {float(row['median_ms']):.4f}/{float(row['p95_ms']):.4f} -> {float(other['median_ms']):.4f}/{float(other['p95_ms']):.4f}")
-    rows = list(csv.DictReader(Path(__file__).with_name("runs.csv").open(encoding="utf-8")))
     print("All retained primary runs are included, including observed compilation.")
     for workload in ("replay", "synthetic"):
         for zoom in ("0", "-120"):
             cell = [r for r in rows if r["workload"] == workload and r["zoom"] == zoom]
-            if not cell:
-                continue
             print(f"\n{workload} / {'default' if zoom == '0' else 'whole-map'}")
             for side in ("before", "after"):
                 runs = [r for r in cell if r["side"] == side]
