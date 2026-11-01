@@ -139,6 +139,17 @@ is the default; `SLITHER_CLIENT_E2E_PROTOCOL=13` selects 13 through the probe's
 test-only selector-12 login override. Both use the same production client core;
 the desktop and browser login paths keep their stock login.
 
+`food_ingress.rs` uses authored food floods for protocols 13 and 19 through
+`LocalGame`, shared by desktop and WebGPU, and the ordinary core factory API.
+It bounds per-message allocation growth against retained food history, preserves
+duplicate presentation instances, and checks following own movement, pong
+clearing and resumed pinging. Core tests compare singleton `F` and compact `f/b`
+forms with ordinary transactions, including cache inheritance and rollback.
+Its two ignored CPU-only drain samples process 18,852 authored food commands:
+`cargo test -p slither-wgpu-slice --test food_ingress drain_18852 -- --ignored --nocapture`.
+These are offline regressions and diagnostic timings; live-server and frame-rate
+acceptance remain separate.
+
 ### CI
 
 CI runs this as the `e2e` job in `.github/workflows/checks.yml`, inside
