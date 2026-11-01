@@ -4,7 +4,6 @@ mod tape;
 #[allow(dead_code)]
 mod support {
     pub mod offscreen;
-    pub mod pellet_timing;
 }
 use slither_client::{presentation::QualityMode, settings::WorldResolution};
 use slither_wgpu_slice::{Result, game::LocalGame, gpu, render, world_presenter::WorldPresenter};
@@ -67,14 +66,9 @@ async fn run(output: &Path) -> Result<()> {
         .into_iter()
         .find(|a| a.get_info().device_type == wgpu::DeviceType::IntegratedGpu)
         .ok_or("No DX12 integrated GPU")?;
-    let timing = std::env::args().any(|s| s == "--timing");
-    let mut r = gpu::Renderer::from_adapter_for_diagnostics(
-        adapter,
-        wgpu::TextureFormat::Rgba8Unorm,
-        4,
-        timing,
-    )
-    .await?;
+    let mut r =
+        gpu::Renderer::from_adapter_with_max_samples(adapter, wgpu::TextureFormat::Rgba8Unorm, 4)
+            .await?;
     let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
     let mut rows = Vec::new();
     for dpr in [1., 1.5] {
@@ -124,18 +118,6 @@ async fn run(output: &Path) -> Result<()> {
                         format!("{:?}", picture.frame),
                     )
                     .map_err(|e| e.to_string())?;
-                    if timing && dpr == 1. {
-                        support::pellet_timing::run(
-                            &mut r,
-                            &mut p,
-                            &picture,
-                            &g.bank,
-                            &target.create_view(&Default::default()),
-                            physical,
-                            mode,
-                            &output.join(file.replace(".png", ".timing.json")),
-                        )?;
-                    }
                     rows.push(serde_json::json!({"file":file,"dpr":dpr,"physical":physical,"projection":extent,"attachment":report.plan.attachment,"samples":report.plan.samples,"draws":picture.frame.draws.len(),"gpu_draws":report.world_draws,"texture_bytes":picture.pixel_bytes(),"quality":format!("{quality:?}")}));
                 }
             }

@@ -34,6 +34,16 @@ and resident 64 MiB texture limits charge the actual raster and every mip level.
 This trades a small bounded cache increase for sampling quality, without a
 global resolution increase or a new per-frame shader calculation.
 
+For the full set of 170 body and 170 glow rasters, texture payload is 12.23 MiB
+versus 6.77 MiB on the pre-change main. Cold uploads increase from 340 to 1,900
+`queue.write_texture` calls (one per allocated mip level). These totals exclude
+other textures and driver overhead; the bank still loads only selected sources.
+
+Remaining raster limits apply in both quality modes. Original still upscales its
+1500×845 backing at 16:9, and Low removes the glow passes. Fractional bodies under
+four backing pixels retain some coverage instability. Smoothness at every zoom
+is not claimed.
+
 ## Offline verification
 
 `pellet_quality` is an authored 80-food scene with no external artwork, socket,
@@ -55,16 +65,6 @@ at High stock zoom, and 3.50 to 4.95 MiB at High full zoom-out. Low uses 0.54 an
 residency, FPS or whole-process memory measurements. No gameplay performance or
 owner visual acceptance is inferred from offscreen rendering.
 
-The optional `--timing` capture compares the original single-level food rasters
-against the refined resources in the same renderer and frozen picture. At DPR 1,
-each of the eight quality/presentation/zoom cells retains three alternating
-pairs of 10 warmup plus 20 measured submissions per side (960 measured samples
-total). GPU world-pass timestamps exclude uploads, blit, HUD, CPU preparation
-and readback. The largest observed median increase was 0.105 ms; the largest
-p95 increase was 0.035 ms. Other host compilation was observed, so these are
-bounded diagnostic timings, not an isolated benchmark, speedup or FPS claim.
-Cold materialization/upload cost and other weak-GPU workloads are unmeasured.
-
 Run from the repository root in PowerShell (use a new external output directory):
 
 ```powershell
@@ -74,9 +74,6 @@ cargo run --offline --locked -p slither-wgpu-slice --example pellet_quality -- C
 cargo test --offline --locked -p slither-wgpu-slice --lib food_texture
 cargo test --offline --locked -p slither-wgpu-slice --test pellet_quality -- --include-ignored
 ```
-
-Append `--timing` after the example's output directory to retain the matched
-resource-control timings; use a fresh directory and retain every sample.
 
 The CPU regression bounds bilinear alpha variation along a circular rim of the
 smallest sprite, validates complete mip payloads and premultiplied channels, and
@@ -88,3 +85,8 @@ invariant subpixel brightness or roundness is not claimed. A separate test check
 retained raster sharing, logical dimensions and the minimum body mip size.
 Visual acceptance is perceptual; the authored tests do not establish byte parity
 with Canvas or final owner play acceptance.
+
+The isolated glow GPU regression strongly minifies a 157×157 source to a 2×2
+backing-pixel quad across subpixel phases. It checks energy against the source's
+area average, and runs a single-level control that must fail that bound. This
+tests actual mip sampling separately from the four-pixel body-rim check.

@@ -118,3 +118,88 @@ fn single_sample_food_rim_is_round_and_minified_energy_is_phase_stable() {
         assert!(scope.pop().await.is_none());
     });
 }
+
+#[test]
+#[ignore = "explicit finite offscreen GPU check"]
+fn strongly_minified_glow_filters_energy_across_subpixel_phases() {
+    pollster::block_on(async {
+        let adapter = instance()
+            .request_adapter(&Default::default())
+            .await
+            .unwrap();
+        let mut renderer =
+            Renderer::from_adapter_with_max_samples(adapter, wgpu::TextureFormat::Rgba8Unorm, 1)
+                .await
+                .unwrap();
+        let scope = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut bank = Bank::new().unwrap();
+        let asset = bank.food(9, [0., 0.]).glows[16].asset();
+        let resources = bank.resources(&frame(asset, 2., 62.)).unwrap();
+        let image = &resources[0].image;
+        let base_bytes = image.width as usize * image.height as usize * 4;
+        let expected = image.pixels[..base_bytes]
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|pixel| f64::from(pixel[0]))
+            .sum::<f64>()
+            / (base_bytes / 4) as f64
+            * 4.;
+        let mut single_level = resources.clone();
+        std::sync::Arc::make_mut(&mut single_level[0].image)
+            .pixels
+            .truncate(base_bytes);
+        let target = offscreen::target(&renderer, [128, 128]);
+        for (mipped, sources) in [(true, &resources), (false, &single_level)] {
+            renderer.sync_resources(&[]).unwrap();
+            renderer.sync_resources(sources).unwrap();
+            let mut energy = Vec::new();
+            for y in 0..8 {
+                for x in 0..8 {
+                    // Integer diameter keeps quad coverage at four pixels. Only
+                    // the texture footprint changes phase, not the covered area.
+                    let mut picture = frame(asset, 2., 62. + f64::from(x) / 8.);
+                    picture.draws[0].destination.y = 62. + f64::from(y) / 8.;
+                    renderer
+                        .render(&picture, &target.create_view(&Default::default()))
+                        .unwrap();
+                    energy.push(
+                        offscreen::pixels(&renderer, &target)
+                            .unwrap()
+                            .as_chunks::<4>()
+                            .0
+                            .iter()
+                            .map(|pixel| u64::from(pixel[0]))
+                            .sum::<u64>() as f64,
+                    );
+                }
+            }
+            let min = energy.iter().copied().fold(f64::INFINITY, f64::min);
+            let max = energy.iter().copied().fold(0_f64, f64::max);
+            let variation = (max - min) / expected;
+            eprintln!(
+                "mipped={mipped}: glow energy {min}..{max}, area reference {expected}, variation {variation}"
+            );
+            if mipped {
+                assert!(
+                    energy
+                        .iter()
+                        .all(|value| (value - expected).abs() / expected < 0.03),
+                    "filtered glow must preserve area-averaged energy: {energy:?}, reference {expected}"
+                );
+                assert!(
+                    variation < 0.03,
+                    "filtered glow phase variation {variation}"
+                );
+            } else {
+                assert!(
+                    variation > 0.1,
+                    "single-level control must expose aliasing: {variation}"
+                );
+            }
+        }
+        assert!(scope.pop().await.is_none());
+    });
+}
