@@ -1,5 +1,7 @@
 //! Frozen production preparation + offscreen rendering, at physical 1080p/4K.
 //! Each invocation is one A/B side; alternate retained binaries externally.
+#[path = "history.rs"]
+mod history;
 #[path = "output.rs"]
 mod output_directory;
 #[path = "presented.rs"]

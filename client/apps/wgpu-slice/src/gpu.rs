@@ -546,6 +546,14 @@ impl Renderer {
     pub fn diagnostic_timestamps(&self) -> Option<&wgpu::QuerySet> {
         self.diagnostic_timestamps.as_ref()
     }
+    /// Retained allocation sizes, sampled outside reported preparation/submission.
+    #[cfg(feature = "frame-profile")]
+    pub fn diagnostic_vertex_capacities(&self) -> Vec<u64> {
+        self.vertices
+            .iter()
+            .filter_map(|chunk| chunk.buffer.as_ref().map(wgpu::Buffer::size))
+            .collect()
+    }
     /// Start a multi-pass diagnostic picture; timing callers resolve after the
     /// complete presenter. Legacy single-pass callers still use queries 0/1.
     #[cfg(feature = "frame-profile")]

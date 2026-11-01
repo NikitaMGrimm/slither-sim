@@ -55,11 +55,16 @@ pub fn run_created(output: &Path) -> Result<()> {
     let profile = std::env::var_os("FRAME_PERF_PHASES").is_some();
     let plan_only = std::env::var_os("FRAME_PERF_PLAN_ONLY").is_some();
     let capture_pixels = std::env::var_os("FRAME_PERF_NO_PNG").is_none();
+    let whole_map_png_only = std::env::var_os("FRAME_PERF_WHOLE_MAP_PNG_ONLY").is_some();
     let trace_root = std::env::var_os("FRAME_PERF_GPU_TRACE_DIR").map(std::path::PathBuf::from);
     // A validation capture needs one complete API-input picture per cell, not
     // thirty timing samples. Retain all creation/upload actions before it.
     let rendered_frames = if trace_root.is_some() { 1 } else { 40 };
     let fresh = std::env::var_os("FRAME_PERF_FRESH_CONTROL").is_some();
+    let shared_history = std::env::var_os("FRAME_PERF_SHARED_HISTORY").is_some();
+    if fresh && shared_history {
+        return Err("choose either fresh control or shared history".into());
+    }
     let controls_only = fresh || std::env::var_os("FRAME_PERF_CONTROL_ONLY").is_some();
     let isolated_width = if fresh {
         Some(
@@ -86,7 +91,13 @@ pub fn run_created(output: &Path) -> Result<()> {
     {
         return Err("invalid isolated control mode/width".into());
     }
-    let history = if fresh { "fresh" } else { "sequence" };
+    let history = if shared_history {
+        "shared-9-chunks"
+    } else if fresh {
+        "fresh"
+    } else {
+        "sequence"
+    };
     let instance = gpu::instance();
     let mut seen = std::collections::BTreeSet::new();
     for adapter in pollster::block_on(instance.enumerate_adapters(wgpu::Backends::DX12)) {
@@ -106,7 +117,7 @@ pub fn run_created(output: &Path) -> Result<()> {
         std::fs::write(dir.join("adapter.txt"), format!("{info:?}\n"))
             .map_err(|e| e.to_string())?;
         let mut csv = String::from(
-            "bots,width,height,backing_width,backing_height,attachment_width,attachment_height,dpr,requested_mode,effective_mode,requested_samples,samples,overlay_samples,history,level,frame,scale,snakes,draws,vertices,draw_calls,prepare_ns,hud_ns,sync_ns,submit_ns,gpu_ns,world_gpu_ns,blit_gpu_ns,overlay_gpu_ns,prepare_bytes,hud_bytes,sync_bytes,submit_bytes,quad_area_px,capture_kind\n",
+            "bots,width,height,backing_width,backing_height,attachment_width,attachment_height,dpr,requested_mode,effective_mode,requested_samples,samples,overlay_samples,history,level,frame,scale,snakes,draws,vertices,draw_calls,prepare_ns,hud_ns,sync_ns,submit_ns,gpu_ns,world_gpu_ns,blit_gpu_ns,overlay_gpu_ns,prepare_bytes,hud_bytes,sync_bytes,submit_bytes,quad_area_px,capture_kind,vertex_capacities\n",
         );
         let mut phases = String::from(
             "bots,width,height,dpr,mode,requested_samples,samples,level,frame,stage,ns\n",
@@ -166,6 +177,9 @@ pub fn run_created(output: &Path) -> Result<()> {
                             if controls_only && level != "default" {
                                 continue;
                             }
+                            if shared_history && !plan_only {
+                                history::warm(&mut r)?;
+                            }
                             r.sync_resources(&[])?;
                             let mut world = game.client().clone();
                             let mut bank = slither_wgpu_slice::bank::Bank::new()?;
@@ -181,6 +195,11 @@ pub fn run_created(output: &Path) -> Result<()> {
                                     quality,
                                 )?;
                                 if frame == 109 {
+                                    if shared_history && p.draw_count() > history::QUADS {
+                                        return Err(
+                                            "fixture exceeds shared VBO history ceiling".into()
+                                        );
+                                    }
                                     if level == "out"
                                         && p.frame.snakes.len()
                                             != (usize::from(bots) + 1)
@@ -228,6 +247,11 @@ pub fn run_created(output: &Path) -> Result<()> {
                                 })?;
                                 let (p, hud_ns, hud_bytes) =
                                     measure(|| render::finish_hud(p, &mut bank, &hud))?;
+                                if shared_history && p.draw_count() > history::QUADS {
+                                    return Err(
+                                        "measured frame exceeds shared VBO history ceiling".into(),
+                                    );
+                                }
                                 if profile {
                                     observe("build_end", 20000 + frame);
                                 }
@@ -265,7 +289,13 @@ pub fn run_created(output: &Path) -> Result<()> {
                                         .map(|d| (d.destination.width * d.destination.height).abs())
                                         .sum();
                                     let plan = report.plan;
-                                    writeln!(csv,"{bots},{},{},{},{},{},{},{dpr},{requested:?},{:?},{requested_samples},{},1,{history},{level},{frame},{:.12},{},{},{},{},{prep},{hud_ns},{sync_ns},{submit_ns},{:.0},{:.0},{:.0},{:.0},{prep_bytes},{hud_bytes},{sync_bytes},{submit_bytes},{area:.0},{}",
+                                    let capacities = r
+                                        .diagnostic_vertex_capacities()
+                                        .iter()
+                                        .map(u64::to_string)
+                                        .collect::<Vec<_>>()
+                                        .join(":");
+                                    writeln!(csv,"{bots},{},{},{},{},{},{},{dpr},{requested:?},{:?},{requested_samples},{},1,{history},{level},{frame},{:.12},{},{},{},{},{prep},{hud_ns},{sync_ns},{submit_ns},{:.0},{:.0},{:.0},{:.0},{prep_bytes},{hud_bytes},{sync_bytes},{submit_bytes},{area:.0},{},{capacities}",
                                         physical[0],physical[1],projection[0],projection[1],plan.attachment[0],plan.attachment[1],plan.effective,plan.samples,world.camera().zoom(),p.frame.snakes.len(),p.draw_count(),p.draw_count()*6,
                                         report.world_draws+report.overlay_draws+usize::from(plan.blit),times.iter().map(|x|x.1).sum::<f64>(),time("world"),time("blit"),time("overlay"),if trace_root.is_some(){"input-trace"}else if profile{"profile"}else{"timing"}).unwrap();
                                     if profile {
@@ -279,7 +309,7 @@ pub fn run_created(output: &Path) -> Result<()> {
                                 if frame + 1 == rendered_frames && requested_samples == 4 {
                                     let name =
                                         format!("{bots}-{}-{level}-{requested:?}", physical[0]);
-                                    if capture_pixels {
+                                    if capture_pixels && (!whole_map_png_only || level == "out") {
                                         capture_png(
                                             &r,
                                             &texture,

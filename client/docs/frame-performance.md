@@ -23,6 +23,8 @@ are recorded. Waits/readbacks are outside CPU timing; this is not gameplay FPS.
 `FRAME_PERF_PHASES=1` enables a separate render preparation observer for diagnostic
 runs excluded from timing comparisons. It does not extend `latency-trace-v1`.
 `FRAME_PERF_NO_PNG=1` omits redundant PNGs; default draw snapshots remain.
+`FRAME_PERF_WHOLE_MAP_PNG_ONLY=1` limits presented PNGs to whole-map views while
+retaining the full CSV/profile matrix.
 `FRAME_PERF_PLAN_ONLY=1` performs workload/budget preflight without timing frames
 (adapter/device setup still occurs). All output directories must be new.
 
@@ -69,6 +71,17 @@ selects default 500-model cases without the strict one-case isolation.
 The diagnostic build feature `frame-profile-no-shadow-cut` forces the candidate
 renderer to retain shadows, for the third-binary comparison; it is not a user
 quality setting. Record this feature and each executable hash in provenance.
+
+`FRAME_PERF_SHARED_HISTORY=1` runs the same authored one-pixel geometry upload
+before each presented cell, outside preparation/submission timing. It fills nine
+full vertex chunks (73,728 quads; 8.4375 MiB of GPU vertex capacity) and waits for
+completion. Each real frame must fit that fixture ceiling. This conditions both
+capacity and unused mutable-buffer contents, so unaffected controls enter with
+matching GPU inputs despite different earlier LOD work. CSVs label it
+`shared-9-chunks`. Leave it unset for the additional production-history pair
+(`sequence`). This is diagnostic setup, not a production cache-sizing change.
+Presented CSVs also record retained vertex-buffer capacities for every measured
+picture, sampled outside the reported CPU phases.
 
 ## Battledome live cross-check
 
