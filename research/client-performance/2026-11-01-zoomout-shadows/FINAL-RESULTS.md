@@ -10,7 +10,7 @@ Every table in this document and every `final08-*.csv` uses **rebased-08-stock-c
 - **candidate**: commit `095449709fc68cb9bdc28c489008fe12c3a5979e`, source tree `8e953b148d6bd54a550e6e00fc44e98e75e54e41`; frame_perf SHA-256 `b81c925413acedcabf4f3f36623d5a961aab3b84c77912b9dcc2db69bbdcb8c2`; features `frame-profile,feel-trace`.
 - **forced_off**: commit `095449709fc68cb9bdc28c489008fe12c3a5979e`, source tree `8e953b148d6bd54a550e6e00fc44e98e75e54e41`; frame_perf SHA-256 `d0eb29cdff9461e641d63f60c24e970229f834af59facf45d4f3fe1856a56560`; features `frame-profile-no-shadow-cut,feel-trace`.
 
-All three were built cleanly on main `3669ac9a3a334a3d6d5b767cbe2080646487dc97`, including #404 and #412. The final published head adds a test-only feature-aware expectation; it does not change the measured production code. [Full build commands, toolchain, features, binary hashes, data checksums and crop manifest](final08-provenance.json) are retained. Old retained-02, preliminary-01, A/A/B/A, and round-07 CSVs retain their original mappings.
+All three were built cleanly on main `3669ac9a3a334a3d6d5b767cbe2080646487dc97`, including #404 and #412. Subsequent commits add a test-only feature-aware expectation, reports and offline payload I/O guards; they do not change the measured production code or retained binaries. [Full build commands, toolchain, features, binary hashes, data checksums and crop manifest](final08-provenance.json) are retained. Old retained-02, preliminary-01, A/A/B/A, and round-07 CSVs retain their original mappings.
 
 The authored model uses 120/500 configured arena populations, but at most **256 live snakes** in client state. The 500-model full-map frame sees all 256; it is not a 500-live-snake admission test. Art is procedural placeholder data only. No game socket, original artwork, simulator advance, or ingress participates in the frozen measurements. The earlier local-host subscription cross-check remains in [REPORT.md](REPORT.md).
 
@@ -116,3 +116,13 @@ Matched full-map crop, same source coordinates and native pixel scale, authored 
 ![Full-map 500-model crop, stock and corrected distant-shadow cut](https://github.com/user-attachments/assets/e0825b3e-9651-48b5-969e-396c2817029e)
 
 Pixels intentionally change only where the zoom-out eligibility allows the shadow cut. This crop supports a scale-specific visual judgment, not formal GPU perceptual acceptance. RTX sparse-pixel readbacks were nonrepeatable even for unchanged retained baselines; the cause remains unresolved. No owner-play, Canvas/browser GPU parity, pacing, or 500-live-snake admission acceptance is claimed. Raw attempts, raw traces, telemetry, failed captures and archive/restore manifests stay in scratch; verified lossless groups preserve their original bytes and paths.
+
+## Offline tool follow-up
+
+After capture, `77e86f7b` bounds payload reads before allocation and during streaming, caps decompressed gzip output at 128 MiB, and checks each file's real path against the trace root's real path, including the ENOENT gzip fallback and trace.ron. All nine hasher tests pass, including oversized raw/compressed inputs, oversized decompression and raw/gzip symlink escapes (no skips). The full Node tools suite passes 1,655/1,655. This changes I/O guards, not fingerprint math; the capture manifest preserves the original hasher source hash used for validation.
+
+## Final checks
+
+The uninterrupted `npm run check` completed successfully at 13:04:22 local on November 1. It covers repository/history guards, Node and app tests, core tests/docs/Clippy, web build and Wasm smoke, native wgpu tests/Clippy, the feature-enabled observer/scale/cleanup regressions, desktop build, Wasm Clippy/build and bindings. The complete Node tools group was repeated after the offline I/O changes and passed 1,655/1,655. The normal and all-features body-shadow boundary variants each passed both tests. All Cargo commands used `CARGO_TARGET_DIR=D:/CargoTargets/zoomout-perf` and `CARGO_BUILD_JOBS=2`.
+
+The final crop's authenticated GitHub download is byte-identical to the inspected local compositor output (SHA-256 `a6e9d37dad1922895c2d054f4448ad3a35ef254a08bf1c47ce72ca3ab67f26af`). Unauthenticated attachment requests returned 404, so anonymous image access is not verified. Source and composed PNGs remain in scratch. Local checks do not imply independent re-review or owner acceptance; the historical AMD thread remains open for assessment.
