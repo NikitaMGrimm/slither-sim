@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- An opt-in `latency-rig` host recorder retains bounded per-tick head truth for local measurement and exports it after shutdown.
+
 ## [0.9.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.8.2...v0.9.0) - 2026-11-01
 
 ### Changed

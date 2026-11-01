@@ -423,6 +423,8 @@ pub struct Host {
     latency: LatencyConfig,
     decision_seconds: f64,
     max_tick: Option<f64>,
+    #[cfg(feature = "latency-rig")]
+    latency_truth: Option<super::latency_truth::Export>,
 }
 
 impl Host {
@@ -449,11 +451,32 @@ impl Host {
             latency,
             decision_seconds,
             max_tick: config.max_tick,
+            #[cfg(feature = "latency-rig")]
+            latency_truth: None,
         })
     }
 
     pub fn local_addr(&self) -> Result<SocketAddr, String> {
         self.listener.local_addr().map_err(|e| e.to_string())
+    }
+
+    #[cfg(feature = "latency-rig")]
+    #[allow(dead_code)] // Used only by the binary's private copy of the host.
+    pub(crate) fn with_latency_truth(
+        mut self,
+        path: &std::path::Path,
+        seconds: Duration,
+    ) -> Result<Self, String> {
+        super::latency_truth::loopback(self.local_addr()?)?;
+        let (export, recorder) = super::latency_truth::Export::create(
+            path,
+            seconds,
+            self.world.dt(),
+            self.max_clients + self.bots,
+        )?;
+        self.world.set_latency_truth(recorder);
+        self.latency_truth = Some(export);
+        Ok(self)
     }
 
     /// Serve on new threads; the world clock starts now.
@@ -484,7 +507,15 @@ impl Host {
             address,
             shared: shared.clone(),
             threads: Vec::new(),
+            #[cfg(feature = "latency-rig")]
+            latency_truth: self.latency_truth,
         };
+        #[cfg(feature = "latency-rig")]
+        let mut world = self.world;
+        #[cfg(feature = "latency-rig")]
+        world.start_latency_truth(shared.clock.epoch);
+        #[cfg(not(feature = "latency-rig"))]
+        let world = self.world;
         let (commands, inbox) = mpsc::channel();
         let (to_sockets, socket_inbox) = mpsc::channel();
         let mut routes = vec![to_sockets];
@@ -526,7 +557,7 @@ impl Host {
         };
         let agents = self.max_clients + self.bots;
         let simulation = Simulation {
-            world: self.world,
+            world,
             commands: inbox,
             batches: routes.iter().map(|_| Vec::new()).collect(),
             routes,
@@ -557,6 +588,8 @@ pub struct RunningHost {
     address: SocketAddr,
     shared: Arc<Shared>,
     threads: Vec<JoinHandle<Result<(), String>>>,
+    #[cfg(feature = "latency-rig")]
+    latency_truth: Option<super::latency_truth::Export>,
 }
 
 impl RunningHost {
@@ -652,11 +685,17 @@ impl RunningHost {
             .failure
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        match (failure.clone(), panicked) {
+        let result = match (failure.clone(), panicked) {
             (Some(error), _) => Err(error),
             (None, true) => Err("A host thread panicked".into()),
             (None, false) => Ok(()),
+        };
+        #[cfg(feature = "latency-rig")]
+        if let Some(export) = self.latency_truth.take() {
+            let exported = export.finish(result.is_ok());
+            return result.and(exported);
         }
+        result
     }
 }
 
@@ -710,6 +749,10 @@ impl Simulation {
         }
         let dt = self.shared.clock.dt;
         while !self.shared.stopped() {
+            #[cfg(feature = "latency-rig")]
+            if self.world.latency_truth_finished(Instant::now()) {
+                return Ok(());
+            }
             let due = self.due_ticks(Instant::now());
             if due == 0 {
                 let next = (self.ticks + self.deferred + 1) as f64 * dt;
@@ -718,6 +761,10 @@ impl Simulation {
             }
             let started = Instant::now();
             for _ in 0..due {
+                #[cfg(feature = "latency-rig")]
+                if self.world.latency_truth_finished(Instant::now()) {
+                    return Ok(());
+                }
                 // A command applies in the tick during which it arrives. Its send
                 // time, not this loop, picks that tick, so each frame reflects the
                 // input that reached the world by its due time.
@@ -738,6 +785,10 @@ impl Simulation {
         let mut previous = self.shared.clock.epoch;
         let mut next = floor;
         while !self.shared.stopped() {
+            #[cfg(feature = "latency-rig")]
+            if self.world.latency_truth_finished(Instant::now()) {
+                return Ok(());
+            }
             if self.shared.clock.wall(Instant::now()) < next {
                 self.shared.clock.sleep_until(next, MAX_IDLE);
                 continue;
