@@ -26,6 +26,10 @@ arena plans. Session and input policies own connection phases, timing, ping,
 turning and boost intents. HUD/menu owners retain scores, leaderboard, minimap,
 appearance and player-facing state.
 
+[Snake capacity](snake-capacity.md) separates the 512-live-ID received world from
+bounded visual geometry, curves, recipes and draw storage. The own object keeps
+full detail; previously inadmissible large worlds trim rival presentation.
+
 Setup selects the shared crate's protocol-13 or protocol-19 reader for the
 connection. The 13 adapter maps explicit IDs, coordinate anchors, all appearance
 deltas and absolute food keys into the same presentation inputs. A later Setup

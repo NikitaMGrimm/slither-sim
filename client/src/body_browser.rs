@@ -640,7 +640,7 @@ impl BorrowedSources {
         let mouth = image("mouth")?;
         // The shared marks source is submitted twice: charge three actual uses.
         self.uses += 1;
-        if self.uses > 262_144 {
+        if self.uses > crate::presentation::MAX_FRAME_ASSET_USES {
             return Err(error("frame asset-use budget exceeded"));
         }
         Ok(MouthFaceSources {
@@ -1065,7 +1065,7 @@ impl BorrowedSources {
         target: &HtmlCanvasElement,
     ) -> Result<BodyAssetUse, JsValue> {
         self.uses += 1;
-        if self.uses > 262_144 {
+        if self.uses > crate::presentation::MAX_FRAME_ASSET_USES {
             return Err(error("frame asset-use budget exceeded"));
         }
         let raw = field(value, "asset")?;
@@ -1147,7 +1147,7 @@ impl BorrowedSources {
             index
         } else {
             self.catalog_entries += 1;
-            if self.catalog_entries > 4096 {
+            if self.catalog_entries > crate::presentation::MAX_FRAME_ASSET_USES {
                 return Err(error("frame catalog budget exceeded"));
             }
             catalog_ids.push(id);

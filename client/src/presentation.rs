@@ -73,8 +73,8 @@ pub use body_painter::{
     BodyPaintError, BodyPaintGeometry, BodyPaintInput, BodyPaintPass, BodyPaintPlan,
     BodyPaintQuality, BodyPaintRecipe, BodyPaintSample, BodyPaintView, BodyPaintVisual,
     BodyPalette, BodyRect, BodyRun, BodyStyle, BodyVariantMode, MAX_BODY_PAINT_COMMANDS,
-    MAX_BODY_PAINT_SAMPLES, plan_standard_body, plan_standard_body_with_antenna,
-    plan_standard_body_with_storage, plan_standard_body_with_zoom_and_storage,
+    MAX_BODY_PAINT_SAMPLES, plan_reduced_body, plan_reduced_body_with_storage, plan_standard_body,
+    plan_standard_body_with_antenna, plan_standard_body_with_storage, plan_standard_body_with_zoom_and_storage,
 };
 pub use boundary::{BOUNDARY_SAMPLES, BoundaryRadius};
 pub(crate) use camera::UserZoom;
@@ -83,8 +83,11 @@ pub use client::{
     AccessoryPresentation, AnimatedClient, AntennaDrawBudget, AntennaRandomRequest,
     AppearanceContext, AppearancePresentation, ClientControlActions, ClientControlView,
     ClientPresentationError, ClientScoreView, FacePresentation, MAX_DRAW_SAMPLES,
-    MAX_RETAINED_SNAKES, MAX_RETAINED_TOTAL_BODY_POINTS, OwnControlView, OwnScoreView,
-    PreparedAccessorySnake, PreparedBodyGeometry, PreparedSnake, ScoreStatus, TintedPresentation,
+    MAX_FRAME_ASSET_USES, MAX_PRESSURE_SCENE_IMAGES, MAX_RETAINED_SNAKES,
+    MAX_RETAINED_TOTAL_BODY_POINTS, OwnControlView, OwnScoreView, PRESSURE_BODY_POINTS,
+    PRESSURE_FOOD_DRAWS, PRESSURE_PREY_DRAWS, PRESSURE_RIVAL_DRAW_SAMPLES, PreparedAccessorySnake,
+    PreparedBodyGeometry, PreparedSnake, SNAKE_PRESENTATION_MEMORY_BUDGET, ScoreStatus,
+    TintedPresentation,
 };
 pub use curve::{
     CurveInput, CurveOutput, CurveSample, CurveVertex, MAX_CURVE_SAMPLES, sample_curve,

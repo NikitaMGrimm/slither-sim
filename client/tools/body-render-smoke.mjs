@@ -163,6 +163,31 @@ export function bodyRenderSmoke(wasm) {
     return failure;
   }
   try {
+    const capacity = fixture();
+    try {
+      capacity.scene.reset();
+      const snakes = Array.from({ length: 512 }, (_, id) => {
+        const packet = appearance();
+        packet[1] = id >>> 8; packet[2] = id & 255;
+        return packet;
+      });
+      capacity.scene.apply_frame(bundle(syntheticSetup(), ...snakes), false);
+      capacity.scene.advance(80, false).free();
+      const own = capacity.scene.own_body();
+      capacity.scene.set_zoom(0.005);
+      capacity.requests.length = 0;
+      capacity.render();
+      const world = JSON.parse(capacity.scene.snapshot());
+      ok(world.camera.zoom < 0.05, 'full-map Canvas view crosses the former zoom floor');
+      ok([[world.camera.x, 960], [world.camera.y, 540]].every(([position, side]) =>
+        2 * (world.radius + Math.abs(position)) * world.camera.zoom <= side));
+      eq(new Set(capacity.requests.map(request => request.id)).size, 512,
+        'real Wasm standard Canvas planning resolves every live snake under pressure');
+      ok(bodyImages(capacity).length >= 512);
+      ok(bodyImages(capacity).length <= 688144, 'Canvas images fit the audited pressure pool');
+      eq(capacity.scene.own_body(), own, 'pressure rendering preserves every own anchor');
+      eq(capacity.target.context.stack.length, 0);
+    } finally { capacity.close(); }
     const backgroundLayers = fixture();
     try {
       const f = backgroundLayers, backdrop = new HTMLImageElement('authored backdrop');

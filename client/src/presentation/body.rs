@@ -14,6 +14,9 @@ pub const BODY_SAMPLES: usize = 53;
 /// Logical segment count has the separate received-state limit of 4096.
 pub const MAX_RETAINED_BODY_POINTS: usize = MAX_BODY_POINTS * 2;
 const SPACING_SAMPLES: usize = 100;
+// The count is at most 4096. Reuse its unused high bit so legacy bodies retain
+// their record layout and allocation footprint, including replay allocations.
+const VISUAL_REDUCED: usize = 1 << (usize::BITS - 1);
 
 #[derive(Clone, Debug, PartialEq)]
 struct BodyCorrections {
@@ -277,7 +280,7 @@ impl BodyGeometry {
     ) -> Result<Point, PresentationError> {
         finite(&[displayed_head.x, displayed_head.y])?;
         if self.points.len() >= MAX_RETAINED_BODY_POINTS
-            || (grew && self.logical_segments >= MAX_BODY_POINTS)
+            || (grew && self.logical_segments() >= MAX_BODY_POINTS)
         {
             return Err(PresentationError);
         }
@@ -378,6 +381,18 @@ impl BodyGeometry {
     /// A living point with zero logical length would require a negative count;
     /// that unsupported transition returns an error without changing the body.
     pub fn remove_tail(&mut self) -> Result<bool, PresentationError> {
+        if self.detail_reduced() {
+            let Some(remaining) = self.logical_segments().checked_sub(1) else {
+                return Ok(false);
+            };
+            self.logical_segments = remaining | VISUAL_REDUCED;
+            if self.points.iter().filter(|p| !p.dying).count() > remaining
+                && let Some(tail) = self.points.iter_mut().rev().find(|p| !p.dying)
+            {
+                tail.dying = true;
+            }
+            return Ok(true);
+        }
         let Some(tail) = self.points.iter_mut().rev().find(|point| !point.dying) else {
             return Ok(false);
         };
@@ -416,11 +431,53 @@ impl BodyGeometry {
         &self.points
     }
 
+    /// Collapse only visual interior anchors. Keep the three newest anchors,
+    /// both endpoints, surviving correction offsets and the protocol count.
+    /// Reductions are nested and never reversed during this appearance, avoiding
+    /// camera-driven oscillation. See docs/snake-capacity.md.
+    pub(crate) fn compact_visual(&mut self) {
+        if self.points.len() <= 8 {
+            return;
+        }
+        let count = self.points.len();
+        let mut compact = Vec::<BodyPoint>::with_capacity(count.div_ceil(2) + 3);
+        for (index, point) in std::mem::take(&mut self.points).into_iter().enumerate() {
+            if index < 3 || index % 2 == 0 || index == count - 1 {
+                if let Some(previous) = compact.last_mut() {
+                    previous.previous_delta = Point {
+                        x: previous.position.x - point.position.x,
+                        y: previous.position.y - point.position.y,
+                    };
+                }
+                compact.push(point);
+            } else if let Some(previous) = compact.last_mut() {
+                previous.edge_length += point.edge_length;
+            }
+        }
+        self.points = compact.into_boxed_slice().into_vec();
+        self.logical_segments |= VISUAL_REDUCED;
+    }
+
+    /// Whether this appearance has lost visual anchors under scene pressure.
+    pub fn detail_reduced(&self) -> bool {
+        self.logical_segments & VISUAL_REDUCED != 0
+    }
+
+    pub(crate) fn storage_slots(&self) -> usize {
+        self.points.capacity()
+    }
+
+    pub(crate) fn reclaim_storage(&mut self) {
+        self.points = std::mem::take(&mut self.points)
+            .into_boxed_slice()
+            .into_vec();
+    }
+
     /// Nonnegative protocol count, updated by growth and tail removals.
     /// It is not recomputed from retained or living points: a non-growing anchor
     /// after exhaustion can add a living point while this count remains zero.
     pub fn logical_segments(&self) -> usize {
-        self.logical_segments
+        self.logical_segments & !VISUAL_REDUCED
     }
 
     /// Effective cached wire heading for later relative anchors.

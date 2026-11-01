@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client | [Bounded 512-snake capacity](client-performance/2026-11-01-snake-capacity/REPORT.md) | Authored admission, maximum-body storage, full-map draw and legacy replay controls; headless CPU/allocation workload, with loopback subscriptions reported separately. |
 | Client | [Native egui Settings trial](client/2026-11-01-egui-settings-trial/REPORT.md) | Historical head ee203f6: authored two-size renders, bounded CPU/size/rebuild measurements and their limits. Owner subsequently chose native egui; shared-host correctness fixes are separate from these measurements. |
 | Client performance | [Whole-map snake shadows](client-performance/2026-11-01-zoomout-shadows/REPORT.md) | Omits interleaved body shadows below four logical pixels only while zoomed out. Authored 120/500-bot arena models retain 121/256 snakes; 1080p/4K CPU/GPU/MSAA matrix, exact default draw lists and native feel replay. RTX pixel repeatability and an unaffected AMD GPU control increase remain unresolved; no 500-live-snake or gameplay-FPS claim. |
 | Performance | [64,000-bot public session](performance/2026-10-31-64k-session/REPORT.md) | What a 64k-bot session measured: inexact collision stride and LOD (kept out of the product), exact speedups and where they landed, PGO and hugetlb builds, world aging, backlog ping, co-location and the Vlither login failure. No capacity claim for the shipped host. |

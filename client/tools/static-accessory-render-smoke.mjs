@@ -341,12 +341,13 @@ export async function staticAccessoryRenderSmoke(wasm, options = {}) {
           eq(images(full).length + images(full, 2).length + images(full, 3).length + images(full, 4).length,
             family === 'paired' ? 1536 : 2048, 'actual per-draw face/accessory charges at 512 objects');
           eq(full.scene.face_state().snakes.length, 512); eq(full.target.context.stack.length, 0); cases++;
-          atomic(full, () => full.install(packet(0)), /limit|capacity|retained/i);
+          full.install(packet(0)); eq(full.scene.face_state().snakes.length, 513);
         } finally { full.close(); }
       }
       const catalog = fixture({ factories: true, packets: bundle(syntheticSetup(), ...Array.from({ length: 65 }, () => packet())) });
-      try { atomic(catalog, () => catalog.setup(lane, bundle(...Array.from({ length: lane === 'basic' ? 64 : 32 }, syntheticSetup)),
-        { width: 64, height: 64 }), /catalog budget/); } finally { catalog.close(); }
+      try { const count = lane === 'basic' ? 64 : 32;
+        eq(catalog.setup(lane, bundle(...Array.from({ length: count }, syntheticSetup)), { width: 64, height: 64 }), count);
+      } finally { catalog.close(); }
       const empty = fixture({ factories: true, packets: syntheticSetup() });
       try {
         eq(empty.setup(lane, bundle(...Array.from({ length: 64 }, syntheticSetup)), { width: 1, height: 1 }), 64);
@@ -402,7 +403,7 @@ export async function staticAccessoryRenderSmoke(wasm, options = {}) {
     const uses = fixture({ factories: true });
     try {
       uses.transform(s => { const usage = s.recipe.palettes[0].variants[0]; s.recipe.palettes = Array.from({ length: 256 }, () => ({ variants: Array(256).fill(usage), boostGlow: usage })); return s; });
-      atomic(uses, () => uses.setup('standard', bundle(...Array.from({ length: 4 }, syntheticSetup)), { width: 64, height: 64 }), /asset-use budget/);
+      atomic(uses, () => uses.setup('standard', bundle(...Array.from({ length: 8 }, syntheticSetup)), { width: 64, height: 64 }), /asset-use budget/);
     } finally { uses.close(); }
   } finally {
     for (const [key, old] of globals) { if (old) Object.defineProperty(globalThis, key, old); else delete globalThis[key]; }

@@ -340,6 +340,10 @@ impl PreyWorld {
     pub fn referenced_eaters(&self) -> impl Iterator<Item = SnakeObjectToken> + '_ {
         self.preys.iter().filter_map(|p| p.state.eater)
     }
+
+    pub(crate) fn retire_eater(&mut self, token: SnakeObjectToken) {
+        self.preys.retain(|prey| prey.state.eater != Some(token));
+    }
     /// Clear live objects while preserving serial allocation.
     pub fn clear(&mut self) {
         self.preys.clear();

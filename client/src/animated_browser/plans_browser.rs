@@ -136,6 +136,7 @@ pub(super) struct DrawBudget {
     pub(super) images: usize,
     pub(super) layouts: usize,
     pub(super) antenna: AntennaDrawBudget,
+    pressure_extra: bool,
 }
 impl Default for DrawBudget {
     fn default() -> Self {
@@ -144,10 +145,17 @@ impl Default for DrawBudget {
             images: MAX_BODY_PAINT_COMMANDS,
             layouts: MAX_DRAW_SAMPLES,
             antenna: AntennaDrawBudget::default(),
+            pressure_extra: false,
         }
     }
 }
 impl DrawBudget {
+    fn enter_pressure(&mut self, client: &AnimatedClient) {
+        if client.detail_pressure() && !self.pressure_extra {
+            self.images += crate::presentation::MAX_PRESSURE_SCENE_IMAGES - MAX_BODY_PAINT_COMMANDS;
+            self.pressure_extra = true;
+        }
+    }
     pub(super) fn prepared(&mut self, snakes: &[PreparedAccessorySnake]) -> Result<(), JsValue> {
         self.layouts = self
             .layouts
@@ -401,12 +409,21 @@ pub(super) fn food_plan(
     quality: BodyPaintQuality,
     budget: &mut DrawBudget,
 ) -> Result<Option<FoodPaintPlan>, JsValue> {
+    budget.enter_pressure(prepared);
     if !prepared.food_enabled() {
         return Ok(None);
     }
     sources.validate(target)?;
+    let foods = prepared.foods().foods();
+    let start = if prepared.detail_pressure() {
+        foods
+            .len()
+            .saturating_sub(crate::presentation::PRESSURE_FOOD_DRAWS / 7)
+    } else {
+        0
+    };
     let plan = plan_food(FoodPaintInput {
-        foods: prepared.foods().foods(),
+        foods: &foods[start..],
         view,
         quality,
         bounds: prepared.food_bounds(),
@@ -444,6 +461,7 @@ pub(super) fn prey_plan(
     view: BodyPaintView,
     budget: &mut DrawBudget,
 ) -> Result<Option<PreyPaintPlan>, JsValue> {
+    budget.enter_pressure(prepared);
     if !prepared.prey_enabled() {
         return Ok(None);
     }
@@ -474,8 +492,16 @@ pub(super) fn prey_plan(
             ),
         )?;
     }
+    let preys = prepared.preys().preys();
+    let start = if prepared.detail_pressure() {
+        preys
+            .len()
+            .saturating_sub(crate::presentation::PRESSURE_PREY_DRAWS / 6)
+    } else {
+        0
+    };
     let plan = plan_prey(PreyPaintInput {
-        preys: prepared.preys().preys(),
+        preys: &preys[start..],
         eaters: &eaters,
         view,
         assets: &sources.assets()?,
@@ -523,6 +549,7 @@ fn prepare_snakes<F>(
 where
     F: FnMut(usize, bool, &SnakePresentation) -> Result<bool, ResolveError>,
 {
+    budget.enter_pressure(prepared);
     if accessory {
         let random =
             random.ok_or_else(|| error("accessory presentation random resolver required"))?;
@@ -920,9 +947,11 @@ fn build_standard(
                     boost_phase: m.boost_phase,
                 },
                 entry_alpha,
-                command_limit: remaining,
+                command_limit: remaining.min(MAX_BODY_PAINT_COMMANDS),
             };
-            let body = if let Some(antenna) = &snake.antenna {
+            let body = if prepared.detail_pressure() && !snake.own {
+                plan_reduced_body(input)
+            } else if let Some(antenna) = &snake.antenna {
                 plan_standard_body_with_antenna(input, antenna.barrier_effect)
             } else {
                 plan_standard_body(input)

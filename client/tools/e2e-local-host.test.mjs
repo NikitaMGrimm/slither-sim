@@ -18,6 +18,16 @@ test('port policy rejects forbidden, zero and malformed ports', () => {
   for (const port of [32768, 49152, 65535]) assert.equal(allowedPort(port), true);
 });
 
+test('Battledome requires full-map pictures without skips and preserves measured subscription counts', () => {
+  const options = argumentsFor(['--host-bin', 'host', '--battledome', '500', '--scratch', 'scratch']);
+  assert.equal(options.battledome, 500);
+  assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
+  const summary = { ...complete(), fullMap: true, pictureSkips: 0, peakReceivedSnakes: 7, peakPreparedSnakes: 7 };
+  assert.equal(assertSummary(summary, 19, true), summary);
+  assert.throws(() => assertSummary({ ...summary, fullMap: false }, 19, true), { stage: 'full-map' });
+  assert.throws(() => assertSummary({ ...summary, pictureSkips: 1 }, 19, true), { stage: 'picture-skips' });
+});
+
 test('readiness requires a complete exact loopback announcement, independent of log chunking', () => {
   const line = 'Listening on ws://127.0.0.1:49152/slither\r\n';
   assert.equal(readyEndpoint('warning\n' + line), 'ws://127.0.0.1:49152/slither');

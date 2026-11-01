@@ -574,11 +574,12 @@ impl SnakePresentation {
         &mut self,
         quality_scale: f64,
         detailed_style: bool,
+        sample_limit: Option<usize>,
     ) -> Result<(Option<CurveOutput>, f64), PresentationError> {
         let next = self;
         next.prepare_draw()?;
         let metrics = next.metrics();
-        let input = CurveInput {
+        let mut input = CurveInput {
             corrected_head: metrics.corrected_head,
             head_fraction: metrics.corrected_head_fraction,
             body: next.body.points(),
@@ -593,7 +594,25 @@ impl SnakePresentation {
             0 => (None, metrics.heading),
             1 => (None, single_anchor_eye_target(input, metrics.heading)?),
             _ => {
-                let curve = sample_curve_with_heading(input, metrics.heading)?;
+                // Only previously inadmissible worlds select a limit. Sampling
+                // is private and does not advance spacing/eyes on retries.
+                let mut curve = sample_curve_with_heading(input, metrics.heading);
+                if let Some(limit) = sample_limit {
+                    for _ in 0..32 {
+                        if curve.as_ref().is_ok_and(|c| c.samples.len() <= limit) {
+                            break;
+                        }
+                        input.quality_scale *= curve.as_ref().map_or(2., |c| {
+                            (c.samples.len() as f64 / limit.saturating_sub(2).max(1) as f64)
+                                .max(1.05)
+                        });
+                        curve = sample_curve_with_heading(input, metrics.heading);
+                    }
+                }
+                let curve = curve?;
+                if sample_limit.is_some_and(|limit| curve.samples.len() > limit) {
+                    return Err(PresentationError);
+                }
                 let target = curve.target_eye_heading;
                 (Some(curve), target)
             }
@@ -690,6 +709,14 @@ impl SnakePresentation {
     /// Read-only absolute body geometry, retained dying points, and correction rings.
     pub fn body(&self) -> &BodyGeometry {
         &self.body
+    }
+
+    pub(crate) fn compact_visual_body(&mut self) {
+        self.body.compact_visual();
+    }
+
+    pub(crate) fn reclaim_visual_storage(&mut self) {
+        self.body.reclaim_storage();
     }
 
     /// Read-only logical/displayed length and its Float32 correction ring.

@@ -20,8 +20,8 @@ use crate::{
     protocol::ElapsedHeader,
     state::{
         Appearance, ClientState, FoodSpawnInput, FrameReport, HudCommandBoundary,
-        HudCommandCollector, HudCommandMarker, MAX_SNAKES, MAX_TOTAL_BODY_POINTS, Point,
-        PresentationEvent, PreySpawnInput, Setup, SnakeTarget, StateError,
+        HudCommandCollector, HudCommandMarker, MAX_SNAKES, Point, PresentationEvent,
+        PreySpawnInput, Setup, SnakeTarget, StateError,
     },
 };
 
@@ -59,10 +59,30 @@ fn validate_minimap_work(
 
 /// Retained objects, including duplicate appearances, deaths, and an undrawn own object.
 pub const MAX_RETAINED_SNAKES: usize = MAX_SNAKES * 2;
+/// Aggregate borrowed Canvas recipe metadata; image sources remain shared.
+pub const MAX_FRAME_ASSET_USES: usize = MAX_RETAINED_SNAKES * 512;
 /// Aggregate physical anchors, including retained dying body points and undrawn own geometry.
-pub const MAX_RETAINED_TOTAL_BODY_POINTS: usize = MAX_TOTAL_BODY_POINTS * 2;
+pub const MAX_RETAINED_TOTAL_BODY_POINTS: usize = 131_072;
+/// Compact only previously inadmissible worlds; preserve the legacy envelope.
+pub const PRESSURE_BODY_POINTS: usize = MAX_SNAKES * 64;
 /// Aggregate active curve samples permitted in one prepared numeric draw.
 pub const MAX_DRAW_SAMPLES: usize = MAX_RETAINED_TOTAL_BODY_POINTS * 2;
+/// Rival curve samples under pressure, shared by native, WebGPU and Canvas.
+pub const PRESSURE_RIVAL_DRAW_SAMPLES: usize = MAX_SNAKES * 96;
+/// Complete food/prey command lanes under presentation pressure.
+pub const PRESSURE_FOOD_DRAWS: usize = MAX_SNAKES * 64;
+/// Prey body/glow command envelope in previously inadmissible worlds.
+pub const PRESSURE_PREY_DRAWS: usize = MAX_SNAKES * 32;
+/// Complete Canvas pressure picture: unchanged own-body maximum, reduced rivals,
+/// entities, faces, accessories and antenna bulbs.
+pub const MAX_PRESSURE_SCENE_IMAGES: usize = super::MAX_BODY_PAINT_COMMANDS
+    + 2 * PRESSURE_RIVAL_DRAW_SAMPLES
+    + PRESSURE_FOOD_DRAWS
+    + PRESSURE_PREY_DRAWS
+    + 16 * MAX_RETAINED_SNAKES;
+/// Snake-specific presentation storage, including transaction/draw scratch.
+/// The executable accounting assertion lives beside `check_limits`.
+pub const SNAKE_PRESENTATION_MEMORY_BUDGET: usize = 1536 * 1024 * 1024;
 
 /// A copied score result; unavailable or unsupported inputs never invent a value.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -301,11 +321,11 @@ pub struct AntennaDrawBudget {
 impl Default for AntennaDrawBudget {
     fn default() -> Self {
         Self {
-            bulbs: 512,
-            paths: 1024,
-            strokes: 2048,
-            vertices: 11264,
-            random_units: 10240,
+            bulbs: MAX_RETAINED_SNAKES,
+            paths: MAX_RETAINED_SNAKES * 2,
+            strokes: MAX_RETAINED_SNAKES * 4,
+            vertices: MAX_RETAINED_SNAKES * 2 * super::MAX_ANTENNA_NODES,
+            random_units: MAX_RETAINED_SNAKES * 2 * (super::MAX_ANTENNA_NODES - 1),
         }
     }
 }
@@ -680,6 +700,7 @@ pub struct AnimatedClient {
     arena_edge_view: ArenaEdgeView,
     connected: bool,
     entries: Vec<Entry>,
+    detail_pressure: bool,
     body_paint_flags: Vec<u8>,
     foods: FoodWorld,
     food_bounds: Option<FoodCullBounds>,
@@ -732,6 +753,7 @@ impl AnimatedClient {
             arena_edge_view: ArenaEdgeView::default(),
             connected: false,
             entries: Vec::new(),
+            detail_pressure: false,
             body_paint_flags: vec![0; MAX_CURVE_SAMPLES],
             foods: FoodWorld::new(),
             food_bounds: None,
@@ -757,6 +779,7 @@ impl AnimatedClient {
         self.reset_camera();
         self.connected = false;
         self.entries.clear();
+        self.detail_pressure = false;
         self.minimap.reset_world();
         self.nickname_draws.clear();
         self.own_score_adjustment = 0;
@@ -943,14 +966,63 @@ impl AnimatedClient {
             .rposition(|entry| entry.addressed && entry.wire_id == Some(id))
     }
 
-    fn check_limits(&self) -> Result<(), ClientPresentationError> {
-        if self.entries.len() > MAX_RETAINED_SNAKES
-            || self.retained_body_points() > MAX_RETAINED_TOTAL_BODY_POINTS
-        {
-            Err(ClientPresentationError::Limit)
-        } else {
-            Ok(())
+    fn check_limits(&mut self) -> Result<(), ClientPresentationError> {
+        while self.entries.len() > MAX_RETAINED_SNAKES {
+            let index = self
+                .entries
+                .iter()
+                .position(|e| !e.own && !e.addressed)
+                .ok_or(ClientPresentationError::Limit)?;
+            let token = self.entries[index].token;
+            self.foods.retire_eater(token);
+            self.preys.retire_eater(token);
+            self.entries.remove(index);
+            self.detail_pressure = true;
         }
+        self.detail_pressure |= self.retained_body_points() > MAX_RETAINED_TOTAL_BODY_POINTS;
+        let point_limit = if self.detail_pressure {
+            PRESSURE_BODY_POINTS
+        } else {
+            MAX_RETAINED_TOTAL_BODY_POINTS
+        };
+        while self.retained_body_points() > point_limit {
+            let camera = self.camera.position();
+            let index = self
+                .entries
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| !e.own && e.snake.body().points().len() > 8)
+                .min_by(|(ai, a), (bi, b)| {
+                    let priority = |e: &Entry| {
+                        let m = e.snake.metrics();
+                        let distance =
+                            (m.corrected_head.x - camera.x).hypot(m.corrected_head.y - camera.y);
+                        m.scale / (1. + distance)
+                    };
+                    priority(a).total_cmp(&priority(b)).then(ai.cmp(bi))
+                })
+                .map(|(i, _)| i)
+                .ok_or(ClientPresentationError::Limit)?;
+            self.entries[index].snake.compact_visual_body();
+        }
+        if self
+            .entries
+            .iter()
+            .map(|e| e.snake.body().storage_slots())
+            .sum::<usize>()
+            > point_limit
+        {
+            for entry in &mut self.entries {
+                entry.snake.reclaim_visual_storage();
+            }
+        }
+        Ok(())
+    }
+
+    /// This latch is set only after ingress crosses the old received-world bound.
+    /// Reset clears it; ordinary camera motion never toggles detail back and forth.
+    pub fn detail_pressure(&self) -> bool {
+        self.detail_pressure
     }
 
     /// Apply a singleton F/f/b frame without copying the existing world. Returns
@@ -2196,6 +2268,13 @@ impl AnimatedClient {
         }
         let mut next = self.clone();
         next.food_enabled |= enable_food;
+        next.detail_pressure |= received.snakes.len() > 256
+            || received
+                .snakes
+                .values()
+                .map(|s| s.body.len())
+                .sum::<usize>()
+                > 65_536;
         next.prey_enabled |= enable_prey;
         next.appearance_enabled |= enable_appearance;
         next.face_presentation_enabled |= enable_face_presentation;
@@ -2706,6 +2785,7 @@ impl AnimatedClient {
                 .map_err(ClientPresentationError::from)?;
         }
         next.advance_entities(step, now_ms)?;
+        next.check_limits()?;
         #[cfg(feature = "feel-trace")]
         next.trace_boundary("update", Some(step), None, None, None);
         *self = next;
@@ -3317,10 +3397,37 @@ impl AnimatedClient {
         }
         let mut prepared = Vec::new();
         let mut samples = 0_usize;
-        for (draw_ordinal, entry) in next
+        // Protect the own curve. Give the closest/largest rivals the remaining
+        // detail first, with an eight-sample floor for every visible rival.
+        let mut curve_limits = Vec::new();
+        if next.detail_pressure {
+            curve_limits.resize(next.entries.len(), 0);
+            let priorities: Vec<_> = next
+                .entries
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| e.drawn && !e.own && e.snake.metrics().visible)
+                .map(|(i, e)| {
+                    let m = e.snake.metrics();
+                    let distance =
+                        (m.corrected_head.x - camera.x).hypot(m.corrected_head.y - camera.y);
+                    (i, m.scale / (256. + distance))
+                })
+                .collect();
+            let extra = PRESSURE_RIVAL_DRAW_SAMPLES - priorities.len() * 8;
+            let total: f64 = priorities.iter().map(|(_, weight)| weight).sum();
+            for (i, weight) in priorities {
+                // Proportional shares change gradually with the camera instead
+                // of swapping a whole curve's quota at a distance-order tie.
+                curve_limits[i] =
+                    (8 + (extra as f64 * weight / total).floor() as usize).min(MAX_CURVE_SAMPLES);
+            }
+        }
+        for (draw_ordinal, (entry_index, entry)) in next
             .entries
             .iter_mut()
-            .filter(|entry| entry.drawn)
+            .enumerate()
+            .filter(|(_, entry)| entry.drawn)
             .enumerate()
         {
             let metrics = entry.snake.metrics();
@@ -3330,7 +3437,11 @@ impl AnimatedClient {
             let detailed_style = resolve_style(draw_ordinal, entry.own, &entry.snake)?;
             let (curve, face_heading) = entry
                 .snake
-                .prepare_curve_staged(quality_scale, detailed_style)
+                .prepare_curve_staged(
+                    quality_scale,
+                    detailed_style,
+                    (next.detail_pressure && !entry.own).then(|| curve_limits[entry_index]),
+                )
                 .map_err(ClientPresentationError::from)?;
             samples = samples
                 .checked_add(curve.as_ref().map_or(0, |curve| curve.samples.len()))
@@ -3689,6 +3800,15 @@ impl AnimatedClient {
             .map(|entry| entry.snake.body().points().len())
             .sum()
     }
+
+    /// Allocated visual anchor payload, including unused vector capacity.
+    pub fn body_storage_bytes(&self) -> usize {
+        self.entries
+            .iter()
+            .map(|e| e.snake.body().storage_slots())
+            .sum::<usize>()
+            * std::mem::size_of::<super::BodyPoint>()
+    }
 }
 
 #[cfg(test)]
@@ -3696,6 +3816,69 @@ mod resolved_draw_tests {
     use super::*;
     use crate::presentation::{BodyAsset, BodyAssetStatus, FoodSource, food_palette};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn snake_presentation_storage_accounting_fits_one_wasm_envelope() {
+        // Committed world, native ingress stage, core transaction, Setup draw
+        // stage. Spare capacity is reclaimed before committing any transition.
+        // Each committed stage is either legacy-sized or pressure-sized. Raw
+        // received anchors remain complete in both; visual scratch below covers
+        // the single-body overshoot before a transition reclaims its storage.
+        let legacy_anchors = MAX_RETAINED_TOTAL_BODY_POINTS * size_of::<super::super::BodyPoint>()
+            + 65_536 * size_of::<Point>();
+        let pressure_anchors = PRESSURE_BODY_POINTS * size_of::<super::super::BodyPoint>()
+            + crate::state::MAX_TOTAL_BODY_POINTS * size_of::<Point>();
+        // Reduced plans can reserve slots for culled spans that emit no image.
+        // Across bundled Setup draws the sample pool bounds those spare slots,
+        // independently of the emitted-image quota. Couple this allowance to
+        // the pressure anchor branch instead of combining incompatible maxima.
+        let legacy_scene = 4 * legacy_anchors
+            + super::super::MAX_BODY_PAINT_COMMANDS * size_of::<super::super::BodyImageCommand>();
+        let pressure_scene = 4 * pressure_anchors
+            + (MAX_PRESSURE_SCENE_IMAGES + 2 * MAX_DRAW_SAMPLES)
+                * size_of::<super::super::BodyImageCommand>();
+        let scene = legacy_scene.max(pressure_scene);
+        let entries = 8 * MAX_RETAINED_SNAKES * size_of::<Entry>();
+        let geometry = 2
+            * MAX_DRAW_SAMPLES
+            * (size_of::<super::super::CurveSample>()
+                + size_of::<super::super::CurveVertex>()
+                + size_of::<super::super::BodyPaintSample>())
+            + 4 * super::super::MAX_RETAINED_BODY_POINTS * size_of::<super::super::BodyPoint>();
+        let commands = super::super::MAX_FOOD_PAINT_COMMANDS
+            * size_of::<super::super::FoodImageCommand>()
+            + super::super::MAX_PREY_PAINT_COMMANDS * size_of::<super::super::PreyImageCommand>();
+        let recipes = 2
+            * MAX_FRAME_ASSET_USES
+            * (size_of::<super::super::BodyAssetUse>()
+                + size_of::<super::super::BodyAsset>()
+                + size_of::<usize>());
+        let entities = 4
+            * (super::super::MAX_RETAINED_FOODS * size_of::<super::super::FoodSnapshot>()
+                + super::super::MAX_RETAINED_PREYS * size_of::<super::super::PreySnapshot>());
+        // Renderer/adapter envelope: 2 draw buffers (128 MiB), picture pixels
+        // (64), text (32), CPU vertex/state chunks (36), cosmetic pixels (16),
+        // minimap/layout/name scratch (16), four source registries (128),
+        // and 100 MiB for collection overhead and constructor scratch.
+        let adapters = 520 * 1024 * 1024;
+        let total = scene + entries + geometry + commands + recipes + entities + adapters;
+        assert!(total <= SNAKE_PRESENTATION_MEMORY_BUDGET, "{total}");
+        const {
+            assert!(
+                super::super::MAX_RETAINED_BODY_POINTS + 8 * MAX_RETAINED_SNAKES
+                    <= PRESSURE_BODY_POINTS
+            );
+        }
+        assert_eq!(
+            crate::state::MAX_TOTAL_BODY_POINTS,
+            MAX_SNAKES * crate::state::MAX_BODY_POINTS
+        );
+        println!(
+            "BodyPoint={} Entry={} presentation_upper_bytes={total} budget_bytes={SNAKE_PRESENTATION_MEMORY_BUDGET}",
+            size_of::<super::super::BodyPoint>(),
+            size_of::<Entry>()
+        );
+    }
 
     fn background_input(client: &AnimatedClient, width: u32, height: u32) -> BackgroundInput {
         BackgroundInput {
@@ -4103,14 +4286,19 @@ mod resolved_draw_tests {
             )
             .unwrap();
         let antenna = output[0].antenna.as_ref().unwrap();
-        assert_eq!(used.bulbs, 511);
-        assert_eq!(used.paths, 1022);
-        assert_eq!(used.strokes, 2044);
+        assert_eq!(used.bulbs, AntennaDrawBudget::default().bulbs - 1);
+        assert_eq!(used.paths, AntennaDrawBudget::default().paths - 2);
+        assert_eq!(used.strokes, AntennaDrawBudget::default().strokes - 4);
         assert_eq!(
             used.vertices,
-            11264 - antenna.outer_path.len() - antenna.inner_path.len()
+            AntennaDrawBudget::default().vertices
+                - antenna.outer_path.len()
+                - antenna.inner_path.len()
         );
-        assert_eq!(used.random_units, 10224);
+        assert_eq!(
+            used.random_units,
+            AntennaDrawBudget::default().random_units - 16
+        );
         let vertices = antenna.outer_path.len() + antenna.inner_path.len();
         for index in 0..6 {
             let mut rejected = client.clone();
@@ -4204,7 +4392,8 @@ mod resolved_draw_tests {
     #[test]
     fn antenna_budget_is_shared_across_sixty_four_setup_plans_and_final_draw() {
         let mut client = antenna_client();
-        let spawns: Vec<_> = (8_u16..15)
+        let per_draw = MAX_RETAINED_SNAKES / 64;
+        let spawns: Vec<_> = (8_u16..8 + (per_draw - 1) as u16)
             .map(|id| {
                 let mut snake = spawn(3, 11);
                 snake[1..3].copy_from_slice(&id.to_be_bytes());
@@ -4248,7 +4437,7 @@ mod resolved_draw_tests {
             )
             .unwrap();
         assert_eq!(hooks, 64);
-        assert_eq!(calls, 512);
+        assert_eq!(calls, MAX_RETAINED_SNAKES);
         assert_eq!(budget.bulbs, 0);
         assert_eq!(budget.paths, 0);
         assert_eq!(budget.strokes, 0);

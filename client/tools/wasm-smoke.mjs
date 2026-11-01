@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { loadWasm } from './wasm-test-context.mjs';
+import { snakeCapacitySmoke } from './snake-capacity-smoke.mjs';
 import { syntheticChallenge } from './synthetic-challenge.mjs';
 import { HandshakeSession } from '../web/handshake-session.mjs';
 import { bundle, syntheticScene, syntheticSetup, syntheticStep } from '../web/synthetic-scene.mjs';
@@ -42,6 +43,7 @@ import { desktopInputLifetimeSmoke } from './desktop-input-lifetime-smoke.mjs';
 
 // Entirely synthetic ABI integration; no reference files or network are used.
 const wasm = await loadWasm();
+console.log('Synthetic real-Wasm maximum snake capacity passed:', snakeCapacitySmoke(wasm));
 console.log('Synthetic selected accessory request ABI passed:', selectedAccessoryRequestSmoke(wasm));
 console.log('Synthetic real-Wasm pending-connection status passed:', connectingStatusSmoke(wasm));
 console.log('Synthetic real-Wasm copied phase-string status ABI passed:', connectingStatusScalarSmoke(wasm));

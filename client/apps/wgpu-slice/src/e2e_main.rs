@@ -36,6 +36,11 @@ mod probe {
         leaderboard: bool,
         minimap: bool,
         pictures: u64,
+        peak_received: usize,
+        peak_prepared: usize,
+        skipped: u64,
+        full_map: bool,
+        best_map_overflow: Option<f64>,
         closed: bool,
         baseline: Option<(Point, f64, f64)>,
         peak_speed: f64,
@@ -43,6 +48,11 @@ mod probe {
     impl Summary {
         fn observe(&mut self, game: &LocalGame, active: f64) -> Result<()> {
             let state = game.client().received();
+            self.peak_received = self.peak_received.max(state.snakes.len());
+            self.skipped = game.draw_diagnostics.skipped_frames;
+            if self.skipped != 0 {
+                return Err("presentation: picture skipped".into());
+            }
             if let Some(setup) = &state.setup {
                 self.protocol = setup.protocol;
             }
@@ -77,7 +87,7 @@ mod probe {
         }
         fn print(&self, seconds: f64) {
             println!(
-                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"seconds\":{:.3}}}",
+                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"bestMapOverflowPixels\":{},\"seconds\":{:.3}}}",
                 self.opened,
                 self.challenge,
                 self.login,
@@ -95,6 +105,11 @@ mod probe {
                 self.minimap,
                 self.pictures,
                 self.closed,
+                self.peak_received,
+                self.peak_prepared,
+                self.skipped,
+                self.full_map,
+                self.best_map_overflow.unwrap_or(0.),
                 seconds
             );
         }
@@ -152,12 +167,34 @@ mod probe {
         }
         fn pictures(&mut self) -> Result<()> {
             for _ in 0..16 {
-                let Some(_picture) = self.game.take_frame() else {
+                let Some(picture) = self.game.take_frame() else {
                     return Ok(());
                 };
-                // CPU sink accepts the actual production prepared picture. This
-                // commits LocalGame's transaction, but makes no GPU/pixel claim.
+                self.summary.peak_prepared =
+                    self.summary.peak_prepared.max(picture.frame.snakes.len());
+                // Accept the picture before observing its committed camera;
+                // the candidate's draw transform is not yet in game.client().
                 self.game.presented(true)?;
+                if let Some(setup) = &self.game.client().received().setup {
+                    let camera = self.game.client().camera();
+                    let radius = setup
+                        .radius
+                        .max(self.game.client().boundary().map_or(0., |b| b.displayed()));
+                    let overflow = [camera.position().x, camera.position().y]
+                        .into_iter()
+                        .zip(EXTENT)
+                        .map(|(position, side)| {
+                            2. * (radius + (position - setup.grid_center).abs()) * camera.zoom()
+                                - f64::from(side)
+                        })
+                        .fold(0., f64::max);
+                    self.summary.best_map_overflow = Some(
+                        self.summary
+                            .best_map_overflow
+                            .map_or(overflow, |prior| prior.min(overflow)),
+                    );
+                    self.summary.full_map |= overflow <= 1e-6;
+                }
                 self.summary.pictures += 1;
             }
             if self.game.has_frame() {
@@ -199,8 +236,14 @@ mod probe {
                 self.flush()?;
             }
             if self.game.phase() == Phase::Playing {
-                if self.summary.own {
-                    self.playing.get_or_insert_with(Instant::now);
+                if self.summary.own && self.playing.is_none() {
+                    // Wheel admission requires a playing, live own snake.
+                    if std::env::var("SLITHER_CLIENT_E2E_FULL_MAP").as_deref() == Ok("1")
+                        && !self.game.wheel_zoom(-1000.)
+                    {
+                        return Err("full-map: zoom admission rejected".into());
+                    }
+                    self.playing = Some(Instant::now());
                 }
                 let heading = self.summary.baseline.map_or(0., |(_, h, _)| h) + 0.8;
                 self.game.pointer(

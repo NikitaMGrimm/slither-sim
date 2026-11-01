@@ -512,6 +512,12 @@ impl FoodWorld {
         self.foods.iter().filter_map(|f| f.state.eater)
     }
 
+    /// Under parent object pressure, retire only the consumed visual flights.
+    /// Received food keys and snake anchors belong to the separate state owner.
+    pub(crate) fn retire_eater(&mut self, token: SnakeObjectToken) {
+        self.foods.retain(|food| food.state.eater != Some(token));
+    }
+
     /// Advance atomically using only step.delta, including zero or disconnected
     /// updates. Call after all snakes advance. The resolver reads the captured
     /// object's current raw pose, never its current wire-ID lookup. A missing
