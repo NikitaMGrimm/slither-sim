@@ -1,7 +1,13 @@
 //! Frozen production preparation + offscreen rendering, at physical 1080p/4K.
 //! Each invocation is one A/B side; alternate retained binaries externally.
+#[path = "output.rs"]
+mod output_directory;
+#[path = "presented.rs"]
+mod presented;
 #[path = "../../tests/support/battledome_world.rs"]
 mod synthetic;
+#[path = "trace_payloads.rs"]
+mod trace_payloads;
 use super::*;
 use std::{fmt::Write as _, io::Write as _};
 
@@ -123,7 +129,12 @@ fn capture_png(r: &gpu::Renderer, texture: &wgpu::Texture, path: &Path) -> Resul
 }
 
 pub fn run(output: &Path) -> Result<()> {
-    std::fs::create_dir(output).map_err(|e| e.to_string())?;
+    output_directory::with_new_directory(output, || run_created(output))
+}
+pub fn presented(output: &Path) -> Result<()> {
+    output_directory::with_new_directory(output, || presented::run_created(output))
+}
+fn run_created(output: &Path) -> Result<()> {
     let instance = gpu::instance();
     let mut seen = std::collections::BTreeSet::new();
     for adapter in pollster::block_on(instance.enumerate_adapters(wgpu::Backends::DX12)) {
@@ -336,17 +347,19 @@ pub fn run(output: &Path) -> Result<()> {
 
 /// A single local-host cross-check, deliberately excluded from frozen A/B data.
 pub fn live(endpoint: &str, output: &Path) -> Result<()> {
-    use slither_client::session_policy::Phase;
-    use slither_wgpu_slice::{
-        game::{EffectKind, LocalGame, loopback_endpoint},
-        native::{Event, Transport},
-    };
     let url = format!("ws://{endpoint}/slither");
-    let port = loopback_endpoint(&url)?;
+    let port = slither_wgpu_slice::game::loopback_endpoint(&url)?;
     if [8766, 18884, 18885].contains(&port) {
         return Err("reserved port".into());
     }
-    std::fs::create_dir(output).map_err(|e| e.to_string())?;
+    output_directory::with_new_directory(output, || live_created(&url, output))
+}
+fn live_created(url: &str, output: &Path) -> Result<()> {
+    use slither_client::session_policy::Phase;
+    use slither_wgpu_slice::{
+        game::{EffectKind, LocalGame},
+        native::{Event, Transport},
+    };
     let instance = gpu::instance();
     let mut renderer = pollster::block_on(gpu::Renderer::new(
         &instance,
@@ -373,7 +386,7 @@ pub fn live(endpoint: &str, output: &Path) -> Result<()> {
     game.draw_diagnostics.strict_validation = true;
     let mut transport = Transport::with_wake(|| {});
     let start = Instant::now();
-    game.play(&url, "Zoom probe", 0)?;
+    game.play(url, "Zoom probe", 0)?;
     let mut playing = None;
     let mut captured = false;
     let mut peak_received = 0;

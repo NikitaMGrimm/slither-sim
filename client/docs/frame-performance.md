@@ -11,7 +11,7 @@ The 500 model is not 500 admitted live snakes. It opens no socket or window.
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/zoomout-perf'
 $env:CARGO_BUILD_JOBS = '2'
-cargo build --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 & "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --battledome C:/new/external/output
 ```
 
@@ -30,6 +30,45 @@ The [2026-11-01 shadow study](../../research/client-performance/2026-11-01-zoomo
 contains the complete selected matrix, phase results, exactness checks,
 loopback-host cross-check and unresolved RTX/AMD limits. The ordinary renderer
 does not request timestamp features or allocate query storage.
+
+The non-default `frame-profile` feature enables this example and its render
+observer/API-trace instrumentation. Ordinary builds compile every observer
+lookup and phase call out. `--battledome` requires `TIMESTAMP_QUERY` and encoder
+timestamps (`TIMESTAMP_QUERY_INSIDE_ENCODERS`) for its diagnostic renderer.
+An adapter without the required features stops the invocation with exit status
+1 and is not measured. A failed invocation retains its newly created output
+under a unique `frame-perf-failed-*` directory, freeing the original path for
+retry; a pre-existing output directory is never cleaned or overwritten.
+
+### Presented native viewport and GPU-input diagnostics
+
+`--battledome-presented NEW_DIRECTORY` uses the native window-to-backing mapping
+and the complete `WorldPresenter`, headlessly, for both Original and Native.
+It records physical/backing/attachment extents, DPR, requested/effective mode
+and MSAA, plus separate world/blit/overlay GPU timestamps. Native's effective
+sample count follows the current shared policy; a requested 4x cell at 4K can
+be effective 1x. Compare matching modes/sample counts rather than assuming the
+request is the effective result. `FRAME_PERF_DPR` selects DPR (default 1).
+
+`FRAME_PERF_GPU_TRACE_DIR` selects a separately created, empty external trace
+root for a **validation-only** run. The pinned wgpu API tracer records actual
+buffer/texture write bytes, all resource/pipeline/bind-group descriptors and
+ordered pass/draw commands, including the blitter. It runs below the Draw layer.
+Payloads are losslessly archived and verified byte-for-byte before retiring
+their uncompressed copies. `gpu-trace-json` streams the typed trace for offline
+SHA-256 analysis. Trace-enabled timings are excluded from performance tables;
+timing runs leave this variable unset. All frame markers and trace hooks are
+behind `frame-profile`. Trace validation records one complete rendered picture
+per cell, including all preceding resource creation and upload actions; it does
+not use the timing run's 10/30 warmup/sample counts.
+
+`FRAME_PERF_FRESH_CONTROL=1`, with `FRAME_PERF_WIDTH` set to 1920 or 3840 and
+`FRAME_PERF_MODE` to Original or Native, isolates the 500-model/default control
+in a fresh process/device for each chosen case. `FRAME_PERF_CONTROL_ONLY=1`
+selects default 500-model cases without the strict one-case isolation.
+The diagnostic build feature `frame-profile-no-shadow-cut` forces the candidate
+renderer to retain shadows, for the third-binary comparison; it is not a user
+quality setting. Record this feature and each executable hash in provenance.
 
 ## Battledome live cross-check
 
@@ -57,7 +96,7 @@ Run the finite Windows offscreen workload from the repository root:
 
 ```powershell
 $env:CARGO_BUILD_JOBS = '2'
-cargo build --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 target/release/examples/frame_perf.exe C:/new/external/output
 ```
 
@@ -107,7 +146,7 @@ The `frame_perf` driver also has a GPU-free food-validation workload:
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'
 $env:CARGO_BUILD_JOBS = '1'
-cargo build --offline --release --locked -p slither-wgpu-slice --example frame_perf
+cargo build --offline --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
 & "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --cpu-food C:/new/external/output
 ```
 

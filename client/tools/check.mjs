@@ -31,6 +31,8 @@ try {
   if (process.platform === 'win32') {
     gpu('test', '--locked', '--lib', '--tests');
     gpu('clippy', '--locked', '--all-targets', '--', '-D', 'warnings');
+    gpu('test', '--locked', '--features', 'frame-profile', '--test', 'render_profile', '--test', 'body_shadow_scale', '--test', 'frame_perf_output');
+    gpu('clippy', '--locked', '--features', 'frame-profile', '--all-targets', '--', '-D', 'warnings');
     gpu('build', '--locked', '--bin', 'slither-wgpu-desktop');
   } else console.log('Windows desktop checks run on Windows CI; checking shared Wasm here.');
   gpu('clippy', '--locked', '--lib', '--target', 'wasm32-unknown-unknown', '--', '-D', 'warnings');

@@ -1,4 +1,5 @@
 //! Passive render diagnostics remain separate from the latency trace schema.
+#![cfg(feature = "frame-profile")]
 #[path = "support/announcement_tape.rs"]
 mod tape;
 use slither_wgpu_slice::{latency, render};

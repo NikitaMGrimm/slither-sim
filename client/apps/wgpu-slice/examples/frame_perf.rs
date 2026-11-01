@@ -293,7 +293,7 @@ fn main() {
     let first = args
         .next()
         .expect(
-            "[--cpu-food|--zoom|--battledome|--battledome-live HOST:PORT] new external output directory",
+            "[--cpu-food|--zoom|--battledome|--battledome-presented|--battledome-live HOST:PORT] new external output directory",
         );
     let result = if first == "--cpu-food" {
         food::run()
@@ -303,6 +303,10 @@ fn main() {
             endpoint.to_str().expect("UTF-8 endpoint"),
             Path::new(&args.next().expect("new external output directory")),
         )
+    } else if first == "--battledome-presented" {
+        battledome::presented(Path::new(
+            &args.next().expect("new external output directory"),
+        ))
     } else if first == "--battledome" {
         battledome::run(Path::new(
             &args.next().expect("new external output directory"),
