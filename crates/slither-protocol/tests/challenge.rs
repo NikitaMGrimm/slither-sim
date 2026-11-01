@@ -1,6 +1,7 @@
 mod common;
 use slither_protocol::challenge::*;
-const SOURCE: &[u8] = b"var a = \"_k/T)\";a+=\"dr'Ay(^|``J9l@Bs'L{]JX\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}";
+// Authored synthetic literals, including punctuation with signed remainder.
+const SOURCE: &[u8] = b"var a = \" !Z_a\";a+=\"0123456789ABCdefghij!?\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}";
 #[test]
 fn exact_literal_errors_point_to_the_offending_encoded_byte() {
     // First/last positions in both literals, including the second-literal start
@@ -24,11 +25,11 @@ fn algorithms_have_separate_independent_golden_replies() {
     for grammar in [Grammar::ExactTemplate, Grammar::TokenWhitespace] {
         assert_eq!(
             stock(&encoded, grammar).unwrap(),
-            *b"LzLIOvqUYaFMrAJWShKPlPEiOBC"
+            *b"647?I6*9/@81+@<@+1X`OYJVIA)"
         );
         assert_eq!(
             literal_27(&encoded, grammar).unwrap(),
-            *b"_k/T)dr'Ay(^|``J9l@Bs'L{]JX"
+            *b" !Z_a0123456789ABCdefghij!?"
         );
         // The step-2 array is independently pinned by the browser admission fixture.
         let host = common::encode_source(b"var a = \"Slith\";a+=\"erSimLocalHostChalleng\";for (var i=0;i<27;i++){idba[i]=a.charCodeAt(i);}");
@@ -47,11 +48,11 @@ fn algorithms_have_separate_independent_golden_replies() {
 }
 #[test]
 fn whitespace_is_only_admitted_by_token_grammar() {
-    let source = b" \tvar a=\"_k/T)\" ; a += \"dr'Ay(^|``J9l@Bs'L{]JX\" ;\nfor(var i=0;i<27;i++){idba[i]=a.charCodeAt(i);} \r";
+    let source = b" \tvar a=\" !Z_a\" ; a += \"0123456789ABCdefghij!?\" ;\nfor(var i=0;i<27;i++){idba[i]=a.charCodeAt(i);} \r";
     let encoded = common::encode_source(source);
     assert_eq!(
         stock(&encoded, Grammar::TokenWhitespace).unwrap(),
-        *b"LzLIOvqUYaFMrAJWShKPlPEiOBC"
+        *b"647?I6*9/@81+@<@+1X`OYJVIA)"
     );
     assert!(stock(&encoded, Grammar::ExactTemplate).is_err());
     for bad in [
@@ -111,7 +112,7 @@ fn general_copy_loop_has_independent_synthetic_golden_replies() {
         copy_loop(&common::encode_source(SOURCE))
             .unwrap()
             .as_bytes(),
-        b"LzLIOvqUYaFMrAJWShKPlPEiOBC"
+        b"647?I6*9/@81+@<@+1X`OYJVIA)"
     );
     let uppercase = legacy
         .iter()

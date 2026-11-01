@@ -98,6 +98,7 @@ fn setup_and_appearance_round_trip_with_fixed_raw_fields_and_all_body_pairs() {
             (a.name, a.custom_skin, a.skin),
             (b"Reader".as_slice(), [4, 5].as_slice(), 3)
         );
+        assert_eq!((a.raw_direction, a.cosmetic), (b'0', 0));
         assert_eq!(a.head, [163170, 162750]);
         assert_eq!(a.body.first, Some([162750, 162750]));
         assert_eq!(
@@ -254,9 +255,9 @@ fn shared_prey_hud_control_and_map_encoders_round_trip() {
     let mut encoder = Encoder::new(9);
     let prey = Prey {
         id: 123,
-        position: Point::default(),
-        heading: 0.,
-        target_heading: 0.,
+        position: Point { x: 3., y: 6. },
+        heading: std::f64::consts::TAU / 4.,
+        target_heading: std::f64::consts::TAU / 2.,
         speed: 100.,
         size: 3.,
     };
@@ -266,8 +267,9 @@ fn shared_prey_hud_control_and_map_encoders_round_trip() {
     };
     assert_eq!(
         (p.id, p.position, p.heading, p.wanted_heading, p.speed),
-        (23, [162750, 162750], 0, 0, 3200)
+        (23, [162765, 162780], 4_194_304, 8_388_608, 3200)
     );
+    assert_eq!((p.color, p.size, p.raw_direction), (0, 15, b'2'));
     for full in [false, true] {
         let p = convert(&mut encoder, encode::prey_motion(23, &prey, full).unwrap());
         let Message::PreyMotion(p) = v13::decode(&p, ClientPresentation).unwrap() else {
@@ -275,7 +277,15 @@ fn shared_prey_hud_control_and_map_encoders_round_trip() {
         };
         assert_eq!(
             (p.id, p.position, p.speed),
-            (23, [10850, 10850], full.then_some(3200))
+            (23, [10851, 10852], full.then_some(3200))
+        );
+        assert_eq!(
+            (p.raw_direction, p.heading, p.wanted_heading),
+            (
+                full.then_some(b'2'),
+                full.then_some(4_194_304),
+                full.then_some(8_388_608)
+            )
         );
     }
     for eater in [None, Some(9)] {
@@ -330,19 +340,43 @@ fn shared_prey_hud_control_and_map_encoders_round_trip() {
         let p = convert(&mut encoder, source);
         assert_eq!(v13::decode(&p, ClientPresentation).unwrap(), expected);
     }
-    for source in [
-        encode::pong(),
-        encode::game_over(false),
-        encode::victory_accepted(),
-        encode::removal(9, true),
-        encode::record(123, 456, b"Reader", b"Text").unwrap(),
+    let p = convert(&mut encoder, encode::pong());
+    assert_eq!(
+        v13::decode(&p, ClientPresentation).unwrap(),
+        Message::Pong(b"p")
+    );
+    for (source, status) in [
+        (encode::game_over(false), 0),
+        (encode::game_over(true), 1),
+        (encode::victory_accepted(), 2),
     ] {
         let p = convert(&mut encoder, source);
-        assert!(!matches!(
+        assert_eq!(
             v13::decode(&p, ClientPresentation).unwrap(),
-            Message::Unknown { .. }
-        ));
+            Message::LifeControl {
+                status: Some(status),
+                command: &[b'v', status],
+            }
+        );
     }
+    for (id, died) in [(9, false), (17, true)] {
+        let p = convert(&mut encoder, encode::removal(id, died));
+        let Message::SnakeRemoval(r) = v13::decode(&p, ClientPresentation).unwrap() else {
+            panic!()
+        };
+        assert_eq!((r.id, r.raw_status), (id, Some(u8::from(died))));
+    }
+    let p = convert(
+        &mut encoder,
+        encode::record(123, 456, b"Reader", b"Text").unwrap(),
+    );
+    let Message::Announcement(a) = v13::decode(&p, ClientPresentation).unwrap() else {
+        panic!()
+    };
+    assert_eq!(
+        (a.count(), a.raw_fraction(), a.name(), a.message()),
+        (123, 456, b"Reader".as_slice(), b"Text".as_slice())
+    );
     let map = Minimap {
         side: 4,
         cells: (0..16).map(|i| u8::from([0, 7, 15].contains(&i))).collect(),
@@ -353,12 +387,36 @@ fn shared_prey_hud_control_and_map_encoders_round_trip() {
         panic!()
     };
     assert_eq!(
+        (
+            m.format(),
+            m.advertised_size(),
+            m.dimension(),
+            m.layer_count()
+        ),
+        (minimap::MinimapFormat::SnapshotM, Some(4), Some(4), 1)
+    );
+    assert_eq!(
         m.selected(4).unwrap().map(|c| c.index).collect::<Vec<_>>(),
         [15, 7, 0]
     );
-    let p = convert(&mut encoder, encode::minimap_delta(&map, &map).unwrap());
+    let mut next = map.clone();
+    next.cells[7] = 0;
+    next.cells[14] = 1;
+    let p = convert(&mut encoder, encode::minimap_delta(&map, &next).unwrap());
     let Message::Minimap(m) = v13::decode(&p, ClientPresentation).unwrap() else {
         panic!()
     };
-    assert_eq!(m.selected(4).unwrap().count(), 0);
+    assert_eq!(
+        (
+            m.format(),
+            m.advertised_size(),
+            m.dimension(),
+            m.layer_count()
+        ),
+        (minimap::MinimapFormat::ToggleV, None, None, 1)
+    );
+    assert_eq!(
+        m.selected(4).unwrap().map(|c| c.index).collect::<Vec<_>>(),
+        [14, 7]
+    );
 }
