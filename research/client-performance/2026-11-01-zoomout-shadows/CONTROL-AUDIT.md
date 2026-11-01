@@ -67,3 +67,14 @@ deciding whether the increase is an order/state artefact. Also record GPU clock
 state if a non-admin telemetry API is available; report unsupported readings.
 The booked window is 08:00–08:25 local, with compiler-exit extension capped at
 08:40. No A/A result is claimed yet; the merge blocker remains open.
+
+A non-admin probe of the installed AMD ADL read-only telemetry getter succeeded:
+graphics, memory and SoC clock fields are supported. The control-run supervisor
+will sample them about every 200 ms, also when a new `PLAN` line arrives, and
+retain NVIDIA clock/P-state queries about once per second. These are observers
+shared by all follow-up arms; their possible influence must be reported. The
+retained benchmark has one `PLAN` bracket for both sequential MSAA cases, so
+clock context cannot be assigned to an individual timed frame or sample count.
+The API's sensor definitions and getter contract are documented by
+[AMD GPUOpen](https://gpuopen-librariesandsdks.github.io/adl/group__OVERDRIVE8API.html).
+This reads telemetry only; no clock, power or driver setting is changed.

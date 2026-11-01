@@ -270,8 +270,10 @@ The first measurement window is retained as [preliminary selected data](selected
 including its control-time discrepancy; the final table uses the corrected
 observer's rebuilt baseline/candidate pair.
 
-- Full `npm run check` is still running at initial PR creation; its completed
-  result will be recorded in PR validation. No full-check pass is claimed yet.
+- Full `npm run check` reached the native studio-cosmetics tests before its
+  measurement-window guard stopped that attempt. A fresh check was paused at
+  the owner's next quiet-window instruction. Full validation will resume after
+  08:40; no complete full-check pass is claimed yet.
 - Final all-target format/Clippy, 33 body-painter tests, nine release zoom tests,
   issued-picture feel regression, two latency tests and observer regression passed.
 - Final baseline/candidate workload preflights completed, score-400 assertions
