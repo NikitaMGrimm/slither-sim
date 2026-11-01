@@ -322,11 +322,15 @@ fn synthetic_malformed_supported_tail_rolls_back_all_fields_and_caches() {
 fn maximum_population_non_growing_updates_keep_all_anchors_inside_the_storage_quota() {
     let mut state = ClientState::default();
     apply(&mut state, &setup_with_score_index(430));
-    let commands: Vec<_> = (1..=MAX_SNAKES as u16)
-        .map(|id| spawn(id, MAX_BODY_POINTS))
-        .collect();
-    for packet in &commands {
-        apply(&mut state, packet);
+    // Admission is exercised separately with 512 packets. Populate the already
+    // validated maximum bodies directly here to isolate the aggregate rule
+    // without repeatedly copying a growing 32 MiB world in debug CI.
+    apply(&mut state, &spawn(1, MAX_BODY_POINTS));
+    let template = state.snakes[&1].clone();
+    for id in 2..=MAX_SNAKES as u16 {
+        let mut snake = template.clone();
+        snake.id = id;
+        state.snakes.insert(id, snake);
     }
     apply(&mut state, &[b'G', 0, 0]);
     assert_eq!(state.snakes.len(), MAX_SNAKES);
@@ -453,11 +457,15 @@ fn synthetic_body_hard_and_global_caps() {
         state.apply_frame(&spawn(1, MAX_BODY_POINTS + 1), ElapsedHeader::Absent),
         Err(StateError::Limit)
     );
-    let commands: Vec<_> = (1..=MAX_SNAKES as u16)
-        .map(|id| spawn(id, MAX_BODY_POINTS))
-        .collect();
-    for packet in &commands {
-        apply(&mut state, packet);
+    // Admission is exercised separately with 512 packets. Populate the already
+    // validated maximum bodies directly here to isolate the aggregate rule
+    // without repeatedly copying a growing 32 MiB world in debug CI.
+    apply(&mut state, &spawn(1, MAX_BODY_POINTS));
+    let template = state.snakes[&1].clone();
+    for id in 2..=MAX_SNAKES as u16 {
+        let mut snake = template.clone();
+        snake.id = id;
+        state.snakes.insert(id, snake);
     }
     assert_eq!(
         state.snakes.values().map(|s| s.body.len()).sum::<usize>(),

@@ -22,8 +22,13 @@ test('Battledome requires full-map pictures without skips and preserves measured
   const options = argumentsFor(['--host-bin', 'host', '--battledome', '500', '--scratch', 'scratch']);
   assert.equal(options.battledome, 500);
   assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
-  const summary = { ...complete(), fullMap: true, pictureSkips: 0, peakReceivedSnakes: 7, peakPreparedSnakes: 7 };
+  const summary = { ...complete(), fullMap: true, pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
   assert.equal(assertSummary(summary, 19, true), summary);
+  for (const count of [7, 256, 499]) {
+    assert.throws(() => assertSummary({ ...summary, peakReceivedSnakes: count }, 19, true), { stage: "population" });
+    assert.throws(() => assertSummary({ ...summary, peakPreparedSnakes: count }, 19, true), { stage: "population" });
+  }
+  assert.equal(argumentsFor(["--host-bin", "host", "--battledome", "500", "--vision", "1500"]).vision, 1500);
   assert.throws(() => assertSummary({ ...summary, fullMap: false }, 19, true), { stage: 'full-map' });
   assert.throws(() => assertSummary({ ...summary, pictureSkips: 1 }, 19, true), { stage: 'picture-skips' });
 });

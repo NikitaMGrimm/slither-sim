@@ -17,6 +17,7 @@ const SPACING_SAMPLES: usize = 100;
 // The count is at most 4096. Reuse its unused high bit so legacy bodies retain
 // their record layout and allocation footprint, including replay allocations.
 const VISUAL_REDUCED: usize = 1 << (usize::BITS - 1);
+const COMPACT_INTERVAL: u16 = 1 << 15;
 
 #[derive(Clone, Debug, PartialEq)]
 struct BodyCorrections {
@@ -24,6 +25,232 @@ struct BodyCorrections {
     offset: [f64; 4],
     index: usize,
     pending: i32,
+}
+
+#[cfg(test)]
+mod compact_tests {
+    use super::*;
+    use crate::presentation::{CurveInput, sample_curve_with_heading};
+    use crate::state::Direction;
+
+    fn fixture(count: usize, direction: f64) -> BodyGeometry {
+        let setup = Setup {
+            protocol: 19,
+            grid_center: 1000.,
+            radius: 900.,
+            sector_size: 100,
+            sector_count: 20,
+            max_segments: 4096,
+            body_spacing: 6.,
+            body_contraction: 0.5,
+            spangdv: 4.,
+            nsp1: 4.,
+            nsp2: 0.5,
+            nsp3: 12.,
+            mamu: 0.03,
+            mamu2: 0.02,
+            server_number: None,
+            game_mode: None,
+            team: None,
+        };
+        let points: Vec<_> = (0..count)
+            .map(|i| Point {
+                x: 60030. - direction * i as f64 * 6.,
+                y: 4.,
+            })
+            .collect();
+        BodyGeometry::from_appearance(
+            &Appearance {
+                id: 3,
+                skin: 0,
+                name: String::new(),
+                custom_skin: Vec::new(),
+                cosmetic: 255,
+                absolute_head: points[0],
+                absolute_body: points,
+                anchor_direction: Some(0),
+                heading: 0.,
+                wanted_heading: 0.,
+                speed_per_32ms: 4.,
+                fam: 0.,
+                wire_direction: Direction::None,
+            },
+            &setup,
+        )
+        .unwrap()
+    }
+
+    fn assert_span(body: &BodyGeometry, received: &[Point]) {
+        assert_curve(body, received, 0.);
+    }
+
+    fn assert_curve(body: &BodyGeometry, received: &[Point], relative_tolerance: f64) {
+        assert_eq!(body.logical_segments(), received.len());
+        assert_eq!(
+            body.points()
+                .iter()
+                .map(BodyPoint::represented_intervals)
+                .sum::<usize>(),
+            received.len()
+        );
+        let first = received[0];
+        let curve = sample_curve_with_heading(
+            CurveInput {
+                corrected_head: first,
+                head_fraction: 0.,
+                body: body.points(),
+                displayed_length: received.len() as f64,
+                segment_length: 6.,
+                point_spacing: 6.,
+                target_point_spacing: 6.,
+                quality_scale: 64.,
+                detailed_style: false,
+            },
+            0.,
+        )
+        .unwrap();
+        let epsilon = 0.02; // Includes Float32 rounding at the 60,000-unit fixture origin.
+        let bounds = received
+            .iter()
+            .fold([first.x, first.x, first.y, first.y], |b, p| {
+                [b[0].min(p.x), b[1].max(p.x), b[2].min(p.y), b[3].max(p.y)]
+            });
+        for p in &curve.samples {
+            assert!(f64::from(p.x) >= bounds[0] - epsilon);
+            assert!(f64::from(p.x) <= bounds[1] + epsilon);
+            assert!(f64::from(p.y) >= bounds[2] - epsilon);
+            assert!(f64::from(p.y) <= bounds[3] + epsilon);
+        }
+        let length: f64 = curve
+            .samples
+            .windows(2)
+            .map(|p| {
+                (f64::from(p[1].x) - f64::from(p[0].x)).hypot(f64::from(p[1].y) - f64::from(p[0].y))
+            })
+            .sum();
+        let received_length: f64 = received
+            .windows(2)
+            .map(|p| (p[1].x - p[0].x).hypot(p[1].y - p[0].y))
+            .sum();
+        assert!(
+            (length - received_length).abs() <= epsilon + relative_tolerance * received_length,
+            "visual {length}, received {received_length}"
+        );
+    }
+
+    #[test]
+    fn compact_terminal_and_sixteen_motion_updates_preserve_received_span() {
+        assert_eq!(
+            size_of::<BodyPoint>(),
+            960,
+            "legacy replay allocation layout"
+        );
+        let mut body = fixture(2048, 1.);
+        let mut received: Vec<_> = body.points().iter().map(BodyPoint::position).collect();
+        while body.points().len() > 8 {
+            body.compact_visual();
+        }
+        assert_span(&body, &received);
+        for _ in 0..16 {
+            let head = Point {
+                x: received[0].x + 6.,
+                y: 4.,
+            };
+            received.pop();
+            received.insert(0, head);
+            body.apply_anchor(Some(head), None, false, head, false)
+                .unwrap();
+            body.advance(1000);
+            assert_span(&body, &received);
+        }
+    }
+
+    #[test]
+    fn deterministic_compact_growth_motion_and_tail_sequences_preserve_intervals() {
+        for seed in [7_u64, 28, 161803] {
+            let direction = if seed & 1 == 0 { -1. } else { 1. };
+            let mut body = fixture(128, direction);
+            let mut received: Vec<_> = body.points().iter().map(BodyPoint::position).collect();
+            while body.points().len() > 8 {
+                body.compact_visual();
+            }
+            let mut random = seed;
+            for step in 0..if cfg!(debug_assertions) { 96 } else { 768 } {
+                random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let action = (random >> 32) % 3;
+                if action == 0 && received.len() > 8 {
+                    received.pop();
+                    body.remove_tail().unwrap();
+                } else {
+                    let grew = action == 1;
+                    let head = Point {
+                        x: received[0].x + direction * 6.,
+                        y: 4.,
+                    };
+                    if !grew {
+                        received.pop();
+                    }
+                    received.insert(0, head);
+                    body.apply_anchor(Some(head), None, grew, head, false)
+                        .unwrap();
+                }
+                if step % 7 == 0 && body.points().len() > 8 {
+                    body.compact_visual();
+                }
+                body.advance(1000);
+                assert_span(&body, &received);
+            }
+        }
+    }
+
+    #[test]
+    fn compact_curved_motion_stays_in_received_bounds_and_tracks_length() {
+        for seed in [11_u64, 42] {
+            let position = |i: i32| {
+                let a = f64::from(i) / 128.;
+                Point {
+                    x: 60030. + 768. * a.sin(),
+                    y: 768. * a.cos(),
+                }
+            };
+            let mut body = fixture(128, 1.);
+            for (i, p) in body.points.iter_mut().enumerate() {
+                p.position = position(-(i as i32));
+            }
+            let mut received: Vec<_> = body.points.iter().map(BodyPoint::position).collect();
+            while body.points.len() > 8 {
+                body.compact_visual();
+            }
+            let mut random = seed;
+            let mut head_index = 0;
+            for step in 0..if cfg!(debug_assertions) { 96 } else { 768 } {
+                random = random.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let action = (random >> 32) % 3;
+                if action == 0 && received.len() > 8 {
+                    received.pop();
+                    body.remove_tail().unwrap();
+                } else {
+                    head_index += 1;
+                    let head = position(head_index);
+                    let grew = action == 1;
+                    if !grew {
+                        received.pop();
+                    }
+                    received.insert(0, head);
+                    body.apply_anchor(Some(head), None, grew, head, false)
+                        .unwrap();
+                }
+                if step % 7 == 0 && body.points.len() > 8 {
+                    body.compact_visual();
+                }
+                body.sync_received_tail(*received.last().unwrap());
+                body.advance(1000);
+                // Smooth curved paths admit chord simplification; the straight
+                // reproductions above instead require absolute 0.02-unit parity.
+                assert_curve(&body, &received, 0.10);
+            }
+        }
+    }
 }
 
 impl Default for BodyCorrections {
@@ -93,10 +320,20 @@ pub struct BodyPoint {
     spacing_multiplier: f64,
     tail_fade: f64,
     dying: bool,
+    // Fits the record's existing alignment padding; legacy allocation is exact.
+    represented: u16,
     corrections: BodyCorrections,
 }
 
 impl BodyPoint {
+    pub(super) fn compacted(&self) -> bool {
+        self.represented & COMPACT_INTERVAL != 0
+    }
+
+    /// Logical incoming intervals represented by this retained visual anchor.
+    pub fn represented_intervals(&self) -> usize {
+        usize::from(self.represented & !COMPACT_INTERVAL).max(1)
+    }
     /// Absolute, contracted anchor position before displayed corrections.
     pub fn position(&self) -> Point {
         self.position
@@ -107,7 +344,8 @@ impl BodyPoint {
         self.previous_delta
     }
 
-    /// Creation-time edge length divided by the configured segment length.
+    /// Legacy creation-time edge length divided by segment length; compact
+    /// anchors instead carry their represented incoming logical interval count.
     pub fn edge_length(&self) -> f64 {
         self.edge_length
     }
@@ -252,6 +490,7 @@ impl BodyGeometry {
                 spacing_multiplier: f64::from(spacing[index.min(SPACING_SAMPLES - 4)]),
                 tail_fade: 0.,
                 dying: false,
+                represented: 0,
                 corrections: BodyCorrections::default(),
             });
         }
@@ -310,6 +549,11 @@ impl BodyGeometry {
             spacing_multiplier: 1.,
             tail_fade: 0.,
             dying: false,
+            represented: if self.detail_reduced() {
+                COMPACT_INTERVAL | 1
+            } else {
+                0
+            },
             corrections: BodyCorrections::default(),
         };
         if visible {
@@ -345,8 +589,13 @@ impl BodyGeometry {
             )?;
         }
         let mut next = self.clone();
+        if next.detail_reduced() {
+            point.edge_length = 1.;
+        }
         if grew {
             next.logical_segments += 1;
+        } else if next.detail_reduced() {
+            next.consume_compact_tail();
         } else if let Some(tail) = next.points.iter_mut().rev().find(|point| !point.dying) {
             tail.dying = true;
         }
@@ -354,7 +603,11 @@ impl BodyGeometry {
         next.anchor_direction = next_direction;
         // The three newest anchors stay fixed. Each moved anchor follows the
         // already moved neighbor, including retained dying records.
-        for index in 3..next.points.len() {
+        for index in 3..if next.detail_reduced() {
+            3
+        } else {
+            next.points.len()
+        } {
             let neighbor = next.points[index - 1].position;
             let point = &mut next.points[index];
             let before = point.position;
@@ -386,11 +639,7 @@ impl BodyGeometry {
                 return Ok(false);
             };
             self.logical_segments = remaining | VISUAL_REDUCED;
-            if self.points.iter().filter(|p| !p.dying).count() > remaining
-                && let Some(tail) = self.points.iter_mut().rev().find(|p| !p.dying)
-            {
-                tail.dying = true;
-            }
+            self.consume_compact_tail();
             return Ok(true);
         }
         let Some(tail) = self.points.iter_mut().rev().find(|point| !point.dying) else {
@@ -439,23 +688,55 @@ impl BodyGeometry {
         if self.points.len() <= 8 {
             return;
         }
+        // Retired correction/ghost detail is optional for reduced rivals. Own
+        // bodies never enter this path. Track incoming logical spans separately
+        // from the legacy sampler's outgoing traversal intervals.
+        self.points.retain(|point| !point.dying);
         let count = self.points.len();
         let mut compact = Vec::<BodyPoint>::with_capacity(count.div_ceil(2) + 3);
+        let mut represented = 0;
         for (index, point) in std::mem::take(&mut self.points).into_iter().enumerate() {
+            represented += point.represented_intervals();
             if index < 3 || index % 2 == 0 || index == count - 1 {
-                if let Some(previous) = compact.last_mut() {
-                    previous.previous_delta = Point {
-                        x: previous.position.x - point.position.x,
-                        y: previous.position.y - point.position.y,
-                    };
-                }
+                let mut point = point;
+                point.represented = COMPACT_INTERVAL | represented as u16;
+                point.edge_length = represented as f64;
+                represented = 0;
                 compact.push(point);
-            } else if let Some(previous) = compact.last_mut() {
-                previous.edge_length += point.edge_length;
             }
         }
         self.points = compact.into_boxed_slice().into_vec();
         self.logical_segments |= VISUAL_REDUCED;
+    }
+
+    fn consume_compact_tail(&mut self) {
+        let Some(index) = self.points.len().checked_sub(1) else {
+            return;
+        };
+        let span = self.points[index].represented_intervals();
+        if span == 1 || index == 0 {
+            self.points.pop();
+        } else {
+            let near = self.points[index - 1].position;
+            let tail = &mut self.points[index];
+            tail.position.x += (near.x - tail.position.x) / span as f64;
+            tail.position.y += (near.y - tail.position.y) / span as f64;
+            tail.represented = COMPACT_INTERVAL | (span - 1) as u16;
+            tail.edge_length = (span - 1) as f64;
+        }
+    }
+
+    /// Fractional traversal is exact for straight folded spans. On a bend its
+    /// chord approximates the retired path; pin the remaining endpoint to the
+    /// received tail after ingress so repeated retirement cannot drift outward.
+    pub(crate) fn sync_received_tail(&mut self, position: Point) {
+        if self.detail_reduced()
+            && let Some(tail) = self.points.last_mut()
+            && tail.position != position
+        {
+            tail.position = position;
+            tail.corrections = BodyCorrections::default();
+        }
     }
 
     /// Whether this appearance has lost visual anchors under scene pressure.

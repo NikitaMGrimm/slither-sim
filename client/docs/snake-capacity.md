@@ -32,9 +32,15 @@ Under pressure:
   Reduce small/distant rivals first, ordered by `scale / (1 + camera distance)`;
   appearance order breaks ties. Repeated reductions keep endpoints, the three
   newest anchors and surviving correction offsets, folding removed intervals
-  into their retained neighbour. The logical count stays independent. Reductions
+  into the next tailward endpoint. The logical count stays independent. Reductions
   are nested and are not reversed during that appearance, preventing oscillation
   as the camera crosses a boundary. Newly arriving head anchors remain detailed.
+  Reduced curves resample the retained polyline, without terminal extrapolation.
+  A tail update consumes one logical interval before retiring a physical anchor;
+  ingress pins the endpoint to the complete received tail. Straight-body extent
+  regressions use a 0.02-unit Float32 tolerance; deterministic smooth curved
+  sequences allow 10% chord-length loss. Sharp bends can lose more visual arc
+  length when simplified; received geometry is always complete.
 - Share **49,152 curve samples** among visible rivals, with an eight-sample floor.
   Extra samples are proportional to `scale / (256 + camera distance)`. This
   avoids swapping whole quotas when two rivals exchange distance order. Sampling
@@ -45,13 +51,21 @@ Under pressure:
   and fade decoration. Native reduces translucent eye-outline tessellation and
   rival antenna strokes; bulbs, numeric antenna updates and RNG cadence remain.
   Canvas uses the same connected-body planner. The legacy painter is unchanged.
+  Main's logical-pixel shadow cut applies only on the ordinary standard painter
+  path. Reduced rivals already omit shadows, so its savings are not subtracted
+  again. The own snake retains the same standard painter and shadow policy it
+  has in an unpressured world; capacity pressure never reduces its detail.
 - Native reserves the own body/antenna and overlay capacity first. Remaining
   rival body quotas can reduce the connected curve further, to a head marker or
   no optional body commands when exhausted. Optional rival faces, bulbs and names
   cannot exhaust that reservation. Fresh maximum-length full-map fixtures retain
   a body for every snake; this last resort protects unusually expensive own draws.
-- Select bounded suffixes of retained food/prey for painting only. Their complete
-  received and animated state, including eater tokens, remains retained.
+- Both adapters use one shared food/prey selector: cull invisible entities first,
+  then keep the newest visible entities within the shared own-reserved quotas,
+  preserving their original dense order. Prey visibility includes independently
+  visible, interpolated glows. Below pressure the original slices are borrowed
+  unchanged. Complete received and animated state, including eater tokens,
+  remains retained.
 - At the retained-object ceiling, retire the oldest unaddressed rival appearance
   and only its already-consumed food/prey flights. Keep every addressable live
   snake and the original own object. This prevents appearance churn from turning
@@ -92,7 +106,7 @@ Values are per world/picture unless a transaction or cache is specified.
 | Canvas distinct body sources | 4,096 | 4,096 | Shared DOM source identities, not one source set per snake |
 | Food / prey retained instances | 65,536 / 4,096 | Unchanged | Received food keys and presentation multiplicity have separate bounds |
 | Food / prey painter commands | 458,752 / 24,576 | Unchanged hard maxima | Seven / six commands per retained instance |
-| Pressure food / prey paint allowance | — | At most 32,768 / 16,384 | `64 / 32 * MAX_SNAKES`; native can select fewer to protect own/UI |
+| Pressure food / prey paint allowance | — | At most 32,768 / 16,384 | `64 / 32 * MAX_SNAKES`; shared selection can trim further to protect own/UI |
 | Food/prey family source entries | 4,096 each | Unchanged | Bounded creation metadata, not proportional to eater count |
 | Combined Canvas food/prey catalog / snapshots | 262,144 / 524,288 | Unchanged | Shared ingress registry work; no new per-snake catalog |
 | Native names submitted / nickname cache | 128 / 216 runs | Unchanged | Visible prefix trims; subpixel names exit before rasterization |
@@ -128,8 +142,9 @@ renderer/adapter allowances. It takes the larger of the legacy and pressure
 storage branches, rather than multiplying full pressure raw state by legacy
 visual detail. It is an
 upper bound on requested buffer payloads, not an allocator/RSS measurement.
-The supported native-layout accounting sums to **1,574,112,512 bytes**, including
-sample-bounded spare command slots, within that single envelope.
+The supported native-layout accounting sums to **1,579,766,632 bytes**, including
+sample-bounded spare command slots and bounded entity-selection/polyline scratch,
+within that single envelope.
 Caller-owned DOM images/fonts and device memory have their independent admission
 contracts above; they are not Wasm linear-memory copies per snake.
 

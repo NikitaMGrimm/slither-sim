@@ -1,4 +1,4 @@
-run_id,binary_sha256,source_tree,round,population,anchors,frame,cpu_ns,allocated_bytes,draws,visible_snakes,pixel_bytes,body_payload_bytes
+run_id,binary_sha256,source_tree,round,population,anchors,frame,elapsed_ns,allocated_bytes,draws,visible_snakes,pixel_bytes,body_payload_bytes
 timing-01,e1127669e8931a1a3eabef74edf9bbe5fdd3446b40d7d26e5c0afb98c23fc9fb,b531775c2e5bded32461b873d268efc67de34aef,0,256,26,10,5579800,13470036,46739,256,1926172,6389760
 timing-01,e1127669e8931a1a3eabef74edf9bbe5fdd3446b40d7d26e5c0afb98c23fc9fb,b531775c2e5bded32461b873d268efc67de34aef,0,256,26,11,6036500,13470036,46739,256,1926172,6389760
 timing-01,e1127669e8931a1a3eabef74edf9bbe5fdd3446b40d7d26e5c0afb98c23fc9fb,b531775c2e5bded32461b873d268efc67de34aef,0,256,26,12,4819800,13470036,46739,256,1926172,6389760

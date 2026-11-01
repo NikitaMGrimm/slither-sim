@@ -461,12 +461,112 @@ pub(super) fn single_anchor_eye_target(
     Ok(f64::from(angle) + PI)
 }
 
+// A compact anchor owns multiple incoming logical intervals. The legacy
+// quadratic terminal extrapolation assumes one interval per anchor and cannot
+// consume that representation. Resample its retained polyline inside its hull.
+fn sample_compact_curve(
+    input: CurveInput<'_>,
+    raw_heading: Option<f64>,
+) -> Result<CurveOutput, PresentationError> {
+    let (spacing, density) = sampling_parameters(input)?;
+    let mut path = vec![input.corrected_head];
+    for anchor in input.body.iter().filter(|p| !p.dying()) {
+        let p = corrected(anchor)?;
+        if path.last() != Some(&p) {
+            path.push(p);
+        }
+    }
+    let first = path[0];
+    if path
+        .iter()
+        .all(|p| (p.x as f32, p.y as f32) == (first.x as f32, first.y as f32))
+    {
+        return Ok(CurveOutput {
+            samples: vec![CurveSample {
+                x: first.x as f32,
+                y: first.y as f32,
+                angle: raw_heading.unwrap_or(0.) as f32,
+            }],
+            point_spacing: spacing,
+            target_eye_heading: raw_heading.unwrap_or(0.),
+            vertices: vec![CurveVertex {
+                sampled: first,
+                position: first,
+                distance_from_previous: Some(0.),
+            }],
+            redistribution_count: 0,
+            distance_cursor_seed: None,
+        });
+    }
+    let count = (input.displayed_length.max(1.) * density).ceil() + 1.;
+    if !count.is_finite() || count > MAX_CURVE_SAMPLES as f64 {
+        return Err(PresentationError);
+    }
+    let count = (count as usize).max(2);
+    let total = path
+        .windows(2)
+        .try_fold(0., |sum, p| distance(p[0], p[1]).map(|d| sum + d))?;
+    finite(&[total])?;
+    let mut samples = Vec::with_capacity(count);
+    let mut vertices = Vec::with_capacity(count);
+    let mut segment = 1;
+    let mut before = 0.;
+    let mut previous = first;
+    let mut seed = None;
+    for i in 0..count {
+        let target = total * i as f64 / (count - 1) as f64;
+        let mut length = distance(path[segment - 1], path[segment])?;
+        while segment + 1 < path.len() && before + length < target {
+            before += length;
+            segment += 1;
+            length = distance(path[segment - 1], path[segment])?;
+        }
+        let t = if length == 0. {
+            0.
+        } else {
+            ((target - before) / length).clamp(0., 1.)
+        };
+        let a = path[segment - 1];
+        let b = path[segment];
+        let p = point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)?;
+        let delta = point(p.x - previous.x, p.y - previous.y)?;
+        let angle = if i == 0 { 0. } else { delta.y.atan2(delta.x) };
+        samples.push(CurveSample {
+            x: p.x as f32,
+            y: p.y as f32,
+            angle: angle as f32,
+        });
+        vertices.push(CurveVertex {
+            sampled: p,
+            position: p,
+            distance_from_previous: Some(distance(previous, p)?),
+        });
+        if i != 0 {
+            seed = Some(delta);
+        }
+        previous = p;
+    }
+    samples[0].angle = samples[1].angle;
+    let target_eye_heading = f64::from(samples[1].angle) + PI;
+    Ok(CurveOutput {
+        samples,
+        vertices,
+        point_spacing: spacing,
+        target_eye_heading,
+        redistribution_count: 0,
+        distance_cursor_seed: seed,
+    })
+}
+
 fn sample_curve_inner(
     input: CurveInput<'_>,
     raw_heading: Option<f64>,
 ) -> Result<CurveOutput, PresentationError> {
     if input.body.len() < 2 {
         return Err(PresentationError);
+    }
+    if input.body.iter().any(BodyPoint::compacted) {
+        return sample_compact_curve(input, raw_heading);
     }
     let (spacing, mut density) = sampling_parameters(input)?;
     let base_density = density;

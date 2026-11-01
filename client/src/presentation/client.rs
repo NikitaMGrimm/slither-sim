@@ -1,6 +1,6 @@
 //! Atomic received events and bounded animation state, with separate update/draw clocks.
 
-use std::{collections::BTreeSet, error::Error, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeSet, error::Error, fmt, sync::Arc};
 
 use super::{
     AnchorView, AntennaCullBounds, AntennaDrawInput, AntennaError, AntennaSnapshot, AntennaState,
@@ -73,6 +73,111 @@ pub const PRESSURE_RIVAL_DRAW_SAMPLES: usize = MAX_SNAKES * 96;
 pub const PRESSURE_FOOD_DRAWS: usize = MAX_SNAKES * 64;
 /// Prey body/glow command envelope in previously inadmissible worlds.
 pub const PRESSURE_PREY_DRAWS: usize = MAX_SNAKES * 32;
+/// Common pressure picture ceiling, checked against the GPU Draw-record quota.
+pub const PRESSURE_PICTURE_DRAWS: usize = 262_144;
+
+/// Shared entity lanes, reserving full own geometry and bounded non-entity work.
+#[derive(Clone, Copy, Debug)]
+pub struct PressureEntityBudget {
+    /// Complete food-command allowance; seven commands can belong to one food.
+    pub food_commands: usize,
+    /// Complete prey-command allowance; six commands can belong to one prey.
+    pub prey_commands: usize,
+}
+
+fn select_pressure<T: Clone, E>(
+    items: &[T],
+    limit: usize,
+    mut visible: impl FnMut(&T) -> Result<bool, E>,
+) -> Result<Vec<T>, E> {
+    let mut selected = Vec::with_capacity(limit.min(items.len()));
+    for item in items.iter().rev() {
+        if selected.len() == limit {
+            break;
+        }
+        if visible(item)? {
+            selected.push(item.clone());
+        }
+    }
+    selected.reverse();
+    Ok(selected)
+}
+
+impl PressureEntityBudget {
+    /// Reserve once from an untrimmed own plan. The antenna bound counts each
+    /// segment and at most one pi-sweep fan per path point, including end caps.
+    /// Standard-shadow LOD can only reduce this conservative reservation.
+    pub fn for_own(own: Option<&PreparedSnake>) -> Self {
+        let body = own
+            .and_then(|s| s.body_geometry.as_ref())
+            .map_or(0, |g| g.samples.len().saturating_mul(8).saturating_add(16));
+        let antenna = own.and_then(|s| s.antenna.as_ref()).map_or(0, |a| {
+            a.strokes
+                .iter()
+                .fold(usize::from(a.bulb.is_some()), |sum, stroke| {
+                    let n = match stroke.path {
+                        super::AntennaPath::Outer => a.outer_path.len(),
+                        super::AntennaPath::Inner => a.inner_path.len(),
+                    };
+                    let fan = (std::f64::consts::TAU * (stroke.width / 2.).max(1.))
+                        .ceil()
+                        .min(PRESSURE_PICTURE_DRAWS as f64) as usize;
+                    sum.saturating_add(n.saturating_sub(1))
+                        .saturating_add(n.saturating_mul(fan))
+                })
+        });
+        // Arena, faces/bulbs, text, HUD and platform composition remain bounded
+        // independently of food/prey. This reservation is shared by both hosts.
+        let remaining = PRESSURE_PICTURE_DRAWS
+            .saturating_sub(body.saturating_add(antenna).saturating_add(32_768 + 128));
+        Self {
+            food_commands: PRESSURE_FOOD_DRAWS.min(remaining / 2),
+            prey_commands: PRESSURE_PREY_DRAWS.min(remaining / 4),
+        }
+    }
+
+    /// Keep the newest visible foods, in original dense order. Legacy draws
+    /// borrow the original slice without allocating or changing traversal.
+    pub fn foods<'a>(
+        self,
+        pressure: bool,
+        foods: &'a [super::FoodPresentation],
+        bounds: Option<FoodCullBounds>,
+        zoom_factor: f64,
+    ) -> Cow<'a, [super::FoodPresentation]> {
+        if !pressure {
+            return Cow::Borrowed(foods);
+        }
+        Cow::Owned(
+            select_pressure(foods, self.food_commands / 7, |food| {
+                Ok::<_, std::convert::Infallible>(
+                    bounds.is_some_and(|b| b.contains(food.snapshot().render_position))
+                        && super::food_painter::zoom_eligible(food.snapshot(), zoom_factor),
+                )
+            })
+            .expect("infallible food visibility"),
+        )
+    }
+
+    /// Cull body and independently visible interpolated glows before applying
+    /// the shared prey quota. Retained prey/eater state is never modified.
+    pub fn preys<'a>(
+        self,
+        pressure: bool,
+        preys: &'a [super::PreyPresentation],
+        eaters: &[(SnakeObjectToken, super::PreyEaterPose)],
+        view: BodyPaintView,
+    ) -> Result<Cow<'a, [super::PreyPresentation]>, super::PreyPaintError> {
+        if !pressure {
+            return Ok(Cow::Borrowed(preys));
+        }
+        Ok(Cow::Owned(select_pressure(
+            preys,
+            self.prey_commands / 6,
+            |prey| super::prey_painter::pressure_visible(prey, eaters, view),
+        )?))
+    }
+}
 /// Complete Canvas pressure picture: unchanged own-body maximum, reduced rivals,
 /// entities, faces, accessories and antenna bulbs.
 pub const MAX_PRESSURE_SCENE_IMAGES: usize = super::MAX_BODY_PAINT_COMMANDS
@@ -2719,6 +2824,24 @@ impl AnimatedClient {
             event_start = boundary.event_end;
         }
         next.received = received;
+        if next.detail_pressure {
+            let center = next.received.setup.as_ref().map_or(0., |s| s.grid_center);
+            for entry in &mut next.entries {
+                if !entry.own
+                    && entry.addressed
+                    && entry.snake.body().detail_reduced()
+                    && let Some(tail) = entry
+                        .wire_id
+                        .and_then(|id| next.received.snakes.get(&id))
+                        .and_then(|s| s.body.last())
+                {
+                    entry.snake.sync_received_visual_tail(Point {
+                        x: tail.x + center,
+                        y: tail.y + center,
+                    });
+                }
+            }
+        }
         #[cfg(feature = "feel-trace")]
         next.trace_boundary("update", None, None, None, None);
         *self = next;
@@ -3861,7 +3984,11 @@ mod resolved_draw_tests {
         // minimap/layout/name scratch (16), four source registries (128),
         // and 100 MiB for collection overhead and constructor scratch.
         let adapters = 520 * 1024 * 1024;
-        let total = scene + entries + geometry + commands + recipes + entities + adapters;
+        let selection = (PRESSURE_FOOD_DRAWS / 7) * size_of::<super::super::FoodPresentation>()
+            + (PRESSURE_PREY_DRAWS / 6) * size_of::<super::super::PreyPresentation>()
+            + 2 * PRESSURE_BODY_POINTS * size_of::<Point>();
+        let total =
+            scene + entries + geometry + commands + recipes + entities + selection + adapters;
         assert!(total <= SNAKE_PRESENTATION_MEMORY_BUDGET, "{total}");
         const {
             assert!(

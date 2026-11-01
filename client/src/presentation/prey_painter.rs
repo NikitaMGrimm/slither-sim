@@ -263,6 +263,37 @@ fn interpolated(
     }
     Ok(result)
 }
+
+pub(super) fn pressure_visible(
+    prey: &PreyPresentation,
+    eaters: &[(SnakeObjectToken, PreyEaterPose)],
+    view: BodyPaintView,
+) -> Result<bool, PreyPaintError> {
+    let p = prey.state();
+    let offset = p.corrections.offset();
+    let raw = Point {
+        x: p.position.x + offset[0],
+        y: p.position.y + offset[1],
+    };
+    if visible(project(raw, view)?, view, 50.) {
+        return Ok(true);
+    }
+    let point = interpolated(p, raw, eaters)?;
+    for expansion in [0.08, 0.32] {
+        let fs = 1. + expansion * p.scale;
+        let center = Point {
+            x: (point.x - view.camera.x) * fs * view.zoom + view.half_width,
+            y: (point.y - view.camera.y) * fs * view.zoom + view.half_height,
+        };
+        if !finite(&[center.x, center.y]) {
+            return Err(PreyPaintError::Arithmetic);
+        }
+        if visible(center, view, 150.) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 fn draw(
     source: PreySource,
     center: Point,

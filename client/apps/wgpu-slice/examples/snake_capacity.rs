@@ -1,4 +1,4 @@
-//! Headless CPU planning/allocation workload; timing requires --measure.
+//! Headless elapsed planning/allocation workload; timing requires --measure.
 #[path = "../tests/support/capacity_world.rs"]
 mod synthetic;
 #[path = "../tests/support/announcement_tape.rs"]
@@ -41,7 +41,7 @@ fn run() -> Result<()> {
         return Err("Expected --functional or --measure (book a quiet window first)".into());
     }
     println!(
-        "round,population,anchors,frame,cpu_ns,allocated_bytes,draws,visible_snakes,pixel_bytes,body_payload_bytes"
+        "round,population,anchors,frame,elapsed_ns,allocated_bytes,draws,visible_snakes,pixel_bytes,body_payload_bytes"
     );
     for points in if measure { vec![26, 4096] } else { vec![26] } {
         let populations = if args == ["--functional-256"] {

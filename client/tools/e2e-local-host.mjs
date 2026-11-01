@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const clientRoot = fileURLToPath(new URL('..', import.meta.url));
-const usage = 'node tools/e2e-local-host.mjs --host-bin PATH [--client-bin PATH] [--seconds 5..60] [--battledome 500] [--scratch PATH]';
+const usage = 'node tools/e2e-local-host.mjs --host-bin PATH [--client-bin PATH] [--seconds 5..60] [--battledome 500] [--scratch PATH] [--vision 1..40000]';
 const fail = (stage, message) => Object.assign(new Error(message), { stage });
 
 export function argumentsFor(args) {
@@ -13,14 +13,15 @@ export function argumentsFor(args) {
     `slither-client-e2e${process.platform === 'win32' ? '.exe' : ''}`) };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
-    const key = { '--host-bin': 'hostBin', '--client-bin': 'clientBin', '--seconds': 'seconds', '--battledome': 'battledome', '--scratch': 'scratch' }[args[i]];
+    const key = { '--host-bin': 'hostBin', '--client-bin': 'clientBin', '--seconds': 'seconds', '--battledome': 'battledome', '--scratch': 'scratch', '--vision': 'vision' }[args[i]];
     const value = args[i + 1];
     if (!key || !value || value.startsWith('--') || seen.has(key)) throw fail('arguments', usage);
     seen.add(key);
-    options[key] = ['seconds', 'battledome'].includes(key) ? Number(value) : path.resolve(value);
+    options[key] = ['seconds', 'battledome', 'vision'].includes(key) ? Number(value) : path.resolve(value);
   }
   if (!options.hostBin || !Number.isFinite(options.seconds) || options.seconds < 5 || options.seconds > 60
-    || options.battledome !== undefined && options.battledome !== 500) {
+    || options.battledome !== undefined && options.battledome !== 500
+    || options.vision !== undefined && (options.battledome !== 500 || !Number.isFinite(options.vision) || options.vision <= 0 || options.vision > 40000)) {
     throw fail('arguments', usage);
   }
   return options;
@@ -55,8 +56,8 @@ export function assertSummary(s, protocol = 19, battledome = false) {
   if (battledome) {
     stages.splice(4, 2);
     stages.push(['full-map', s.fullMap === true], ['picture-skips', s.pictureSkips === 0],
-      ['population', Number.isInteger(s.peakReceivedSnakes) && s.peakReceivedSnakes > 0
-        && Number.isInteger(s.peakPreparedSnakes) && s.peakPreparedSnakes > 0]);
+      ['population', Number.isInteger(s.peakReceivedSnakes) && s.peakReceivedSnakes >= 500
+        && Number.isInteger(s.peakPreparedSnakes) && s.peakPreparedSnakes >= 500]);
   }
   for (const [stage, valid] of stages) if (!valid) throw fail(stage, `Client assertion failed: ${stage}`);
   return s;
@@ -155,7 +156,7 @@ export async function runLocalHost(options) {
     await writeFile(config, JSON.stringify({
       bind: '127.0.0.1:0', seed: 7, players: { max: 1 }, bots: { count: options.battledome ?? 0, threads: 2 },
       simulation: {
-        world: options.battledome ? { preset: 'battledome', vision: 40000 } : { radius: 10000, dynamicRadius: false, sizeToPopulation: false,
+        world: options.battledome ? { preset: 'battledome', vision: options.vision ?? 40000 } : { radius: 10000, dynamicRadius: false, sizeToPopulation: false,
           spawnRadius: 3000, minScore: 400, foodCount: 0, ambientReplenishPerSecond: 0,
           prey: { count: 0 }, kiosk: { enabled: false } },
         leaderboardIntervalSeconds: 0.5, minimapIntervalSeconds: 0.5,

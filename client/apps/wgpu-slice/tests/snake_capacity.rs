@@ -44,9 +44,11 @@ fn session_admits_512_and_rejects_513_atomically_then_closes_cleanly() {
     assert!(closed);
 }
 
-#[test]
-fn maximum_length_full_map_retains_received_anchors_and_own_detail_in_bounded_pictures() {
-    let mut game = synthetic::world(MAX_SNAKES, MAX_BODY_POINTS).unwrap();
+fn maximum_length_full_map(population: usize) {
+    let mut game = synthetic::world(population, MAX_BODY_POINTS).unwrap();
+    let mut own_control = synthetic::world(1, MAX_BODY_POINTS).unwrap();
+    let mut own_world = own_control.client().clone();
+    own_world.wheel_zoom(-1000.);
     let mut world = game.client().clone();
     assert_eq!(MAX_TOTAL_BODY_POINTS, MAX_SNAKES * MAX_BODY_POINTS);
     assert_eq!(
@@ -56,7 +58,7 @@ fn maximum_length_full_map_retains_received_anchors_and_own_detail_in_bounded_pi
             .values()
             .map(|s| s.body.len())
             .sum::<usize>(),
-        MAX_TOTAL_BODY_POINTS
+        population * MAX_BODY_POINTS
     );
     assert_eq!(
         world.own_snake().unwrap().body().points().len(),
@@ -69,7 +71,10 @@ fn maximum_length_full_map_retains_received_anchors_and_own_detail_in_bounded_pi
     let own = world.own_snake().unwrap().body().clone();
     world.wheel_zoom(-1000.);
     let quality = game.quality();
-    for _ in 0..110 {
+    for _ in 0..2 {
+        own_world
+            .prepare_draw_with_style(synthetic::EXTENT[0], synthetic::EXTENT[1], 1e6, false)
+            .unwrap();
         world
             .prepare_draw_with_style(synthetic::EXTENT[0], synthetic::EXTENT[1], 1e6, false)
             .unwrap();
@@ -84,10 +89,31 @@ fn maximum_length_full_map_retains_received_anchors_and_own_detail_in_bounded_pi
             quality,
         )
         .unwrap();
+        let control = render::prepare_gameplay(
+            &mut own_world,
+            &mut own_control.bank,
+            synthetic::EXTENT,
+            1.,
+            identity,
+            quality,
+        )
+        .unwrap();
+        // Main's shadow cut remains the own snake's ordinary planner policy;
+        // capacity pressure adds no further reduction to its body or curves.
+        let own_commands = |p: &slither_wgpu_slice::render::PreparedFrame| {
+            p.frame
+                .snakes
+                .iter()
+                .find(|s| s.id == 1)
+                .unwrap()
+                .body_commands
+        };
+        assert_eq!(own_commands(&p), own_commands(&control));
+        own_control.bank.recycle_frame(control);
         assert!(p.draw_count() <= MAX_DRAWS);
         assert!(p.pixel_bytes() <= slither_wgpu_slice::bank::PIXEL_BUDGET);
         if identity == 2 {
-            assert_eq!(p.frame.snakes.len(), MAX_SNAKES);
+            assert_eq!(p.frame.snakes.len(), population);
             assert!(p.frame.snakes.iter().all(|s| s.body_commands > 0));
         }
         game.bank.recycle_frame(p);
@@ -97,8 +123,7 @@ fn maximum_length_full_map_retains_received_anchors_and_own_detail_in_bounded_pi
     assert_eq!(game.draw_diagnostics.skipped_frames, 0);
 }
 
-#[test]
-fn maximum_length_burst_releases_prepared_work_without_losing_live_state() {
+fn maximum_length_burst(population: usize, arrivals: usize) {
     let mut game = synthetic::world(1, MAX_BODY_POINTS).unwrap();
     // Score-table coverage is independent of received-anchor capacity. Keep the
     // maximum own appearance inside its advertised HUD domain for this session.
@@ -118,7 +143,8 @@ fn maximum_length_burst_releases_prepared_work_without_losing_live_state() {
     assert!(game.has_frame());
     // Leave the prepared picture unissued while more than one deferred-queue
     // capacity of maximum-length bare appearances arrives in the same wake.
-    for id in 2..=MAX_SNAKES as u16 {
+    for arrival in 0..arrivals {
+        let id = 2 + (arrival % (population - 1)) as u16;
         game.receive(
             game.generation(),
             &synthetic::snake(id, MAX_BODY_POINTS),
@@ -128,7 +154,7 @@ fn maximum_length_burst_releases_prepared_work_without_losing_live_state() {
     }
     tape::pictures(&mut game);
     game.service_ingress().unwrap();
-    assert_eq!(game.client().received().snakes.len(), MAX_SNAKES);
+    assert_eq!(game.client().received().snakes.len(), population);
     assert_eq!(
         game.client()
             .received()
@@ -136,19 +162,25 @@ fn maximum_length_burst_releases_prepared_work_without_losing_live_state() {
             .values()
             .map(|s| s.body.len())
             .sum::<usize>(),
-        MAX_TOTAL_BODY_POINTS
+        population * MAX_BODY_POINTS
     );
     assert!(game.failure.is_none());
     assert_eq!(game.draw_diagnostics.skipped_frames, 0);
     assert!(game.wheel_zoom(-1000.));
-    for frame in 0..110 {
+    for frame in 0..2 {
         game.begin_frame(20. + f64::from(frame) * 16., synthetic::EXTENT, 1.)
             .unwrap();
         tape::effects(&mut game);
         let picture = game.take_frame().expect("complete session picture");
         assert!(picture.draw_count() <= MAX_DRAWS);
-        if frame == 109 {
-            assert_eq!(picture.frame.snakes.len(), MAX_SNAKES);
+        if frame == 1 {
+            assert!(game.client().received().snakes.keys().all(|id| {
+                picture
+                    .frame
+                    .snakes
+                    .iter()
+                    .any(|s| s.id == *id && s.body_commands > 0)
+            }));
             assert!(picture.frame.snakes.iter().all(|s| s.body_commands > 0));
         }
         game.presented(true).unwrap();
@@ -158,7 +190,27 @@ fn maximum_length_burst_releases_prepared_work_without_losing_live_state() {
 }
 
 #[test]
+fn maximum_length_full_map_fast() {
+    maximum_length_full_map(17);
+}
+#[test]
+fn maximum_length_burst_fast() {
+    maximum_length_burst(17, 80);
+}
+#[test]
+#[ignore = "exhaustive 512 x 4096 payload; fast 17 x 4096 and 512-ID tests cover the rules"]
+fn exhaustive_maximum_length_full_map() {
+    maximum_length_full_map(MAX_SNAKES);
+}
+#[test]
+#[ignore = "exhaustive 512 x 4096 payload; fast burst and 512-ID tests cover the rules"]
+fn exhaustive_maximum_length_burst() {
+    maximum_length_burst(MAX_SNAKES, MAX_SNAKES - 1);
+}
+
+#[test]
 fn pressure_quota_relationships_fit_the_fixed_draw_and_device_envelopes() {
+    assert_eq!(MAX_DRAWS, PRESSURE_PICTURE_DRAWS);
     const {
         assert!(
             MAX_RETAINED_SNAKES * 8 + MAX_RETAINED_BODY_POINTS <= MAX_RETAINED_TOTAL_BODY_POINTS

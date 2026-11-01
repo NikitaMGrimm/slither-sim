@@ -4,7 +4,7 @@
   "baseCommit": "3669ac9a3a334a3d6d5b767cbe2080646487dc97",
   "baseTree": "2d1be87cb305217744672492b2c02f87f451109f",
   "candidateStagedTreeAtMeasurement": "b531775c2e5bded32461b873d268efc67de34aef",
-  "sourceBinding": "Candidate built from the measured staged snapshot based on baseCommit. sourceSha256 pins measured inputs. Listed final changes affect cfg(test) assertions/fixtures, Canvas-only Wasm preflight and the standalone loopback probe. Measured native planner and workload code are unchanged.",
+  "sourceBinding": "Historical 11:10 measurement: sourceSha256 and original binary hashes pin the pre-review artifact. Rebase and review corrections change the native planner, compact-tail representation and whole-map camera. These samples do not measure the corrected implementation. Pre-review post-measurement exceptions below are retained as historical provenance, not current source bindings.",
   "features": [
     "feel-trace (recorder unset)"
   ],
@@ -23,7 +23,7 @@
     "tape": "7f3238fa3667b0512cbee434290514033b99395e86d4ab75d7bdf716b0f19da1"
   },
   "rawCsvSha256": "f2942aeeb93dfa3defd403665cf070465fb2e3ad5065abfe2ae50553e24b1e6e",
-  "selectedCsvSha256": "b19318a515912d1f55b8a24bdecae003202ef7e23a98f4d7959c625a08517abf",
+  "selectedCsvSha256": "489cd4cd28f33b57f30adfd64d5a17f3ca9b5ac38c068aa2ee88aed161d4ba86",
   "receipt": {
     "start": "2026-11-01T11:10:21.0589818+01:00",
     "end": "2026-11-01T11:10:46.6784893+01:00",
@@ -388,27 +388,29 @@
     {
       "path": "client/src/presentation/client.rs",
       "scope": "cfg(test) resolved_draw_tests: working-envelope accounting for raw copies and reserved command slots, compile-time quota assertion and derived antenna-quota fixture",
-      "finalSha256": "f730615a4e50764ecc3ded436297388464b9af9b07a7e4a9c851ee646520f64c"
+      "preReviewSha256": "f730615a4e50764ecc3ded436297388464b9af9b07a7e4a9c851ee646520f64c"
     },
     {
       "path": "client/apps/wgpu-slice/tests/snake_capacity.rs",
       "scope": "integration test: maximum-length deferred burst regression and compile-time quota assertions",
-      "finalSha256": "390a4558fb71e0e09abeb16c562ea1d9a71bf80619967321174d0bb019b99b1f"
+      "preReviewSha256": "390a4558fb71e0e09abeb16c562ea1d9a71bf80619967321174d0bb019b99b1f"
     }
   ],
   "postMeasurementWasmOnlyChanges": [
     {
       "path": "client/src/canvas_browser.rs",
       "scope": "Canvas zoom preflight: accept finite positive whole-map scales below 0.05; module excluded from native builds",
-      "finalSha256": "208eccc89c584393a72e4f2b8971a082b92757a8911f476229e317cad32226a3"
+      "preReviewSha256": "208eccc89c584393a72e4f2b8971a082b92757a8911f476229e317cad32226a3"
     }
   ],
   "postMeasurementHarnessChanges": [
     {
       "path": "client/apps/wgpu-slice/src/e2e_main.rs",
       "scope": "standalone loopback probe, not measured by snake_capacity: admit wheel input only after Playing and observe the camera after picture acknowledgement; retain fit diagnostics",
-      "finalSha256": "ce1a8c8255041f353e62e7966a51c0377939ef0585057a993d98d09028712ee8"
+      "preReviewSha256": "ce1a8c8255041f353e62e7966a51c0377939ef0585057a993d98d09028712ee8"
     }
   ],
-  "finalAccountingPayloadUpperBytes": 1574112512
+  "originalSelectedCsvSha256": "b19318a515912d1f55b8a24bdecae003202ef7e23a98f4d7959c625a08517abf",
+  "selectedCsvChange": "Header only: cpu_ns renamed elapsed_ns; numeric observations unchanged. Instant elapsed is wall time, not thread CPU time.",
+  "preReviewAccountingPayloadUpperBytes": 1574112512
 }

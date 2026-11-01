@@ -137,6 +137,7 @@ pub(super) struct DrawBudget {
     pub(super) layouts: usize,
     pub(super) antenna: AntennaDrawBudget,
     pressure_extra: bool,
+    entities: crate::presentation::PressureEntityBudget,
 }
 impl Default for DrawBudget {
     fn default() -> Self {
@@ -146,6 +147,7 @@ impl Default for DrawBudget {
             layouts: MAX_DRAW_SAMPLES,
             antenna: AntennaDrawBudget::default(),
             pressure_extra: false,
+            entities: crate::presentation::PressureEntityBudget::for_own(None),
         }
     }
 }
@@ -157,6 +159,11 @@ impl DrawBudget {
         }
     }
     pub(super) fn prepared(&mut self, snakes: &[PreparedAccessorySnake]) -> Result<(), JsValue> {
+        if self.pressure_extra {
+            self.entities = crate::presentation::PressureEntityBudget::for_own(
+                snakes.iter().find(|s| s.snake.own).map(|s| &s.snake),
+            );
+        }
         self.layouts = self
             .layouts
             .checked_sub(snakes.len())
@@ -414,24 +421,33 @@ pub(super) fn food_plan(
         return Ok(None);
     }
     sources.validate(target)?;
-    let foods = prepared.foods().foods();
-    let start = if prepared.detail_pressure() {
-        foods
-            .len()
-            .saturating_sub(crate::presentation::PRESSURE_FOOD_DRAWS / 7)
+    let pressure = prepared.detail_pressure();
+    let zoom_factor = if pressure {
+        prepared.camera().user_zoom_factor()
     } else {
-        0
+        1.
     };
-    let plan = plan_food(FoodPaintInput {
-        foods: &foods[start..],
-        view,
-        quality,
-        bounds: prepared.food_bounds(),
-        assets: &sources.assets()?,
-        target_handle: None,
-        entry_alpha: 1.,
-        command_limit: budget.images,
-    })
+    let foods = budget.entities.foods(
+        pressure,
+        prepared.foods().foods(),
+        prepared.food_bounds(),
+        zoom_factor,
+    );
+    let plan = crate::presentation::plan_food_with_zoom(
+        FoodPaintInput {
+            foods: &foods,
+            view,
+            quality,
+            bounds: prepared.food_bounds(),
+            assets: &sources.assets()?,
+            target_handle: None,
+            entry_alpha: 1.,
+            command_limit: budget.images,
+        },
+        Vec::new(),
+        Vec::new(),
+        zoom_factor,
+    )
     .map_err(error)?;
     budget.images = budget
         .images
@@ -492,16 +508,17 @@ pub(super) fn prey_plan(
             ),
         )?;
     }
-    let preys = prepared.preys().preys();
-    let start = if prepared.detail_pressure() {
-        preys
-            .len()
-            .saturating_sub(crate::presentation::PRESSURE_PREY_DRAWS / 6)
-    } else {
-        0
-    };
+    let preys = budget
+        .entities
+        .preys(
+            prepared.detail_pressure(),
+            prepared.preys().preys(),
+            &eaters,
+            view,
+        )
+        .map_err(error)?;
     let plan = plan_prey(PreyPaintInput {
-        preys: &preys[start..],
+        preys: &preys,
         eaters: &eaters,
         view,
         assets: &sources.assets()?,

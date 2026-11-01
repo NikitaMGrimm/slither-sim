@@ -715,6 +715,10 @@ impl SnakePresentation {
         self.body.compact_visual();
     }
 
+    pub(crate) fn sync_received_visual_tail(&mut self, position: Point) {
+        self.body.sync_received_tail(position);
+    }
+
     pub(crate) fn reclaim_visual_storage(&mut self) {
         self.body.reclaim_storage();
     }

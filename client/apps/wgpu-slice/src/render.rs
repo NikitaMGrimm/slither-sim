@@ -970,27 +970,23 @@ fn prepare_composed(
     } else {
         0
     };
-    let optional = if pressure {
-        let own_body = prepared
-            .iter()
-            .find(|s| s.snake.own)
-            .and_then(|s| s.snake.body_geometry.as_ref())
-            .map_or(0, |g| 8 * g.samples.len() + 16);
-        MAX_DRAWS.saturating_sub(own_body + own_antenna_draws + 128 + 16_384 + draws.len())
+    let entity_budget = if pressure {
+        PressureEntityBudget::for_own(prepared.iter().find(|s| s.snake.own).map(|s| &s.snake))
     } else {
-        MAX_DRAWS
+        PressureEntityBudget {
+            food_commands: 0,
+            prey_commands: 0,
+        }
     };
-    let foods = client.foods().foods();
-    let food_start = if pressure {
-        foods
-            .len()
-            .saturating_sub(PRESSURE_FOOD_DRAWS.min(optional / 2) / 7)
-    } else {
-        0
-    };
+    let foods = entity_budget.foods(
+        pressure,
+        client.foods().foods(),
+        client.food_bounds(),
+        user_zoom,
+    );
     let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
-            foods: &foods[food_start..],
+            foods: &foods,
             view,
             quality,
             bounds: client.food_bounds(),
@@ -1028,17 +1024,12 @@ fn prepare_composed(
             )
         })
         .collect();
-    let preys = client.preys().preys();
-    let prey_start = if pressure {
-        preys
-            .len()
-            .saturating_sub(PRESSURE_PREY_DRAWS.min(optional / 4) / 6)
-    } else {
-        0
-    };
+    let preys = entity_budget
+        .preys(pressure, client.preys().preys(), &eaters, view)
+        .map_err(|e| e.to_string())?;
     let prey_plan = plan_prey_with_zoom(
         PreyPaintInput {
-            preys: &preys[prey_start..],
+            preys: &preys,
             eaters: &eaters,
             view,
             assets: &bank.assets,
@@ -1176,11 +1167,14 @@ fn prepare_composed(
                         .as_ref()
                         .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                     body_storage,
-                    if cfg!(feature = "frame-profile-no-shadow-cut") { 1. } else { user_zoom },
+                    if cfg!(feature = "frame-profile-no-shadow-cut") {
+                        1.
+                    } else {
+                        user_zoom
+                    },
                     body_pixels_per_unit,
                 )
             }
-
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
                     DRAW_MEMORY_LIMIT.into()
