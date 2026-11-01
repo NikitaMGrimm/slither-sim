@@ -61,8 +61,10 @@ their fast or partial rows.
 ## Corrected results (15:45 quiet window)
 
 The corrected benchmark binary is bound to shared-core/planner source `8b800bfd`,
-rebased onto `d716697b` including #411 and #417. The later strict loopback probe
-at `fe081b6a` is a separate executable and is not linked into this benchmark.
+rebased onto `d716697b` including #411 and #417. Later loopback probes are
+separate executables and are not linked into this benchmark. The subsequent
+main rebase adds #414's default-off latency instrumentation; the timing rows
+remain bound to the measured artifact, not relabelled as a new capture.
 All 450 measured pictures completed across four cells and five alternating
 rounds per cell, with every population present, a body for every snake, and no
 draw/pixel quota failure.
@@ -226,6 +228,14 @@ The baseline and host were built from the retained `d716697b` archive. Earlier
 JSON labels accidentally followed a later `origin/main` ref; schema 2 corrects
 those metadata labels while retaining the superseded values and binary hashes.
 
+The follow-up branch rebase is onto **`7d03f2da`**, including #408 and #414.
+#408 was already an ancestor; #414 adds optional latency-rig code. All existing
+PR patches replayed unchanged. Focused validation passed with `latency-rig`
+enabled: 76 core tests, the rig library rule, two latency-CLI rules, four e2e
+rules, four fast capacity cases, 25 Node tests and native all-targets Clippy.
+The default build's feel replay and 256-ID allocation/Draw controls still match
+the retained `d716697b` baseline byte for byte. No new timing was taken.
+
 Default stress fixtures separately cover 512 live IDs and a 17 × 4,096-anchor
 world crossing the same pressure threshold. The latter sends 80 arrivals across
 the 64-envelope deferred limit. Exhaustive 512 × 4,096 cases remain explicit
@@ -289,7 +299,10 @@ node tools/e2e-local-host.mjs --host-bin <slither-sim> --client-bin <slither-cli
 
 It binds only `127.0.0.1:0`, excludes reserved ports, requests full zoom-out and
 measures every acknowledged post-wheel committed transform. It requires at least
-one fit sample and worst overflow at most 0.000001 logical pixels, no picture skips,
+two fit samples, worst overflow at most 0.000001 logical pixels, and camera
+displacement greater than one world unit from the first post-wheel sampled
+camera. Lifetime snake movement cannot substitute for this same-window motion.
+It also requires no picture skips,
 no session failure, at least 500
 received/prepared snakes and a clean requested close. Full
 recordings and failed attempts stay outside Git.
@@ -311,12 +324,21 @@ attributing server subscriptions to the client cap. The simulator lane must
 choose a whole-map interest policy for an ordinary host; this e2e opts into
 40,000-unit coverage explicitly.
 
-The strict post-wheel probe is a **different binary and run** from historical
+The initial strict post-wheel probe was a **different binary and run** from historical
 attempt 4's 3.5604467877800516-pixel failure. After the camera endpoint fix, the
 20-second wide-vision run reached **501 received / 501 prepared**, with zero skips
 and a clean close. All **40** acknowledged post-wheel pictures fit: best overflow
 0, worst **1.1368683772161603e-13 logical pixels**, within the 1e-6 tolerance. This
-is headless transform acceptance for that run, not hardware-pixel evidence.
+established geometric fit and population delivery for that run, not motion-gated
+acceptance: that collector did not retain post-wheel camera displacement.
+
+The final motion-gated probe at `36a56ebe`, after the #414 rebase, passed with
+**501 received / 503 prepared**, zero skips and clean close. Across **32**
+post-wheel pictures, camera displacement from its first sampled position reached
+**1,308.5531196143277 world units**; best and worst overflow were both **0**.
+Schema 3 records this as the current moving-camera acceptance and preserves the
+earlier 40-picture run with same-window motion marked unmeasured. This is
+headless transform acceptance, not hardware-pixel evidence.
 
 The new eight-second default-vision control measured **440** post-wheel pictures,
 best/worst overflow **0/0**, but reached only **5** snakes and therefore failed
@@ -332,3 +354,7 @@ The earlier eight-second wide run reached only 411; a longer low-vision run fail
 close with `Socket is not open`. Both remain retained failures. The latest
 collector rejects a late overflow even if an earlier or later picture fits, and
 serializes absent fit measurements as `null`, not zero.
+The authored moving sequence **[3.56, 0, 4]** rejects despite its fitted middle
+picture. A separate stationary-summary rule rejects even with lifetime
+`moved=true`, fitted pictures, 501 snakes and a clean close; post-wheel camera
+displacement must independently exceed one world unit.

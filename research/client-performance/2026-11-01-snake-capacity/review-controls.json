@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "origin": "AUTHORED SYNTHETIC and explicit loopback-only simulator; untimed functional validation",
   "baseCommit": "d716697b812019a8841dbca098cf7dd13ff01bc4",
   "nativeSourceCommit": "8b800bfd8a1c64ab65aa7f5d83f98b3bbd5255f3",
@@ -10,7 +10,8 @@
     "final-client-e2e.exe": "be7b47c39b0448b9e6fb1c0b408e359abb71fc2324b7b81b06c53aff97a34515",
     "review-main-snake-capacity.exe": "b98560210bbbed2ee0ad034332bcec855a235b8f42db79619f0c33a2f86da2f9",
     "review-main-feel-replay.exe": "3763ea3df0413097e6d8961a1ff9d2062c2aaf1046871a7ef242d3da0cb5fb9b",
-    "worst-fit-client-e2e.exe": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1"
+    "worst-fit-client-e2e.exe": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+    "moving-camera-client-e2e.exe": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2"
   },
   "feel": {
     "byteIdentical": true,
@@ -44,10 +45,10 @@
       "bind": "127.0.0.1:0",
       "fillSeconds": 15
     },
-    "probeSourceCommit": "fe081b6ad868f2247577cc083ef1a1ab788070e4",
-    "probeSourceSha256": "a25bb14dd19f4869833fbae7a99e513704206e84f70de623dfabbaf7540d50af",
-    "probeBinarySha256": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
-    "acceptanceRule": "At least 500 received/prepared snakes, zero skips, clean close, at least one post-wheel fit sample, and worst overflow <= 1e-6 logical px. A fit-only control is not 500-player acceptance.",
+    "probeSourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+    "probeSourceSha256": "cd6ed084e570d097f68cdca2c8872af32503fc6fd2c1eaa5cca7d2180a54e942",
+    "probeBinarySha256": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2",
+    "acceptanceRule": "At least 500 received/prepared snakes, zero skips, clean close, at least two post-wheel fit samples, worst overflow <= 1e-6 logical px, and camera displacement > 1 world unit from the first post-wheel sampled camera. Lifetime snake movement is not a substitute.",
     "historicalPreCameraFix": {
       "runId": "historical-loopback-attempt-4-pre-camera-fix",
       "sourceRecord": "loopback-summary.json, attempt 4",
@@ -139,22 +140,30 @@
       ]
     },
     "wideVisionRun": {
-      "runId": "all-post-wheel-wide-vision-20261101",
+      "runId": "moving-post-wheel-wide-vision-after-414-rebase-20261101",
       "vision": 40000,
       "clientSeconds": 20,
-      "rawSummarySha256": "0f05b851e05c6aa047c29eef0ca0957537bc47ea6e831dad6db96e0aa071434e",
+      "probeSourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+      "probeBinarySha256": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2",
+      "rawSummarySha256": "366a42e2a485076f616fa618d7ed123d19e63e5437e5d8ae302511ebb0ccac72",
       "wholeMap500Acceptance": true,
       "fitMeasurement": {
-        "scope": "All acknowledged committed pictures after whole-map wheel admission",
-        "samples": 40,
+        "scope": "All acknowledged committed post-wheel pictures",
+        "samples": 32,
         "bestOverflowLogicalPixels": 0,
-        "worstOverflowLogicalPixels": 1.1368683772161603e-13,
+        "worstOverflowLogicalPixels": 0,
         "toleranceLogicalPixels": 0.000001,
         "passed": true
       },
+      "cameraMotion": {
+        "scope": "Same post-wheel sampled pictures",
+        "moved": true,
+        "maxDisplacementFromFirstSampleWorldUnits": 1308.5531196143277,
+        "minimumExclusiveWorldUnits": 1
+      },
       "probeResult": {
         "ok": true,
-        "endpoint": "ws://127.0.0.1:55920/slither",
+        "endpoint": "ws://127.0.0.1:51811/slither",
         "protocolCoverage": [
           19
         ],
@@ -174,18 +183,20 @@
           "decelerated": true,
           "leaderboard": true,
           "minimap": true,
-          "preparedFrames": 149,
+          "preparedFrames": 112,
           "cleanClose": true,
           "peakReceivedSnakes": 501,
-          "peakPreparedSnakes": 501,
+          "peakPreparedSnakes": 503,
           "pictureSkips": 0,
           "fullMap": true,
-          "mapFitSamples": 40,
+          "mapFitSamples": 32,
           "bestMapOverflowPixels": 0,
-          "worstMapOverflowPixels": 1.1368683772161603e-13,
-          "seconds": 22.372
+          "worstMapOverflowPixels": 0,
+          "mapCameraMoved": true,
+          "mapCameraMaxDisplacementWorldUnits": 1308.5531196143277,
+          "seconds": 21.739
         },
-        "seconds": 37.624
+        "seconds": 37.079
       }
     },
     "defaultVisionControl": {
@@ -233,7 +244,65 @@
           "worstMapOverflowPixels": 0,
           "seconds": 9.957
         }
-      }
+      },
+      "probeSourceCommit": "fe081b6ad868f2247577cc083ef1a1ab788070e4",
+      "probeBinarySha256": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+      "postWheelCameraMotion": null
+    },
+    "previousAllFitRunWithoutMotionGate": {
+      "runId": "all-post-wheel-wide-vision-20261101",
+      "vision": 40000,
+      "clientSeconds": 20,
+      "rawSummarySha256": "0f05b851e05c6aa047c29eef0ca0957537bc47ea6e831dad6db96e0aa071434e",
+      "wholeMap500Acceptance": null,
+      "fitMeasurement": {
+        "scope": "All acknowledged committed pictures after whole-map wheel admission",
+        "samples": 40,
+        "bestOverflowLogicalPixels": 0,
+        "worstOverflowLogicalPixels": 1.1368683772161603e-13,
+        "toleranceLogicalPixels": 0.000001,
+        "passed": true
+      },
+      "probeResult": {
+        "ok": true,
+        "endpoint": "ws://127.0.0.1:55920/slither",
+        "protocolCoverage": [
+          19
+        ],
+        "client": {
+          "websocket": true,
+          "challenge": true,
+          "loginSent": true,
+          "protocol": 19,
+          "setup": true,
+          "ownSnake": true,
+          "steeringCommands": 1,
+          "boostOn": true,
+          "boostOff": true,
+          "moved": true,
+          "turned": true,
+          "accelerated": true,
+          "decelerated": true,
+          "leaderboard": true,
+          "minimap": true,
+          "preparedFrames": 149,
+          "cleanClose": true,
+          "peakReceivedSnakes": 501,
+          "peakPreparedSnakes": 501,
+          "pictureSkips": 0,
+          "fullMap": true,
+          "mapFitSamples": 40,
+          "bestMapOverflowPixels": 0,
+          "worstMapOverflowPixels": 1.1368683772161603e-13,
+          "seconds": 22.372
+        },
+        "seconds": 37.624
+      },
+      "probeSourceCommit": "fe081b6ad868f2247577cc083ef1a1ab788070e4",
+      "probeBinarySha256": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+      "acceptedUnderPreviousFitAndPopulationRule": true,
+      "postWheelCameraMotion": null,
+      "limitation": "This earlier collector measured all post-wheel fit samples but did not retain camera displacement during that same window; moving-camera acceptance was not measured."
     }
   },
   "presentation": {
@@ -278,5 +347,44 @@
     "packageListSha256": "a370cea2aa3eb459c4cad90e22762a3efd449aa50097e517c331c1633b5faea5",
     "command": "cargo package --list --allow-dirty --offline --manifest-path client/Cargo.toml",
     "studyLink": "../../research/client-performance/2026-11-01-snake-capacity/REPORT.md"
+  },
+  "currentRebaseBaseCommit": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+  "postRebaseValidation": {
+    "sourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+    "baseCommit": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+    "coreLatencyFeatureTests": 76,
+    "latencyRigLibraryTests": 1,
+    "e2eProbeTests": 4,
+    "latencyCliTests": 2,
+    "capacityTestsPassed": 4,
+    "capacityExhaustiveIgnored": 2,
+    "nodeTests": 25,
+    "clippy": "slither-wgpu-slice all-targets with latency-rig, warnings denied",
+    "regressions": [
+      "moving camera with authored overflow [3.56,0,4] rejects despite middle fit",
+      "stationary post-zoom summary rejects despite lifetime moved=true"
+    ],
+    "feel": {
+      "byteIdentical": true,
+      "policy": "feel-perceptual-v1",
+      "passed": true,
+      "mismatches": 0,
+      "errors": [],
+      "samples": 148,
+      "pictures": 72,
+      "commands": 7,
+      "observationSha256": "432c391171d573ed09092a133052fc50814e304c8f16ac5ff19078ed7b67549d",
+      "baselineArtifactSha256": "3763ea3df0413097e6d8961a1ff9d2062c2aaf1046871a7ef242d3da0cb5fb9b",
+      "candidateArtifactSha256": "fe7ec417ce7e2fa927321037dea098eb12ac316553771c3cfa1a41163e127a57"
+    },
+    "legacy256": {
+      "allocationRowsByteIdentical": true,
+      "orderedDrawSha256": "ec0724478151f26df1797a2685a4e1fba0c7267553e9956b06da70c0fd3c1551",
+      "requestedAllocationBytes": 151384002,
+      "draws": 24467,
+      "baselineSourceCommit": "d716697b812019a8841dbca098cf7dd13ff01bc4",
+      "candidateBinarySha256": "5d49eb7c49cf99a7d6a58a012dd1b88fe8d3d9066d591f28dc8914211ae0f2b0"
+    },
+    "timingScope": "No new timing capture. The 15:45 results remain bound to original benchmark artifact/source 8b800bfd; the main rebase adds default-off latency instrumentation."
   }
 }
