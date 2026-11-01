@@ -9,6 +9,22 @@ use winit::{
 
 const ACTION_KEYS: [Key; 4] = [Key::Tab, Key::Enter, Key::Space, Key::Escape];
 
+/// Input the owning menu consumes at once, in order. Deferred to the next
+/// frame, it would land after directory or session updates and reach egui as
+/// one unsplit batch, so a press could act on a newer panel generation.
+pub fn immediate_menu_input(event: &WindowEvent) -> bool {
+    matches!(
+        event,
+        WindowEvent::KeyboardInput { .. }
+            | WindowEvent::CursorMoved { .. }
+            | WindowEvent::CursorLeft { .. }
+            | WindowEvent::MouseInput { .. }
+            | WindowEvent::MouseWheel { .. }
+            | WindowEvent::Touch(_)
+            | WindowEvent::Ime(_)
+    )
+}
+
 /// Window bookkeeping precedes input ownership, including while another menu owns input.
 pub struct WindowInput {
     physical_cursor: Option<[f64; 2]>,

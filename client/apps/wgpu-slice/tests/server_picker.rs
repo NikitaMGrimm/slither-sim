@@ -1090,3 +1090,166 @@ fn keys_after_a_queued_wheel_use_the_current_row_window() {
     press(&mut login, egui::Key::ArrowDown);
     assert_eq!(login.picker.ui.focused(), Some(ControlId(16)));
 }
+
+/// A tap as egui-winit translates it: Touch, PointerMoved and a primary press
+/// on start; Touch, the primary release and PointerGone on end.
+fn tap(id: u64, p: [f64; 2], start: bool, end: bool) -> Vec<egui::Event> {
+    let pos = egui::pos2(p[0] as f32, p[1] as f32);
+    let touch = |phase| egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    };
+    let button = |pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    let mut events = Vec::new();
+    if start {
+        events.extend([
+            touch(egui::TouchPhase::Start),
+            egui::Event::PointerMoved(pos),
+            button(true),
+        ]);
+    }
+    if end {
+        events.extend([
+            touch(egui::TouchPhase::End),
+            button(false),
+            egui::Event::PointerGone,
+        ]);
+    }
+    events
+}
+fn batch(login: &mut NativeLogin, events: Vec<egui::Event>) {
+    login.settings_input(egui::RawInput {
+        events,
+        ..Default::default()
+    });
+}
+
+/// Desktop touch reaches the owning menu immediately and in order, like mouse
+/// input, so a press is judged against the panel generation it started in.
+#[test]
+fn touch_input_is_dispatched_immediately_and_in_order() {
+    use slither_wgpu_slice::egui_native::immediate_menu_input;
+    use winit::event::{DeviceId, Touch, TouchPhase, WindowEvent};
+    for phase in [
+        TouchPhase::Started,
+        TouchPhase::Moved,
+        TouchPhase::Ended,
+        TouchPhase::Cancelled,
+    ] {
+        assert!(immediate_menu_input(&WindowEvent::Touch(Touch {
+            device_id: DeviceId::dummy(),
+            phase,
+            location: winit::dpi::PhysicalPosition::new(4., 4.),
+            force: None,
+            id: 1,
+        })));
+    }
+    // A touch press dispatched before a directory replacement cannot select
+    // the replacement; the next tap can.
+    let mut login = opened(true);
+    let p = single_row(&mut login, 2000);
+    batch(&mut login, tap(1, p, true, false));
+    replace_row(&mut login, 3000);
+    login.prepare([960, 720], true, None).unwrap();
+    batch(&mut login, tap(1, p, false, true));
+    assert!(login.picker.policy.is_open());
+    batch(&mut login, tap(2, p, true, true));
+    assert_eq!(login.picker.policy.selection.official_id(), Some(3000));
+    // A stale touch release and a fresh tap in one batch: only the release
+    // is ignored.
+    let mut login = opened(true);
+    let p = single_row(&mut login, 2000);
+    batch(&mut login, tap(1, p, true, false));
+    replace_row(&mut login, 3000);
+    login.prepare([960, 720], true, None).unwrap();
+    let mut events = tap(1, p, false, true);
+    events.extend(tap(2, p, true, true));
+    batch(&mut login, events);
+    assert_eq!(login.picker.policy.selection.official_id(), Some(3000));
+    // The same batch after a keyboard Remove under the held touch, with no
+    // directory replacement: the fresh tap removes the remaining entry.
+    let mut login = opened(false);
+    for address in ["192.0.2.1:80", "192.0.2.2:80"] {
+        login.picker.policy.add_custom(address.into()).unwrap();
+    }
+    login.prepare([960, 720], true, None).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    for _ in 0..12 {
+        if login.picker.ui.focused() == Some(ControlId(8192)) {
+            break;
+        }
+        press(&mut login, egui::Key::Tab);
+    }
+    let r = widget(&login, ControlId(8192));
+    let p = [f64::from(r.center().x), f64::from(r.center().y)];
+    batch(&mut login, tap(1, p, true, false));
+    press(&mut login, egui::Key::Space);
+    assert_eq!(login.picker.policy.custom, ["192.0.2.2:80"]);
+    let mut events = tap(1, p, false, true);
+    events.extend(tap(2, p, true, true));
+    batch(&mut login, events);
+    assert!(login.picker.policy.custom.is_empty());
+}
+
+/// Login text painted below the picker's full-window dimming (all of it while
+/// the picker is closed): string, origin and galley bounds.
+fn login_text(login: &NativeLogin, window: egui::Rect) -> Vec<(String, egui::Pos2, egui::Rect)> {
+    let shapes = login.egui.prepared_shapes();
+    let dim = shapes
+        .iter()
+        .position(|s| matches!(&s.shape, egui::Shape::Rect(r) if r.rect == window))
+        .unwrap_or(shapes.len());
+    shapes[..dim]
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Text(t) => Some((t.galley.job.text.clone(), t.pos, t.galley.rect)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The login under the picker stays on the egui renderer through entry, the
+/// fades and exit, so its links and captions never shift between renderers.
+#[test]
+fn login_text_is_pixel_stable_while_the_picker_enters_and_leaves() {
+    for dpr in [1., 1.5] {
+        let mut login = settled(true);
+        let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+        let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(960., 720.));
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        let closed = login_text(&login, window);
+        for caption in ["Change Skin", "Settings"] {
+            assert!(
+                closed.iter().any(|t| t.0.contains(caption)),
+                "{dpr}: {caption} in {closed:?}"
+            );
+        }
+        let r = login.layout.viewport_rect(E::Server);
+        let physical = [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr];
+        click_at(&mut login, mouse_client_position(physical, dpr));
+        assert!(login.picker.policy.is_open());
+        let check = |login: &mut NativeLogin, now: u32, phase: &str| {
+            login.step(f64::from(now), true, false).unwrap();
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            assert_eq!(login_text(login, window), closed, "{dpr} {phase} {now}");
+        };
+        for now in (9616..=10000).step_by(16) {
+            check(&mut login, now, "enter");
+        }
+        assert!(login.picker.policy.alpha >= 1.);
+        press(&mut login, egui::Key::Escape);
+        for now in (10016..=10400).step_by(16) {
+            check(&mut login, now, "leave");
+        }
+        assert!(!login.picker.policy.visible());
+        check(&mut login, 10416, "closed");
+    }
+}

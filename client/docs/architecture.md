@@ -90,7 +90,10 @@ egui-wgpu renderer.
 Closed screens bypass translation, draining and context mutation. Window cursor,
 DPI, focus, modifier and held-key bookkeeping precedes input ownership; activation
 synchronizes the adapter from that state. Repeated key-down events are filtered
-before custom Tab traversal and egui processing.
+before custom Tab traversal and egui processing. Keyboard, pointer, wheel, touch
+and IME events reach the owning screen at once, in order
+(`egui_native::immediate_menu_input`); leftover adapter input takes the same
+ordered route on the next frame, never one raw egui batch.
 
 The [native login](login-egui.md) uses `login_egui.rs` for editable nickname,
 Play and menu entry points, including the after-death result. Adjacent IME

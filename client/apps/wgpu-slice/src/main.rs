@@ -583,7 +583,15 @@ mod desktop {
                 if self.game.ingame_menu_open() {
                     self.login.ingame_input(&mut self.game, input)?;
                 } else {
-                    self.login.egui.input(input);
+                    // Leftover adapter input takes the same ordered route as
+                    // immediate menu input, never one raw egui batch.
+                    let admission =
+                        self.game.can_play() && self.preparation.is_none() && self.can_play();
+                    self.login.set_admission(admission);
+                    self.login.settings_input(input);
+                    self.login.egui.platform_output(&self.window);
+                    let effects = self.login.take_egui_effects();
+                    self.edit_effects(effects);
                 }
             }
             self.login.prepare_ingame(&mut self.game, physical, dpr)?;
@@ -940,15 +948,7 @@ mod desktop {
                     if response.repaint {
                         r.schedule.invalidate();
                     }
-                    let input_event = matches!(
-                        event,
-                        WindowEvent::KeyboardInput { .. }
-                            | WindowEvent::CursorMoved { .. }
-                            | WindowEvent::CursorLeft { .. }
-                            | WindowEvent::MouseInput { .. }
-                            | WindowEvent::MouseWheel { .. }
-                            | WindowEvent::Ime(_)
-                    );
+                    let input_event = slither_wgpu_slice::egui_native::immediate_menu_input(&event);
                     if (input_event
                         || matches!(
                             event,
