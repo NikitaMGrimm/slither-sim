@@ -1,5 +1,13 @@
 # Distant snake shadows at whole-map zoom (2026-11-01)
 
+**Preliminary retained-binary study; final candidate pending.** Independent review
+found that the native four-pixel eligibility used backing coordinates rather
+than displayed logical pixels, and that the disabled observer still performed
+thread-local checks. The retained results below describe the pinned old pair,
+not the corrected candidate. The 08:00 A/A and reversed B/A investigation will
+use that old pair unchanged; after 08:40 the scale conversion and observer
+feature gate will be corrected and the affected cells/crop remeasured.
+
 Dropping interleaved body shadows below four logical pixels reduces CPU render
 submission and GPU state changes in the authored Battledome workload. The native
 wheel factor must also be below one. Body samples, palettes, tangents, other
