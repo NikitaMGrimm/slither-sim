@@ -140,16 +140,17 @@ jobs:
           PRERELEASE: ${{ steps.package.outputs.prerelease }}
           RELEASE_TAG: ${{ steps.target.outputs.tag }}
         run: |
-          # Only simulator releases may become the repository's Latest release;
-          # slither-protocol-v0.1.1 displaced v0.9.0 on 2026-11-01.
-          latest=true
-          if [[ "$RELEASE_TAG" == slither-protocol-* ]]; then latest=false; fi
+          # Protocol releases must not become the repository's Latest release
+          # (slither-protocol-v0.1.1 displaced v0.9.0 on 2026-11-01). Simulator
+          # releases keep GitHub's default.
+          latest=()
+          if [[ "$RELEASE_TAG" == slither-protocol-* ]]; then latest=(--latest=false); fi
           if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft); then
             if [[ "$draft" == 'true' ]]; then
-              gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE" --latest="$latest"
+              gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE" "${latest[@]}"
             fi
           else
-            args=(--verify-tag --title "$RELEASE_TAG" --generate-notes --latest="$latest")
+            args=(--verify-tag --title "$RELEASE_TAG" --generate-notes "${latest[@]}")
             if [[ "$PRERELEASE" == 'true' ]]; then args+=(--prerelease); fi
             gh release create "$RELEASE_TAG" "${args[@]}"
           fi
