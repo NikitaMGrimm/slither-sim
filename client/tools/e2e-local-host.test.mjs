@@ -23,7 +23,8 @@ test('Battledome requires full-map pictures without skips and preserves measured
   assert.equal(options.battledome, 500);
   assert.equal(options.seconds, 20);
   assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
-  const summary = { ...complete(), fullMap: true, pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
+  const summary = { ...complete(), fullMap: true, mapFitSamples: 12, bestMapOverflowPixels: 0, worstMapOverflowPixels: 0,
+    pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
   assert.equal(assertSummary(summary, 19, true), summary);
   for (const count of [7, 256, 499]) {
     assert.throws(() => assertSummary({ ...summary, peakReceivedSnakes: count }, 19, true), { stage: "population" });
@@ -31,6 +32,9 @@ test('Battledome requires full-map pictures without skips and preserves measured
   }
   assert.equal(argumentsFor(["--host-bin", "host", "--battledome", "500", "--vision", "1500"]).vision, 1500);
   assert.throws(() => assertSummary({ ...summary, fullMap: false }, 19, true), { stage: 'full-map' });
+  for (const patch of [{mapFitSamples: 0}, {worstMapOverflowPixels: null}, {worstMapOverflowPixels: 3.56}]) {
+    assert.throws(() => assertSummary({ ...summary, ...patch }, 19, true), { stage: 'full-map' });
+  }
   assert.throws(() => assertSummary({ ...summary, pictureSkips: 1 }, 19, true), { stage: 'picture-skips' });
 });
 

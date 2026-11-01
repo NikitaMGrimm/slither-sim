@@ -167,4 +167,4 @@ visual records before transaction copies, exceeding Wasm's useful memory range.
 Tests cover the exact 512/513 live boundary, maximum received anchor product,
 allocated visual slots, own-body preservation, connected reduced spans, draw and
 pixel limits, and real Canvas Wasm admission. Headless workload measurements and
-their precise limits are in the [capacity study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-01-snake-capacity/REPORT.md).
+their precise limits are in the [capacity study](../../research/client-performance/2026-11-01-snake-capacity/REPORT.md).

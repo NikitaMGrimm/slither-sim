@@ -41,11 +41,23 @@ mod probe {
         skipped: u64,
         full_map: bool,
         best_map_overflow: Option<f64>,
+        worst_map_overflow: Option<f64>,
+        map_fit_samples: usize,
         closed: bool,
         baseline: Option<(Point, f64, f64)>,
         peak_speed: f64,
     }
     impl Summary {
+        fn observe_map_fit(&mut self, overflow: f64) {
+            self.map_fit_samples += 1;
+            self.best_map_overflow =
+                Some(self.best_map_overflow.map_or(overflow, |p| p.min(overflow)));
+            self.worst_map_overflow = Some(
+                self.worst_map_overflow
+                    .map_or(overflow, |p| p.max(overflow)),
+            );
+            self.full_map = self.worst_map_overflow.is_some_and(|p| p <= 1e-6);
+        }
         fn observe(&mut self, game: &LocalGame, active: f64) -> Result<()> {
             let state = game.client().received();
             self.peak_received = self.peak_received.max(state.snakes.len());
@@ -87,7 +99,7 @@ mod probe {
         }
         fn print(&self, seconds: f64) {
             println!(
-                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"bestMapOverflowPixels\":{},\"seconds\":{:.3}}}",
+                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"mapFitSamples\":{},\"bestMapOverflowPixels\":{},\"worstMapOverflowPixels\":{},\"seconds\":{:.3}}}",
                 self.opened,
                 self.challenge,
                 self.login,
@@ -109,7 +121,11 @@ mod probe {
                 self.peak_prepared,
                 self.skipped,
                 self.full_map,
-                self.best_map_overflow.unwrap_or(0.),
+                self.map_fit_samples,
+                self.best_map_overflow
+                    .map_or("null".to_owned(), |p| p.to_string()),
+                self.worst_map_overflow
+                    .map_or("null".to_owned(), |p| p.to_string()),
                 seconds
             );
         }
@@ -122,6 +138,7 @@ mod probe {
         started: Instant,
         playing: Option<Instant>,
         legacy: bool,
+        full_map_requested: bool,
     }
     impl Host {
         fn now(&self) -> f64 {
@@ -175,7 +192,12 @@ mod probe {
                 // Accept the picture before observing its committed camera;
                 // the candidate's draw transform is not yet in game.client().
                 self.game.presented(true)?;
-                if let Some(setup) = &self.game.client().received().setup {
+                // Only post-wheel committed pictures establish fit. An early
+                // Setup or a single lucky frame cannot accept the moving view.
+                if self.full_map_requested
+                    && self.playing.is_some()
+                    && let Some(setup) = &self.game.client().received().setup
+                {
                     let camera = self.game.client().camera();
                     let radius = setup
                         .radius
@@ -188,12 +210,7 @@ mod probe {
                                 - f64::from(side)
                         })
                         .fold(0., f64::max);
-                    self.summary.best_map_overflow = Some(
-                        self.summary
-                            .best_map_overflow
-                            .map_or(overflow, |prior| prior.min(overflow)),
-                    );
-                    self.summary.full_map |= overflow <= 1e-6;
+                    self.summary.observe_map_fit(overflow);
                 }
                 self.summary.pictures += 1;
             }
@@ -238,9 +255,7 @@ mod probe {
             if self.game.phase() == Phase::Playing {
                 if self.summary.own && self.playing.is_none() {
                     // Wheel admission requires a playing, live own snake.
-                    if std::env::var("SLITHER_CLIENT_E2E_FULL_MAP").as_deref() == Ok("1")
-                        && !self.game.wheel_zoom(-1000.)
-                    {
+                    if self.full_map_requested && !self.game.wheel_zoom(-1000.) {
                         return Err("full-map: zoom admission rejected".into());
                     }
                     self.playing = Some(Instant::now());
@@ -327,6 +342,7 @@ mod probe {
             started,
             playing: None,
             legacy,
+            full_map_requested: std::env::var("SLITHER_CLIENT_E2E_FULL_MAP").as_deref() == Ok("1"),
         };
         host.game.play(&endpoint, "Local E2E", 0)?;
         let result = host.run(seconds);
@@ -337,6 +353,22 @@ mod probe {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn whole_map_requires_every_post_zoom_picture_to_fit() {
+            let mut summary = Summary::default();
+            assert_eq!(summary.map_fit_samples, 0);
+            assert_eq!(summary.best_map_overflow, None);
+            assert_eq!(summary.worst_map_overflow, None);
+            assert!(!summary.full_map);
+            summary.observe_map_fit(0.);
+            assert!(summary.full_map);
+            summary.observe_map_fit(3.56);
+            summary.observe_map_fit(0.);
+            assert_eq!(summary.map_fit_samples, 3);
+            assert_eq!(summary.best_map_overflow, Some(0.));
+            assert_eq!(summary.worst_map_overflow, Some(3.56));
+            assert!(!summary.full_map);
+        }
         #[test]
         fn server_arguments_keep_literal_loopback_and_time_bounds() {
             for port in [1, 80, 49152, 65535] {

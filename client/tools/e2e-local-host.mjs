@@ -56,7 +56,8 @@ export function assertSummary(s, protocol = 19, battledome = false) {
   ];
   if (battledome) {
     stages.splice(4, 2);
-    stages.push(['full-map', s.fullMap === true], ['picture-skips', s.pictureSkips === 0],
+    stages.push(['full-map', s.fullMap === true && Number.isInteger(s.mapFitSamples) && s.mapFitSamples > 0
+      && Number.isFinite(s.worstMapOverflowPixels) && s.worstMapOverflowPixels <= 1e-6], ['picture-skips', s.pictureSkips === 0],
       ['population', Number.isInteger(s.peakReceivedSnakes) && s.peakReceivedSnakes >= 500
         && Number.isInteger(s.peakPreparedSnakes) && s.peakPreparedSnakes >= 500]);
   }
