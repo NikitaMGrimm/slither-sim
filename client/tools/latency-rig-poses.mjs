@@ -3,6 +3,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {distribution} from './latency-rig-analysis.mjs';
 import {evidenceText} from './latency-rig-storage.mjs';
+import {analyze} from './latency-trace.mjs';
 const check=(ok,message)=>{if(!ok)throw Error(message);};
 const parse=text=>text.trim().split('\n').map(JSON.parse);
 const ms=(a,b)=>Number(BigInt(b)-BigInt(a))/1e6;
@@ -48,7 +49,9 @@ export function referenceCadence(events,heads,poses) {
     limits:'Conservative selected-reference segments only; no interval bridges selection gaps, removal or appearance. Bundled commands deduplicated per message and channel. No absent motion reports are invented.'};
 }
 export async function analyzePoses(directory) {
-  const trace=parse(await evidenceText(path.join(directory,'latency.jsonl')));
+  const traceText=await evidenceText(path.join(directory,'latency.jsonl'));
+  analyze(traceText,{cpu:true});
+  const trace=parse(traceText);
   const heads=parse(await evidenceText(path.join(directory,'client/heads.jsonl')));
   const poses=parse(await evidenceText(path.join(directory,'client/heads.poses.jsonl')));
   const header=poses.shift(),end=poses.pop();
