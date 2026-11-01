@@ -97,6 +97,7 @@ struct Session {
     renderer: Option<egui_wgpu::Renderer>,
     held: [bool; 4],
     reveal_focus: bool,
+    cancel_ime: bool,
     extent: [u32; 2],
     dpr: f32,
 }
@@ -143,6 +144,7 @@ impl NativeEguiHost {
                 *current |= native;
             }
             s.input.events.clear();
+            s.cancel_ime = false;
             s.context.input_mut(|i| {
                 i.pointer = Default::default();
                 i.keys_down.clear();
@@ -162,6 +164,7 @@ impl NativeEguiHost {
         if let Some(s) = &mut self.session {
             s.adapter = None;
             s.input.events.clear();
+            s.cancel_ime = false;
             s.held = self.window.held;
             s.context.input_mut(|i| {
                 i.pointer = Default::default();
@@ -199,6 +202,7 @@ impl NativeEguiHost {
                 renderer: None,
                 held: self.window.held,
                 reveal_focus: true,
+                cancel_ime: false,
                 extent: [960, 540],
                 dpr: 1.,
             });
@@ -247,6 +251,13 @@ impl NativeEguiHost {
                 .session
                 .as_ref()
                 .is_some_and(|s| !s.input.events.is_empty())
+    }
+    pub fn take_ime_cancellation(&mut self) -> bool {
+        self.active
+            && self
+                .session
+                .as_mut()
+                .is_some_and(|s| std::mem::take(&mut s.cancel_ime))
     }
     pub fn synthetic_key(&mut self, key: &NativeKey, state: ElementState) {
         self.window.key(key, state);
@@ -361,6 +372,17 @@ impl NativeEguiHost {
         window: impl FnOnce() -> &'a Window,
     ) -> egui_winit::EventResponse {
         self.route_window_event(event, dpr, |host| {
+            // egui-winit 0.37 drops Disabled, but Windows can end composition
+            // without an empty preedit or commit. Preserve that cancellation.
+            if matches!(event, WindowEvent::Ime(winit::event::Ime::Disabled)) {
+                if let Some(s) = &mut host.session {
+                    s.input.events.retain(|event| {
+                        !matches!(event, egui::Event::Ime(egui::ImeEvent::Preedit { .. }))
+                    });
+                    s.cancel_ime = true;
+                }
+                return egui_winit::EventResponse { consumed: true, repaint: true };
+            }
             if let WindowEvent::KeyboardInput { event, .. } = event
                 && host.process_key(event.into()) {
                 return egui_winit::EventResponse { consumed:true, repaint:false };

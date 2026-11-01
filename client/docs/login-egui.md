@@ -16,9 +16,11 @@ the existing skin Save boundary persists the committed nickname.
 The egui-winit adapter owns native composition, candidate placement and platform
 output while login owns input. Adjacent preedit replacements coalesce until
 redraw; commit, keys and pointer boundaries retain order. Provisional Unicode is
-bounded separately from the committed nickname. Cancellation restores the
-pre-composition text and selection. Windows clipboard access uses the existing
-clipboard dependency, since egui-winit's optional system clipboard is disabled.
+bounded separately from the committed nickname. Cancellation, including native
+IME Disabled, restores the pre-composition text, selection and copied undo history.
+Committed edits keep their undo history without provisional candidates. Windows
+clipboard access uses the existing clipboard dependency, since egui-winit's
+optional system clipboard is disabled.
 
 Settings shares the egui context during its fade. Server picker, skin studio and
 champion retain their existing toolkit, input adapters and transition composition

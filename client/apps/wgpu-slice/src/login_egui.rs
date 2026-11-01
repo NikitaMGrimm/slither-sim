@@ -48,6 +48,12 @@ struct Logo {
     tiles: Vec<egui::TextureHandle>,
 }
 
+struct Composition {
+    nickname: String,
+    state: egui::text_edit::TextEditState,
+    undoer: egui::util::undoer::Undoer<(egui::text::CCursorRange, String)>,
+}
+
 #[derive(Default)]
 pub struct LoginUi {
     pub controls: Vec<(ControlId, Rect, bool)>,
@@ -55,7 +61,7 @@ pub struct LoginUi {
     pub composing: bool,
     pub keyboard_focus: bool,
     request_focus: Option<ControlId>,
-    composition: Option<(String, egui::text_edit::TextEditState)>,
+    composition: Option<Composition>,
     logo: Option<Logo>,
     spinner: Option<egui::TextureHandle>,
     skin: Option<(u64, u64, egui::TextureHandle)>,
@@ -66,17 +72,23 @@ impl LoginUi {
     }
     pub fn begin_composition(&mut self, ctx: &egui::Context) {
         if self.composition.is_none() {
-            self.composition = Some((
-                self.nickname.clone(),
-                egui::TextEdit::load_state(ctx, widget_id(NICKNAME)).unwrap_or_default(),
-            ));
+            let state = egui::TextEdit::load_state(ctx, widget_id(NICKNAME)).unwrap_or_default();
+            // TextEditState clones share their undoer through an Arc. Copy the
+            // history by value so provisional redraws cannot change the snapshot.
+            let undoer = state.undoer();
+            self.composition = Some(Composition {
+                nickname: self.nickname.clone(),
+                state,
+                undoer,
+            });
         }
         self.composing = true;
     }
     pub fn cancel_composition(&mut self, ctx: &egui::Context) {
-        if let Some((text, state)) = self.composition.take() {
-            self.nickname = text;
-            state.store(ctx, widget_id(NICKNAME));
+        if let Some(mut snapshot) = self.composition.take() {
+            self.nickname = snapshot.nickname;
+            snapshot.state.set_undoer(snapshot.undoer);
+            snapshot.state.store(ctx, widget_id(NICKNAME));
         }
         self.composing = false;
     }
@@ -508,16 +520,23 @@ impl LoginUi {
                 }
             });
             if !self.composing {
-                self.composition = None;
                 self.nickname = slither_client::start_page::normalize_nickname(&self.nickname);
-                if let Some(mut state) = egui::TextEdit::load_state(ctx, widget_id(NICKNAME))
-                    && let Some(range) = state.cursor.char_range()
-                {
-                    let mut range = range;
-                    let chars = self.nickname.chars().count();
-                    range.primary.index.0 = range.primary.index.0.min(chars);
-                    range.secondary.index.0 = range.secondary.index.0.min(chars);
-                    state.cursor.set_char_range(Some(range));
+                let snapshot = self.composition.take();
+                if let Some(mut state) = egui::TextEdit::load_state(ctx, widget_id(NICKNAME)) {
+                    if let Some(mut range) = state.cursor.char_range() {
+                        let chars = self.nickname.chars().count();
+                        range.primary.index.0 = range.primary.index.0.min(chars);
+                        range.secondary.index.0 = range.secondary.index.0.min(chars);
+                        state.cursor.set_char_range(Some(range));
+                    }
+                    if let Some(mut snapshot) = snapshot {
+                        // Keep the committed edit and its current caret, while
+                        // discarding every provisional undo/redo entry.
+                        if let Some(range) = state.cursor.char_range() {
+                            snapshot.undoer.add_undo(&(range, self.nickname.clone()));
+                        }
+                        state.set_undoer(snapshot.undoer);
+                    }
                     state.store(ctx, widget_id(NICKNAME));
                 }
             }

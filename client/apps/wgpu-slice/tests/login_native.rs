@@ -231,6 +231,115 @@ fn ime_cancellation_restores_committed_text_and_full_field_commit_uses_the_same_
 }
 
 #[test]
+fn native_ime_disabled_restores_preedit_before_and_after_redraw() {
+    for redraw in [false, true] {
+        let mut login = settled("Initial");
+        select_all(&mut login);
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        if redraw {
+            login.prepare([960, 540], true, None).unwrap();
+        }
+        assert!(login.login_ui.composing);
+        let response = login.egui.window_event(
+            &winit::event::WindowEvent::Ime(winit::event::Ime::Disabled),
+            1.,
+            || panic!("native Disabled must be handled before the window adapter"),
+        );
+        assert!(response.repaint);
+        login.settings_input(egui::RawInput::default());
+        assert!(!login.login_ui.composing);
+        assert_eq!(login.displayed_nickname(), "Initial");
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(login.displayed_nickname(), "Initial");
+        press(&mut login, egui::Key::Tab, egui::Modifiers::NONE);
+        assert_eq!(login.focused(), Some(PLAY));
+        press(&mut login, egui::Key::Enter, egui::Modifiers::NONE);
+        assert!(matches!(
+            login.step(9616., true, false).unwrap().0.as_slice(),
+            [StartMenuIntent::Play { nickname, .. }] if nickname == "Initial"
+        ));
+    }
+}
+
+#[test]
+fn timed_ime_candidates_never_enter_cancelled_or_committed_undo_history() {
+    for commit in [false, true] {
+        let mut login = settled("Before");
+        select_all(&mut login);
+        input(&mut login, egui::Event::Text("Committed".into()));
+        login.step(11200., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        select_all(&mut login);
+        input(
+            &mut login,
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text: "候補".into(),
+                active_range_chars: None,
+            }),
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        login.step(12800., true, false).unwrap();
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(login.displayed_nickname(), "候補");
+        input(
+            &mut login,
+            if commit {
+                egui::Event::Ime(egui::ImeEvent::Commit("Final".into()))
+            } else {
+                egui::Event::Ime(egui::ImeEvent::Preedit {
+                    text: String::new(),
+                    active_range_chars: None,
+                })
+            },
+        );
+        login.prepare([960, 540], true, None).unwrap();
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit { "Final" } else { "Committed" }
+        );
+        let command = egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        };
+        let mut saw_committed = !commit;
+        for _ in 0..6 {
+            press(&mut login, egui::Key::Z, command);
+            let text = login.displayed_nickname();
+            assert!(matches!(text.as_str(), "Before" | "Committed"), "{text:?}");
+            saw_committed |= text == "Committed";
+        }
+        assert!(saw_committed);
+        assert_eq!(login.displayed_nickname(), "Before");
+        for _ in 0..6 {
+            press(
+                &mut login,
+                egui::Key::Z,
+                egui::Modifiers {
+                    shift: true,
+                    ..command
+                },
+            );
+            let text = login.displayed_nickname();
+            assert!(
+                matches!(text.as_str(), "Before" | "Committed" | "Final"),
+                "{text:?}"
+            );
+        }
+        assert_eq!(
+            login.displayed_nickname(),
+            if commit { "Final" } else { "Committed" }
+        );
+    }
+}
+
+#[test]
 fn windows_process_enter_cannot_insert_payload_or_activate_until_key_up() {
     use slither_wgpu_slice::menu_input_native::KeyInput;
     use winit::{

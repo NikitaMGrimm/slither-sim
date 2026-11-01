@@ -646,6 +646,12 @@ impl NativeLogin {
         if !self.egui.active() {
             return;
         }
+        if self.egui.take_ime_cancellation() && self.login_owns_input() {
+            if let Some(ctx) = self.egui.context() {
+                self.login_ui.cancel_composition(ctx);
+            }
+            self.settings_frame();
+        }
         let events = std::mem::take(&mut input.events);
         for mut event in events {
             if !self.egui.active() {

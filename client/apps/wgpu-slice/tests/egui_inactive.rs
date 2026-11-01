@@ -53,6 +53,7 @@ fn closed_callbacks(host: &mut NativeEguiHost) {
                 position: PhysicalPosition::new(i as f64, 200.),
             },
             WindowEvent::Resized(PhysicalSize::new(960, 540)),
+            WindowEvent::Ime(winit::event::Ime::Disabled),
         ] {
             host.observe_only(&event, 1.75);
             let response = host.window_event(&event, 1.75, || {
