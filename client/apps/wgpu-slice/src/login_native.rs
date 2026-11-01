@@ -21,6 +21,7 @@ pub struct NativeLogin {
     pub ingame_ui: crate::ingame_egui::InGameUi,
     ingame_visible: bool,
     ingame_viewport: ([u32; 2], f64),
+    replay_after_close: bool,
     settings_storage: crate::menu_storage::SettingsStorage,
     pub studio: crate::skin_studio_native::SkinStudioNative,
     pub input: NativeMenuInput,
@@ -96,6 +97,7 @@ impl NativeLogin {
             ingame_ui: Default::default(),
             ingame_visible: false,
             ingame_viewport: ([960, 540], 1.),
+            replay_after_close: false,
             settings_storage: crate::menu_storage::SettingsStorage::at(None),
             studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
@@ -199,6 +201,11 @@ impl NativeLogin {
             self.panel.visible = false;
             self.egui.focus(crate::ingame_egui::leave_id());
         }
+        // A closing socket still owns admission. Keep the current screen until
+        // its Close effect completes; Enter is retained by ingame_key meanwhile.
+        if game.stopping() {
+            return Ok(());
+        }
         self.champion_session = game.champion_session();
         self.champion.observe(game);
         if self.champion.policy.finished() {
@@ -207,7 +214,16 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
+        if self.replay_after_close && game.can_play() {
+            self.replay_after_close = false;
+            self.state.action(MenuAction::Play, true);
+        }
         Ok(())
+    }
+    pub fn cancel_game(&mut self, game: &mut crate::game::LocalGame) {
+        self.replay_after_close = false;
+        self.state.cancel_pending_play();
+        game.request_stop();
     }
     /// Esc admission is shared by the desktop callback and CPU-only session tests.
     pub fn ingame_key(
@@ -220,6 +236,14 @@ impl NativeLogin {
             event::ElementState,
             keyboard::{KeyCode, PhysicalKey},
         };
+        if game.stopping()
+            && event.physical == PhysicalKey::Code(KeyCode::Enter)
+            && event.state == ElementState::Pressed
+            && !event.repeat
+        {
+            self.replay_after_close = true;
+            return Ok(true);
+        }
         if event.physical == PhysicalKey::Code(KeyCode::Escape)
             && event.state == ElementState::Pressed
             && !event.repeat
@@ -269,7 +293,7 @@ impl NativeLogin {
             });
         self.egui.check_error()?;
         match action {
-            Some(crate::ingame_egui::Action::Leave) => game.stop(),
+            Some(crate::ingame_egui::Action::Leave) => game.request_stop(),
             Some(crate::ingame_egui::Action::Dismiss) => {
                 game.close_ingame_menu();
                 let cursor = self.egui.window.cursor();

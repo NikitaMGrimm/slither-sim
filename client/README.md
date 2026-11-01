@@ -45,7 +45,8 @@ npm run dev:desktop
 Press Enter to Play; use pointer/arrows and Space or mouse boost.
 During play, Escape opens a small menu with **Leave game**. Escape again or click
 outside to dismiss it. The game keeps running: steering holds its last heading
-and boost is released until the menu closes. Leave game returns to login for
+and boost is released until the menu closes. Leave game returns to login after
+the peer closes or the five-second close deadline. Enter during that wait queues
 another Play. Escape still cancels a pending connection.
 During play, the mouse wheel [zooms](docs/zoom.md) from 1.25 times the stock
 scale out to the whole map. Zoom lasts until the app closes.

@@ -241,8 +241,12 @@ mod desktop {
                     )?;
                     self.handshake_wake = Some(constructed + Duration::from_millis(3334));
                 }
-                match self.transport.execute(&e) {
-                    Ok(()) => self.game.acknowledge(e.generation, e.id, true)?,
+                match self.transport.execute_pending(&e, Instant::now()) {
+                    Ok(true) => self.game.acknowledge(e.generation, e.id, true)?,
+                    Ok(false) => {
+                        self.handshake_wake = None;
+                        return Ok(());
+                    }
                     Err(error) => {
                         self.transport.close();
                         self.game.fail(&error);
@@ -397,7 +401,7 @@ mod desktop {
                     }
                     Event::Closed(g) => self.game.closed(g),
                     Event::Failed(g, e) => {
-                        if g == self.game.generation() {
+                        if g == self.game.generation() && !self.game.stopping() {
                             self.game.fail(&e);
                         }
                     }
@@ -1104,14 +1108,10 @@ mod desktop {
                         match event.physical_key {
                             PhysicalKey::Code(KeyCode::Enter) if down && !event.repeat => {}
                             PhysicalKey::Code(KeyCode::Escape) if down && !event.repeat => {
-                                if r.game.phase() == Phase::Playing {
-                                    return Ok(());
-                                }
-                                r.login.state.cancel_pending_play();
                                 if let Some(p) = &r.preparation {
                                     p.cancel();
                                 }
-                                r.game.stop();
+                                r.login.cancel_game(&mut r.game);
                                 r.effects()?;
                                 r.schedule.invalidate();
                             }
@@ -1147,10 +1147,15 @@ mod desktop {
                 if r.schedule.request_redraw(Instant::now()) {
                     r.window.request_redraw();
                 }
-                if let Some(deadline) = [r.schedule.deadline(), r.discovery_poll, r.handshake_wake]
-                    .into_iter()
-                    .flatten()
-                    .min()
+                if let Some(deadline) = [
+                    r.schedule.deadline(),
+                    r.discovery_poll,
+                    r.handshake_wake,
+                    r.transport.close_deadline(),
+                ]
+                .into_iter()
+                .flatten()
+                .min()
                 {
                     l.set_control_flow(ControlFlow::WaitUntil(deadline));
                 }
