@@ -19,6 +19,7 @@ export function argumentsFor(args) {
     seen.add(key);
     options[key] = ['seconds', 'battledome', 'vision'].includes(key) ? Number(value) : path.resolve(value);
   }
+  if (options.battledome === 500 && !seen.has('seconds')) options.seconds = 20;
   if (!options.hostBin || !Number.isFinite(options.seconds) || options.seconds < 5 || options.seconds > 60
     || options.battledome !== undefined && options.battledome !== 500
     || options.vision !== undefined && (options.battledome !== 500 || !Number.isFinite(options.vision) || options.vision <= 0 || options.vision > 40000)) {

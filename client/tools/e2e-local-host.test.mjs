@@ -21,6 +21,7 @@ test('port policy rejects forbidden, zero and malformed ports', () => {
 test('Battledome requires full-map pictures without skips and preserves measured subscription counts', () => {
   const options = argumentsFor(['--host-bin', 'host', '--battledome', '500', '--scratch', 'scratch']);
   assert.equal(options.battledome, 500);
+  assert.equal(options.seconds, 20);
   assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
   const summary = { ...complete(), fullMap: true, pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
   assert.equal(assertSummary(summary, 19, true), summary);

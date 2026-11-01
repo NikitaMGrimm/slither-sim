@@ -166,6 +166,22 @@ mod compact_tests {
     }
 
     #[test]
+    fn compact_exhaustion_can_accept_a_new_absolute_growth_anchor() {
+        let mut body = fixture(32, 1.);
+        body.compact_visual();
+        for _ in 0..32 {
+            assert!(body.remove_tail().unwrap());
+        }
+        assert_eq!(body.logical_segments(), 0);
+        assert!(body.points().is_empty());
+        let head = Point { x: 60036., y: 4. };
+        body.apply_anchor(Some(head), None, true, Point { x: 60030., y: 4. }, false)
+            .unwrap();
+        assert_eq!(body.logical_segments(), 1);
+        assert_eq!(body.points()[0].position(), head);
+    }
+
+    #[test]
     fn deterministic_compact_growth_motion_and_tail_sequences_preserve_intervals() {
         for seed in [7_u64, 28, 161803] {
             let direction = if seed & 1 == 0 { -1. } else { 1. };
@@ -523,7 +539,27 @@ impl BodyGeometry {
         {
             return Err(PresentationError);
         }
-        let last = self.points.first().ok_or(PresentationError)?;
+        // Reduced rivals do not retain the legacy three dying tail ghosts.
+        // After complete exhaustion an absolute growth anchor must still be
+        // admissible; use the retained head only as its prior visual reference.
+        let exhausted;
+        let last = if let Some(last) = self.points.first() {
+            last
+        } else if self.detail_reduced() {
+            exhausted = BodyPoint {
+                position: displayed_head,
+                previous_delta: Point::default(),
+                edge_length: 1.,
+                spacing_multiplier: 1.,
+                tail_fade: 0.,
+                dying: true,
+                represented: COMPACT_INTERVAL | 1,
+                corrections: BodyCorrections::default(),
+            };
+            &exhausted
+        } else {
+            return Err(PresentationError);
+        };
         let next_direction = direction.or(self.anchor_direction);
         let position = match absolute_position {
             Some(position) => position,
