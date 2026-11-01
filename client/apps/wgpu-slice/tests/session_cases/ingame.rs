@@ -298,11 +298,52 @@ fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() 
         .find(|c| c.0 == PLAY)
         .unwrap()
         .1;
-    assert!(login.intercepts_pointer([r.center().x as f64, r.center().y as f64]));
+    assert!(!login.intercepts_pointer([r.center().x as f64, r.center().y as f64]));
     assert!(login.wheel_zoom(&mut game, -1.));
     assert!(escape(&mut login, &mut game, false));
     assert!(game.ingame_menu_open());
     assert!(login.egui_owns_input());
+}
+
+#[test]
+fn clicking_fading_play_reaches_gameplay_without_queuing_another_login() {
+    let mut game = playing();
+    let mut login = login(&game);
+    login.prepare([960, 540], false, None).unwrap();
+    let view = login.state.view(false);
+    assert_eq!(view.phase, MenuPhase::Outgoing);
+    assert!(view.visible && view.play_disabled);
+    let r = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == slither_client::login_controls::PLAY)
+        .unwrap()
+        .1;
+    let point = [r.center().x as f64, r.center().y as f64];
+    let generation = game.generation();
+    // Exercise the desktop callback's menu-or-world click boundary.
+    if login.intercepts_pointer(point) {
+        login.pointer(point, Some(true), false);
+        game.mouse_up();
+    } else {
+        slither_wgpu_slice::world_resolution::WorldWindow {
+            physical: [960, 540],
+            dpr: 1.,
+            requested: login.state.settings.preferences().resolution,
+        }
+        .pointer(&mut game, point, true)
+        .unwrap();
+    }
+    assert!(
+        pump(&mut game, 100.).contains(&vec![253]),
+        "outgoing login swallowed the boost click"
+    );
+    game.mouse_up();
+    assert!(pump(&mut game, 180.).contains(&vec![254]));
+    assert!(login.step(28., false, true).unwrap().0.is_empty());
+    assert_eq!(login.state.view(false).phase, MenuPhase::Outgoing);
+    assert_eq!(game.generation(), generation);
 }
 
 #[test]

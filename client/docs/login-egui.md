@@ -27,6 +27,7 @@ champion retain their existing toolkit, input adapters and transition compositio
 until their own ports. The outgoing login fade still paints while gameplay owns
 steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
+The disabled outgoing controls allow pointer input through to gameplay.
 
 `tests/login_native.rs` exercises the real CPU widget tree: unique focus,
 keyboard reachability, pointer actions, containment at small/large sizes and

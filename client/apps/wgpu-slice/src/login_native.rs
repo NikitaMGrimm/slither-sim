@@ -70,12 +70,9 @@ impl NativeLogin {
     }
     pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
         if self.egui.active() {
-            return self.egui_owns_input()
-                || self
-                    .login_ui
-                    .controls
-                    .iter()
-                    .any(|(_, r, _)| r.contains(egui::pos2(point[0] as f32, point[1] as f32)));
+            // Outgoing controls are disabled by shared policy. Their fading
+            // rectangles must not swallow pointer input owned by gameplay.
+            return self.egui_owns_input();
         }
         self.blocks_gameplay()
             || self.controls.capture().is_some()
