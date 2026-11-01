@@ -103,13 +103,19 @@ second player seat and starts one extra bot through the host binary's existing
 `slither-client-json-v2` network API, before the measured client joins. All 120
 background Foragers remain. No host changes or takeover are needed. The probe
 accepts only this bot's reported wire ID within the same 1,200-unit distance;
-missing reference exposure remains missing. The bot approaches the pit without
-boost, then alternates two-second straight normal, turning normal, straight
-boost and turning boost requests, using only received positions and reported pit
-geometry. Outward excursions trigger inward steering without boost. Requested
-actions do not establish actual strata: authoritative headings and boost remain
-the classifier. Deaths reconnect explicitly and retained control journals carry
-life IDs. This extra JSON client adds CPU/load; compare such runs separately.
+missing reference exposure remains missing. The `formation-fan-v3` controller
+alternates two-second straight normal, turning normal, straight boost and turning
+boost requests from play. When it receives the primary player, it follows a
+target 250 units lateral to that head. Otherwise it approaches the center. Like
+the primary rig, it derives live pit geometry from the frozen Battledome wall
+ratio. A bounded received-head/body lookahead fan avoids immediate obstacles and
+the pit exit; it cannot guarantee survival. Requested actions do not establish
+actual strata: authoritative headings and boost remain the classifier, including
+acceleration/deceleration phases. Deaths reconnect explicitly and retained
+control journals carry life IDs, reported pit and wall radius. This extra JSON
+client adds CPU/load; compare such runs separately. Earlier controller attempts
+that waited for deep entry or used a 600-unit formation remain distinct failed
+coverage attempts; never relabel them as this controller.
 The host recorder runs for client duration + 24 seconds in this mode.
 
 ## Clocks and endpoints
@@ -135,6 +141,9 @@ It never prepares a second picture. Frame identity/generation join the immutable
 geometry to the existing issue/submit/acknowledgement events. Superseded pictures
 are excluded from submitted geometry metrics. The bounded, preallocated scalar
 journal reports overflow explicitly; output is written after the run.
+This is a prepared-geometry proxy. A visible body can retain a head outside the
+viewport; the journal does not establish that head pixels were visible. Neither
+the geometry nor offscreen completion is a visible-display latency endpoint.
 
 Offscreen GPU work is completed synchronously after each picture, matching the
 existing `--headless` completion policy. This introduces serialized GPU waits.
@@ -175,6 +184,14 @@ strata remain missing. Frame samples are correlated descriptive observations;
 `sparseP99` flags fewer than 1,000 observations. No percentile sums are used.
 During a turn, projected spatial error divided by speed is a **lag-equivalent,
 not an identified temporal delay**. Neither interpolation nor smoothing is truth.
+
+Trace completion and motion coverage are separate. `measurementCoverage` names
+every missing stratum, reports per-stratum frame counts, and distinguishes all
+four strata being present from all four having at least 1,000 frames. The latter
+is only the descriptive sparse-p99 threshold; correlated frames do not become
+independent observations. A trace can be complete while the requested matrix is
+incomplete. Failed approaches and missing boost exposure remain part of the
+results, not successful measurement rows with invented zeros.
 
 The companion PowerShell sampler checks cargo/rustc roughly every 200 ms,
 including machine-wide process IDs, and records machine CPU via CIM about
@@ -223,3 +240,16 @@ tearing, desktop event-loop pacing and physical pointer sampling still require
 the corresponding window/surface evidence. Do not infer their gains from an
 offscreen run. Default smoothing remains unchanged; any visual/feel candidate
 must be an explicit setting off by default and await owner judgement.
+
+The November 2026 loopback baseline exposed two measurement pitfalls. A held
+position anchor produced a roughly 230 ms packet-relative sawtooth even though
+authoritative tangent/speed errors were only a few milliseconds. Exact reference
+receipt journals separated those anchors from changed motion reports, whose
+median was about 42 ms. Also, repeatedly aging the last consumed message on every
+frame produced an apparent ~180 ms p99. Joining each message to its first
+consuming submission instead gave p99 27.80–28.41 ms across four 120-second
+natural-reference confirmation runs. That remaining distribution belongs to this
+fixed-cadence, serialized-GPU rig; it does not establish desktop swapchain delay.
+Keep full per-run quantiles, load, missing strata and immutable captures in the
+external study directory. No production speedup or smoothing preference follows
+from these corrections.
