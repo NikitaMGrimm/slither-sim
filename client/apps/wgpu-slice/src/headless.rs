@@ -22,6 +22,13 @@ use std::{
 };
 
 const EXTENT: [u32; 2] = [960, 540];
+mod diagnostics;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct OwnSample {
+    head: slither_client::state::Point,
+    speed: f64,
+}
 
 fn autopilot_heading(seconds: f64) -> f64 {
     // Broad arcs with a slow heading drift; the first minute travels across the map.
@@ -130,7 +137,6 @@ impl Options {
 
 #[derive(Default)]
 struct Summary {
-    server: Option<String>,
     version: Option<u16>,
     opened: bool,
     negotiated: bool,
@@ -140,6 +146,13 @@ struct Summary {
     protocol: Option<u8>,
     foods: usize,
     foods_max: usize,
+    wire: diagnostics::WireCounts,
+    phase: Option<Phase>,
+    ping_pending: bool,
+    lagging: bool,
+    own_id: Option<u16>,
+    initial_own: Option<OwnSample>,
+    final_own: Option<OwnSample>,
     received_frames: u64,
     received_commands: u64,
     sent: u64,
@@ -158,10 +171,24 @@ impl Summary {
         self.login_sent |= game.phase() == Phase::Setup;
         self.setup |= game.client().score_view().table_max.is_some();
         self.playing |= game.phase() == Phase::Playing;
+        let session = game.champion_session();
+        self.phase = Some(session.phase);
+        self.ping_pending = session.ping_pending;
+        self.lagging = session.lagging;
         let state = game.client().received();
         self.protocol = state.setup.as_ref().map(|s| s.protocol);
         self.foods = state.foods.len();
         self.foods_max = self.foods_max.max(self.foods);
+        self.own_id = state.own_snake_id;
+        if let Some(snake) = self.own_id.and_then(|id| state.snakes.get(&id)) {
+            // Received, centered coordinates and world units/second; no predicted motion.
+            let sample = OwnSample {
+                head: snake.head,
+                speed: snake.speed,
+            };
+            self.initial_own.get_or_insert(sample);
+            self.final_own = Some(sample);
+        }
     }
     fn sample(&mut self, game: &LocalGame, seconds: f64) {
         let view = game.client().score_view();
@@ -178,8 +205,7 @@ impl Summary {
     fn print(&self, elapsed: Duration) {
         println!("Headless summary ({:.2}s):", elapsed.as_secs_f64());
         println!(
-            "server={} client_version={}",
-            self.server.as_deref().unwrap_or("not selected"),
+            "client_version={}",
             self.version
                 .map_or_else(|| "not acquired".into(), |v| v.to_string())
         );
@@ -217,6 +243,27 @@ impl Summary {
         println!(
             "playing={} protocol={:?} food_count={} food_max={}",
             self.playing, self.protocol, self.foods, self.foods_max
+        );
+        println!(
+            "ping_sent={} pong_received={} final_ping_pending={} final_phase={:?} final_lagging={}",
+            self.wire.pings, self.wire.pongs, self.ping_pending, self.phase, self.lagging
+        );
+        println!(
+            "own_id={:?} initial_own_head={:?} final_own_head={:?} initial_own_speed={:?} final_own_speed={:?}",
+            self.own_id,
+            self.initial_own.map(|s| s.head),
+            self.final_own.map(|s| s.head),
+            self.initial_own.map(|s| s.speed),
+            self.final_own.map(|s| s.speed)
+        );
+        println!(
+            "own_move={} own_growth={} own_motion={} own_mass={} own_tail={} own_removal={}",
+            self.wire.own_moves,
+            self.wire.own_growth,
+            self.wire.own_motion,
+            self.wire.own_mass,
+            self.wire.own_tail,
+            self.wire.own_removal
         );
         self.encounters.print();
         println!("exit={}", self.reason);
@@ -395,9 +442,9 @@ impl Host<'_> {
                     .construct(effect.generation, effect.id, self.seconds() * 1000.0)?;
             }
             self.transport.execute(&effect)?;
-            self.game.acknowledge(effect.generation, effect.id, true)?;
-            if let EffectKind::Send(bytes) = effect.kind {
+            if let EffectKind::Send(bytes) = &effect.kind {
                 self.summary.sent += 1;
+                self.summary.wire.sent(bytes);
                 if self.game.phase() == Phase::Playing && bytes.len() == 1 && bytes[0] < 251 {
                     self.summary.headings += 1;
                 }
@@ -405,6 +452,7 @@ impl Host<'_> {
                     self.summary.boosts += 1;
                 }
             }
+            self.game.acknowledge(effect.generation, effect.id, true)?;
             self.summary.observe(&self.game);
         }
         Err("Headless effect drain budget".into())
@@ -441,10 +489,11 @@ impl Host<'_> {
     fn frame(&mut self, active_seconds: f64) -> Result<()> {
         for event in self.transport.poll() {
             let now = self.seconds() * 1000.0;
-            match event {
+            let received = match event {
                 Event::Opened(g) => {
                     self.summary.opened = true;
                     self.game.opened(g, now)?;
+                    None
                 }
                 Event::Binary(g, bytes) => {
                     self.summary.received_frames += 1;
@@ -452,16 +501,26 @@ impl Host<'_> {
                         self.summary.received_commands += decoded.command_count() as u64;
                     }
                     self.game.receive(g, &bytes, now)?;
+                    Some(bytes)
                 }
                 Event::Closed(g) => {
                     self.summary.reason = "remote WebSocket closed".into();
                     self.game.closed(g);
+                    None
                 }
                 Event::Failed(_, error) => return Err(error),
-            }
+            };
             self.summary.observe(&self.game);
             self.effects()?;
             self.pictures()?;
+            if let Some(bytes) = received {
+                let state = self.game.client().received();
+                self.summary.wire.received(
+                    &bytes,
+                    state.setup.as_ref().map(|s| s.protocol),
+                    state.own_snake_id,
+                );
+            }
             if terminal_reason(self.game.phase()).is_some() {
                 return Ok(());
             }
@@ -552,6 +611,8 @@ impl Host<'_> {
 }
 impl Drop for Host<'_> {
     fn drop(&mut self) {
+        // Preserve the error/terminal observation before cleanup clears ping state.
+        self.summary.observe(&self.game);
         self.game.key("Space", false);
         self.game.stop();
         self.transport.close();
@@ -576,10 +637,7 @@ pub fn run(
     cosmetics: Option<slither_wgpu_slice::cosmetics::Cosmetics>,
 ) -> Result<()> {
     let started = Instant::now();
-    let mut summary = Summary {
-        server: Some(endpoint.to_owned()),
-        ..Default::default()
-    };
+    let mut summary = Summary::default();
     let result = (|| {
         output_directory(&options.frames)?;
         let gpu = Offscreen::new()?;
@@ -622,9 +680,56 @@ fn play_endpoint(
 }
 
 #[cfg(test)]
+#[path = "../tests/support/announcement_tape.rs"]
+mod synthetic_host;
+#[cfg(test)]
+#[path = "../../../tests/support/protocol13.rs"]
+mod synthetic_v13;
+
+#[cfg(test)]
 mod tests {
     // ORIGINAL SYNTHETIC settings/output fixtures; no connection or GPU.
     use super::*;
+    #[test]
+    fn remote_close_preserves_summary_protocol_and_received_own_observations() {
+        let mut game = synthetic_host::negotiating();
+        game.receive(
+            game.generation(),
+            &synthetic_v13::bundle(&[synthetic_v13::setup(), synthetic_v13::snake(0)]),
+            4.,
+        )
+        .unwrap();
+        synthetic_host::pictures(&mut game);
+        synthetic_host::pump(&mut game, 20.);
+        let mut summary = Summary::default();
+        summary.observe(&game);
+        let initial = summary.initial_own.unwrap();
+        let movement = synthetic_v13::anchor(b'g', 0, &[3, 232, 4, 76], None);
+        game.receive(game.generation(), &movement, 30.).unwrap();
+        synthetic_host::pictures(&mut game);
+        summary.observe(&game);
+        assert_eq!(summary.initial_own, Some(initial));
+        assert_ne!(summary.final_own.unwrap().head, initial.head);
+        assert_eq!(summary.final_own.unwrap().speed, initial.speed);
+        synthetic_host::pump(&mut game, 300.);
+        summary.observe(&game);
+        assert!(summary.ping_pending);
+        game.closed(game.generation());
+        summary.observe(&game);
+        synthetic_host::effects(&mut game);
+        synthetic_host::pictures(&mut game);
+        summary.observe(&game);
+        assert!(terminal_reason(game.phase()).is_some());
+        assert_eq!(summary.phase, Some(Phase::Disconnected));
+        assert!(!summary.ping_pending);
+        assert_eq!(summary.protocol, Some(13));
+        assert_eq!(summary.own_id, Some(0));
+        assert_eq!(summary.initial_own, Some(initial));
+        assert_eq!(
+            summary.final_own.unwrap().head,
+            slither_client::state::Point { x: 0., y: 100. }
+        );
+    }
     #[test]
     fn headless_endpoint_uses_fixed_profile_version() {
         let mut game = LocalGame::new(0.).unwrap();

@@ -118,3 +118,42 @@ fn same_protocol_setup_boundaries_preserve_world_and_reject_a_version_switch_ato
     );
     assert_eq!(g.client().received(), &before);
 }
+
+#[test]
+fn v13_pong_clears_the_pending_ping_and_the_next_due_ping_is_sent() {
+    let mut g = host::negotiating();
+    g.receive(g.generation(), &bundle(&[setup(), snake(0)]), 4.)
+        .unwrap();
+    host::pictures(&mut g);
+    assert_eq!(g.client().received().setup.as_ref().unwrap().protocol, 13);
+    let first = host::pump(&mut g, 300.);
+    assert_eq!(first.iter().filter(|b| b.as_slice() == [251]).count(), 1);
+    assert!(g.champion_session().ping_pending);
+    assert!(
+        host::pump(&mut g, 1200.)
+            .iter()
+            .all(|b| b.as_slice() != [251])
+    );
+    g.receive(g.generation(), b"p", 1210.).unwrap();
+    host::pictures(&mut g);
+    assert!(!g.champion_session().ping_pending);
+    assert!(!g.champion_session().lagging);
+    let resumed = host::pump(&mut g, 1250.);
+    assert_eq!(resumed.iter().filter(|b| b.as_slice() == [251]).count(), 1);
+    assert!(g.champion_session().ping_pending);
+    g.receive(g.generation(), b"p", 1260.).unwrap();
+    host::pictures(&mut g);
+    assert!(!g.champion_session().ping_pending);
+    assert!(
+        host::pump(&mut g, 1500.)
+            .iter()
+            .all(|b| b.as_slice() != [251])
+    );
+    assert_eq!(
+        host::pump(&mut g, 1501.)
+            .iter()
+            .filter(|b| b.as_slice() == [251])
+            .count(),
+        1
+    );
+}

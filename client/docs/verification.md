@@ -91,6 +91,13 @@ The probe takes `--server 127.0.0.1:<port> --seconds 5..60`; it builds the
 WebSocket URL internally and retains its loopback-only admission. The ordinary
 desktop headless path also needs `--server`, and rejects `--official`.
 
+The headless summary includes transport ping send receipts, recognized pong
+receipts, final phase/lag/pending-ping state, own ID and first/last received own
+head and speed (centered world coordinates; world units/second). Own movement,
+growth, motion, mass, tail and removal counts use the negotiated reader; growth
+anchors also count as moves. Removal retains the last observed head/speed sample.
+The summary contains numeric diagnostics without endpoints or packet payloads.
+
 The runner writes a temporary host config: one player, no bots/food/prey,
 fixed radius, a 400-point starting floor so boost is available, and leaderboard
 and minimap periods of 0.5 seconds. It starts the host with
@@ -117,7 +124,8 @@ real text preparation (`fonts-dejavu-core` on Ubuntu). This is a protocol and
 CPU presentation guard; it establishes no pixel, GPU or perceptual parity.
 
 The single JSON result checks WebSocket open and challenge, login acceptance
-through decoded Setup advertising protocol 19, own appearance, sent steering
+through decoded Setup advertising the selected protocol (19 by default), own
+appearance, sent steering
 and boost-on/off, changed **received** head coordinates and heading, and received
 speed increasing after boost-on then decreasing after boost-off. It does not
 substitute predicted presentation motion for server updates. Leaderboard and
@@ -126,9 +134,10 @@ at least one picture must be prepared. Finally the native transport sends Close
 and polls for the peer's acknowledgement before exit code 0. Failures identify
 the stage and include the partial client summary where available.
 
-Only protocol 19 is covered. The host also supports 13, but this client's
-`SessionPolicy::admit_protocol` and state decoder currently reject it. This
-test does not add legacy support or relabel protocol 19 evidence.
+Each run covers one protocol and reports it in `protocolCoverage`. Protocol 19
+is the default; `SLITHER_CLIENT_E2E_PROTOCOL=13` selects 13 through the probe's
+test-only selector-12 login override. Both use the same production client core;
+the desktop and browser login paths keep their stock login.
 
 ### CI
 
