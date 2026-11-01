@@ -7,7 +7,7 @@ use crate::{
 };
 use slither_client::{
     challenge::solve_challenge,
-    desktop_input::{DesktopInput, OwnInput},
+    desktop_input::{DesktopInput, OwnInput, Point as InputPoint},
     gameplay_policy::GameplayPolicy,
     presentation::*,
     protocol::{self, ElapsedHeader},
@@ -145,6 +145,12 @@ impl Drop for LoginProfile {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Cursor {
+    source: [f64; 4],
+    stock: InputPoint,
+}
+
 pub struct LocalGame {
     #[cfg(feature = "feel-trace")]
     trace: Option<slither_client::feel_trace::Recorder>,
@@ -156,6 +162,8 @@ pub struct LocalGame {
     pub bank: Bank,
     session: SessionPolicy,
     input: DesktopInput,
+    cursor: Option<Cursor>,
+    zoom_pointer_projected: bool,
     policy: GameplayPolicy,
     hud: HudHistory,
     rows: LeaderboardHistory,
@@ -207,6 +215,8 @@ impl LocalGame {
             bank: Bank::new()?,
             session,
             input: DesktopInput::new(19.).map_err(|e| e.to_string())?,
+            cursor: None,
+            zoom_pointer_projected: false,
             policy: GameplayPolicy::new(true, true, true, true, true, false),
             hud: HudHistory::default(),
             rows: LeaderboardHistory::default(),
@@ -1147,6 +1157,7 @@ impl LocalGame {
                 }
                 3 => {
                     if self.input.view().own.is_some() {
+                        self.refresh_zoom_pointer()?;
                         self.input.heading_phase(now).map_err(|e| e.to_string())?
                     } else {
                         Vec::new()
@@ -1328,6 +1339,10 @@ impl LocalGame {
         }
         let backing = render::backing_size(physical.map(|n| f64::from(n) / dpr))?;
         self.viewport(backing, 1.)?;
+        if let Some(cursor) = &mut self.cursor {
+            cursor.source[2] = f64::from(physical[0]) / dpr;
+            cursor.source[3] = f64::from(physical[1]) / dpr;
+        }
         Ok(backing)
     }
     /// Resize supersedes queued intermediate Setup pictures, never their admitted packet state.
@@ -1413,11 +1428,27 @@ impl LocalGame {
     pub fn blur(&mut self) {
         self.input.blur();
     }
-    pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
-        latency::generation(self.generation);
+    /// Returns whether play consumed the wheel. Menus route their input first.
+    pub fn wheel_zoom(&mut self, notches: f64) -> bool {
+        if self.phase() != Phase::Playing
+            || !notches.is_finite()
+            || notches == 0.
+            || self.client.control_view().own.is_none_or(|own| own.dead)
+        {
+            return false;
+        }
+        self.client.wheel_zoom(notches);
+        // A prepared candidate can be waiting for presentation acknowledgement.
+        // Keep its preference current without changing its immutable picture.
+        if let Some(world) = self.work.as_mut().and_then(|w| w.world.as_mut()) {
+            world.wheel_zoom(notches);
+        }
+        true
+    }
+    fn pointer_args(&self, [x, y, width, height]: [f64; 4]) -> Result<([f64; 11], [f64; 11])> {
         let v = self.client.control_view();
         let head = v.own.map(|o| o.raw_head).unwrap_or_default();
-        let args = [
+        let mut args = [
             x,
             y,
             width,
@@ -1430,12 +1461,87 @@ impl LocalGame {
             head.y,
             v.zoom,
         ];
+        let stock = args;
+        if self.client.camera().user_zoom_factor() != 1.
+            && let Some(own) = self.client.own_snake()
+        {
+            // Camera correction can leave the displayed head off centre. Map
+            // that offset through the world backing into pointer CSS space.
+            // Keep the original centre/raw-head policy exactly at factor one;
+            // only the displacement changes, never the send/dead-zone cadence.
+            let head = own.metrics().corrected_head;
+            let logical = render::dimensions(self.extent, self.scale)?;
+            args[0] -= (head.x - v.camera.x) * v.zoom * width / f64::from(logical[0]);
+            args[1] -= (head.y - v.camera.y) * v.zoom * height / f64::from(logical[1]);
+            args[4] = 1.; // Offset already projected, including non-following views.
+        }
+        Ok((stock, args))
+    }
+    fn refresh_zoom_pointer(&mut self) -> Result<()> {
+        let zoomed = self.client.camera().user_zoom_factor() != 1.;
+        // Restore the admitted stock input once after zoom, including its old
+        // viewport/centre quirks. Factor one never reprojects from a new view.
+        if (zoomed || self.zoom_pointer_projected)
+            && let Some(cursor) = self.cursor
+        {
+            if zoomed {
+                let args = self.pointer_args(cursor.source)?.1;
+                self.input.pointer(&args).map_err(|e| e.to_string())?;
+            } else {
+                self.input
+                    .restore_pointer(cursor.stock)
+                    .map_err(|e| e.to_string())?;
+            }
+            // This updates displacement only: the existing heading phase owns
+            // comparison, dead zone, quantization and cadence (docs/zoom.md).
+            self.zoom_pointer_projected = zoomed;
+        }
+        Ok(())
+    }
+    /// Observe the host cursor at gameplay handoff, without admitting a stock
+    /// pointer callback or changing boost/cadence. Menus may own its movement.
+    pub fn observe_cursor(&mut self, x: f64, y: f64, width: f64, height: f64) -> Result<()> {
+        slither_client::desktop_input::project_pointer(&[
+            x, y, width, height, 1., 0., 0., 0., 0., 0., 1.,
+        ])
+        .map_err(|e| e.to_string())?;
+        self.cursor = Some(Cursor {
+            source: [x, y, width, height],
+            stock: self
+                .cursor
+                .map_or(self.input.view().pointer, |cursor| cursor.stock),
+        });
+        Ok(())
+    }
+    pub fn pointer(&mut self, x: f64, y: f64, width: f64, height: f64, down: bool) -> Result<()> {
+        latency::generation(self.generation);
+        let cursor = [x, y, width, height];
+        let (mut stock_args, args) = self.pointer_args(cursor)?;
+        let admitted = !down || self.input.view().own.is_some();
+        let zoomed = self.client.camera().user_zoom_factor() != 1.;
+        let stock = if zoomed && admitted {
+            if self.input.view().own.is_none() {
+                stock_args[5] = 0.;
+            }
+            Some(
+                slither_client::desktop_input::project_pointer(&stock_args)
+                    .map_err(|e| e.to_string())?
+                    .point,
+            )
+        } else {
+            None
+        };
         if down {
             self.input.mouse_down(&args).map_err(|e| e.to_string())?;
         } else {
             self.input.pointer(&args).map_err(|e| e.to_string())?;
         }
-        if !down || self.input.view().own.is_some() {
+        if admitted {
+            self.cursor = Some(Cursor {
+                source: cursor,
+                stock: stock.unwrap_or(self.input.view().pointer),
+            });
+            self.zoom_pointer_projected = zoomed;
             latency::admitted(0);
         }
         if down && self.input.view().own.is_some() {

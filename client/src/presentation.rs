@@ -59,7 +59,10 @@ pub use antenna::{
     AntennaDrawInput, AntennaDrawRequest, AntennaError, AntennaPath, AntennaSnapshot, AntennaState,
     AntennaStroke, MAX_ANTENNA_NODES, OrdinaryAntennaGeometry, PreparedAntenna,
 };
-pub use arena_edge::{ArenaEdgeInput, ArenaEdgePlan, ArenaEdgeView, plan_arena_edge};
+pub use arena_edge::{
+    ArenaEdgeInput, ArenaEdgePlan, ArenaEdgeView, MAX_ARENA_EDGE_SEGMENTS, ZoomArenaEdgePlan,
+    plan_arena_edge, plan_arena_edge_with_zoom,
+};
 pub use background::{
     BackgroundImageLayer, BackgroundInput, BackgroundPatternLayer, BackgroundPlan,
     BackgroundSolidLayer, BackgroundState,
@@ -74,6 +77,7 @@ pub use body_painter::{
     plan_standard_body_with_storage,
 };
 pub use boundary::{BOUNDARY_SAMPLES, BoundaryRadius};
+pub(crate) use camera::UserZoom;
 pub use camera::{CAMERA_SAMPLES, CameraCorrections};
 pub use client::{
     AccessoryPresentation, AnimatedClient, AntennaDrawBudget, AntennaRandomRequest,
@@ -98,7 +102,8 @@ pub use food::{
 pub use food_painter::{
     FoodAssetIndex, FoodCullBounds, FoodImageCommand, FoodImageDraw, FoodPaintCounts,
     FoodPaintError, FoodPaintInput, FoodPaintPass, FoodPaintPlan, MAX_FOOD_PAINT_COMMANDS,
-    plan_food, plan_food_with_index, plan_food_with_storage,
+    plan_food, plan_food_with_index, plan_food_with_storage, plan_food_with_zoom,
+    plan_food_with_zoom_and_index,
 };
 pub(crate) use hud::HudLeaderboardRowsBudget;
 pub use hud::{
@@ -144,7 +149,7 @@ pub use prey::{
 };
 pub use prey_painter::{
     MAX_PREY_PAINT_COMMANDS, PreyImageCommand, PreyPaintCounts, PreyPaintError, PreyPaintInput,
-    PreyPaintPass, PreyPaintPlan, plan_prey,
+    PreyPaintPass, PreyPaintPlan, plan_prey, plan_prey_with_zoom,
 };
 pub use quality::{QualityMode, QualitySnapshot, QualityState};
 pub use score::{ScoreError, ScoreTables};

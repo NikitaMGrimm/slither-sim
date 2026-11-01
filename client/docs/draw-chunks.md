@@ -8,6 +8,10 @@ the same texture's repeat/clamp states. A run crossing a chunk boundary splits w
 changing primitive order. MSAA is cleared and resolved once for the whole frame.
 Canvas output and core painter traversal/quality semantics are unchanged.
 
+Native [wheel zoom](zoom.md) applies its subpixel food/name eligibility before
+planning and uses the same complete-picture budgets and bounded chunks. The
+default view retains the stock eligibility and paint order.
+
 `Renderer::render(&mut self)` retains growable vertex chunks and writes them with
 `queue.write_buffer`. Exclusive calls finish submission before the next call's
 writes, so queue order protects earlier in-flight vertices, including the world

@@ -265,6 +265,18 @@ impl DesktopInput {
         self.view.pointer = point.point;
         Ok(point)
     }
+    /// Restore a copied CSS displacement without projecting a new viewport.
+    /// Boost, comparison state and heading cadence remain owned by their phases.
+    pub fn restore_pointer(&mut self, point: Point) -> Result<()> {
+        finite(point.x, "Invalid pointer displacement x")?;
+        finite(point.y, "Invalid pointer displacement y")?;
+        finite(
+            point.x * point.x + point.y * point.y,
+            "Invalid pointer squared distance",
+        )?;
+        self.view.pointer = point;
+        Ok(())
+    }
     /// Mouse press only affects a retained own appearance.
     pub fn mouse_down(&mut self, values: &[f64]) -> Result<()> {
         if self.view.own.is_some() {
@@ -531,6 +543,32 @@ mod tests {
             (2.0, [1920.25, -2.25], [960.0, -2.0]),
         ] {
             assert_eq!(mouse_client_position(physical, dpr), expected, "DPR {dpr}");
+        }
+    }
+
+    #[test]
+    fn copied_pointer_restore_preserves_bits_and_other_input_state_atomically() {
+        let mut input = DesktopInput::new(19.).unwrap();
+        input.view.last_heading_ms = 42.;
+        input.view.want_heading = true;
+        input.view.left_steps = 3;
+        input.view.boost_key_held = true;
+        let point = Point { x: -0., y: 16.25 };
+        let mut expected = input.view.clone();
+        expected.pointer = point;
+        input.restore_pointer(point).unwrap();
+        assert_eq!(input.view, expected);
+        assert_eq!(input.view.pointer.x.to_bits(), point.x.to_bits());
+        for point in [
+            Point { x: f64::NAN, y: 0. },
+            Point {
+                x: 0.,
+                y: f64::INFINITY,
+            },
+            Point { x: 1e200, y: 0. },
+        ] {
+            assert!(input.restore_pointer(point).is_err());
+            assert_eq!(input.view, expected);
         }
     }
 

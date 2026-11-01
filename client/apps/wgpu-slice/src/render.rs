@@ -893,7 +893,8 @@ fn prepare_composed(
         push_draw(&mut draws, draw)?;
     }
     let [early, late] = std::mem::take(&mut bank.food_commands);
-    let food = plan_food_with_index(
+    let user_zoom = client.camera().user_zoom_factor();
+    let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
             foods: client.foods().foods(),
             view,
@@ -907,6 +908,7 @@ fn prepare_composed(
         &mut bank.food_asset_index,
         early,
         late,
+        user_zoom,
     )
     .map_err(|e| {
         if e == FoodPaintError::CommandLimit {
@@ -931,17 +933,20 @@ fn prepare_composed(
             )
         })
         .collect();
-    let prey_plan = plan_prey(PreyPaintInput {
-        preys: client.preys().preys(),
-        eaters: &eaters,
-        view,
-        assets: &bank.assets,
-        target_handle: None,
-        early_entry_alpha: 1.,
-        late_entry_alpha: 1.,
-        command_limit: MAX_PREY_PAINT_COMMANDS
-            .min(MAX_DRAWS - draws.len() - food.early.len() - food.late.len()),
-    })
+    let prey_plan = plan_prey_with_zoom(
+        PreyPaintInput {
+            preys: client.preys().preys(),
+            eaters: &eaters,
+            view,
+            assets: &bank.assets,
+            target_handle: None,
+            early_entry_alpha: 1.,
+            late_entry_alpha: 1.,
+            command_limit: MAX_PREY_PAINT_COMMANDS
+                .min(MAX_DRAWS - draws.len() - food.early.len() - food.late.len()),
+        },
+        user_zoom,
+    )
     .map_err(|e| {
         if e == PreyPaintError::CommandLimit {
             DRAW_MEMORY_LIMIT.into()
@@ -986,6 +991,18 @@ fn prepare_composed(
         .map_err(|e| e.to_string())?;
         let mut antenna_index = draws.len();
         if let Some(geometry) = &snake.body_geometry {
+            // Below two logical pixels across, separate outline/shadow/inner
+            // shimmer details cannot resolve. Reuse the existing low-quality
+            // passes without removing body geometry or changing global quality.
+            // Authored wheel LOD; measured workload and limits: docs/zoom.md.
+            let body_quality = if user_zoom < 1. && 29. * m.scale * view.zoom < 2. {
+                BodyPaintQuality {
+                    high_quality: false,
+                    blend: 0.,
+                }
+            } else {
+                quality
+            };
             let body_storage = std::mem::take(&mut bank.body_commands);
             let body = plan_standard_body_with_storage(
                 BodyPaintInput {
@@ -1004,7 +1021,7 @@ fn prepare_composed(
                     },
                     assets: &bank.assets,
                     view,
-                    quality,
+                    quality: body_quality,
                     visual: BodyPaintVisual {
                         scale: m.scale,
                         spawn: m.spawn_progress,
@@ -1078,34 +1095,39 @@ fn prepare_composed(
     draws.extend(prey_plan.late.iter().map(prey));
     bank.food_commands = [food.early, food.late];
     if let Some(boundary) = client.boundary()
-        && let Some(edge) = plan_arena_edge(ArenaEdgeInput {
-            view: client.arena_edge_view(),
-            camera: view.camera,
-            zoom: view.zoom,
-            width: logical[0],
-            height: logical[1],
-            radius: boundary.displayed(),
-        })
+        && let Some(edge) = plan_arena_edge_with_zoom(
+            ArenaEdgeInput {
+                view: client.arena_edge_view(),
+                camera: view.camera,
+                zoom: view.zoom,
+                width: logical[0],
+                height: logical[1],
+                radius: boundary.displayed(),
+            },
+            user_zoom != 1.,
+        )
         .map_err(|e| e.to_string())?
     {
         let fill = bank.solid([48, 0, 0]);
-        for i in 0..40 {
+        let edge_fill = edge.fill();
+        let segments = edge.stroke().len() - 2;
+        for i in 0..segments {
             push_draw(
                 &mut draws,
                 polygon(
                     fill,
                     [
-                        edge.fill[i + 1],
-                        edge.fill[i + 2],
-                        edge.fill[81 - i],
-                        edge.fill[82 - i],
+                        edge_fill[i + 1],
+                        edge_fill[i + 2],
+                        edge_fill[2 * segments + 1 - i],
+                        edge_fill[2 * segments + 2 - i],
                     ],
                     0.8,
                 ),
             )?;
         }
         let stroke = bank.solid([128, 0, 0]);
-        let points = &edge.stroke[1..];
+        let points = &edge.stroke()[1..];
         for i in 0..points.len() - 1 {
             let a = points[i];
             let b = points[i + 1];
@@ -1116,8 +1138,8 @@ fn prepare_composed(
                 continue;
             }
             let n = Point {
-                x: -dy / length * edge.line_width / 2.,
-                y: dx / length * edge.line_width / 2.,
+                x: -dy / length * edge.line_width() / 2.,
+                y: dx / length * edge.line_width() / 2.,
             };
             push_draw(
                 &mut draws,
@@ -1148,11 +1170,17 @@ fn prepare_composed(
     }
     let mut text_draws = Vec::new();
     let mut text_resources = std::collections::BTreeMap::new();
+    let name_zoom = user_zoom;
     for name in client
         .nickname_draws()
         .iter()
         .take(crate::text::MAX_NICKNAME_RUNS_PER_FRAME)
     {
+        // The text rasterizer requires at least one pixel. Subpixel world
+        // names disappear with subpixel food instead of rejecting the picture.
+        if name.font_size * name_zoom < 1. {
+            continue;
+        }
         use crate::text::{Align, Baseline, TextRun, TextStyle, Weight};
         for (draw, resource) in bank.text.draw(
             TextRun {
@@ -1160,14 +1188,18 @@ fn prepare_composed(
                 style: TextStyle {
                     family: TextFamily::Arial,
                     slant: TextSlant::Normal,
-                    // The core's nickname font is fixed in backing pixels.
-                    size: name.font_size / scale,
+                    // Preserve stock sizing at default; names belong to the
+                    // world when the player changes zoom (docs/zoom.md).
+                    size: name.font_size * name_zoom / scale,
                     weight: Weight::Normal,
                     color: name.color,
                 },
                 // The core mixes a fixed backing-pixel gap with world geometry;
                 // only the latter should grow when the logical frame is scaled.
-                position: [name.position.x, name.position.y - 32. + 32. / scale],
+                position: [
+                    name.position.x,
+                    name.position.y - 32. + 32. * name_zoom / scale,
+                ],
                 align: Align::Center,
                 baseline: Baseline::Middle,
                 alpha: name.alpha,
