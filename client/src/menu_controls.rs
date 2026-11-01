@@ -113,13 +113,6 @@ pub enum ControlKind {
         /// Visible caption.
         label: String,
     },
-    /// Binary preference with matching-release button interaction.
-    Toggle {
-        /// Visible caption and semantic name.
-        label: String,
-        /// Committed requested value.
-        checked: bool,
-    },
     /// One section in a roving tab set.
     SectionTab {
         /// Visible section title.
@@ -333,10 +326,6 @@ impl PanelView {
             .filter(|r| r.control.visible)
             .map(|r| {
                 let enabled = self.enabled && r.control.enabled;
-                let checked = match r.control.kind {
-                    ControlKind::Toggle { checked, .. } => Some(checked),
-                    _ => None,
-                };
                 let selected = match r.control.kind {
                     ControlKind::SectionTab { selected, .. }
                     | ControlKind::Swatch { selected, .. }
@@ -344,11 +333,6 @@ impl PanelView {
                     _ => None,
                 };
                 let (role, value, actions) = match r.control.kind {
-                    ControlKind::Toggle { checked, .. } => (
-                        AccessibleRole::Checkbox,
-                        checked.to_string(),
-                        vec![PanelAction::Focus, PanelAction::SetChecked],
-                    ),
                     ControlKind::SectionTab { label, .. } => (
                         AccessibleRole::Tab,
                         label,
@@ -394,7 +378,7 @@ impl PanelView {
                     ),
                 };
                 PanelNode {
-                    checked,
+                    checked: None,
                     id: r.control.id,
                     role,
                     name: r.control.name,
@@ -725,17 +709,7 @@ impl PanelInputState {
             let captured = self.capture.take();
             if let Some(control) = captured.filter(|id| Some(*id) == hit) {
                 return Some(ControlIntent {
-                    checked: panel
-                        .controls
-                        .iter()
-                        .find(|c| c.id == control)
-                        .and_then(|c| {
-                            if let ControlKind::Toggle { checked, .. } = c.kind {
-                                Some(!checked)
-                            } else {
-                                None
-                            }
-                        }),
+                    checked: None,
                     panel: panel.id,
                     generation: panel.generation,
                     control,
@@ -753,13 +727,7 @@ impl PanelInputState {
             .iter()
             .any(|c| c.id == id && Self::available(panel, c))
             .then_some(ControlIntent {
-                checked: panel.controls.iter().find(|c| c.id == id).and_then(|c| {
-                    if let ControlKind::Toggle { checked, .. } = c.kind {
-                        Some(!checked)
-                    } else {
-                        None
-                    }
-                }),
+                checked: None,
                 panel: panel.id,
                 generation: panel.generation,
                 control: id,

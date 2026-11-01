@@ -3,13 +3,15 @@
 The native login's secondary row is Change Skin, Choose Server, Settings, after
 Nickname and Play in keyboard order. Settings opens only in admitted, settled
 Login, with no pending Play, champion editor, skin studio or picker. Its shared
-modal uses the server picker's shared fade and scale ramp. Login content fades
-behind it, and the settled panel replaces inactive login/wordmark resources.
-Tab wraps Quality → World resolution → Done; Enter/Space activates the focused
-control. Done, Escape and a backdrop click start the exit fade. The panel keeps
-visual feedback and input ownership until opacity reaches zero, while closed
-controls reject activation. Focus then returns to Settings. In-game Escape
-remains Stop/cancel.
+modal backdrop replaces login content and the wordmark. Tab wraps Quality →
+World resolution → Done;
+Enter/Space activates the focused control. Done and Escape close and restore
+Settings focus. Outside clicks close on matching release. In-game Escape remains Stop/cancel.
+The native screen is an egui 0.37 trial; other native menus retain the shared
+control renderer, and browser hosts retain their DOM controls. Settings uses the
+shared picker transition timing: 400 ms in, 320 ms out, with a 40 ms step cap.
+The outgoing panel keeps input until its fade finishes. Keyboard zoom is disabled;
+the host's physical size and DPI remain authoritative.
 
 Quality is the existing requested High/Low mode, independent of adaptive runtime
 quality and resolution. Changes apply immediately to preferences; Play freezes
@@ -42,32 +44,31 @@ file. The browser dev/reference hosts retain their UI and legacy key, migrating
 through the same copied Wasm parser at `slither-client-settings-v1` and retaining
 `slither-client-quality-v1` for older hosts. They perform no startup writes.
 
-The two shared Toggles expose checkbox semantics, checked state and SetChecked action;
-matching pointer release and Enter/Space carry an explicit next value. Blur,
-disable, resize and generation replacement cancel capture. Native accessibility
-bridging remains separate.
+The two egui controls expose checkbox semantics and checked state; matching
+pointer release and Enter/Space carry an explicit next value into the same
+generation-checked settings owner. Key repeats do not toggle. Tab/Shift+Tab wrap
+without an unfocused frame. Blur, resize, DPI changes and a new mount cancel
+pointer capture. Nickname composition blocks entry; the modal releases gameplay
+holds and disables nickname IME. Native accessibility bridging remains separate.
 
 Offline tests cover record precedence, write failures, entry/return focus,
-modality, capture cancellation and Play snapshots. Settings retains the existing
-global menu/picture quotas. The settled-state compactness regression keeps 32 resources,
-4 MiB and 160 producer quads through DPR 1–5, with ≤64 quads through DPR 2.
-Menus retain the DPR-5 raster cap and physical-resolution placement through DPR 8.
-The rounded settings panel stretches only uniform centre/edge strips; its corners
-and shadow retain their raster density. Important labels/toggles/headings keep
-18/20/24px type, with 16px instructions and status text.
-Inactive screen resources retire transactionally; retained pictures remain valid.
+modality, capture cancellation and Play snapshots. Layout tests check containment,
+non-overlap and keyboard reachability across narrow/wide windows and DPR 1–8;
+they do not compare pixels or exact coordinates. The panel uses flow layout and
+scrolling on short windows. Labels/toggles/headings retain 18/20/24px type, with
+16px help and status text, using the same installed font bytes as native text.
+Pill fills use the shared theme's two colour stops, with one focus outline and
+reserved shadow space. egui owns its glyph atlas and meshes; the former
+Settings-only raster-resource quotas no longer describe this screen. Other
+menus retain their existing quotas and retained pictures remain valid.
 
 On native non-Linux hosts (the app tests and specimen tool are not built on Linux),
-`menu_specimens <new-output-directory> --settings` produces finite offscreen PNGs
-and `settings.json` with geometry, revision, fonts, resource/quad costs and actual
-GPU draw runs. It includes 960×540 at 1×/1.5×/2×, narrow and DPR-5 cases, selected,
-focused, pressed, disabled, Native-unavailable and combined storage-failure states. Run with
-`CARGO_BUILD_JOBS=2`. Full verification is `npm run check`, which skips native
+`menu_specimens <new-output-directory> --settings-trial` (also `--settings`)
+produces authored offscreen Settings PNGs at 960×540 and 360×640, plus
+`timings.json`: 1,000 warmed preparation samples and 120 CPU submission samples
+per size, with GPU completion waited outside each timed CPU frame. No art
+directory is loaded. Run with `CARGO_BUILD_JOBS=2`. Full verification is `npm run check`, which skips native
 wgpu checks on Linux; neither proves physical input, owner appearance/feel or
 server acceptance. These checks open no windows and contact no game servers.
 
-`menu_specimens <new-output-directory> --settings-fade` captures fixed-clock
-entry/exit frames at 1×/1.5×/2× and a DPR 1–8 ledger, including fractional DPR,
-narrow/short-wide windows, keyboard/mouse entry, storage/capability messages and
-sampled control feedback. It uses procedural geometry only. Partial transitions
-share the unchanged global 512-record, 64-resource, 13 MiB menu allowance.
+See the [egui trial measurements and renders](egui-settings-trial.md).

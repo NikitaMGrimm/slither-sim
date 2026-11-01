@@ -874,12 +874,34 @@ impl SurfaceHost {
         });
         Ok(true)
     }
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    pub fn present_with_settings(
+        &mut self,
+        frame: &Frame,
+        overlay: Option<&Frame>,
+        requested: slither_client::settings::WorldResolution,
+        settings: &mut crate::settings_egui::SettingsUi,
+    ) -> RenderResult<bool> {
+        self.present_inner_with(frame, true, overlay, requested, |renderer, view| {
+            settings.paint(renderer, view)
+        })
+    }
     fn present_inner(
         &mut self,
         frame: &Frame,
         scale: bool,
         overlay: Option<&Frame>,
         requested: slither_client::settings::WorldResolution,
+    ) -> RenderResult<bool> {
+        self.present_inner_with(frame, scale, overlay, requested, |_, _| {})
+    }
+    fn present_inner_with(
+        &mut self,
+        frame: &Frame,
+        scale: bool,
+        overlay: Option<&Frame>,
+        requested: slither_client::settings::WorldResolution,
+        paint: impl FnOnce(&Renderer, &wgpu::TextureView),
     ) -> RenderResult<bool> {
         if overlay.is_some_and(|f| f.extent != self.extent) {
             return Err("overlay/surface extent mismatch".into());
@@ -911,6 +933,7 @@ impl SurfaceHost {
             self.extent,
             requested,
         )?;
+        paint(&self.renderer, &view);
         crate::latency::picture("present_begin");
         self.renderer.queue.present(texture);
         crate::latency::picture("present_end");

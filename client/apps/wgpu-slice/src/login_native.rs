@@ -16,6 +16,7 @@ use slither_client::{
 };
 
 pub struct NativeLogin {
+    pub settings_ui: crate::settings_egui::SettingsUi,
     settings_storage: crate::menu_storage::SettingsStorage,
     pub studio: crate::skin_studio_native::SkinStudioNative,
     pub input: NativeMenuInput,
@@ -85,6 +86,7 @@ impl NativeLogin {
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         let panel = login_controls::panel(&state.view(true), &layout, [960., 540.]);
         Ok(Self {
+            settings_ui: crate::settings_egui::SettingsUi::new()?,
             settings_storage: crate::menu_storage::SettingsStorage::at(None),
             studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
@@ -113,6 +115,7 @@ impl NativeLogin {
         self.studio.step(now);
         let settings_visible = self.state.settings.visible();
         self.state.settings.step(now).map_err(str::to_owned)?;
+        self.settings_ui.step(now, &self.state.settings);
         if let Some(record) = self.state.settings.take_write() {
             self.state
                 .settings
@@ -138,6 +141,7 @@ impl NativeLogin {
             .sync_menu(&self.state.view(admission), &intents);
         effects.extend(self.sync_controls(admission));
         if settings_visible && !self.state.settings.visible() {
+            effects.extend(self.input.state.apply(EditIntent::Modal(false)));
             effects.extend(self.focus(SETTINGS));
         }
         self.controls
@@ -214,9 +218,14 @@ impl NativeLogin {
         effects
     }
     fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
-        self.panel = if self.state.settings.visible() {
-            self.state.settings.panel(self.area)
-        } else if self.studio.state.visible() {
+        if self.settings_ui.active() || self.state.settings.visible() {
+            if self.state.settings.visible() {
+                self.controls.blur();
+            }
+            self.panel.visible = false;
+            return self.input.state.apply(EditIntent::Focus(None));
+        }
+        self.panel = if self.studio.state.visible() {
             self.studio.state.panel(self.area, &self.studio.status)
         } else {
             let mut panel =
@@ -263,6 +272,10 @@ impl NativeLogin {
         }
     }
     pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
+        if self.state.settings.visible() {
+            self.settings_ui.focus(focus);
+            return Vec::new();
+        }
         self.controls.set_focus(focus);
         self.controls.sync_focus(&self.panel, &mut self.input.state)
     }
@@ -281,42 +294,69 @@ impl NativeLogin {
         }
         let view = self.state.view(admission);
         if self.state.settings.open(&view) {
-            self.sync_controls(admission)
+            self.settings_ui.sync(&self.state.settings);
+            self.settings_frame();
+            self.settings_frame();
+            let mut effects = self.input.state.apply(EditIntent::Modal(true));
+            effects.extend(self.sync_controls(admission));
+            effects
         } else {
             Vec::new()
         }
     }
     pub fn close_settings(&mut self, admission: bool) -> Vec<HostEditEffect> {
         self.state.settings.close();
-        let mut effects = self.sync_controls(admission);
+        self.settings_ui.sync(&self.state.settings);
+        let mut effects = Vec::new();
         if !self.state.settings.visible() {
+            effects.extend(self.input.state.apply(EditIntent::Modal(false)));
+            effects.extend(self.sync_controls(admission));
             effects.extend(self.focus(SETTINGS));
         }
         effects
     }
-    fn settings_activation(
-        &mut self,
-        intent: slither_client::menu_controls::ControlIntent,
-        admission: bool,
-    ) -> Vec<HostEditEffect> {
-        self.state.settings.activate(intent);
-        if self.state.settings.visible() {
-            self.sync_controls(admission)
-        } else {
-            self.close_settings(admission)
+    fn settings_frame(&mut self) {
+        let open = self.state.settings.is_open();
+        self.settings_ui.frame(
+            &mut self.state.settings,
+            self.area.map(|n| (n * self.pixel_scale) as u32),
+            self.pixel_scale,
+        );
+        if open && !self.state.settings.is_open() {
+            self.close_settings(true);
         }
+    }
+    /// Authored input and the native egui-winit adapter feed the same widget tree.
+    pub fn settings_input(&mut self, input: egui::RawInput) {
+        self.settings_ui.input(input);
+        self.settings_frame();
+    }
+    fn settings_key(&mut self, key: egui::Key) {
+        let modifiers = egui::Modifiers {
+            shift: self.input.shift_key(),
+            ..Default::default()
+        };
+        let events = [true, false]
+            .into_iter()
+            .map(|pressed| egui::Event::Key {
+                key,
+                physical_key: None,
+                pressed,
+                repeat: false,
+                modifiers,
+            })
+            .collect();
+        self.settings_input(egui::RawInput {
+            events,
+            ..Default::default()
+        });
     }
     pub fn activate(&mut self, admission: bool) {
         if self.picker.policy.visible() {
             return;
         }
         if self.state.settings.visible() {
-            if let Some(intent) = self.controls.activate(
-                &self.panel,
-                slither_client::menu_controls::Activation::Enter,
-            ) {
-                self.settings_activation(intent, admission);
-            }
+            self.settings_key(egui::Key::Enter);
             return;
         }
         if self.studio.state.visible() {
@@ -366,6 +406,16 @@ impl NativeLogin {
         admission: bool,
     ) -> crate::menu_input_native::NativeInputResult {
         use winit::event::WindowEvent;
+        if self.settings_ui.active()
+            && matches!(
+                event,
+                WindowEvent::Focused(false)
+                    | WindowEvent::Resized(_)
+                    | WindowEvent::ScaleFactorChanged { .. }
+            )
+        {
+            self.settings_ui.cancel_pointer();
+        }
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
         }
@@ -427,31 +477,22 @@ impl NativeLogin {
         {
             self.controls.keyboard_navigation();
         }
-        if self.state.settings.visible() {
-            let mut effects = Vec::new();
+        if self.settings_ui.active() || self.state.settings.visible() {
             if event.state == ElementState::Pressed && !event.repeat {
-                match event.logical {
-                    Key::Named(NamedKey::Escape) => effects.extend(self.close_settings(admission)),
-                    Key::Named(NamedKey::Tab) => {
-                        self.controls.tab(&self.panel, self.input.shift_key())
-                    }
-                    Key::Named(NamedKey::Enter | NamedKey::Space) => {
-                        let activation = if event.logical == &Key::Named(NamedKey::Space) {
-                            slither_client::menu_controls::Activation::Space
-                        } else {
-                            slither_client::menu_controls::Activation::Enter
-                        };
-                        if let Some(intent) = self.controls.activate(&self.panel, activation) {
-                            effects.extend(self.settings_activation(intent, admission));
-                        }
-                    }
-                    _ => {}
+                let key = match event.logical {
+                    Key::Named(NamedKey::Escape) => Some(egui::Key::Escape),
+                    Key::Named(NamedKey::Tab) => Some(egui::Key::Tab),
+                    Key::Named(NamedKey::Enter) => Some(egui::Key::Enter),
+                    Key::Named(NamedKey::Space) => Some(egui::Key::Space),
+                    _ => None,
+                };
+                if let Some(key) = key {
+                    self.settings_key(key);
                 }
-                effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
             }
             return NativeInputResult {
                 consumed: true,
-                effects,
+                effects: Vec::new(),
             };
         }
         if self.studio.state.visible() {
@@ -578,14 +619,22 @@ impl NativeLogin {
         down: Option<bool>,
         admission: bool,
     ) -> Vec<HostEditEffect> {
-        if self.state.settings.visible() {
-            let mut effects = self.sync_controls(admission);
-            let resolved = self.panel.resolve(self.area).unwrap_or_default();
-            if let Some(intent) = self.controls.pointer(&self.panel, &resolved, point, down) {
-                effects.extend(self.settings_activation(intent, admission));
+        if self.settings_ui.active() || self.state.settings.visible() {
+            let pos = egui::pos2(point[0] as f32, point[1] as f32);
+            let mut events = vec![egui::Event::PointerMoved(pos)];
+            if let Some(pressed) = down {
+                events.push(egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: Default::default(),
+                });
             }
-            effects.extend(self.controls.sync_focus(&self.panel, &mut self.input.state));
-            return effects;
+            self.settings_input(egui::RawInput {
+                events,
+                ..Default::default()
+            });
+            return Vec::new();
         }
         if self.picker.policy.visible() {
             return self
@@ -696,6 +745,7 @@ impl NativeLogin {
         self.studio.viewport = area;
         let resized = area != self.area || dpr != self.pixel_scale;
         if resized {
+            self.settings_ui.cancel_pointer();
             self.controls.blur();
         }
         self.pixel_scale = dpr;
@@ -706,48 +756,16 @@ impl NativeLogin {
         }
         self.layout = fresh;
         self.area = area;
-        if self.state.settings.visible() {
-            self.sync_controls(admission);
-            let alpha = self.state.settings.alpha();
-            let mut picture = if alpha == 1. {
-                // The settled panel keeps its compact resource envelope.
-                self.menu.prepare_panel(
-                    &mut self.text,
-                    &self.panel,
-                    &self.controls,
-                    &self.input.state,
-                    &mut self.scroll,
-                    Default::default(),
-                    extent,
-                    dpr,
-                )?
-            } else {
-                view.login_alpha *= 1. - alpha;
-                view.visible = view.login_alpha > 0.;
-                self.menu.prepare_with_panel(
-                    &mut self.text,
-                    &view,
-                    &self.layout,
-                    extent,
-                    dpr,
-                    cosmetics,
-                    Some(&self.input.state),
-                    Some(crate::menu::PanelPaint {
-                        thumbnails: None,
-                        panel: &self.panel,
-                        input: &self.controls,
-                        edit: &self.input.state,
-                        scroll: &mut self.scroll,
-                        theme: Default::default(),
-                    }),
-                )?
-            };
-            if picture.backdrop.is_none() {
-                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
-                picture.backdrop = page.backdrop;
-                picture.resources.extend(page.resources);
+        self.settings_ui.sync(&self.state.settings);
+        if self.settings_ui.active() {
+            self.settings_frame();
+            if self.settings_ui.alpha() == 1. {
+                return MenuFrame::world_crossfade(extent, dpr, 0.);
             }
-            return Ok(picture);
+            view.login_alpha *= 1. - self.settings_ui.alpha();
+            return self
+                .menu
+                .prepare(&mut self.text, &view, &self.layout, extent, dpr, cosmetics);
         }
         if self.studio.state.visible() {
             if resized && let Some(focus) = self.controls.focus() {

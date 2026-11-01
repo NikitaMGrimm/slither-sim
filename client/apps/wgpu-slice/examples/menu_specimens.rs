@@ -45,6 +45,15 @@ fn readback(
     resources: &[Resource],
     physical: Option<[u32; 2]>,
 ) -> Result<Vec<u8>> {
+    readback_with(renderer, frame, resources, physical, |_, _| {})
+}
+fn readback_with(
+    renderer: &mut Renderer,
+    frame: &Frame,
+    resources: &[Resource],
+    physical: Option<[u32; 2]>,
+    paint: impl FnOnce(&Renderer, &wgpu::TextureView),
+) -> Result<Vec<u8>> {
     renderer.sync_resources(resources)?;
     let [width, height] = physical.unwrap_or(frame.extent);
     let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
@@ -97,6 +106,7 @@ fn readback(
     } else {
         renderer.render_overlay(frame, &texture.create_view(&Default::default()))?;
     }
+    paint(renderer, &texture.create_view(&Default::default()));
     let row = (width * 4).div_ceil(256) * 256;
     let buffer = renderer.device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("menu readback"),
@@ -207,12 +217,12 @@ async fn run(output: &Path) -> Result<()> {
             .await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    if std::env::args().nth(2).as_deref() == Some("--settings-fade") {
-        return settings_fade::specimens(&mut renderer, output).await;
+    if std::env::args().nth(2).as_deref() == Some("--settings-trial") {
+        return settings_trial(output, &mut renderer);
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--settings") {
-        return settings_specimens(output, &mut renderer).await;
+        return settings_trial(output, &mut renderer);
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--builder") {
@@ -626,6 +636,80 @@ async fn run(output: &Path) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+fn settings_trial(output: &Path, renderer: &mut Renderer) -> Result<()> {
+    use slither_wgpu_slice::login_native::NativeLogin;
+    use std::time::Instant;
+    let mut rows = Vec::new();
+    for extent in [[960, 540], [360, 640]] {
+        let mut login = NativeLogin::new("Player")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        login.open_settings(true);
+        for now in (9616..=10000).step_by(16) {
+            login.step(now as f64, true, false)?;
+            login.prepare_host(extent, 1., true, None)?;
+        }
+        let mut times = Vec::new();
+        for _ in 0..1000 {
+            let start = Instant::now();
+            std::hint::black_box(login.prepare_host(extent, 1., true, None)?);
+            times.push(start.elapsed().as_nanos() as u64);
+        }
+        times.sort_unstable();
+        let picture = login.prepare_host(extent, 1., true, None)?;
+        capture_settings(
+            renderer,
+            &picture,
+            &mut login,
+            &output.join(format!("settings-{}x{}.png", extent[0], extent[1])),
+        )?;
+        let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("settings trial"),
+            size: wgpu::Extent3d {
+                width: extent[0],
+                height: extent[1],
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+        let target = texture.create_view(&Default::default());
+        let mut frame_times = Vec::new();
+        for _ in 0..120 {
+            let start = Instant::now();
+            let mut picture = login.prepare_host(extent, 1., true, None)?;
+            if let Some(backdrop) = picture.backdrop {
+                picture.frame.draws.insert(0, backdrop);
+            }
+            renderer.sync_resources(&picture.resources)?;
+            renderer.render_overlay(&picture.frame, &target)?;
+            login.settings_ui.paint(renderer, &target);
+            frame_times.push(start.elapsed().as_nanos() as u64);
+            renderer
+                .device
+                .poll(wgpu::PollType::Wait {
+                    submission_index: None,
+                    timeout: Some(Duration::from_secs(10)),
+                })
+                .map_err(|e| e.to_string())?;
+        }
+        frame_times.sort_unstable();
+        rows.push(serde_json::json!({"extent":extent,"samples":times.len(),"prepare_median_ns":times[500],"prepare_p95_ns":times[950],"frame_samples":frame_times.len(),"frame_cpu_median_ns":frame_times[60],"frame_cpu_p95_ns":frame_times[114],"adapter":format!("{:?}",renderer.adapter_info.device_type)}));
+    }
+    std::fs::write(
+        output.join("timings.json"),
+        serde_json::to_vec_pretty(&rows).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
 #[cfg(not(target_os = "linux"))]
 fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     use slither_client::{
@@ -966,211 +1050,6 @@ fn stroke_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-async fn settings_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
-    use slither_client::{
-        login_controls::{NICKNAME, SETTINGS},
-        menu_controls::ControlKind,
-        menu_preferences::MenuQuality,
-        settings::{DONE, QUALITY, RESOLUTION, WorldResolution},
-    };
-    use slither_wgpu_slice::login_native::NativeLogin;
-    let validation = renderer
-        .device
-        .push_error_scope(wgpu::ErrorFilter::Validation);
-    let mut login = NativeLogin::new("Player")?;
-    for now in (0..=9600).step_by(16) {
-        login.step(now as f64, true, false)?;
-    }
-    let mut measurements = Vec::new();
-    let mut now = 9600.;
-    for (logical, dpr) in [
-        ([960., 540.], 1.),
-        ([960., 540.], 1.5),
-        ([960., 540.], 2.),
-        ([960., 540.], 3.),
-        ([960., 540.], 4.),
-        ([960., 540.], 5.),
-        ([960., 540.], 6.),
-        ([960., 540.], 7.),
-        ([960., 540.], 8.),
-        ([360., 640.], 1.),
-        ([360., 640.], 2.),
-        ([360., 640.], 5.),
-    ] {
-        let extent = logical.map(|v| (v * dpr) as u32);
-        login.close_settings(true);
-        while login.state.settings.visible() {
-            now += 16.;
-            login.step(now, true, false)?;
-        }
-        login.focus(NICKNAME);
-        assert_eq!(login.controls.focus(), Some(NICKNAME));
-        let outgoing = login.prepare_host(extent, dpr, true, None)?;
-        capture(
-            renderer,
-            &outgoing,
-            &output.join(format!("login-{}x{}-{dpr}x.png", logical[0], logical[1])),
-        )?;
-        login.focus(SETTINGS);
-        login.open_settings(true);
-        while login.state.settings.alpha() < 1. {
-            now += 16.;
-            login.step(now, true, false)?;
-        }
-        for state in [
-            "high-focus",
-            "high-pressed",
-            "not-saved-pressed",
-            "low-focus",
-            "not-saved",
-            "done-focus",
-            "disabled",
-            "native-focus",
-            "native-unavailable-not-saved",
-        ] {
-            login.focus(RESOLUTION);
-            if (login.state.settings.preferences().resolution == WorldResolution::Native)
-                != state.starts_with("native")
-            {
-                login.activate(true);
-                now += 16.;
-                login.step(now, true, false)?;
-            }
-            login
-                .state
-                .settings
-                .native_available(state != "native-unavailable-not-saved");
-            let high = matches!(state, "high-focus" | "high-pressed");
-            login.focus(QUALITY);
-            if (login.state.view(true).quality == MenuQuality::High) != high {
-                login.activate(true);
-                now += 16.;
-                login.step(now, true, false)?;
-            }
-            login.state.settings.storage_result(!matches!(
-                state,
-                "not-saved" | "not-saved-pressed" | "native-unavailable-not-saved"
-            ));
-            login.controls.set_progress(
-                QUALITY,
-                if matches!(state, "high-pressed" | "not-saved-pressed") {
-                    [1., 1.]
-                } else {
-                    [0., 0.]
-                },
-            );
-            if matches!(state, "done-focus" | "not-saved-pressed") {
-                login.focus(DONE);
-            }
-            login.controls.set_progress(
-                RESOLUTION,
-                if state == "native-unavailable-not-saved" {
-                    [1., 1.]
-                } else {
-                    [0., 0.]
-                },
-            );
-            if state.starts_with("native") {
-                login.focus(RESOLUTION);
-            }
-            let mut picture = login.prepare_host(extent, dpr, true, None)?;
-            if state == "disabled" {
-                // Authored shared-control specimen; v1 has no unavailable Quality mode.
-                let mut panel = login.panel.clone();
-                panel
-                    .controls
-                    .iter_mut()
-                    .find(|c| c.id == QUALITY)
-                    .unwrap()
-                    .enabled = false;
-                picture = Menu::default().prepare_panel(
-                    &mut TextCache::menu(),
-                    &panel,
-                    &login.controls,
-                    &login.input.state,
-                    &mut Default::default(),
-                    Default::default(),
-                    extent,
-                    dpr,
-                )?;
-                let page = MenuFrame::world_crossfade(extent, dpr, 0.)?;
-                picture.backdrop = page.backdrop;
-                picture.resources.extend(page.resources);
-                assert!(matches!(
-                    panel
-                        .controls
-                        .iter()
-                        .find(|c| c.id == QUALITY)
-                        .unwrap()
-                        .kind,
-                    ControlKind::Toggle { checked: false, .. }
-                ));
-            }
-            let bytes = picture
-                .resources
-                .iter()
-                .map(|r| r.image.pixels.len())
-                .sum::<usize>();
-            if picture.resources.len() > 32
-                || bytes > 4 * 1024 * 1024
-                || picture.frame.draws.len() > if dpr <= 2. { 64 } else { 160 }
-            {
-                return Err(format!(
-                    "Settings compactness regression: {logical:?} {dpr} {state}: {} slots, {bytes} bytes, {} quads",
-                    picture.resources.len(),
-                    picture.frame.draws.len()
-                ));
-            }
-            let file = format!("settings-{state}-{}x{}-{dpr}x.png", logical[0], logical[1]);
-            // The synthetic disabled panel uses a fresh painter/handle namespace.
-            // Retire the preceding upload set before and after this isolated case.
-            if state == "disabled" {
-                renderer.sync_resources(&[])?;
-            }
-            capture(renderer, &picture, &output.join(&file))?;
-            measurements.push(serde_json::json!({"file":file,"logical":logical,"dpr":dpr,"state":state,"producer_quads":picture.frame.draws.len(),"gpu_draws_including_page":renderer.draw_call_count(),"slots":picture.resources.len(),"bytes":bytes,"max_tile_axis":picture.resources.iter().map(|r|r.asset.width.max(r.asset.height)).max(),"retained_outgoing_bytes":outgoing.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),"focus":format!("{:?}",login.controls.focus())}));
-            if state == "disabled" {
-                renderer.sync_resources(&[])?;
-            }
-        }
-        outgoing.frame.validate(
-            &outgoing
-                .resources
-                .iter()
-                .map(|r| (r.asset.into(), r.asset))
-                .collect(),
-        )?;
-        login.close_settings(true);
-        while login.state.settings.visible() {
-            now += 16.;
-            login.step(now, true, false)?;
-        }
-        assert_eq!(login.controls.focus(), Some(SETTINGS));
-        let returned = login.prepare_host(extent, dpr, true, None)?;
-        capture(
-            renderer,
-            &returned,
-            &output.join(format!("return-{}x{}-{dpr}x.png", logical[0], logical[1])),
-        )?;
-    }
-    let revision = std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()
-        .map_err(|e| e.to_string())?;
-    let fonts = [slither_client::menu_theme::ControlStyle::Heading, slither_client::menu_theme::ControlStyle::HelpText, slither_client::menu_theme::ControlStyle::PrimaryButton].map(|role| serde_json::json!({"role":format!("{role:?}"),"face":TextCache::native_face(slither_client::menu_theme::MenuTheme::default().text_style(role))}));
-    let manifest = serde_json::json!({"revision":String::from_utf8_lossy(&revision.stdout).trim(),"fixture":"authored synthetic; no game servers or external art","fonts":fonts,"panel_at_960x540":[200,70,560,400],"settings_record":"2:<0|1>:<original|native>","measurements":measurements,"limits":{"slots":32,"bytes":4*1024*1024,"producer_quads":160,"producer_quads_dpr_1_to_2":64,"menu_raster_density_cap":5},"unverified":"physical input, visible-window behavior, owner appearance/feel and live servers"});
-    std::fs::write(
-        output.join("settings.json"),
-        serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    if let Some(error) = validation.pop().await {
-        return Err(error.to_string());
-    }
-    Ok(())
-}
-
 fn main() {
     let result = std::env::args_os()
         .nth(1)
@@ -1217,5 +1096,25 @@ mod focus;
 mod picker_panel;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-#[path = "menu_specimens/settings_fade.rs"]
-mod settings_fade;
+fn capture_settings(
+    renderer: &mut Renderer,
+    picture: &MenuFrame,
+    login: &mut slither_wgpu_slice::login_native::NativeLogin,
+    path: &Path,
+) -> Result<()> {
+    let mut frame = picture.frame.clone();
+    if let Some(backdrop) = &picture.backdrop {
+        frame.draws.insert(0, backdrop.clone());
+    }
+    let pixels = readback_with(renderer, &frame, &picture.resources, None, |r, v| {
+        login.settings_ui.paint(r, v)
+    })?;
+    image::save_buffer(
+        path,
+        &pixels,
+        frame.extent[0],
+        frame.extent[1],
+        image::ColorType::Rgba8,
+    )
+    .map_err(|e| e.to_string())
+}

@@ -1,0 +1,582 @@
+{
+  "baseline_commit": "4347d710322263b6892e0292a0464f708b758956",
+  "fixture": "authored offline Settings; High quality, Original resolution; no cosmetics; initial Quality focus",
+  "production_source_sha256": {
+    "client/apps/wgpu-slice/src/gpu.rs": "dfd589b5ecbe118141d274f10e03489a3db08427320a92eb24548da58d308c60",
+    "client/apps/wgpu-slice/src/lib.rs": "cff6c0fbe52918ebd2ca15312087ad2c9813d351f5a7d8ba12c0e34abf3db2d2",
+    "client/apps/wgpu-slice/src/login_native.rs": "0402bea8d370352a00daba244ccfcb3e0a3446d0ef855bb0a127e6add9920ab3",
+    "client/apps/wgpu-slice/src/main.rs": "13f44c9847b0c2d4c679ac3e9bcd7f2cba7b0a057a1036dbaa0fd80d959df3d4",
+    "client/apps/wgpu-slice/src/menu.rs": "3bf5ecf3c203951d5653f4a0a802b4c868b38feeb20a9fac02a5791bc504761a",
+    "client/apps/wgpu-slice/src/menu/focus.rs": "76797dfd141d5a5b10b613201965d7a80aa9f7a7bb874a6d356b40921877acd6",
+    "client/apps/wgpu-slice/src/settings_egui.rs": "26741c606d51b4a3460c44764ab6553dd15acb795241bece8bbf4ffb8450577c",
+    "client/apps/wgpu-slice/src/text.rs": "d3d95686ce6716d3ff143f2c716c41050d43a73a440ad6e2d517defd3e8db0fa",
+    "client/apps/wgpu-slice/src/text_native.rs": "1a71433d6b9e811d9b77629bcb963f7a20eac340e731ad5771c5774d8f24a22a",
+    "client/src/lib.rs": "eff514f2ad88b00b78ff8be2c146faad84c404d4d82b9e97820287606440138b",
+    "client/src/menu_controls.rs": "f103dbaf3fe37c972116293944e058844340e19610a05ec557a0fffb1e32129a",
+    "client/src/menu_theme.rs": "4a50ef7895cf85caeb43e387b554184a17fd83adfbc089b5dc04c314d3c00399",
+    "client/src/menu_transition.rs": "ed504c79a8318673af9e9fef944c870841d43f7c375e6dc217a040839defb0e4",
+    "client/src/server_picker.rs": "e6b6e689232ef1f1ac39d8da39172b09e8425e17ebb5cb3065f96edfca9f67ec",
+    "client/src/settings.rs": "f5646437a0f73adead2def05dbe46b5b898ada7f101fba706a928b776c34d3ea",
+    "Cargo.lock": "f4bfba140f64cf1ae0e4aa1ab27dfa5315997d2acf643db13d5ec65f4e4a0879",
+    "client/apps/wgpu-slice/Cargo.toml": "31b05a866ff224a2f43a53d3ce98a12324d2ea7510525e0564e911fd03713b38",
+    "client/apps/wgpu-slice/examples/menu_specimens.rs": "bcf7c5162f9a971dfc9268659e225725ccc02178576ca34b1d2afe7cf992bbbc"
+  },
+  "code_diff_lines_including_comments_and_blank_lines": {
+    "added": 800,
+    "removed": 498,
+    "files": [
+      {
+        "path": "client/apps/wgpu-slice/src/gpu.rs",
+        "added": 23,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/lib.rs",
+        "added": 2,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/login_native.rs",
+        "added": 107,
+        "removed": 66
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/main.rs",
+        "added": 60,
+        "removed": 1
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/menu.rs",
+        "added": 0,
+        "removed": 164
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/menu/focus.rs",
+        "added": 4,
+        "removed": 10
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/settings_egui.rs",
+        "added": 541,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/text.rs",
+        "added": 6,
+        "removed": 0
+      },
+      {
+        "path": "client/apps/wgpu-slice/src/text_native.rs",
+        "added": 12,
+        "removed": 7
+      },
+      {
+        "path": "client/src/lib.rs",
+        "added": 1,
+        "removed": 0
+      },
+      {
+        "path": "client/src/menu_controls.rs",
+        "added": 3,
+        "removed": 35
+      },
+      {
+        "path": "client/src/menu_theme.rs",
+        "added": 0,
+        "removed": 14
+      },
+      {
+        "path": "client/src/menu_transition.rs",
+        "added": 18,
+        "removed": 0
+      },
+      {
+        "path": "client/src/server_picker.rs",
+        "added": 2,
+        "removed": 13
+      },
+      {
+        "path": "client/src/settings.rs",
+        "added": 21,
+        "removed": 188
+      }
+    ]
+  },
+  "incremental_seconds": {
+    "before": 6.268946,
+    "after": 6.920382,
+    "runs_per_side": 1,
+    "profile": "dev, debug info off, warmed incremental cache; width 560 -> 568; restored afterward"
+  },
+  "sizes": [
+    {
+      "kind": "native_exe",
+      "before": {
+        "raw_bytes": 12793856,
+        "gzip9_bytes": 5173050,
+        "sha256": "bb936a3284a04fd9612facf9036f735751fa3a4c2d6e0d2414f3cf05ddb744ef"
+      },
+      "after": {
+        "raw_bytes": 16396288,
+        "gzip9_bytes": 6723903,
+        "sha256": "81907c562ff7da3aacd674ab35f0c8f482622ba98f52f228e2452b0edb18c8aa"
+      },
+      "raw_delta_bytes": 3602432,
+      "gzip9_delta_bytes": 1550853
+    },
+    {
+      "kind": "webgpu_wasm_post_bindgen",
+      "before": {
+        "raw_bytes": 3192161,
+        "gzip9_bytes": 1048927,
+        "sha256": "8be72b5945b6ef57764894a8b5e3b0c8ad0038cf4bc35b1ddfab1be40e779a9e"
+      },
+      "after": {
+        "raw_bytes": 3186064,
+        "gzip9_bytes": 1046919,
+        "sha256": "0a4db998dd7493f88b21e13433aa142455eba7a11a5769b71c50fa9f7d6987ed"
+      },
+      "raw_delta_bytes": -6097,
+      "gzip9_delta_bytes": -2008
+    },
+    {
+      "kind": "webgpu_wasm_compiler_output",
+      "before": {
+        "raw_bytes": 4563363,
+        "gzip9_bytes": 1305918,
+        "sha256": "709bb3b65901fdcfc1c7bbcf38b812ed12fd43bbf9247285a18b1611c51e094a"
+      },
+      "after": {
+        "raw_bytes": 4557065,
+        "gzip9_bytes": 1303502,
+        "sha256": "b8fd5ff3fec00c694228b2b49f179667049c0f6db98dd7aaae66819e7eccd17c"
+      },
+      "raw_delta_bytes": -6298,
+      "gzip9_delta_bytes": -2416
+    }
+  ],
+  "runs": [
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 121900,
+          "frame_cpu_p95_ns": 185400,
+          "frame_samples": 120,
+          "prepare_median_ns": 20200,
+          "prepare_p95_ns": 40300,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 69100,
+          "frame_cpu_p95_ns": 129700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19900,
+          "prepare_p95_ns": 20800,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 121300,
+          "frame_cpu_p95_ns": 286200,
+          "frame_samples": 120,
+          "prepare_median_ns": 21500,
+          "prepare_p95_ns": 23500,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 107000,
+          "frame_cpu_p95_ns": 167300,
+          "frame_samples": 120,
+          "prepare_median_ns": 20700,
+          "prepare_p95_ns": 21800,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 70900,
+          "frame_cpu_p95_ns": 147000,
+          "frame_samples": 120,
+          "prepare_median_ns": 19700,
+          "prepare_p95_ns": 24400,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 118900,
+          "frame_cpu_p95_ns": 154400,
+          "frame_samples": 120,
+          "prepare_median_ns": 19600,
+          "prepare_p95_ns": 23900,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 103700,
+          "frame_cpu_p95_ns": 178100,
+          "frame_samples": 120,
+          "prepare_median_ns": 21600,
+          "prepare_p95_ns": 31800,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 100100,
+          "frame_cpu_p95_ns": 169600,
+          "frame_samples": 120,
+          "prepare_median_ns": 21400,
+          "prepare_p95_ns": 24700,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 69300,
+          "frame_cpu_p95_ns": 128700,
+          "frame_samples": 120,
+          "prepare_median_ns": 19400,
+          "prepare_p95_ns": 20700,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 61500,
+          "frame_cpu_p95_ns": 125400,
+          "frame_samples": 120,
+          "prepare_median_ns": 19700,
+          "prepare_p95_ns": 22200,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 156900,
+          "frame_cpu_p95_ns": 297300,
+          "frame_samples": 120,
+          "prepare_median_ns": 21400,
+          "prepare_p95_ns": 48900,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 152900,
+          "frame_cpu_p95_ns": 218300,
+          "frame_samples": 120,
+          "prepare_median_ns": 21300,
+          "prepare_p95_ns": 46500,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 124600,
+          "frame_cpu_p95_ns": 165200,
+          "frame_samples": 120,
+          "prepare_median_ns": 19600,
+          "prepare_p95_ns": 30000,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 124200,
+          "frame_cpu_p95_ns": 191100,
+          "frame_samples": 120,
+          "prepare_median_ns": 19900,
+          "prepare_p95_ns": 28500,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 164400,
+          "frame_cpu_p95_ns": 246500,
+          "frame_samples": 120,
+          "prepare_median_ns": 31100,
+          "prepare_p95_ns": 64200,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 153800,
+          "frame_cpu_p95_ns": 223500,
+          "frame_samples": 120,
+          "prepare_median_ns": 21200,
+          "prepare_p95_ns": 26800,
+          "samples": 1000
+        }
+      ]
+    },
+    {
+      "before": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 118000,
+          "frame_cpu_p95_ns": 175100,
+          "frame_samples": 120,
+          "prepare_median_ns": 19600,
+          "prepare_p95_ns": 20500,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 118000,
+          "frame_cpu_p95_ns": 156100,
+          "frame_samples": 120,
+          "prepare_median_ns": 19900,
+          "prepare_p95_ns": 29800,
+          "samples": 1000
+        }
+      ],
+      "after": [
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            960,
+            540
+          ],
+          "frame_cpu_median_ns": 168200,
+          "frame_cpu_p95_ns": 236500,
+          "frame_samples": 120,
+          "prepare_median_ns": 21900,
+          "prepare_p95_ns": 38100,
+          "samples": 1000
+        },
+        {
+          "adapter": "IntegratedGpu",
+          "extent": [
+            360,
+            640
+          ],
+          "frame_cpu_median_ns": 170100,
+          "frame_cpu_p95_ns": 274000,
+          "frame_samples": 120,
+          "prepare_median_ns": 22500,
+          "prepare_p95_ns": 69300,
+          "samples": 1000
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "size": "960x540",
+      "before": {
+        "prepare_median_ns": {
+          "median": 19600,
+          "min": 19400,
+          "max": 20200
+        },
+        "prepare_p95_ns": {
+          "median": 24400,
+          "min": 20500,
+          "max": 40300
+        },
+        "frame_cpu_median_ns": {
+          "median": 118000,
+          "min": 69300,
+          "max": 124600
+        },
+        "frame_cpu_p95_ns": {
+          "median": 165200,
+          "min": 128700,
+          "max": 185400
+        }
+      },
+      "after": {
+        "prepare_median_ns": {
+          "median": 21600,
+          "min": 21400,
+          "max": 31100
+        },
+        "prepare_p95_ns": {
+          "median": 38100,
+          "min": 23500,
+          "max": 64200
+        },
+        "frame_cpu_median_ns": {
+          "median": 156900,
+          "min": 103700,
+          "max": 168200
+        },
+        "frame_cpu_p95_ns": {
+          "median": 246500,
+          "min": 178100,
+          "max": 297300
+        }
+      }
+    },
+    {
+      "size": "360x640",
+      "before": {
+        "prepare_median_ns": {
+          "median": 19900,
+          "min": 19600,
+          "max": 19900
+        },
+        "prepare_p95_ns": {
+          "median": 23900,
+          "min": 20800,
+          "max": 29800
+        },
+        "frame_cpu_median_ns": {
+          "median": 118000,
+          "min": 61500,
+          "max": 124200
+        },
+        "frame_cpu_p95_ns": {
+          "median": 154400,
+          "min": 125400,
+          "max": 191100
+        }
+      },
+      "after": {
+        "prepare_median_ns": {
+          "median": 21300,
+          "min": 20700,
+          "max": 22500
+        },
+        "prepare_p95_ns": {
+          "median": 26800,
+          "min": 21800,
+          "max": 69300
+        },
+        "frame_cpu_median_ns": {
+          "median": 152900,
+          "min": 100100,
+          "max": 170100
+        },
+        "frame_cpu_p95_ns": {
+          "median": 218300,
+          "min": 167300,
+          "max": 274000
+        }
+      }
+    }
+  ],
+  "images_sha256": {
+    "before-960x540.png": "a24eb70b437ecc8dd62cb4adbc5f341442f1b85cf775613a80f75e83e1e3e582",
+    "before-360x640.png": "1c449aa17e08b6b1d57d4dc24a461a3c38c25b9ba9e5ab53c77991cec44821a3",
+    "after-960x540.png": "bb811641a4e3df3266f57c15000853b1d83faf8e9efa5ac02d039a9bd9bfa332",
+    "after-360x640.png": "15fca08588127a846593f6fdba718f26d951d5e77c3ca15170b1edb99f5ea3f3"
+  },
+  "images_access": "Comparison figures are GitHub user attachments; raw source PNGs remain local-only",
+  "method": {
+    "runs_per_side": 5,
+    "order": "A1 B1 A2 B2 A3 B3 A4 B4 A5 B5",
+    "preparation_samples_per_run": 1000,
+    "submission_samples_per_run": 120,
+    "warmup": "25 frames after settled login and Settings entry",
+    "gpu_completion": "wait after every CPU submission sample, outside its timed region",
+    "target": "x86_64-pc-windows-msvc; Rust 1.99.0; release thin LTO; one codegen unit",
+    "dpi": 1,
+    "gpu_class": "IntegratedGpu",
+    "gpu_timestamp_duration": "not measured; production device does not request timestamp features",
+    "limiter": "not profiled; descriptive shared-host timings, not a general performance or adoption conclusion",
+    "host_activity": "Shared Windows host; required checks and other work may be active; alternating runs are descriptive, not an exclusive-machine benchmark"
+  },
+  "baseline_harness_patch_sha256": "9f76344181ec57757b7bfa6f47fed05a8b3475322175ac3a748e806e135fc48c",
+  "benchmark_binaries_sha256": {
+    "before": "4c2c3c3a6651a68fb813451a58f1012aacdb194804c66d11d497246e4265a75f",
+    "after": "8146c4ab7c13c47d50559aeef19c7424fd5fd96687825ce428cdc1ffdfffa461"
+  },
+  "figure_attachments": {
+    "960x540": {
+      "url": "https://github.com/user-attachments/assets/c30405f1-ae70-4b78-acf1-2e41df9b02c6",
+      "sha256": "9b17f45e7c842f54bb82e884f97e184089bcb688b0c92de63bf13bc23ffe23a9"
+    },
+    "360x640": {
+      "url": "https://github.com/user-attachments/assets/928d495d-8679-427a-ac1d-09adc726c4d8",
+      "sha256": "9140852a505e7b6904e04db49ec3faba47bc7a6d9d983403cc9abd953b0bdead"
+    }
+  }
+}

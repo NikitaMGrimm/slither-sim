@@ -71,6 +71,13 @@ semantic local art. The [server picker](server-picker.md) uses shared directory
 and windowed-list policy. Both browsers share a semantic DOM login overlay backed by
 the same Rust state, clocks and layout; world renderers draw the world only.
 
+Native Settings is the bounded egui trial in `settings_egui.rs`. egui-winit
+translates input while that modal owns interaction; egui-wgpu draws its meshes
+after the existing world/menu composition and before presentation, on the same
+device and queue. The shared `settings::SettingsState` still owns preferences,
+generation checks and pending persistence. Other menus and both browser hosts
+retain their existing adapters; egui dependencies are native-only.
+
 The wgpu crate still includes its small synthetic diagnostic executable and
 examples alongside the renderer. See its README for builds and controls.
 

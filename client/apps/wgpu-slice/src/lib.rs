@@ -36,6 +36,8 @@ pub mod render;
 pub mod scene;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod server_picker_native;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod settings_egui;
 pub mod text;
 pub mod wordmark;
 pub mod world_presenter;

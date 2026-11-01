@@ -146,6 +146,7 @@ mod desktop {
     }
     struct Running {
         login: NativeLogin,
+        settings_input: egui_winit::State,
         endpoint: Option<String>,
         official: bool,
         server: Option<String>,
@@ -609,6 +610,11 @@ mod desktop {
                 physical.map(|n| f64::from(n) / dpr),
                 self.game.bank.cosmetics.as_mut(),
             )?;
+            if self.login.settings_ui.active() {
+                self.login
+                    .settings_ui
+                    .input(self.settings_input.take_egui_input(&self.window));
+            }
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
@@ -657,10 +663,11 @@ mod desktop {
             }
             latency::picture("pre_present_notify");
             self.window.pre_present_notify();
-            match self.host.present_world_with_overlay(
+            match self.host.present_with_settings(
                 &picture.frame,
                 picture.overlay.as_ref(),
                 window.requested,
+                &mut self.login.settings_ui,
             ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {
@@ -686,6 +693,15 @@ mod desktop {
                 Err(RenderError::Host(e)) => {
                     self.game.presented(false)?;
                     return Err(e);
+                }
+            }
+            if let Some(output) = self.login.settings_ui.platform_output() {
+                if self.login.settings_ui.active() {
+                    self.settings_input
+                        .handle_platform_output(&self.window, output);
+                } else {
+                    // Late egui output must not change the returning editor's IME.
+                    self.window.set_cursor(winit::window::CursorIcon::Default);
                 }
             }
             self.effects()?;
@@ -825,7 +841,16 @@ mod desktop {
                     .state
                     .reset_editor(slither_client::server_picker::ADDRESS_EDITOR, address);
             }
+            let settings_input = egui_winit::State::new(
+                login.settings_ui.context.clone(),
+                egui::ViewportId::ROOT,
+                window.as_ref(),
+                Some(window.scale_factor() as f32),
+                None,
+                Some(host.renderer.device.limits().max_texture_dimension_2d as usize),
+            );
             Ok(Running {
+                settings_input,
                 login,
                 endpoint: options.endpoint.clone(),
                 official: options.official,
@@ -913,6 +938,40 @@ mod desktop {
                         };
                         inactive.window_event(&event);
                     }
+                }
+                let response = r.settings_input.on_window_event(&r.window, &event);
+                if matches!(
+                    event,
+                    WindowEvent::Resized(_)
+                        | WindowEvent::ScaleFactorChanged { .. }
+                        | WindowEvent::Focused(false)
+                ) {
+                    let _ = r.settings_input.take_egui_input(&r.window);
+                    r.login.settings_ui.cancel_pointer();
+                }
+                if r.login.settings_ui.active() {
+                    if response.repaint {
+                        r.schedule.invalidate();
+                    }
+                    if matches!(
+                        event,
+                        WindowEvent::KeyboardInput { .. }
+                            | WindowEvent::CursorMoved { .. }
+                            | WindowEvent::CursorLeft { .. }
+                            | WindowEvent::MouseInput { .. }
+                            | WindowEvent::MouseWheel { .. }
+                            | WindowEvent::Ime(_)
+                    ) {
+                        // Preserve callback order for quick toggle/key pairs,
+                        // rather than coalescing their activations into one frame.
+                        r.login
+                            .settings_input(r.settings_input.take_egui_input(&r.window));
+                        r.game.mouse_up();
+                        r.schedule.invalidate();
+                        return Ok(());
+                    }
+                } else {
+                    let _ = r.settings_input.take_egui_input(&r.window);
                 }
                 let mapped = if r.login.picker.policy.visible() {
                     r.login.picker.event(&event)

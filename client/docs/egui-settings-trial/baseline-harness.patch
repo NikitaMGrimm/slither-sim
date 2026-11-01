@@ -1,0 +1,87 @@
+--- a/client/apps/wgpu-slice/examples/menu_specimens.rs
++++ b/client/apps/wgpu-slice/examples/menu_specimens.rs
+@@ -205,6 +205,10 @@
+         let reference = std::env::args_os().nth(3);
+         return studio_panel::specimens(&mut renderer, output, reference.as_deref().map(Path::new))
+             .await;
++    }
++    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
++    if std::env::args().nth(2).as_deref() == Some("--settings-trial") {
++        return settings_trial(output, &mut renderer);
+     }
+     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+     if std::env::args().nth(2).as_deref() == Some("--settings") {
+@@ -622,6 +626,73 @@
+     }
+     Ok(())
+ }
++#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
++fn settings_trial(output: &Path, renderer: &mut Renderer) -> Result<()> {
++    use slither_wgpu_slice::login_native::NativeLogin;
++    use std::time::Instant;
++    let mut rows = Vec::new();
++    for extent in [[960, 540], [360, 640]] {
++        let mut login = NativeLogin::new("Player")?;
++        for now in (0..=9600).step_by(16) {
++            login.step(now as f64, true, false)?;
++        }
++        login.open_settings(true);
++        for now in (9616..=10000).step_by(16) {
++            login.step(now as f64, true, false)?;
++            login.prepare_host(extent, 1., true, None)?;
++        }
++        let mut times = Vec::new();
++        for _ in 0..1000 {
++            let start = Instant::now();
++            std::hint::black_box(login.prepare_host(extent, 1., true, None)?);
++            times.push(start.elapsed().as_nanos() as u64);
++        }
++        times.sort_unstable();
++        let picture = login.prepare_host(extent, 1., true, None)?;
++        capture(renderer, &picture, &output.join(format!("settings-{}x{}.png", extent[0],extent[1])))?;
++        let texture = renderer.device.create_texture(&wgpu::TextureDescriptor {
++            label: Some("settings trial"),
++            size: wgpu::Extent3d {
++                width: extent[0],
++                height: extent[1],
++                depth_or_array_layers: 1,
++            },
++            mip_level_count: 1,
++            sample_count: 1,
++            dimension: wgpu::TextureDimension::D2,
++            format: wgpu::TextureFormat::Rgba8Unorm,
++            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
++            view_formats: &[],
++        });
++        let target = texture.create_view(&Default::default());
++        let mut frame_times = Vec::new();
++        for _ in 0..120 {
++            let start = Instant::now();
++            let mut picture = login.prepare_host(extent, 1., true, None)?;
++            if let Some(backdrop) = picture.backdrop {
++                picture.frame.draws.insert(0, backdrop);
++            }
++            renderer.sync_resources(&picture.resources)?;
++            renderer.render_overlay(&picture.frame, &target)?;
++            frame_times.push(start.elapsed().as_nanos() as u64);
++            renderer
++                .device
++                .poll(wgpu::PollType::Wait {
++                    submission_index: None,
++                    timeout: Some(Duration::from_secs(10)),
++                })
++                .map_err(|e| e.to_string())?;
++        }
++        frame_times.sort_unstable();
++        rows.push(serde_json::json!({"extent":extent,"samples":times.len(),"prepare_median_ns":times[500],"prepare_p95_ns":times[950],"frame_samples":frame_times.len(),"frame_cpu_median_ns":frame_times[60],"frame_cpu_p95_ns":frame_times[114],"adapter":format!("{:?}",renderer.adapter_info.device_type)}));
++    }
++    std::fs::write(
++        output.join("timings.json"),
++        serde_json::to_vec_pretty(&rows).map_err(|e| e.to_string())?,
++    )
++    .map_err(|e| e.to_string())?;
++    Ok(())
++}
+ #[cfg(not(target_os = "linux"))]
+ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
+     use slither_client::{

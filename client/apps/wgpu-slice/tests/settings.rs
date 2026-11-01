@@ -1,9 +1,7 @@
 //! Offline native settings/atomic storage regressions; no windows or sockets.
 #![cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use slither_client::{
-    login_controls::{self, CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
-    menu_controls::ControlKind,
-    menu_input::EditorId,
+    login_controls::{CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
     menu_preferences::MenuQuality as Q,
     settings::{DONE, QUALITY, RESOLUTION},
     start_page::StartMenuIntent,
@@ -43,33 +41,25 @@ fn settled() -> NativeLogin {
     }
     login
 }
-fn finish_transition(login: &mut NativeLogin, now: &mut f64) {
-    for _ in 0..256 {
-        if !login.state.settings.visible()
-            || (login.state.settings.is_open() && login.state.settings.alpha() == 1.)
-        {
-            return;
-        }
-        *now += 16.;
-        login.step(*now, true, false).unwrap();
-    }
-    panic!("Settings transition did not finish");
-}
-
 fn point(
     login: &NativeLogin,
     id: slither_client::menu_controls::ControlId,
     area: [f64; 2],
 ) -> [f64; 2] {
-    let resolved = login.panel.resolve(area).unwrap();
-    let r = resolved.iter().find(|r| r.control.id == id).unwrap().rect;
-    [r.x + r.width / 2., r.y + r.height / 2.]
+    let _ = area;
+    let rect = login
+        .settings_ui
+        .controls
+        .iter()
+        .find(|(control, _, _)| *control == id)
+        .unwrap()
+        .1;
+    [f64::from(rect.center().x), f64::from(rect.center().y)]
 }
 
 #[test]
 fn entry_order_modality_escape_done_and_play_snapshot() {
     let mut login = settled();
-    let mut now = 9600.;
     login.prepare([960, 540], true, None).unwrap();
     let appearance = login.studio.state.committed().clone();
     login.picker.policy.selection = slither_client::server_picker::ServerPreference::Official(7);
@@ -96,7 +86,7 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
             .contains(&slither_client::menu_input::HostEditEffect::ReleasePointerBoost)
     );
     assert!(login.state.settings.visible());
-    assert_eq!(login.controls.focus(), Some(QUALITY));
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
     assert_eq!(login.input.state.focus(), None);
     assert!(login.blocks_gameplay());
     login.open_studio();
@@ -106,19 +96,19 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     login.focus(QUALITY);
     assert!(key(&mut login, NamedKey::Space));
     assert_eq!(login.state.view(true).quality, Q::Low);
-    now += 16.;
-    assert!(login.step(now, true, false).unwrap().0.is_empty());
+    assert!(login.step(9616., true, false).unwrap().0.is_empty());
     assert!(!login.state.view(true).spinner_visible);
     assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.controls.focus(), Some(RESOLUTION));
+    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
     assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.controls.focus(), Some(DONE));
+    assert_eq!(login.settings_ui.focused(), Some(DONE));
     assert!(key(&mut login, NamedKey::Tab));
-    assert_eq!(login.controls.focus(), Some(QUALITY));
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
     assert!(key(&mut login, NamedKey::Escape));
-    finish_transition(&mut login, &mut now);
-    assert!(!login.state.settings.visible());
+    assert!(!login.state.settings.is_open());
+    login.step(9846., true, false).unwrap();
     assert_eq!(login.controls.focus(), Some(SETTINGS));
+    login.prepare([960, 540], true, None).unwrap();
     assert!(key(&mut login, NamedKey::Enter));
     login.focus(DONE);
     assert!(key(&mut login, NamedKey::Space));
@@ -132,9 +122,8 @@ fn entry_order_modality_escape_done_and_play_snapshot() {
     key(&mut login, NamedKey::Enter);
     login.open_settings(true);
     assert!(!login.state.settings.visible());
-    now += 16.;
     assert_eq!(
-        login.step(now, true, false).unwrap().0,
+        login.step(9862., true, false).unwrap().0,
         vec![StartMenuIntent::Play {
             nickname: "Player".into(),
             quality: Q::Low
@@ -277,7 +266,7 @@ fn failed_replace_keeps_old_data_and_memory_and_does_not_retry_each_frame() {
     assert_eq!(login.state.view(true).quality, Q::Low);
     assert_eq!(std::fs::read_to_string(path.join("old")).unwrap(), "keep");
     assert_eq!(std::fs::read_dir(&temp.0).unwrap().count(), 1);
-    assert!(login.state.settings.panel([960., 540.]).controls.iter().any(|c| matches!(&c.kind, ControlKind::Label { text } if text == "Not saved; applies this session")));
+    assert!(login.state.settings.not_saved());
     std::fs::remove_file(path.join("old")).unwrap();
     std::fs::remove_dir(&path).unwrap();
     login.step(9632., true, false).unwrap();
@@ -311,304 +300,224 @@ fn startup_read_failure_does_not_block_later_explicit_save() {
 }
 
 #[test]
-fn all_settings_states_resize_and_retained_pictures_fit_compact_budgets() {
+fn egui_layout_focus_keyboard_reachability_and_retained_login() {
     let mut login = settled();
     let old = login.prepare([960, 540], true, None).unwrap();
     let frozen = old
         .resources
         .iter()
-        .map(|r| (r.asset, r.image.pixels.clone()))
+        .map(|r| r.image.pixels.clone())
         .collect::<Vec<_>>();
     login.open_settings(true);
-    finish_transition(&mut login, &mut 9600.);
-    for dpr in [1., 1.25, 1.5, 2., 3., 4., 5., 6., 7., 8.] {
-        for area in [[960., 540.], [360., 640.]] {
-            for state in 0..9 {
-                login.focus(RESOLUTION);
-                if (login.state.settings.preferences().resolution
-                    == slither_client::settings::WorldResolution::Native)
-                    != (state >= 7)
-                {
-                    key(&mut login, NamedKey::Space);
-                }
-                login.state.settings.native_available(state != 8);
-                if state == 1 {
-                    login.focus(QUALITY);
-                    key(&mut login, NamedKey::Space);
-                }
-                login
-                    .state
-                    .settings
-                    .storage_result(!matches!(state, 4 | 6 | 8));
+    login.step(9900., true, false).unwrap();
+    login.state.settings.activate(login.state.settings.intent(
+        RESOLUTION,
+        Some(true),
+        slither_client::menu_controls::Activation::Enter,
+    ));
+    for dpr in [1., 1.25, 1.5, 2., 3., 5., 8.] {
+        for area in [[960., 540.], [360., 640.], [640., 360.]] {
+            login.state.settings.storage_result(false);
+            login.state.settings.native_available(false);
+            for _ in 0..3 {
                 login
                     .prepare_host(area.map(|v| (v * dpr) as u32), dpr, true, None)
                     .unwrap();
-                login.focus(if matches!(state, 2 | 6) {
-                    DONE
-                } else {
-                    QUALITY
-                });
-                login.controls.set_progress(
-                    QUALITY,
-                    if matches!(state, 3 | 6) {
-                        [1., 1.]
-                    } else {
-                        [0., 0.]
-                    },
+            }
+            let window = egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(area[0] as f32, area[1] as f32),
+            );
+            assert!(
+                window.contains_rect(login.settings_ui.panel_rect),
+                "{area:?} {dpr}: {:?}",
+                login.settings_ui.panel_rect
+            );
+            let controls = &login.settings_ui.controls;
+            assert_eq!(controls.len(), 3);
+            assert!(controls.iter().filter(|(_, _, focused)| *focused).count() <= 1);
+            for (i, (_, rect, _)) in controls.iter().enumerate() {
+                assert!(login.settings_ui.panel_rect.contains_rect(*rect));
+                assert!(
+                    controls[i + 1..]
+                        .iter()
+                        .all(|(_, other, _)| !rect.intersects(*other))
                 );
-                login
-                    .controls
-                    .set_progress(RESOLUTION, if state == 8 { [1., 1.] } else { [0., 0.] });
-                let mut picture = login
-                    .prepare_host(area.map(|v| (v * dpr) as u32), dpr, true, None)
-                    .unwrap();
-                if state == 5 {
-                    let mut panel = login.panel.clone();
-                    panel
-                        .controls
-                        .iter_mut()
-                        .find(|c| c.id == QUALITY)
-                        .unwrap()
-                        .enabled = false;
-                    picture = slither_wgpu_slice::menu::Menu::default()
-                        .prepare_panel(
-                            &mut slither_wgpu_slice::text::TextCache::menu(),
-                            &panel,
-                            &login.controls,
-                            &login.input.state,
-                            &mut Default::default(),
-                            Default::default(),
-                            area.map(|v| (v * dpr) as u32),
-                            dpr,
-                        )
+            }
+            login.focus(QUALITY);
+            for id in [RESOLUTION, DONE, QUALITY] {
+                key(&mut login, NamedKey::Tab);
+                for _ in 0..2 {
+                    login
+                        .prepare_host(area.map(|v| (v * dpr) as u32), dpr, true, None)
                         .unwrap();
-                    let page = slither_wgpu_slice::menu::MenuFrame::world_crossfade(
-                        area.map(|v| (v * dpr) as u32),
-                        dpr,
-                        0.,
-                    )
-                    .unwrap();
-                    picture.backdrop = page.backdrop;
-                    picture.resources.extend(page.resources);
                 }
-                let bytes = picture
-                    .resources
-                    .iter()
-                    .map(|r| r.image.pixels.len())
-                    .sum::<usize>();
+                assert_eq!(login.settings_ui.focused(), Some(id));
                 assert!(
-                    picture.resources.len() <= 32,
-                    "{area:?} {dpr} {state}: {} slots {:?}",
-                    picture.resources.len(),
-                    picture
-                        .resources
+                    login
+                        .settings_ui
+                        .controls
                         .iter()
-                        .map(|r| [r.asset.width, r.asset.height])
-                        .collect::<Vec<_>>()
+                        .find(|(control, _, _)| *control == id)
+                        .unwrap()
+                        .1
+                        .is_positive(),
+                    "{area:?} {dpr} {id:?}"
                 );
-                assert!(
-                    bytes <= 4 * 1024 * 1024,
-                    "{dpr} {state}: {bytes} bytes, {} quads, {:?}",
-                    picture.frame.draws.len(),
-                    picture
-                        .resources
+                assert_eq!(
+                    login
+                        .settings_ui
+                        .controls
                         .iter()
-                        .map(|r| [r.asset.width, r.asset.height])
-                        .collect::<Vec<_>>()
+                        .filter(|(_, _, focus)| *focus)
+                        .count(),
+                    1
                 );
-                let ceiling = if dpr <= 2. { 64 } else { 160 };
-                assert!(
-                    picture.frame.draws.len() <= ceiling,
-                    "{dpr} {state}: {} quads",
-                    picture.frame.draws.len()
-                );
-                assert!(
-                    picture
-                        .resources
-                        .iter()
-                        .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
-                );
-                let resident = picture
-                    .resources
-                    .iter()
-                    .map(|r| (r.asset.into(), r.asset))
-                    .collect();
-                picture.frame.validate(&resident).unwrap();
             }
         }
     }
     assert_eq!(
         old.resources
             .iter()
-            .map(|r| (r.asset, r.image.pixels.clone()))
+            .map(|r| r.image.pixels.clone())
             .collect::<Vec<_>>(),
         frozen
     );
-    old.frame
-        .validate(
-            &old.resources
-                .iter()
-                .map(|r| (r.asset.into(), r.asset))
-                .collect(),
-        )
-        .unwrap();
     assert_eq!(login.input.state.focus(), None);
-    assert_ne!(login.input.state.focus(), Some(EditorId::Nickname));
-    assert!(
-        login
-            .panel
-            .controls
-            .iter()
-            .all(|c| c.id != login_controls::CHANGE_SKIN || c.name != "Change Skin")
+}
+
+#[test]
+fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
+    let mut login = settled();
+    login.open_settings(true);
+    assert_eq!(login.settings_ui.alpha(), 0.);
+    login.step(9715., true, false).unwrap();
+    let alpha = login.settings_ui.alpha();
+    assert!(alpha > 0. && alpha < 1.);
+    login.close_settings(true);
+    assert_eq!(login.settings_ui.alpha(), alpha);
+    assert!(login.settings_ui.active());
+    login.step(9945., true, false).unwrap();
+    assert!(!login.settings_ui.active());
+    assert_eq!(login.controls.focus(), Some(SETTINGS));
+}
+
+#[test]
+fn native_settings_uses_the_shared_picker_fade_durations() {
+    let mut login = settled();
+    login.open_settings(true);
+    for now in (9616..=10_000).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    assert_eq!(login.settings_ui.alpha(), 1.);
+    login.close_settings(true);
+    assert!(login.settings_ui.active());
+    for now in (10_016..=10_320).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    assert!(!login.settings_ui.active());
+    assert_eq!(login.controls.focus(), Some(SETTINGS));
+}
+
+#[test]
+fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
+    let mut login = settled();
+    login.open_settings(true);
+    login.step(9900., true, false).unwrap();
+    login.prepare([960, 540], true, None).unwrap();
+    let key = |key, repeat, modifiers| egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat,
+        modifiers,
+    };
+    login.settings_input(egui::RawInput {
+        events: vec![key(egui::Key::Tab, false, egui::Modifiers::SHIFT)],
+        ..Default::default()
+    });
+    assert_eq!(login.settings_ui.focused(), Some(DONE));
+    login.focus(QUALITY);
+    login.settings_input(egui::RawInput {
+        events: vec![key(egui::Key::Space, false, egui::Modifiers::NONE)],
+        ..Default::default()
+    });
+    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    login.settings_input(egui::RawInput {
+        events: vec![key(egui::Key::Space, true, egui::Modifiers::NONE)],
+        ..Default::default()
+    });
+    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    let pos = point(&login, RESOLUTION, [960., 540.]);
+    login.pointer(pos, Some(true), true);
+    login.close_settings(true);
+    login.step(9916., true, false).unwrap();
+    login.step(9932., true, false).unwrap();
+    login.open_settings(true);
+    login.pointer(pos, Some(false), true);
+    assert_eq!(
+        login.state.settings.preferences().resolution,
+        slither_client::settings::WorldResolution::Original
     );
 }
 
 #[test]
-fn entry_and_exit_keep_focus_until_finished_and_reject_closed_activation() {
-    for keyboard in [false, true] {
-        for backdrop in [false, true] {
-            let mut login = settled();
-            let mut now = 9600.;
-            login.prepare([960, 540], true, None).unwrap();
-            if keyboard {
-                while login.controls.focus() != Some(SETTINGS) {
-                    key(&mut login, NamedKey::Tab);
-                }
-                key(&mut login, NamedKey::Enter);
-            } else {
-                let p = point(&login, SETTINGS, [960., 540.]);
-                login.pointer(p, Some(true), true);
-                login.pointer(p, Some(false), true);
-            }
-            assert!(login.state.settings.is_open());
-            now += 16.;
-            login.step(now, true, false).unwrap();
-            assert!(login.state.settings.alpha() > 0. && login.state.settings.alpha() < 1.);
-            login.prepare_host([1440, 810], 1.5, true, None).unwrap();
-            let prefs = login.state.settings.preferences();
-            let p = point(&login, QUALITY, [960., 540.]);
-            login.pointer(p, Some(true), true);
-            if backdrop {
-                login.pointer([0., 0.], Some(true), true);
-                login.pointer([0., 0.], Some(false), true);
-            } else {
-                key(&mut login, NamedKey::Escape);
-            }
-            assert!(!login.state.settings.is_open());
-            assert!(login.state.settings.visible());
-            assert_eq!(login.panel.id, slither_client::settings::PANEL);
-            login.pointer(p, Some(false), true);
-            login.focus(QUALITY);
-            key(&mut login, NamedKey::Space);
-            key(&mut login, NamedKey::Escape);
-            assert_eq!(login.state.settings.preferences(), prefs);
-            assert!(login.state.settings.take_write().is_none());
-            let mut alpha = login.state.settings.alpha();
-            for _ in 0..256 {
-                now += 16.;
-                let (intents, _) = login.step(now, true, false).unwrap();
-                assert!(
-                    !intents
-                        .iter()
-                        .any(|i| matches!(i, StartMenuIntent::Play { .. }))
-                );
-                assert!(login.state.settings.alpha() <= alpha);
-                alpha = login.state.settings.alpha();
-                if !login.state.settings.visible() {
-                    break;
-                }
-                assert_eq!(login.panel.id, slither_client::settings::PANEL);
-            }
-            assert!(!login.state.settings.visible());
-            assert_eq!(login.controls.focus(), Some(SETTINGS));
-            assert!(login.controls.capture().is_none());
-            assert!(
-                login.panel.controls.iter().all(|c| login
-                    .controls
-                    .progress(c.id)
-                    .into_iter()
-                    .all(|p| p == 0.))
-            );
-            now += 16.;
-            login.step(now, true, false).unwrap();
-            assert_eq!(login.controls.focus(), Some(SETTINGS));
-            assert_eq!(login.state.settings.preferences(), prefs);
-            assert!(!login.state.view(true).spinner_visible);
-        }
+fn backdrop_closes_on_matching_release_and_retains_the_return_fade() {
+    let mut login = settled();
+    login.open_settings(true);
+    for now in (9616..=10_000).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
     }
+    login.prepare([960, 540], true, None).unwrap();
+    login.pointer([0., 0.], Some(true), true);
+    assert!(login.state.settings.is_open());
+    login.pointer([0., 0.], Some(false), true);
+    assert!(!login.state.settings.is_open());
+    assert!(login.state.settings.visible());
+    assert!(login.blocks_gameplay());
 }
 
 #[test]
-fn fade_frames_fit_menu_limits_and_retained_pictures_survive() {
-    let mut peak = 0;
-    for logical in [[960., 540.], [360., 640.], [960., 360.]] {
-        for dpr in [1_f64, 1.25, 1.5, 1.75, 2., 3., 4., 5., 6., 7., 8.] {
-            let extent = logical.map(|v| (v * dpr).round() as u32);
-            let mut login = settled();
-            login.state.settings = slither_client::settings::SettingsState::new(
-                slither_client::settings::SettingsPreferences {
-                    quality: Q::Low,
-                    resolution: slither_client::settings::WorldResolution::Native,
-                },
-            );
-            login.state.settings.step(9600.).unwrap();
-            login.state.settings.storage_result(false);
-            login.state.settings.native_available(false);
-            login.prepare_host(extent, dpr, true, None).unwrap();
-            login.open_settings(true);
-            let mut now = 9600.;
-            let mut retained = None;
-            for open in [true, false] {
-                if !open {
-                    login.close_settings(true);
-                }
-                let mut finished = false;
-                for _ in 0..256 {
-                    now += 16.;
-                    login.step(now, true, false).unwrap();
-                    for c in &login.panel.controls {
-                        if c.enabled {
-                            login.controls.set_progress(c.id, [1., 1.]);
-                        }
-                    }
-                    let picture = login.prepare_host(extent, dpr, true, None).unwrap();
-                    let count = picture.draw_counts(0).admitted_menu();
-                    peak = peak.max(count);
-                    assert!(count <= 512, "{logical:?} {dpr}: {count}");
-                    assert!(picture.resources.len() <= 64);
-                    assert!(
-                        picture
-                            .resources
-                            .iter()
-                            .map(|r| r.image.pixels.len())
-                            .sum::<usize>()
-                            <= 13 * 1024 * 1024
-                    );
-                    if open && login.state.settings.alpha() == 1. {
-                        retained = Some(picture);
-                        finished = true;
-                        break;
-                    }
-                    if !open && !login.state.settings.visible() {
-                        finished = true;
-                        break;
-                    }
-                }
-                assert!(finished);
-            }
-            let retained = retained.unwrap();
-            retained
-                .frame
-                .validate(
-                    &retained
-                        .resources
-                        .iter()
-                        .map(|r| (r.asset.into(), r.asset))
-                        .collect(),
-                )
-                .unwrap();
-            assert_eq!(login.controls.focus(), Some(SETTINGS));
-        }
+fn nickname_composition_blocks_settings_entry() {
+    use slither_client::menu_input::{EditIntent, EditorId};
+    let mut login = settled();
+    login
+        .input
+        .state
+        .apply(EditIntent::Focus(Some(EditorId::Nickname)));
+    login
+        .input
+        .state
+        .apply(EditIntent::Preedit("authored preedit".into(), None));
+    login.open_settings(true);
+    assert!(!login.state.settings.visible());
+    login.input.state.apply(EditIntent::CancelComposition);
+    login.open_settings(true);
+    assert!(login.state.settings.visible());
+    assert_eq!(login.input.state.focus(), None);
+}
+
+#[test]
+fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
+    let mut login = settled();
+    login.prepare([640, 360], true, None).unwrap();
+    login.open_settings(true);
+    key(&mut login, NamedKey::Tab);
+    for _ in 0..2 {
+        login.prepare([640, 360], true, None).unwrap();
     }
-    println!("Settings fade peak: {peak}/512 menu records");
+    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    login.close_settings(true);
+    login.open_settings(true);
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
+    assert!(
+        login
+            .settings_ui
+            .controls
+            .iter()
+            .find(|(id, _, _)| *id == QUALITY)
+            .unwrap()
+            .1
+            .is_positive()
+    );
 }

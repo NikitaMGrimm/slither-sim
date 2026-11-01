@@ -322,6 +322,12 @@ impl TextCache {
     ) -> Result<slither_client::presentation::TextMeasurement> {
         self.rasterizer.measure(text, style)
     }
+    /// The same installed font bytes for native immediate-mode controls.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn native_font_bytes(style: TextStyle) -> Result<Vec<u8>> {
+        platform::font_bytes(style)
+    }
+
     /// Installed native face selected for this display style.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn native_face(style: TextStyle) -> &'static str {
