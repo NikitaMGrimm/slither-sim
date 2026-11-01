@@ -62,3 +62,24 @@ test('retained CPU inputs uploaded before the frame remain part of its fingerpri
   assert.equal(a.uploads_sha256, b.uploads_sha256);
   assert.notEqual(a.descriptor_sha256, b.descriptor_sha256);
 });
+
+test('queued commands retain a descriptor after its public handle drops', async () => {
+  const input = actions();
+  input.splice(4, 0, { DropBuffer: id(1) });
+  assert.equal((await collect(input)).passes.length, 2);
+});
+
+test('opaque address reuse creates a new resource identity within the frame', async () => {
+  const input = pointer => {
+    const stream = actions();
+    const commands = structuredClone(stream[4].Submit[1]);
+    for (const command of commands) command.RunRenderPass.pass.commands[0].SetVertexBuffer.buffer = id(pointer);
+    stream.splice(5, 0,
+      { DropBuffer: id(1) },
+      { CreateBuffer: [id(pointer), { label: 'ordered vertex chunk', size: 512, usage: 'VERTEX | COPY_DST', mapped_at_creation: false }] },
+      { WriteBuffer: { id: id(pointer), data: { Binary: ['bin', Array(20).fill(2)] }, offset: 0, size: 20, queued: true } },
+      { Submit: [9, commands] });
+    return stream;
+  };
+  assert.equal((await collect(input(1))).combined_sha256, (await collect(input(600))).combined_sha256);
+});

@@ -21,7 +21,7 @@ const isId = value => value && typeof value === 'object' && !Array.isArray(value
 
 export class InputHasher {
   constructor(loadData, emit) {
-    this.loadData = loadData; this.emit = emit; this.resources = new Map(); this.frame = null;
+    this.loadData = loadData; this.emit = emit; this.resources = new Map(); this.retired = new Map(); this.nextResource = 0; this.frame = null;
     this.payloads = []; this.frames = 0; this.cache = new Map();
   }
   async data(data) {
@@ -35,16 +35,17 @@ export class InputHasher {
     this.payloads.push({ file: data.File ?? null, ...record });
     return record;
   }
+  resource(id) { return this.resources.get(id) ?? this.retired.get(id); }
   descriptor(id, stack = new Set()) {
-    const existing = this.resources.get(id); if (!existing) throw Error(`Unknown resource pointer ${id}`);
+    const existing = this.resource(id); if (!existing) throw Error(`Unknown resource pointer ${id}`);
     if (existing.descriptorHash) return existing.descriptorHash;
     if (this.cache.has(id)) return this.cache.get(id);
-    const r = this.resources.get(id); if (!r) throw Error(`Unknown resource pointer ${id}`);
+    const r = existing;
     if (stack.has(id)) throw Error('Cyclic resource descriptor');
     const next = new Set(stack).add(id);
     const walk = v => {
       if (isId(v)) {
-        const child = this.resources.get(idOf(v)); if (!child) throw Error('Missing descriptor dependency');
+        const child = this.resource(idOf(v)); if (!child) throw Error('Missing descriptor dependency');
         return { kind: child.kind, descriptor_sha256: this.descriptor(idOf(v), next), cpu_input: child.cpuInput ?? null };
       }
       if (Array.isArray(v)) return v.map(walk);
@@ -56,12 +57,12 @@ export class InputHasher {
   }
   normalize(value) {
     if (isId(value)) {
-      const id = idOf(value), r = this.resources.get(id); if (!r) throw Error('Uncreated GPU resource reference');
-      if (!this.frame.aliases.has(id)) {
+      const id = idOf(value), r = this.resource(id); if (!r) throw Error(`Uncreated GPU resource reference ${id} in frame ${this.frame.label}`);
+      if (!this.frame.aliases.has(r.token)) {
         const slot = this.frame.kindCounts.get(r.kind) ?? 0;
-        this.frame.kindCounts.set(r.kind, slot + 1); this.frame.aliases.set(id, slot);
+        this.frame.kindCounts.set(r.kind, slot + 1); this.frame.aliases.set(r.token, slot);
       }
-      return { kind: r.kind, slot: this.frame.aliases.get(id), descriptor_sha256: this.descriptor(id), cpu_input: r.cpuInput ?? null };
+      return { kind: r.kind, slot: this.frame.aliases.get(r.token), descriptor_sha256: this.descriptor(id), cpu_input: r.cpuInput ?? null };
     }
     if (Array.isArray(value)) return value.map(v => this.normalize(v));
     if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.normalize(v)]));
@@ -109,17 +110,18 @@ export class InputHasher {
       else { id = value.id; desc = value.desc; }
       if (!id || !desc) throw Error(`Unsupported creation action ${kind}`);
       if (kind === 'CreateTextureView') desc = { parent: value.parent, ...desc };
-      const r = { kind: kind.slice(6), desc };
+      const r = { kind: kind.slice(6), desc, token: this.nextResource++ };
       if (kind === 'CreateShaderModule') r.shader = await this.data(value.data);
       if (kind === 'CreateRenderBundle') r.desc = { ...desc, base: value.base };
-      this.resources.set(idOf(id), r); this.cache.clear();
+      this.resources.set(idOf(id), r); this.retired.delete(idOf(id)); this.cache.clear();
       // Keep immutable dependency fingerprints even after the public shader or
       // layout handle drops, or its opaque address is reused by another object.
       r.descriptorHash = this.descriptor(idOf(id));
       this.event('create', id); return;
     }
     if (kind.startsWith('Get') && kind.endsWith('BindGroupLayout')) {
-      this.resources.set(idOf(value.id), { kind: 'BindGroupLayout', desc: { pipeline: value.pipeline, index: value.index } });
+      this.resources.set(idOf(value.id), { kind: 'BindGroupLayout', desc: { pipeline: value.pipeline, index: value.index }, token: this.nextResource++ });
+      this.retired.delete(idOf(value.id));
       this.resources.get(idOf(value.id)).descriptorHash = this.descriptor(idOf(value.id));
       this.cache.clear(); this.event('create', value.id); return;
     }
@@ -161,7 +163,12 @@ export class InputHasher {
       this.event('submit', 'end'); return;
     }
     if (kind.startsWith('Drop')) {
-      this.event('drop', value); this.resources.delete(idOf(value)); this.cache.clear(); return;
+      // A public handle may drop before Submit: encoders keep the core Arc alive
+      // (notably TextureBlitter's temporary bind group). Preserve its descriptor
+      // for queued commands, while excluding it from the public live inventory.
+      const id = idOf(value), resource = this.resources.get(id);
+      if (!resource) throw Error('Duplicate or uncreated resource drop');
+      this.event('drop', value); this.retired.set(id, resource); this.resources.delete(id); this.cache.clear(); return;
     }
     if (kind.startsWith('Destroy')) { this.event('destroy', value); return; }
     throw Error(`Unsupported API action ${kind}`);

@@ -1,5 +1,11 @@
 # Distant snake shadows at whole-map zoom (2026-11-01)
 
+**Historical retained-binary study; new measurements pending.** See the
+[actual GPU-input and forced-off results](INPUT-RESULTS.md): all 72 unaffected
+controls upload identical bytes, but 56 have resource-history differences;
+the 20 matched stock/forced-off runs do not reproduce a persistent 1 ms effect.
+Candidate A/B remains blocked until the booked controlled-history comparison.
+
 **Historical retained-binary study; new measurements pending.** The logical-pixel
 conversion and non-default observer feature are now implemented and have focused
 regressions. The 08:00 A/A and reversed B/A data did **not** clear the AMD merge
