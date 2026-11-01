@@ -875,15 +875,15 @@ impl SurfaceHost {
         Ok(true)
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    pub fn present_with_settings(
+    pub fn present_with_menu(
         &mut self,
         frame: &Frame,
         overlay: Option<&Frame>,
         requested: slither_client::settings::WorldResolution,
-        settings: &mut crate::settings_egui::SettingsUi,
+        menus: &mut crate::egui_native::NativeEguiHost,
     ) -> RenderResult<bool> {
         self.present_inner_with(frame, true, overlay, requested, |renderer, view| {
-            settings.paint(renderer, view)
+            menus.paint(renderer, view)
         })
     }
     fn present_inner(

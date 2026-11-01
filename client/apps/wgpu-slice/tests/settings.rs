@@ -390,15 +390,15 @@ fn egui_layout_focus_keyboard_reachability_and_retained_login() {
 fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
     let mut login = settled();
     login.open_settings(true);
-    assert_eq!(login.settings_ui.alpha(), 0.);
+    assert_eq!(login.state.settings.alpha(), 0.);
     login.step(9715., true, false).unwrap();
-    let alpha = login.settings_ui.alpha();
+    let alpha = login.state.settings.alpha();
     assert!(alpha > 0. && alpha < 1.);
     login.close_settings(true);
-    assert_eq!(login.settings_ui.alpha(), alpha);
-    assert!(login.settings_ui.active());
+    assert_eq!(login.state.settings.alpha(), alpha);
+    assert!(login.egui.active());
     login.step(9945., true, false).unwrap();
-    assert!(!login.settings_ui.active());
+    assert!(!login.egui.active());
     assert_eq!(login.controls.focus(), Some(SETTINGS));
 }
 
@@ -409,13 +409,13 @@ fn native_settings_uses_the_shared_picker_fade_durations() {
     for now in (9616..=10_000).step_by(16) {
         login.step(now as f64, true, false).unwrap();
     }
-    assert_eq!(login.settings_ui.alpha(), 1.);
+    assert_eq!(login.state.settings.alpha(), 1.);
     login.close_settings(true);
-    assert!(login.settings_ui.active());
+    assert!(login.egui.active());
     for now in (10_016..=10_320).step_by(16) {
         login.step(now as f64, true, false).unwrap();
     }
-    assert!(!login.settings_ui.active());
+    assert!(!login.egui.active());
     assert_eq!(login.controls.focus(), Some(SETTINGS));
 }
 
@@ -529,11 +529,160 @@ fn fractional_dpi_preserves_the_physical_viewport() {
     for (extent, dpr) in [([453, 945], 1.75), ([951, 1200], 1.1)] {
         login.prepare_host(extent, dpr, true, None).unwrap();
         let logical = login
-            .settings_ui
-            .context
+            .egui
+            .context()
+            .unwrap()
             .input(|input| input.viewport_rect().size());
         let physical = [logical.x, logical.y].map(|n| (n * dpr as f32).round() as u32);
         assert_eq!(physical, extent);
         assert!(logical.is_finite());
     }
+}
+
+fn adapter_key(login: &mut NativeLogin, key: egui::Key, pressed: bool, shift: bool) {
+    // egui-winit 0.37 leaves repeat detection to egui, even for native auto-repeat.
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed,
+            repeat: false,
+            modifiers: if shift {
+                egui::Modifiers::SHIFT
+            } else {
+                egui::Modifiers::NONE
+            },
+        }],
+        ..Default::default()
+    });
+}
+
+#[test]
+fn adapter_format_repeated_down_does_not_repeat_activation_or_traversal() {
+    for key in [egui::Key::Space, egui::Key::Enter] {
+        let mut login = settled();
+        login.open_settings(true);
+        adapter_key(&mut login, key, true, false);
+        assert_eq!(login.state.settings.preferences().quality, Q::Low);
+        for _ in 0..10 {
+            adapter_key(&mut login, key, true, false);
+        }
+        assert_eq!(login.state.settings.preferences().quality, Q::Low);
+        adapter_key(&mut login, key, false, false);
+        adapter_key(&mut login, key, true, false);
+        assert_eq!(login.state.settings.preferences().quality, Q::High);
+    }
+    let mut login = settled();
+    login.open_settings(true);
+    adapter_key(&mut login, egui::Key::Tab, true, false);
+    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    for _ in 0..10 {
+        adapter_key(&mut login, egui::Key::Tab, true, false);
+    }
+    assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
+    adapter_key(&mut login, egui::Key::Tab, false, false);
+    adapter_key(&mut login, egui::Key::Tab, true, true);
+    assert_eq!(login.settings_ui.focused(), Some(QUALITY));
+}
+
+#[test]
+fn held_opener_and_blur_do_not_create_activation_in_the_next_owner() {
+    let mut login = settled();
+    assert!(!login.egui.initialized());
+    login
+        .egui
+        .window
+        .key(&Key::Named(NamedKey::Enter), ElementState::Pressed);
+    login.open_settings(true);
+    assert!(login.egui.initialized());
+    for _ in 0..3 {
+        adapter_key(&mut login, egui::Key::Enter, true, false);
+    }
+    assert_eq!(login.state.settings.preferences().quality, Q::High);
+    adapter_key(&mut login, egui::Key::Enter, false, false);
+    adapter_key(&mut login, egui::Key::Enter, true, false);
+    assert_eq!(login.state.settings.preferences().quality, Q::Low);
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::WindowFocused(false)],
+        ..Default::default()
+    });
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::WindowFocused(true)],
+        ..Default::default()
+    });
+    login.focus(QUALITY);
+    adapter_key(&mut login, egui::Key::Enter, true, false);
+    assert_eq!(login.state.settings.preferences().quality, Q::High);
+}
+
+#[test]
+fn modal_cursor_handoff_uses_the_latest_physical_position_without_another_move() {
+    use winit::{
+        dpi::{PhysicalPosition, PhysicalSize},
+        event::{DeviceId, WindowEvent},
+    };
+    let mut login = settled();
+    login.prepare([960, 540], true, None).unwrap();
+    let opener = login
+        .panel
+        .resolve([960., 540.])
+        .unwrap()
+        .into_iter()
+        .find(|r| r.control.id == SETTINGS)
+        .unwrap()
+        .rect;
+    let start = [opener.x + opener.width / 2., opener.y + opener.height / 2.];
+    let moved = |p: [f64; 2]| WindowEvent::CursorMoved {
+        device_id: DeviceId::dummy(),
+        position: PhysicalPosition::new(p[0], p[1]),
+    };
+    assert!(
+        login
+            .egui
+            .route_window_event(&moved(start), 1., |_| panic!(
+                "closed owner translated input"
+            ))
+            .is_none()
+    );
+    login.pointer(login.egui.window.cursor(), Some(true), true);
+    login.pointer(login.egui.window.cursor(), Some(false), true);
+    for now in (9616..=10_000).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    let done = point(&login, DONE, [960., 540.]);
+    assert_eq!(
+        login
+            .egui
+            .route_window_event(&moved(done), 1., |host| host.window.cursor()),
+        Some(slither_client::desktop_input::mouse_client_position(
+            done, 1.
+        ))
+    );
+    let resize = WindowEvent::Resized(PhysicalSize::new(1920, 1080));
+    assert_eq!(login.egui.window.physical_cursor(), Some(done));
+    assert_eq!(
+        login
+            .egui
+            .route_window_event(&resize, 2., |host| host.window.cursor()),
+        Some(slither_client::desktop_input::mouse_client_position(
+            done, 2.
+        ))
+    );
+    login.egui.route_window_event(&resize, 1., |_| ());
+    assert_eq!(login.egui.window.physical_cursor(), Some(done));
+    login.pointer(login.egui.window.cursor(), Some(true), true);
+    login.pointer(login.egui.window.cursor(), Some(false), true);
+    for now in (10_016..=10_400).step_by(16) {
+        login.step(now as f64, true, false).unwrap();
+    }
+    login.prepare([960, 540], true, None).unwrap();
+    assert!(!login.state.settings.visible());
+    assert_eq!(
+        login.egui.window.cursor(),
+        slither_client::desktop_input::mouse_client_position(done, 1.)
+    );
+    login.pointer(login.egui.window.cursor(), Some(true), true);
+    login.pointer(login.egui.window.cursor(), Some(false), true);
+    assert!(!login.state.settings.is_open());
 }

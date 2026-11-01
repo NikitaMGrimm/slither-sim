@@ -146,7 +146,6 @@ mod desktop {
     }
     struct Running {
         login: NativeLogin,
-        settings_input: egui_winit::State,
         endpoint: Option<String>,
         official: bool,
         server: Option<String>,
@@ -155,8 +154,6 @@ mod desktop {
         game: LocalGame,
         transport: Transport,
         started: Instant,
-        cursor: [f64; 2],
-        cursor_physical: Option<[f64; 2]>,
         cursor_generation: Option<u32>,
         preparation: Option<Preparation>,
         directory: Option<DirectoryPreparation>,
@@ -583,12 +580,13 @@ mod desktop {
                 // Menu callbacks need not reach Game::pointer. Seed the zoom
                 // source at ownership handoff, re-normalizing physical position
                 // with current DPR; leave admitted stock input untouched.
-                if let Some(cursor) = self.cursor_physical {
+                if let Some(cursor) = self.login.egui.window.physical_cursor() {
                     window.observe_cursor(&mut self.game, cursor)?;
                 } else {
                     let [width, height] = window.css_size();
+                    let cursor = self.login.egui.window.cursor();
                     self.game
-                        .observe_cursor(self.cursor[0], self.cursor[1], width, height)?;
+                        .observe_cursor(cursor[0], cursor[1], width, height)?;
                 }
             }
             self.game
@@ -610,10 +608,8 @@ mod desktop {
                 physical.map(|n| f64::from(n) / dpr),
                 self.game.bank.cosmetics.as_mut(),
             )?;
-            if self.login.settings_ui.active() {
-                self.login
-                    .settings_ui
-                    .input(self.settings_input.take_egui_input(&self.window));
+            if let Some(input) = self.login.egui.take_window_input(|| self.window.as_ref()) {
+                self.login.egui.input(input);
             }
             let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
@@ -663,11 +659,11 @@ mod desktop {
             }
             latency::picture("pre_present_notify");
             self.window.pre_present_notify();
-            match self.host.present_with_settings(
+            match self.host.present_with_menu(
                 &picture.frame,
                 picture.overlay.as_ref(),
                 window.requested,
-                &mut self.login.settings_ui,
+                &mut self.login.egui,
             ) {
                 Ok(true) => {
                     if composed.is_some() && self.login.studio.state.visible() {
@@ -695,15 +691,7 @@ mod desktop {
                     return Err(e);
                 }
             }
-            if let Some(output) = self.login.settings_ui.platform_output() {
-                if self.login.settings_ui.active() {
-                    self.settings_input
-                        .handle_platform_output(&self.window, output);
-                } else {
-                    // Late egui output must not change the returning editor's IME.
-                    self.window.set_cursor(winit::window::CursorIcon::Default);
-                }
-            }
+            self.login.egui.platform_output(&self.window);
             self.effects()?;
             Ok(())
         }
@@ -752,7 +740,7 @@ mod desktop {
                 dpr: self.window.scale_factor(),
                 requested: self.login.state.settings.preferences().resolution,
             }
-            .pointer(&mut self.game, self.cursor, down)
+            .pointer(&mut self.game, self.login.egui.window.cursor(), down)
         }
     }
     pub struct App {
@@ -841,16 +829,7 @@ mod desktop {
                     .state
                     .reset_editor(slither_client::server_picker::ADDRESS_EDITOR, address);
             }
-            let settings_input = egui_winit::State::new(
-                login.settings_ui.context.clone(),
-                egui::ViewportId::ROOT,
-                window.as_ref(),
-                Some(window.scale_factor() as f32),
-                None,
-                Some(host.renderer.device.limits().max_texture_dimension_2d as usize),
-            );
             Ok(Running {
-                settings_input,
                 login,
                 endpoint: options.endpoint.clone(),
                 official: options.official,
@@ -862,8 +841,6 @@ mod desktop {
                     let _ = proxy.send_event(TransportWake);
                 }),
                 started: Instant::now(),
-                cursor: [480., 270.],
-                cursor_physical: None,
                 cursor_generation: None,
                 preparation: None,
                 directory: None,
@@ -913,11 +890,11 @@ mod desktop {
             )
             .then(latency::callback);
             let result = (|| -> Result<()> {
-                // Capture even when the menu consumes the event below. Physical
-                // coordinates can be converted again after a DPR change.
-                if let WindowEvent::CursorMoved { position, .. } = &event {
-                    r.cursor_physical = Some([position.x, position.y]);
-                }
+                // Raw window state belongs to the host, before any modal can consume delivery.
+                let response = r
+                    .login
+                    .egui
+                    .window_event(&event, r.window.scale_factor(), || r.window.as_ref());
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
                     r.login.champion.input.modifiers(modifiers.state());
@@ -939,21 +916,11 @@ mod desktop {
                         inactive.window_event(&event);
                     }
                 }
-                let response = r.settings_input.on_window_event(&r.window, &event);
-                if matches!(
-                    event,
-                    WindowEvent::Resized(_)
-                        | WindowEvent::ScaleFactorChanged { .. }
-                        | WindowEvent::Focused(false)
-                ) {
-                    let _ = r.settings_input.take_egui_input(&r.window);
-                    r.login.settings_ui.cancel_pointer();
-                }
-                if r.login.settings_ui.active() {
+                if r.login.egui.active() {
                     if response.repaint {
                         r.schedule.invalidate();
                     }
-                    if matches!(
+                    let input_event = matches!(
                         event,
                         WindowEvent::KeyboardInput { .. }
                             | WindowEvent::CursorMoved { .. }
@@ -961,17 +928,21 @@ mod desktop {
                             | WindowEvent::MouseInput { .. }
                             | WindowEvent::MouseWheel { .. }
                             | WindowEvent::Ime(_)
-                    ) {
-                        // Preserve callback order for quick toggle/key pairs,
-                        // rather than coalescing their activations into one frame.
-                        r.login
-                            .settings_input(r.settings_input.take_egui_input(&r.window));
+                    );
+                    if (input_event
+                        || matches!(
+                            event,
+                            WindowEvent::Focused(_) | WindowEvent::ModifiersChanged(_)
+                        ))
+                        && let Some(input) = r.login.egui.take_window_input(|| r.window.as_ref())
+                    {
+                        r.login.settings_input(input);
+                    }
+                    if input_event {
                         r.game.mouse_up();
                         r.schedule.invalidate();
                         return Ok(());
                     }
-                } else {
-                    let _ = r.settings_input.take_egui_input(&r.window);
                 }
                 let mapped = if r.login.picker.policy.visible() {
                     r.login.picker.event(&event)
@@ -1049,14 +1020,11 @@ mod desktop {
                             r.schedule.invalidate();
                         }
                     }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        let d = r.window.scale_factor();
-                        r.cursor = slither_client::desktop_input::mouse_client_position(
-                            [position.x, position.y],
-                            d,
-                        );
-                        if r.login.intercepts_pointer(r.cursor) {
-                            let effects = r.login.pointer(r.cursor, None, admission);
+                    WindowEvent::CursorMoved { .. } => {
+                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
+                            let effects =
+                                r.login
+                                    .pointer(r.login.egui.window.cursor(), None, admission);
                             r.edit_effects(effects);
                         } else {
                             r.pointer(false)?;
@@ -1067,9 +1035,9 @@ mod desktop {
                         button: MouseButton::Left,
                         ..
                     } => {
-                        if r.login.intercepts_pointer(r.cursor) {
+                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
                             let effects = r.login.pointer(
-                                r.cursor,
+                                r.login.egui.window.cursor(),
                                 Some(state == ElementState::Pressed),
                                 admission,
                             );

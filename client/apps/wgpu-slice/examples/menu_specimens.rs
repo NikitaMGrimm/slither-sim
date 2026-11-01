@@ -690,7 +690,7 @@ fn settings_trial(output: &Path, renderer: &mut Renderer) -> Result<()> {
             }
             renderer.sync_resources(&picture.resources)?;
             renderer.render_overlay(&picture.frame, &target)?;
-            login.settings_ui.paint(renderer, &target);
+            login.egui.paint(renderer, &target);
             frame_times.push(start.elapsed().as_nanos() as u64);
             renderer
                 .device
@@ -1107,7 +1107,7 @@ fn capture_settings(
         frame.draws.insert(0, backdrop.clone());
     }
     let pixels = readback_with(renderer, &frame, &picture.resources, None, |r, v| {
-        login.settings_ui.paint(r, v)
+        login.egui.paint(r, v)
     })?;
     image::save_buffer(
         path,

@@ -1,5 +1,14 @@
 # Native egui Settings trial — 2026-11-01
 
+> Historical trial at `ee203f6ab3347438c36df09c67c318cbab8058c3`. The measurements,
+> source/image hashes and conclusions below describe that revision, before the
+> shared host and input fixes. Independent review subsequently found native
+> repeat handling, cursor handoff and inactive-allocation defects that the trial
+> tests did not cover. Those corrections have separate regressions in PR #404.
+> The owner later preferred the native egui screen and chose it as the foundation
+> for migrating native menus; this adoption decision does not extend the measured
+> performance, GPU or IME evidence. Original results and failed attempts remain.
+
 This trial replaces one native screen while retaining the existing settings
 model, record format, immediate preference updates, persistence adapter and Play
 snapshot. Other native menus retain the old toolkit; browser menus retain their
@@ -20,7 +29,7 @@ Settings model/view changes and native input, font and GPU integration together.
 The Settings-only layout and legacy Toggle rendering/input plumbing are removed.
 The old panel slicer remains because the server picker uses it. Dependencies,
 lockfile, tests, documentation and these trial notes are excluded from that code count;
-the per-file counts are in [measurements.json](egui-settings-trial/measurements.json). Coexistence
+the per-file counts are in [measurements.json](measurements.json). Coexistence
 charges all egui integration/custom chrome to this screen; it does not remove the
 roughly 9k-line toolkit still used by other menus.
 
@@ -161,7 +170,8 @@ wgpu 30.0.1 and one winit 0.30.13. Their published license is MIT OR Apache-2.0:
 [egui-wgpu](https://docs.rs/crate/egui-wgpu/0.37.0),
 [egui-winit](https://docs.rs/crate/egui-winit/0.37.0).
 
-[licenses.json](egui-settings-trial/licenses.json) records all 34 new lockfile packages. Permissive
+The current note at `client/docs/egui-licenses.md` replaces the generated
+34-package licence ledger after independent manifest verification. Permissive
 MIT/Apache choices are available, including Apache-2.0 for `self_cell` (its GPL
 alternative is not selected). `unicode-properties` also requires Unicode-3.0
 notices. Apple-only lockfile additions were checked from their crate manifests.
@@ -183,9 +193,9 @@ was commissioned.
 ## Reproduce and source pins
 
 Baseline: `3de1ebcfba4b87bc942de4fc893f1440747b4b58` plus the selected
-[baseline instrumentation patch](egui-settings-trial/baseline-harness.patch). The final implementation
+[baseline instrumentation patch](baseline-harness.patch). The final implementation
 and build-input file digests, binary digests, per-file line counts, all ten run
-summaries and PNG digests are in [measurements.json](egui-settings-trial/measurements.json).
+summaries and PNG digests are in [measurements.json](measurements.json).
 The baseline patch retains equivalent instrumentation for the old code; it is
 not applied to the trial. The preserved measured executable is identified by its
 digest, rather than asserting deterministic reproduction of linker bytes.

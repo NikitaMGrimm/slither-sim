@@ -16,6 +16,7 @@ use slither_client::{
 };
 
 pub struct NativeLogin {
+    pub egui: crate::egui_native::NativeEguiHost,
     pub settings_ui: crate::settings_egui::SettingsUi,
     settings_storage: crate::menu_storage::SettingsStorage,
     pub studio: crate::skin_studio_native::SkinStudioNative,
@@ -86,7 +87,8 @@ impl NativeLogin {
         let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         let panel = login_controls::panel(&state.view(true), &layout, [960., 540.]);
         Ok(Self {
-            settings_ui: crate::settings_egui::SettingsUi::new()?,
+            egui: Default::default(),
+            settings_ui: Default::default(),
             settings_storage: crate::menu_storage::SettingsStorage::at(None),
             studio: crate::skin_studio_native::SkinStudioNative::new(record, storage)?,
             input,
@@ -115,7 +117,8 @@ impl NativeLogin {
         self.studio.step(now);
         let settings_visible = self.state.settings.visible();
         self.state.settings.step(now).map_err(str::to_owned)?;
-        self.settings_ui.step(now, &self.state.settings);
+        self.egui.step(now);
+        self.egui.set_active(self.state.settings.visible());
         if let Some(record) = self.state.settings.take_write() {
             self.state
                 .settings
@@ -218,7 +221,7 @@ impl NativeLogin {
         effects
     }
     fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
-        if self.settings_ui.active() || self.state.settings.visible() {
+        if self.egui.active() || self.state.settings.visible() {
             if self.state.settings.visible() {
                 self.controls.blur();
             }
@@ -273,7 +276,9 @@ impl NativeLogin {
     }
     pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
         if self.state.settings.visible() {
-            self.settings_ui.focus(focus);
+            self.settings_ui.request_focus(focus);
+            self.egui.focus(crate::settings_egui::widget_id(focus));
+            self.settings_frame();
             return Vec::new();
         }
         self.controls.set_focus(focus);
@@ -294,7 +299,12 @@ impl NativeLogin {
         }
         let view = self.state.view(admission);
         if self.state.settings.open(&view) {
-            self.settings_ui.sync(&self.state.settings);
+            self.egui.set_active(self.state.settings.visible());
+            self.settings_ui
+                .request_focus(slither_client::settings::QUALITY);
+            self.egui.focus(crate::settings_egui::widget_id(
+                slither_client::settings::QUALITY,
+            ));
             self.settings_frame();
             self.settings_frame();
             let mut effects = self.input.state.apply(EditIntent::Modal(true));
@@ -306,7 +316,7 @@ impl NativeLogin {
     }
     pub fn close_settings(&mut self, admission: bool) -> Vec<HostEditEffect> {
         self.state.settings.close();
-        self.settings_ui.sync(&self.state.settings);
+        self.egui.set_active(self.state.settings.visible());
         let mut effects = Vec::new();
         if !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
@@ -317,10 +327,11 @@ impl NativeLogin {
     }
     fn settings_frame(&mut self) {
         let open = self.state.settings.is_open();
-        self.settings_ui.frame(
-            &mut self.state.settings,
+        self.egui.frame(
             self.area.map(|n| (n * self.pixel_scale).round() as u32),
             self.pixel_scale,
+            &crate::settings_egui::focus_order(),
+            |ctx, reveal| self.settings_ui.show(ctx, &mut self.state.settings, reveal),
         );
         if open && !self.state.settings.is_open() {
             self.close_settings(true);
@@ -328,7 +339,7 @@ impl NativeLogin {
     }
     /// Authored input and the native egui-winit adapter feed the same widget tree.
     pub fn settings_input(&mut self, input: egui::RawInput) {
-        self.settings_ui.input(input);
+        self.egui.input(input);
         self.settings_frame();
     }
     fn settings_key(&mut self, key: egui::Key) {
@@ -406,7 +417,7 @@ impl NativeLogin {
         admission: bool,
     ) -> crate::menu_input_native::NativeInputResult {
         use winit::event::WindowEvent;
-        if self.settings_ui.active()
+        if self.egui.active()
             && matches!(
                 event,
                 WindowEvent::Focused(false)
@@ -414,7 +425,7 @@ impl NativeLogin {
                     | WindowEvent::ScaleFactorChanged { .. }
             )
         {
-            self.settings_ui.cancel_pointer();
+            self.egui.cancel_pointer();
         }
         if matches!(event, WindowEvent::Focused(false)) {
             self.controls.blur();
@@ -477,7 +488,7 @@ impl NativeLogin {
         {
             self.controls.keyboard_navigation();
         }
-        if self.settings_ui.active() || self.state.settings.visible() {
+        if self.egui.active() || self.state.settings.visible() {
             if event.state == ElementState::Pressed && !event.repeat {
                 let key = match event.logical {
                     Key::Named(NamedKey::Escape) => Some(egui::Key::Escape),
@@ -619,7 +630,7 @@ impl NativeLogin {
         down: Option<bool>,
         admission: bool,
     ) -> Vec<HostEditEffect> {
-        if self.settings_ui.active() || self.state.settings.visible() {
+        if self.egui.active() || self.state.settings.visible() {
             let pos = egui::pos2(point[0] as f32, point[1] as f32);
             let mut events = vec![egui::Event::PointerMoved(pos)];
             if let Some(pressed) = down {
@@ -745,7 +756,7 @@ impl NativeLogin {
         self.studio.viewport = area;
         let resized = area != self.area || dpr != self.pixel_scale;
         if resized {
-            self.settings_ui.cancel_pointer();
+            self.egui.cancel_pointer();
             self.controls.blur();
         }
         self.pixel_scale = dpr;
@@ -756,13 +767,14 @@ impl NativeLogin {
         }
         self.layout = fresh;
         self.area = area;
-        self.settings_ui.sync(&self.state.settings);
-        if self.settings_ui.active() {
+        self.egui.set_active(self.state.settings.visible());
+        if self.egui.active() {
             self.settings_frame();
-            if self.settings_ui.alpha() == 1. {
+            self.egui.check_error()?;
+            if self.state.settings.alpha() == 1. {
                 return MenuFrame::world_crossfade(extent, dpr, 0.);
             }
-            view.login_alpha *= 1. - self.settings_ui.alpha();
+            view.login_alpha *= 1. - self.state.settings.alpha();
             return self
                 .menu
                 .prepare(&mut self.text, &view, &self.layout, extent, dpr, cosmetics);
