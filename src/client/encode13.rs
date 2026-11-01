@@ -423,3 +423,6 @@ fn minimap(map: &Minimap) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod shared_reader_tests;

@@ -1,4 +1,4 @@
-//! A tokenized, closed grammar for the two-literal string-copy challenge family.
+//! Bounded, closed grammars for the string-copy challenge family.
 //!
 //! Unknown programs are rejected; no source is evaluated or interpreted generally.
 
@@ -35,7 +35,7 @@ pub fn vlither_27(encoded: &[u8], grammar: Grammar) -> Result<[u8; 27], Challeng
     rotate(&mut reply, 2);
     Ok(reply)
 }
-fn rotate(reply: &mut [u8; 27], step: i32) {
+fn rotate(reply: &mut [u8], step: i32) {
     let mut rotation = 0;
     for (index, byte) in reply.iter_mut().enumerate() {
         let (base, upper) = if *byte >= b'a' {
@@ -125,6 +125,18 @@ pub fn ntl_legacy_24(encoded: &[u8]) -> Result<[u8; 24], ChallengeError> {
 /// accepted. Whitespace between tokens is allowed. Literal contents are runtime
 /// input, not credentials embedded in the library.
 pub fn literal_27(encoded: &[u8], grammar: Grammar) -> Result<[u8; 27], ChallengeError> {
+    let mut source_buffer = [0_u8; MAX_SOURCE_BYTES];
+    let source = decode_source(encoded, &mut source_buffer)?;
+    if grammar == Grammar::ExactTemplate {
+        return exact_literals(source);
+    }
+    stock_literals(source)
+}
+
+fn decode_source<'a>(
+    encoded: &[u8],
+    source_buffer: &'a mut [u8; MAX_SOURCE_BYTES],
+) -> Result<&'a [u8], ChallengeError> {
     if encoded.is_empty()
         || encoded.len() > MAX_SOURCE_BYTES * 2
         || !encoded.len().is_multiple_of(2)
@@ -135,7 +147,6 @@ pub fn literal_27(encoded: &[u8], grammar: Grammar) -> Result<[u8; 27], Challeng
             offset: 0,
         });
     }
-    let mut source_buffer = [0_u8; MAX_SOURCE_BYTES];
     let mut key = 23_u8;
     let mut high = 0;
     for (index, &letter) in encoded.iter().enumerate() {
@@ -153,10 +164,10 @@ pub fn literal_27(encoded: &[u8], grammar: Grammar) -> Result<[u8; 27], Challeng
         }
         key = (key + 17) % 26;
     }
-    let source = &source_buffer[..encoded.len() / 2];
-    if grammar == Grammar::ExactTemplate {
-        return exact_literals(source);
-    }
+    Ok(&source_buffer[..encoded.len() / 2])
+}
+
+fn stock_literals(source: &[u8]) -> Result<[u8; 27], ChallengeError> {
     let mut parser = Parser { source, offset: 0 };
     parser.tokens(&["var", "a", "="])?;
     let first = parser.literal(5)?;
@@ -204,12 +215,137 @@ pub fn literal_27(encoded: &[u8], grammar: Grammar) -> Result<[u8; 27], Challeng
     Ok(reply)
 }
 
+/// A reply to the general copy-loop grammar. Only `as_bytes()` is transmitted;
+/// unused capacity is private. Its capacity shares the decoded-source bound.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CopyLoopReply {
+    bytes: [u8; MAX_SOURCE_BYTES],
+    len: usize,
+}
+impl CopyLoopReply {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+/// Solve one or more nonempty printable ASCII literals followed by exactly one
+/// `for(var i=0;i<N;i++)` copy into `idba[i]`, with an optional braced body.
+/// Literals may use either quote, but cannot contain that delimiter or a
+/// backslash. Token whitespace is allowed. N has 1..=3 decimal digits, no
+/// leading zero and must equal the concatenated length. No code is evaluated.
+///
+/// Uses the stock start-3/step-4 rotation over N bytes, including JS signed
+/// remainder. This is opt-in: the stock and simulator admission APIs retain
+/// their existing grammars. Errors count encoded payload bytes, like `stock`.
+pub fn copy_loop(encoded: &[u8]) -> Result<CopyLoopReply, ChallengeError> {
+    let mut source_buffer = [0; MAX_SOURCE_BYTES];
+    let source = decode_source(encoded, &mut source_buffer)?;
+    let mut parser = Parser { source, offset: 0 };
+    parser.tokens(&["var", "a", "="])?;
+    let mut reply = CopyLoopReply {
+        bytes: [0; MAX_SOURCE_BYTES],
+        len: 0,
+    };
+    loop {
+        let literal = parser.copy_literal()?;
+        // Literals are disjoint slices of the bounded source, so their total
+        // length cannot exceed capacity.
+        reply.bytes[reply.len..reply.len + literal.len()].copy_from_slice(literal);
+        reply.len += literal.len();
+        parser.tokens(&[";"])?;
+        parser.whitespace();
+        if parser.source.get(parser.offset) != Some(&b'a') {
+            break;
+        }
+        parser.tokens(&["a", "+="])?;
+    }
+    parser.tokens(&["for", "(", "var", "i", "=", "0", ";", "i", "<"])?;
+    parser.whitespace();
+    let count_offset = parser.offset;
+    if parser.count()? != reply.len {
+        return Err(error(count_offset * 2, ErrorKind::Literal));
+    }
+    parser.tokens(&[";", "i", "++", ")"])?;
+    parser.whitespace();
+    let braced = parser.source.get(parser.offset) == Some(&b'{');
+    if braced {
+        parser.tokens(&["{"])?;
+    }
+    parser.tokens(&[
+        "idba",
+        "[",
+        "i",
+        "]",
+        "=",
+        "a",
+        ".",
+        "charCodeAt",
+        "(",
+        "i",
+        ")",
+        ";",
+    ])?;
+    if braced {
+        parser.tokens(&["}"])?;
+    }
+    parser.whitespace();
+    if parser.offset != source.len() {
+        return Err(error(parser.offset * 2, ErrorKind::Syntax));
+    }
+    rotate(&mut reply.bytes[..reply.len], 4);
+    Ok(reply)
+}
+
 struct Parser<'a> {
     source: &'a [u8],
     offset: usize,
 }
 
 impl<'a> Parser<'a> {
+    fn copy_literal(&mut self) -> Result<&'a [u8], ChallengeError> {
+        self.whitespace();
+        let quote = match self.source.get(self.offset) {
+            Some(&quote @ (b'"' | b'\'')) => quote,
+            _ => return Err(error(self.offset * 2, ErrorKind::Literal)),
+        };
+        let start = self.offset + 1;
+        self.offset = start;
+        while let Some(&c) = self.source.get(self.offset) {
+            if c == quote {
+                if self.offset == start {
+                    return Err(error(self.offset * 2, ErrorKind::Literal));
+                }
+                let literal = &self.source[start..self.offset];
+                self.offset += 1;
+                return Ok(literal);
+            }
+            if !(b' '..=b'~').contains(&c) || c == b'\\' {
+                return Err(error(self.offset * 2, ErrorKind::Literal));
+            }
+            self.offset += 1;
+        }
+        Err(error(self.offset * 2, ErrorKind::Literal))
+    }
+
+    fn count(&mut self) -> Result<usize, ChallengeError> {
+        self.whitespace();
+        let start = self.offset;
+        while self.source.get(self.offset).is_some_and(u8::is_ascii_digit) {
+            self.offset += 1;
+        }
+        let digits = &self.source[start..self.offset];
+        if digits.is_empty() || digits[0] == b'0' || digits.len() > 3 {
+            return Err(error(start * 2, ErrorKind::Syntax));
+        }
+        Ok(digits.iter().fold(0, |n, c| n * 10 + usize::from(c - b'0')))
+    }
+
     fn whitespace(&mut self) {
         while self
             .source

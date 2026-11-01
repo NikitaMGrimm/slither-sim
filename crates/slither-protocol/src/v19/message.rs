@@ -69,13 +69,15 @@ pub fn setup_protocol_version(p: &[u8], admission: DecodeAdmission) -> Result<u8
     Ok(p[23])
 }
 fn setup(p: &[u8], admission: DecodeAdmission) -> Result<SetupRef<'_>, DecodeError> {
+    setup_for_version(p, admission, PROTOCOL_VERSION)
+}
+pub(crate) fn setup_for_version(
+    p: &[u8],
+    admission: DecodeAdmission,
+    version: u8,
+) -> Result<SetupRef<'_>, DecodeError> {
     let protocol = setup_protocol_version(p, admission)?;
-    require(
-        p,
-        protocol == PROTOCOL_VERSION,
-        23,
-        ErrorKind::UnsupportedVersion,
-    )?;
+    require(p, protocol == version, 23, ErrorKind::UnsupportedVersion)?;
     let s = SetupRef {
         command: p,
         protocol,
