@@ -382,15 +382,12 @@ export function setupRenderSmoke(wasm, { fixture, appearance, vanillaEyes, eq, o
     if (path === 'standard') {
       const catalog = harness(path);
       try {
-        // Twenty-four face-only recipes observe eight distinct catalog IDs
-        // each. The 513th recipe crosses 4096 entries during Setup 22, with
-        // zero curve samples/body images and far below the area/draw ceilings.
+        // Repeated catalogs above the former 4096-entry aggregate ceiling fit
+        // the new population-derived metadata budget with shared sources.
         catalog.legacyApply(bundle(setup(), ...Array.from({ length: 24 }, shortFace)));
         catalog.resize(); catalog.target.context.trace = []; catalog.requests.length = 0;
-        const failure = catalog.atomic(() => catalog.apply(bundle(...setups(32))),
-          'body catalog observations share one pool across all Setup plans');
-        eq(failure, 'frame catalog budget exceeded');
-        eq(catalog.requests.length, 513, 'catalog capacity is reached before the new draw ceiling');
+        eq(catalog.apply(bundle(...setups(32))), 32);
+        eq(catalog.requests.length, 24 * 32);
       } finally { catalog.close(); }
     }
 

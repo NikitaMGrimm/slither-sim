@@ -57,7 +57,10 @@ fn validate(
         || camera_x.abs() > 16_777_215.
         || camera_y.abs() > 16_777_215.
         || !zoom.is_finite()
-        || !(0.05..=8.).contains(&zoom)
+        // Whole-map views can be smaller than the former 0.05 floor. Target
+        // pixels and planned commands, rather than world scale, bound the work.
+        || zoom <= 0.
+        || zoom > 8.
     {
         return Err(error("invalid scene camera or zoom"));
     }

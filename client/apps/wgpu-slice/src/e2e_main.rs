@@ -18,6 +18,7 @@ mod probe {
     use std::time::{Duration, Instant};
 
     const EXTENT: [u32; 2] = [960, 540];
+    const MAP_CAMERA_MOTION_MIN_UNITS: f64 = 1.;
 
     #[derive(Default)]
     struct Summary {
@@ -36,13 +37,44 @@ mod probe {
         leaderboard: bool,
         minimap: bool,
         pictures: u64,
+        peak_received: usize,
+        peak_prepared: usize,
+        skipped: u64,
+        full_map: bool,
+        best_map_overflow: Option<f64>,
+        worst_map_overflow: Option<f64>,
+        map_fit_samples: usize,
+        map_camera_origin: Option<Point>,
+        map_camera_max_displacement: f64,
         closed: bool,
         baseline: Option<(Point, f64, f64)>,
         peak_speed: f64,
     }
     impl Summary {
+        fn observe_map_fit(&mut self, overflow: f64, position: Point) {
+            let origin = *self.map_camera_origin.get_or_insert(position);
+            self.map_camera_max_displacement = self
+                .map_camera_max_displacement
+                .max((position.x - origin.x).hypot(position.y - origin.y));
+            self.map_fit_samples += 1;
+            self.best_map_overflow =
+                Some(self.best_map_overflow.map_or(overflow, |p| p.min(overflow)));
+            self.worst_map_overflow = Some(
+                self.worst_map_overflow
+                    .map_or(overflow, |p| p.max(overflow)),
+            );
+            self.full_map = self.worst_map_overflow.is_some_and(|p| p <= 1e-6);
+        }
+        fn map_camera_moved(&self) -> bool {
+            self.map_camera_max_displacement > MAP_CAMERA_MOTION_MIN_UNITS
+        }
         fn observe(&mut self, game: &LocalGame, active: f64) -> Result<()> {
             let state = game.client().received();
+            self.peak_received = self.peak_received.max(state.snakes.len());
+            self.skipped = game.draw_diagnostics.skipped_frames;
+            if self.skipped != 0 {
+                return Err("presentation: picture skipped".into());
+            }
             if let Some(setup) = &state.setup {
                 self.protocol = setup.protocol;
             }
@@ -77,7 +109,7 @@ mod probe {
         }
         fn print(&self, seconds: f64) {
             println!(
-                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"seconds\":{:.3}}}",
+                "{{\"websocket\":{},\"challenge\":{},\"loginSent\":{},\"protocol\":{},\"setup\":{},\"ownSnake\":{},\"steeringCommands\":{},\"boostOn\":{},\"boostOff\":{},\"moved\":{},\"turned\":{},\"accelerated\":{},\"decelerated\":{},\"leaderboard\":{},\"minimap\":{},\"preparedFrames\":{},\"cleanClose\":{},\"peakReceivedSnakes\":{},\"peakPreparedSnakes\":{},\"pictureSkips\":{},\"fullMap\":{},\"mapFitSamples\":{},\"bestMapOverflowPixels\":{},\"worstMapOverflowPixels\":{},\"mapCameraMoved\":{},\"mapCameraMaxDisplacementWorldUnits\":{},\"seconds\":{:.3}}}",
                 self.opened,
                 self.challenge,
                 self.login,
@@ -95,6 +127,19 @@ mod probe {
                 self.minimap,
                 self.pictures,
                 self.closed,
+                self.peak_received,
+                self.peak_prepared,
+                self.skipped,
+                self.full_map,
+                self.map_fit_samples,
+                self.best_map_overflow
+                    .map_or("null".to_owned(), |p| p.to_string()),
+                self.worst_map_overflow
+                    .map_or("null".to_owned(), |p| p.to_string()),
+                self.map_camera_moved(),
+                self.map_camera_origin.map_or("null".to_owned(), |_| self
+                    .map_camera_max_displacement
+                    .to_string()),
                 seconds
             );
         }
@@ -107,6 +152,7 @@ mod probe {
         started: Instant,
         playing: Option<Instant>,
         legacy: bool,
+        full_map_requested: bool,
     }
     impl Host {
         fn now(&self) -> f64 {
@@ -152,12 +198,34 @@ mod probe {
         }
         fn pictures(&mut self) -> Result<()> {
             for _ in 0..16 {
-                let Some(_picture) = self.game.take_frame() else {
+                let Some(picture) = self.game.take_frame() else {
                     return Ok(());
                 };
-                // CPU sink accepts the actual production prepared picture. This
-                // commits LocalGame's transaction, but makes no GPU/pixel claim.
+                self.summary.peak_prepared =
+                    self.summary.peak_prepared.max(picture.frame.snakes.len());
+                // Accept the picture before observing its committed camera;
+                // the candidate's draw transform is not yet in game.client().
                 self.game.presented(true)?;
+                // Only post-wheel committed pictures establish fit. An early
+                // Setup or a single lucky frame cannot accept the moving view.
+                if self.full_map_requested
+                    && self.playing.is_some()
+                    && let Some(setup) = &self.game.client().received().setup
+                {
+                    let camera = self.game.client().camera();
+                    let radius = setup
+                        .radius
+                        .max(self.game.client().boundary().map_or(0., |b| b.displayed()));
+                    let overflow = [camera.position().x, camera.position().y]
+                        .into_iter()
+                        .zip(EXTENT)
+                        .map(|(position, side)| {
+                            2. * (radius + (position - setup.grid_center).abs()) * camera.zoom()
+                                - f64::from(side)
+                        })
+                        .fold(0., f64::max);
+                    self.summary.observe_map_fit(overflow, camera.position());
+                }
                 self.summary.pictures += 1;
             }
             if self.game.has_frame() {
@@ -199,8 +267,12 @@ mod probe {
                 self.flush()?;
             }
             if self.game.phase() == Phase::Playing {
-                if self.summary.own {
-                    self.playing.get_or_insert_with(Instant::now);
+                if self.summary.own && self.playing.is_none() {
+                    // Wheel admission requires a playing, live own snake.
+                    if self.full_map_requested && !self.game.wheel_zoom(-1000.) {
+                        return Err("full-map: zoom admission rejected".into());
+                    }
+                    self.playing = Some(Instant::now());
                 }
                 let heading = self.summary.baseline.map_or(0., |(_, h, _)| h) + 0.8;
                 self.game.pointer(
@@ -284,6 +356,7 @@ mod probe {
             started,
             playing: None,
             legacy,
+            full_map_requested: std::env::var("SLITHER_CLIENT_E2E_FULL_MAP").as_deref() == Ok("1"),
         };
         host.game.play(&endpoint, "Local E2E", 0)?;
         let result = host.run(seconds);
@@ -294,6 +367,56 @@ mod probe {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn whole_map_requires_every_post_zoom_picture_to_fit() {
+            let mut summary = Summary::default();
+            assert_eq!(summary.map_fit_samples, 0);
+            assert_eq!(summary.best_map_overflow, None);
+            assert_eq!(summary.worst_map_overflow, None);
+            assert!(!summary.full_map);
+            summary.observe_map_fit(0., Point::default());
+            assert!(summary.full_map);
+            summary.observe_map_fit(3.56, Point { x: 2., y: 0. });
+            summary.observe_map_fit(0., Point { x: 4., y: 0. });
+            assert_eq!(summary.map_fit_samples, 3);
+            assert_eq!(summary.best_map_overflow, Some(0.));
+            assert_eq!(summary.worst_map_overflow, Some(3.56));
+            assert!(!summary.full_map);
+            assert!(summary.map_camera_moved());
+        }
+        #[test]
+        fn authored_motion_sequence_keeps_both_clipped_endpoints() {
+            let mut summary = Summary::default();
+            for (index, overflow) in [3.56, 0., 4.].into_iter().enumerate() {
+                summary.observe_map_fit(
+                    overflow,
+                    Point {
+                        x: index as f64 * 2.,
+                        y: 0.,
+                    },
+                );
+            }
+            assert_eq!(summary.map_fit_samples, 3);
+            assert_eq!(summary.best_map_overflow, Some(0.));
+            assert_eq!(summary.worst_map_overflow, Some(4.));
+            assert!(summary.map_camera_moved());
+            assert!(!summary.full_map);
+        }
+        #[test]
+        fn stationary_post_zoom_summary_does_not_prove_camera_motion() {
+            // Lifetime snake movement is deliberately true: it cannot stand
+            // in for camera movement during the fitted post-wheel pictures.
+            let mut summary = Summary {
+                moved: true,
+                ..Summary::default()
+            };
+            for _ in 0..3 {
+                summary.observe_map_fit(0., Point { x: 20., y: 30. });
+            }
+            assert!(summary.full_map);
+            assert_eq!(summary.map_camera_max_displacement, 0.);
+            assert!(!summary.map_camera_moved());
+        }
         #[test]
         fn server_arguments_keep_literal_loopback_and_time_bounds() {
             for port in [1, 80, 49152, 65535] {

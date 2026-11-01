@@ -20,10 +20,12 @@ At the centre this fits the diameter into the shorter viewport side. Away from
 the centre it also accounts for the camera offset, so the entire circle fits
 while the snake stays centred. The radius follows existing Setup/`z` state;
 while the displayed boundary contracts, use the larger of received and displayed
-radii to avoid clipping the easing boundary. A settled endpoint follows radius,
-viewport and stock-scale changes immediately.
+radii to avoid clipping the easing boundary. The explicit whole-map endpoint
+follows radius, camera motion, viewport and stock-scale changes immediately.
+It is a fit constraint: smoothing a moving endpoint can otherwise leave the
+limiting edge permanently clipped.
 
-The user factor interpolates in log space by 18% of the remaining distance per
+Away from that endpoint, the user factor interpolates in log space by 18% of the remaining distance per
 eligible draw, snapping within `1e-7` log units. It shares the stock camera's draw
 clock; retrying a frozen picture consumes no extra sample.
 Requests within `1e-12` of factor one normalize to exact stock zoom, so reciprocal

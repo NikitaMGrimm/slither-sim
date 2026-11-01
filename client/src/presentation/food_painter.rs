@@ -55,7 +55,7 @@ impl FoodCullBounds {
         [self.left, self.right, self.top, self.bottom]
     }
 
-    fn contains(self, point: Point) -> bool {
+    pub(super) fn contains(self, point: Point) -> bool {
         point.x >= self.left
             && point.x <= self.right
             && point.y >= self.top
@@ -266,7 +266,7 @@ fn validate_view(view: BodyPaintView) -> Result<(), FoodPaintError> {
     Ok(())
 }
 
-fn zoom_eligible(food: FoodSnapshot, zoom_factor: f64) -> bool {
+pub(super) fn zoom_eligible(food: FoodSnapshot, zoom_factor: f64) -> bool {
     zoom_factor >= 1. || {
         let width = if food.scale == 1. {
             f64::from(food.sources.body.asset().width)

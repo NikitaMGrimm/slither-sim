@@ -536,7 +536,7 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
     }
     for (const [nodes, repeated] of [[8, false], [11, true]]) {
       const g = geometry(nodes); g.repeatedInnerStrokes = repeated;
-      const commands = Array.from({ length: 8 }, (_, i) => spawn(i, { x: 32540 + i, y: 32550, heading: 0 }));
+      const commands = Array.from({ length: 16 }, (_, i) => spawn(i, { x: 32540 + i, y: 32550, heading: 0 }));
       const f = make({ lane, g, commands, factories: true });
       const compact = f => {
         f.metadata.runs = [{ palette: 0, count: 1 }];
@@ -549,24 +549,24 @@ export function antennaRenderSmoke(wasm, { fixture, vanillaEyes, eq, ok, rejects
         f.setRandom(r => { const tape = new Float64Array(2 * r.randomPairCount).fill(0.5);
           f.randomRequests.push({ request: structuredClone(r), tape }); return tape; });
         f.clear(); eq(f.ingress(bundle(...Array.from({ length: 64 }, () => setup()))), 64);
-        eq(f.randomRequests.length, 512); eq(bulbImages(f).length, 512);
-        eq(antennaStrokes(f).length, repeated ? 2048 : 1024);
+        eq(f.randomRequests.length, 1024); eq(bulbImages(f).length, 1024);
+        eq(antennaStrokes(f).length, repeated ? 4096 : 2048);
         const vertexCount = antennaStrokes(f).filter((_, i) => i % (repeated ? 4 : 2) < 2)
           .reduce((total, p) => total + p.path.length, 0);
-        eq(vertexCount, 512 * nodes * 2, 'full-length paths reach the exact vertex accounting boundary');
-        eq(f.randomRequests.reduce((n, v) => n + v.tape.length, 0), 512 * (nodes - 1) * 2);
+        eq(vertexCount, 1024 * nodes * 2, 'full-length paths reach the exact vertex accounting boundary');
+        eq(f.randomRequests.reduce((n, v) => n + v.tape.length, 0), 1024 * (nodes - 1) * 2);
       } finally { f.close(); }
       const failed = make({ lane, g: structuredClone(g), commands, factories: true });
       compact(failed);
       try {
         failed.setRandom(r => { const tape = new Float64Array(2 * r.randomPairCount).fill(0.5);
           failed.randomRequests.push({ request: structuredClone(r), tape }); return tape; });
-        const error = failed.atomic(() => failed.ingress(bundle(...Array.from({ length: 63 }, () => setup()), spawn(8), setup())));
-        eq(String(error), 'retained presentation capacity exceeded', '513th eligible chain exceeds one shared ingress antenna budget');
-        eq(failed.randomRequests.length, nodes === 11 ? 512 : 513,
+        const error = failed.atomic(() => failed.ingress(bundle(...Array.from({ length: 63 }, () => setup()), spawn(16), setup())));
+        eq(String(error), 'retained presentation capacity exceeded', '1025th eligible chain exceeds one shared ingress antenna budget');
+        eq(failed.randomRequests.length, nodes === 11 ? 1024 : 1025,
           'random-unit cap precedes RNG; later output-cap failure retains external RNG consumption');
-        eq(failed.scene.antenna_state().snakes.length, 8, 'late Setup failure discards the newly staged ninth appearance');
-        failed.clear(); failed.draw(); eq(failed.randomRequests.length, 8, 'successful retry starts with the unconsumed model');
+        eq(failed.scene.antenna_state().snakes.length, 16, 'late Setup failure discards the newly staged seventeenth appearance');
+        failed.clear(); failed.draw(); eq(failed.randomRequests.length, 16, 'successful retry starts with the unconsumed model');
       } finally { failed.close(); }
     }
 

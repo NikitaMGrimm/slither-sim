@@ -21,6 +21,7 @@ fn usage(asset: usize) -> BodyAssetUse {
 }
 
 struct Fixture {
+    reduced: bool,
     samples: Vec<BodyPaintSample>,
     active_count: usize,
     seed: Point,
@@ -47,6 +48,7 @@ struct Fixture {
 impl Fixture {
     fn new(n: usize) -> Self {
         Self {
+            reduced: false,
             samples: (0..n)
                 .map(|i| BodyPaintSample {
                     ordinal: i,
@@ -159,6 +161,12 @@ impl Fixture {
             entry_alpha: self.entry_alpha,
             command_limit: self.limit,
         };
+        if self.reduced {
+            return slither_client::presentation::plan_reduced_body_with_storage(
+                input,
+                storage.unwrap_or_default(),
+            );
+        }
         if let Some(zoom_factor) = self.zoom_factor {
             return slither_client::presentation::plan_standard_body_with_zoom_and_storage(
                 input,
@@ -200,6 +208,44 @@ impl Fixture {
                 count: 1,
             },
         ];
+    }
+}
+
+#[test]
+fn reduced_rival_plan_connects_the_complete_curve_inside_its_exact_quota() {
+    for count in [2, 8, 96, 4096] {
+        let mut f = Fixture::new(count);
+        f.reduced = true;
+        f.limit = 2 * count - 1;
+        f.visual.dead = true;
+        f.visual.smoothed_speed = 8.;
+        let plan = f.plan().unwrap();
+        assert_eq!(plan.commands.len(), f.limit);
+        assert!(plan.commands.iter().all(|c| c.pass == Body));
+        assert_eq!(plan.antenna_barrier, plan.commands.len());
+        for segment in plan
+            .commands
+            .iter()
+            .filter(|c| c.destination.width > c.destination.height)
+        {
+            let i = segment.ordinal;
+            let a = f.samples[i - 1];
+            let b = f.samples[i];
+            let length = (f64::from(b.x - a.x)).hypot(f64::from(b.y - a.y)) * f.view.zoom;
+            assert!(segment.destination.width >= length);
+            assert_eq!(
+                segment.translation.x,
+                ((f64::from(a.x) + f64::from(b.x)) / 2. - f.view.camera.x) * f.view.zoom
+            );
+            assert_eq!(
+                segment.translation.y,
+                ((f64::from(a.y) + f64::from(b.y)) / 2. - f.view.camera.y) * f.view.zoom
+            );
+        }
+        f.limit -= 1;
+        assert!(f.plan().unwrap().commands.len() <= f.limit);
+        f.limit = 0;
+        assert!(f.plan().unwrap().commands.is_empty());
     }
 }
 

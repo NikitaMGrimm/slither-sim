@@ -404,14 +404,14 @@ export function mouthFaceRenderSmoke(wasm) {
       f.scene.apply_frame_with_face_presentation(appearancePacket(), false, () => numeric(4096));
       eq(f.scene.face_state().snakes.at(-1).face.geometry.pupilTravel, 4096, 'numeric upper endpoint installs without ready sources'); cases++;
     } finally { f.close(); }
-    // Full catalog charge is cumulative across Setup plans, with one shared
-    // source handle and two distinct roles. No per-plan reset grants new quota.
+    // Repeated recipe catalogs share source handles. The former 4096-entry
+    // aggregate ceiling must not reject a full-map population or Setup bundle.
     for (const lane of ['basic', 'standard']) {
       const f = fixture({ factories: true, packets: bundle(syntheticSetup(), ...Array.from({ length: 65 }, (_, i) => appearancePacket(i))) });
       try {
         const count = lane === 'basic' ? 32 : 22;
         const bytes = bundle(...Array.from({ length: count }, syntheticSetup));
-        atomic(f, () => f.setup(lane, bytes, { width: 64, height: 64 }), /catalog budget exceeded/);
+        eq(f.setup(lane, bytes, { width: 64, height: 64 }), count);
         cases++;
       } finally { f.close(); }
     }
@@ -422,9 +422,8 @@ export function mouthFaceRenderSmoke(wasm) {
         s.recipe.palettes = Array.from({ length: 256 }, () => ({ variants: Array(256).fill(usage), boostGlow: usage }));
         return s;
       });
-      // A single plan charges 65,798 uses. Four plans exceed the same ingress
-      // pool's 262,144-use cap without exhausting catalog or layout budgets.
-      atomic(manyUses, () => manyUses.setup('standard', bundle(...Array.from({ length: 4 }, syntheticSetup)), { width: 64, height: 64 }), /asset-use budget exceeded/);
+      // A single plan charges 65,798 uses; eight exceed the derived 524,288 cap.
+      atomic(manyUses, () => manyUses.setup('standard', bundle(...Array.from({ length: 8 }, syntheticSetup)), { width: 64, height: 64 }), /asset-use budget exceeded/);
       cases++;
     } finally { manyUses.close(); }
     for (const lane of ['basic', 'standard']) {
@@ -434,7 +433,8 @@ export function mouthFaceRenderSmoke(wasm) {
         eq(full.scene.face_state().snakes.length, 512, 'retained-object cap supports 512 independent appearances');
         eq(images(full).length, 1536, '512 three-image faces exceed the former two-image/1024 assumption');
         eq(full.target.context.stack.length, 0);
-        atomic(full, () => full.scene.apply_frame_with_face_presentation(shortAppearance(0), false, () => numeric()), /limit|capacity|retained/i);
+        full.scene.apply_frame_with_face_presentation(shortAppearance(0), false, () => numeric());
+        eq(full.scene.face_state().snakes.length, 513);
         cases++;
       } finally { full.close(); }
       const bounded = fixture();

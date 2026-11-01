@@ -639,31 +639,30 @@ fn callback_failure_after_first_antenna_leaves_draw_and_numeric_ownership_unchan
 }
 
 #[test]
-fn retained_limit_is_512_inclusive_and_failed_tail_does_not_consume_identity() {
-    assert_eq!(MAX_RETAINED_SNAKES, 512);
+fn retained_accessory_pressure_preserves_own_and_retires_oldest_duplicate() {
+    assert_eq!(MAX_RETAINED_SNAKES, 1024);
     let mut c = AnimatedClient::new(0.).unwrap();
     let mut commands = vec![setup()];
-    commands.extend((0..512).map(|_| spawn(7, 2000, 2)));
+    commands.extend((0..MAX_RETAINED_SNAKES).map(|_| spawn(7, 2000, 2)));
     apply(
         &mut c,
         &commands,
         presentation(FaceGeometry::default(), true, false),
     );
-    assert_eq!(c.retained_count(), 512);
-    assert_eq!(draw(&mut c).len(), 512);
-    let before = c.clone();
-    assert_eq!(
-        c.apply_frame_with_accessory_presentation::<ClientPresentationError, _>(
-            &spawn(7, 2000, 2),
-            ElapsedHeader::Absent,
-            |_, context| {
-                assert!(!context.own);
-                Ok(presentation(FaceGeometry::default(), true, false))
-            }
-        ),
-        Err(ClientPresentationError::Limit)
-    );
-    exact(&c, &before);
+    assert_eq!(c.retained_count(), MAX_RETAINED_SNAKES);
+    assert_eq!(draw(&mut c).len(), MAX_RETAINED_SNAKES);
+    let own = c.own_snake().unwrap().clone();
+    c.apply_frame_with_accessory_presentation::<ClientPresentationError, _>(
+        &spawn(7, 2000, 2),
+        ElapsedHeader::Absent,
+        |_, context| {
+            assert!(!context.own);
+            Ok(presentation(FaceGeometry::default(), true, false))
+        },
+    )
+    .unwrap();
+    assert_eq!(c.retained_count(), MAX_RETAINED_SNAKES);
+    assert_eq!(c.own_snake().unwrap(), &own);
 }
 
 #[test]

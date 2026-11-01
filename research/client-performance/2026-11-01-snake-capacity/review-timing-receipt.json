@@ -1,0 +1,23 @@
+{
+  "start": "2026-11-01T15:45:16.6633467+01:00",
+  "end": "2026-11-01T15:45:50.7114568+01:00",
+  "approvedStart": "2026-11-01T15:45:00.0000000+01:00",
+  "approvedEnd": "2026-11-01T15:50:00.0000000+01:00",
+  "windowEntry": "2026-11-01T15:45:16.6321440+01:00",
+  "preCaptureWaitSeconds": 0.0312027,
+  "startDelaySeconds": 16.6633467,
+  "monitoredNames": [
+    "cargo",
+    "rustc",
+    "tar",
+    "bsdtar",
+    "zstd",
+    "zstdmt",
+    "pzstd"
+  ],
+  "exitCode": 0,
+  "invalid": null,
+  "processSamples": 94,
+  "processOverlap": 0,
+  "binarySha256": "dbbae9f53a9ee913689de555703040e2eb50abe8457abf0a823f4d919300ed7c"
+}

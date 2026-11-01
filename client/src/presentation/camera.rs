@@ -90,6 +90,13 @@ impl UserZoom {
         } else {
             self.target.clamp(minimum, Self::MAX_FACTOR)
         };
+        // The whole-map endpoint is a fit constraint, not a moving animation
+        // target. Smoothing it while following a moving head can miss the arena
+        // forever. Other wheel positions retain their existing interpolation.
+        if self.whole_map {
+            self.current = minimum;
+            return stock.min(fit);
+        }
         let delta = self.target.ln() - self.current.ln();
         self.current = if delta.abs() < 1e-7 {
             self.target
@@ -209,6 +216,29 @@ impl CameraCorrections {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn moving_whole_map_endpoint_fits_all_aspects_and_dprs() {
+        for logical in [[960., 540.], [540., 960.], [1920., 360.], [360., 1920.]] {
+            for dpr in [1., 1.25, 2., 4.] {
+                let viewport = logical.map(|v| (v * dpr) as u32);
+                let mut zoom = UserZoom::default();
+                zoom.wheel(-1000.);
+                for frame in 0..32 {
+                    let camera = Point {
+                        x: 1000. + f64::from(frame) * 37.,
+                        y: -500. + f64::from(frame) * 19.,
+                    };
+                    let radius = 15000. + f64::from(frame) * 11.;
+                    let applied =
+                        zoom.prepare(0.8 * dpr, viewport, radius, Point::default(), camera);
+                    for (offset, side) in [camera.x, camera.y].into_iter().zip(viewport) {
+                        assert!(2. * (radius + offset.abs()) * applied <= f64::from(side) + 1e-9);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn user_zoom_properties_across_stock_scales_viewports_and_radius_changes() {

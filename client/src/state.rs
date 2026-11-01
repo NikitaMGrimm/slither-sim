@@ -24,12 +24,13 @@ use slither_protocol::{
 mod v13;
 use v13::AppearanceHeader;
 
-/// Maximum simultaneously retained snakes.
-pub const MAX_SNAKES: usize = 256;
+/// Maximum simultaneously received live snakes (including the player).
+/// The next new ID rejects its entire frame; adapters close the failed session.
+pub const MAX_SNAKES: usize = 512;
 /// Maximum anchors per snake, an independent scene retention policy.
 pub const MAX_BODY_POINTS: usize = 4096;
 /// Maximum total retained anchors across snakes.
-pub const MAX_TOTAL_BODY_POINTS: usize = 65_536;
+pub const MAX_TOTAL_BODY_POINTS: usize = MAX_SNAKES * MAX_BODY_POINTS;
 /// Maximum simultaneously retained food positions.
 pub const MAX_FOODS: usize = 65_536;
 /// Absolute bound on each centered coordinate and advertised radius.
@@ -1348,7 +1349,7 @@ impl ClientState {
         })
     }
 
-    fn check_total_body(&self) -> Result<(), StateError> {
+    fn check_total_body(&mut self) -> Result<(), StateError> {
         if self
             .snakes
             .values()
@@ -1356,10 +1357,24 @@ impl ClientState {
             .sum::<usize>()
             > MAX_TOTAL_BODY_POINTS
         {
-            Err(StateError::Limit)
-        } else {
-            Ok(())
+            return Err(StateError::Limit);
         }
+        // Non-growing inserts can leave spare capacity after removing a tail.
+        // Bound requested storage too, without dropping any received anchor.
+        if self
+            .snakes
+            .values()
+            .map(|s| s.body.capacity())
+            .sum::<usize>()
+            > MAX_TOTAL_BODY_POINTS
+        {
+            for snake in self.snakes.values_mut() {
+                snake.body = std::mem::take(&mut snake.body)
+                    .into_boxed_slice()
+                    .into_vec();
+            }
+        }
+        Ok(())
     }
 }
 

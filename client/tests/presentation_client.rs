@@ -851,26 +851,26 @@ fn view_and_clock_errors_are_atomic() {
 }
 
 #[test]
-fn retained_object_limit_includes_duplicates_and_rejects_whole_frame() {
+fn retained_object_pressure_retires_old_duplicates_and_preserves_own() {
     let mut c = AnimatedClient::new(0.).unwrap();
     let mut commands = vec![setup()];
     commands.extend((0..MAX_RETAINED_SNAKES).map(|_| appearance(7, 2000, 2)));
     apply(&mut c, &commands);
     assert_eq!(c.received().snakes.len(), 1);
-    assert_eq!(c.retained_count(), 512);
-    let before = c.clone();
-    assert_eq!(
-        c.apply_frame(
-            &bundle(&[mass(7, 1), appearance(7, 2100, 2)]),
-            ElapsedHeader::Absent
-        ),
-        Err(ClientPresentationError::Limit)
-    );
-    assert_eq!(c, before);
+    assert_eq!(c.retained_count(), MAX_RETAINED_SNAKES);
+    let own = c.own_snake().unwrap().clone();
+    c.apply_frame(
+        &bundle(&[mass(7, 1), appearance(7, 2100, 2)]),
+        ElapsedHeader::Absent,
+    )
+    .unwrap();
+    assert_eq!(c.retained_count(), MAX_RETAINED_SNAKES);
+    assert_eq!(c.own_snake().unwrap(), &own);
+    assert!(c.detail_pressure());
 }
 
 #[test]
-fn retained_physical_point_limit_is_aggregate_and_rolls_back_prior_events() {
+fn retained_physical_point_pressure_compacts_rivals_without_changing_received_or_own() {
     let mut c = AnimatedClient::new(0.).unwrap();
     let points = 2048;
     let appearances = MAX_RETAINED_TOTAL_BODY_POINTS / points;
@@ -879,15 +879,16 @@ fn retained_physical_point_limit_is_aggregate_and_rolls_back_prior_events() {
     apply(&mut c, &commands);
     assert_eq!(c.retained_body_points(), 131_072);
     assert_eq!(c.received().snakes[&7].body.len(), points);
-    let before = c.clone();
-    assert_eq!(
-        c.apply_frame(
-            &bundle(&[mass(7, 1), anchor(Some(7), 65535, 1000, false)]),
-            ElapsedHeader::Absent
-        ),
-        Err(ClientPresentationError::Limit)
-    );
-    assert_eq!(c, before);
+    let own = c.own_snake().unwrap().clone();
+    c.apply_frame(
+        &bundle(&[mass(7, 1), anchor(Some(7), 65535, 1000, false)]),
+        ElapsedHeader::Absent,
+    )
+    .unwrap();
+    assert!(c.retained_body_points() <= MAX_RETAINED_TOTAL_BODY_POINTS);
+    assert_eq!(c.received().snakes[&7].body.len(), points);
+    assert_eq!(c.own_snake().unwrap(), &own);
+    assert!(c.drawn_snakes().any(|s| s.body().detail_reduced()));
 }
 
 #[test]

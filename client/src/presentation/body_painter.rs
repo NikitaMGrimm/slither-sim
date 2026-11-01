@@ -747,6 +747,96 @@ pub fn plan_standard_body(input: BodyPaintInput<'_>) -> Result<BodyPaintPlan, Bo
     plan_standard_body_with_antenna(input, AntennaBarrierEffect::Disabled)
 }
 
+/// Continuous, bounded rival detail for previously inadmissible worlds. Join
+/// retained samples with stretched base images and cover each joint once;
+/// removing sample density must not turn a long snake into disconnected dots.
+/// This lane never paints the own snake. All ordinary entry points stay exact.
+pub fn plan_reduced_body(input: BodyPaintInput<'_>) -> Result<BodyPaintPlan, BodyPaintError> {
+    plan_reduced_body_with_storage(input, Vec::new())
+}
+
+/// Reuse one retired reduced-body plan. At most `2 * active_count - 1` base
+/// draws replace outlines, fades, shadows, boost and death decoration.
+pub fn plan_reduced_body_with_storage(
+    input: BodyPaintInput<'_>,
+    mut commands: Vec<BodyImageCommand>,
+) -> Result<BodyPaintPlan, BodyPaintError> {
+    let style = validate(&input)?;
+    let n = input.geometry.active_count;
+    let samples = &input.geometry.samples[..n];
+    let selected = n.min(
+        input
+            .command_limit
+            .min(MAX_BODY_PAINT_COMMANDS)
+            .saturating_add(1)
+            / 2,
+    );
+    let count = selected.saturating_mul(2).saturating_sub(1);
+    commands.clear();
+    commands
+        .try_reserve_exact(count)
+        .map_err(|_| BodyPaintError::Allocation)?;
+    let mut painter = Painter {
+        input,
+        style,
+        commands,
+        cursor: input.geometry.distance_cursor_seed,
+    };
+    let diameter = 29. * input.visual.scale * input.view.zoom;
+    let opacity = (input.visual.spawn * (1. - input.visual.death)).powi(2);
+    let alpha = BodyAlpha::assign(opacity, input.entry_alpha);
+    for slot in (0..selected).rev() {
+        let i = if selected < 2 {
+            0
+        } else {
+            slot * (n - 1) / (selected - 1)
+        };
+        let usage = input.recipe.palettes[painter.palette(i)].variants[painter.variant(i)];
+        if samples[i].flag != 0 {
+            painter.draw(i, BodyPaintPass::Body, usage, square(diameter / 2.), alpha)?;
+        }
+        if slot == 0 {
+            continue;
+        }
+        let previous = (slot - 1) * (n - 1) / (selected - 1);
+        if samples[i].flag == 0 && samples[previous].flag == 0 {
+            continue;
+        }
+        let a = samples[previous];
+        let b = samples[i];
+        let dx = f64::from(b.x) - f64::from(a.x);
+        let dy = f64::from(b.y) - f64::from(a.y);
+        let width = dx.hypot(dy) * input.view.zoom + diameter;
+        if !all_finite(&[width, diameter]) {
+            return Err(BodyPaintError::Arithmetic);
+        }
+        painter.draw(
+            i,
+            BodyPaintPass::Body,
+            usage,
+            BodyRect {
+                x: -width / 2.,
+                y: -diameter / 2.,
+                width,
+                height: diameter,
+            },
+            alpha,
+        )?;
+        let command = painter.commands.last_mut().expect("just emitted segment");
+        command.translation = Point {
+            x: ((f64::from(a.x) + f64::from(b.x)) / 2. - input.view.camera.x) * input.view.zoom,
+            y: ((f64::from(a.y) + f64::from(b.y)) / 2. - input.view.camera.y) * input.view.zoom,
+        };
+        command.rotation = Some(dy.atan2(dx));
+    }
+    let barrier = painter.commands.len();
+    Ok(BodyPaintPlan {
+        commands: painter.commands,
+        antenna_barrier: barrier,
+        final_distance_cursor: painter.cursor,
+    })
+}
+
 /// Plan a standard body with the antenna's draw-time scratch effect inserted
 /// before death commands. The caller submits the corresponding antenna commands
 /// at the returned image barrier; disabled retains the legacy plan exactly.

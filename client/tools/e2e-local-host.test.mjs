@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup } from './e2e-local-host.mjs';
+import { argumentsFor, allowedPort, readyEndpoint, assertSummary, runWithCleanup, waitForHostFill } from './e2e-local-host.mjs';
 
 test('arguments require a host, accept bounded seconds and prebuilt paths, reject ambiguous input', () => {
   assert.equal(argumentsFor(['--host-bin', 'host']).seconds, 8);
@@ -16,6 +16,40 @@ test('arguments require a host, accept bounded seconds and prebuilt paths, rejec
 test('port policy rejects forbidden, zero and malformed ports', () => {
   for (const port of [0, -1, 65536, 1.5, NaN, '49152', 8766, 18884, 18885]) assert.equal(allowedPort(port), false);
   for (const port of [32768, 49152, 65535]) assert.equal(allowedPort(port), true);
+});
+
+test('Battledome requires full-map pictures without skips and preserves measured subscription counts', () => {
+  const options = argumentsFor(['--host-bin', 'host', '--battledome', '500', '--scratch', 'scratch']);
+  assert.equal(options.battledome, 500);
+  assert.equal(options.seconds, 20);
+  assert.throws(() => argumentsFor(['--host-bin', 'host', '--battledome', '501']), { stage: 'arguments' });
+  const summary = { ...complete(), fullMap: true, mapFitSamples: 12, bestMapOverflowPixels: 0, worstMapOverflowPixels: 0,
+    mapCameraMoved: true, mapCameraMaxDisplacementWorldUnits: 20,
+    pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501 };
+  assert.equal(assertSummary(summary, 19, true), summary);
+  for (const count of [7, 256, 499]) {
+    assert.throws(() => assertSummary({ ...summary, peakReceivedSnakes: count }, 19, true), { stage: "population" });
+    assert.throws(() => assertSummary({ ...summary, peakPreparedSnakes: count }, 19, true), { stage: "population" });
+  }
+  assert.equal(argumentsFor(["--host-bin", "host", "--battledome", "500", "--vision", "1500"]).vision, 1500);
+  assert.throws(() => assertSummary({ ...summary, fullMap: false }, 19, true), { stage: 'full-map' });
+  for (const patch of [{mapFitSamples: 0}, {worstMapOverflowPixels: null}, {worstMapOverflowPixels: 3.56}]) {
+    assert.throws(() => assertSummary({ ...summary, ...patch }, 19, true), { stage: 'full-map' });
+  }
+  assert.throws(() => assertSummary({ ...summary, pictureSkips: 1 }, 19, true), { stage: 'picture-skips' });
+});
+
+test('Battledome rejects stationary post-zoom summaries despite earlier snake movement', () => {
+  const summary = { ...complete(), fullMap: true, mapFitSamples: 3, bestMapOverflowPixels: 0, worstMapOverflowPixels: 0,
+    pictureSkips: 0, peakReceivedSnakes: 501, peakPreparedSnakes: 501,
+    mapCameraMoved: true, mapCameraMaxDisplacementWorldUnits: 20 };
+  assert.equal(assertSummary(summary, 19, true), summary);
+  for (const patch of [{mapCameraMoved: false, mapCameraMaxDisplacementWorldUnits: 0},
+    {mapCameraMaxDisplacementWorldUnits: 0}, {mapCameraMaxDisplacementWorldUnits: null}, {mapFitSamples: 1}]) {
+    assert.throws(() => assertSummary({ ...summary, ...patch }, 19, true), {stage: 'camera-motion'});
+  }
+  assert.throws(() => assertSummary({ ...summary, bestMapOverflowPixels: 0, worstMapOverflowPixels: 4,
+    fullMap: false }, 19, true), {stage: 'full-map'}, 'authored [3.56, 0, 4] must fail');
 });
 
 test('readiness requires a complete exact loopback announcement, independent of log chunking', () => {
@@ -62,6 +96,30 @@ test('cleanup is awaited after success and surfaces its own error only without a
   const cleanupError = new Error('cleanup failed');
   await assert.rejects(runWithCleanup(async () => result, async () => { throw cleanupError; }), error => error === cleanupError);
   await assert.rejects(runWithCleanup(async () => { throw undefined; }, async () => { throw cleanupError; }), error => error === undefined);
+});
+
+test('host fill leaves no pending timers after early exit, abort or completion', async t => {
+  const pending = new Map();
+  t.mock.method(globalThis, 'setTimeout', (callback, ms) => {
+    const handle = { callback, ms }; pending.set(handle, handle); return handle;
+  });
+  t.mock.method(globalThis, 'clearTimeout', handle => pending.delete(handle));
+  await assert.rejects(waitForHostFill({ done: Promise.resolve({ code: 1 }) }), { stage: 'host-fill' });
+  assert.equal(pending.size, 0, 'early host exit releases both fill and deadline timers');
+
+  const host = { done: new Promise(() => {}) };
+  const controller = new AbortController();
+  const aborted = waitForHostFill(host, controller.signal);
+  controller.abort();
+  await assert.rejects(aborted, { stage: 'interrupted' });
+  assert.equal(pending.size, 0, 'abort releases both timers');
+
+  const completed = waitForHostFill(host);
+  const fill = [...pending.values()].find(timer => timer.ms === 15000);
+  assert.ok(fill);
+  pending.delete(fill); fill.callback();
+  await completed;
+  assert.equal(pending.size, 0, 'normal fill completion releases the deadline timer');
 });
 
 test('summary assertions require every observed stage, including server responses and close', () => {

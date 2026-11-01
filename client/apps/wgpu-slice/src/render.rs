@@ -191,6 +191,7 @@ fn submit_face(
     snake: &PreparedSnake,
     view: EyeLayoutInput,
     accessory: Option<(StaticHeadAccessoryGeometry, BodyAsset)>,
+    limited: bool,
     draws: &mut Vec<Draw>,
 ) -> Result<()> {
     submit_face_geometry(
@@ -202,6 +203,7 @@ fn submit_face(
         snake.metrics.spawn_progress,
         view,
         accessory,
+        limited,
         draws,
     )
 }
@@ -215,6 +217,7 @@ fn submit_face_geometry(
     spawn: f64,
     view: EyeLayoutInput,
     accessory: Option<(StaticHeadAccessoryGeometry, BodyAsset)>,
+    limited: bool,
     draws: &mut Vec<Draw>,
 ) -> Result<()> {
     if let FaceGeometry::Paired(face) = face_geometry {
@@ -225,7 +228,7 @@ fn submit_face_geometry(
         for pair in e.pairs {
             if e.outline_width > 0. {
                 let outer = e.eye_radius + e.outline_width / 2.;
-                if e.eye_alpha >= 1. {
+                if e.eye_alpha >= 1. || limited {
                     // The opaque fill covers the disk's interior, saving draws.
                     push_draw(
                         draws,
@@ -551,6 +554,7 @@ pub fn prepare_studio_preview(
         bank.cosmetics
             .as_ref()
             .and_then(|c| c.preview_accessory(skin)),
+        false,
         &mut draws,
     )?;
     if draws.len() > 1024 {
@@ -941,9 +945,48 @@ fn prepare_composed(
     let [early, late] = std::mem::take(&mut bank.food_commands);
     preparation_phase!("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
+    let pressure = client.detail_pressure();
+    let own_antenna_draws = if pressure {
+        prepared
+            .iter()
+            .find(|s| s.snake.own)
+            .and_then(|s| s.snake.antenna.as_ref())
+            .map_or(0, |antenna| {
+                antenna
+                    .strokes
+                    .iter()
+                    .try_fold(usize::from(antenna.bulb.is_some()), |count, stroke| {
+                        let points = match stroke.path {
+                            AntennaPath::Outer => &antenna.outer_path,
+                            AntennaPath::Inner => &antenna.inner_path,
+                        };
+                        let path = stroke_path(points, stroke.width)?;
+                        count.checked_add(
+                            path.segments.len() + path.fans.iter().map(|f| f.4).sum::<usize>(),
+                        )
+                    })
+                    .unwrap_or(MAX_DRAWS)
+            })
+    } else {
+        0
+    };
+    let entity_budget = if pressure {
+        PressureEntityBudget::for_own(prepared.iter().find(|s| s.snake.own).map(|s| &s.snake))
+    } else {
+        PressureEntityBudget {
+            food_commands: 0,
+            prey_commands: 0,
+        }
+    };
+    let foods = entity_budget.foods(
+        pressure,
+        client.foods().foods(),
+        client.food_bounds(),
+        user_zoom,
+    );
     let food = plan_food_with_zoom_and_index(
         FoodPaintInput {
-            foods: client.foods().foods(),
+            foods: &foods,
             view,
             quality,
             bounds: client.food_bounds(),
@@ -981,9 +1024,12 @@ fn prepare_composed(
             )
         })
         .collect();
+    let preys = entity_budget
+        .preys(pressure, client.preys().preys(), &eaters, view)
+        .map_err(|e| e.to_string())?;
     let prey_plan = plan_prey_with_zoom(
         PreyPaintInput {
-            preys: client.preys().preys(),
+            preys: &preys,
             eaters: &eaters,
             view,
             assets: &bank.assets,
@@ -1017,6 +1063,18 @@ fn prepare_composed(
     let nickname_index = draws.len();
     let mut snakes = Vec::new();
     let mut antennas = Vec::new();
+    let mut own_antenna_index = None;
+    let mut rival_count = prepared.iter().filter(|s| !s.snake.own).count();
+    let mut rival_samples = prepared
+        .iter()
+        .filter(|s| !s.snake.own)
+        .map(|s| {
+            s.snake
+                .body_geometry
+                .as_ref()
+                .map_or(0, |g| g.samples.len())
+        })
+        .sum::<usize>();
     for prepared_snake in prepared {
         let snake = prepared_snake.snake;
         let m = snake.metrics;
@@ -1040,6 +1098,21 @@ fn prepare_composed(
         .map_err(|e| e.to_string())?;
         let mut antenna_index = draws.len();
         if let Some(geometry) = &snake.body_geometry {
+            let body_limit = if pressure && !snake.own {
+                let remaining = MAX_DRAWS.saturating_sub(
+                    draws.len()
+                        + food.late.len()
+                        + prey_plan.late.len()
+                        + own_antenna_draws
+                        + 16_384
+                        + 10 * rival_count,
+                );
+                // Bound the product on WebGPU's 32-bit Wasm target too.
+                ((remaining as u64 * geometry.samples.len() as u64) / rival_samples.max(1) as u64)
+                    as usize
+            } else {
+                MAX_DRAWS.saturating_sub(draws.len() + food.late.len() + prey_plan.late.len())
+            };
             // Below two logical pixels across, separate outline/shadow/inner
             // shimmer details cannot resolve. Reuse the existing low-quality
             // passes without removing body geometry or changing global quality.
@@ -1053,53 +1126,55 @@ fn prepare_composed(
                 quality
             };
             let body_storage = std::mem::take(&mut bank.body_commands);
-            let body = plan_standard_body_with_zoom_and_storage(
-                BodyPaintInput {
-                    geometry: geometry.as_paint_geometry(),
-                    recipe: BodyPaintRecipe {
-                        base_palette: skin.base_palette,
-                        palettes: &palettes,
-                        runs: &skin.runs,
-                        variant_mode: skin.variant_mode,
-                        variant_period: skin.variant_period,
-                        custom: skin.custom,
-                        style: Some(skin.body_style),
-                        outline: Some(bank.outline),
-                        shadow: Some(bank.shadow),
-                        death: Some(bank.death),
-                    },
-                    assets: &bank.assets,
-                    view,
-                    quality: body_quality,
-                    visual: BodyPaintVisual {
-                        scale: m.scale,
-                        spawn: m.spawn_progress,
-                        death: m.death_progress,
-                        dead: !m.alive,
-                        smoothed_speed: m.visual_speed,
-                        boost_threshold: m.boost_threshold_speed,
-                        cruise_speed: m.cruise_speed,
-                        maximum_speed: m.maximum_speed,
-                        boost_phase: m.boost_phase,
-                    },
-                    entry_alpha: 1.,
-                    command_limit: MAX_BODY_PAINT_COMMANDS.min(
-                        MAX_DRAWS
-                            .saturating_sub(draws.len() + food.late.len() + prey_plan.late.len()),
-                    ),
+            let input = BodyPaintInput {
+                geometry: geometry.as_paint_geometry(),
+                recipe: BodyPaintRecipe {
+                    base_palette: skin.base_palette,
+                    palettes: &palettes,
+                    runs: &skin.runs,
+                    variant_mode: skin.variant_mode,
+                    variant_period: skin.variant_period,
+                    custom: skin.custom,
+                    style: Some(skin.body_style),
+                    outline: Some(bank.outline),
+                    shadow: Some(bank.shadow),
+                    death: Some(bank.death),
                 },
-                snake
-                    .antenna
-                    .as_ref()
-                    .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
-                body_storage,
-                if cfg!(feature = "frame-profile-no-shadow-cut") {
-                    1.
-                } else {
-                    user_zoom
+                assets: &bank.assets,
+                view,
+                quality: body_quality,
+                visual: BodyPaintVisual {
+                    scale: m.scale,
+                    spawn: m.spawn_progress,
+                    death: m.death_progress,
+                    dead: !m.alive,
+                    smoothed_speed: m.visual_speed,
+                    boost_threshold: m.boost_threshold_speed,
+                    cruise_speed: m.cruise_speed,
+                    maximum_speed: m.maximum_speed,
+                    boost_phase: m.boost_phase,
                 },
-                body_pixels_per_unit,
-            )
+                entry_alpha: 1.,
+                command_limit: MAX_BODY_PAINT_COMMANDS.min(body_limit),
+            };
+            let body = if pressure && !snake.own {
+                plan_reduced_body_with_storage(input, body_storage)
+            } else {
+                plan_standard_body_with_zoom_and_storage(
+                    input,
+                    snake
+                        .antenna
+                        .as_ref()
+                        .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
+                    body_storage,
+                    if cfg!(feature = "frame-profile-no-shadow-cut") {
+                        1.
+                    } else {
+                        user_zoom
+                    },
+                    body_pixels_per_unit,
+                )
+            }
             .map_err(|e| {
                 if e == BodyPaintError::CommandLimit {
                     DRAW_MEMORY_LIMIT.into()
@@ -1120,6 +1195,9 @@ fn prepare_composed(
             antenna_index = draws.len();
             draws.extend(body.commands[body.antenna_barrier..].iter().map(Draw::from));
             bank.body_commands = body.commands;
+            if !snake.own {
+                rival_samples -= geometry.samples.len();
+            }
         }
         snakes.push(observation);
         let input = EyeLayoutInput {
@@ -1139,10 +1217,35 @@ fn prepare_composed(
                 .and_then(|c| c.accessory(snake.own))
                 .map(|r| (geometry, r.asset))
         });
-        submit_face(bank, &skin, &snake, input, accessory, &mut draws)?;
+        if !pressure
+            || snake.own
+            || draws.len() + 9 + food.late.len() + prey_plan.late.len() + own_antenna_draws + 16_384
+                <= MAX_DRAWS
+        {
+            submit_face(
+                bank,
+                &skin,
+                &snake,
+                input,
+                accessory,
+                pressure && !snake.own,
+                &mut draws,
+            )?;
+        }
         check_draw_count(draws.len() + food.late.len() + prey_plan.late.len())?;
-        if let Some(antenna) = snake.antenna {
+        if let Some(mut antenna) = snake.antenna {
+            if snake.own {
+                own_antenna_index = Some(antennas.len());
+            }
+            if pressure && !snake.own {
+                // Keep the bulb and its core state/RNG cadence; omit expensive
+                // round-join tessellation only for pressured rival decoration.
+                antenna.strokes.clear();
+            }
             antennas.push((antenna_index, skin, antenna));
+        }
+        if !snake.own {
+            rival_count -= 1;
         }
     }
     reserve_draws(&mut draws, food.late.len() + prey_plan.late.len())?;
@@ -1263,6 +1366,9 @@ fn prepare_composed(
             },
             scale,
         )? {
+            if pressure && draws.len() + text_draws.len() + 1 + own_antenna_draws > MAX_DRAWS {
+                break;
+            }
             check_draw_count(draws.len() + text_draws.len() + 1)?;
             text_resources.insert(resource.asset.handle, resource);
             text_draws.push(draw);
@@ -1276,7 +1382,10 @@ fn prepare_composed(
     check_draw_count(draws.len())?;
     let mut remaining = MAX_DRAWS - draws.len();
     let mut inserted = 0;
-    for (index, skin, antenna) in antennas {
+    for (ordinal, (index, skin, antenna)) in antennas.into_iter().enumerate() {
+        if pressure && own_antenna_index != Some(ordinal) && remaining == 0 {
+            continue;
+        }
         let mut commands = Vec::new();
         submit_antenna(bank, &skin, &antenna, remaining, &mut commands)?;
         remaining -= commands.len();

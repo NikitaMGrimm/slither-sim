@@ -319,6 +319,38 @@ fn synthetic_malformed_supported_tail_rolls_back_all_fields_and_caches() {
 }
 
 #[test]
+fn maximum_population_non_growing_updates_keep_all_anchors_inside_the_storage_quota() {
+    let mut state = ClientState::default();
+    apply(&mut state, &setup_with_score_index(430));
+    // Admission is exercised separately with 512 packets. Populate the already
+    // validated maximum bodies directly here to isolate the aggregate rule
+    // without repeatedly copying a growing 32 MiB world in debug CI.
+    apply(&mut state, &spawn(1, MAX_BODY_POINTS));
+    let template = state.snakes[&1].clone();
+    for id in 2..=MAX_SNAKES as u16 {
+        let mut snake = template.clone();
+        snake.id = id;
+        state.snakes.insert(id, snake);
+    }
+    apply(&mut state, &[b'G', 0, 0]);
+    assert_eq!(state.snakes.len(), MAX_SNAKES);
+    assert!(
+        state
+            .snakes
+            .values()
+            .all(|s| s.body.len() == MAX_BODY_POINTS)
+    );
+    assert!(
+        state
+            .snakes
+            .values()
+            .map(|s| s.body.capacity())
+            .sum::<usize>()
+            <= slither_client::state::MAX_TOTAL_BODY_POINTS
+    );
+}
+
+#[test]
 fn synthetic_supported_packet_truncations_never_panic_or_partially_apply() {
     let packets = [
         spawn(18, 3),
@@ -411,7 +443,7 @@ fn synthetic_limits_hold_across_frames_and_duplicate_replacement_is_allowed() {
     apply(&mut state, &spawn(1, 2));
     let before = state.clone();
     assert_eq!(
-        state.apply_frame(&spawn(257, 2), ElapsedHeader::Absent),
+        state.apply_frame(&spawn(MAX_SNAKES as u16 + 1, 2), ElapsedHeader::Absent),
         Err(StateError::Limit)
     );
     assert_eq!(state, before);
@@ -425,9 +457,20 @@ fn synthetic_body_hard_and_global_caps() {
         state.apply_frame(&spawn(1, MAX_BODY_POINTS + 1), ElapsedHeader::Absent),
         Err(StateError::Limit)
     );
-    for id in 1..=16 {
-        apply(&mut state, &spawn(id, MAX_BODY_POINTS));
+    // Admission is exercised separately with 512 packets. Populate the already
+    // validated maximum bodies directly here to isolate the aggregate rule
+    // without repeatedly copying a growing 32 MiB world in debug CI.
+    apply(&mut state, &spawn(1, MAX_BODY_POINTS));
+    let template = state.snakes[&1].clone();
+    for id in 2..=MAX_SNAKES as u16 {
+        let mut snake = template.clone();
+        snake.id = id;
+        state.snakes.insert(id, snake);
     }
+    assert_eq!(
+        state.snakes.values().map(|s| s.body.len()).sum::<usize>(),
+        slither_client::state::MAX_TOTAL_BODY_POINTS
+    );
     let before = state.clone();
     assert_eq!(
         state.apply_frame(&[b'N', 0, 0, 0, 0, 0], ElapsedHeader::Absent),
@@ -435,7 +478,7 @@ fn synthetic_body_hard_and_global_caps() {
     );
     assert_eq!(state, before);
     assert_eq!(
-        state.apply_frame(&spawn(17, 1), ElapsedHeader::Absent),
+        state.apply_frame(&spawn(MAX_SNAKES as u16 + 1, 1), ElapsedHeader::Absent),
         Err(StateError::Limit)
     );
     assert_eq!(state, before);

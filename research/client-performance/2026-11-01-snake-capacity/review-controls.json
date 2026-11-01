@@ -1,0 +1,390 @@
+{
+  "schema": 3,
+  "origin": "AUTHORED SYNTHETIC and explicit loopback-only simulator; untimed functional validation",
+  "baseCommit": "d716697b812019a8841dbca098cf7dd13ff01bc4",
+  "nativeSourceCommit": "8b800bfd8a1c64ab65aa7f5d83f98b3bbd5255f3",
+  "sourceBinding": "Capacity/feel harnesses were rebuilt at nativeSourceCommit. Later changes to the separate loopback diagnostic, documentation and evidence do not alter those executables. Loopback probe source/binary are bound separately below. Full raw outputs and failed attempts remain outside Git.",
+  "artifactSha256": {
+    "final-snake-capacity.exe": "dbbae9f53a9ee913689de555703040e2eb50abe8457abf0a823f4d919300ed7c",
+    "final-feel-replay.exe": "91625d2c79904434e6b405541a1c0a638a843e4b7a0aa6d4d049900c04122197",
+    "final-client-e2e.exe": "be7b47c39b0448b9e6fb1c0b408e359abb71fc2324b7b81b06c53aff97a34515",
+    "review-main-snake-capacity.exe": "b98560210bbbed2ee0ad034332bcec855a235b8f42db79619f0c33a2f86da2f9",
+    "review-main-feel-replay.exe": "3763ea3df0413097e6d8961a1ff9d2062c2aaf1046871a7ef242d3da0cb5fb9b",
+    "worst-fit-client-e2e.exe": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+    "moving-camera-client-e2e.exe": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2"
+  },
+  "feel": {
+    "byteIdentical": true,
+    "policy": "feel-perceptual-v1",
+    "passed": true,
+    "mismatches": 0,
+    "errors": [],
+    "samples": 148,
+    "pictures": 72,
+    "commands": 7,
+    "observationSha256": "432c391171d573ed09092a133052fc50814e304c8f16ac5ff19078ed7b67549d",
+    "baselineArtifactSha256": "3763ea3df0413097e6d8961a1ff9d2062c2aaf1046871a7ef242d3da0cb5fb9b",
+    "candidateArtifactSha256": "91625d2c79904434e6b405541a1c0a638a843e4b7a0aa6d4d049900c04122197"
+  },
+  "legacy256": {
+    "allocationRowsByteIdentical": true,
+    "orderedDrawByteIdentical": true,
+    "orderedDrawSha256": "ec0724478151f26df1797a2685a4e1fba0c7267553e9956b06da70c0fd3c1551",
+    "requestedAllocationBytes": 151384002,
+    "draws": 24467
+  },
+  "loopback": {
+    "hostSource": "d716697b812019a8841dbca098cf7dd13ff01bc4",
+    "hostBinarySha256": "21f5cc09a5f72f13461a2ccf4cb2a1e45c90dc3565acdbca1269e4f5fa0dabae",
+    "configuration": {
+      "seed": 7,
+      "bots": 500,
+      "botThreads": 2,
+      "playerSlots": 1,
+      "preset": "battledome",
+      "bind": "127.0.0.1:0",
+      "fillSeconds": 15
+    },
+    "probeSourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+    "probeSourceSha256": "cd6ed084e570d097f68cdca2c8872af32503fc6fd2c1eaa5cca7d2180a54e942",
+    "probeBinarySha256": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2",
+    "acceptanceRule": "At least 500 received/prepared snakes, zero skips, clean close, at least two post-wheel fit samples, worst overflow <= 1e-6 logical px, and camera displacement > 1 world unit from the first post-wheel sampled camera. Lifetime snake movement is not a substitute.",
+    "historicalPreCameraFix": {
+      "runId": "historical-loopback-attempt-4-pre-camera-fix",
+      "sourceRecord": "loopback-summary.json, attempt 4",
+      "wholeMap500Acceptance": false,
+      "probeResultOk": false,
+      "stage": "full-map",
+      "peakReceivedSnakes": 501,
+      "peakPreparedSnakes": 503,
+      "pictureSkips": 0,
+      "cleanClose": true,
+      "fitMeasurement": {
+        "scope": "Historical best-only collector before the camera endpoint fix",
+        "bestOverflowLogicalPixels": 3.5604467877800516,
+        "worstOverflowLogicalPixels": null,
+        "samples": null,
+        "passed": false
+      },
+      "probeSourceSha256": "ce1a8c8255041f353e62e7966a51c0377939ef0585057a993d98d09028712ee8"
+    },
+    "supersededBestOnlyRuns": {
+      "sourceRecord": "https://github.com/NikitaMGrimm/slither-sim/blob/d8b325eafd0ca1b38a45837536f5a8ac7a89bcf9/research/client-performance/2026-11-01-snake-capacity/review-controls.json",
+      "limitation": "The legacy fullMap field meant any picture fit and best overflow defaulted to zero when unmeasured. No post-wheel sample count or worst overflow was retained. These fields do not establish fit throughout motion.",
+      "runs": [
+        {
+          "sourceKey": "fullCoverage",
+          "probeResultOk": true,
+          "stage": null,
+          "peakReceivedSnakes": 501,
+          "peakPreparedSnakes": 501,
+          "pictureSkips": 0,
+          "cleanClose": true,
+          "legacyReportedAnyFit": true,
+          "legacyReportedBestOverflow": 0,
+          "fitMeasurement": null,
+          "wholeMap500Acceptance": null
+        },
+        {
+          "sourceKey": "defaultVisionControl",
+          "probeResultOk": false,
+          "stage": "population",
+          "peakReceivedSnakes": 8,
+          "peakPreparedSnakes": 8,
+          "pictureSkips": 0,
+          "cleanClose": true,
+          "legacyReportedAnyFit": true,
+          "legacyReportedBestOverflow": 0,
+          "fitMeasurement": null,
+          "wholeMap500Acceptance": false
+        },
+        {
+          "sourceKey": "precedingDefaultVisionControl",
+          "probeResultOk": false,
+          "stage": "population",
+          "peakReceivedSnakes": 5,
+          "peakPreparedSnakes": 5,
+          "pictureSkips": 0,
+          "cleanClose": true,
+          "legacyReportedAnyFit": true,
+          "legacyReportedBestOverflow": 0,
+          "fitMeasurement": null,
+          "wholeMap500Acceptance": false
+        },
+        {
+          "sourceKey": "failedShortFullCoverage",
+          "probeResultOk": false,
+          "stage": "population",
+          "peakReceivedSnakes": 411,
+          "peakPreparedSnakes": 411,
+          "pictureSkips": 0,
+          "cleanClose": true,
+          "legacyReportedAnyFit": true,
+          "legacyReportedBestOverflow": 0,
+          "fitMeasurement": null,
+          "wholeMap500Acceptance": false
+        },
+        {
+          "sourceKey": "failedLongDefaultVision",
+          "probeResultOk": false,
+          "stage": "close",
+          "peakReceivedSnakes": 5,
+          "peakPreparedSnakes": 5,
+          "pictureSkips": 0,
+          "cleanClose": false,
+          "legacyReportedAnyFit": true,
+          "legacyReportedBestOverflow": 0,
+          "fitMeasurement": null,
+          "wholeMap500Acceptance": false
+        }
+      ]
+    },
+    "wideVisionRun": {
+      "runId": "moving-post-wheel-wide-vision-after-414-rebase-20261101",
+      "vision": 40000,
+      "clientSeconds": 20,
+      "probeSourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+      "probeBinarySha256": "1023503ecda2bf3af4f59eb4eefc3cbcb8c612c86427a5a292871e98a48196e2",
+      "rawSummarySha256": "366a42e2a485076f616fa618d7ed123d19e63e5437e5d8ae302511ebb0ccac72",
+      "wholeMap500Acceptance": true,
+      "fitMeasurement": {
+        "scope": "All acknowledged committed post-wheel pictures",
+        "samples": 32,
+        "bestOverflowLogicalPixels": 0,
+        "worstOverflowLogicalPixels": 0,
+        "toleranceLogicalPixels": 0.000001,
+        "passed": true
+      },
+      "cameraMotion": {
+        "scope": "Same post-wheel sampled pictures",
+        "moved": true,
+        "maxDisplacementFromFirstSampleWorldUnits": 1308.5531196143277,
+        "minimumExclusiveWorldUnits": 1
+      },
+      "probeResult": {
+        "ok": true,
+        "endpoint": "ws://127.0.0.1:51811/slither",
+        "protocolCoverage": [
+          19
+        ],
+        "client": {
+          "websocket": true,
+          "challenge": true,
+          "loginSent": true,
+          "protocol": 19,
+          "setup": true,
+          "ownSnake": true,
+          "steeringCommands": 1,
+          "boostOn": true,
+          "boostOff": true,
+          "moved": true,
+          "turned": true,
+          "accelerated": true,
+          "decelerated": true,
+          "leaderboard": true,
+          "minimap": true,
+          "preparedFrames": 112,
+          "cleanClose": true,
+          "peakReceivedSnakes": 501,
+          "peakPreparedSnakes": 503,
+          "pictureSkips": 0,
+          "fullMap": true,
+          "mapFitSamples": 32,
+          "bestMapOverflowPixels": 0,
+          "worstMapOverflowPixels": 0,
+          "mapCameraMoved": true,
+          "mapCameraMaxDisplacementWorldUnits": 1308.5531196143277,
+          "seconds": 21.739
+        },
+        "seconds": 37.079
+      }
+    },
+    "defaultVisionControl": {
+      "runId": "all-post-wheel-default-vision-20261101",
+      "vision": 1500,
+      "clientSeconds": 8,
+      "rawSummarySha256": "61946f989ffbba87e7bbbb447d0f0b1c36afca6f150038b691ce11c07405d413",
+      "wholeMap500Acceptance": false,
+      "fitMeasurement": {
+        "scope": "All acknowledged committed pictures after whole-map wheel admission",
+        "samples": 440,
+        "bestOverflowLogicalPixels": 0,
+        "worstOverflowLogicalPixels": 0,
+        "toleranceLogicalPixels": 0.000001,
+        "passed": true
+      },
+      "probeResult": {
+        "ok": false,
+        "stage": "population",
+        "error": "Client assertion failed: population",
+        "client": {
+          "websocket": true,
+          "challenge": true,
+          "loginSent": true,
+          "protocol": 19,
+          "setup": true,
+          "ownSnake": true,
+          "steeringCommands": 1,
+          "boostOn": true,
+          "boostOff": true,
+          "moved": true,
+          "turned": true,
+          "accelerated": true,
+          "decelerated": true,
+          "leaderboard": true,
+          "minimap": true,
+          "preparedFrames": 555,
+          "cleanClose": true,
+          "peakReceivedSnakes": 5,
+          "peakPreparedSnakes": 5,
+          "pictureSkips": 0,
+          "fullMap": true,
+          "mapFitSamples": 440,
+          "bestMapOverflowPixels": 0,
+          "worstMapOverflowPixels": 0,
+          "seconds": 9.957
+        }
+      },
+      "probeSourceCommit": "fe081b6ad868f2247577cc083ef1a1ab788070e4",
+      "probeBinarySha256": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+      "postWheelCameraMotion": null
+    },
+    "previousAllFitRunWithoutMotionGate": {
+      "runId": "all-post-wheel-wide-vision-20261101",
+      "vision": 40000,
+      "clientSeconds": 20,
+      "rawSummarySha256": "0f05b851e05c6aa047c29eef0ca0957537bc47ea6e831dad6db96e0aa071434e",
+      "wholeMap500Acceptance": null,
+      "fitMeasurement": {
+        "scope": "All acknowledged committed pictures after whole-map wheel admission",
+        "samples": 40,
+        "bestOverflowLogicalPixels": 0,
+        "worstOverflowLogicalPixels": 1.1368683772161603e-13,
+        "toleranceLogicalPixels": 0.000001,
+        "passed": true
+      },
+      "probeResult": {
+        "ok": true,
+        "endpoint": "ws://127.0.0.1:55920/slither",
+        "protocolCoverage": [
+          19
+        ],
+        "client": {
+          "websocket": true,
+          "challenge": true,
+          "loginSent": true,
+          "protocol": 19,
+          "setup": true,
+          "ownSnake": true,
+          "steeringCommands": 1,
+          "boostOn": true,
+          "boostOff": true,
+          "moved": true,
+          "turned": true,
+          "accelerated": true,
+          "decelerated": true,
+          "leaderboard": true,
+          "minimap": true,
+          "preparedFrames": 149,
+          "cleanClose": true,
+          "peakReceivedSnakes": 501,
+          "peakPreparedSnakes": 501,
+          "pictureSkips": 0,
+          "fullMap": true,
+          "mapFitSamples": 40,
+          "bestMapOverflowPixels": 0,
+          "worstMapOverflowPixels": 1.1368683772161603e-13,
+          "seconds": 22.372
+        },
+        "seconds": 37.624
+      },
+      "probeSourceCommit": "fe081b6ad868f2247577cc083ef1a1ab788070e4",
+      "probeBinarySha256": "891718c7469a7d1b70552bf66d2decb8b919284c1ecb9d55c2b93c32338421e1",
+      "acceptedUnderPreviousFitAndPopulationRule": true,
+      "postWheelCameraMotion": null,
+      "limitation": "This earlier collector measured all post-wheel fit samples but did not retain camera displacement during that same window; moving-camera acceptance was not measured."
+    }
+  },
+  "presentation": {
+    "requestedPayloadUpperBytes": 1579766632,
+    "budgetBytes": 1610612736,
+    "nativeBodyPointBytes": 960
+  },
+  "exhaustiveNative": {
+    "tests": 6,
+    "passed": 6,
+    "ignored": 0,
+    "profile": "release",
+    "elapsedSuiteSeconds": 28.59
+  },
+  "exhaustiveWasm": {
+    "snakes": 512,
+    "receivedAnchors": 2097152,
+    "passed": true,
+    "network": false
+  },
+  "defaultTestBinariesSeconds": {
+    "nativeCapacitySingleThread": [
+      5.26,
+      6.14
+    ],
+    "presentationClient": 0.12,
+    "state": 0.1,
+    "presentationPressure": 0
+  },
+  "metadataCorrection": {
+    "previousBaseCommit": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+    "previousHostSource": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+    "reason": "These labels incorrectly followed the mutable origin/main ref. The retained main-d716 source archive built the baseline and host; their unchanged binary hashes bind d716697b, not the later ref value."
+  },
+  "documentationPackaging": {
+    "clientDocsPackaged": false,
+    "clientManifestInclude": [
+      "/src",
+      "/README.md",
+      "/LICENSE"
+    ],
+    "packageListSha256": "a370cea2aa3eb459c4cad90e22762a3efd449aa50097e517c331c1633b5faea5",
+    "command": "cargo package --list --allow-dirty --offline --manifest-path client/Cargo.toml",
+    "studyLink": "../../research/client-performance/2026-11-01-snake-capacity/REPORT.md"
+  },
+  "currentRebaseBaseCommit": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+  "postRebaseValidation": {
+    "sourceCommit": "36a56ebe90e8c0ca6ae49ed306ec3fabd5de13ea",
+    "baseCommit": "7d03f2daf355ae8333fe9e54e44d2958be2a1894",
+    "coreLatencyFeatureTests": 76,
+    "latencyRigLibraryTests": 1,
+    "e2eProbeTests": 4,
+    "latencyCliTests": 2,
+    "capacityTestsPassed": 4,
+    "capacityExhaustiveIgnored": 2,
+    "nodeTests": 25,
+    "clippy": "slither-wgpu-slice all-targets with latency-rig, warnings denied",
+    "regressions": [
+      "moving camera with authored overflow [3.56,0,4] rejects despite middle fit",
+      "stationary post-zoom summary rejects despite lifetime moved=true"
+    ],
+    "feel": {
+      "byteIdentical": true,
+      "policy": "feel-perceptual-v1",
+      "passed": true,
+      "mismatches": 0,
+      "errors": [],
+      "samples": 148,
+      "pictures": 72,
+      "commands": 7,
+      "observationSha256": "432c391171d573ed09092a133052fc50814e304c8f16ac5ff19078ed7b67549d",
+      "baselineArtifactSha256": "3763ea3df0413097e6d8961a1ff9d2062c2aaf1046871a7ef242d3da0cb5fb9b",
+      "candidateArtifactSha256": "fe7ec417ce7e2fa927321037dea098eb12ac316553771c3cfa1a41163e127a57"
+    },
+    "legacy256": {
+      "allocationRowsByteIdentical": true,
+      "orderedDrawSha256": "ec0724478151f26df1797a2685a4e1fba0c7267553e9956b06da70c0fd3c1551",
+      "requestedAllocationBytes": 151384002,
+      "draws": 24467,
+      "baselineSourceCommit": "d716697b812019a8841dbca098cf7dd13ff01bc4",
+      "candidateBinarySha256": "5d49eb7c49cf99a7d6a58a012dd1b88fe8d3d9066d591f28dc8914211ae0f2b0"
+    },
+    "timingScope": "No new timing capture. The 15:45 results remain bound to original benchmark artifact/source 8b800bfd; the main rebase adds default-off latency instrumentation."
+  }
+}

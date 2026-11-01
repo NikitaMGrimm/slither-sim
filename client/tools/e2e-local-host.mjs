@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const clientRoot = fileURLToPath(new URL('..', import.meta.url));
-const usage = 'node tools/e2e-local-host.mjs --host-bin PATH [--client-bin PATH] [--seconds 5..60]';
+const usage = 'node tools/e2e-local-host.mjs --host-bin PATH [--client-bin PATH] [--seconds 5..60] [--battledome 500] [--scratch PATH] [--vision 1..40000]';
 const fail = (stage, message) => Object.assign(new Error(message), { stage });
 
 export function argumentsFor(args) {
@@ -13,13 +13,16 @@ export function argumentsFor(args) {
     `slither-client-e2e${process.platform === 'win32' ? '.exe' : ''}`) };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
-    const key = { '--host-bin': 'hostBin', '--client-bin': 'clientBin', '--seconds': 'seconds' }[args[i]];
+    const key = { '--host-bin': 'hostBin', '--client-bin': 'clientBin', '--seconds': 'seconds', '--battledome': 'battledome', '--scratch': 'scratch', '--vision': 'vision' }[args[i]];
     const value = args[i + 1];
     if (!key || !value || value.startsWith('--') || seen.has(key)) throw fail('arguments', usage);
     seen.add(key);
-    options[key] = key === 'seconds' ? Number(value) : path.resolve(value);
+    options[key] = ['seconds', 'battledome', 'vision'].includes(key) ? Number(value) : path.resolve(value);
   }
-  if (!options.hostBin || !Number.isFinite(options.seconds) || options.seconds < 5 || options.seconds > 60) {
+  if (options.battledome === 500 && !seen.has('seconds')) options.seconds = 20;
+  if (!options.hostBin || !Number.isFinite(options.seconds) || options.seconds < 5 || options.seconds > 60
+    || options.battledome !== undefined && options.battledome !== 500
+    || options.vision !== undefined && (options.battledome !== 500 || !Number.isFinite(options.vision) || options.vision <= 0 || options.vision > 40000)) {
     throw fail('arguments', usage);
   }
   return options;
@@ -37,7 +40,7 @@ export function readyEndpoint(output) {
   return match[1];
 }
 
-export function assertSummary(s, protocol = 19) {
+export function assertSummary(s, protocol = 19, battledome = false) {
   if (!s || typeof s !== 'object') throw fail('summary', 'Missing client summary');
   const stages = [
     ['handshake', s.websocket === true && s.challenge === true],
@@ -51,12 +54,22 @@ export function assertSummary(s, protocol = 19) {
     ['presentation', Number.isInteger(s.preparedFrames) && s.preparedFrames > 0],
     ['close', s.cleanClose === true],
   ];
+  if (battledome) {
+    stages.splice(4, 2);
+    stages.push(['full-map', s.fullMap === true && Number.isInteger(s.mapFitSamples) && s.mapFitSamples > 0
+      && Number.isFinite(s.worstMapOverflowPixels) && s.worstMapOverflowPixels <= 1e-6],
+      ['camera-motion', s.mapFitSamples >= 2 && s.mapCameraMoved === true
+        && Number.isFinite(s.mapCameraMaxDisplacementWorldUnits) && s.mapCameraMaxDisplacementWorldUnits > 1],
+      ['picture-skips', s.pictureSkips === 0],
+      ['population', Number.isInteger(s.peakReceivedSnakes) && s.peakReceivedSnakes >= 500
+        && Number.isInteger(s.peakPreparedSnakes) && s.peakPreparedSnakes >= 500]);
+  }
   for (const [stage, valid] of stages) if (!valid) throw fail(stage, `Client assertion failed: ${stage}`);
   return s;
 }
 
-function launch(binary, args) {
-  const child = spawn(binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+function launch(binary, args, env = process.env) {
+  const child = spawn(binary, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env });
   const listeners = new Set();
   const state = { child, stdout: '', stderr: '', listeners, result: null };
   for (const stream of ['stdout', 'stderr']) {
@@ -133,6 +146,15 @@ export async function runWithCleanup(session, cleanup) {
   return result;
 }
 
+export async function waitForHostFill(host, signal) {
+  let timer;
+  try {
+    await bounded(Promise.race([new Promise(resolve => { timer = setTimeout(resolve, 15000); }), host.done.then(result => {
+      throw fail('host-fill', `Host exited while filling: ${JSON.stringify(result)}`);
+    })]), 17000, 'host-fill', signal);
+  } finally { clearTimeout(timer); }
+}
+
 export async function runLocalHost(options) {
   const protocol = Number(process.env.SLITHER_CLIENT_E2E_PROTOCOL ?? 19);
   if (![13, 19].includes(protocol)) throw fail('arguments', 'SLITHER_CLIENT_E2E_PROTOCOL must be 13 or 19');
@@ -143,12 +165,12 @@ export async function runLocalHost(options) {
   process.once('SIGTERM', interrupt);
   let directory, host, client;
   return runWithCleanup(async () => {
-    directory = await mkdtemp(path.join(os.tmpdir(), 'slither-client-e2e-'));
+    directory = await mkdtemp(path.join(options.scratch ?? os.tmpdir(), 'slither-client-e2e-'));
     const config = path.join(directory, 'host.json');
     await writeFile(config, JSON.stringify({
-      bind: '127.0.0.1:0', seed: 7, players: { max: 1 }, bots: { count: 0 },
+      bind: '127.0.0.1:0', seed: 7, players: { max: 1 }, bots: { count: options.battledome ?? 0, threads: 2 },
       simulation: {
-        world: { radius: 10000, dynamicRadius: false, sizeToPopulation: false,
+        world: options.battledome ? { preset: 'battledome', vision: options.vision ?? 40000 } : { radius: 10000, dynamicRadius: false, sizeToPopulation: false,
           spawnRadius: 3000, minScore: 400, foodCount: 0, ambientReplenishPerSecond: 0,
           prey: { count: 0 }, kiosk: { enabled: false } },
         leaderboardIntervalSeconds: 0.5, minimapIntervalSeconds: 0.5,
@@ -157,8 +179,10 @@ export async function runLocalHost(options) {
     // Host owns the port-0 listener throughout startup: no reserve/release race.
     host = launch(options.hostBin, ['host', '--config', config, '--bind', '127.0.0.1:0']);
     const endpoint = await readiness(host, controller.signal);
+    if (options.battledome) await waitForHostFill(host, controller.signal);
     const server = endpoint.slice('ws://'.length, -'/slither'.length);
-    client = launch(options.clientBin, ['--server', server, '--seconds', String(options.seconds)]);
+    client = launch(options.clientBin, ['--server', server, '--seconds', String(options.seconds)],
+      { ...process.env, ...(options.battledome ? { SLITHER_CLIENT_E2E_FULL_MAP: '1' } : {}) });
     const result = await bounded(Promise.race([client.done, host.done.then(result => {
       throw fail('host', `Host exited during client session: ${JSON.stringify(result)}`);
     })]), (options.seconds + 30) * 1000, 'client', controller.signal);
@@ -167,7 +191,7 @@ export async function runLocalHost(options) {
     try { summary = JSON.parse(client.stdout.trim()); }
     catch { throw fail('summary', `Client produced no valid JSON: ${client.stderr}; ${JSON.stringify(result)}`); }
     try {
-      assertSummary(summary, protocol);
+      assertSummary(summary, protocol, Boolean(options.battledome));
       if (result.code !== 0) throw fail('client-exit', JSON.stringify(result));
     } catch (error) {
       error.client = summary;

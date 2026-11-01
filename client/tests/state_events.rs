@@ -1552,14 +1552,17 @@ fn synthetic_semantic_failures_and_retention_limits_discard_all_events() {
         &bundle(&[vec![b'd', 1, 2, 3], vec![b'N', 0, 0, 0]]),
     );
     let template = state.snakes[&0].clone();
-    for id in 1..16 {
+    for id in 1..MAX_SNAKES as u16 {
         let mut snake = template.clone();
         snake.id = id;
         state.snakes.insert(id, snake);
     }
     assert_rollback(
         &mut state,
-        &bundle(&[vec![b'd', 1, 2, 3], appearance(17, b'0', 123, 1)]),
+        &bundle(&[
+            vec![b'd', 1, 2, 3],
+            appearance(MAX_SNAKES as u16, b'0', 123, 1),
+        ]),
     );
     state
         .snakes
@@ -1574,7 +1577,10 @@ fn synthetic_semantic_failures_and_retention_limits_discard_all_events() {
     let before = state.clone();
     assert_eq!(
         state.apply_frame_with_events(
-            &bundle(&[vec![b'd', 1, 2, 3], appearance(256, b'0', 123, 0)]),
+            &bundle(&[
+                vec![b'd', 1, 2, 3],
+                appearance(MAX_SNAKES as u16, b'0', 123, 0)
+            ]),
             ElapsedHeader::Absent
         ),
         Err(StateError::Limit)
