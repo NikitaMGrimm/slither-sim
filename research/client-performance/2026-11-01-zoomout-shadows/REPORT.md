@@ -6,12 +6,11 @@ controls upload identical bytes, but 56 have resource-history differences;
 the 20 matched stock/forced-off runs do not reproduce a persistent 1 ms effect.
 Candidate A/B remains blocked until the booked controlled-history comparison.
 
-**Historical retained-binary study; new measurements pending.** The logical-pixel
-conversion and non-default observer feature are now implemented and have focused
-regressions. The 08:00 A/A and reversed B/A data did **not** clear the AMD merge
-blocker. Three newly built, #412-based binaries await the booked 10:10–10:50
-validation/remeasure window; compiler wait may extend it only to 11:05. Input
-validation precedes timing and any unequal unaffected input stops timing.
+The logical-pixel conversion and non-default observer feature have focused
+regressions. The completed 10:10 diagnostic found buffer-history differences;
+matched stock/forced-off timings are published separately. The booked 12:00
+comparison will condition both pools and include one production-history pair.
+No production cache-sizing decision has been made.
 
 All tables below, `selected.csv` and `phases.csv` use **retained-02**: baseline
 commit `181bc01f21441d3447cad7acefec1f683b347e29`, executable SHA-256

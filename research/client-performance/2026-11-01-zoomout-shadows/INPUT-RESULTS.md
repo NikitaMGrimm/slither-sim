@@ -64,6 +64,9 @@ Each validation cell samples one complete picture; these are not timing runs.
   targets a **983,040-byte** stock buffer and a **524,288-byte** candidate buffer.
   Both use `COPY_DST | VERTEX`. This occurs for both requested sample counts on
   both adapters; Native 4K is effective 1x under #412.
+  The stock buffer was grown during the earlier 500-model/1080p Original
+  whole-map frame; the candidate buffer was created during 120-model/4K
+  Original whole-map. The retained raw allocation calls establish both origins.
 - Source `gpu.rs` grows a chunk only when its current capacity is too small, and
   keeps unused chunks. Earlier omitted shadows therefore change later capacity,
   allocation calls and retained contents even when that later Draw list matches.
