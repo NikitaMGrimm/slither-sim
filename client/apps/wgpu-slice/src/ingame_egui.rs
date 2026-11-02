@@ -49,7 +49,7 @@ impl InGameUi {
                 }
                 self.leave_rect = response.rect;
                 self.focused = response.has_focus();
-                response.clicked()
+                crate::egui_panel::owned_click(&response)
             });
         self.panel_rect = modal.response.rect;
         if modal.should_close() {

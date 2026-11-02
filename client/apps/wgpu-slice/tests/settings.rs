@@ -479,6 +479,43 @@ fn backdrop_closes_on_matching_release_and_retains_the_return_fade() {
 }
 
 #[test]
+fn another_button_cannot_hand_a_primary_press_to_a_settings_control() {
+    use egui::PointerButton::{Middle, Primary, Secondary};
+    for other in [Secondary, Middle] {
+        let mut login = settled();
+        login.open_settings(true);
+        for now in (9616..=10_000).step_by(16) {
+            login.step(now as f64, true, false).unwrap();
+        }
+        login.prepare([960, 540], true, None).unwrap();
+        let [quality, done] = [QUALITY, DONE].map(|id| {
+            let p = point(&login, id, [960., 540.]);
+            egui::pos2(p[0] as f32, p[1] as f32)
+        });
+        for (pos, button, pressed) in [
+            (quality, Primary, true),
+            (done, other, true),
+            (done, Primary, false),
+            (done, other, false),
+        ] {
+            login.settings_input(egui::RawInput {
+                events: vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button,
+                        pressed,
+                        modifiers: Default::default(),
+                    },
+                ],
+                ..Default::default()
+            });
+        }
+        assert!(login.state.settings.is_open(), "{other:?}");
+    }
+}
+
+#[test]
 fn nickname_composition_blocks_settings_entry() {
     let mut login = settled();
     login.prepare([960, 540], true, None).unwrap();

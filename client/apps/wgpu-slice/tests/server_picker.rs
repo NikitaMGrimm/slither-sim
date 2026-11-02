@@ -907,6 +907,129 @@ fn picker_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
     assert!(login.picker.policy.is_open());
 }
 
+fn wheel(login: &mut NativeLogin, rows: f32) {
+    input(
+        login,
+        egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0., -rows),
+            phase: egui::TouchPhase::Move,
+            source: egui::MouseWheelSource::Unknown,
+            modifiers: Default::default(),
+        },
+    );
+}
+fn middle(login: &NativeLogin, id: ControlId) -> [f64; 2] {
+    let r = widget(login, id);
+    [f64::from(r.center().x), f64::from(r.center().y)]
+}
+fn long_list() -> NativeLogin {
+    let mut login = opened(true);
+    let rows: Vec<_> = (1..=40)
+        .map(|id| Server {
+            id,
+            cluster: 0,
+            address: SocketAddr::from(([192, 0, 2, 4], id)),
+            population: 40,
+            active: true,
+        })
+        .collect();
+    login
+        .picker
+        .policy
+        .replace(&rows, &BTreeMap::new())
+        .unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    login
+}
+const HELD_ROW: ControlId = ControlId(16 + 3);
+
+/// The list window moves the pressed control, as a replacement would. The row
+/// stays visible, and the release lands on its new position.
+#[test]
+fn a_moved_list_window_retires_the_held_press() {
+    for keyboard in [false, true] {
+        for redraw in [false, true] {
+            let mut login = long_list();
+            let start = middle(&login, HELD_ROW);
+            login.pointer(start, Some(true), true);
+            login.step(11_000., true, false).unwrap();
+            login.prepare([960, 720], true, None).unwrap();
+            if keyboard {
+                let target = login
+                    .picker
+                    .navigate(Some(ControlId(16 + 6)), egui::Key::ArrowDown);
+                assert_eq!(target, Some(ControlId(16 + 7)));
+            } else {
+                wheel(&mut login, 2.);
+            }
+            if redraw {
+                login.prepare([960, 720], true, None).unwrap();
+            }
+            login.prepare([960, 720], true, None).unwrap();
+            let end = middle(&login, HELD_ROW);
+            assert_ne!(start, end);
+            login.pointer(end, Some(false), true);
+            assert!(login.picker.policy.is_open(), "{keyboard} {redraw}");
+            assert_eq!(login.picker.policy.selection, ServerPreference::Automatic);
+            // A fresh click on the same row acts.
+            login.prepare([960, 720], true, None).unwrap();
+            click(&mut login, HELD_ROW);
+            assert!(!login.picker.policy.is_open(), "{keyboard} {redraw}");
+        }
+    }
+}
+
+/// Away and back before any pass sees it: comparing windows at the pass would
+/// miss this.
+#[test]
+fn queued_wheel_away_and_back_retires_the_held_press() {
+    let mut login = long_list();
+    let start = middle(&login, HELD_ROW);
+    login.pointer(start, Some(true), true);
+    wheel(&mut login, 1.);
+    wheel(&mut login, -1.);
+    login.pointer(start, Some(false), true);
+    assert!(login.picker.policy.is_open());
+}
+
+#[test]
+fn a_remove_press_scrolled_away_and_back_deletes_nothing() {
+    let mut login = opened(false);
+    for n in 0..10 {
+        login
+            .picker
+            .policy
+            .add_custom(format!("192.0.2.{n}:80"))
+            .unwrap();
+    }
+    login.picker.policy.scroll(-100);
+    login.prepare([960, 720], true, None).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    let remove = middle(&login, ControlId(8192 + 2));
+    login.pointer(remove, Some(true), true);
+    login.step(11_000., true, false).unwrap();
+    login.prepare([960, 720], true, None).unwrap();
+    wheel(&mut login, 3.);
+    login.prepare([960, 720], true, None).unwrap();
+    wheel(&mut login, -3.);
+    login.prepare([960, 720], true, None).unwrap();
+    login.pointer(remove, Some(false), true);
+    assert_eq!(login.picker.policy.custom.len(), 10);
+}
+
+#[test]
+fn a_wheel_that_moves_nothing_leaves_the_press() {
+    let mut login = long_list();
+    let start = middle(&login, HELD_ROW);
+    login.pointer(start, Some(true), true);
+    wheel(&mut login, -1.);
+    login.prepare([960, 720], true, None).unwrap();
+    login.pointer(start, Some(false), true);
+    assert!(!login.picker.policy.is_open());
+}
+
 #[test]
 fn a_press_held_across_a_generation_change_never_clicks() {
     // Keyboard Remove while the mouse holds the same Remove button.

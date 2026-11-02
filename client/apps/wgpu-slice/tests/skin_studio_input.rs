@@ -458,6 +458,42 @@ fn studio_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
 }
 
+/// Arrow keys can move the cosmetic window under a press, as the wheel can.
+#[test]
+fn a_keyboard_moved_cosmetic_window_retires_the_held_press() {
+    let mut login = opened_studio();
+    login.studio.activate(COSMETICS_TAB, "Player");
+    login.step(500., false, false).unwrap();
+    login.prepare([960, 540], false, None).unwrap();
+    let cell = ControlId(COSMETIC_BASE + 5);
+    let middle = |login: &NativeLogin| {
+        let c = login
+            .studio_ui
+            .controls
+            .iter()
+            .find(|c| c.0 == cell)
+            .unwrap();
+        [f64::from(c.1.center().x), f64::from(c.1.center().y)]
+    };
+    let before = login.studio.state.preview_cosmetic();
+    let start = middle(&login);
+    login.pointer(start, Some(true), false);
+    assert_eq!(login.focused(), Some(cell));
+    for _ in 0..2 {
+        key(&mut login, NamedKey::ArrowDown);
+    }
+    login.prepare([960, 540], false, None).unwrap();
+    let end = middle(&login);
+    assert_ne!(start, end);
+    login.pointer(end, Some(false), false);
+    assert_eq!(login.studio.state.preview_cosmetic(), before);
+    // A fresh click on the same cell acts.
+    login.prepare([960, 540], false, None).unwrap();
+    login.pointer(end, Some(true), false);
+    login.pointer(end, Some(false), false);
+    assert_ne!(login.studio.state.preview_cosmetic(), before);
+}
+
 /// A section switch starts a new panel generation: a press held across it
 /// never activates the control under its release, as the old capture rules.
 #[test]

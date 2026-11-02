@@ -1051,7 +1051,9 @@ impl NativeLogin {
             } => {
                 if *pressed {
                     self.studio_ui.keyboard_focus = true;
+                    // Revealing the focus can move the pressed control.
                     self.studio_reveal = true;
+                    self.studio_ui.invalidate_press();
                 }
                 let direction = match key {
                     K::ArrowLeft => N::Left,

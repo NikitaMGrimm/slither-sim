@@ -19,9 +19,11 @@ that route and `egui_native`.
 
 Login, picker, studio and champion buttons act on the release matching their
 press, however long it was held and even after the pointer left and came back:
-`egui_panel::pointer_click` is free of egui's 0.8-second and 6-point click limits. A
-blur, touch cancel, disable or screen replacement cancels the press. Those limits
-stay global because text selection needs them. Two clicks within 0.5 s, the
+`egui_panel::pointer_click` is free of egui's 0.8-second and 6-point click limits.
+A blur, touch cancel, disable, screen replacement or moved list window cancels
+the press. Those limits stay global because text selection needs them. Settings
+and the in-game menu keep them through `owned_click`. On every screen, only a
+primary press on the widget counts: another mouse button can't hand one over. Two clicks within 0.5 s, the
 Windows default, select a word on every platform; a custom OS double-click
 setting is not read.
 

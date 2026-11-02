@@ -414,6 +414,41 @@ fn death_while_open_retires_the_overlay_and_esc_cannot_reopen_it() {
     assert!(!escape(&mut login, &mut game, false));
 }
 
+/// With no pass between the move and the second press, egui's click target is
+/// still Leave when the primary is released away from it.
+#[test]
+fn a_release_away_from_leave_does_not_leave_with_another_button_down() {
+    use egui::PointerButton::{Middle, Primary, Secondary};
+    for other in [Secondary, Middle] {
+        let mut game = playing();
+        let mut login = login(&game);
+        escape(&mut login, &mut game, false);
+        release_escape(&mut login, &mut game);
+        let leave = login.ingame_ui.leave_rect.center();
+        let away = egui::pos2(2., 2.);
+        for (pos, button, pressed) in [
+            (leave, Primary, true),
+            (away, other, true),
+            (away, Primary, false),
+        ] {
+            input(
+                &mut login,
+                &mut game,
+                vec![
+                    Event::PointerMoved(pos),
+                    Event::PointerButton {
+                        pos,
+                        button,
+                        pressed,
+                        modifiers: Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        assert!(!game.stopping(), "{other:?}");
+    }
+}
+
 #[test]
 fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
     for key in [None, Some(Key::Enter), Some(Key::Space)] {

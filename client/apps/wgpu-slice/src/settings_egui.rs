@@ -62,7 +62,7 @@ impl SettingsUi {
                     theme::ink(slither_client::menu_theme::MenuTheme::default().backdrop)
                         .gamma_multiply(0.88 * alpha),
                 );
-                if interactive && response.clicked() {
+                if crate::egui_panel::owned_click(&response) && interactive {
                     actions.push((settings::DONE, None));
                 }
             });
@@ -120,7 +120,7 @@ impl SettingsUi {
                                     response.rect.intersect(ui.clip_rect()),
                                     response.has_focus(),
                                 ));
-                                if response.clicked() {
+                                if crate::egui_panel::owned_click(&response) {
                                     actions.push((id, Some(!checked)));
                                 }
                             }
@@ -146,7 +146,7 @@ impl SettingsUi {
                         }
                         self.controls
                             .push((settings::DONE, response.rect, response.has_focus()));
-                        if response.clicked() {
+                        if crate::egui_panel::owned_click(&response) {
                             actions.push((settings::DONE, None));
                         }
                     });

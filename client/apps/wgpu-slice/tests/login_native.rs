@@ -675,6 +675,48 @@ fn login_buttons_answer_a_long_hold_and_a_drag_out_and_back() {
 }
 
 #[test]
+fn another_button_cannot_hand_a_primary_press_to_a_login_button() {
+    use egui::PointerButton::{Middle, Primary, Secondary};
+    for other in [Secondary, Middle] {
+        let mut login = settled("Player");
+        let center = |login: &NativeLogin, id| {
+            login
+                .login_ui
+                .controls
+                .iter()
+                .find(|c| c.0 == id)
+                .unwrap()
+                .1
+                .center()
+        };
+        let (play, settings) = (center(&login, PLAY), center(&login, SETTINGS));
+        for (pos, button, pressed) in [
+            (play, Primary, true),
+            (settings, other, true),
+            (settings, Primary, false),
+            (settings, other, false),
+        ] {
+            input(&mut login, egui::Event::PointerMoved(pos));
+            input(
+                &mut login,
+                egui::Event::PointerButton {
+                    pos,
+                    button,
+                    pressed,
+                    modifiers: Default::default(),
+                },
+            );
+        }
+        assert!(!login.state.settings.is_open(), "{other:?}");
+        assert_ne!(
+            login.state.view(true).phase,
+            MenuPhase::Connecting,
+            "{other:?}"
+        );
+    }
+}
+
+#[test]
 fn nickname_persists_at_the_existing_skin_save_boundary() {
     use slither_wgpu_slice::menu_storage::MenuStorage;
     let directory =

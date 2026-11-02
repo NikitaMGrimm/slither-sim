@@ -65,28 +65,41 @@ fn capture_key() -> Id {
 pub fn release_capture(ctx: &egui::Context) {
     ctx.data_mut(|data| data.remove::<Id>(capture_key()));
 }
+/// Whether `response` owns the primary press, recording a new one. egui's own
+/// click target does not decide this: another button's press can seed it, and it
+/// can outlive the pointer leaving the widget.
+fn owns_press(response: &egui::Response) -> bool {
+    let ctx = &response.ctx;
+    if response.enabled()
+        && ctx.input(|i| i.pointer.primary_pressed())
+        && response.hovered()
+        && response.contains_pointer()
+    {
+        ctx.data_mut(|data| data.insert_temp(capture_key(), response.id));
+    }
+    ctx.data(|data| data.get_temp::<Id>(capture_key())) == Some(response.id)
+}
+fn keyboard_click(response: &egui::Response) -> bool {
+    response.clicked() && !response.clicked_by(egui::PointerButton::Primary)
+}
 /// A primary press and release on the same widget, however long it was held and
 /// wherever the pointer went between them. egui's own click gives up after 0.8 s
 /// or 6 points of movement, which the menus never did; those limits stay global
 /// because text selection needs them to tell a drag from a click.
 pub fn pointer_click(response: &egui::Response) -> bool {
-    let ctx = &response.ctx;
-    let captured = ctx.data(|data| data.get_temp::<Id>(capture_key())) == Some(response.id);
+    let owned = owns_press(response);
     if !response.enabled() {
-        if captured {
-            release_capture(ctx);
+        if owned {
+            release_capture(&response.ctx);
         }
         return false;
     }
-    let (pressed, released) =
-        ctx.input(|i| (i.pointer.primary_pressed(), i.pointer.primary_released()));
-    if pressed && response.is_pointer_button_down_on() {
-        ctx.data_mut(|data| data.insert_temp(capture_key(), response.id));
-    }
-    response.clicked_by(egui::PointerButton::Primary)
+    owned
+        && response.ctx.input(|i| i.pointer.primary_released())
         // `hovered` is egui's top-most hit test, so another control or the panel
         // over a backdrop still takes the release.
-        || (released && captured && response.hovered() && response.contains_pointer())
+        && response.hovered()
+        && response.contains_pointer()
 }
 /// How `response` was activated this pass. `suppress` retires a pointer release
 /// that belongs to a press from before a panel replacement.
@@ -94,8 +107,15 @@ pub fn activation(response: &egui::Response, suppress: bool) -> Option<Activatio
     if pointer_click(response) {
         (!suppress).then_some(Activation::Pointer)
     } else {
-        response.clicked().then_some(Activation::Enter)
+        keyboard_click(response).then_some(Activation::Enter)
     }
+}
+/// A key activation, or egui's click from the press this widget owns, keeping
+/// egui's limits. For the screens with no press guard for a scrolled release.
+pub fn owned_click(response: &egui::Response) -> bool {
+    let owned = owns_press(response);
+    (owned && response.clicked_by(egui::PointerButton::Primary) && response.contains_pointer())
+        || keyboard_click(response)
 }
 /// A primary press held across a panel generation change (open, section,
 /// directory or window replacement) must not click whatever control now

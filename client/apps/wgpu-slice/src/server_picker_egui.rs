@@ -49,6 +49,10 @@ impl PickerUi {
     pub fn focused(&self) -> Option<ControlId> {
         self.controls.iter().find(|c| c.2).map(|c| c.0)
     }
+    /// A moved list window moves the pressed control, like a replacement.
+    pub fn invalidate_press(&mut self) {
+        self.press.invalidate();
+    }
     pub fn request_focus(&mut self, id: ControlId) {
         self.request_focus = Some(id);
     }

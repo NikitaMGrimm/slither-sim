@@ -1,7 +1,7 @@
 //! Directory picker host binding and storage. No socket/session effects are executed here.
 use crate::{Result, server_picker_egui::PickerUi};
 use slither_client::{
-    menu_controls::{ControlId, ControlIntent, PanelView},
+    menu_controls::{ControlId, ControlIntent, PanelView, ScrollList},
     server_picker::*,
 };
 use std::{
@@ -91,7 +91,9 @@ impl NativeServerPicker {
         self.wheel += rows;
         let whole = self.wheel.trunc() as isize;
         self.wheel -= whole as f64;
+        let list = self.policy.list;
         self.policy.scroll(whole);
+        self.retire_moved_press(list);
         self.sync();
     }
     /// Arrow, Page and Home/End list navigation. Text fields keep caret keys:
@@ -110,9 +112,18 @@ impl NativeServerPicker {
         if focus == Some(ADDRESS) || (focus == Some(SEARCH) && matches!(key, K::Home | K::End)) {
             return None;
         }
+        let list = self.policy.list;
         let target = self.policy.navigate(focus, delta);
+        self.retire_moved_press(list);
         self.sync();
         Some(target)
+    }
+    /// Decided here rather than at the next pass, so queued input that moves
+    /// the window away and back still counts.
+    fn retire_moved_press(&mut self, before: ScrollList) {
+        if self.policy.list != before {
+            self.ui.invalidate_press();
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use crate::{menu_layout::MenuRect, menu_theme::ControlStyle};
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ControlId(pub u16);
 /// Fixed-height list window. Only this range is copied, rasterised and drawn.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ScrollList {
     first: usize,
     visible: usize,

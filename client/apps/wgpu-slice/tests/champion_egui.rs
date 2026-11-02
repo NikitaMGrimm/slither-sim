@@ -619,6 +619,44 @@ fn save_answers_the_matching_release_however_long_or_far_the_press_went() {
     assert!(login.champion.take_submission().is_none());
 }
 
+#[test]
+fn another_button_cannot_hand_a_primary_press_to_save() {
+    use egui::PointerButton::{Middle, Primary, Secondary};
+    let button = |login: &mut NativeLogin, pos, button, pressed| {
+        raw(
+            login,
+            vec![
+                Event::PointerMoved(pos),
+                Event::PointerButton {
+                    pos,
+                    button,
+                    pressed,
+                    modifiers: Default::default(),
+                },
+            ],
+        );
+    };
+    for other in [Secondary, Middle] {
+        // Primary went down in the message, so its release is not Save's.
+        let (_, mut login) = opened();
+        text(&mut login, "message");
+        let (field, save) = (center(&login, MESSAGE), center(&login, SAVE));
+        button(&mut login, field, Primary, true);
+        button(&mut login, save, other, true);
+        button(&mut login, save, Primary, false);
+        button(&mut login, save, other, false);
+        assert!(login.champion.take_submission().is_none(), "{other:?}");
+        // Another button leaves Save's own primary press to click once.
+        button(&mut login, save, Primary, true);
+        button(&mut login, save, other, true);
+        button(&mut login, save, other, false);
+        button(&mut login, save, Primary, false);
+        let (_, _, source) = login.champion.take_submission().unwrap();
+        assert_eq!(source, Activation::Pointer, "{other:?}");
+        assert!(login.champion.take_submission().is_none(), "{other:?}");
+    }
+}
+
 /// egui forgets the press on each of these, but still reports the later release.
 #[test]
 fn a_cancelled_or_disabled_save_press_never_clicks_after_a_long_hold() {
