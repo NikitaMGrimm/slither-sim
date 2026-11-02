@@ -9,7 +9,7 @@
       "binary_sha256": "b4af8bbe2f218b355af9ffb807568f18a9e8a6c1b550a119f772b8e420b5268c",
       "frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
       "reviewed_frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
-      "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
+      "source_comparison": "Measured control frame.rs bytes match the main-base source at fde706f1600e7d0917bc467a9b578de1b3d3b724; they are not claimed to match the optimized candidate branch.",
       "final_runtime_sha256": "974662291ec34cec1b22f794e7d13ed4b2293b25ab2aa75c48e68e10cc2a973f",
       "instrumented_source_sha256": {
         "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
@@ -23,13 +23,14 @@
         "client/apps/wgpu-slice/src/render.rs": "06d697b531ecf1795472dbc5e04813afa8e912b8b5b8413637cc1fa6166e00da",
         "client/apps/wgpu-slice/src/text_native.rs": "2306c1a78f9e163f342f351c406e19cc13e631cdf0456fb36242f47f79a89c33",
         "client/apps/wgpu-slice/examples/join_profile.rs": "f31099427df9b414425dd3c086488b8fd24bb01577d388c72ddf867c5fe5b93d"
-      }
+      },
+      "source_reference_revision": "fde706f1600e7d0917bc467a9b578de1b3d3b724"
     },
     "candidate": {
       "binary_sha256": "086f715e63468ad2de5f4a557a4590e13b612454199ac0e66e319eadf78861a8",
       "frame_source_sha256": "1a8292dabd4e7a699999775b94211cf472c62a4f073aef1f8a88019c7ec5d035",
       "reviewed_frame_source_sha256": "1a8292dabd4e7a699999775b94211cf472c62a4f073aef1f8a88019c7ec5d035",
-      "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
+      "source_comparison": "Measured candidate frame.rs bytes match the reviewed candidate source at 775703c05ae479a828751cb732a4f4c0a6995119. No normalization is used.",
       "final_runtime_sha256": "7209307f714338cf9dc958819d6e8b808c9ffe49c20395f8583bcc35e5eb7dcd",
       "instrumented_source_sha256": {
         "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
@@ -43,7 +44,8 @@
         "client/apps/wgpu-slice/src/render.rs": "06d697b531ecf1795472dbc5e04813afa8e912b8b5b8413637cc1fa6166e00da",
         "client/apps/wgpu-slice/src/text_native.rs": "2306c1a78f9e163f342f351c406e19cc13e631cdf0456fb36242f47f79a89c33",
         "client/apps/wgpu-slice/examples/join_profile.rs": "f31099427df9b414425dd3c086488b8fd24bb01577d388c72ddf867c5fe5b93d"
-      }
+      },
+      "source_reference_revision": "775703c05ae479a828751cb732a4f4c0a6995119"
     }
   },
   "parity": {

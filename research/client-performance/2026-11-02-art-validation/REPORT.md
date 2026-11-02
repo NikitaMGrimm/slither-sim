@@ -186,7 +186,12 @@ each diagnostic, without world positions or identities.
   study recomputation/source-binding test also pass.
 - The first current-composition full check observed a late progress row in the
   unchanged official-startup cancellation test (`official.rs:893`). The same
-  injected-fetch test passed alone; the full retry is retained separately.
+  injected-fetch test passed alone. The complete retry command was `npm run check`
+  from `client/`, using the same target/jobs/optimized-dev environment as the
+  original check (`CARGO_PROFILE_DEV_OPT_LEVEL=1`, `CARGO_PROFILE_DEV_DEBUG=0`)
+  and the pinned wasm-bindgen 0.2.129 executable. It completed
+  with **exit status 0** and `All checks passed.` Its complete output is retained
+  owner-locally at `D:/slither-scratch/client-lane-20261101/community-lag/join-20261102/val-v2-full-check-retry.log`.
   No assertion or unrelated startup code was changed. This test opens no
   outside-server connection.
 - Remaining default-view costs rank preparation and CPU packing ahead of GPU

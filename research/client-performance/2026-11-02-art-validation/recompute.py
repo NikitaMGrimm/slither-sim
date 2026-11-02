@@ -6,6 +6,9 @@ def rows(name):
  with (ROOT/name).open(newline='',encoding='utf-8')as stream:return list(csv.DictReader(stream))
 def tables():
  data=rows('runs-current.csv');identity=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
+ for arms in identity['parity'].values():
+  for arm in ['control','candidate']:assert arms[arm]['binary_sha256']==identity['arms'][arm]['binary_sha256']
+  for key in ['command_digest','quad_digest','numeric_sha256']:assert arms['control'][key]==arms['candidate'][key]
  for r in data:
   assert int(r['callbacks'])==600 and int(r['skips'])==0
   assert r['binary_sha256']==identity['arms'][r['arm']]['binary_sha256']

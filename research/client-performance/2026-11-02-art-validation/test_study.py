@@ -15,8 +15,12 @@ class Study(unittest.TestCase):
         identities = json.loads((FOLDER / 'identities.json').read_text(encoding='utf-8'))
         candidate = identities['arms']['candidate']
         self.assertEqual(candidate['frame_source_sha256'], candidate['reviewed_frame_source_sha256'])
-        reviewed = subprocess.check_output(['git', 'cat-file', 'blob', candidate['reviewed_frame_blob_oid']], cwd=REPO)
-        self.assertEqual(hashlib.sha256(reviewed).hexdigest(),
+        for arm in identities['arms'].values():
+            revision = arm['source_reference_revision']
+            self.assertTrue(len(revision) == 40 and all(c in '0123456789abcdef' for c in revision))
+            reviewed = subprocess.check_output(['git', 'show', f'{revision}:client/apps/wgpu-slice/src/frame.rs'], cwd=REPO)
+            self.assertEqual(hashlib.sha256(reviewed).hexdigest(), arm['frame_source_sha256'])
+        self.assertEqual(hashlib.sha256((REPO / 'client/apps/wgpu-slice/src/frame.rs').read_bytes()).hexdigest(),
                          candidate['frame_source_sha256'])
         module = runpy.run_path(str(FOLDER / 'recompute.py'))
         report = (FOLDER / 'REPORT.md').read_text(encoding='utf-8')

@@ -184,7 +184,7 @@ Recompute every matched table and check run/source/parity assignment, using only
 the Python standard library:
 
 ```text
-python research/client-performance/2026-11-02-art-validation/recompute.py --check
+python research/client-performance/2026-11-02-art-validation/earlier-composition/recompute.py --check
 ```
 
 [diagnostic.patch](diagnostic.patch) retains the common passive observers and

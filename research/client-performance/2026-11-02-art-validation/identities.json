@@ -10,7 +10,7 @@
       "frame_source_sha256": "86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee",
       "reviewed_frame_source_sha256": "86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee",
       "reviewed_frame_blob_oid": "55a5a56d79433e378e5d414344deb6217dcfd733",
-      "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
+      "source_comparison": "Measured control frame.rs bytes match the main-base source at 0f45f4acb00431ba461c604340fa6b63428c2db4; they are not claimed to match the optimized candidate branch.",
       "final_runtime_sha256": "093ca1f06a721737e1e3722e8ea7faa9545e5554ea4fa7e5c2c06f1b9711f8c2",
       "instrumented_source_sha256": {
         "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
@@ -24,14 +24,15 @@
         "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
         "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
         "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
-      }
+      },
+      "source_reference_revision": "0f45f4acb00431ba461c604340fa6b63428c2db4"
     },
     "candidate": {
       "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90",
       "frame_source_sha256": "81febecf004263eaa2b6e830acec2ffd963f33ae3c6c4d8d91a681bbc30d9138",
       "reviewed_frame_source_sha256": "81febecf004263eaa2b6e830acec2ffd963f33ae3c6c4d8d91a681bbc30d9138",
       "reviewed_frame_blob_oid": "ffb3301909380456d0c2578053a77588a51b98a3",
-      "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
+      "source_comparison": "Measured candidate frame.rs bytes match the reviewed candidate source at 6eca0b3496dd6690d227fa802796522fd5363626. No normalization is used.",
       "final_runtime_sha256": "1466006cf252d4a93079e4eab63ddc23be269ef296ee9c20e5c39732dd2139da",
       "instrumented_source_sha256": {
         "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
@@ -45,7 +46,8 @@
         "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
         "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
         "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
-      }
+      },
+      "source_reference_revision": "6eca0b3496dd6690d227fa802796522fd5363626"
     }
   },
   "parity": {
