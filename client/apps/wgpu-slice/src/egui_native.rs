@@ -105,6 +105,8 @@ impl WindowInput {
 struct Session {
     context: egui::Context,
     adapter: Option<egui_winit::State>,
+    /// egui-winit's private `pointer_touch_id`; lives and dies with `adapter`.
+    pointer_touch: Option<egui::TouchId>,
     input: egui::RawInput,
     output: Option<egui::PlatformOutput>,
     textures: egui::TexturesDelta,
@@ -155,6 +157,7 @@ impl NativeEguiHost {
     fn reset_input(&mut self) {
         if let Some(s) = &mut self.session {
             s.adapter = None;
+            s.pointer_touch = None;
             s.input.events.clear();
             s.cancel_ime = false;
             s.held = self.window.held;
@@ -228,6 +231,7 @@ impl NativeEguiHost {
             self.session = Some(Session {
                 context,
                 adapter: None,
+                pointer_touch: None,
                 input: Default::default(),
                 output: None,
                 textures: Default::default(),
@@ -254,6 +258,23 @@ impl NativeEguiHost {
             s.context.input_mut(|i| i.pointer = Default::default());
             s.input.events.clear();
         }
+    }
+    /// Tracks egui-winit's pointer owner, which it does not expose: a touch
+    /// starting with no owner drives the synthetic pointer until it ends or
+    /// cancels, and other touches send only `Touch` events. It compares touch
+    /// ids alone, so this does too. Returns whether `event` cancels the owner.
+    pub fn owning_touch_cancelled(&mut self, event: &egui::Event) -> bool {
+        use egui::TouchPhase::{Cancel, End, Start};
+        let (Some(s), egui::Event::Touch { id, phase, .. }) = (&mut self.session, event) else {
+            return false;
+        };
+        let owner = s.pointer_touch == Some(*id);
+        match phase {
+            Start if s.pointer_touch.is_none() => s.pointer_touch = Some(*id),
+            End | Cancel if owner => s.pointer_touch = None,
+            _ => {}
+        }
+        owner && *phase == Cancel
     }
     pub fn focus(&mut self, id: Id) {
         if let Some(s) = self.ensure() {
@@ -396,6 +417,7 @@ impl NativeEguiHost {
         self.observe(event, dpr);
         if let Some(s) = &mut self.session {
             s.adapter = None;
+            s.pointer_touch = None;
             s.held = self.window.held;
         }
     }

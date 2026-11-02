@@ -591,50 +591,144 @@ fn held_navigation_keys_act_once_per_physical_press() {
     assert_eq!(login.studio.state.section, StudioSection::Builder);
 }
 
-/// egui-winit turns a cancelled touch into Touch(Cancel) and PointerGone with
-/// no release. The press neither clicks nor stays held on the returned login.
-#[test]
-fn a_cancelled_touch_releases_the_pointer_without_a_click() {
-    let mut login = opened_studio();
-    let pos = login
+/// Touches as egui-winit translates them: only the touch that owns the
+/// synthetic pointer gets pointer events, and its cancel has no release.
+fn touch(id: u64, phase: egui::TouchPhase, pos: egui::Pos2) -> egui::Event {
+    egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    }
+}
+fn primary(pos: egui::Pos2, pressed: bool) -> egui::Event {
+    egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    }
+}
+fn owner_down(login: &mut NativeLogin, id: u64, pos: egui::Pos2) {
+    raw(
+        login,
+        vec![
+            touch(id, egui::TouchPhase::Start, pos),
+            egui::Event::PointerMoved(pos),
+            primary(pos, true),
+        ],
+    );
+}
+fn owner_up(login: &mut NativeLogin, id: u64, pos: egui::Pos2) {
+    raw(
+        login,
+        vec![
+            touch(id, egui::TouchPhase::End, pos),
+            primary(pos, false),
+            egui::Event::PointerGone,
+        ],
+    );
+}
+fn owner_cancel(login: &mut NativeLogin, id: u64, pos: egui::Pos2) {
+    raw(
+        login,
+        vec![
+            touch(id, egui::TouchPhase::Cancel, pos),
+            egui::Event::PointerGone,
+        ],
+    );
+}
+fn next_center(login: &NativeLogin) -> egui::Pos2 {
+    login
         .studio_ui
         .controls
         .iter()
         .find(|c| c.0 == NEXT)
         .unwrap()
         .1
-        .center();
-    let touch = |phase| egui::Event::Touch {
-        device_id: egui::TouchDeviceId(1),
-        id: egui::TouchId(7),
-        phase,
-        pos,
-        force: None,
-    };
-    raw(
-        &mut login,
-        vec![
-            touch(egui::TouchPhase::Start),
-            egui::Event::PointerMoved(pos),
-            egui::Event::PointerButton {
-                pos,
-                button: egui::PointerButton::Primary,
-                pressed: true,
-                modifiers: Default::default(),
-            },
-        ],
-    );
-    raw(
-        &mut login,
-        vec![touch(egui::TouchPhase::Cancel), egui::Event::PointerGone],
-    );
-    let context = login.egui.context().unwrap().clone();
-    assert!(!context.input(|i| i.pointer.any_down()));
+        .center()
+}
+fn held(login: &NativeLogin) -> bool {
+    login
+        .egui
+        .context()
+        .unwrap()
+        .input(|i| i.pointer.any_down())
+}
+
+/// The owner's cancelled press neither clicks nor stays held on the returned
+/// login.
+#[test]
+fn a_cancelled_touch_releases_the_pointer_without_a_click() {
+    let mut login = opened_studio();
+    let pos = next_center(&login);
+    owner_down(&mut login, 7, pos);
+    owner_cancel(&mut login, 7, pos);
+    assert!(!held(&login));
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
     login.studio.state.cancel(230.);
     login.step(460., false, false).unwrap();
     login.sync_return_focus(false);
     login.prepare([960, 540], false, None).unwrap();
     assert!(!login.studio.state.visible());
-    assert!(!context.input(|i| i.pointer.any_down()));
+    assert!(!held(&login));
+}
+
+/// A second finger gets no pointer events while the first owns the pointer, so
+/// cancelling it leaves the first finger's press to click on release.
+#[test]
+fn a_cancelled_secondary_touch_leaves_the_primary_press() {
+    let mut login = opened_studio();
+    let pos = next_center(&login);
+    let other = pos + egui::vec2(100., 100.);
+    owner_down(&mut login, 7, pos);
+    raw(&mut login, vec![touch(8, egui::TouchPhase::Start, other)]);
+    raw(&mut login, vec![touch(8, egui::TouchPhase::Cancel, other)]);
+    assert!(held(&login));
+    owner_up(&mut login, 7, pos);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    assert!(!held(&login));
+}
+
+#[test]
+fn the_owner_still_cancels_after_a_secondary_touch_comes_and_goes() {
+    let mut login = opened_studio();
+    let pos = next_center(&login);
+    let other = pos + egui::vec2(100., 100.);
+    owner_down(&mut login, 7, pos);
+    raw(&mut login, vec![touch(8, egui::TouchPhase::Start, other)]);
+    raw(&mut login, vec![touch(8, egui::TouchPhase::Cancel, other)]);
+    raw(&mut login, vec![touch(9, egui::TouchPhase::Start, other)]);
+    owner_cancel(&mut login, 7, pos);
+    assert!(!held(&login));
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    // Touch 9 started under the old owner, so it never owned the pointer, and
+    // the cancel freed ownership for the next touch.
+    raw(&mut login, vec![touch(9, egui::TouchPhase::End, other)]);
+    owner_down(&mut login, 10, pos);
+    owner_up(&mut login, 10, pos);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+}
+
+/// A new egui-winit adapter starts with no owner, whichever touch was down.
+#[test]
+fn a_dropped_adapter_forgets_the_owning_touch() {
+    let resets: [fn(&mut NativeLogin); 2] = [
+        |login| login.egui.observe_only(&WindowEvent::Focused(true), 1.),
+        |login| {
+            login.egui.set_active(false);
+            login.egui.set_active(true);
+        },
+    ];
+    for reset in resets {
+        let mut login = opened_studio();
+        let pos = next_center(&login);
+        owner_down(&mut login, 7, pos);
+        reset(&mut login);
+        owner_down(&mut login, 8, pos);
+        owner_cancel(&mut login, 8, pos);
+        assert!(!held(&login));
+        assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    }
 }

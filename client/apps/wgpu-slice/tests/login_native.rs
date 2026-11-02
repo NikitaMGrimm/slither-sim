@@ -1668,3 +1668,68 @@ fn studio_text_and_widgets_stay_put_across_a_section_fade() {
         }
     }
 }
+
+/// Only the touch that owns egui-winit's synthetic pointer gets pointer
+/// events, so only its cancel may drop the press.
+#[test]
+fn change_skin_tap_survives_a_cancelled_secondary_touch() {
+    let touch = |id, phase, pos| egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    };
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    let send = |login: &mut NativeLogin, events| {
+        login.settings_input(egui::RawInput {
+            events,
+            ..Default::default()
+        })
+    };
+    let mut login = settled("Player");
+    let pos = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == CHANGE_SKIN)
+        .unwrap()
+        .1
+        .center();
+    let down = vec![
+        touch(7, egui::TouchPhase::Start, pos),
+        egui::Event::PointerMoved(pos),
+        button(pos, true),
+    ];
+    // The owner's cancel drops the press.
+    send(&mut login, down.clone());
+    send(
+        &mut login,
+        vec![
+            touch(7, egui::TouchPhase::Cancel, pos),
+            egui::Event::PointerGone,
+        ],
+    );
+    assert!(!login.studio.state.visible());
+    let context = login.egui.context().unwrap().clone();
+    assert!(!context.input(|i| i.pointer.any_down()));
+    // A secondary touch's cancel does not.
+    send(&mut login, down);
+    let other = pos + egui::vec2(100., 100.);
+    send(&mut login, vec![touch(8, egui::TouchPhase::Start, other)]);
+    send(&mut login, vec![touch(8, egui::TouchPhase::Cancel, other)]);
+    send(
+        &mut login,
+        vec![
+            touch(7, egui::TouchPhase::End, pos),
+            button(pos, false),
+            egui::Event::PointerGone,
+        ],
+    );
+    assert!(login.studio.state.visible());
+}

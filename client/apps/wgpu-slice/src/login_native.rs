@@ -843,6 +843,7 @@ impl NativeLogin {
             if !self.egui.active() {
                 break;
             }
+            let cancelled_press = self.egui.owning_touch_cancelled(&event);
             if !self.studio_owns_input() || matches!(event, egui::Event::WindowFocused(false)) {
                 // Releases go elsewhere while the studio does not own input.
                 self.studio_keys.clear();
@@ -952,23 +953,16 @@ impl NativeLogin {
                     | egui::Event::ModifiersChanged(_)
                     | egui::Event::MouseWheel { .. }
             );
-            // egui-winit translates a cancelled touch to Touch(Cancel) and
-            // PointerGone without a release, and egui keeps the primary
-            // button held. Drop the press without a click once egui has
-            // seen the cancel.
-            let cancelled = matches!(
-                event,
-                egui::Event::Touch {
-                    phase: egui::TouchPhase::Cancel,
-                    ..
-                }
-            );
             input.events.push(event);
             self.egui.input(input.take());
             if discrete {
                 self.settings_frame();
             }
-            if cancelled {
+            // egui-winit translates the owning touch's cancel to Touch(Cancel)
+            // and PointerGone without a release, and egui keeps the primary
+            // button held. Drop the press without a click once egui has seen
+            // the cancel. Another touch's cancel leaves the owner's press.
+            if cancelled_press {
                 self.egui.cancel_pointer();
             }
         }

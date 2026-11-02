@@ -141,7 +141,8 @@ modality. A press focuses its control, as the old panel input did. Wheel and
 key handling stay in the core: arrows, Home/End and Left/Right cycling on
 Previous/Next go through `StudioState::key_navigation`, once per physical key press
 (egui-winit reports native auto-repeats as fresh presses). A wheel scroll or a
-cancelled touch drops the held press without a click.
+cancel of the touch that owns the pointer drops the held press without a click;
+another touch's cancel leaves it alone.
 Cosmetic thumbnails upload once per handle and revision as egui textures and
 are dropped when evicted or the studio closes. The old toolkit no longer
 paints studio controls and rejects them.

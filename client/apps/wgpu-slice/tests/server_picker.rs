@@ -1255,3 +1255,45 @@ fn login_text_is_pixel_stable_while_the_picker_enters_and_leaves() {
         check(&mut login, 10416, "closed");
     }
 }
+
+/// Only the touch that owns egui-winit's synthetic pointer gets pointer
+/// events, so only its cancel may drop the press.
+#[test]
+fn close_tap_survives_a_cancelled_secondary_touch() {
+    let mut login = opened(false);
+    let r = login
+        .picker
+        .ui
+        .controls
+        .iter()
+        .find(|c| c.0 == CLOSE)
+        .unwrap()
+        .1;
+    let p = [f64::from(r.center().x), f64::from(r.center().y)];
+    let touch = |id, phase, pos| egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    };
+    // The owner's cancel drops the press.
+    batch(&mut login, tap(7, p, true, false));
+    batch(
+        &mut login,
+        vec![
+            touch(7, egui::TouchPhase::Cancel, r.center()),
+            egui::Event::PointerGone,
+        ],
+    );
+    assert!(login.picker.policy.is_open());
+    let context = login.egui.context().unwrap().clone();
+    assert!(!context.input(|i| i.pointer.any_down()));
+    // A secondary touch's cancel does not.
+    batch(&mut login, tap(7, p, true, false));
+    let other = r.center() + egui::vec2(100., 100.);
+    batch(&mut login, vec![touch(8, egui::TouchPhase::Start, other)]);
+    batch(&mut login, vec![touch(8, egui::TouchPhase::Cancel, other)]);
+    batch(&mut login, tap(7, p, false, true));
+    assert!(!login.picker.policy.is_open());
+}
