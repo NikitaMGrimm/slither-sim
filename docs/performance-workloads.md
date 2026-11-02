@@ -44,6 +44,10 @@ The Windows product's separate native frame workload (`client/docs/frame-perform
 measures synthetic offscreen preparation, resource synchronization, render
 submission and calling-thread heap bytes on each exposed hardware adapter.
 It is outside the simulator timing/trace suites below.
+The separate `gpu_sprite_probe` workload adds authored 30,000-food/40-snake
+scenes and owner-local offline replay, with clipped food coverage and finite GPU
+pass timestamps. Its [sprite bandwidth guide](https://github.com/NikitaMGrimm/slither-sim/blob/main/client/docs/sprite-bandwidth.md)
+defines the matrix and evidence boundaries; it is not a simulator tick or FPS case.
 
 - **Legacy:** `step-default`, `step-food`, `step-body`, `observe`, `portable` and
   `protocol` come first; the catalog holds their resolved definitions.

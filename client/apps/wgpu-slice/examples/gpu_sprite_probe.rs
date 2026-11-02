@@ -49,6 +49,8 @@ struct Gpu {
     view: wgpu::TextureView,
     physical: [u32; 2],
     policy: WorldResolution,
+    selected_samples: u32,
+    attachment: [u32; 2],
 }
 impl Gpu {
     fn new(physical: [u32; 2], samples: u32, policy: WorldResolution) -> Result<Self> {
@@ -87,6 +89,8 @@ impl Gpu {
             view,
             physical,
             policy,
+            selected_samples: 0,
+            attachment: [0, 0],
         })
     }
     fn draw(&mut self, p: &render::PreparedFrame) -> Result<(u64, u64, u64, f64, usize)> {
@@ -106,6 +110,8 @@ impl Gpu {
                 self.policy,
             )
             .map_err(String::from)?;
+        self.selected_samples = report.plan.samples;
+        self.attachment = report.plan.attachment;
         let submit = ns(t);
         let gpu_ns = self.timestamp()?;
         let t = Instant::now();
@@ -182,6 +188,12 @@ impl Gpu {
 
 // Continuous triangle/square intersection area in NDC; not fragment invocations.
 fn area(vertices: &[[f32; 5]; 6]) -> f64 {
+    let [a, b, c, _, _, d] = *vertices;
+    if a[0] == d[0] && b[0] == c[0] && a[1] == b[1] && c[1] == d[1] {
+        let x = (f64::from(a[0].max(b[0])).min(1.) - f64::from(a[0].min(b[0])).max(-1.)).max(0.);
+        let y = (f64::from(a[1].max(d[1])).min(1.) - f64::from(a[1].min(d[1])).max(-1.)).max(0.);
+        return x * y / 4.;
+    }
     let mut sum = 0.;
     for tri in vertices.as_chunks::<3>().0 {
         let mut p: Vec<[f64; 2]> = tri.iter().map(|v| [v[0] as f64, v[1] as f64]).collect();
@@ -275,8 +287,9 @@ fn main() -> Result<()> {
     let mut cursor = 0;
     let mut zoomed = false;
     let mut out = String::from(
-        "frame,repeat,model_ms,draws,calls,sync_ns,submit_ns,gpu_ns,body_quads,outline_quads,glow_quads,other_quads,body_screen_area,outline_screen_area,glow_screen_area,other_screen_area,attachment_pixels,samples\n",
+        "frame,repeat,model_ms,draws,calls,sync_ns,submit_ns,gpu_ns,body_quads,outline_quads,glow_quads,other_quads,body_screen_area,outline_screen_area,glow_screen_area,other_screen_area,attachment_pixels,samples,received_foods,received_snakes,picture\n",
     );
+    let full = std::env::var_os("GPU_SPRITE_FULL").is_some();
     for frame in 0..if synth { 181 } else { 366 } {
         let model = frame as f64 * 1000. / 60. + if synth { 1000. } else { 0. };
         if !zoomed && g.phase() == slither_client::session_policy::Phase::Playing {
@@ -303,11 +316,12 @@ fn main() -> Result<()> {
                     }
                 });
             }
-            if if synth {
+            let selected = if synth {
                 [60, 120, 180].contains(&frame)
             } else {
                 [120, 240, 365].contains(&frame)
-            } {
+            };
+            if full || selected {
                 let resident = p
                     .resources
                     .iter()
@@ -339,7 +353,7 @@ fn main() -> Result<()> {
                     if j >= warm {
                         writeln!(
                             out,
-                            "{frame},{},{model},{},{c},{s},{u},{n},{},{},{},{},{},{},{},{},{},{}",
+                            "{frame},{},{model},{},{c},{s},{u},{n},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                             j - warm,
                             p.draw_count(),
                             counts[0],
@@ -350,22 +364,23 @@ fn main() -> Result<()> {
                             areas[1],
                             areas[2],
                             areas[3],
-                            if policy == WorldResolution::Native {
-                                physical[0] * physical[1]
-                            } else {
-                                backing[0] * backing[1]
-                            },
-                            samples
+                            gpu.attachment[0]*gpu.attachment[1],
+                            gpu.selected_samples,
+                            g.client().received().foods.len(),
+                            g.client().received().snakes.len(),
+                            p.frame.identity
                         )
                         .unwrap();
                     }
                 }
-                if std::env::var_os("GPU_SPRITE_READBACK").is_some() {
+                if selected && std::env::var_os("GPU_SPRITE_READBACK").is_some() {
                     let pixels = offscreen::pixels(&gpu.r, &gpu._target)?;
                     let path = std::path::Path::new(&a[3]).with_extension(format!("{frame}.rgba"));
                     std::fs::write(path, pixels).map_err(|e| e.to_string())?;
                 }
-                println!("snapshot={frame},quads={counts:?},screen_area={areas:?}");
+                if selected {
+                    println!("snapshot={frame},quads={counts:?},screen_area={areas:?}");
+                }
             }
             g.presented(true)?;
             g.bank.recycle_frame(p);

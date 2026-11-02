@@ -62,12 +62,16 @@ preparation can discard scratch capacity, but never publishes a partial plan.
 The [WebGPU default limits](https://www.w3.org/TR/2026/CRD-webgpu-20260915/#limits)
 allow a 268,435,456-byte `maxBufferSize`, a 2,048-byte
 `maxVertexBufferArrayStride`, 8 vertex buffers and 16 attributes. Each chunk uses
-983,040 bytes at most, a 20-byte stride, one active vertex-buffer slot and three
-attributes. Its draw indices cover at most 49,152 vertices. Native and browser
+917,504 bytes at most, a 28-byte stride, one active vertex-buffer slot and four
+attributes. A shared 16-bit index buffer describes at most 49,152 triangle-list
+indices over 32,768 unique corner vertices. Native and browser
 request WebGL2 downlevel validation limits with the adapter's resolution;
 no raised buffer limit is required. Chunks are all
-retained through one submission: total vertex storage scales at 120 bytes per
-quad, rather than being a constant-size streaming ring.
+retained through one submission: total vertex storage scales at 112 bytes per
+uploaded quad, rather than being a constant-size streaming ring. Adjacent
+identical additive pairs share four corners while retaining both opacities;
+the original CPU picture and six-vertex diagnostic iterator stay unchanged.
+See [food sprite bandwidth](sprite-bandwidth.md) for the soft-layer paths.
 
 The existing **64 MiB active-pixel**, texture-count, queued-pixel and attachment
 limits are unchanged. Text producer limits also remain: HUD 128, minimap 12 and

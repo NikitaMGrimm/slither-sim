@@ -30,6 +30,13 @@ directly at sample count 1. It creates no sampled backing and no blit. Both reta
 the current physical-resolution, single-sample HUD/menu overlay loaded over the
 world. The public `present`/`present_scaled` entry points default to Original.
 
+[Soft food layers](sprite-bandwidth.md) have separate single-sample targets:
+padded outlines at the world extent and eligible glows at one quarter or one
+eighth of each axis. Body rasters keep the selected world sample count. These
+layers do not change projection, the requested resolution, the MSAA budget
+boundary or the Original backing/blit decision. `PresentationReport` includes
+their retained/transient bytes and actual pass counts.
+
 Preflight uses actual negotiated texture limits, MAX_EXTENT (8192) and the
 unchanged 128 MiB hard attachment guard, applied to attachment pixels and the
 selected sample count. Native availability includes its sample-count-one path;
@@ -51,8 +58,9 @@ one previous target in the queue; there is no forced per-frame GPU wait.
 
 ## Attachment costs
 
-These calculated costs assume RGBA/BGRA8, no depth, B=1500×845, excluding
-driver padding, buffers, caches, staging and extra swapchain images. Original
+These calculated base-target costs assume RGBA/BGRA8, no depth, B=1500×845,
+excluding food-layer targets, driver padding, buffers, caches, staging and extra
+swapchain images. Original
 retains 19.34 MiB MSAA4 plus 4.84 MiB backing (24.18 MiB) at all three outputs.
 
 | Physical output | Original upscale per axis (x / y) | Native pixels vs Original | Previous Native MSAA4 | Current Native samples / world targets | One presentation image |
@@ -66,7 +74,9 @@ or sampled backing: at sample count one it writes directly into the presentation
 image. At 4K this removes the previous 126.56 MiB MSAA target (158.20 → 31.64 MiB
 including one presentation image). A transition from Original to 4K Native can
 retain Original's 24.18 MiB until queued work retires; no new world target is
-allocated. This is logical ownership accounting, not a driver-residency peak.
+allocated for this base-target policy. Food-layer targets, when used, are
+additional and reported separately as described above. This is logical ownership
+accounting, not a driver-residency peak.
 MSAA4's inclusive 64 MiB boundary is 4,194,304 pixels, independent of aspect
 ratio and DPR. Physical output already incorporates DPR; do not multiply twice.
 On sample-count-one devices both modes retain their existing single-sample path.

@@ -64,7 +64,7 @@ fn additive_pair(a: &crate::frame::Quad, b: &crate::frame::Quad) -> bool {
 }
 struct Texture {
     asset: BodyAsset,
-    array: Arc<TextureArray>,
+    array: TextureArray,
     layer: u32,
     black: bool,
     food_glow: bool,
@@ -165,7 +165,7 @@ pub struct Renderer {
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
     arrays: BTreeMap<(u32, u32, u32, usize), Group>,
-    bindings: BTreeMap<ResourceKey, Arc<TextureArray>>,
+    bindings: BTreeMap<ResourceKey, TextureArray>,
     next_array: u64,
     indices: wgpu::Buffer,
     lost: Arc<AtomicBool>,
@@ -614,17 +614,12 @@ impl Renderer {
             .map(|t| (t.array.key, t.array.clone()))
             .collect();
     }
-    fn new_array(
-        &mut self,
-        size: [u32; 2],
-        layers: u32,
-        mips: u32,
-    ) -> RenderResult<Arc<TextureArray>> {
+    fn new_array(&mut self, size: [u32; 2], layers: u32, mips: u32) -> RenderResult<TextureArray> {
         self.next_array = self
             .next_array
             .checked_add(1)
             .ok_or("image array identity exhausted")?;
-        Ok(Arc::new(TextureArray::new(
+        Ok(TextureArray::new(
             &self.device,
             &self.layout,
             ResourceKey {
@@ -634,7 +629,7 @@ impl Renderer {
             size,
             layers,
             mips,
-        )))
+        ))
     }
     pub fn release(&mut self, key: ResourceKey) -> bool {
         self.arrays.clear();
@@ -717,7 +712,7 @@ impl Renderer {
                 let previous = self
                     .arrays
                     .get(&group_key)
-                    .filter(|g| Arc::ptr_eq(&g.array, &array));
+                    .filter(|g| g.array.key == array.key);
                 let mut keys = Vec::with_capacity(chunk.len());
                 for (layer, &(key, r)) in chunk.iter().enumerate() {
                     if previous.is_none_or(|g| g.keys[layer] != key) {
@@ -1759,6 +1754,13 @@ impl SurfaceHost {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn native_renderer_retains_send_ownership() {
+        fn send<T: Send>() {}
+        send::<Renderer>();
+    }
 
     #[test]
     fn chunk_and_record_storage_fit_webgl2_device_limits() {

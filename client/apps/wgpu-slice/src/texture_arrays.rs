@@ -1,7 +1,7 @@
 //! Equal-size images share a binding; each layer retains its own clamp/repeat edges.
 use crate::{frame::ResourceKey, scene::Resource};
-use std::sync::Arc;
 
+#[derive(Clone)]
 pub(super) struct TextureArray {
     pub key: ResourceKey,
     pub texture: wgpu::Texture,
@@ -9,7 +9,7 @@ pub(super) struct TextureArray {
     pub repeat_bind: wgpu::BindGroup,
 }
 pub(super) struct Group {
-    pub array: Arc<TextureArray>,
+    pub array: TextureArray,
     pub keys: Vec<ResourceKey>,
 }
 impl TextureArray {

@@ -5,6 +5,9 @@
 - Let settled native menus sleep between input, result updates and egui repaint
   deadlines, while preserving menu animations, active gameplay and surface retries.
 
+- Reduce crowded-frame GPU bandwidth with single-sample padded food outlines,
+  smaller glow targets, preserved mip chains and combined additive draw pairs.
+
 - Smooth pellet rims and zoom-out glows with denser food body rasters and
   filtered food mip levels, preserving logical sizes and draw planning.
 
