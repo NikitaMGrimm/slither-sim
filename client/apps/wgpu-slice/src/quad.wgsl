@@ -65,7 +65,30 @@ fn cubic(t: f32) -> vec4<f32> {
 // would turn two individually invisible contributions into visible light.
 @fragment fn fs_pair(v: VertexOut) -> @location(0) vec4<f32> {
     let color=textureSample(source,source_sampler,v.uv,i32(v.layer));
-    let a=round(color*v.alpha.x*255.)/255.;
-    let b=round(color*v.alpha.y*255.)/255.;
+    return pair(color, v.alpha);
+}
+fn pair(color: vec4<f32>, alpha: vec2<f32>) -> vec4<f32> {
+    let a=round(color*alpha.x*255.)/255.;
+    let b=round(color*alpha.y*255.)/255.;
     return a+b;
+}
+// Reduced attachments must retain the world-sized source footprint. Otherwise
+// implicit derivatives select extra mip reduction before reconstruction.
+@fragment fn fs_glow2(v: VertexOut) -> @location(0) vec4<f32> {
+    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.)*v.alpha.x;
+}
+@fragment fn fs_glow4(v: VertexOut) -> @location(0) vec4<f32> {
+    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.)*v.alpha.x;
+}
+@fragment fn fs_glow8(v: VertexOut) -> @location(0) vec4<f32> {
+    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.)*v.alpha.x;
+}
+@fragment fn fs_pair2(v: VertexOut) -> @location(0) vec4<f32> {
+    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.),v.alpha);
+}
+@fragment fn fs_pair4(v: VertexOut) -> @location(0) vec4<f32> {
+    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.),v.alpha);
+}
+@fragment fn fs_pair8(v: VertexOut) -> @location(0) vec4<f32> {
+    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.),v.alpha);
 }

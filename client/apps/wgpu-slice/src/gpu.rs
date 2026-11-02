@@ -162,6 +162,8 @@ pub struct Renderer {
     lighter: wgpu::RenderPipeline,
     pair_lighter: wgpu::RenderPipeline,
     overlay_pair_lighter: wgpu::RenderPipeline,
+    glow_lighter: [wgpu::RenderPipeline; 3],
+    glow_pair_lighter: [wgpu::RenderPipeline; 3],
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
     arrays: BTreeMap<(u32, u32, u32, usize), Group>,
@@ -468,6 +470,10 @@ impl Renderer {
         };
         let pair_lighter = pipeline(glow_blend, "fs_pair", sample_count, false);
         let overlay_pair_lighter = pipeline(glow_blend, "fs_pair", 1, false);
+        let glow_lighter =
+            ["fs_glow2", "fs_glow4", "fs_glow8"].map(|entry| pipeline(glow_blend, entry, 1, false));
+        let glow_pair_lighter =
+            ["fs_pair2", "fs_pair4", "fs_pair8"].map(|entry| pipeline(glow_blend, entry, 1, false));
         let outline_composite = pipeline(glow_blend, "fs", sample_count, true);
         let fine_composite_single = pipeline(glow_blend, "fs", 1, true);
         let glow_composite = pipeline(glow_blend, "fs_glow_composite", sample_count, true);
@@ -506,6 +512,8 @@ impl Renderer {
             lighter,
             pair_lighter,
             overlay_pair_lighter,
+            glow_lighter,
+            glow_pair_lighter,
             black_over,
             textures: BTreeMap::new(),
             arrays: BTreeMap::new(),
@@ -1416,14 +1424,18 @@ impl Renderer {
                             }
                         }
                         Pipeline::PairLighter => {
-                            if samples == 1 {
+                            if let Some(scale) = filter.filter(|&s| s > 0) {
+                                &self.glow_pair_lighter[scale as usize - 1]
+                            } else if samples == 1 {
                                 &self.overlay_pair_lighter
                             } else {
                                 &self.pair_lighter
                             }
                         }
                         Pipeline::Lighter => {
-                            if samples == 1 {
+                            if let Some(scale) = filter.filter(|&s| s > 0) {
+                                &self.glow_lighter[scale as usize - 1]
+                            } else if samples == 1 {
                                 &self.overlay_lighter
                             } else {
                                 &self.lighter

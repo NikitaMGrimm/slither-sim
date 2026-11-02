@@ -320,3 +320,88 @@ fn glow_resolution_boundaries_stay_within_isolated_layer_budget() {
     }
     assert!(pollster::block_on(scope.pop()).is_none());
 }
+
+#[test]
+#[ignore = "explicit finite AMD offscreen source-mip check"]
+fn reduced_glows_keep_the_original_world_source_mip_footprint() {
+    let mut r = renderer(4);
+    let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let asset = BodyAsset {
+        handle: 900_000,
+        revision: 1,
+        width: 64,
+        height: 64,
+        status: slither_client::presentation::BodyAssetStatus::Ready,
+    };
+    // Distinct authored mip colors make unintended extra minification visible.
+    // All three world footprints magnify the red base, whereas their reduced
+    // attachments alone would select the green mip without a footprint correction.
+    let mut pixels = Vec::new();
+    for level in 0..7 {
+        let side = 64 >> level;
+        let color = if level == 0 {
+            [255, 0, 0, 255]
+        } else {
+            [0, 255, 0, 255]
+        };
+        for _ in 0..side * side {
+            pixels.extend(color);
+        }
+    }
+    let resource = Resource {
+        asset,
+        food_glow: true,
+        food_outline: false,
+        image: RgbaImage {
+            width: 64,
+            height: 64,
+            pixels,
+        }
+        .into(),
+    };
+    let mut reference = resource.clone();
+    reference.food_glow = false;
+    reference.asset.handle += 1;
+    r.sync_resources(&[resource, reference.clone()]).unwrap();
+    let extent = [512, 512];
+    let cases = [(16., 16., 64.), (120., 16., 128.), (16., 176., 256.)];
+    for paired in [false, true] {
+        let mut draws = Vec::new();
+        for (x, y, size) in cases {
+            draws.push(draw(asset, x, y, size, 0.1, BodyBlend::Lighter));
+            if paired {
+                draws.push(draw(asset, x, y, size, 0.05, BodyBlend::Lighter));
+            }
+        }
+        let picture = frame(extent, draws);
+        let mut control = picture.clone();
+        for d in &mut control.draws {
+            d.asset = reference.asset;
+        }
+        let a = offscreen::target(&r, extent);
+        let b = offscreen::target(&r, extent);
+        r.render(&picture, &a.create_view(&Default::default()))
+            .unwrap();
+        assert_eq!(r.half_glow_extent(), Some([256, 256]));
+        assert_eq!(r.fine_glow_extent(), Some([128, 128]));
+        assert_eq!(r.food_glow_extent(), Some([64, 64]));
+        r.render(&control, &b.create_view(&Default::default()))
+            .unwrap();
+        let actual = offscreen::pixels(&r, &a).unwrap();
+        let expected = offscreen::pixels(&r, &b).unwrap();
+        for (x, y, size) in cases {
+            let center = [(x + size / 2.) as usize, (y + size / 2.) as usize];
+            for y in center[1] - 8..center[1] + 8 {
+                for x in center[0] - 8..center[0] + 8 {
+                    let offset = (y * extent[0] as usize + x) * 4;
+                    assert_eq!(
+                        &actual[offset..offset + 4],
+                        &expected[offset..offset + 4],
+                        "source footprint changed, paired={paired}, size={size}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(pollster::block_on(scope.pop()).is_none());
+}

@@ -41,6 +41,12 @@ attachment is smaller. The smallest glows keep their existing sample coverage
 and mip filtering. The authored offscreen tests bound isolated layer differences;
 the dated study retains whole-picture readback differences, including maxima.
 
+Reduced passes bias the source mip selection by minus `log2(factor)`, retaining
+the original world-sized source footprint. Implicit derivatives otherwise apply
+extra mip reduction before reconstruction and change overlapping glow energy.
+This keeps every #427 source mip available, including ordinary minified glows;
+the correction applies only while painting the smaller attachments.
+
 Only this explicitly additive glow barrier may regroup GPU quads by resolution
 and texture binding. Nonnegative additive contributions commute before output
 quantization; bodies, text and source-over geometry keep their order. Glow
