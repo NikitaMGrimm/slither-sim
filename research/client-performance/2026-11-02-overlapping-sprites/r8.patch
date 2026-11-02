@@ -1,0 +1,65 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -173 +173 @@
+-    arrays: BTreeMap<(u32, u32, u32, usize), Group>,
++    arrays: BTreeMap<(u32, u32, u32, bool, usize), Group>,
+@@ -605 +605 @@
+-        let array = self.new_array([r.image.width, r.image.height], 1, mip_level_count)?;
++        let array = self.new_array([r.image.width, r.image.height], 1, mip_level_count, r.image.pixels.as_chunks::<4>().0.iter().all(|p| p[..3] == [0;3]))?;
+@@ -637 +637 @@
+-    fn new_array(&mut self, size: [u32; 2], layers: u32, mips: u32) -> RenderResult<TextureArray> {
++    fn new_array(&mut self, size: [u32; 2], layers: u32, mips: u32, alpha_only: bool) -> RenderResult<TextureArray> {
+@@ -651,0 +652 @@
++            alpha_only,
+@@ -691 +692 @@
+-        let mut sizes = BTreeMap::<(u32, u32, u32), BTreeMap<ResourceKey, &Resource>>::new();
++        let mut sizes = BTreeMap::<(u32, u32, u32, bool), BTreeMap<ResourceKey, &Resource>>::new();
+@@ -712 +713 @@
+-                .entry((r.image.width, r.image.height, mips))
++                .entry((r.image.width, r.image.height, mips, r.image.pixels.as_chunks::<4>().0.iter().all(|p| p[..3] == [0;3])))
+@@ -719 +720 @@
+-        for ((width, height, mips), members) in sizes {
++        for ((width, height, mips, alpha_only), members) in sizes {
+@@ -722 +723 @@
+-                let group_key = (width, height, mips, index);
++                let group_key = (width, height, mips, alpha_only, index);
+@@ -730 +731 @@
+-                    self.new_array([width, height], chunk.len() as u32, mips)?
++                    self.new_array([width, height], chunk.len() as u32, mips, alpha_only)?
+@@ -1023 +1024 @@
+-                chunk.bytes.extend_from_slice(&texture.layer.to_le_bytes());
++                chunk.bytes.extend_from_slice(&(texture.layer | if texture.array.alpha_only {1 << 31} else {0}).to_le_bytes());
+--- a/client/apps/wgpu-slice/src/quad.wgsl
++++ b/client/apps/wgpu-slice/src/quad.wgsl
+@@ -0,0 +1,4 @@
++fn source_layer(layer: u32) -> i32 { return i32(layer & 0x7fffffffu); }
++fn unpack_source(c: vec4<f32>, layer: u32) -> vec4<f32> {
++    return select(c, vec4<f32>(0.,0.,0.,c.r), (layer & 0x80000000u) != 0u);
++}
+@@ -18 +22 @@
+-    return textureSample(source, source_sampler, v.uv, i32(v.layer)) * v.alpha.x;
++    return unpack_source(textureSample(source,source_sampler,v.uv,source_layer(v.layer)),v.layer) * v.alpha.x;
+@@ -22 +26 @@
+-    let alpha = textureSample(source, source_sampler, v.uv, i32(v.layer)).a * v.alpha.x;
++    let alpha = unpack_source(textureSample(source,source_sampler,v.uv,source_layer(v.layer)),v.layer).a * v.alpha.x;
+@@ -67 +71 @@
+-    let color=textureSample(source,source_sampler,v.uv,i32(v.layer));
++    let color=unpack_source(textureSample(source,source_sampler,v.uv,source_layer(v.layer)),v.layer);
+@@ -78 +82 @@
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.)*v.alpha.x;
++    return unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-1.),v.layer)*v.alpha.x;
+@@ -81 +85 @@
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.)*v.alpha.x;
++    return unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-2.),v.layer)*v.alpha.x;
+@@ -84 +88 @@
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.)*v.alpha.x;
++    return unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-3.),v.layer)*v.alpha.x;
+@@ -87 +91 @@
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.),v.alpha);
++    return pair(unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-1.),v.layer),v.alpha);
+@@ -90 +94 @@
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.),v.alpha);
++    return pair(unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-2.),v.layer),v.alpha);
+@@ -93 +97 @@
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.),v.alpha);
++    return pair(unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-3.),v.layer),v.alpha);

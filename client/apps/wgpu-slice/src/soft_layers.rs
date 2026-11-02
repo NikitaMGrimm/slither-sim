@@ -20,7 +20,8 @@ pub(super) fn pays(saved: f64, fixed: f64, active: bool) -> bool {
 pub(super) fn select_glows(coverage: [f64; 4], samples: u32, previous: LayerHistory) -> [bool; 4] {
     let samples = f64::from(samples);
     let mut saved = 0.;
-    // Splitting the world requires another full-attachment store/load.
+    // Retain the pre-hoisting admission reserve. Lowering it would change which
+    // pictures use reconstructed glows; this optimization preserves that choice.
     let mut fixed = 2. * samples;
     let mut bins = [false; 4];
     for (bin, area) in coverage.into_iter().enumerate().skip(1) {

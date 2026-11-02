@@ -1,0 +1,152 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -152,6 +152,7 @@
+     base: Option<&'a wgpu::BindGroup>,
+ }
+ pub struct Renderer {
++    pub body_probe_split_resolve: bool,
+     pub sample_count: u32,
+     pub(crate) format: wgpu::TextureFormat,
+     pub device: wgpu::Device,
+@@ -532,6 +533,7 @@
+             fine_glow: None,
+             half_glow: None,
+             layer_history: LayerHistory::default(),
++            body_probe_split_resolve: false,
+             fine_composite_single,
+             outline_target: None,
+             outline_composite,
+@@ -1195,6 +1197,9 @@
+         };
+         #[cfg(not(feature = "frame-profile"))]
+         let queries = [(0, 1); 5];
++        let resolve_only_queries = if self.body_probe_split_resolve && !overlay && samples > 1 {
++            Some(self.diagnostic_pass("msaa-resolve-only")?)
++        } else { None };
+         let msaa_view = (samples > 1).then(|| {
+             &replacement
+                 .as_ref()
+@@ -1384,6 +1389,19 @@
+                 },
+             )
+         };
++        if let Some(q) = resolve_only_queries {
++            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
++                label: Some("diagnostic resolve isolation"),
++                timestamp_writes: Some(wgpu::RenderPassTimestampWrites {
++                    query_set: self.diagnostic_timestamps.as_ref().unwrap(),
++                    beginning_of_pass_write_index: Some(q.0), end_of_pass_write_index: Some(q.1),
++                }),
++                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
++                    view: msaa_view.unwrap(), depth_slice: None, resolve_target: Some(target),
++                    ops: wgpu::Operations {load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store},
++                })], ..Default::default()
++            });
++        }
+         if aggregate_queries {
+             encoder.write_timestamp(self.diagnostic_timestamps.as_ref().expect("queries"), 1);
+         }
+@@ -1538,7 +1556,7 @@
+             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                 view: target,
+                 depth_slice: None,
+-                resolve_target: resolve,
++                resolve_target: if self.body_probe_split_resolve { None } else { resolve },
+                 ops: wgpu::Operations {
+                     load,
+                     store: wgpu::StoreOp::Store,
+--- a/client/apps/wgpu-slice/examples/gpu_sprite_probe.rs
++++ b/client/apps/wgpu-slice/examples/gpu_sprite_probe.rs
+@@ -283,12 +283,21 @@
+             classes.insert(s.asset().handle, 2);
+         }
+     }
++    for family in &g.bank.bodies {
++        for u in &family.variants { classes.insert(g.bank.assets[u.asset].handle, 3); }
++        classes.insert(g.bank.assets[family.glow.asset].handle, 4);
++    }
++    for u in [g.bank.outline, g.bank.shadow] { classes.insert(g.bank.assets[u.asset].handle, 5); }
++    classes.insert(g.bank.assets[g.bank.death.asset].handle, 6);
++    let diagnostics = std::env::var_os("BODY_DIAGNOSTICS").is_some();
++    let mut gpu_single = if diagnostics { Some(Gpu::new(physical, 1, policy)?) } else { None };
+     let mut gpu = Gpu::new(physical, samples, policy)?;
+     let mut cursor = 0;
+     let mut zoomed = false;
+     let mut out = String::from(
+         "frame,repeat,model_ms,draws,calls,sync_ns,submit_ns,gpu_ns,body_quads,outline_quads,glow_quads,other_quads,body_screen_area,outline_screen_area,glow_screen_area,other_screen_area,attachment_pixels,samples,received_foods,received_snakes,picture\n",
+     );
++    if diagnostics { out = String::from("frame,pair,diagnostic,side,iteration,gpu_ns,sync_ns,submit_ns,draws,calls\n"); }
+     let full = std::env::var_os("GPU_SPRITE_FULL").is_some();
+     for frame in 0..if synth { 181 } else { 366 } {
+         let model = frame as f64 * 1000. / 60. + if synth { 1000. } else { 0. };
+@@ -327,14 +336,45 @@
+                     .iter()
+                     .map(|r| (r.asset.into(), r.asset))
+                     .collect();
+-                let mut areas = [0.; 4];
+-                let mut counts = [0usize; 4];
++                let mut areas = [0.; 8];
++                let mut counts = [0usize; 8];
+                 for q in p.frame.quad_iter(&resident)? {
+                     let q = q?;
+-                    let c = classes.get(&q.key.handle).copied().unwrap_or(3);
++                    let c = classes.get(&q.key.handle).copied().unwrap_or(7);
+                     areas[c] += area(&q.vertices);
+                     counts[c] += 1;
+                 }
++                if diagnostics {
++                    println!("coverage frame={frame} quads={counts:?} areas={areas:?}");
++                    let original = p.frame.draws.clone();
++                    for pair in 1..=5 {
++                        for diagnostic in ["no-body", "no-boost", "no-shadow", "no-snakes", "no-food", "resolve-only", "msaa1"] {
++                            for side in if pair % 2 == 1 { ["before", "after"] } else { ["after", "before"] } {
++                                p.frame.draws = original.iter().filter(|d| {
++                                    if side == "before" { return true; }
++                                    let c = classes.get(&d.asset.handle).copied().unwrap_or(7);
++                                    match diagnostic {
++                                        "no-body" => c != 3, "no-boost" => c != 4, "no-shadow" => c != 5,
++                                        "no-snakes" => !(3..=6).contains(&c), "no-food" => c > 2,
++                                        _ => true,
++                                    }
++                                }).cloned().collect();
++                                let active = if side == "after" && diagnostic == "msaa1" { gpu_single.as_mut().unwrap() } else { &mut gpu };
++                                active.r.body_probe_split_resolve = side == "after" && diagnostic == "resolve-only";
++                                println!("cell={frame},{pair},{diagnostic},{side}");
++                                for j in 0..warm + count {
++                                    println!("iteration={j}");
++                                    let (sync, submit, _, gpu_ns, calls) = active.draw(&p)?;
++                                    if j >= warm {
++                                        writeln!(out,"{frame},{pair},{diagnostic},{side},{},{gpu_ns},{sync},{submit},{},{calls}",j-warm,p.draw_count()).unwrap();
++                                    }
++                                }
++                            }
++                        }
++                    }
++                    let pixels = offscreen::pixels(&gpu.r, &gpu._target)?;
++                    std::fs::write(std::path::Path::new(&a[3]).with_extension(format!("baseline.{frame}.rgba")),pixels).unwrap();
++                } else {
+                 let mut seen = 0;
+                 p.frame.draws.retain(|d| {
+                     if classes.get(&d.asset.handle) != Some(&2) {
+@@ -359,11 +399,11 @@
+                             counts[0],
+                             counts[1],
+                             counts[2],
+-                            counts[3],
++                            counts[3..].iter().sum::<usize>(),
+                             areas[0],
+                             areas[1],
+                             areas[2],
+-                            areas[3],
++                            areas[3..].iter().sum::<f64>(),
+                             gpu.attachment[0]*gpu.attachment[1],
+                             gpu.selected_samples,
+                             g.client().received().foods.len(),
+@@ -380,6 +420,7 @@
+                 }
+                 if selected {
+                     println!("snapshot={frame},quads={counts:?},screen_area={areas:?}");
++                }
+                 }
+             }
+             g.presented(true)?;

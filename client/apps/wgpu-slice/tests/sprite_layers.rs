@@ -60,8 +60,9 @@ fn frame(extent: [u32; 2], draws: Vec<Draw>) -> Frame {
 
 const LOAD_OUTLINE: u64 = 990_000;
 const LOAD_GLOW: u64 = 990_001;
+const LOAD_BACKGROUND: u64 = 990_002;
 fn shader_load_resources() -> Vec<Resource> {
-    [LOAD_OUTLINE, LOAD_GLOW]
+    [LOAD_OUTLINE, LOAD_GLOW, LOAD_BACKGROUND]
         .map(|handle| Resource {
             asset: BodyAsset {
                 handle,
@@ -75,21 +76,33 @@ fn shader_load_resources() -> Vec<Resource> {
             image: RgbaImage {
                 width: 1,
                 height: 1,
-                pixels: vec![0, 0, 0, 255],
+                pixels: if handle == LOAD_BACKGROUND {
+                    vec![40, 50, 60, 255]
+                } else {
+                    vec![0, 0, 0, 255]
+                },
             }
             .into(),
         })
         .to_vec()
 }
 fn amortize_shader_fixture(picture: &mut Frame) {
-    // Exercise shader/resize paths independently of the density selector. Black
-    // source-over load precedes all ink on the black clear; additive black load
-    // follows it. Both leave the compared RGB and opaque destination alpha intact.
+    // Exercise shader/resize paths independently of black-prefix elimination.
+    // A colored background makes the following outline draws observable. Both
+    // compared arms receive it; no pixel expectation or error budget is relaxed.
     let resources = shader_load_resources();
     let size = f64::from(picture.extent[0].max(picture.extent[1]));
     picture.draws.splice(
         0..0,
-        (0..8).map(|_| {
+        std::iter::once(draw(
+            resources[2].asset,
+            0.,
+            0.,
+            size,
+            1.,
+            BodyBlend::SourceOver,
+        ))
+        .chain((0..8).map(|_| {
             draw(
                 resources[0].asset,
                 0.,
@@ -98,7 +111,7 @@ fn amortize_shader_fixture(picture: &mut Frame) {
                 0.01,
                 BodyBlend::SourceOver,
             )
-        }),
+        })),
     );
     for alpha in [0.1, 0.05] {
         picture.draws.extend((0..128).map(|_| {
@@ -594,8 +607,8 @@ fn sparse_food_uses_the_ordinary_pass_and_crossover_pictures_match() {
     for (picture, passes) in [
         (&low, 1),
         (&middle, 1),
-        (&high, 4),
-        (&middle, 4),
+        (&high, 3),
+        (&middle, 3),
         (&low, 1),
         (&middle, 1),
     ] {
@@ -681,7 +694,7 @@ fn unused_glow_bins_are_counted_until_the_glow_path_retires() {
     assert_eq!(r.half_glow_extent(), Some([256, 256]));
     assert_eq!(r.fine_glow_extent(), Some([128, 128]));
     assert_eq!(r.food_glow_extent(), Some([64, 64]));
-    assert_eq!(report.passes, 3);
+    assert_eq!(report.passes, 2);
     assert_eq!(
         report.target_bytes,
         512 * 512 * 4 * 4 + (256 * 256 + 128 * 128 + 64 * 64) * 4
@@ -702,4 +715,111 @@ fn unused_glow_bins_are_counted_until_the_glow_path_retires() {
     assert_eq!(report.target_bytes, 512 * 512 * 4 * 4);
     assert_eq!(offscreen::pixels(&r, &target).unwrap()[..4], [0, 0, 0, 255]);
     assert!(pollster::block_on(scope.pop()).is_none());
+}
+
+#[test]
+#[ignore = "explicit finite offscreen exact no-op and validation check"]
+fn black_prefix_and_zero_pairs_are_exact_without_skipping_validation_or_overlays() {
+    for samples in [1, 4] {
+        let mut r = renderer(samples);
+        let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+        let resources = shader_load_resources();
+        r.sync_resources(&resources).unwrap();
+        let black = resources[0].asset;
+        let color = resources[2].asset;
+        let background = draw(color, 0., 0., 32., 1., BodyBlend::SourceOver);
+        let mut shadow = draw(black, 2.25, 3.75, 23., 0.4, BodyBlend::SourceOver);
+        shadow.black_effect = true;
+        let mut prefix: Vec<_> = (0..8)
+            .map(|_| draw(black, 0., 0., 32., 0.2, BodyBlend::SourceOver))
+            .collect();
+        let expected = frame([32, 32], vec![background.clone(), shadow.clone()]);
+        prefix.extend(expected.draws.clone());
+        // Keep these adjacent to exercise fs_pair; each rounds all four channels
+        // to zero even on a transparent loaded overlay, whereas 0.51 is visible.
+        let zero = draw(color, 0., 0., 32., 0.48 / 255., BodyBlend::Lighter);
+        prefix.extend([zero.clone(), zero.clone()]);
+        let actual = frame([32, 32], prefix);
+        let a = offscreen::target(&r, [32, 32]);
+        let b = offscreen::target(&r, [32, 32]);
+        r.render(&expected, &a.create_view(&Default::default()))
+            .unwrap();
+        r.render(&actual, &b.create_view(&Default::default()))
+            .unwrap();
+        assert_eq!(r.world_pass_count(), 1);
+        assert_eq!(
+            r.food_outline_extent(),
+            None,
+            "black-only prefix needs no outline target"
+        );
+        assert_eq!(
+            offscreen::pixels(&r, &a).unwrap(),
+            offscreen::pixels(&r, &b).unwrap()
+        );
+
+        let mut invalid = actual.clone();
+        let mut bad = zero.clone();
+        bad.effective_alpha = f64::NAN;
+        invalid.draws.push(bad);
+        assert!(
+            r.render(&invalid, &b.create_view(&Default::default()))
+                .is_err()
+        );
+        assert_eq!(
+            offscreen::pixels(&r, &a).unwrap(),
+            offscreen::pixels(&r, &b).unwrap()
+        );
+
+        // A loaded colored world must still be darkened by the first overlay
+        // draw. The world path paints the same draw sequence as a reference.
+        let overlay = frame([32, 32], vec![shadow.clone(), zero.clone(), zero.clone()]);
+        r.render(
+            &frame([32, 32], vec![background.clone()]),
+            &b.create_view(&Default::default()),
+        )
+        .unwrap();
+        r.render_overlay(&overlay, &b.create_view(&Default::default()))
+            .unwrap();
+        if samples == 1 {
+            assert_eq!(
+                offscreen::pixels(&r, &a).unwrap(),
+                offscreen::pixels(&r, &b).unwrap()
+            );
+        }
+        // Start an independently transparent target; zero-pair alpha must also
+        // stay zero. An above-boundary pair must not be discarded.
+        let clear = |r: &Renderer| {
+            let mut encoder = r.device.create_command_encoder(&Default::default());
+            {
+                let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &b.create_view(&Default::default()),
+                        depth_slice: None,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    ..Default::default()
+                });
+            }
+            r.queue.submit([encoder.finish()]);
+        };
+        clear(&r);
+        r.render_overlay(
+            &frame([32, 32], vec![zero.clone(), zero]),
+            &b.create_view(&Default::default()),
+        )
+        .unwrap();
+        assert!(offscreen::pixels(&r, &b).unwrap().iter().all(|&v| v == 0));
+        let bright = draw(color, 0., 0., 32., 0.51 / 255., BodyBlend::Lighter);
+        r.render_overlay(
+            &frame([32, 32], vec![bright.clone(), bright]),
+            &b.create_view(&Default::default()),
+        )
+        .unwrap();
+        assert_eq!(offscreen::pixels(&r, &b).unwrap()[3], 2);
+        assert!(pollster::block_on(scope.pop()).is_none());
+    }
 }

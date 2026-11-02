@@ -1,0 +1,91 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -923,6 +923,7 @@
+         let mut glow_count = 0;
+         let mut glow_coverage = [0.; 4];
+         let mut outline_coverage = 0.;
++        let mut black_prefix = 0;
+         let previous =
+             if self.layer_history.extent == attachment && self.layer_history.samples == samples {
+                 self.layer_history
+@@ -1010,6 +1011,9 @@
+                 }
+             }
+             let texture = &self.textures[&quad.key];
++            if soft_layers && index == black_prefix && texture.black {
++                black_prefix += 1;
++            }
+             for vertex in [
+                 quad.vertices[0],
+                 quad.vertices[1],
+@@ -1032,7 +1036,7 @@
+         }
+         let glow_bins = select_glows(glow_coverage, samples, previous);
+         let glow_span =
+-            glow_span.filter(|span| span.len() == glow_count && glow_bins[1..].contains(&true));
++            glow_span.filter(|span| span.end > black_prefix && span.len() == glow_count && glow_bins[1..].contains(&true));
+         // An individually unprofitable bin stays on the ordinary path even
+         // when another bin can pay for splitting the world pass.
+         for chunk in &mut self.vertices[..chunk_count] {
+@@ -1129,6 +1133,7 @@
+         // explicitly marked additive glow barrier can use a smaller attachment.
+         let outline_span = outline_span.filter(|span| {
+             samples > 1
++                && span.end > black_prefix
+                 && span.len() == outline_count
+                 && unsafe_prefix.is_none_or(|i| i >= span.end)
+                 && pays(
+@@ -1220,7 +1225,7 @@
+             .as_ref()
+             .or(self.outline_target.as_ref());
+         let mut outline_calls = 0;
+-        let start = outline_span.as_ref().map_or(0, |span| span.end);
++        let start = outline_span.as_ref().map_or(black_prefix, |span| span.end.max(black_prefix));
+         if outline_span.is_some() {
+             outline_calls = self.encode_pass(
+                 &mut encoder,
+@@ -1229,7 +1234,7 @@
+                     resolve: None,
+                     samples: 1,
+                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+-                    range: 0..start,
++                    range: black_prefix..start,
+                     queries: if aggregate_queries {
+                         None
+                     } else {
+--- a/client/apps/wgpu-slice/src/quad.wgsl
++++ b/client/apps/wgpu-slice/src/quad.wgsl
+@@ -75,20 +75,27 @@
+ // Reduced attachments must retain the world-sized source footprint. Otherwise
+ // implicit derivatives select extra mip reduction before reconstruction.
+ @fragment fn fs_glow2(v: VertexOut) -> @location(0) vec4<f32> {
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.)*v.alpha.x;
++    return food_glow(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.)*v.alpha.x);
+ }
+ @fragment fn fs_glow4(v: VertexOut) -> @location(0) vec4<f32> {
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.)*v.alpha.x;
++    return food_glow(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.)*v.alpha.x);
+ }
+ @fragment fn fs_glow8(v: VertexOut) -> @location(0) vec4<f32> {
+-    return textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.)*v.alpha.x;
++    return food_glow(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.)*v.alpha.x);
+ }
+ @fragment fn fs_pair2(v: VertexOut) -> @location(0) vec4<f32> {
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.),v.alpha);
++    return food_glow(pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-1.),v.alpha));
+ }
+ @fragment fn fs_pair4(v: VertexOut) -> @location(0) vec4<f32> {
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.),v.alpha);
++    return food_glow(pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-2.),v.alpha));
+ }
+ @fragment fn fs_pair8(v: VertexOut) -> @location(0) vec4<f32> {
+-    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.),v.alpha);
++    return food_glow(pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.),v.alpha));
+ }
++
++// Reduced additive food layers feed an opaque UNORM8 world. Their alpha cannot
++// change its final alpha; skip RGB-zero contributions, and leave intermediate alpha zero.
++fn food_glow(c: vec4<f32>) -> vec4<f32> {
++    if all(c.rgb == vec3<f32>(0.)) { discard; }
++    return vec4<f32>(c.rgb,0.);
++}
