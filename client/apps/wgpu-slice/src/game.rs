@@ -1021,6 +1021,35 @@ impl LocalGame {
             session = self.session.clone();
             session.prepare_controls(&commands, now).map_err(|e| e.0)?;
         }
+        if decoded.command_count() == 1
+            && matches!(commands[0].opcode, b'g' | b'G' | b'=')
+            && self
+                .client
+                .received()
+                .setup
+                .as_ref()
+                .is_some_and(|s| matches!(s.protocol, 13 | 19))
+        {
+            // Non-growing anchors emit no length/HUD journal. Admit the
+            // session before the snake-local core transaction can publish.
+            session.match_report(&[], 0).map_err(|e| e.0)?;
+            session.commit_controls().map_err(|e| e.0)?;
+            if self
+                .client
+                .try_apply_single_anchor(bytes, ElapsedHeader::Absent)
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                self.session = session;
+                #[cfg(feature = "feel-trace")]
+                if self.trace.is_some() {
+                    self.ingress_observations.push(now);
+                }
+                return Ok(());
+            }
+            session = self.session.clone();
+            session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        }
         let guards: Vec<_> = plan
             .guards
             .iter()

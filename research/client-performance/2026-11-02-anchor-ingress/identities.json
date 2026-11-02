@@ -1,0 +1,38 @@
+{
+  "base": "1b09894d3d11ba819474381fc33c68bd705da933",
+  "pairs": 6,
+  "binaries": {
+    "control": "24ebbc5c7924d44867812d72a8149cf04e43b2ec1342d3fdef7dc03eb8b95bd4",
+    "combined": "5ba2dffefec8d8b639b37bec3bb4212874778001110ec06678c8301e4176798f",
+    "anchor": "b1c4d13a2e3dae66cf64682db14b969251d59f3eccd68b46d9613cc4d44e8268",
+    "allthree": "56833c5212f28542c13212a76abb7a7ccb7bfbdfef9dd396af8932aac0fbfb7c"
+  },
+  "state_sha256": {
+    "0": "7e733b1c7bc1ae450cd60b81f6907f9728943a56f649f6137c38cdc569327d5a",
+    "-120": "c3ae6169eba05d9cd203b5601f797621025e0d9bf1a006985256aed7108bca97"
+  },
+  "output_digests": {
+    "0": "b9f2870246df9495",
+    "-120": "78b36afd816d2773"
+  },
+  "source_hashes": {
+    "anchor-instrumented.patch": "aa853cb5835be1953612ad33e0f93ae9d036c796d26955022630d894f141a5d8",
+    "allthree-instrumented.patch": "9e8291788ba1c93a9bb991238693dc388c1d6ba2cc845dbfd82af9232835b1b5",
+    "combined-instrumented.patch": "df4d47df8b88390e43efd2c1e344eb3dd134df4f31aa08e96e6306c337595ad1",
+    "burst_profile.rs": "47c88eff74a0b88aa21765609e55743844ff0a8a944ff2438bae4fe79d0eae65"
+  },
+  "world_counts": {
+    "0": {
+      "foods": 31467,
+      "snakes": 40,
+      "preys": 0,
+      "draws": 118747
+    },
+    "-120": {
+      "foods": 31467,
+      "snakes": 40,
+      "preys": 0,
+      "draws": 1196
+    }
+  }
+}

@@ -1266,6 +1266,95 @@ impl AnimatedClient {
         }))
     }
 
+    /// Stage a non-growing anchor using the canonical snake-local wire reducer.
+    /// Pressure/capacity transitions, growth and batches retain full staging.
+    pub fn try_apply_single_anchor(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+    ) -> Result<Option<FrameReport>, ClientPresentationError> {
+        if self.detail_pressure
+            || self.entries.len() > MAX_RETAINED_SNAKES
+            || self.received.snakes.len() > 256
+            || self
+                .received
+                .snakes
+                .values()
+                .map(|s| s.body.len())
+                .sum::<usize>()
+                > 65_536
+        {
+            return Ok(None);
+        }
+        let decoded = crate::protocol::read_frame(bytes, header).map_err(StateError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let Some(prepared) = self
+            .received
+            .prepare_single_anchor(decoded.commands().next().expect("one command"))?
+        else {
+            return Ok(None);
+        };
+        if prepared.body_points > 65_536 {
+            return Ok(None);
+        }
+        let mut camera = self.camera.clone();
+        let mut changed = None;
+        if let Some(PresentationEvent::SnakeAnchor {
+            target,
+            absolute_position,
+            direction,
+            grew: false,
+            ..
+        }) = &prepared.event
+            && let Some(index) = self.target_index(*target)
+        {
+            let entry = &self.entries[index];
+            let previous = entry.snake.metrics().corrected_head;
+            let mut snake = entry.snake.as_ref().clone();
+            snake.apply_anchor(
+                *absolute_position,
+                *direction,
+                None,
+                AnchorView {
+                    zoom: camera.zoom(),
+                    extrapolated_distance: 0.,
+                },
+            )?;
+            if entry.own {
+                camera.reanchor(previous, snake.metrics().corrected_head)?;
+            }
+            let points = self.retained_body_points() - entry.snake.body().points().len()
+                + snake.body().points().len();
+            let storage = self
+                .entries
+                .iter()
+                .map(|e| e.snake.body().storage_slots())
+                .sum::<usize>()
+                - entry.snake.body().storage_slots()
+                + snake.body().storage_slots();
+            // Full staging owns cross-object compaction/reclamation. Decline
+            // without mutation whenever this anchor could trigger those paths.
+            if points > MAX_RETAINED_TOTAL_BODY_POINTS || storage > MAX_RETAINED_TOTAL_BODY_POINTS {
+                return Ok(None);
+            }
+            changed = Some((index, snake));
+        }
+        Arc::make_mut(&mut self.received).commit_single_anchor(prepared, decoded.prefix());
+        if let Some((index, snake)) = changed {
+            self.entries[index].snake = Arc::new(snake);
+        }
+        self.camera = camera;
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(Some(FrameReport {
+            commands: 1,
+            ignored: 0,
+        }))
+    }
+
     fn apply_prepared_food<E, G>(
         &mut self,
         prepared: crate::state::PreparedFood,
