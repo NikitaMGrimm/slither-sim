@@ -1,0 +1,24 @@
+{
+  "base": "1b09894d3d11ba819474381fc33c68bd705da933",
+  "pairs": 6,
+  "state_sha256": {
+    "0": "7e733b1c7bc1ae450cd60b81f6907f9728943a56f649f6137c38cdc569327d5a",
+    "-120": "c3ae6169eba05d9cd203b5601f797621025e0d9bf1a006985256aed7108bca97"
+  },
+  "output_digests": {
+    "0": "b9f2870246df9495",
+    "-120": "78b36afd816d2773"
+  },
+  "binaries": {
+    "control": "24ebbc5c7924d44867812d72a8149cf04e43b2ec1342d3fdef7dc03eb8b95bd4",
+    "consume": "6c41243e0cc28df28f3cbfdf93ff3851eea851f4c4a572f9c8f71e0ab9c9e4e4",
+    "snakes": "7a3ec577514948c45aa0012764b59c534c3e8b120f3000632d632be6a178712c",
+    "combined": "5ba2dffefec8d8b639b37bec3bb4212874778001110ec06678c8301e4176798f"
+  },
+  "source_hashes": {
+    "snake-instrumented.patch": "52575e3521265a1403cb3600ce2031e19e33a6df0e0ca549457e82065e026d6e",
+    "combined-instrumented.patch": "df4d47df8b88390e43efd2c1e344eb3dd134df4f31aa08e96e6306c337595ad1",
+    "consume-production.patch": "c9522322adcaf17c2e085296c494aeb450d21059764473f36d7d9fcf7ed548b9",
+    "burst_profile.rs": "47c88eff74a0b88aa21765609e55743844ff0a8a944ff2438bae4fe79d0eae65"
+  }
+}

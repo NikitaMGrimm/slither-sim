@@ -742,7 +742,8 @@ struct Entry {
     addressed: bool,
     own: bool,
     drawn: bool,
-    snake: SnakePresentation,
+    // Packet snapshots share untouched snakes; mutation detaches one object.
+    snake: Arc<SnakePresentation>,
     antenna: Option<AntennaState>,
     accessory: Option<StaticHeadAccessoryGeometry>,
     nickname: Option<RetainedNickname>,
@@ -1110,7 +1111,7 @@ impl AnimatedClient {
                 })
                 .map(|(i, _)| i)
                 .ok_or(ClientPresentationError::Limit)?;
-            self.entries[index].snake.compact_visual_body();
+            Arc::make_mut(&mut self.entries[index].snake).compact_visual_body();
         }
         if self
             .entries
@@ -1120,7 +1121,7 @@ impl AnimatedClient {
             > point_limit
         {
             for entry in &mut self.entries {
-                entry.snake.reclaim_visual_storage();
+                Arc::make_mut(&mut entry.snake).reclaim_visual_storage();
             }
         }
         Ok(())
@@ -1204,7 +1205,7 @@ impl AnimatedClient {
             && let Some(index) = self.target_index(*target)
         {
             let entry = &self.entries[index];
-            let mut snake = entry.snake.clone();
+            let mut snake = entry.snake.as_ref().clone();
             snake.set_motion(*heading, *wanted_heading, *direction, *speed_per_32ms)?;
             if !entry.own
                 && let Some(wanted) = wanted_heading
@@ -1215,7 +1216,7 @@ impl AnimatedClient {
         }
         Arc::make_mut(&mut self.received).commit_single_motion(prepared, decoded.prefix());
         if let Some((index, snake)) = changed {
-            self.entries[index].snake = snake;
+            self.entries[index].snake = Arc::new(snake);
         }
         self.sync_received_visual_tails();
         #[cfg(feature = "feel-trace")]
@@ -2536,8 +2537,7 @@ impl AnimatedClient {
                             );
                         }
                         for entry in &mut next.entries {
-                            entry
-                                .snake
+                            Arc::make_mut(&mut entry.snake)
                                 .apply_setup(&value)
                                 .map_err(ClientPresentationError::from)?;
                         }
@@ -2664,7 +2664,7 @@ impl AnimatedClient {
                             addressed: true,
                             own,
                             drawn: true,
-                            snake,
+                            snake: Arc::new(snake),
                             antenna,
                             accessory: resolved.accessory,
                             nickname: if next.nicknames_enabled {
@@ -2692,15 +2692,13 @@ impl AnimatedClient {
                     } => {
                         if let Some(index) = next.target_index(target) {
                             let entry = &mut next.entries[index];
-                            entry
-                                .snake
+                            Arc::make_mut(&mut entry.snake)
                                 .set_motion(heading, wanted_heading, direction, speed_per_32ms)
                                 .map_err(ClientPresentationError::from)?;
                             if !entry.own
                                 && let Some(wanted) = wanted_heading
                             {
-                                entry
-                                    .snake
+                                Arc::make_mut(&mut entry.snake)
                                     .set_gaze_heading(wanted)
                                     .map_err(ClientPresentationError::from)?;
                             }
@@ -2716,8 +2714,7 @@ impl AnimatedClient {
                         if let Some(index) = next.target_index(target) {
                             let entry = &mut next.entries[index];
                             let previous = entry.snake.metrics().corrected_head;
-                            entry
-                                .snake
+                            Arc::make_mut(&mut entry.snake)
                                 .apply_anchor(
                                     absolute_position,
                                     direction,
@@ -2741,8 +2738,7 @@ impl AnimatedClient {
                     }
                     PresentationEvent::SnakeMass { id, fam } => {
                         if let Some(index) = next.lookup_index(id) {
-                            next.entries[index]
-                                .snake
+                            Arc::make_mut(&mut next.entries[index].snake)
                                 .set_mass(fam)
                                 .map_err(ClientPresentationError::from)?;
                             if next.entries[index].own {
@@ -2752,8 +2748,7 @@ impl AnimatedClient {
                     }
                     PresentationEvent::SnakeTailRemoved { id, fam } => {
                         if let Some(index) = next.lookup_index(id) {
-                            next.entries[index]
-                                .snake
+                            Arc::make_mut(&mut next.entries[index].snake)
                                 .remove_tail(fam, next.camera.zoom())
                                 .map_err(ClientPresentationError::from)?;
                             if next.entries[index].own {
@@ -2777,7 +2772,7 @@ impl AnimatedClient {
                             let entry = &mut next.entries[index];
                             entry.wire_id = None;
                             if died {
-                                entry.snake.mark_dead();
+                                Arc::make_mut(&mut entry.snake).mark_dead();
                             } else {
                                 entry.drawn = false;
                             }
@@ -2933,7 +2928,7 @@ impl AnimatedClient {
                         .and_then(|id| self.received.snakes.get(&id))
                         .and_then(|s| s.body.last())
                 {
-                    entry.snake.sync_received_visual_tail(Point {
+                    Arc::make_mut(&mut entry.snake).sync_received_visual_tail(Point {
                         x: tail.x + center,
                         y: tail.y + center,
                     });
@@ -3037,7 +3032,7 @@ impl AnimatedClient {
                 .map_err(ClientPresentationError::Minimap)?;
         }
         for entry in &mut self.entries {
-            if entry.drawn && !entry.snake.advance(step)? {
+            if entry.drawn && !Arc::make_mut(&mut entry.snake).advance(step)? {
                 entry.drawn = false;
             }
         }
@@ -3603,7 +3598,7 @@ impl AnimatedClient {
                 let y = position.y + offset.y;
                 x >= left && y >= top && x <= right && y <= bottom
             });
-            entry.snake.set_visible(visible);
+            Arc::make_mut(&mut entry.snake).set_visible(visible);
         }
         if !allow_face_presentation
             && next.entries.iter().any(|entry| {
@@ -3656,8 +3651,7 @@ impl AnimatedClient {
                 continue;
             }
             let detailed_style = resolve_style(draw_ordinal, entry.own, &entry.snake)?;
-            let (curve, face_heading) = entry
-                .snake
+            let (curve, face_heading) = Arc::make_mut(&mut entry.snake)
                 .prepare_curve_staged(
                     quality_scale,
                     detailed_style,
@@ -3787,7 +3781,7 @@ impl AnimatedClient {
     pub fn set_own_gaze_heading(&mut self, heading: f64) -> Result<(), ClientPresentationError> {
         finite(&[heading])?;
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.own) {
-            entry.snake.set_gaze_heading(heading)?;
+            Arc::make_mut(&mut entry.snake).set_gaze_heading(heading)?;
         }
         Ok(())
     }
@@ -3949,7 +3943,7 @@ impl AnimatedClient {
     ) -> impl Iterator<Item = (SnakeObjectToken, bool, bool, &SnakePresentation)> {
         self.entries
             .iter()
-            .map(|entry| (entry.token, entry.own, entry.drawn, &entry.snake))
+            .map(|entry| (entry.token, entry.own, entry.drawn, entry.snake.as_ref()))
     }
 
     /// Stable identity of the retained original own object.
@@ -3965,7 +3959,7 @@ impl AnimatedClient {
         self.entries
             .iter()
             .find(|entry| entry.token == token)
-            .map(|entry| &entry.snake)
+            .map(|entry| entry.snake.as_ref())
     }
 
     /// Read-only draw-driven camera and correction samples.
@@ -3978,7 +3972,7 @@ impl AnimatedClient {
         self.entries
             .iter()
             .find(|entry| entry.own)
-            .map(|entry| &entry.snake)
+            .map(|entry| entry.snake.as_ref())
     }
 
     /// Original own object while it belongs to the draw collection, including death fade.
@@ -3986,7 +3980,7 @@ impl AnimatedClient {
         self.entries
             .iter()
             .find(|entry| entry.own && entry.drawn)
-            .map(|entry| &entry.snake)
+            .map(|entry| entry.snake.as_ref())
     }
 
     /// Original own object while alive and still in the draw collection.
@@ -3998,7 +3992,7 @@ impl AnimatedClient {
     /// Latest addressable appearance for an explicit wire ID.
     pub fn snake(&self, id: u16) -> Option<&SnakePresentation> {
         self.lookup_index(id)
-            .map(|index| &self.entries[index].snake)
+            .map(|index| self.entries[index].snake.as_ref())
     }
 
     /// Current draw collection in update/paint order, including culled snakes.
@@ -4006,7 +4000,7 @@ impl AnimatedClient {
         self.entries
             .iter()
             .filter(|entry| entry.drawn)
-            .map(|entry| &entry.snake)
+            .map(|entry| entry.snake.as_ref())
     }
 
     /// All retained objects, including the own object after it stops drawing.
@@ -4812,6 +4806,83 @@ mod resolved_draw_tests {
             .unwrap();
         assert!(client.prey_enabled());
         assert_eq!(client.received.frames_applied, 1);
+    }
+
+    #[test]
+    fn snake_snapshots_share_untouched_objects_and_isolate_changes_and_rejection() {
+        let mut client = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut client, &setup());
+        apply_factories(&mut client, &spawn(0, 0));
+        let mut rival = spawn(0, 0);
+        rival[2] = 8;
+        apply_factories(&mut client, &rival);
+        let frozen = client.clone();
+        let before = format!("{frozen:?}");
+        assert!(
+            client
+                .entries
+                .iter()
+                .zip(&frozen.entries)
+                .all(|(a, b)| Arc::ptr_eq(&a.snake, &b.snake))
+        );
+        client
+            .apply_frame(&[b'h', 0, 8, 0x12, 0x34, 0x56], ElapsedHeader::Absent)
+            .unwrap();
+        assert!(Arc::ptr_eq(
+            &client.entries[0].snake,
+            &frozen.entries[0].snake
+        ));
+        assert!(!Arc::ptr_eq(
+            &client.entries[1].snake,
+            &frozen.entries[1].snake
+        ));
+        let snapshot = client.clone();
+        // Owned observations cannot change through the Arcs shared by these clients.
+        let client_before = format!("{client:?}");
+        let snapshot_before = format!("{snapshot:?}");
+        let own_before: SnakePresentation = client.own_snake().unwrap().clone();
+        let own_references = Arc::strong_count(&snapshot.entries[0].snake);
+        let rejected = bundle(&[
+            vec![b'h', 0, 7, 0x12, 0x34, 0x56],
+            vec![b'f', 1, 2, 3, 4, 7, 25],
+        ]);
+        let sentinel = Rc::new(());
+        let mut calls = 0;
+        let error = client
+            .apply_frame_with_factories::<HookError, _, _>(
+                &rejected,
+                ElapsedHeader::Absent,
+                |_| Ok(PairedFaceGeometry::default()),
+                |_, _| {
+                    calls += 1;
+                    // Staging adds a shared reference; the preceding own-snake
+                    // mutation must detach it before this later callback fails.
+                    assert_eq!(
+                        Arc::strong_count(&snapshot.entries[0].snake),
+                        own_references,
+                        "own-snake mutation must detach before food resolution"
+                    );
+                    Err(HookError::Callback(Rc::clone(&sentinel)))
+                },
+            )
+            .unwrap_err();
+        match error {
+            HookError::Callback(actual) => assert!(Rc::ptr_eq(&actual, &sentinel)),
+            HookError::Model(error) => panic!("unexpected model failure: {error}"),
+        }
+        assert_eq!(calls, 1);
+        assert_eq!(format!("{client:?}"), client_before);
+        assert_eq!(format!("{snapshot:?}"), snapshot_before);
+        assert_eq!(client.own_snake().unwrap(), &own_before);
+        assert_eq!(snapshot.own_snake().unwrap(), &own_before);
+        assert_eq!(format!("{frozen:?}"), before);
+        client.advance(100., false).unwrap();
+        client.prepare_draw(960, 540).unwrap();
+        client
+            .apply_frame(&[b's', 0, 8, 1], ElapsedHeader::Absent)
+            .unwrap();
+        client.reset();
+        assert_eq!(format!("{frozen:?}"), before);
     }
 
     // Original synthetic protocol-19 inputs; no external source or fixture.
