@@ -54,19 +54,22 @@ scale out to the whole map. Zoom lasts until the app closes.
 Official servers (Windows desktop):
 
 ```sh
-cargo run --release --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop -- --official --nickname Player --skin 0
+cargo run --release --manifest-path apps/wgpu-slice/Cargo.toml --locked --bin slither-wgpu-desktop -- --nickname Player --skin 0
 ```
 
 slither-client is an independent project, not affiliated with or endorsed by
-slither.io or Lowtech Studios. Connecting to the official servers is your own
-choice; check slither.io's terms before you do.
+slither.io or Lowtech Studios. Native startup begins official-site discovery and
+server probing in the background. Play uses the results or waits for the in-flight
+acquisition. Use `--server host:port` to skip that contact. Check slither.io's terms
+before connecting.
 
 Use `--server host:port` to connect directly to a custom server. The client builds
-`ws://host:port/slither` internally; IPv6 uses `[address]:port`. Without `--official`,
-it never fetches the official website or discovers servers. Combining
-`--official --server host:port` still fetches fresh login values before using
-that explicit server.
-Official play is interactive only: headless runs need `--server` without `--official`.
+`ws://host:port/slither` internally; IPv6 uses `[address]:port`. Direct launches
+never fetch the official website or discover servers. With no server flag, the
+native client discovers official servers and measures latency in the background
+at startup. Play with Automatic (best ping) joins that work and connects using
+fresh login values. The former official opt-in flag has been removed.
+Official play is interactive only: headless runs require `--server`.
 
 Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
@@ -83,11 +86,12 @@ wordmark. `--cosmetics-dir` still supplies backgrounds, skins, accessories and m
 icons. [Settings](docs/settings.md) on the login selects and remembers Quality
 for the next Play.
 
-With no connection flags, open [Servers](docs/server-picker.md), add a `host:port`
-and choose its Custom row to Play directly. Custom entries and choices save
-locally. The picker stays offline until Load official is chosen; a restored
-official ID alone does not start discovery. `--official` remains an explicit
-opt-in to official discovery and fresh login values.
+Open [Servers](docs/server-picker.md) to see the official directory or add a
+`host:port` and choose its Custom row to Play directly. Choosing Custom cancels
+unfinished official discovery. Custom entries and choices save locally; a new
+no-flag launch starts in official context, preserving a saved official ID and
+using Automatic for a saved custom choice. Choose Automatic or an official row
+to return to official play. The picker needs no directory-loading button.
 
 
 Browser (Canvas2D):

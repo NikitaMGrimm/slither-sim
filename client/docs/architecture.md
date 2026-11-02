@@ -61,8 +61,8 @@ dependency on the core. game::LocalGame owns the shared protocol/session/input/p
 flow. Windows uses winit and tungstenite; the browser uses WebSocket and RAF.
 Both submit ordered frames and authored materials through the same wgpu renderer.
 
-Play opens a simulator endpoint or, natively with `--official`, an official
-server chosen from the live directory; there is no automatic reconnect. The
+Play opens a direct endpoint or, by default natively, an official server chosen
+from the directory measured in the background at startup; there is no automatic reconnect. The
 renderer covers body, food, prey, paired eyes, arena and platform text for
 nicknames, the HUD, leaderboard and official record announcements.
 Image faces, antennas and complete chooser menus remain incomplete. Rasterization can

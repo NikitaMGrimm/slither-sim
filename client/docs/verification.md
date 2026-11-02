@@ -93,7 +93,15 @@ prebuilt debug probe path; `--seconds N` selects 5–60 seconds of gameplay
 readiness and assertion tests run in `npm test` without either binary.
 The probe takes `--server 127.0.0.1:<port> --seconds 5..60`; it builds the
 WebSocket URL internally and retains its loopback-only admission. The ordinary
-desktop headless path also needs `--server`, and rejects `--official`.
+desktop headless path also needs `--server` and never starts official discovery.
+
+No-flag native startup discovers official servers. Offline tests exercise its
+parsed options and picker request, then use authored directory responses and
+injected probes in `official.rs`; they never launch the interactive binary.
+The development launcher passes an explicit loopback `--server` (covered by its
+launcher test). CI builds the desktop binary without running its entry point;
+the end-to-end probe requires its explicit loopback server. Offscreen menu
+specimens inject directory data and never consume requests with a network worker.
 
 The headless summary includes transport ping send receipts, recognized pong
 receipts, final phase/lag/pending-ping state, own ID and first/last received own

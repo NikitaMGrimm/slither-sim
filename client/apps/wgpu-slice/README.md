@@ -21,24 +21,24 @@ The client builds `ws://host:port/slither` internally.
 
 Direct `--server` sends a fixed official-format login (the same values as the
 simulator's portable_bot), for compatibility with custom server implementations
-that copied the official login. Without `--official`, it never fetches the
-official website or performs discovery.
+that copied the official login. Direct launches never fetch the official website
+or perform discovery.
 
-With no flags, Servers accepts and saves custom `host:port` entries offline.
-Choose a Custom row for direct Play, or Load official to opt into discovery.
-Restoring an official ID does not make a no-flag launch contact the website.
+With no flags, official discovery and latency measurement start in the background.
+Servers lists official rows as they arrive and accepts saved custom `host:port`
+entries. Choose a Custom row for direct Play; Automatic returns to official play.
 See [server picker](../../docs/server-picker.md) for bounds and record formats.
 
 ## Official servers
 
-`--official` configures official play (native only). The window opens on login;
+Official play is the native default. The window opens on login;
 `--nickname`/`--skin` are initial values. Click Play or press Enter to connect.
 Official discovery starts in the background at login. Each explicit Play fetches
 the homepage and its `/s/game<digits>.js` script as inert data,
 parses `client_version`/`cpw` with the core's closed literal grammar (code is
 never evaluated). Automatic selection joins the directory/ping worker and picks
-by lowest cluster RTT, then population-weighted. `--official --server host:port`
-uses that explicit server with fresh login values. Game sockets use the original `ws://`
+by lowest cluster RTT, then population-weighted. `--server host:port` bypasses
+discovery and uses a fixed login. Game sockets use the original `ws://`
 path with `Origin: http://slither.io`. Downloads are capped after gzip decoding
 (256 KiB page/directory, 1 MiB script, 5 s, at most three same-host redirects,
 no HTTPS-to-HTTP downgrade for the script/directory) and kept only in memory.
@@ -59,7 +59,7 @@ starts one Play without a window, wanders along broad drifting arcs with a perio
 normal input path, saves 960x540 PNGs outside the checkout and prints a summary
 (server, profile version, handshake/login/Setup, packet and frame counts, own
 length over time, exit reason). Page echo bytes and raw packets are never printed.
-Headless runs reject `--official` even when an explicit server is supplied.
+Headless requires an explicit server and never starts official acquisition.
 
 The encounter summary separates received retained other appearances (maximum
 count and distinct wire IDs) from the core's culled-visible appearances, and

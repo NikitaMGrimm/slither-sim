@@ -15,7 +15,6 @@ pub const BACKDROP: ControlId = ControlId(0);
 pub const SEARCH_EDITOR: EditorId = EditorId(2);
 pub const ADDRESS: ControlId = ControlId(9);
 pub const ADD_CUSTOM: ControlId = ControlId(10);
-pub const OFFICIAL: ControlId = ControlId(11);
 pub const ADDRESS_EDITOR: EditorId = EditorId(3);
 pub const MAX_CUSTOM_SERVERS: usize = 32;
 pub const MAX_CUSTOM_ADDRESS: usize = 512;
@@ -128,7 +127,6 @@ pub struct ServerPicker {
     request: bool,
     directory_requested: bool,
     directory_ready: bool,
-    changed: bool,
     dirty: bool,
     pending_rows: Option<Vec<DirectoryRow>>,
     pub custom: Vec<String>,
@@ -152,7 +150,6 @@ impl Default for ServerPicker {
             request: false,
             directory_requested: false,
             directory_ready: false,
-            changed: false,
             dirty: false,
             pending_rows: None,
             custom: Vec::new(),
@@ -170,38 +167,21 @@ impl ServerPicker {
     pub fn is_open(&self) -> bool {
         self.open
     }
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
     pub fn official_context(&self) -> bool {
         self.official_context
     }
     pub fn can_play(&self) -> bool {
         self.selection.custom_address().is_some() || self.official_context
     }
-    pub fn enter_official(&mut self) {
-        if self.official_context {
-            return;
-        }
+    /// Enter official context and request acquisition once. Direct startup skips this.
+    pub fn start_directory(&mut self) {
         self.official_context = true;
+        // Default launch uses official Automatic; saved custom entries remain
+        // available for direct selection. Startup never writes the preference.
         if self.selection.custom_address().is_some() {
             self.selection = ServerPreference::Automatic;
         }
-        self.changed = true;
-        self.dirty = true;
-        self.start_directory(true);
-    }
-    /// Called once when the native login starts; endpoint mode stays offline.
-    pub fn start_directory(&mut self, official: bool) {
-        if official {
-            self.official_context = true;
-            // An explicit official launch overrides a restored custom choice for
-            // this run; startup does not write the preference back to disk.
-            if self.selection.custom_address().is_some() {
-                self.selection = ServerPreference::Automatic;
-            }
-        }
-        if official && !self.directory_requested {
+        if !self.directory_requested {
             self.request = true;
             self.directory_requested = true;
         }
@@ -236,14 +216,12 @@ impl ServerPicker {
     pub fn directory_failed(&mut self, status: &str) {
         if !self.directory_ready {
             // Provisional samples belong to the failed attempt, not the next retry.
-            if self.official_context && !self.rows.is_empty() {
+            if !self.rows.is_empty() {
                 self.generation = self.generation.wrapping_add(1);
             }
             self.rows.clear();
             self.pending_rows = None;
-            if self.official_context {
-                self.list = ScrollList::new(VISIBLE_ROWS);
-            }
+            self.list = ScrollList::new(VISIBLE_ROWS);
             self.directory_requested = false;
             self.request = false;
             self.status = status.to_owned();
@@ -290,7 +268,6 @@ impl ServerPicker {
         let address = self.custom.remove(index);
         if self.selection.custom_address() == Some(address.as_str()) {
             self.selection = ServerPreference::Automatic;
-            self.changed = true;
             self.dirty = true;
         }
         self.custom_operations
@@ -299,12 +276,7 @@ impl ServerPicker {
         self.list.window(self.total());
     }
     fn total(&self) -> usize {
-        self.custom.len()
-            + if self.official_context {
-                self.entry_iter().count()
-            } else {
-                0
-            }
+        self.custom.len() + self.entry_iter().count()
     }
     pub fn step(&mut self, now: f64) -> Result<(), &'static str> {
         crate::menu_transition::step(&mut self.alpha, &mut self.previous, self.open, now)
@@ -356,7 +328,7 @@ impl ServerPicker {
             && rows
                 .iter()
                 .all(|row| old_by_id.contains_key(&row.server.id));
-        if self.official_context && self.visible() && !self.rows.is_empty() && same_ids {
+        if self.visible() && !self.rows.is_empty() && same_ids {
             self.pending_rows = Some(rows.clone());
             // Progress belongs to the same decoded directory. Retain the visible
             // representative's active flag too, so deduplication cannot move rows.
@@ -366,7 +338,7 @@ impl ServerPicker {
             }
         } else {
             self.pending_rows = None;
-            if self.official_context && !self.rows.is_empty() && !same_ids {
+            if !self.rows.is_empty() && !same_ids {
                 self.generation = self.generation.wrapping_add(1);
             }
         }
@@ -395,7 +367,7 @@ impl ServerPicker {
     pub fn search(&mut self, value: &str) -> bool {
         let value =
             TextRule::NumericServer.normalize_units(&value.encode_utf16().collect::<Vec<_>>());
-        if value == self.search || !self.open || !self.official_context {
+        if value == self.search || !self.open {
             return false;
         }
         self.search = value;
@@ -412,8 +384,8 @@ impl ServerPicker {
         false
     }
     fn choose(&mut self, id: Option<u16>) {
+        self.start_directory();
         self.selection = id.map_or(ServerPreference::Automatic, ServerPreference::Official);
-        self.changed = true;
         self.dirty = true;
         self.close();
     }
@@ -423,10 +395,9 @@ impl ServerPicker {
         }
         match intent.control {
             BACKDROP | CLOSE => self.close(),
-            OFFICIAL => self.enter_official(),
             ADD_CUSTOM => self.add_request = true,
             ADDRESS if intent.activation != Activation::Pointer => self.add_request = true,
-            AUTOMATIC if self.official_context => self.choose(None),
+            AUTOMATIC => self.choose(None),
             ControlId(n) if n >= REMOVE_BASE => {
                 let index = usize::from(n - REMOVE_BASE);
                 let total = self.total();
@@ -445,7 +416,6 @@ impl ServerPicker {
                     self.selection = ServerPreference::Custom(self.custom[index].clone());
                     self.official_context = false;
                     self.request = false;
-                    self.changed = true;
                     self.dirty = true;
                     self.close();
                     return true;
@@ -602,32 +572,14 @@ impl ServerPicker {
             },
         );
         add(
-            OFFICIAL,
+            SEARCH,
             24.,
             150.,
-            160.,
-            42.,
-            S::StudioAction,
-            "Official servers",
-            Some(2),
-            ControlKind::Button {
-                label: if self.official_context {
-                    "Official"
-                } else {
-                    "Load official"
-                }
-                .into(),
-            },
-        );
-        add(
-            SEARCH,
-            196.,
-            150.,
-            100.,
+            140.,
             42.,
             S::Field,
             "Server ID",
-            Some(3),
+            Some(2),
             ControlKind::TextField {
                 editor: SEARCH_EDITOR,
                 placeholder: "Server ID".into(),
@@ -638,9 +590,9 @@ impl ServerPicker {
         );
         add(
             AUTOMATIC,
-            308.,
+            176.,
             150.,
-            228.,
+            360.,
             42.,
             if self.selection == ServerPreference::Automatic && self.official_context {
                 S::StudioSave
@@ -648,9 +600,9 @@ impl ServerPicker {
                 S::StudioAction
             },
             "Automatic, best ping",
-            Some(4),
+            Some(3),
             ControlKind::Button {
-                label: "Automatic".into(),
+                label: "Automatic (best ping)".into(),
             },
         );
         add(
@@ -763,7 +715,7 @@ impl ServerPicker {
             None,
             ControlKind::Label {
                 text: if total == 0 {
-                    "Add a server or load official servers".into()
+                    "No servers available".into()
                 } else {
                     format!(
                         "{}–{} of {} · scroll or use arrows",
@@ -813,11 +765,6 @@ impl ServerPicker {
         );
         controls[0].placement = Placement::rect(0., 0., viewport[0], viewport[1]);
         controls[0].alpha = 0.88;
-        for control in &mut controls {
-            if matches!(control.id, SEARCH | AUTOMATIC) {
-                control.enabled = self.official_context;
-            }
-        }
         PanelView {
             id: 2,
             generation: self.generation,

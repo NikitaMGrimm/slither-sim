@@ -1,27 +1,29 @@
 # Native server picker
 
 The login's Servers icon opens a shared modal with a `host:port` field, Add,
-saved Custom entries and an explicit Load official action. A no-flag launch
-stays offline: opening the picker, restoring a saved official ID and adding or
-choosing custom entries do not fetch the official website. Choose a custom row
+saved Custom entries and official rows. A no-flag native launch starts official
+directory discovery and latency measurement in the background. Choose a custom row
 to enable direct Play with the fixed login. Removing the selected custom entry
 leaves Play unconfigured until another choice is made.
 
-Load official enters official context and requests discovery. `--official`
-opts into that context at login, starting directory discovery and latency
-measurement in the background. Opening the picker then joins that work;
+Automatic (best ping) is the initial choice. Opening the picker joins startup work;
 it never grants Play, creates a game session, or sends login. Choosing a Custom
 row leaves official context and cancels unfinished official work. Direct Play
 never invokes official profile acquisition, directory fetching or probing.
+Returning to Automatic discards cancelled startup work; uncached Play starts
+fresh acquisition while non-cancelled work remains reusable.
+Completed official rows remain visible alongside Custom entries. Choose Automatic,
+an official row or a matching ID to return to official context; Automatic can
+restart discovery if no completed directory is available. There is no loading button.
 Subsequent opens reuse the process's completed directory and ping samples;
 there is no open-count or timed refresh. An in-flight request is shared.
-If acquisition fails or Play cancels it before completion, the next open retries
+In official context, the next open retries failed or cancelled acquisition
 once. Failure never starts an automatic retry loop or discards completed samples,
 including a successfully empty directory.
 Direct `--server host:port` keeps its explicit server and performs no discovery
 or website fetch. It uses the fixed login and builds `ws://host:port/slither`
-internally; IPv6 authorities use brackets. `--official --server host:port` keeps
-the explicit server but fetches fresh login values on Play.
+internally; IPv6 authorities use brackets. The former official opt-in flag and
+its combined explicit-server/profile-acquisition mode have been removed.
 
 Custom addresses use the same admission as `--server`: a host and nonzero port,
 bracketed IPv6, with no URL scheme, credentials, path, query or internal whitespace.
@@ -50,6 +52,9 @@ takes the worker. Partial results are for display only: automatic Play still
 waits for the unchanged ping sweep and selects from its completed samples.
 Partial results never become the completed cache or suppress a retry after
 cancellation/failure. Fetch limits, cancellation and probe deadlines are unchanged.
+Closing the app signals cancellation and detaches acquisition workers instead of
+waiting for blocked I/O. A request may finish within its existing deadline while
+the process remains open; detached workers do not keep the process alive.
 Cold Play after a failed or cancelled startup starts that same streaming worker,
 even without reopening the picker. Failure/cancellation clears provisional rows
 and their captures; completed samples remain reusable. Retries still require an
@@ -68,9 +73,8 @@ an empty changed value has numeric value zero. Search does not invent regions
 or silently filter the directory. Clicking the search field deliberately clears
 its text on every click, including when already focused, matching the reference.
 
-Official Automatic (best ping) remains the default choice, but does not opt a
-no-flag launch into official context. `SlitherClient/server-choice.txt` beneath
-local application data still loads `1:<id>` and `1:auto`; a custom choice uses
+Official Automatic (best ping) is the default choice. The local application data
+file `SlitherClient/server-choice.txt` still loads `1:<id>` and `1:auto`; a custom choice uses
 `2:custom:<authority>`. Reads are capped at 544 bytes and custom authorities are
 revalidated. Missing, malformed or unreadable choice storage restores Automatic.
 A failed write leaves the in-memory choice intact.
@@ -89,9 +93,9 @@ The picker refreshes from the merged list,
 preserving edits saved by other instances since startup. Failed or malformed
 reads use the current in-memory list instead. Official endpoints and all historical pings never persist;
 the user's own custom authorities and custom choice are user data and may
-persist. An explicit CLI server wins until a picker choice/context action.
-`--official` overrides a restored custom choice with official Automatic for that
-run; this startup override does not rewrite the saved choice.
+persist. An explicit CLI server wins until a picker choice. A no-flag launch
+preserves a saved official ID and uses official Automatic for a restored custom
+choice; this startup override does not rewrite the saved choice or custom list.
 
 Official Play still acquires a fresh profile through its preparation worker. A saved ID is
 resolved against the retained directory using measured pings, then passes through
@@ -102,8 +106,7 @@ a Play racing picker acquisition waits for that same worker. Only the profile
 page and script are reacquired per Play. The picker does not execute downloaded scripts.
 Completed directory/ping samples are published even if that Play later fails
 profile acquisition or selected-ID resolution; reopening reuses those samples.
-An explicit or forced endpoint leaves pending discovery with the picker; Play
-does not wait on it, and its success or failure is handled independently.
+Direct endpoints use the fixed login without a preparation worker.
 
 The shared `ScrollList` admits six server rows per window, independent of directory
 size. Only these `ListRow` controls become widgets. Wheel, arrows,
