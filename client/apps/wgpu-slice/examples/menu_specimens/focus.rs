@@ -48,7 +48,9 @@ impl Sweep<'_> {
                 )
             })?;
         if let Some(id) = focus {
-            login.controls.keyboard_navigation();
+            // The egui screens draw their focus ring in keyboard modality.
+            login.login_ui.keyboard_focus = true;
+            login.studio_ui.keyboard_focus = true;
             login.focus(id);
         }
         for control in &login.panel.controls {
@@ -66,13 +68,19 @@ impl Sweep<'_> {
                     self.logical, self.dpr, self.ready
                 )
             })?;
+        // Settings keeps its own egui focus record.
+        let focused = if login.state.settings.visible() {
+            login.settings_ui.focused()
+        } else {
+            login.focused()
+        };
         if let Some(id) = focus
-            && login.controls.focus() != Some(id)
+            && focused != Some(id)
         {
             return Err(format!("Focus fixture lost {id:?} in {name}"));
         }
         let studio = login.studio.state.visible();
-        let counts = menu.draw_counts(0);
+        let counts = menu.draw_counts();
         let records = counts.admitted_menu();
         let bytes: usize = menu.resources.iter().map(|r| r.image.pixels.len()).sum();
         if records > if studio { 448 } else { 512 }
@@ -89,11 +97,13 @@ impl Sweep<'_> {
         if counts.components.total() != menu.frame.draws.len() {
             return Err("Focus attribution mismatch".into());
         }
-        self.ledger.push(serde_json::json!({"case":name,"logical":self.logical,"dpr":self.dpr,"ready_art":self.ready,"studio":studio,"records":records,"slots":menu.resources.len(),"bytes":bytes,"focus":format!("{:?}",login.controls.focus())}));
+        self.ledger.push(serde_json::json!({"case":name,"logical":self.logical,"dpr":self.dpr,"ready_art":self.ready,"studio":studio,"records":records,"slots":menu.resources.len(),"bytes":bytes,"focus":format!("{focused:?}")}));
         let wide = self.logical == [960., 540.];
-        let screenshot = !self.ready
+        // Procedural ready art also shows the egui studio's cosmetic thumbnails.
+        let thumbnails = self.ready && name.starts_with("cosmetics-");
+        let screenshot = (!self.ready || thumbnails)
             && [1., 1.5, 2.].contains(&self.dpr)
-            && (focus.is_some() || name.starts_with("roundtrip-"))
+            && (focus.is_some() || name.starts_with("roundtrip-") || name.contains("-fade-"))
             && (wide || name == "cosmetics-cell" || name == "settings-toggle");
         if screenshot {
             if studio {
@@ -102,15 +112,16 @@ impl Sweep<'_> {
                 menu.frame.draws.extend(preview.draws);
                 menu.resources.extend(resources);
             }
-            if let Some(cover) = menu.world_cover.take() {
-                menu.frame.draws.insert(0, cover);
-            }
-            capture(
+            capture_layered(
                 self.renderer,
                 &menu,
+                login,
                 &self.output.join(format!(
-                    "{name}-{}x{}-{}x.png",
-                    self.logical[0], self.logical[1], self.dpr
+                    "{name}-{}x{}-{}x{}.png",
+                    self.logical[0],
+                    self.logical[1],
+                    self.dpr,
+                    if self.ready { "-ready" } else { "" }
                 )),
             )?;
             login.studio.presented();
@@ -264,18 +275,30 @@ impl Sweep<'_> {
             )?;
             let logical = self.logical;
             let click = |login: &mut NativeLogin, id| -> Result<()> {
-                let resolved = login.panel.resolve(logical).map_err(str::to_owned)?;
-                let r = resolved
-                    .iter()
-                    .find(|r| r.control.id == id)
-                    .ok_or("Missing click fixture")?;
-                let point = [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.];
+                // Both screens are egui; click where each paints the control.
+                let point = if login.studio.state.visible() {
+                    let resolved = login.studio_panel.resolve(logical).map_err(str::to_owned)?;
+                    let r = resolved
+                        .iter()
+                        .find(|r| r.control.id == id)
+                        .ok_or("Missing click fixture")?;
+                    [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.]
+                } else {
+                    let r = login
+                        .login_ui
+                        .controls
+                        .iter()
+                        .find(|c| c.0 == id)
+                        .ok_or("Missing click fixture")?
+                        .1;
+                    [f64::from(r.center().x), f64::from(r.center().y)]
+                };
                 login.pointer(point, Some(true), true);
                 login.pointer(point, Some(false), true);
                 Ok(())
             };
             if keyboard {
-                roundtrip.controls.keyboard_navigation();
+                roundtrip.login_ui.keyboard_focus = true;
                 roundtrip.focus(login_ids::CHANGE_SKIN);
                 roundtrip.activate(true);
             } else {

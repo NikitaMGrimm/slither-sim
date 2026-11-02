@@ -30,19 +30,22 @@ fn opened(record: AppearanceRecord) -> NativeLogin {
     login.open_studio();
     login
 }
+/// The egui studio adds no menu records; its only textures are the visible
+/// cosmetic thumbnails, uploaded once and released when the studio closes.
 #[test]
 fn cosmetics_first_entry_fades_windows_and_return_fit_the_allowances() {
-    use slither_wgpu_slice::menu_counts::MenuComponent;
-    let mut peak = 0;
-    let mut section_peak = 0;
     for logical in [[960., 540.], [360., 640.], [960., 360.]] {
         for dpr in [1., 1.25, 1.5, 1.75, 2., 3., 4., 5., 6., 7., 8.] {
             let extent = logical.map(|v| (v * dpr) as u32);
             let mut art = art();
             let mut login = opened(AppearanceRecord::default());
             login.prepare_host(extent, dpr, false, Some(&art)).unwrap();
+            let context = login.egui.context().unwrap().clone();
+            let textures = || context.tex_manager().read().num_allocated();
+            let baseline = textures();
             login.studio.activate(COSMETICS_TAB, "Player");
-            for time in [0., 1., 90., 115., 180., 229., 230., 410., 525., 640.] {
+            let mut shown = 0;
+            for time in [0., 1., 90., 115., 180., 229., 230., 410., 525., 640., 755.] {
                 login.step(9600. + time, false, false).unwrap();
                 if time == 410. {
                     login.studio.state.scroll_cosmetics(99, logical);
@@ -51,25 +54,9 @@ fn cosmetics_first_entry_fades_windows_and_return_fit_the_allowances() {
                 if time == 525. {
                     login.studio.activate(CANCEL, "Player");
                 }
-                if [1., 230.].contains(&time) {
-                    for control in &login.panel.controls {
-                        if control.enabled {
-                            login.controls.set_progress(control.id, [1., 1.]);
-                        }
-                    }
-                }
                 login.studio.sync_art(logical, Some(&mut art)).unwrap();
                 let picture = login.prepare_host(extent, dpr, false, Some(&art)).unwrap();
-                let counts = picture.draw_counts(0);
-                peak = peak.max(counts.admitted_menu());
-                section_peak =
-                    section_peak.max(counts.components.get(MenuComponent::StudioSection));
-                assert_eq!(counts.components.total(), picture.frame.draws.len());
-                assert!(
-                    counts.admitted_menu() <= 448,
-                    "{logical:?} {dpr} {time}: {counts:?}"
-                );
-                assert!(counts.components.get(MenuComponent::StudioSection) <= 88);
+                assert!(picture.frame.draws.is_empty(), "{logical:?} {dpr} {time}");
                 assert!(picture.resources.len() <= 64);
                 assert!(
                     picture
@@ -79,23 +66,15 @@ fn cosmetics_first_entry_fades_windows_and_return_fit_the_allowances() {
                         .sum::<usize>()
                         <= 13 * 1024 * 1024
                 );
-                if login.studio.state.alpha() == 1.
-                    && login.studio.state.section == StudioSection::Cosmetics
-                {
-                    for (namespace, slots) in [(7, 8), (8, 20)] {
-                        let group: Vec<_> = picture
-                            .resources
-                            .iter()
-                            .filter(|r| r.asset.handle >> 60 == namespace)
-                            .collect();
-                        assert!(group.len() <= slots);
-                        assert!(
-                            group.iter().map(|r| r.image.pixels.len()).sum::<usize>()
-                                <= 2 * 1024 * 1024
-                        );
-                    }
-                }
+                let thumbnails = login.studio.thumbnails.len();
+                assert!(thumbnails <= 12);
+                shown = shown.max(thumbnails);
                 if login.studio.state.visible() {
+                    assert_eq!(
+                        textures(),
+                        baseline + thumbnails,
+                        "{logical:?} {dpr} {time}"
+                    );
                     let (preview, _) = login
                         .studio
                         .prepare_preview(extent, dpr, Some(&art))
@@ -104,11 +83,11 @@ fn cosmetics_first_entry_fades_windows_and_return_fit_the_allowances() {
                     login.studio.presented();
                 }
             }
+            assert!(shown > 0);
+            assert!(!login.studio.state.visible());
+            assert_eq!(textures(), baseline, "{logical:?} {dpr}");
         }
     }
-    println!(
-        "Cosmetics sweep: {peak}/448 admitted menu records; {section_peak} active-section records"
-    );
 }
 
 #[test]
@@ -493,7 +472,7 @@ fn generation_capture_blur_resize_escape_and_joint_save_keep_transaction_rules()
     login.step(9830., false, false).unwrap();
     login.studio.activate(COSMETICS_TAB, "Player");
     login.prepare_host([360, 640], 1., false, None).unwrap();
-    let resolved = login.panel.resolve([360., 640.]).unwrap();
+    let resolved = login.studio_panel.resolve([360., 640.]).unwrap();
     let cell = resolved
         .iter()
         .find(|r| r.control.id == ControlId(COSMETIC_BASE + 1))

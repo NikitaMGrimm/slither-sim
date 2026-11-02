@@ -1381,20 +1381,60 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
 }
 
 /// Login text egui paints: string, origin and galley bounds. The cycling tip
-/// changes on its own clock, so its row is left out.
+/// changes on its own clock, so its row is left out, and so is the text of
+/// an egui studio drawn above the login.
 fn login_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
     let tips = login.layout.viewport_rect(E::Tips);
+    let studio = studio_strings(login);
+    egui_text(login)
+        .into_iter()
+        .filter(|t| {
+            !(tips.y..tips.y + tips.height).contains(&f64::from(t.1.y)) && !studio.contains(&t.0)
+        })
+        .collect()
+}
+fn egui_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
     login
         .egui
         .prepared_shapes()
         .iter()
         .filter_map(|s| match &s.shape {
-            egui::Shape::Text(t)
-                if !(tips.y..tips.y + tips.height).contains(&f64::from(t.pos.y)) =>
-            {
-                Some((t.galley.job.text.clone(), t.pos, t.galley.rect))
-            }
+            egui::Shape::Text(t) => Some((t.galley.job.text.clone(), t.pos, t.galley.rect)),
             _ => None,
+        })
+        .collect()
+}
+/// Every string the visible studio panel can paint.
+fn studio_strings(login: &NativeLogin) -> Vec<String> {
+    use slither_client::menu_controls::ControlKind as K;
+    if !login.studio.state.visible() {
+        return Vec::new();
+    }
+    let mut strings: Vec<String> = login
+        .studio_panel
+        .controls
+        .iter()
+        .filter_map(|c| match &c.kind {
+            K::Label { text } => Some(text.clone()),
+            K::Button { label } | K::SectionTab { label, .. } => Some(label.clone()),
+            K::Swatch {
+                count: Some(count), ..
+            } => Some(count.to_string()),
+            K::CosmeticCell { cosmetic: None, .. } => Some("None".into()),
+            _ => None,
+        })
+        .collect();
+    strings.retain(|s| !s.is_empty());
+    strings
+}
+/// Studio text egui paints, keyed like login text.
+fn studio_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
+    let studio = studio_strings(login);
+    let tips = login.layout.viewport_rect(E::Tips);
+    egui_text(login)
+        .into_iter()
+        .filter(|t| {
+            studio.contains(&t.0) && !(tips.y..tips.y + tips.height).contains(&f64::from(t.1.y))
         })
         .collect()
 }
@@ -1414,9 +1454,10 @@ fn assert_stable(
     }
 }
 
-/// The skin studio still draws on the old toolkit, but the login below it
-/// stays on egui through entry, the fades and exit: its links and captions
-/// never change renderer, so they never shift.
+/// The skin studio and the login below it are both egui through entry,
+/// the fades and exit: the login's links and captions never change
+/// renderer, so they never shift, and the studio's own text holds still
+/// while it fades.
 #[test]
 fn login_text_stays_put_while_the_skin_studio_enters_and_leaves() {
     use slither_client::skin_studio::CANCEL;
@@ -1439,18 +1480,34 @@ fn login_text_stays_put_while_the_skin_studio_enters_and_leaves() {
         login.pointer(p, Some(true), true);
         login.pointer(p, Some(false), true);
         assert!(login.studio.state.visible());
-        let frame = |login: &mut NativeLogin, now: u32, phase: &str| {
+        let mut studio = Vec::new();
+        let mut frame = |login: &mut NativeLogin, now: u32, phase: &str| {
             login.step(f64::from(now), true, false).unwrap();
             login.prepare_host(extent, dpr, true, None).unwrap();
             let visible = 1. - login.studio.state.alpha() > 0.05;
-            assert_stable(login, &settled, visible, &format!("{dpr} {phase} {now}"));
+            let at = format!("{dpr} {phase} {now}");
+            assert_stable(login, &settled, visible, &at);
+            if login.studio.state.visible() {
+                studio.push((at, studio_text(login)));
+            }
         };
         for now in (9616..=10400).step_by(16) {
             frame(&mut login, now, "enter");
         }
         assert!(login.studio.state.alpha() >= 1.);
+        let open = studio_text(&login);
+        for caption in [
+            "Skin studio",
+            "Built-in",
+            "Previous",
+            "Next",
+            "Cancel",
+            "Save",
+        ] {
+            assert!(open.iter().any(|t| t.0 == caption), "{dpr}: {open:?}");
+        }
         let cancel = login
-            .panel
+            .studio_panel
             .resolve([960., 720.])
             .unwrap()
             .into_iter()
@@ -1465,6 +1522,12 @@ fn login_text_stays_put_while_the_skin_studio_enters_and_leaves() {
         }
         assert!(!login.studio.state.visible());
         frame(&mut login, 11216, "closed");
+        // The studio's text sits where the open studio paints it on every
+        // frame of its entry and exit fades.
+        for (at, text) in &studio {
+            assert!(text.iter().all(|t| open.contains(t)), "{at}: {text:?}");
+        }
+        assert!(studio.iter().filter(|s| s.1 == open).count() > 50);
         // egui owns input again; the host's post-present sync returns focus
         // to the opener.
         assert!(login.egui_owns_input());
@@ -1540,4 +1603,133 @@ fn login_text_stays_put_while_the_champion_editor_exits() {
             }
         }
     }
+}
+
+/// A section switch fades only the section's own content: the title, tabs
+/// and footer text and widgets hold still on every frame, and the incoming
+/// section's text appears where it settles.
+#[test]
+fn studio_text_and_widgets_stay_put_across_a_section_fade() {
+    use slither_client::skin_studio::{BUILDER_TAB, CANCEL, COSMETICS_TAB, SAVE};
+    for dpr in [1., 1.5, 2.] {
+        let mut login = settled("Player");
+        let extent = [(960. * dpr) as u32, (720. * dpr) as u32];
+        login.prepare_host(extent, dpr, true, None).unwrap();
+        login.open_studio();
+        let mut now = 9616;
+        while login.studio.state.alpha() < 1. {
+            login.step(f64::from(now), true, false).unwrap();
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            now += 16;
+        }
+        let chrome = [
+            "Skin studio",
+            "Built-in",
+            "Builder",
+            "Cosmetics",
+            "Cancel",
+            "Save",
+        ];
+        let fixed = |login: &NativeLogin| {
+            let text: Vec<_> = studio_text(login)
+                .into_iter()
+                .filter(|t| chrome.contains(&t.0.as_str()))
+                .collect();
+            let widgets: Vec<_> = login
+                .studio_ui
+                .controls
+                .iter()
+                .filter(|c| [BUILDER_TAB, COSMETICS_TAB, CANCEL, SAVE].contains(&c.0))
+                .map(|c| (c.0, c.1))
+                .collect();
+            (text, widgets)
+        };
+        let open = fixed(&login);
+        assert_eq!(open.0.len(), chrome.len(), "{dpr}: {:?}", open.0);
+        assert_eq!(open.1.len(), 4);
+        login.studio.activate(BUILDER_TAB, "Player");
+        let mut frames = Vec::new();
+        for _ in 0..16 {
+            login.step(f64::from(now), true, false).unwrap();
+            login.prepare_host(extent, dpr, true, None).unwrap();
+            assert_eq!(fixed(&login), open, "{dpr} {now}");
+            frames.push((now, studio_text(&login)));
+            now += 16;
+        }
+        let settled = studio_text(&login);
+        assert!(settled.iter().any(|t| t.0 == "Add"), "{dpr}: {settled:?}");
+        for (at, text) in &frames {
+            assert!(
+                text.iter()
+                    .filter(|t| !["Previous", "Next"].contains(&t.0.as_str()))
+                    .all(|t| settled.contains(t)),
+                "{dpr} {at}: {text:?}"
+            );
+        }
+    }
+}
+
+/// Only the touch that owns egui-winit's synthetic pointer gets pointer
+/// events, so only its cancel may drop the press.
+#[test]
+fn change_skin_tap_survives_a_cancelled_secondary_touch() {
+    let touch = |id, phase, pos| egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    };
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: Default::default(),
+    };
+    let send = |login: &mut NativeLogin, events| {
+        login.settings_input(egui::RawInput {
+            events,
+            ..Default::default()
+        })
+    };
+    let mut login = settled("Player");
+    let pos = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == CHANGE_SKIN)
+        .unwrap()
+        .1
+        .center();
+    let down = vec![
+        touch(7, egui::TouchPhase::Start, pos),
+        egui::Event::PointerMoved(pos),
+        button(pos, true),
+    ];
+    // The owner's cancel drops the press.
+    send(&mut login, down.clone());
+    send(
+        &mut login,
+        vec![
+            touch(7, egui::TouchPhase::Cancel, pos),
+            egui::Event::PointerGone,
+        ],
+    );
+    assert!(!login.studio.state.visible());
+    let context = login.egui.context().unwrap().clone();
+    assert!(!context.input(|i| i.pointer.any_down()));
+    // A secondary touch's cancel does not.
+    send(&mut login, down);
+    let other = pos + egui::vec2(100., 100.);
+    send(&mut login, vec![touch(8, egui::TouchPhase::Start, other)]);
+    send(&mut login, vec![touch(8, egui::TouchPhase::Cancel, other)]);
+    send(
+        &mut login,
+        vec![
+            touch(7, egui::TouchPhase::End, pos),
+            button(pos, false),
+            egui::Event::PointerGone,
+        ],
+    );
+    assert!(login.studio.state.visible());
 }

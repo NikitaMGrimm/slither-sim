@@ -619,7 +619,9 @@ mod desktop {
                 self.game.bank.cosmetics.as_mut(),
             )?;
             let view = self.login.state.view(admission);
-            // Where an old-toolkit screen's draws start in the composed UI frame.
+            // Where the layer presented above egui starts in the composed UI
+            // frame: the champion editor's old-toolkit draws, or the studio's
+            // preview snake appended below.
             let mut top_at = None;
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
@@ -631,7 +633,7 @@ mod desktop {
                     );
                     let menu_draws = menu.as_ref().map_or(0, |m| m.frame.draws.len());
                     let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(menu, &p)?;
-                    if self.login.egui.paint_only()
+                    if (self.login.egui.paint_only() || self.login.studio.state.visible())
                         && let Some(picture) = &picture
                     {
                         top_at = Some(picture.ui_frame().draws.len() - menu_draws);
@@ -656,8 +658,7 @@ mod desktop {
             {
                 return self.skip_bad_frame(p.frame.identity, error);
             }
-            // The skin studio or champion editor (with the preview) presents
-            // above egui, which paints the login below it.
+            // The champion editor, or the studio preview, presents above egui.
             let top = match (top_at, &mut composed) {
                 (Some(at), Some(picture)) => {
                     let ui = picture.ui_frame_mut();

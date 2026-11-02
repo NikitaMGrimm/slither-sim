@@ -325,7 +325,7 @@ fn menu_draw_boundary_and_whole_picture_rollback() {
         .unwrap();
     let draw = p.frame.draws[0].clone();
     let make = |count| slither_wgpu_slice::menu::MenuFrame {
-        attribution: slither_wgpu_slice::menu_counts::MenuAttribution([0, 0, 0, 0, 0, 0, 0, count]),
+        attribution: slither_wgpu_slice::menu_counts::MenuAttribution([0, 0, 0, count]),
         backdrop: None,
         world_cover: None,
         frame: slither_wgpu_slice::frame::Frame {

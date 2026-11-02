@@ -124,39 +124,45 @@ preserved. Hidden/minimized time is excluded without catch-up; rejected pictures
 do not advance antenna/random-tape state. Prepared resources remain owned across
 replacement and retry. Preview assets have an independent handle namespace.
 
-Controls retain the shared 64-slot / 13 MiB / 512-draw Menu allowance, with
-at least 24 slots / 5 MiB working headroom in the regression. The preview has a
-separate 1,024-draw cap and uses direct logical quads, including rotation, rather
-than a large render target. Combined controls/preview are bounded by 1,536 draws;
-final picture admission retains 64 MiB / 2,048 textures and draw-record limits.
-Fixed sampling makes the command bound independent of DPR. These are resource
-limits, not GPU-memory or timing measurements.
+The preview has a 1,024-draw cap and uses direct logical quads, including
+rotation, rather than a large render target. The desktop host presents it in
+the top layer above egui; final picture admission retains 64 MiB / 2,048
+textures and draw-record limits. Fixed sampling makes the command bound
+independent of DPR. These are resource limits, not GPU-memory or timing
+measurements.
 
-The studio enforces the 20-text-slot / 2 MiB and 8-surface-slot / 2 MiB working
-allocations at DPR1–5. Palette sprites, backdrop and focus ink share one small
-authored atlas. Compact capsule controls reuse mirrored ends and stretch a
-uniform centre column, with the existing theme gradient and compact shadow.
-Tabs/actions share a raster; hover/press opacity and focus ink need no separate
-surface textures. The landed menu raster-density cap remains `min(DPR, 5)`.
+The controls are egui widgets (`skin_studio_egui.rs`) in the login's egui pass.
+They paint the core `StudioState::panel` layout as it is: the same rectangles,
+scroll windows, section fade and entry/return alpha, so the browser and native
+hosts still share one state and layout. Swatches, cells, tabs and actions use
+the theme capsule gradient and compact shadow. Hover and press are instant, as
+on the other egui screens; the keyboard focus ring shows only in keyboard
+modality. A press focuses its control, as the old panel input did. Wheel and
+key handling stay in the core: arrows, Home/End and Left/Right cycling on
+Previous/Next go through `StudioState::key_navigation`, once per physical key press
+(egui-winit reports native auto-repeats as fresh presses). A wheel scroll or a
+cancel of the touch that owns the pointer drops the held press without a click;
+another touch's cancel leaves it alone.
+Cosmetic thumbnails upload once per handle and revision as egui textures and
+are dropped when evicted or the studio closes. The old toolkit no longer
+paints studio controls and rejects them.
 
 Focused checks from `client/`: `cargo test --locked --test skin_studio` and
 `cargo test --locked --manifest-path apps/wgpu-slice/Cargo.toml --test skin_studio
---test skin_studio_input --test login_native`. The Windows offscreen exporter is
+--test skin_studio_input --test skin_builder --test studio_cosmetics
+--test login_native`. The Windows offscreen exporter is
 `cargo run --locked --manifest-path apps/wgpu-slice/Cargo.toml --example
 menu_specimens -- <new-external-directory> --studio`, with `CARGO_BUILD_JOBS=2`.
-It produces 960×540 specimens at 1×/1.5×/2×, narrow layout, synthetic special-art
-poses, a fixed-clock entry/return strip and a DPR1–5 numeric resource ledger.
-Use `--builder` instead for the edit/reset/47-colour/save/restore strips at
-1×/1.5×/2×, responsive editor specimens and builder DPR1–5 resource ledger.
+It composes page, egui and preview as the desktop host does and produces
+960×540 specimens at 1×/1.5×/2×, narrow layout, synthetic special-art poses, a
+fixed-clock entry/return strip, entry over the settled login and a DPR1–5
+ledger of egui shapes/textures and preview resources. Use `--builder` instead
+for the edit/reset/47-colour/save/restore strips at 1×/1.5×/2×, responsive
+editor specimens and builder DPR1–5 ledger, and `--focus` for keyboard focus in
+every section, section fades and cosmetic thumbnails from procedural art.
 
 All fixtures are authored and offline. Owner appearance/feel, real native
 keyboard/IME/accessibility, GPU/display pacing, outside-server operation and
 extension readiness are unverified.
-
-Use `menu_specimens NEW_EXTERNAL_DIRECTORY --cosmetics AUTHORED_ART_DIRECTORY`
-for authored-art 1x/1.5x/2x specimens, entry/return and save/restore states, and a
-DPR 1–8 ledger including 1.25/1.5/1.75, missing art, narrow/short-wide layouts,
-first entry and section fades. The completed sweep must stay at or below 448
-admitted menu records, with a 96-record Cosmetics allowance. The hard limits stay
-64 menu slots, 13 MiB and 512 records. Run `--test studio_cosmetics` for the
-cosmetic-only byte, preview, setter, control and quota regressions.
+Run `--test studio_cosmetics` for the cosmetic-only byte, preview, setter,
+control and quota regressions.

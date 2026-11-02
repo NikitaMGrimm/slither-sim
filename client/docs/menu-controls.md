@@ -74,8 +74,7 @@ message, resend, or enable login before the existing return completes.
 ## Painting and bounds
 
 `Menu::prepare_with_panel` combines specialized login producers and generic
-controls in one material/text transaction. `prepare_panel` also supports isolated
-headless specimens. Typed theme content enters material/text keys; sampled
+controls in one material/text transaction. Typed theme content enters material/text keys; sampled
 position and alpha do not; field text keys include their visible scroll window.
 The holder uses tiled three-slice strips;
 tall uniform surfaces use nine-slice tiles. Published atlas tiles stay at most

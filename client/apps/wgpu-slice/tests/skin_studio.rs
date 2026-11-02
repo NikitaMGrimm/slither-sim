@@ -249,19 +249,14 @@ fn delayed_profile_and_endpoint_send_frozen_exact_appearance_only_on_play() {
     }
 }
 #[test]
-fn all_skin_ready_and_fallback_poses_fit_caps_at_every_dpr_and_survive_retry() {
-    use slither_wgpu_slice::{cosmetics::Cosmetics, menu::Menu, text::TextCache};
+fn all_skin_ready_and_fallback_poses_fit_the_preview_cap_at_every_dpr_and_survive_retry() {
+    use slither_wgpu_slice::cosmetics::Cosmetics;
     let mut png = std::io::Cursor::new(vec![]);
     image::RgbaImage::from_pixel(16, 16, image::Rgba([190, 120, 210, 255]))
         .write_to(&mut png, image::ImageFormat::Png)
         .unwrap();
     let full = Cosmetics::load(|_| Ok(png.get_ref().clone()), Some(0)).unwrap();
     let missing = Cosmetics::from_images(Default::default(), None).unwrap();
-    let mut menu = Menu::default();
-    let mut text = TextCache::menu();
-    let mut input = slither_client::menu_controls::PanelInputState::default();
-    let mut edit = slither_client::menu_input::MenuInputState::default();
-    let mut scroll = Default::default();
     let mut maximum = 0;
     for dpr in [5, 1, 2, 3, 4] {
         let dpr = f64::from(dpr);
@@ -296,54 +291,6 @@ fn all_skin_ready_and_fallback_poses_fit_caps_at_every_dpr_and_survive_retry() {
                     assert!(held.iter().all(|r| !r.image.pixels.is_empty()));
                     assert!(preview.draws.len() <= 1024);
                     maximum = maximum.max(preview.draws.len());
-                    let panel = studio.state.panel([960., 540.], &studio.status);
-                    input.sync(&panel, &mut edit);
-                    let controls = menu
-                        .prepare_panel(
-                            &mut text,
-                            &panel,
-                            &input,
-                            &edit,
-                            &mut scroll,
-                            Default::default(),
-                            extent,
-                            dpr,
-                        )
-                        .unwrap_or_else(|e| panic!("DPR {dpr} skin {skin} clock {now}: {e}"));
-                    assert!(controls.frame.draws.len() <= 384);
-                    assert!(controls.resources.len() <= 40); // At least 24 of the 64 Menu slots remain.
-                    for (namespace, slots, bytes) in
-                        [(8, 20, 2 * 1024 * 1024), (7, 8, 2 * 1024 * 1024)]
-                    {
-                        let group: Vec<_> = controls
-                            .resources
-                            .iter()
-                            .filter(|r| r.asset.handle >> 60 == namespace)
-                            .collect();
-                        assert!(
-                            group.len() <= slots,
-                            "DPR {dpr}, skin {skin}, clock {now}, namespace {namespace}: {} slots",
-                            group.len()
-                        );
-                        let used = group.iter().map(|r| r.image.pixels.len()).sum::<usize>();
-                        assert!(
-                            used <= bytes,
-                            "DPR {dpr}, skin {skin}, clock {now}, namespace {namespace}: {used} bytes, limit {bytes}; {:?}",
-                            group
-                                .iter()
-                                .map(|r| (r.image.width, r.image.height))
-                                .collect::<Vec<_>>()
-                        );
-                    }
-                    assert!(
-                        controls
-                            .resources
-                            .iter()
-                            .map(|r| r.image.pixels.len())
-                            .sum::<usize>()
-                            <= 8 * 1024 * 1024
-                    );
-                    assert!(controls.frame.draws.len() + preview.draws.len() <= 1536);
                     // Prepared pictures retain resources across subsequent plans and retirement.
                     preview
                         .validate(&held.iter().map(|r| (r.asset.into(), r.asset)).collect())

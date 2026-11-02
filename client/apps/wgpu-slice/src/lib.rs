@@ -27,6 +27,8 @@ pub mod skin_studio_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod egui_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod egui_panel;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod egui_theme;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod ingame_egui;
@@ -51,6 +53,8 @@ pub mod server_picker_egui;
 pub mod server_picker_native;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 pub mod settings_egui;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod skin_studio_egui;
 pub mod text;
 pub mod wordmark;
 pub mod world_presenter;

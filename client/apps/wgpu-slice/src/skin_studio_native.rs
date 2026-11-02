@@ -55,6 +55,20 @@ impl SkinStudioNative {
         }
         opened
     }
+    /// Keyboard navigation through the core. A cycled skin clears the
+    /// status like the Previous/Next buttons do.
+    pub fn navigate(
+        &mut self,
+        focus: slither_client::menu_controls::ControlId,
+        direction: Navigation,
+    ) -> slither_client::menu_controls::ControlId {
+        let before = self.state.draft().map(|d| d.record.clone());
+        let next = self.state.key_navigation(focus, direction, self.now);
+        if self.state.draft().map(|d| &d.record) != before.as_ref() {
+            self.status.clear();
+        }
+        next
+    }
     pub fn activate(&mut self, control: slither_client::menu_controls::ControlId, nickname: &str) {
         self.activate_with_random(control, nickname, &mut rand::random);
     }

@@ -332,3 +332,29 @@ fn status_band_does_not_overlap_navigation_footer_or_preview() {
         }
     }
 }
+
+/// Every host maps a key press through the core: Left/Right on Previous/Next
+/// cycle; other directions leave the skin and focus alone.
+#[test]
+fn key_navigation_on_previous_and_next_cycles_and_keeps_focus() {
+    let mut studio = state(7);
+    studio.open(0., true);
+    studio.step(230.);
+    assert_eq!(studio.key_navigation(NEXT, Navigation::Right, 230.), NEXT);
+    assert_eq!(studio.draft().unwrap().record.selection().skin, 8);
+    assert_eq!(studio.key_navigation(NEXT, Navigation::Left, 230.), NEXT);
+    assert_eq!(
+        studio.key_navigation(PREVIOUS, Navigation::Left, 230.),
+        PREVIOUS
+    );
+    assert_eq!(studio.draft().unwrap().record.selection().skin, 6);
+    for direction in [
+        Navigation::Up,
+        Navigation::Down,
+        Navigation::Home,
+        Navigation::End,
+    ] {
+        assert_eq!(studio.key_navigation(PREVIOUS, direction, 230.), PREVIOUS);
+    }
+    assert_eq!(studio.draft().unwrap().record.selection().skin, 6);
+}

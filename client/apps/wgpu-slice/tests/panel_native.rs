@@ -65,6 +65,8 @@ fn preedit_cannot_swallow_release_or_activate_a_control() {
     );
 }
 
+#[path = "support/panel_paint.rs"]
+mod panel_paint;
 #[path = "support/announcement_tape.rs"]
 mod tape;
 fn victory_at(
@@ -288,18 +290,18 @@ fn long_os_preedit_is_bounded_before_geometry_and_rasterization() {
     assert!(geometry.display.len() <= 3 * MAX_PREEDIT_UNITS + 140);
     assert!(geometry.caret.is_finite() && geometry.scroll.is_finite());
     for dpr in [1., 5.] {
-        let frame = Menu::default()
-            .prepare_panel(
-                &mut text,
-                &p.panel,
-                &p.controls,
-                &p.input.state,
-                &mut p.scroll,
-                MenuTheme::default(),
-                [(960. * dpr) as u32, (720. * dpr) as u32],
-                dpr,
-            )
-            .unwrap();
+        let frame = panel_paint::prepare_panel(
+            &mut Menu::default(),
+            &mut text,
+            &p.panel,
+            &p.controls,
+            &p.input.state,
+            &mut p.scroll,
+            MenuTheme::default(),
+            [(960. * dpr) as u32, (720. * dpr) as u32],
+            dpr,
+        )
+        .unwrap();
         assert!(
             frame
                 .resources
@@ -409,18 +411,18 @@ fn champion_field_uses_shared_placement_for_value_placeholder_selection_and_ime(
                 )
                 .unwrap();
             let glyph_top = reference[0].0.destination.y;
-            let frame = Menu::default()
-                .prepare_panel(
-                    &mut text,
-                    &p.panel,
-                    &p.controls,
-                    &p.input.state,
-                    &mut p.scroll,
-                    MenuTheme::default(),
-                    [(960. * dpr) as u32, (720. * dpr) as u32],
-                    dpr,
-                )
-                .unwrap();
+            let frame = panel_paint::prepare_panel(
+                &mut Menu::default(),
+                &mut text,
+                &p.panel,
+                &p.controls,
+                &p.input.state,
+                &mut p.scroll,
+                MenuTheme::default(),
+                [(960. * dpr) as u32, (720. * dpr) as u32],
+                dpr,
+            )
+            .unwrap();
             let text_draws: Vec<_> = frame
                 .frame
                 .draws

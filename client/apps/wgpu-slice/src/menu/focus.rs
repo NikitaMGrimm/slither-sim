@@ -39,17 +39,7 @@ impl Composition<'_> {
         theme: MenuTheme,
     ) -> Result<()> {
         let tokens = theme.surface(r.control.style, ControlState::Idle);
-        let radius = if matches!(
-            r.control.kind,
-            ControlKind::Swatch { .. } | ControlKind::CosmeticCell { .. }
-        ) {
-            // Builder cells share action text tokens, but their painted tiles use cell corners.
-            f64::from(
-                theme
-                    .surface(ControlStyle::SelectedCell, ControlState::Idle)
-                    .radius,
-            ) * r.scale
-        } else if tokens.recipe == SurfaceRecipe::StudioButton {
+        let radius = if tokens.recipe == SurfaceRecipe::StudioButton {
             r.rect.height / 2.
         } else {
             f64::from(tokens.radius) * r.scale
@@ -255,18 +245,11 @@ mod tests {
             ControlKind::Button {
                 label: "Focus".into(),
             },
-            ControlKind::SectionTab {
+            ControlKind::ListRow {
                 label: "Focus".into(),
+                detail: String::new(),
                 selected: true,
-            },
-            ControlKind::Swatch {
-                palette: 1,
-                count: None,
-                selected: true,
-            },
-            ControlKind::CosmeticCell {
-                cosmetic: None,
-                selected: true,
+                ping: None,
             },
         ] {
             for keyboard in [false, true] {
@@ -306,7 +289,6 @@ mod tests {
                     &mut BTreeMap::new(),
                     MenuTheme::default(),
                     &resolved,
-                    None,
                 )
                 .unwrap();
                 let outlined = c
@@ -393,45 +375,18 @@ mod tests {
                         height: d.destination.height,
                     })
                     .collect();
-                assert!(bounds.iter().all(|b| contains_rect(r.rect, *b)));
+                assert!(bounds.iter().all(|b| {
+                    b.x >= r.rect.x
+                        && b.y >= r.rect.y
+                        && b.x + b.width <= r.rect.x + r.rect.width
+                        && b.y + b.height <= r.rect.y + r.rect.height
+                }));
                 painted.push(bounds);
             }
             assert!(painted[0].iter().all(|a| painted[1].iter().all(|b| {
                 let i = intersection(*a, *b);
                 i.width <= 0. || i.height <= 0.
             })));
-        }
-    }
-    #[test]
-    fn fully_visible_control_shadows_keep_their_extent_at_window_edges() {
-        for density in [1_f64, 1.5, 2., 3.] {
-            let empty = BTreeMap::new();
-            let art = BTreeMap::new();
-            for style in [
-                ControlStyle::StudioAction,
-                ControlStyle::Nickname,
-                ControlStyle::StudioSurface,
-            ] {
-                let mut r = control();
-                r.control.clip = Some(r.rect);
-                r.clip = r.rect;
-                let tokens = MenuTheme::default().surface(style, ControlState::Idle);
-                let mut full = composition(&empty, &art, density);
-                full.sliced(r.rect, tokens, 1., None, r.scale).unwrap();
-                let mut windowed = composition(&empty, &art, density);
-                windowed
-                    .sliced(r.rect, tokens, 1., decoration_clip(&r, true), r.scale)
-                    .unwrap();
-                assert_eq!(full.draws.len(), windowed.draws.len());
-                for (a, b) in full.draws.iter().zip(&windowed.draws) {
-                    assert_eq!(a.destination, b.destination);
-                    assert_eq!(a.source, b.source);
-                }
-                assert!(full.draws.iter().any(|d| d.destination.y < r.rect.y));
-                assert!(decoration_clip(&r, false).is_some());
-                r.clip.height /= 2.;
-                assert!(decoration_clip(&r, true).is_some());
-            }
         }
     }
     #[test]
