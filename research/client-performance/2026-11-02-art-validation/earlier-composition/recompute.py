@@ -7,7 +7,9 @@ def rows(name):
 def tables():
  data=rows('runs.csv');identity=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
  for arms in identity['parity'].values():
-  for arm in ['control','candidate']:assert arms[arm]['binary_sha256']==identity['arms'][arm]['binary_sha256']
+  for arm in ['control','candidate']:
+   assert arms[arm]['binary_sha256']==identity['arms'][arm]['binary_sha256']
+   assert (int(arms[arm]['callbacks']),int(arms[arm]['skips']))==(600,0)
   for key in ['command_digest','quad_digest','numeric_sha256']:assert arms['control'][key]==arms['candidate'][key]
  for r in data:
   assert int(r['callbacks'])==600 and int(r['skips'])==0
