@@ -154,6 +154,42 @@ fn received_history_is_not_recopied_by_ingress_snapshots() {
 }
 
 #[test]
+fn singleton_consume_allocation_does_not_copy_retained_food_or_snakes() {
+    for protocol in [13, 19] {
+        let mut bytes = Vec::new();
+        for count in [64, 6000] {
+            let mut game = ready(protocol, count);
+            let packet = if protocol == 13 {
+                wire::eaten(1000, 1000, Some(7))
+            } else {
+                vec![b'<', 10, 10, 0, 0, 0, 7]
+            };
+            let before = game.client().received().frames_applied;
+            BYTES.set(0);
+            ENABLED.set(true);
+            for i in 0..100 {
+                game.receive(game.generation(), &packet, 301. + f64::from(i))
+                    .unwrap();
+            }
+            ENABLED.set(false);
+            bytes.push(BYTES.get());
+            assert_eq!(game.client().received().frames_applied, before + 100);
+            assert_eq!(game.client().received().foods.len(), usize::from(count) - 1);
+            assert_eq!(game.client().foods().foods().len(), usize::from(count));
+            assert_eq!(
+                game.client().foods().foods()[0].snapshot().eater,
+                game.client().own_token()
+            );
+        }
+        assert!(
+            bytes[1] <= bytes[0] + 4096,
+            "protocol={protocol}, bytes={bytes:?}"
+        );
+        println!("consume protocol={protocol}, requested_bytes={bytes:?}");
+    }
+}
+
+#[test]
 fn frozen_received_snapshots_survive_fast_and_full_ingress_and_rollback() {
     for protocol in [13, 19] {
         let mut game = ready(protocol, 64);

@@ -136,6 +136,14 @@ pub(crate) struct PreparedFood {
     update_added_cache: bool,
 }
 
+/// Validated consume caches and removal awaiting an atomic presentation commit.
+pub(crate) struct PreparedConsume {
+    pub key: u32,
+    pub eater_id: Option<u16>,
+    sector: (u8, u8),
+    eater_cache: Option<u16>,
+}
+
 /// Validated scalar motion awaiting the touched presentation object's admission.
 pub(crate) struct PreparedMotion {
     pub event: Option<PresentationEvent>,
@@ -902,25 +910,14 @@ impl ClientState {
                 }
             }
             Message::FoodEaten(raw) => {
-                let sector = raw
-                    .sector
-                    .map(|s| (s[0], s[1]))
-                    .or(self.eaten_sector)
-                    .ok_or(StateError::MissingSector)?;
-                let eater_id = match raw.eater {
-                    v19::Eater::Id(id) => {
-                        self.eater_id = Some(id);
-                        self.eater_id
-                    }
-                    v19::Eater::Cached => self.eater_id,
-                    _ => None,
-                };
-                let key = food_key(sector, raw.offset[0], raw.offset[1]);
-                self.foods.remove(&key);
-                self.eaten_sector = Some(sector);
+                let prepared = self.prepare_consume(raw)?;
                 if let Some(events) = events {
-                    events.push(PresentationEvent::FoodConsume { key, eater_id });
+                    events.push(PresentationEvent::FoodConsume {
+                        key: prepared.key,
+                        eater_id: prepared.eater_id,
+                    });
                 }
+                self.commit_consume(prepared);
             }
             Message::SectorClear([x, y]) => {
                 self.foods.retain(|_, food| food.sector != (x, y));
@@ -1258,6 +1255,69 @@ impl ClientState {
 
     pub(crate) fn commit_single_motion(&mut self, prepared: PreparedMotion, elapsed: Option<u16>) {
         self.commit_motion(prepared);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
+    pub(crate) fn prepare_single_consume(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedConsume>, StateError> {
+        let Some(setup) = &self.setup else {
+            return Ok(None);
+        };
+        if !matches!(command.first(), Some(b'c' | b'C' | b'<')) {
+            return Ok(None);
+        }
+        match setup.protocol {
+            13 => self.prepare_single_v13_consume(command),
+            19 => {
+                let raw = v19::decode(command, DecodeAdmission::ClientPresentation)
+                    .map_err(|_| StateError::InvalidPacket(command[0]))?;
+                let Message::FoodEaten(raw) = raw else {
+                    return Ok(None);
+                };
+                self.prepare_consume(raw).map(Some)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn prepare_consume(&self, raw: v19::FoodEaten) -> Result<PreparedConsume, StateError> {
+        let sector = raw
+            .sector
+            .map(|s| (s[0], s[1]))
+            .or(self.eaten_sector)
+            .ok_or(StateError::MissingSector)?;
+        let eater_id = match raw.eater {
+            v19::Eater::Id(id) => Some(id),
+            v19::Eater::Cached => self.eater_id,
+            _ => None,
+        };
+        Ok(PreparedConsume {
+            key: food_key(sector, raw.offset[0], raw.offset[1]),
+            sector,
+            eater_id,
+            eater_cache: match raw.eater {
+                v19::Eater::Id(id) => Some(id),
+                _ => self.eater_id,
+            },
+        })
+    }
+
+    fn commit_consume(&mut self, prepared: PreparedConsume) {
+        self.foods.remove(&prepared.key);
+        self.eaten_sector = Some(prepared.sector);
+        self.eater_id = prepared.eater_cache;
+    }
+
+    pub(crate) fn commit_single_consume(
+        &mut self,
+        prepared: PreparedConsume,
+        elapsed: Option<u16>,
+    ) {
+        self.commit_consume(prepared);
         self.frames_applied = self.frames_applied.saturating_add(1);
         self.commands_applied = self.commands_applied.saturating_add(1);
         self.last_elapsed_ms = elapsed;

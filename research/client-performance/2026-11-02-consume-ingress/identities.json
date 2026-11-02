@@ -1,0 +1,21 @@
+{
+  "base": "1b09894d3d11ba819474381fc33c68bd705da933",
+  "pairs": 6,
+  "state_sha256": {
+    "0": "7e733b1c7bc1ae450cd60b81f6907f9728943a56f649f6137c38cdc569327d5a",
+    "-120": "c3ae6169eba05d9cd203b5601f797621025e0d9bf1a006985256aed7108bca97"
+  },
+  "output_digests": {
+    "0": "b9f2870246df9495",
+    "-120": "78b36afd816d2773"
+  },
+  "control": {
+    "binary_sha256": "24ebbc5c7924d44867812d72a8149cf04e43b2ec1342d3fdef7dc03eb8b95bd4"
+  },
+  "candidate": {
+    "binary_sha256": "6c41243e0cc28df28f3cbfdf93ff3851eea851f4c4a572f9c8f71e0ab9c9e4e4"
+  },
+  "driver_sha256": "47c88eff74a0b88aa21765609e55743844ff0a8a944ff2438bae4fe79d0eae65",
+  "control-overlay.patch": "708479a9e562ea2219d0e5a6521625504607deded7aaa711f344c4a49a648792",
+  "consume-source.patch": "f267edff3b8ed50e9817baf43fd9f40c87a3e7b998751bb04eeeac97c079dcbc"
+}

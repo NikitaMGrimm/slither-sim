@@ -53,6 +53,32 @@ impl<'a> From<v13::SnakeAppearanceRef<'a>> for AppearanceHeader<'a> {
 }
 
 impl ClientState {
+    pub(super) fn prepare_single_v13_consume(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedConsume>, StateError> {
+        let raw = v13::decode(command, DecodeAdmission::ClientPresentation)
+            .map_err(|_| StateError::InvalidPacket(command[0]))?;
+        let Legacy::FoodEaten(raw) = raw else {
+            return Ok(None);
+        };
+        self.prepare_legacy_consume(raw, self.setup.as_ref().expect("selected protocol"))
+            .map(Some)
+    }
+
+    fn prepare_legacy_consume(
+        &self,
+        raw: v13::FoodEaten,
+        setup: &Setup,
+    ) -> Result<PreparedConsume, StateError> {
+        Ok(PreparedConsume {
+            key: legacy_food_key(raw.position),
+            sector: legacy_sector(setup, raw.position)?,
+            eater_id: raw.eater,
+            eater_cache: raw.eater.or(self.eater_id),
+        })
+    }
+
     pub(crate) fn prepare_single_v13_food(
         &self,
         command: &[u8],
@@ -190,18 +216,14 @@ impl ClientState {
                 return Ok(true);
             }
             Legacy::FoodEaten(raw) => {
-                let key = legacy_food_key(raw.position);
-                self.foods.remove(&key);
-                self.eaten_sector = Some(legacy_sector(setup()?, raw.position)?);
-                if let Some(id) = raw.eater {
-                    self.eater_id = Some(id);
-                }
+                let prepared = self.prepare_legacy_consume(raw, setup()?)?;
                 if let Some(events) = events {
                     events.push(PresentationEvent::FoodConsume {
-                        key,
-                        eater_id: raw.eater,
+                        key: prepared.key,
+                        eater_id: prepared.eater_id,
                     });
                 }
+                self.commit_consume(prepared);
                 return Ok(true);
             }
             Legacy::Setup(raw) => Message::Setup(raw),

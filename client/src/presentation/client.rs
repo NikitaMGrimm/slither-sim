@@ -1226,6 +1226,45 @@ impl AnimatedClient {
         }))
     }
 
+    /// Apply one consume without staging unrelated snakes or retained food.
+    /// Canonical decoding and cache validation precede the infallible commit.
+    /// Other families, batches and disabled food presentation keep full staging.
+    pub fn try_apply_single_consume(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+    ) -> Result<Option<FrameReport>, ClientPresentationError> {
+        if !self.food_enabled {
+            return Ok(None);
+        }
+        let decoded = crate::protocol::read_frame(bytes, header).map_err(StateError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let Some(prepared) = self
+            .received
+            .prepare_single_consume(decoded.commands().next().expect("one command").bytes)?
+        else {
+            return Ok(None);
+        };
+        let consume = match prepared.eater_id {
+            None => FoodConsume::Immediate,
+            Some(id) => FoodConsume::Eaten(self.lookup_index(id).map(|i| self.entries[i].token)),
+        };
+        // No fallible model operation follows canonical validation. Existing
+        // retained snapshots still detach through FoodWorld/received COW.
+        self.foods.consume(prepared.key, consume);
+        self.retire_entries();
+        Arc::make_mut(&mut self.received).commit_single_consume(prepared, decoded.prefix());
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(Some(FrameReport {
+            commands: 1,
+            ignored: 0,
+        }))
+    }
+
     fn apply_prepared_food<E, G>(
         &mut self,
         prepared: crate::state::PreparedFood,
@@ -2292,6 +2331,25 @@ impl AnimatedClient {
                 .map_err(ClientPresentationError::from)?;
             if decoded.command_count() == 1 {
                 let command = decoded.commands().next().expect("one command");
+                if matches!(command.bytes[0], b'c' | b'C' | b'<') {
+                    if let Some(plan) = plan {
+                        plan.validate(decoded.commands())
+                            .map_err(StateError::Hud)
+                            .map_err(ClientPresentationError::from)?;
+                    }
+                    let report = FrameReport {
+                        commands: 1,
+                        ignored: 0,
+                    };
+                    let journal = plan
+                        .map(|p| HudIngressReport::new(report, p.schema, 0))
+                        .transpose()
+                        .map_err(StateError::Hud)
+                        .map_err(ClientPresentationError::from)?;
+                    if let Some(report) = self.try_apply_single_consume(bytes, header)? {
+                        return Ok((report, journal));
+                    }
+                }
                 if matches!(command.bytes[0], b'F' | b'f' | b'b') {
                     if let Some(plan) = plan {
                         plan.validate(decoded.commands())
@@ -4914,7 +4972,10 @@ mod resolved_draw_tests {
             .collect()
     }
 
-    fn factory(spawn: &FoodSpawnInput, _: f64) -> Result<FoodFactory, ClientPresentationError> {
+    pub(super) fn factory(
+        spawn: &FoodSpawnInput,
+        _: f64,
+    ) -> Result<FoodFactory, ClientPresentationError> {
         let sources: Vec<_> = (1..=8)
             .map(|handle| {
                 FoodSource::new(
@@ -5744,3 +5805,7 @@ mod resolved_draw_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "consume_tests.rs"]
+mod consume_tests;
