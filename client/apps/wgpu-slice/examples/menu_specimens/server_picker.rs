@@ -35,7 +35,6 @@ fn before(login: &NativeLogin, extent: [u32; 2], dpr: f64) -> Result<MenuFrame> 
         None,
         Some(&edit),
         Some(PanelPaint {
-            thumbnails: None,
             panel: &picker.panel,
             input: &input,
             edit: &edit,

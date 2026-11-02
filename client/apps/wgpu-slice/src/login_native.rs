@@ -38,6 +38,8 @@ pub struct NativeLogin {
     /// window, as the old studio input did.
     studio_reveal: bool,
     studio_shown: bool,
+    /// Studio navigation keys currently held down.
+    studio_keys: Vec<egui::Key>,
     pub input: NativeMenuInput,
     pub champion: crate::panel_native::NativePanel,
     pub picker: crate::server_picker_native::NativeServerPicker,
@@ -132,6 +134,7 @@ impl NativeLogin {
             studio_panel,
             studio_reveal: false,
             studio_shown: false,
+            studio_keys: Vec::new(),
             input,
             champion: crate::panel_native::NativePanel::new(
                 &slither_client::session_policy::SessionPolicy::new().view(),
@@ -840,6 +843,10 @@ impl NativeLogin {
             if !self.egui.active() {
                 break;
             }
+            if !self.studio_owns_input() || matches!(event, egui::Event::WindowFocused(false)) {
+                // Releases go elsewhere while the studio does not own input.
+                self.studio_keys.clear();
+            }
             let routed = if self.picker_owns_input() {
                 self.picker_event(&mut event)
             } else if self.studio_owns_input() {
@@ -945,10 +952,24 @@ impl NativeLogin {
                     | egui::Event::ModifiersChanged(_)
                     | egui::Event::MouseWheel { .. }
             );
+            // egui-winit translates a cancelled touch to Touch(Cancel) and
+            // PointerGone without a release, and egui keeps the primary
+            // button held. Drop the press without a click once egui has
+            // seen the cancel.
+            let cancelled = matches!(
+                event,
+                egui::Event::Touch {
+                    phase: egui::TouchPhase::Cancel,
+                    ..
+                }
+            );
             input.events.push(event);
             self.egui.input(input.take());
             if discrete {
                 self.settings_frame();
+            }
+            if cancelled {
+                self.egui.cancel_pointer();
             }
         }
     }
@@ -1049,9 +1070,14 @@ impl NativeLogin {
     fn studio_event(&mut self, event: &egui::Event) -> PickerEvent {
         use crate::skin_studio_egui::widget_id;
         use egui::Key as K;
-        use slither_client::skin_studio::{NEXT, Navigation as N, PREVIOUS};
+        use slither_client::skin_studio::Navigation as N;
         match event {
-            egui::Event::Key { key, pressed, .. } => {
+            egui::Event::Key {
+                key,
+                pressed,
+                repeat,
+                ..
+            } => {
                 if *pressed {
                     self.studio_ui.keyboard_focus = true;
                     self.studio_reveal = true;
@@ -1066,6 +1092,19 @@ impl NativeLogin {
                     K::Tab | K::Enter | K::Space | K::Escape => return PickerEvent::Forward,
                     _ => return PickerEvent::Handled,
                 };
+                // egui-winit reports native auto-repeats as fresh presses
+                // (repeat: false). The studio acts once per physical press,
+                // as its old input did; the host's held-key gate covers only
+                // Tab/Enter/Space/Escape, since text fields need repeats.
+                let held = self.studio_keys.contains(key);
+                if *pressed {
+                    if held || *repeat {
+                        return PickerEvent::Handled;
+                    }
+                    self.studio_keys.push(*key);
+                } else {
+                    self.studio_keys.retain(|k| k != key);
+                }
                 let focus = self
                     .focused()
                     .filter(|id| crate::egui_panel::focus_target(&self.studio_panel, *id));
@@ -1073,23 +1112,10 @@ impl NativeLogin {
                 else {
                     return PickerEvent::Handled;
                 };
-                if matches!(focus, PREVIOUS | NEXT) && matches!(direction, N::Left | N::Right) {
-                    let id = if matches!(direction, N::Left) {
-                        PREVIOUS
-                    } else {
-                        NEXT
-                    };
-                    let nickname = self.state.view(true).nickname;
-                    self.studio.activate(id, &nickname);
-                } else {
-                    let next = self
-                        .studio
-                        .state
-                        .navigate(focus, direction, self.studio.now);
-                    self.studio.state.reveal_control(next, self.area);
-                    self.studio_ui.request_focus(next);
-                    self.egui.focus(widget_id(next));
-                }
+                let next = self.studio.navigate(focus, direction);
+                self.studio.state.reveal_control(next, self.area);
+                self.studio_ui.request_focus(next);
+                self.egui.focus(widget_id(next));
                 self.sync_studio();
                 PickerEvent::Pass
             }
@@ -1399,7 +1425,6 @@ impl NativeLogin {
             // Keep specialized logo/result producers, suppress the old pending label.
             view.champion_pending = false;
             Some(crate::menu::PanelPaint {
-                thumbnails: None,
                 panel: &self.champion.panel,
                 input: &self.champion.controls,
                 edit: &self.champion.input.state,
@@ -1408,7 +1433,6 @@ impl NativeLogin {
             })
         } else {
             Some(crate::menu::PanelPaint {
-                thumbnails: None,
                 panel: &self.panel,
                 input: &self.controls,
                 edit: &self.input.state,

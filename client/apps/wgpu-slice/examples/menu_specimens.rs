@@ -295,7 +295,6 @@ async fn run(output: &Path) -> Result<()> {
                 None,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
-                    thumbnails: None,
                     panel: &panel,
                     input: &input,
                     edit: &edit,
@@ -320,7 +319,6 @@ async fn run(output: &Path) -> Result<()> {
                 None,
                 None,
                 Some(slither_wgpu_slice::menu::PanelPaint {
-                    thumbnails: None,
                     panel: &panel,
                     input: &input,
                     edit: &edit,

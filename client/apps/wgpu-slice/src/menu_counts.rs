@@ -7,29 +7,21 @@ pub enum MenuComponent {
     LoginWordmark,
     LoginControls,
     LoginText,
-    StudioShade,
-    StudioSurface,
-    StudioChrome,
-    StudioSection,
     #[default]
     Other,
 }
 impl MenuComponent {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 4] = [
         Self::LoginWordmark,
         Self::LoginControls,
         Self::LoginText,
-        Self::StudioShade,
-        Self::StudioSurface,
-        Self::StudioChrome,
-        Self::StudioSection,
         Self::Other,
     ];
 }
 
 /// Counts only successfully prepared records, never textures or batched GPU runs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MenuAttribution(pub [usize; 8]);
+pub struct MenuAttribution(pub [usize; 4]);
 impl MenuAttribution {
     pub fn total(self) -> usize {
         self.0.iter().sum()
@@ -51,7 +43,6 @@ pub struct MenuDrawCounts {
     pub components: MenuAttribution,
     pub page: usize,
     pub cover: usize,
-    pub preview: usize,
 }
 impl MenuDrawCounts {
     pub fn reported_menu(self) -> usize {
@@ -59,8 +50,5 @@ impl MenuDrawCounts {
     }
     pub fn admitted_menu(self) -> usize {
         self.reported_menu() + self.cover
-    }
-    pub fn combined(self) -> usize {
-        self.admitted_menu() + self.preview
     }
 }

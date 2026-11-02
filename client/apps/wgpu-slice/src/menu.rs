@@ -20,7 +20,6 @@ use slither_client::{
 };
 use std::collections::BTreeMap;
 mod focus;
-mod studio_surface;
 
 pub const MENU_PRODUCER_DRAWS: usize = 512;
 // Windows scaling tops out at 500%. Above that, the picker cannot fit the
@@ -40,11 +39,9 @@ const PAGE_HANDLE: u64 = MENU_MATERIAL_HANDLE_BASE + 1;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum MaterialKey {
     Focus([u32; 2], u64, u64, [u8; 3], u32),
-    Thumbnail(frame::ResourceKey),
     Spinner(u32, u64, u64),
     Control([u32; 2], u64, SurfaceTokens, [u32; 2]),
     Solid([u32; 2], [u8; 3]),
-    Swatches([u8; 3], [u8; 3]),
 }
 const PAGE_COLOR: [u8; 3] = [22, 28, 34];
 pub const WORDMARK_GREEN: [u8; 3] = wordmark::COLORS[0][1];
@@ -67,13 +64,11 @@ pub struct MenuFrame {
     pub resources: Vec<Resource>,
 }
 impl MenuFrame {
-    /// Preview is prepared separately and never charged to the 512-record menu cap.
-    pub fn draw_counts(&self, preview: usize) -> MenuDrawCounts {
+    pub fn draw_counts(&self) -> MenuDrawCounts {
         MenuDrawCounts {
             components: self.attribution,
             page: usize::from(self.backdrop.is_some()),
             cover: usize::from(self.world_cover.is_some()),
-            preview,
         }
     }
     /// A menu quota failure skips this overlay for the frame, preserving the
@@ -400,8 +395,6 @@ fn image(resource: &Resource, r: MenuRect, alpha: f64) -> Draw {
 }
 pub struct PanelPaint<'a> {
     pub panel: &'a PanelView,
-    /// Only the active cosmetic window; resources are charged to the normal menu cache.
-    pub thumbnails: Option<&'a BTreeMap<u8, Resource>>,
     pub input: &'a PanelInputState,
     pub edit: &'a MenuInputState,
     pub scroll: &'a mut BTreeMap<EditorId, f64>,
@@ -435,7 +428,6 @@ impl Composition<'_> {
         scroll: &mut BTreeMap<EditorId, f64>,
         theme: MenuTheme,
         resolved: &[ResolvedControl],
-        thumbnails: Option<&BTreeMap<u8, Resource>>,
     ) -> Result<()> {
         if panel.visible {
             if panel
@@ -451,28 +443,6 @@ impl Composition<'_> {
                 let control = &r.control;
                 self.component = if panel.id == 0 {
                     MenuComponent::LoginControls
-                } else if panel.id == 3 {
-                    use slither_client::skin_studio::{
-                        BUILDER_TAB, BUILT_IN_TAB, CANCEL, COSMETICS_TAB, SAVE,
-                    };
-                    match control.kind {
-                        ControlKind::Backdrop => MenuComponent::StudioShade,
-                        ControlKind::Surface => MenuComponent::StudioSurface,
-                        _ if [
-                            slither_client::menu_controls::ControlId(1),
-                            slither_client::menu_controls::ControlId(4),
-                            BUILT_IN_TAB,
-                            BUILDER_TAB,
-                            COSMETICS_TAB,
-                            CANCEL,
-                            SAVE,
-                        ]
-                        .contains(&control.id) =>
-                        {
-                            MenuComponent::StudioChrome
-                        }
-                        _ => MenuComponent::StudioSection,
-                    }
                 } else {
                     MenuComponent::Other
                 };
@@ -495,9 +465,8 @@ impl Composition<'_> {
                     };
                 let mut style = theme.text_style(control.style);
                 style.size *= r.scale;
-                // A fully visible control keeps its shadow outside the content window.
-                // Partly scrolled controls still crop both body and decoration.
-                let surface_clip = decoration_clip(r, panel.id == 3);
+                // Scrolled controls crop both body and decoration to their window.
+                let surface_clip = r.control.clip.map(|_| r.clip);
                 let add_label = |c: &mut Composition<'_>,
                                  value: String,
                                  rect: MenuRect,
@@ -522,142 +491,11 @@ impl Composition<'_> {
                     });
                 };
                 match &control.kind {
-                    ControlKind::CosmeticCell { cosmetic, selected } => {
-                        self.sliced(
-                            r.rect,
-                            theme.surface(ControlStyle::SelectedCell, ControlState::Idle),
-                            alpha,
-                            surface_clip,
-                            r.scale,
-                        )?;
-                        let inner = MenuRect {
-                            x: r.rect.x + 4.,
-                            y: r.rect.y + 4.,
-                            width: r.rect.width - 8.,
-                            height: r.rect.height - 8.,
-                        };
-                        if let Some(source) =
-                            cosmetic.and_then(|id| thumbnails.and_then(|t| t.get(&id)))
-                        {
-                            let factor = (inner.width / f64::from(source.asset.width))
-                                .min(inner.height / f64::from(source.asset.height));
-                            let width = f64::from(source.asset.width) * factor;
-                            let height = f64::from(source.asset.height) * factor;
-                            let rect = MenuRect {
-                                x: inner.x + (inner.width - width) / 2.,
-                                y: inner.y + (inner.height - height) / 2.,
-                                width,
-                                height,
-                            };
-                            // One <=128px resource per cell, shared across DPRs. Never enlarge the thumbnail cache.
-                            self.materials.insert(
-                                MaterialKey::Thumbnail(source.asset.into()),
-                                source.clone(),
-                            );
-                            let mut draw = image(source, rect, alpha);
-                            draw.source = Some(BodyRect {
-                                x: 0.,
-                                y: 0.,
-                                width: f64::from(source.asset.width),
-                                height: f64::from(source.asset.height),
-                            });
-                            if clip_scaled_draw(&mut draw, r.clip, self.scale) {
-                                self.push(draw)?;
-                            }
-                        } else if cosmetic.is_none() {
-                            add_label(self, "None".into(), r.rect, style, Align::Center, r.clip);
-                        } else {
-                            for mark in [
-                                MenuRect {
-                                    x: r.rect.x + r.rect.width / 2. - 6.,
-                                    y: r.rect.y + r.rect.height / 2. - 1.,
-                                    width: 12.,
-                                    height: 2.,
-                                },
-                                MenuRect {
-                                    x: r.rect.x + r.rect.width / 2. - 1.,
-                                    y: r.rect.y + r.rect.height / 2. - 6.,
-                                    width: 2.,
-                                    height: 12.,
-                                },
-                            ] {
-                                self.studio_solid(
-                                    intersection(mark, r.clip),
-                                    alpha * 0.6,
-                                    theme,
-                                    false,
-                                )?;
-                            }
-                        }
-                        if *selected {
-                            self.studio_solid(
-                                intersection(
-                                    MenuRect {
-                                        x: inner.x,
-                                        y: inner.y,
-                                        width: 4. * r.scale,
-                                        height: 4. * r.scale,
-                                    },
-                                    r.clip,
-                                ),
-                                alpha,
-                                theme,
-                                false,
-                            )?;
-                        }
-                        if input.visible_focus() == Some(control.id) {
-                            self.outline_control(r, alpha, theme)?;
-                        }
-                    }
-                    ControlKind::Swatch {
-                        palette,
-                        count,
-                        selected,
-                    } => {
-                        self.swatch(r, *palette, count.is_some(), alpha, theme)?;
-                        if *selected {
-                            self.studio_solid(
-                                intersection(
-                                    MenuRect {
-                                        x: r.rect.x + r.rect.width / 2. - 2. * r.scale,
-                                        y: r.rect.y + r.rect.height - 5. * r.scale,
-                                        width: 4. * r.scale,
-                                        height: 2. * r.scale,
-                                    },
-                                    r.clip,
-                                ),
-                                alpha,
-                                theme,
-                                false,
-                            )?;
-                        }
-                        if input.visible_focus() == Some(control.id) {
-                            self.outline_control(r, alpha, theme)?;
-                        }
-                        if let Some(count) = count {
-                            style.size = 12. * r.scale;
-                            let rgb =
-                                slither_client::authored_sources::standard_palette_rgb(*palette)
-                                    .ok_or("Invalid swatch")?;
-                            style.color = if u32::from(rgb[0])
-                                + u32::from(rgb[1])
-                                + u32::from(rgb[2])
-                                > 480
-                            {
-                                theme.backdrop
-                            } else {
-                                [255; 3]
-                            };
-                            add_label(
-                                self,
-                                count.to_string(),
-                                r.rect,
-                                style,
-                                Align::Center,
-                                r.clip,
-                            );
-                            self.labels.last_mut().expect("run count").fit = true;
-                        }
+                    // The skin studio paints its own controls with egui.
+                    ControlKind::CosmeticCell { .. }
+                    | ControlKind::Swatch { .. }
+                    | ControlKind::SectionTab { .. } => {
+                        return Err("Skin studio controls are painted by egui".into());
                     }
                     ControlKind::IconLink { label } | ControlKind::SettingsLink { label } => {
                         let [hover, press] = input.progress(control.id);
@@ -748,17 +586,7 @@ impl Composition<'_> {
                         );
                         self.labels.last_mut().unwrap().alpha *= link_alpha;
                     }
-                    ControlKind::Backdrop if control.style == ControlStyle::StudioSurface => {
-                        self.studio_solid(r.rect, alpha, theme, true)?
-                    }
                     ControlKind::Backdrop => self.fill(r.rect, theme.backdrop, alpha)?,
-                    ControlKind::Surface if panel.id == 3 => self.studio_panel(
-                        r.rect,
-                        theme.surface(control.style, ControlState::Idle),
-                        alpha,
-                        surface_clip,
-                        r.scale,
-                    )?,
                     ControlKind::Surface => self.sliced(
                         r.rect,
                         theme.surface(control.style, ControlState::Idle),
@@ -862,7 +690,7 @@ impl Composition<'_> {
                     ControlKind::Label { text: value } => {
                         add_label(self, value.clone(), r.rect, style, Align::Center, r.clip)
                     }
-                    ControlKind::Button { label } | ControlKind::SectionTab { label, .. } => {
+                    ControlKind::Button { label } => {
                         if control.style == ControlStyle::ChangeSkin {
                             if input.visible_focus() == Some(control.id) {
                                 self.sliced(
@@ -926,22 +754,6 @@ impl Composition<'_> {
                             let l = self.labels.last_mut().unwrap();
                             l.line_box = control.style == ControlStyle::LoginPlay;
                             l.fit = control.style != ControlStyle::StudioAction;
-                        }
-                        if matches!(control.kind, ControlKind::SectionTab { selected: true, .. }) {
-                            self.studio_solid(
-                                intersection(
-                                    MenuRect {
-                                        x: r.rect.x + 16.,
-                                        y: r.rect.y + r.rect.height - 3.,
-                                        width: r.rect.width - 32.,
-                                        height: 2.,
-                                    },
-                                    r.clip,
-                                ),
-                                alpha,
-                                theme,
-                                false,
-                            )?;
                         }
                         if compact && focused && enabled {
                             self.outline_control(r, alpha, theme)?;
@@ -1034,106 +846,6 @@ impl Composition<'_> {
             })
         })?;
         self.push(image(&resource, rect, alpha))
-    }
-    /// Fixed authored colour sprites and two padded solids share one small atlas.
-    /// Like body-source sprites, these do not retain a new copy for every DPR.
-    fn studio_atlas(&mut self, theme: MenuTheme) -> Result<Resource> {
-        use slither_client::{authored_sources::standard_palette_rgb, skin_builder::PALETTES};
-        self.cached_material(MaterialKey::Swatches(theme.text, theme.backdrop), || {
-            let mut atlas = materials::RgbaImage {
-                width: 144,
-                height: 176,
-                pixels: vec![0; 144 * 176 * 4],
-            };
-            for (index, palette) in PALETTES.iter().enumerate() {
-                let rgb = standard_palette_rgb(*palette).ok_or("Invalid swatch")?;
-                let tile = materials::menu_control(
-                    [20; 2],
-                    4.,
-                    [rgb, rgb.map(|c| (u16::from(c) * 4 / 5) as u8)],
-                    1.,
-                    materials::MenuSurface::Overlay,
-                )?;
-                let x = index % 6 * 24 + 2;
-                let y = index / 6 * 24 + 2;
-                for row in 0..20 {
-                    let to = ((y + row) * 144 + x) * 4;
-                    atlas.pixels[to..to + 80]
-                        .copy_from_slice(&tile.pixels[row * 80..row * 80 + 80]);
-                }
-            }
-            // Crop inside each solid block so linear sampling cannot mix neighbouring colours.
-            for (x, rgb) in [(0, theme.text), (8, theme.backdrop)] {
-                for y in 168..176 {
-                    for column in x..x + 8 {
-                        let offset = (y * 144 + column) * 4;
-                        atlas.pixels[offset..offset + 4]
-                            .copy_from_slice(&[rgb[0], rgb[1], rgb[2], 255]);
-                    }
-                }
-            }
-            Ok(atlas)
-        })
-    }
-    fn studio_solid(
-        &mut self,
-        rect: MenuRect,
-        alpha: f64,
-        theme: MenuTheme,
-        backdrop: bool,
-    ) -> Result<()> {
-        if alpha == 0. || rect.width <= 0. || rect.height <= 0. {
-            return Ok(());
-        }
-        let resource = self.studio_atlas(theme)?;
-        let mut draw = image(&resource, rect, alpha);
-        draw.source = Some(BodyRect {
-            x: if backdrop { 10. } else { 2. },
-            y: 170.,
-            width: 4.,
-            height: 4.,
-        });
-        self.push(draw)
-    }
-    fn swatch(
-        &mut self,
-        r: &ResolvedControl,
-        palette: u8,
-        run: bool,
-        alpha: f64,
-        theme: MenuTheme,
-    ) -> Result<()> {
-        use slither_client::skin_builder::PALETTES;
-        let visible = intersection(r.rect, r.clip);
-        if alpha == 0. || visible.width <= 0. || visible.height <= 0. {
-            return Ok(());
-        }
-        let index = PALETTES
-            .iter()
-            .position(|p| *p == palette)
-            .ok_or("Invalid swatch")?;
-        let resource = self.studio_atlas(theme)?;
-        let width = if run { r.rect.width - 4. } else { 22. };
-        let mut draw = image(
-            &resource,
-            MenuRect {
-                x: r.rect.x + (r.rect.width - width) / 2.,
-                y: r.rect.y + 3.,
-                width,
-                height: 22.,
-            },
-            alpha,
-        );
-        draw.source = Some(BodyRect {
-            x: (index % 6 * 24 + 1) as f64,
-            y: (index / 6 * 24 + 1) as f64,
-            width: 22.,
-            height: 22.,
-        });
-        if clip_scaled_draw(&mut draw, r.clip, self.scale) {
-            self.push(draw)?;
-        }
-        Ok(())
     }
     fn cached_material(
         &mut self,
@@ -1358,14 +1070,7 @@ impl Composition<'_> {
             SurfaceRecipe::Compact => 128.,
             _ => 32.,
         };
-        let middle = if tokens.recipe == SurfaceRecipe::StudioPanel {
-            // Keep the uniform panel repeat within the first physical tile. A
-            // repeat spanning two Y tiles doubles every interior row's draw cost.
-            // The server picker and existing controls retain their logical repeats.
-            512u32.saturating_sub(radius + pad).max(32)
-        } else {
-            (logical_middle * raster_scale).ceil().max(1.) as u32
-        };
+        let middle = (logical_middle * raster_scale).ceil().max(1.) as u32;
         let atlas = size.map(|n| n.min(2 * radius + middle));
         let padded = atlas.map(|n| n + 2 * pad);
         if padded.iter().any(|n| *n > 2048) {
@@ -1475,9 +1180,10 @@ impl Composition<'_> {
         }
         Ok(())
     }
-    /// Small studio capsules share a compact theme shadow and stretch one uniform
-    /// centre column. Retaining a wide centre would exceed the studio's 2 MiB
-    /// surface allocation at DPR5; repeating a one-pixel column would exceed draws.
+    /// Small capsules (the old toolkit's studio-button recipe) share a compact
+    /// theme shadow and stretch one uniform centre column. Retaining a wide
+    /// centre would cost a raster per width; repeating a one-pixel column would
+    /// exceed draws.
     fn studio_capsule(
         &mut self,
         r: MenuRect,
@@ -2160,7 +1866,6 @@ impl Menu {
             &mut staged_scroll,
             theme,
             &resolved,
-            None,
         )?;
         let (result, next, spinner, materials, art, stroke) =
             c.finish(text, extent, dpr, None, None, Vec::new())?;
@@ -2423,7 +2128,6 @@ impl Menu {
                 &mut BTreeMap::new(),
                 MenuTheme::default(),
                 &resolved,
-                None,
             )?;
         }
         let mut staged_scroll = panel.as_ref().map(|p| p.scroll.clone());
@@ -2440,7 +2144,6 @@ impl Menu {
                 staged_scroll.as_mut().expect("panel scroll"),
                 p.theme,
                 &resolved,
-                p.thumbnails,
             )?;
         }
         let spinner_start = c.draws.len();
@@ -2473,19 +2176,6 @@ type Published = (
     Option<StrokeCache>,
 );
 // (destination, source, length) in physical pixels, including the atlas shadow.
-fn decoration_clip(r: &ResolvedControl, studio: bool) -> Option<MenuRect> {
-    r.control
-        .clip
-        .and_then(|_| (!studio || !contains_rect(r.clip, r.rect)).then_some(r.clip))
-}
-
-fn contains_rect(outer: MenuRect, inner: MenuRect) -> bool {
-    inner.x >= outer.x
-        && inner.y >= outer.y
-        && inner.x + inner.width <= outer.x + outer.width
-        && inner.y + inner.height <= outer.y + outer.height
-}
-
 fn slice_axis(size: u32, atlas: u32, pad: u32, centre: u32) -> Result<Vec<(u32, u32, u32)>> {
     if size == atlas {
         return Ok(vec![(0, 0, size + 2 * pad)]);
@@ -3089,7 +2779,7 @@ mod quota_tests {
             .compose_labels(&mut text, [960, 720], 1., None, None, &[])
             .unwrap();
         assert_eq!(retried.attribution.total(), retried.frame.draws.len());
-        assert_eq!(retried.draw_counts(0).admitted_menu(), 512);
+        assert_eq!(retried.draw_counts().admitted_menu(), 512);
     }
 
     #[test]

@@ -138,11 +138,13 @@ hosts still share one state and layout. Swatches, cells, tabs and actions use
 the theme capsule gradient and compact shadow. Hover and press are instant, as
 on the other egui screens; the keyboard focus ring shows only in keyboard
 modality. A press focuses its control, as the old panel input did. Wheel and
-key handling stay in the core: arrows, Home/End and Previous/Next cycling go
-through `StudioState::navigate`, and a wheel scroll cancels the held press.
+key handling stay in the core: arrows, Home/End and Left/Right cycling on
+Previous/Next go through `StudioState::key_navigation`, once per physical key press
+(egui-winit reports native auto-repeats as fresh presses). A wheel scroll or a
+cancelled touch drops the held press without a click.
 Cosmetic thumbnails upload once per handle and revision as egui textures and
-are dropped when evicted. The old-toolkit studio painter in `menu.rs` no
-longer draws the studio; its unit tests remain until it is removed.
+are dropped when evicted or the studio closes. The old toolkit no longer
+paints studio controls and rejects them.
 
 Focused checks from `client/`: `cargo test --locked --test skin_studio` and
 `cargo test --locked --manifest-path apps/wgpu-slice/Cargo.toml --test skin_studio

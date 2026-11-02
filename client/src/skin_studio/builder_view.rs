@@ -97,6 +97,22 @@ impl StudioState {
         self.editor_scroll = self.editor_window(viewport);
         self.editor_scroll.reveal(row, BUILDER_ROWS);
     }
+    /// One key press in any host: Left/Right on Previous/Next cycle the
+    /// built-in skin and keep focus; every other direction moves focus.
+    pub fn key_navigation(
+        &mut self,
+        focus: ControlId,
+        direction: Navigation,
+        now: f64,
+    ) -> ControlId {
+        if [PREVIOUS, NEXT].contains(&focus)
+            && matches!(direction, Navigation::Left | Navigation::Right)
+        {
+            self.cycle(matches!(direction, Navigation::Right));
+            return focus;
+        }
+        self.navigate(focus, direction, now)
+    }
     /// Roving focus never appends, saves or samples entropy.
     pub fn navigate(&mut self, focus: ControlId, direction: Navigation, now: f64) -> ControlId {
         use Navigation::*;

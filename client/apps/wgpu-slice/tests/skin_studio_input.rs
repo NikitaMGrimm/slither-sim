@@ -238,7 +238,7 @@ fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eigh
                 }
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
                 let draws = menu.frame.draws.len() + usize::from(menu.backdrop.is_some());
-                let counts = menu.draw_counts(0);
+                let counts = menu.draw_counts();
                 assert_eq!(counts.components.total(), menu.frame.draws.len());
                 assert_eq!(counts.reported_menu(), draws);
                 assert_eq!(
@@ -538,4 +538,103 @@ fn touch_taps_activate_through_egui() {
     login.settings_input(tap(center(&login, PREVIOUS), true, true));
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
     assert!(!login.studio_ui.keyboard_focus);
+}
+
+fn raw(login: &mut NativeLogin, events: Vec<egui::Event>) {
+    login.settings_input(egui::RawInput {
+        events,
+        ..Default::default()
+    });
+}
+fn arrow(key: egui::Key, pressed: bool) -> egui::Event {
+    egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed,
+        // egui-winit 0.37 reports native auto-repeats as repeat: false.
+        repeat: false,
+        modifiers: Default::default(),
+    }
+}
+
+/// The adapter route, which the `key` helper's repeat filter would mask:
+/// a held arrow cycles once per physical press, as the old studio input did.
+#[test]
+fn held_navigation_keys_act_once_per_physical_press() {
+    let mut login = opened_studio();
+    login.focus(NEXT);
+    for _ in 0..3 {
+        raw(&mut login, vec![arrow(egui::Key::ArrowRight, true)]);
+    }
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    raw(&mut login, vec![arrow(egui::Key::ArrowRight, false)]);
+    raw(
+        &mut login,
+        vec![
+            arrow(egui::Key::ArrowRight, true),
+            arrow(egui::Key::ArrowRight, true),
+        ],
+    );
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 2);
+    // A held key is forgotten when the window loses focus.
+    raw(&mut login, vec![egui::Event::WindowFocused(false)]);
+    raw(&mut login, vec![egui::Event::WindowFocused(true)]);
+    login.focus(NEXT);
+    raw(&mut login, vec![arrow(egui::Key::ArrowLeft, true)]);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    // Holding Right on the tab switches one section, not all of them.
+    raw(&mut login, vec![arrow(egui::Key::ArrowLeft, false)]);
+    login.focus(BUILT_IN_TAB);
+    for _ in 0..3 {
+        raw(&mut login, vec![arrow(egui::Key::ArrowRight, true)]);
+    }
+    assert_eq!(login.studio.state.section, StudioSection::Builder);
+}
+
+/// egui-winit turns a cancelled touch into Touch(Cancel) and PointerGone with
+/// no release. The press neither clicks nor stays held on the returned login.
+#[test]
+fn a_cancelled_touch_releases_the_pointer_without_a_click() {
+    let mut login = opened_studio();
+    let pos = login
+        .studio_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == NEXT)
+        .unwrap()
+        .1
+        .center();
+    let touch = |phase| egui::Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(7),
+        phase,
+        pos,
+        force: None,
+    };
+    raw(
+        &mut login,
+        vec![
+            touch(egui::TouchPhase::Start),
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: Default::default(),
+            },
+        ],
+    );
+    raw(
+        &mut login,
+        vec![touch(egui::TouchPhase::Cancel), egui::Event::PointerGone],
+    );
+    let context = login.egui.context().unwrap().clone();
+    assert!(!context.input(|i| i.pointer.any_down()));
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    login.studio.state.cancel(230.);
+    login.step(460., false, false).unwrap();
+    login.sync_return_focus(false);
+    login.prepare([960, 540], false, None).unwrap();
+    assert!(!login.studio.state.visible());
+    assert!(!context.input(|i| i.pointer.any_down()));
 }

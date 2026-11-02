@@ -80,7 +80,7 @@ impl Sweep<'_> {
             return Err(format!("Focus fixture lost {id:?} in {name}"));
         }
         let studio = login.studio.state.visible();
-        let counts = menu.draw_counts(0);
+        let counts = menu.draw_counts();
         let records = counts.admitted_menu();
         let bytes: usize = menu.resources.iter().map(|r| r.image.pixels.len()).sum();
         if records > if studio { 448 } else { 512 }
