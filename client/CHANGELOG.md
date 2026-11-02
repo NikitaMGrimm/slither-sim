@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reduce crowded GPU work by skipping exactly invisible additive pairs and
+  initial black shadows, grouping paired glow sources, and keeping world
+  drawing and glow composition in one MSAA pass without changing source rasters.
+
 - Let settled native menus sleep between input, result updates and egui repaint
   deadlines, while preserving menu animations, active gameplay and surface retries.
 

@@ -65,6 +65,24 @@ fn additive_pair(a: &crate::frame::Quad, b: &crate::frame::Quad) -> bool {
             .zip(b.vertices.iter())
             .all(|(a, b)| a[..4] == b[..4])
 }
+
+fn zero_pair(a: f32, b: f32) -> bool {
+    // Each sampled UNORM component is <= 1. fs_pair rounds each contribution
+    // separately to a byte, including alpha. Leave a margin below the half-byte
+    // boundary for interpolation/filter precision; never apply to ordinary fs.
+    f64::from(a.max(b)) * 255. < 0.49
+}
+
+#[cfg(test)]
+#[test]
+fn zero_pairs_leave_a_margin_at_the_byte_rounding_boundary() {
+    assert!(zero_pair(0., 0.48 / 255.));
+    assert!(zero_pair(0.48 / 255., 0.));
+    for alpha in [0.5 / 255., 0.51 / 255., 1.] {
+        assert!(!zero_pair(alpha, 0.));
+        assert!(!zero_pair(0., alpha));
+    }
+}
 struct Texture {
     asset: BodyAsset,
     array: TextureArray,
@@ -144,6 +162,7 @@ struct PaintPass<'a> {
     samples: u32,
     load: wgpu::LoadOp<wgpu::Color>,
     range: std::ops::Range<usize>,
+    before: Option<std::ops::Range<usize>>,
     queries: Option<(u32, u32)>,
     coarse: Option<&'a wgpu::BindGroup>,
     fine: [Option<&'a wgpu::BindGroup>; 2],
@@ -921,6 +940,7 @@ impl Renderer {
         let mut glow_count = 0;
         let mut glow_coverage = [0.; 4];
         let mut outline_coverage = 0.;
+        let mut black_prefix = 0;
         let previous =
             if self.layer_history.extent == attachment && self.layer_history.samples == samples {
                 self.layer_history
@@ -1008,6 +1028,16 @@ impl Renderer {
                 }
             }
             let texture = &self.textures[&quad.key];
+            // Only the opaque black world clear is known here. Black source-over
+            // cannot change it (including fs_black's clamped subtraction). A
+            // loaded overlay or a later shadow must retain its ordinary draw.
+            if soft_layers
+                && index == black_prefix
+                && texture.black
+                && quad.blend == slither_client::presentation::BodyBlend::SourceOver
+            {
+                black_prefix += 1;
+            }
             for vertex in [
                 quad.vertices[0],
                 quad.vertices[1],
@@ -1023,14 +1053,16 @@ impl Renderer {
             let mut state = DrawState::new(&quad, self.textures[&quad.key].black);
             state.glow_scale = scale;
             if paired {
+                state.noop = zero_pair(quad.vertices[0][4], second_alpha);
                 state.pipeline = Pipeline::PairLighter;
             }
             state.key = texture.array.key;
             chunk.states.push(state);
         }
         let glow_bins = select_glows(glow_coverage, samples, previous);
-        let glow_span =
-            glow_span.filter(|span| span.len() == glow_count && glow_bins[1..].contains(&true));
+        let glow_span = glow_span.filter(|span| {
+            span.end > black_prefix && span.len() == glow_count && glow_bins[1..].contains(&true)
+        });
         // An individually unprofitable bin stays on the ordinary path even
         // when another bin can pay for splitting the world pass.
         for chunk in &mut self.vertices[..chunk_count] {
@@ -1065,6 +1097,37 @@ impl Renderer {
                         state.repeat,
                     )
                 });
+                let mut group_start = 0;
+                // Byte-quantized additive pairs can group zero work at the end
+                // without fragmenting active runs, then group source layers for
+                // texture-cache locality. Non-paired groups retain their order.
+                // The authored readback study bounds any GPU rounding drift.
+                while group_start < self.glow_sort.len() {
+                    let first = self.glow_sort[group_start].0;
+                    let mut group_end = group_start + 1;
+                    while group_end < self.glow_sort.len() {
+                        let next = self.glow_sort[group_end].0;
+                        if (first.glow_scale, first.key, first.pipeline, first.repeat)
+                            != (next.glow_scale, next.key, next.pipeline, next.repeat)
+                        {
+                            break;
+                        }
+                        group_end += 1;
+                    }
+                    if first.pipeline == Pipeline::PairLighter {
+                        self.glow_sort[group_start..group_end].sort_unstable_by_key(
+                            |(state, bytes)| {
+                                (
+                                    state.noop,
+                                    u32::from_le_bytes(
+                                        bytes[24..28].try_into().expect("layer bytes"),
+                                    ),
+                                )
+                            },
+                        );
+                    }
+                    group_start = group_end;
+                }
                 for (j, (state, bytes)) in (start..end).zip(self.glow_sort.iter()) {
                     chunk.states[j] = *state;
                     chunk.bytes[j * QUAD_VERTEX_BYTES..(j + 1) * QUAD_VERTEX_BYTES]
@@ -1135,6 +1198,8 @@ impl Renderer {
                     previous.outline,
                 )
         });
+        let admitted_outline = outline_span.is_some();
+        let outline_span = outline_span.filter(|span| span.end > black_prefix);
         let outline_replacement = outline_span.as_ref().and_then(|_| {
             self.outline_target
                 .as_ref()
@@ -1172,13 +1237,7 @@ impl Renderer {
         });
         #[cfg(feature = "frame-profile")]
         let queries = {
-            let mut q = vec![self.diagnostic_pass(if glow_span.is_some() {
-                "world-before-glows"
-            } else if overlay {
-                "overlay"
-            } else {
-                "world"
-            })?];
+            let mut q = vec![self.diagnostic_pass(if overlay { "overlay" } else { "world" })?];
             if glow_span.is_some() {
                 if glow_bins[3] {
                     q.push(self.diagnostic_pass("food-glows-coarse")?);
@@ -1189,7 +1248,6 @@ impl Renderer {
                 if glow_bins[1] {
                     q.push(self.diagnostic_pass("food-glows-half")?);
                 }
-                q.push(self.diagnostic_pass("world-after-glows")?);
             }
             q
         };
@@ -1215,7 +1273,9 @@ impl Renderer {
             .as_ref()
             .or(self.outline_target.as_ref());
         let mut outline_calls = 0;
-        let start = outline_span.as_ref().map_or(0, |span| span.end);
+        let start = outline_span
+            .as_ref()
+            .map_or(black_prefix, |span| span.end.max(black_prefix));
         if outline_span.is_some() {
             outline_calls = self.encode_pass(
                 &mut encoder,
@@ -1224,7 +1284,8 @@ impl Renderer {
                     resolve: None,
                     samples: 1,
                     load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    range: 0..start,
+                    before: None,
+                    range: black_prefix..start,
                     queries: if aggregate_queries {
                         None
                     } else {
@@ -1246,28 +1307,15 @@ impl Renderer {
         let pass_count = 1
             + usize::from(outline_span.is_some())
             + if has_glows {
-                1 + glow_bins[1..].iter().filter(|&&active| active).count()
+                glow_bins[1..].iter().filter(|&&active| active).count()
             } else {
                 0
             };
         let query = |i| (!aggregate_queries).then_some(queries[i]);
         let draw_calls = if let Some(span) = glow_span {
-            let before = self.encode_pass(
-                &mut encoder,
-                PaintPass {
-                    target: world,
-                    resolve: None,
-                    samples,
-                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                    range: start..span.start,
-                    queries: query(0),
-                    coarse: None,
-                    fine: [None; 2],
-                    small_glows: None,
-                    filter: None,
-                    base,
-                },
-            );
+            // Reduced targets read source rasters only. Paint them first, then
+            // keep all world geometry/composites in the original order within
+            // one MSAA pass, avoiding the intermediate world store/load.
             let mut soft = 0;
             let mut i = 1;
             let coarse = glow_bins[3].then(|| {
@@ -1284,6 +1332,7 @@ impl Renderer {
                         resolve: None,
                         samples: 1,
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        before: None,
                         range: span.clone(),
                         queries: query(i),
                         coarse: None,
@@ -1309,6 +1358,7 @@ impl Renderer {
                         resolve: None,
                         samples: 1,
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        before: None,
                         range: span.clone(),
                         queries: query(i),
                         coarse: None,
@@ -1334,6 +1384,7 @@ impl Renderer {
                         resolve: None,
                         samples: 1,
                         load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        before: None,
                         range: span.clone(),
                         queries: query(i),
                         coarse: None,
@@ -1343,7 +1394,6 @@ impl Renderer {
                         base: None,
                     },
                 );
-                i += 1;
             }
             let after = self.encode_pass(
                 &mut encoder,
@@ -1351,17 +1401,18 @@ impl Renderer {
                     target: world,
                     resolve: msaa_view.map(|_| target),
                     samples,
-                    load: wgpu::LoadOp::Load,
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    before: Some(start..span.start),
                     range: span.end..frame.draws.len(),
-                    queries: query(i),
+                    queries: query(0),
                     coarse: coarse.map(|g| &g.bind),
                     fine: [half.map(|g| &g.bind), fine.map(|g| &g.bind)],
                     small_glows: Some(span.clone()),
                     filter: None,
-                    base: None,
+                    base,
                 },
             );
-            before + soft + after
+            soft + after
         } else {
             self.encode_pass(
                 &mut encoder,
@@ -1374,6 +1425,7 @@ impl Renderer {
                     } else {
                         wgpu::LoadOp::Clear(wgpu::Color::BLACK)
                     },
+                    before: None,
                     range: start..frame.draws.len(),
                     queries: query(0),
                     coarse: None,
@@ -1396,7 +1448,7 @@ impl Renderer {
             self.layer_history = LayerHistory {
                 extent: attachment,
                 samples,
-                outline: outline_span.is_some(),
+                outline: admitted_outline,
                 glow: has_glows,
                 glow_bins: if has_glows { glow_bins } else { [false; 4] },
             };
@@ -1450,6 +1502,9 @@ impl Renderer {
             }
             pass.set_vertex_buffer(0, chunk.buffer.as_ref().expect("vertex buffer").slice(..));
             for (state, vertices) in draw_runs(chunk.states[start..end].iter().copied()) {
+                if state.noop {
+                    continue;
+                }
                 if filter.is_some_and(|coarse| coarse != state.glow_scale) {
                     continue;
                 }
@@ -1514,6 +1569,7 @@ impl Renderer {
     }
     fn encode_pass(&self, encoder: &mut wgpu::CommandEncoder, plan: PaintPass<'_>) -> usize {
         let PaintPass {
+            before,
             target,
             resolve,
             samples,
@@ -1551,6 +1607,9 @@ impl Renderer {
             pass.set_bind_group(0, bind, &[]);
             pass.draw(0..3, 0..1);
         }
+        let before_draws = before.map_or(0, |range| {
+            self.encode_draws(&mut pass, range, samples, filter)
+        });
         let mut small_draws = 0;
         for bind in fine.into_iter().flatten() {
             pass.set_pipeline(if samples == 1 {
@@ -1575,6 +1634,7 @@ impl Renderer {
         }
         self.encode_draws(&mut pass, range, samples, filter)
             + small_draws
+            + before_draws
             + usize::from(coarse.is_some())
             + fine.iter().flatten().count()
             + usize::from(base.is_some())

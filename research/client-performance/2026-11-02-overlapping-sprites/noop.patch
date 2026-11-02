@@ -1,0 +1,31 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -925,0 +926 @@
++        let mut black_prefix = 0;
+@@ -1012,0 +1014,3 @@
++            if soft_layers && index == black_prefix && texture.black {
++                black_prefix += 1;
++            }
+@@ -1027,0 +1032 @@
++                state.noop = f64::from(quad.vertices[0][4].max(second_alpha)) * 255. < 0.49;
+@@ -1035 +1040 @@
+-            glow_span.filter(|span| span.len() == glow_count && glow_bins[1..].contains(&true));
++            glow_span.filter(|span| span.end > black_prefix && span.len() == glow_count && glow_bins[1..].contains(&true));
+@@ -1131,0 +1137 @@
++                && span.end > black_prefix
+@@ -1223 +1229 @@
+-        let start = outline_span.as_ref().map_or(0, |span| span.end);
++        let start = outline_span.as_ref().map_or(black_prefix, |span| span.end.max(black_prefix));
+@@ -1232 +1238 @@
+-                    range: 0..start,
++                    range: black_prefix..start,
+@@ -1470,0 +1477 @@
++                if state.noop { continue; }
+--- a/client/apps/wgpu-slice/src/draw_runs.rs
++++ b/client/apps/wgpu-slice/src/draw_runs.rs
+@@ -19,0 +20 @@
++    pub noop: bool,
+@@ -33,0 +35 @@
++            noop: false,
+@@ -69,0 +72 @@
++            noop: false,

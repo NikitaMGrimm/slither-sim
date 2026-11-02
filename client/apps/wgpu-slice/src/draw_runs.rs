@@ -17,6 +17,8 @@ pub(super) struct DrawState {
     pub key: ResourceKey,
     pub repeat: bool,
     pub glow_scale: u8,
+    /// A byte-quantized pair whose RGBA contributions all round to zero.
+    pub noop: bool,
 }
 impl DrawState {
     pub fn new(quad: &Quad, black: bool) -> Self {
@@ -31,6 +33,7 @@ impl DrawState {
             key: quad.key,
             repeat: quad.repeat,
             glow_scale: 0,
+            noop: false,
         }
     }
 }
@@ -67,6 +70,7 @@ mod tests {
             },
             repeat: false,
             glow_scale: 0,
+            noop: false,
         }
     }
 

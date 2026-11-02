@@ -1,0 +1,198 @@
+{
+  "main-msaa": {
+    "before": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "r8-trial": {
+    "before": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "e1cfe9413a8667e6282a86f8f8326aba68724f5d51746cef1873fa3acf10154b"
+      }
+    },
+    "after": {
+      "binary_sha256": "b53f934415aed0b16cc3c791217e1f773bc68fff6e60a286118b9b5ade4e36e8",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "fe04e76c0b83fcc76ccf04db323463ed2bbb6f8c1f89734370f5677791644673",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4bb541bc3ebf58d09afcae597aea390e5457c42bb7b27c9fb86b394ba82df7f7",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "67bf88be93ca1dae22b1173476fbf5105d48f199e1ceed39701398f803851eed"
+      }
+    }
+  },
+  "rgb-trial": {
+    "before": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "bbc73a7eed50ab98814e3078d13d25359bc975b4a6f314f4ef143f024641dd12",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "1c3a85d15714517bd9ecd46adc5d16a1bc639841717610e95dfaa54e755623da",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "5eb847171b2a7b838e7d10e5b446a67f6a399f42f1defa59265b2ad2fbe87ee4",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "noop-trial": {
+    "before": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "829cdb13af5f041ef2b86d636a4b0c9d9cd658d28783226cc8e9c843ca18e6f6",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "ca469524957cbb27c9dc3b00b65bf9ce28afaa0c68ccda768350184fa94ae40d",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "2cffbec1f610245310279fd7c72b0ed7ce94dc199f04f18467e59bb82d0a8f4a",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "combined-trial": {
+    "before": {
+      "binary_sha256": "433f17633d807b99c7f3cf944701bae224c8cbede49e9cc958f22174bfe22fc0",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "2cb3fb1fe4e3a4217fccc3aff447dedeefa759804b92cb89f1c7d2c5c7d49c74",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "48c4903779a19069cc2bbdc2f5b7f8b16e03251de9d3b4ca2cca8ece36e7443d",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "2cffbec1f610245310279fd7c72b0ed7ce94dc199f04f18467e59bb82d0a8f4a",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "selected-native": {
+    "before": {
+      "binary_sha256": "027f7e9179ce4c78c5c86f0a50ecd3a3fda4c6e4a593e9984cd041dd2f7dcbcd",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "397c3f2ab02e49157fed9d9119a6e4d23605a2c9c0fca02b899196cd77a506da",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "3416538d0f94b96d97058a976610b463e8d5c7ff473359e36279fdd189843180",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "21baacb8f795a3d87456522573f771068f653a27f6a302c372b5fe453b2790a8",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "14c5874b0f935c83617c24665fbd3395e0c4996fc25bbdebb410b6cbacbc2b07",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "1aaf3fd7cf27f45b2e513e3633df2acb6566a2b7d8be4da515f8b321d597886b",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "7369ff619a580736c6b61d342935a585b7878a3b25056d5a808b997a5092677e",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "selected-original": {
+    "before": {
+      "binary_sha256": "027f7e9179ce4c78c5c86f0a50ecd3a3fda4c6e4a593e9984cd041dd2f7dcbcd",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "abcb3e65f193405550ef937665fd4e8bb2d4f2bd715426cf6a01fcb619cdfa58",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "c9f42a0d35e1f163504def7ad3c784b52dbcdc7d5591ec030f954e132623209d",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "a33f7ba493f65d2a28fe469f7e6cb0d04d9af0a05afdd2ae7a5f1b0722820d8d",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "397c3f2ab02e49157fed9d9119a6e4d23605a2c9c0fca02b899196cd77a506da",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    },
+    "after": {
+      "binary_sha256": "3416538d0f94b96d97058a976610b463e8d5c7ff473359e36279fdd189843180",
+      "module_sha256": {
+        "client/apps/wgpu-slice/src/gpu.rs": "21baacb8f795a3d87456522573f771068f653a27f6a302c372b5fe453b2790a8",
+        "client/apps/wgpu-slice/src/draw_runs.rs": "14c5874b0f935c83617c24665fbd3395e0c4996fc25bbdebb410b6cbacbc2b07",
+        "client/apps/wgpu-slice/src/soft_layers.rs": "1aaf3fd7cf27f45b2e513e3633df2acb6566a2b7d8be4da515f8b321d597886b",
+        "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
+        "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "7369ff619a580736c6b61d342935a585b7878a3b25056d5a808b997a5092677e",
+        "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+      }
+    }
+  },
+  "baseline_commit": "3f2b0bd93e5f0fe824859a3dc0f3fd92477481e1",
+  "candidate_module_sha256": {
+    "client/apps/wgpu-slice/src/gpu.rs": "21baacb8f795a3d87456522573f771068f653a27f6a302c372b5fe453b2790a8",
+    "client/apps/wgpu-slice/src/draw_runs.rs": "14c5874b0f935c83617c24665fbd3395e0c4996fc25bbdebb410b6cbacbc2b07",
+    "client/apps/wgpu-slice/src/soft_layers.rs": "1aaf3fd7cf27f45b2e513e3633df2acb6566a2b7d8be4da515f8b321d597886b",
+    "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd"
+  },
+  "sparse_binary_sha256": {
+    "before": "1555aeaba8eec3cac54f223962c0c61b0f2de92bd71528be5dd3b4c227817e44",
+    "after": "4cb8ede39c82210c3df2eabc3854e2b3397d8f2e855213cfe8c4b9d816528e65"
+  },
+  "excluded_invalid_copy_cache_csv_sha256": "edf41a142ba2e1d5c2766519a8caf99ca970d85a9eddaaa036f4bb0f9c51a38f"
+}

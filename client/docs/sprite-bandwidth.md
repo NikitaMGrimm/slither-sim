@@ -24,8 +24,12 @@ passes are admitted only when their estimated saved work pays for the full-scree
 operations. In attachment screen areas, outlines save `(samples - 1) * area`
 against fixed work `samples + 2`. Each glow bin saves
 `area * (1 + samples - 2 / factor²)` against `samples + taps + 2 / factor²`,
-where reconstruction uses one or five taps; selected bins also pay `2 * samples`
-for splitting the world pass. This is a portable work estimate, not a GPU timer.
+where reconstruction uses one or five taps; selected bins retain a conservative
+`2 * samples` reserve from the original split-pass admission policy. Reduced
+targets now render first because they read only immutable source rasters. The
+world then paints its original ordered geometry and composites in one MSAA pass,
+avoiding an intermediate world store/load without changing the selected bins.
+This is a portable work estimate, not a GPU timer.
 Each bin must pay independently. Entry requires 125% of fixed work; an active
 path remains selected above 100%. History resets on attachment/sample changes.
 Sparse pictures therefore keep ordinary drawing, including Low-quality outlines.
@@ -84,6 +88,21 @@ The pair path is limited to encoded UNORM8 attachments. The two original
 rounding steps can differ by at most two output bytes in the authored sweep;
 this is not a byte-identical raster claim.
 
+Within an already paired UNORM8 draw, both opacities below `0.49 / 255` make
+every sampled RGBA contribution round to zero. Those pairs still validate but
+issue no draw. The margin below half a byte avoids the rounding boundary. In
+the additive food barrier only, paired draws group by zero/nonzero contribution
+and source array layer to keep active runs contiguous and improve source locality.
+Their quantized nonnegative additions commute in the encoded byte domain; the
+dated follow-up retains actual readback differences rather than assuming hardware
+arithmetic is byte-identical. Non-paired groups keep the existing ordering.
+
+Initial black source-over quads over the opaque black world clear also issue no
+draw. If they cover the entire admitted outline prefix, no outline target/pass
+is needed. Logical outline-admission history is retained so the next picture's
+hysteresis choice stays unchanged. This rule never applies to loaded overlays,
+colored prefixes, later shadows, sRGB or floating-point diagnostic attachments.
+
 All quads validate before buffer uploads. Queue writes occur after prior calls
 submit; wgpu keeps in-flight buffer, texture-array and attachment references
 alive. Resize replaces targets without a CPU/GPU idle wait. World sample-count
@@ -119,3 +138,7 @@ The [dated bandwidth study](https://github.com/NikitaMGrimm/slither-sim/blob/mai
 owns the diagnostic variants, matched run summaries, adapter, readback limits
 and recompute script. GPU pass time is not gameplay FPS, physical latency or
 owner perceptual acceptance.
+
+The [overlapping-sprite follow-up](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-overlapping-sprites/REPORT.md)
+profiles the remaining authored crowded cost and records current-main comparisons
+and exact RGBA controls for the no-op and pass-order changes above.

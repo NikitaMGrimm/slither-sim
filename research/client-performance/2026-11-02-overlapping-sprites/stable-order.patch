@@ -1,0 +1,21 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -1115,16 +1115,8 @@
+                         group_end += 1;
+                     }
+                     if first.pipeline == Pipeline::PairLighter {
+-                        self.glow_sort[group_start..group_end].sort_unstable_by_key(
+-                            |(state, bytes)| {
+-                                (
+-                                    state.noop,
+-                                    u32::from_le_bytes(
+-                                        bytes[24..28].try_into().expect("layer bytes"),
+-                                    ),
+-                                )
+-                            },
+-                        );
++                        self.glow_sort[group_start..group_end]
++                            .sort_by_key(|(state, _)| state.noop);
+                     }
+                     group_start = group_end;
+                 }
