@@ -119,5 +119,6 @@
   "shared_diagnostic_patch": {
     "url": "https://github.com/NikitaMGrimm/slither-sim/blob/ead00d6ffdf0b1c4ac7da8ba9b826fc2af2a9294/research/client-performance/2026-11-02-art-validation/diagnostic.patch",
     "sha256": "66b494bc184f610c9a2b64937b83b25c58cb8db4d7e8adfc30a62c68d8d14c55"
-  }
+  },
+  "source_snapshot": "materials-sources.json.gz"
 }

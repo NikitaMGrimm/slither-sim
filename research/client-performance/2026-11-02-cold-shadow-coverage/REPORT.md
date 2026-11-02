@@ -202,6 +202,16 @@ Rejected circle-only trial: 30 runs retained, 8 excluded. Five complete default-
 
 ## Reproduction and retained attempts
 
+The source check reads [materials-sources.json.gz](materials-sources.json.gz),
+a gzip-compressed JSON map from arm to exact UTF-8 `materials.rs` text. Each
+payload matches its original measured SHA-256 in `identities.json`; recorded
+commit IDs remain origin labels. No old Git objects or current runtime files
+are read. Missing or altered snapshots fail validation. This keeps the historical
+check usable after squash merges, shallow checkout and later source edits.
+Run `python research/client-performance/2026-11-02-cold-shadow-coverage/test_study.py`.
+CI does not discover this manual study suite; its documentation checks validate
+links/index placement. No measured identities or results changed.
+
 ```text
 python research/client-performance/2026-11-02-cold-shadow-coverage/recompute.py --check
 ```
