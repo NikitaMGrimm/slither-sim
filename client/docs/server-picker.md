@@ -153,10 +153,8 @@ still closing.
 From `client/`, with `CARGO_BUILD_JOBS=2`, run the core `server_directory` and
 `server_picker` integration tests and app `server_picker` / `custom_servers`
 tests. The finite `menu_specimens <new-external-directory> --server-picker`
-example emits before/after PNGs for official, scrolled, DPR 3 resize, custom,
-pointer/keyboard focus, invalid and mixed states. The before side is the retained
-toolkit painter fed the same panel, field values and focus; it is not a desktop
-capture. It uses authored synthetic addresses and injected ping results and opens
+example emits PNGs for official, scrolled, DPR 3 resize, custom, pointer/keyboard
+focus, invalid and mixed states. It is not a desktop capture. It uses authored synthetic addresses and injected ping results and opens
 no window, socket or preference file. Full verification remains `npm run check`.
 
 These checks establish synthetic behavior and offscreen rendering only. Live

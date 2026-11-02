@@ -1,7 +1,5 @@
 //! Authored synthetic directories and injected ping results. No transport.
-use slither_client::{
-    menu_controls::*, menu_input::MenuInputState, server_directory::Server, server_picker::*,
-};
+use slither_client::{menu_controls::*, server_directory::Server, server_picker::*};
 use std::{collections::BTreeMap, net::SocketAddr};
 fn server(id: u16, cluster: u16, active: bool) -> Server {
     Server {
@@ -234,45 +232,21 @@ fn incremental_pings_preserve_focus_capture_and_window_until_reopen() {
     p.start_directory();
     assert!(p.take_directory_request());
     p.open();
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    input.sync(&p.panel([960., 720.]), &mut edit);
     p.update_directory(&servers, &BTreeMap::new(), false)
         .unwrap();
-    input.sync(&p.panel([960., 720.]), &mut edit);
-    assert_eq!(input.focus(), Some(ADDRESS));
     let target = p.navigate(None, isize::MAX);
-    let panel = p.panel([960., 720.]);
-    input.sync(&panel, &mut edit);
-    input.focus_control(&panel, target);
-    let resolved = panel.resolve([960., 720.]).unwrap();
-    let row = resolved.iter().find(|r| r.control.id == target).unwrap();
-    let point = [row.rect.x + 10., row.rect.y + 10.];
-    input.pointer(&panel, &resolved, point, Some(true));
+    let old = intent(&p, target);
     let generation = p.generation;
     let window = p.list.window(20);
     for complete in [false, true] {
         p.update_directory(&servers, &BTreeMap::from([(20, 10), (19, 40)]), complete)
             .unwrap();
-        let panel = p.panel([960., 720.]);
-        input.sync(&panel, &mut edit);
         assert_eq!(p.generation, generation);
         assert_eq!(p.list.window(20), window);
-        assert_eq!(input.focus(), Some(target));
-        assert_eq!(input.capture(), Some(target));
         assert_eq!(p.entries()[19].server.id, 20);
         assert_eq!(p.entries()[19].ping, Some(10));
     }
-    let panel = p.panel([960., 720.]);
-    let activation = input
-        .pointer(
-            &panel,
-            &panel.resolve([960., 720.]).unwrap(),
-            point,
-            Some(false),
-        )
-        .unwrap();
-    assert!(p.activate(activation));
+    assert!(p.activate(old));
     assert_eq!(p.selection.official_id(), Some(20));
     p.open();
     assert_eq!(p.rows[0].server.id, 20);
@@ -466,21 +440,9 @@ fn large_window_focus_scroll_and_refresh_cancel_capture() {
             .count(),
         6
     );
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    input.sync(&panel, &mut edit);
-    input.focus_control(&panel, target);
-    assert_eq!(input.focus(), Some(target));
-    let resolved = panel.resolve([960., 720.]).unwrap();
-    let r = resolved.iter().find(|r| r.control.id == target).unwrap();
-    let point = [r.rect.x + 10., r.rect.y + 10.];
-    input.pointer(&panel, &resolved, point, Some(true));
-    assert_eq!(input.capture(), Some(target));
+    assert!(panel.controls.iter().any(|c| c.id == target));
     let old = intent(&p, target);
     p.replace(&[server(8, 1, true)], &BTreeMap::new()).unwrap();
-    let panel = p.panel([960., 720.]);
-    input.sync(&panel, &mut edit);
-    assert_eq!(input.capture(), None);
     assert!(!p.activate(old));
     p.scroll(isize::MIN);
     assert_eq!(p.list.window(1), 0..1);
@@ -493,30 +455,10 @@ fn backdrop_panel_shield_tab_trap_and_closing_selection() {
     p.open();
     p.alpha = 1.;
     let panel = p.panel([960., 720.]);
-    let resolved = panel.resolve([960., 720.]).unwrap();
-    let mut input = PanelInputState::default();
-    let mut edit = MenuInputState::default();
-    input.sync(&panel, &mut edit);
-    assert_eq!(input.focus(), Some(ADDRESS));
-    input.tab(&panel, true);
-    assert_eq!(input.focus(), Some(CLOSE));
-    input.tab(&panel, false);
-    assert_eq!(input.focus(), Some(ADDRESS));
-    let r = resolved
-        .iter()
-        .find(|r| r.control.id == ControlId(1))
-        .unwrap();
-    let point = [r.rect.x + 8., r.rect.y + 8.];
-    input.pointer(&panel, &resolved, point, Some(true));
-    let i = input
-        .pointer(&panel, &resolved, point, Some(false))
-        .unwrap();
-    assert!(!p.activate(i));
+    assert_eq!(panel.initial_focus, Some(ADDRESS));
+    // The panel shield takes the activation without closing; the backdrop closes.
+    assert!(!p.activate(intent(&p, ControlId(1))));
     assert!(p.is_open());
-    input.pointer(&panel, &resolved, [1., 1.], Some(true));
-    let i = input
-        .pointer(&panel, &resolved, [1., 1.], Some(false))
-        .unwrap();
-    assert!(p.activate(i));
+    assert!(p.activate(intent(&p, ControlId(0))));
     assert!(!p.is_open());
 }

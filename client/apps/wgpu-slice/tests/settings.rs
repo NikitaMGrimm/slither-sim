@@ -165,7 +165,7 @@ fn pointer_blur_resize_and_mutually_exclusive_entry() {
         slither_client::settings::WorldResolution::Native
     );
     assert_eq!(login.state.view(true).quality, Q::Low);
-    login.close_settings(true);
+    login.close_settings();
     login.open_studio();
     login.open_settings(true);
     assert!(!login.state.settings.visible());
@@ -395,7 +395,7 @@ fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
     login.step(9715., true, false).unwrap();
     let alpha = login.state.settings.alpha();
     assert!(alpha > 0. && alpha < 1.);
-    login.close_settings(true);
+    login.close_settings();
     assert_eq!(login.state.settings.alpha(), alpha);
     assert!(login.egui.active());
     login.step(9945., true, false).unwrap();
@@ -411,7 +411,7 @@ fn native_settings_uses_the_shared_picker_fade_durations() {
         login.step(now as f64, true, false).unwrap();
     }
     assert_eq!(login.state.settings.alpha(), 1.);
-    login.close_settings(true);
+    login.close_settings();
     assert!(login.egui.active());
     for now in (10_016..=10_320).step_by(16) {
         login.step(now as f64, true, false).unwrap();
@@ -451,7 +451,7 @@ fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
     assert_eq!(login.state.settings.preferences().quality, Q::Low);
     let pos = point(&login, RESOLUTION, [960., 540.]);
     login.pointer(pos, Some(true), true);
-    login.close_settings(true);
+    login.close_settings();
     login.step(9916., true, false).unwrap();
     login.step(9932., true, false).unwrap();
     login.open_settings(true);
@@ -510,7 +510,7 @@ fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
         login.prepare([640, 360], true, None).unwrap();
     }
     assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
-    login.close_settings(true);
+    login.close_settings();
     login.open_settings(true);
     assert_eq!(login.settings_ui.focused(), Some(QUALITY));
     assert!(
@@ -949,14 +949,14 @@ fn modal_cursor_handoff_uses_the_latest_physical_position_without_another_move()
     let mut login = settled();
     login.prepare([960, 540], true, None).unwrap();
     let opener = login
-        .panel
-        .resolve([960., 540.])
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == SETTINGS)
         .unwrap()
-        .into_iter()
-        .find(|r| r.control.id == SETTINGS)
-        .unwrap()
-        .rect;
-    let start = [opener.x + opener.width / 2., opener.y + opener.height / 2.];
+        .1
+        .center();
+    let start = [f64::from(opener.x), f64::from(opener.y)];
     let moved = |p: [f64; 2]| WindowEvent::CursorMoved {
         device_id: DeviceId::dummy(),
         position: PhysicalPosition::new(p[0], p[1]),

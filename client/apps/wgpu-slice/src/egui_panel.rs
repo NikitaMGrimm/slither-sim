@@ -99,10 +99,10 @@ impl PressGuard {
     }
 }
 
-/// A retained-toolkit drop shadow: offset down, blur and spread in logical
-/// pixels, then peak opacity. egui's linear feather is fitted to the old
-/// rasters' measured bottom, side and top edge profiles at DPR 1; their
-/// Gaussian tails cannot match exactly.
+/// A drop shadow: offset down, blur and spread in logical pixels, then peak
+/// opacity. egui's linear feather is fitted to the bottom, side and top edge
+/// profiles measured at DPR 1 from the rasters these replaced; their Gaussian
+/// tails cannot match exactly.
 #[derive(Clone, Copy)]
 pub struct Drop {
     offset: f32,
@@ -137,6 +137,21 @@ pub const PLAY: Drop = Drop {
     blur: 20.,
     spread: 2.,
     alpha: 148,
+};
+/// The picker's search and address fields, as the login nickname's.
+pub const FIELD: Drop = Drop {
+    offset: 4.,
+    blur: 16.,
+    spread: 0.,
+    alpha: 180,
+};
+/// The champion message: the old field raster's deep shadow, 165 at the bottom
+/// edge, 127 at the sides and 90 at the top.
+pub const DEEP_FIELD: Drop = Drop {
+    offset: 6.,
+    blur: 40.,
+    spread: 0.,
+    alpha: 254,
 };
 pub fn shadow(ui: &egui::Ui, r: Rect, radius: f32, scale: f32, drop: Drop) {
     let px = |v: f32| (v * scale).round().min(127.);
@@ -173,7 +188,8 @@ pub fn surface(ui: &egui::Ui, control: &Control, r: Rect, scale: f32, id: Id, to
 }
 
 /// Core button styles: compact studio capsules dim while pressed; full
-/// buttons take the retained hover/focus and pressed overlays.
+/// buttons take the hover/focus and pressed overlays, at the sampled
+/// `fade` when the screen steps them.
 #[allow(clippy::too_many_arguments)]
 pub fn button(
     ui: &egui::Ui,
@@ -184,6 +200,7 @@ pub fn button(
     style: TextStyle,
     id: Id,
     keyboard_focus: bool,
+    fade: Option<[f32; 2]>,
     tokens: MenuTheme,
 ) -> egui::Response {
     let response = ui.interact(r, id, Sense::click());
@@ -217,18 +234,16 @@ pub fn button(
     });
     theme::capsule(ui, r, colors, 1.);
     if !compact && ui.is_enabled() {
+        let [hover, press] = fade.unwrap_or([
+            if response.hovered() { 1. } else { 0. },
+            if pressed { 1. } else { 0. },
+        ]);
         for (state, alpha) in [
             (
                 ControlState::Hovered,
-                if response.hovered() {
-                    1.
-                } else if focused {
-                    0.33
-                } else {
-                    0.
-                },
+                hover.max(if focused { 0.33 } else { 0. }),
             ),
-            (ControlState::Pressed, if pressed { 1. } else { 0. }),
+            (ControlState::Pressed, press),
         ] {
             if alpha > 0. {
                 let overlay = tokens.surface(control.style, state).colors.map(theme::ink);
@@ -253,10 +268,100 @@ pub fn button(
     response
 }
 
+/// A core text field: the shared field surface around a single-line editor
+/// that scrolls long text inside its insets.
+#[allow(clippy::too_many_arguments)]
+pub fn text_field(
+    ui: &mut egui::Ui,
+    control: &Control,
+    text: &mut String,
+    placeholder: &str,
+    inset: [f64; 4],
+    r: Rect,
+    scale: f32,
+    style: TextStyle,
+    id: Id,
+    drop: Drop,
+    keyboard_focus: bool,
+    tokens: MenuTheme,
+) -> egui::Response {
+    let radius = (f32::from(tokens.surface(control.style, ControlState::Idle).radius) * scale)
+        .min(r.height() / 2.);
+    shadow(ui, r, radius, scale, drop);
+    ui.painter()
+        .rect_filled(r, radius, theme::ink(tokens.field));
+    ui.painter().rect_stroke(
+        r,
+        radius,
+        Stroke::new(2. * scale, Color32::BLACK),
+        egui::StrokeKind::Inside,
+    );
+    // egui floors a TextEdit at interact height; the core field size wins.
+    ui.spacing_mut().interact_size.y = 0.;
+    let visuals = ui.visuals_mut();
+    visuals.extreme_bg_color = theme::ink(tokens.field);
+    visuals.text_cursor.stroke = Stroke::new(1., theme::ink(tokens.text));
+    visuals.selection.bg_fill = theme::ink(tokens.selection).gamma_multiply(0.45);
+    visuals.selection.stroke.color = theme::ink(tokens.text);
+    let font = egui::FontId::new(style.size as f32, theme::family(style));
+    let response = ui.put(
+        r,
+        egui::TextEdit::singleline(text)
+            .frame(egui::Frame::NONE.inner_margin(egui::Margin {
+                left: (inset[0] as f32 * scale).round() as i8,
+                right: (inset[2] as f32 * scale).round() as i8,
+                top: 0,
+                bottom: 0,
+            }))
+            .id(id)
+            .hint_text(
+                // The placeholder shares the field font; egui would otherwise
+                // size an empty field by its default body style.
+                egui::RichText::new(placeholder)
+                    .font(font.clone())
+                    .color(theme::ink(tokens.placeholder)),
+            )
+            .font(font)
+            .text_color(theme::ink(style.color))
+            .align(egui::Align2::LEFT_CENTER)
+            .min_size(r.size())
+            .clip_text(true),
+    );
+    if response.has_focus() && keyboard_focus && ui.is_enabled() {
+        outline(ui, r, radius, tokens);
+    }
+    response
+}
+
 /// Row columns crop to their own box; other labels crop only to the panel.
 pub fn column(ui: &egui::Ui, value: &str, r: Rect, style: TextStyle, align: Align) {
     let painter = ui.painter().with_clip_rect(r.intersect(ui.clip_rect()));
     label(&painter, value, r, style, align, false);
+}
+
+/// A centred label on the canvas `middle` baseline: the middle of the em
+/// square, not of egui's line box, sits on the rectangle's centre.
+pub fn em_middle_label(painter: &egui::Painter, value: &str, r: Rect, style: TextStyle) {
+    let color = theme::ink(style.color);
+    let size = style.size as f32;
+    let galley = painter.layout_no_wrap(
+        value.into(),
+        egui::FontId::new(size, theme::family(style)),
+        color,
+    );
+    let Some(row) = galley.rows.first() else {
+        return;
+    };
+    let Some(glyph) = row.row.glyphs.first() else {
+        return;
+    };
+    let baseline = r.center().y + size * (glyph.font_ascent / glyph.font_height - 0.5);
+    let top = baseline - row.pos.y - glyph.pos.y;
+    painter.galley(
+        pos2(r.center().x - galley.size().x / 2., top),
+        galley,
+        color,
+    );
 }
 
 pub fn label(

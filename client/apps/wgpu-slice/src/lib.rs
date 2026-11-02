@@ -3,8 +3,9 @@
 
 pub mod announcement;
 pub mod bank;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+pub mod champion_egui;
 pub mod cosmetics;
-pub mod editor_geometry;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod endpoint_login;
 mod food_texture;
@@ -17,8 +18,7 @@ pub mod latency;
 pub mod latency_rig;
 pub mod materials;
 pub mod menu;
-pub mod menu_counts;
-pub mod menu_specimen;
+pub mod menu_metrics;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod menu_storage;
 #[cfg(not(target_arch = "wasm32"))]
@@ -43,8 +43,6 @@ pub mod minimap;
 pub mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod official;
-#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-pub mod panel_native;
 pub mod render;
 pub mod scene;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]

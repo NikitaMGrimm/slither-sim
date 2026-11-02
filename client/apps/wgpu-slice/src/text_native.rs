@@ -222,16 +222,6 @@ impl Rasterizer {
         style: TextStyle,
         max_width: Option<u32>,
     ) -> Result<Raster> {
-        self.rasterize_window(text, px, style, max_width, None)
-    }
-    pub fn rasterize_window(
-        &mut self,
-        text: &str,
-        px: f64,
-        style: TextStyle,
-        max_width: Option<u32>,
-        window: Option<[f64; 2]>,
-    ) -> Result<Raster> {
         let color = style.color;
         let arial = self.face(style)?;
         let font = &arial.font;
@@ -262,12 +252,8 @@ impl Rasterizer {
             pen += m.advance_width;
             previous = Some(c);
         }
-        let mut left = (f64::from(bounds[0]) / SAMPLE as f64).floor() as i32 - 1;
-        let mut right = (f64::from(bounds[2]) / SAMPLE as f64).ceil() as i32 + 1;
-        if let Some([start, end]) = window {
-            left = left.max(start.floor() as i32 - 1);
-            right = right.min(end.ceil() as i32 + 1);
-        }
+        let left = (f64::from(bounds[0]) / SAMPLE as f64).floor() as i32 - 1;
+        let right = (f64::from(bounds[2]) / SAMPLE as f64).ceil() as i32 + 1;
         let top = (f64::from(bounds[1]) / SAMPLE as f64).floor() as i32 - 1;
         let width = (right - left).max(1) as usize;
         let width = max_width.map_or(width, |limit| width.min(limit as usize + 2));

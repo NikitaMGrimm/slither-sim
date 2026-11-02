@@ -1024,12 +1024,10 @@ fn accepted_death_uses_receipt_score_and_session_return_then_replays_once() {
     let identity = picture.frame.identity;
     let mut composed = picture.clone();
     let menu = login.prepare_host([1920, 1080], 2., false, None).unwrap();
-    let menu_draws = menu.frame.draws.clone();
     menu.append_to(&mut composed).unwrap();
     let overlay = composed.overlay.as_ref().unwrap();
     assert_eq!(overlay.extent, [1920, 1080]);
     assert_eq!(overlay.viewport_scale, 2.);
-    assert!(overlay.draws.ends_with(&menu_draws));
     let world_draws = composed.frame.draws.len();
     assert_eq!(
         world_draws,
@@ -1290,21 +1288,6 @@ fn login_menu_composes_over_the_world_picture() {
     assert!(menu.append_to(&mut picture).is_err());
 }
 
-#[cfg(windows)]
-#[test]
-fn windows_click_preferences_are_converted_to_logical_half_extents() {
-    use slither_wgpu_slice::menu_input_native::click_settings;
-    for dpr in [1., 1.5, 2.] {
-        let settings = click_settings(dpr);
-        assert_eq!(settings.time_ms, f64::from(winsafe::GetDoubleClickTime()));
-        assert_eq!(
-            settings.distance,
-            [winsafe::co::SM::CXDOUBLECLK, winsafe::co::SM::CYDOUBLECLK]
-                .map(|m| f64::from(winsafe::GetSystemMetrics(m).max(1)) / (2. * dpr))
-        );
-    }
-}
-
 #[test]
 fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
     use slither_client::{session_policy::Phase, start_page::MenuSession};
@@ -1386,12 +1369,36 @@ fn shared_login_return_enter_keeps_terminal_guard_and_once_only_queue() {
 fn login_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
     let tips = login.layout.viewport_rect(E::Tips);
     let studio = studio_strings(login);
+    let champion = champion_strings(login);
     egui_text(login)
         .into_iter()
         .filter(|t| {
-            !(tips.y..tips.y + tips.height).contains(&f64::from(t.1.y)) && !studio.contains(&t.0)
+            !(tips.y..tips.y + tips.height).contains(&f64::from(t.1.y))
+                && !studio.contains(&t.0)
+                && !champion.contains(&t.0)
         })
         .collect()
+}
+/// Every string the mounted champion editor can paint, including its empty field.
+fn champion_strings(login: &NativeLogin) -> Vec<String> {
+    use slither_client::menu_controls::ControlKind as K;
+    if !login.champion.policy.visible() {
+        return Vec::new();
+    }
+    let mut strings = vec![String::new()];
+    strings.extend(
+        login
+            .champion
+            .panel
+            .controls
+            .iter()
+            .filter_map(|c| match &c.kind {
+                K::Label { text } => Some(text.clone()),
+                K::Button { label } => Some(label.clone()),
+                _ => None,
+            }),
+    );
+    strings
 }
 fn egui_text(login: &NativeLogin) -> Vec<(String, egui::Pos2, egui::Rect)> {
     login
@@ -1536,9 +1543,8 @@ fn login_text_stays_put_while_the_skin_studio_enters_and_leaves() {
     }
 }
 
-/// The champion editor still draws on the old toolkit. The returning login
-/// below it is on egui throughout, so the final length stays put when the
-/// editor exits and the ordinary controls return.
+/// The final length stays put when the editor exits and the ordinary controls
+/// return, because the returning login below it keeps its place throughout.
 #[test]
 fn login_text_stays_put_while_the_champion_editor_exits() {
     use endpoint_tape::{bundle, effects, pump};

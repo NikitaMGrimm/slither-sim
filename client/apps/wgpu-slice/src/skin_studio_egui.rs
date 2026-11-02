@@ -282,6 +282,7 @@ impl StudioUi {
                 style,
                 id,
                 self.keyboard_focus,
+                None,
                 tokens,
             )),
             ControlKind::SectionTab {
@@ -297,6 +298,7 @@ impl StudioUi {
                     style,
                     id,
                     self.keyboard_focus,
+                    None,
                     tokens,
                 );
                 if *selected {

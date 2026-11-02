@@ -1,35 +1,13 @@
-//! Authored offline visual specimens, like `scene`; never enabled by a game host.
+//! Login layout from the measured text the core layout depends on.
 use crate::{
     Result,
-    menu::{Menu, MenuFrame},
     text::{Family, Slant, TextCache, TextStyle, Weight},
 };
 use slither_client::{
     menu_layout::{MenuLayout, MenuMetrics},
-    menu_preferences::MenuQuality,
-    start_page::{MenuLocale, StartMenuState, StartMenuView},
+    start_page::StartMenuView,
 };
 
-pub fn view(state: u8) -> Result<StartMenuView> {
-    if state > 4 {
-        return Err("Menu specimen state 0..4".into());
-    }
-    let mut view = StartMenuState::new(MenuLocale::English, false, MenuQuality::High).view(true);
-    view.nickname = "Player".into();
-    view.tip = view.wording.tips[2];
-    view.tip_alpha = 1.;
-    view.hover_alpha = f64::from(state == 1);
-    view.press_alpha = f64::from(state == 2);
-    view.disabled = state >= 3;
-    view.play_disabled = view.disabled;
-    if state == 4 {
-        view.spinner_visible = true;
-        view.spinner_alpha = 1.;
-        view.spinner_scale = 0.9;
-        view.spinner_time = 30.;
-    }
-    Ok(view)
-}
 pub fn layout(
     text: &mut TextCache,
     view: &StartMenuView,
@@ -68,10 +46,4 @@ pub fn metrics(text: &mut TextCache, view: &StartMenuView) -> Result<MenuMetrics
         nickname_baseline_space: 0.,
         padded_play_label_width,
     })
-}
-pub fn prepare(extent: [u32; 2], dpr: f64, state: u8) -> Result<MenuFrame> {
-    let mut text = TextCache::menu();
-    let view = view(state)?;
-    let layout = layout(&mut text, &view, extent, dpr)?;
-    Menu::default().prepare(&mut text, &view, &layout, extent, dpr, None)
 }

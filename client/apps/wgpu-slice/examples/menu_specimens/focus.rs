@@ -32,7 +32,6 @@ impl Sweep<'_> {
         art: &mut Cosmetics,
         name: &str,
         focus: Option<ControlId>,
-        hover: bool,
     ) -> Result<()> {
         let extent = self.logical.map(|v| (v * self.dpr).round() as u32);
         if let Some(id) = focus {
@@ -52,13 +51,6 @@ impl Sweep<'_> {
             login.login_ui.keyboard_focus = true;
             login.studio_ui.keyboard_focus = true;
             login.focus(id);
-        }
-        for control in &login.panel.controls {
-            if control.enabled {
-                login
-                    .controls
-                    .set_progress(control.id, if hover { [1., 1.] } else { [0.; 2] });
-            }
         }
         let mut menu = login
             .prepare_host(extent, self.dpr, true, Some(art))
@@ -80,24 +72,16 @@ impl Sweep<'_> {
             return Err(format!("Focus fixture lost {id:?} in {name}"));
         }
         let studio = login.studio.state.visible();
-        let counts = menu.draw_counts();
-        let records = counts.admitted_menu();
         let bytes: usize = menu.resources.iter().map(|r| r.image.pixels.len()).sum();
-        if records > if studio { 448 } else { 512 }
-            || menu.resources.len() > 64
-            || bytes > 13 * 1024 * 1024
-        {
+        if menu.resources.len() > 64 || bytes > 13 * 1024 * 1024 {
             return Err(format!(
-                "Focus allowance {name} {:?} DPR{}: {records} records, {} slots, {bytes} bytes",
+                "Focus allowance {name} {:?} DPR{}: {} slots, {bytes} bytes",
                 self.logical,
                 self.dpr,
                 menu.resources.len()
             ));
         }
-        if counts.components.total() != menu.frame.draws.len() {
-            return Err("Focus attribution mismatch".into());
-        }
-        self.ledger.push(serde_json::json!({"case":name,"logical":self.logical,"dpr":self.dpr,"ready_art":self.ready,"studio":studio,"records":records,"slots":menu.resources.len(),"bytes":bytes,"focus":format!("{focused:?}")}));
+        self.ledger.push(serde_json::json!({"case":name,"logical":self.logical,"dpr":self.dpr,"ready_art":self.ready,"studio":studio,"slots":menu.resources.len(),"bytes":bytes,"focus":format!("{focused:?}")}));
         let wide = self.logical == [960., 540.];
         // Procedural ready art also shows the egui studio's cosmetic thumbnails.
         let thumbnails = self.ready && name.starts_with("cosmetics-");
@@ -106,15 +90,20 @@ impl Sweep<'_> {
             && (focus.is_some() || name.starts_with("roundtrip-") || name.contains("-fade-"))
             && (wide || name == "cosmetics-cell" || name == "settings-toggle");
         if screenshot {
+            let mut top = Frame {
+                draws: Vec::new(),
+                ..page_frame(&menu)
+            };
             if studio {
                 let (preview, resources) =
                     login.studio.prepare_preview(extent, self.dpr, Some(art))?;
-                menu.frame.draws.extend(preview.draws);
+                top = preview;
                 menu.resources.extend(resources);
             }
             capture_layered(
                 self.renderer,
                 &menu,
+                &top,
                 login,
                 &self.output.join(format!(
                     "{name}-{}x{}-{}x{}.png",
@@ -151,7 +140,7 @@ impl Sweep<'_> {
             ("login-settings", login_ids::SETTINGS),
             ("login-skin", login_ids::CHANGE_SKIN),
         ] {
-            self.sample(&mut login, &mut art, name, Some(id), false)?;
+            self.sample(&mut login, &mut art, name, Some(id))?;
         }
         login.open_settings(true);
         for (name, id) in [
@@ -159,27 +148,21 @@ impl Sweep<'_> {
             ("settings-resolution", settings::RESOLUTION),
             ("settings-done", settings::DONE),
         ] {
-            self.sample(&mut login, &mut art, name, Some(id), false)?;
+            self.sample(&mut login, &mut art, name, Some(id))?;
         }
-        login.close_settings(true);
+        login.close_settings();
         login.step(10000., true, false)?;
         login.open_studio();
         for t in [0., 1., 90., 115., 180., 229., 230.] {
             login.step(10000. + t, true, false)?;
-            self.sample(
-                &mut login,
-                &mut art,
-                &format!("builtin-entry-{t}"),
-                None,
-                t == 1.,
-            )?;
+            self.sample(&mut login, &mut art, &format!("builtin-entry-{t}"), None)?;
         }
         for (name, id) in [
             ("builtin-tab", BUILT_IN_TAB),
             ("builtin-previous", PREVIOUS),
             ("builtin-save", SAVE),
         ] {
-            self.sample(&mut login, &mut art, name, Some(id), false)?;
+            self.sample(&mut login, &mut art, name, Some(id))?;
         }
         login.studio.activate(BUILDER_TAB, "Focus");
         login.studio.state.edit_builder(|builder| {
@@ -188,13 +171,7 @@ impl Sweep<'_> {
         });
         for t in [0., 90., 180.] {
             login.step(10230. + t, true, false)?;
-            self.sample(
-                &mut login,
-                &mut art,
-                &format!("builder-fade-{t}"),
-                None,
-                t == 90.,
-            )?;
+            self.sample(&mut login, &mut art, &format!("builder-fade-{t}"), None)?;
         }
         for (name, id) in [
             ("builder-tab", BUILDER_TAB),
@@ -202,18 +179,12 @@ impl Sweep<'_> {
             ("builder-run", ControlId(RUN_BASE)),
             ("builder-add", ADD),
         ] {
-            self.sample(&mut login, &mut art, name, Some(id), false)?;
+            self.sample(&mut login, &mut art, name, Some(id))?;
         }
         login.studio.activate(COSMETICS_TAB, "Focus");
         for t in [0., 90., 180.] {
             login.step(10410. + t, true, false)?;
-            self.sample(
-                &mut login,
-                &mut art,
-                &format!("cosmetics-fade-{t}"),
-                None,
-                t == 90.,
-            )?;
+            self.sample(&mut login, &mut art, &format!("cosmetics-fade-{t}"), None)?;
         }
         login.studio.state.select_cosmetic(Some(0));
         self.sample(
@@ -221,45 +192,25 @@ impl Sweep<'_> {
             &mut art,
             "cosmetics-cell",
             Some(ControlId(COSMETIC_BASE + 1)),
-            false,
         )?;
-        self.sample(
-            &mut login,
-            &mut art,
-            "cosmetics-next",
-            Some(COSMETIC_NEXT),
-            false,
-        )?;
+        self.sample(&mut login, &mut art, "cosmetics-next", Some(COSMETIC_NEXT))?;
         login.studio.state.select_cosmetic(Some(31));
         self.sample(
             &mut login,
             &mut art,
             "cosmetics-last",
             Some(ControlId(COSMETIC_BASE + 32)),
-            true,
         )?;
         login.studio.activate(CANCEL, "Focus");
         for t in [0., 90., 230.] {
             login.step(10590. + t, true, false)?;
-            self.sample(
-                &mut login,
-                &mut art,
-                &format!("studio-return-{t}"),
-                None,
-                false,
-            )?;
+            self.sample(&mut login, &mut art, &format!("studio-return-{t}"), None)?;
         }
         login.open_studio();
         login.studio.activate(BUILDER_TAB, "Focus");
         for t in [0., 1., 90., 115., 180., 229., 230.] {
             login.step(10820. + t, true, false)?;
-            self.sample(
-                &mut login,
-                &mut art,
-                &format!("early-builder-{t}"),
-                None,
-                t == 1.,
-            )?;
+            self.sample(&mut login, &mut art, &format!("early-builder-{t}"), None)?;
         }
         for keyboard in [false, true] {
             self.renderer.sync_resources(&[])?;
@@ -311,7 +262,6 @@ impl Sweep<'_> {
                 &mut art,
                 &format!("roundtrip-{modality}-open"),
                 None,
-                false,
             )?;
             if keyboard {
                 roundtrip.focus(CANCEL);
@@ -326,7 +276,6 @@ impl Sweep<'_> {
                 &mut art,
                 &format!("roundtrip-{modality}-return"),
                 None,
-                false,
             )?;
         }
         Ok(())

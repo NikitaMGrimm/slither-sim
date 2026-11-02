@@ -112,7 +112,6 @@ fn esc_toggle_repeat_outside_click_and_single_keyboard_focus() {
         login.egui.context().unwrap().memory(|m| m.focused()),
         Some(leave_id())
     );
-    assert_eq!(login.controls.focus(), None);
     assert_eq!(login.input.state.focus(), None);
     input(
         &mut login,
@@ -267,10 +266,7 @@ fn retained_login_egui_input_keeps_enter_during_socket_close() {
 
 #[test]
 fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() {
-    use slither_client::{
-        login_controls::PLAY,
-        menu_input::{GameplayKey, HostEditEffect},
-    };
+    use slither_client::menu_input::{GameplayKey, HostEditEffect};
     let mut game = playing();
     let mut login = login(&game);
     login.prepare([960, 540], false, None).unwrap();
@@ -290,15 +286,7 @@ fn outgoing_login_keeps_drawing_while_gameplay_owns_keys_pointer_zoom_and_esc() 
         key: GameplayKey::Left,
         pressed: true
     }));
-    assert!(!login.intercepts_pointer([0., 0.]));
-    let r = login
-        .login_ui
-        .controls
-        .iter()
-        .find(|c| c.0 == PLAY)
-        .unwrap()
-        .1;
-    assert!(!login.intercepts_pointer([r.center().x as f64, r.center().y as f64]));
+    assert!(!login.intercepts_pointer());
     assert!(login.wheel_zoom(&mut game, -1.));
     assert!(escape(&mut login, &mut game, false));
     assert!(game.ingame_menu_open());
@@ -323,7 +311,7 @@ fn clicking_fading_play_reaches_gameplay_without_queuing_another_login() {
     let point = [r.center().x as f64, r.center().y as f64];
     let generation = game.generation();
     // Exercise the desktop callback's menu-or-world click boundary.
-    if login.intercepts_pointer(point) {
+    if login.intercepts_pointer() {
         login.pointer(point, Some(true), false);
         game.mouse_up();
     } else {

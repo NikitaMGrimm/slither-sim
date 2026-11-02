@@ -5,7 +5,7 @@ use crate::{
     egui_panel::{self as widgets, PressGuard, available, column, label, outline, rect},
     egui_theme as theme,
 };
-use egui::{Align, Color32, Id, Rect, Sense, Stroke, pos2, vec2};
+use egui::{Align, Id, Rect, Sense, pos2, vec2};
 use slither_client::{
     menu_controls::{Activation, Control, ControlId, ControlIntent, ControlKind, PanelView},
     menu_input::TextRule,
@@ -332,62 +332,21 @@ impl PickerUi {
             ControlKind::TextField {
                 placeholder, inset, ..
             } => {
-                let radius = (f32::from(tokens.surface(control.style, ControlState::Idle).radius)
-                    * scale)
-                    .min(r.height() / 2.);
-                ui.painter().add(
-                    egui::epaint::Shadow {
-                        offset: [0, (4. * scale).round() as i8],
-                        blur: (16. * scale).round() as u8,
-                        spread: 0,
-                        color: Color32::from_black_alpha(180),
-                    }
-                    .as_shape(r, radius as u8),
-                );
-                ui.painter()
-                    .rect_filled(r, radius, theme::ink(tokens.field));
-                ui.painter().rect_stroke(
+                let keyboard_focus = self.keyboard_focus;
+                Some(widgets::text_field(
+                    ui,
+                    control,
+                    self.text_mut(control.id)?,
+                    placeholder,
+                    *inset,
                     r,
-                    radius,
-                    Stroke::new(2. * scale, Color32::BLACK),
-                    egui::StrokeKind::Inside,
-                );
-                // egui floors a TextEdit at interact height; the core field size wins.
-                ui.spacing_mut().interact_size.y = 0.;
-                let visuals = ui.visuals_mut();
-                visuals.extreme_bg_color = theme::ink(tokens.field);
-                visuals.text_cursor.stroke = Stroke::new(1., theme::ink(tokens.text));
-                visuals.selection.bg_fill = theme::ink(tokens.selection).gamma_multiply(0.45);
-                visuals.selection.stroke.color = theme::ink(tokens.text);
-                let font = egui::FontId::new(style.size as f32, theme::family(style));
-                let text = self.text_mut(control.id)?;
-                let response = ui.put(
-                    r,
-                    egui::TextEdit::singleline(text)
-                        .frame(egui::Frame::NONE.inner_margin(egui::Margin {
-                            left: (inset[0] as f32 * scale).round() as i8,
-                            right: (inset[2] as f32 * scale).round() as i8,
-                            top: 0,
-                            bottom: 0,
-                        }))
-                        .id(id)
-                        .hint_text(
-                            // The placeholder shares the field font; egui would
-                            // otherwise size an empty field by its default body style.
-                            egui::RichText::new(placeholder.as_str())
-                                .font(font.clone())
-                                .color(theme::ink(tokens.placeholder)),
-                        )
-                        .font(font)
-                        .text_color(theme::ink(style.color))
-                        .align(egui::Align2::LEFT_CENTER)
-                        .min_size(r.size())
-                        .clip_text(true),
-                );
-                if response.has_focus() && self.keyboard_focus && ui.is_enabled() {
-                    outline(ui, r, radius, tokens);
-                }
-                Some(response)
+                    scale,
+                    style,
+                    id,
+                    widgets::FIELD,
+                    keyboard_focus,
+                    tokens,
+                ))
             }
             ControlKind::Button { label: text } => Some(widgets::button(
                 ui,
@@ -398,6 +357,7 @@ impl PickerUi {
                 style,
                 id,
                 self.keyboard_focus,
+                None,
                 tokens,
             )),
             ControlKind::ListRow {

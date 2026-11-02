@@ -131,9 +131,6 @@ pub struct NativeEguiHost {
     pub window: WindowInput,
     session: Option<Session>,
     active: bool,
-    /// Paints below an old-toolkit screen that owns input: no translation,
-    /// platform output or text input until ownership returns.
-    paint_only: bool,
     now: f64,
     error: Option<String>,
     restore_cursor: bool,
@@ -141,18 +138,6 @@ pub struct NativeEguiHost {
 impl NativeEguiHost {
     pub fn active(&self) -> bool {
         self.active
-    }
-    pub fn paint_only(&self) -> bool {
-        self.active && self.paint_only
-    }
-    /// Entering or leaving paint-only resets input exactly like activation.
-    pub fn set_paint_only(&mut self, paint_only: bool) {
-        if self.paint_only == paint_only {
-            return;
-        }
-        self.paint_only = paint_only;
-        self.restore_cursor |= paint_only;
-        self.reset_input();
     }
     fn reset_input(&mut self) {
         if let Some(s) = &mut self.session {
@@ -394,7 +379,7 @@ impl NativeEguiHost {
         translate: impl FnOnce(&mut Self) -> R,
     ) -> Option<R> {
         self.observe(event, dpr);
-        if self.active && !self.paint_only {
+        if self.active {
             Some(translate(self))
         } else {
             None
@@ -475,18 +460,17 @@ impl NativeEguiHost {
         &mut self,
         window: impl FnOnce() -> &'a Window,
     ) -> Option<egui::RawInput> {
-        if !self.active || self.paint_only {
+        if !self.active {
             return None;
         }
         let window = window();
         Some(self.adapter(window)?.take_egui_input(window))
     }
     pub fn platform_output(&mut self, window: &Window) {
-        if !self.active || self.paint_only {
+        if !self.active {
             if std::mem::take(&mut self.restore_cursor) {
                 window.set_cursor(winit::window::CursorIcon::Default);
             }
-            // The screen above owns the cursor and IME; drop the underlay's.
             if let Some(s) = &mut self.session {
                 s.output = None;
             }
@@ -632,8 +616,8 @@ impl NativeEguiHost {
                 renderer.update_texture(&gpu.device, &gpu.queue, *id, delta);
             }
         }
-        // A login fully hidden under an old-toolkit screen tessellates to
-        // nothing; texture writes still reach the queue's next submit.
+        // A fully hidden login tessellates to nothing; texture writes still
+        // reach the queue's next submit.
         if !s.meshes.is_empty() {
             Self::submit(gpu, renderer, &s.meshes, s.extent, s.dpr, target);
         }

@@ -1,7 +1,7 @@
 # Start menu
 
-All three product entries open on the shared login. Native uses `NativeLogin`,
-`MenuFrame` and the PR2 editor; Canvas and WebGPU use the same
+All three product entries open on the shared login. Native uses `NativeLogin`
+and its egui screens; Canvas and WebGPU use the same
 `apps/wgpu-slice/web/login-overlay.mjs` semantic DOM adapter. `LoginMenu` exports
 the copied core projection in both Wasm builds. Real input/button elements own
 browser editing, IME, clipboard and accessibility; Rust owns normalization,
@@ -33,19 +33,10 @@ Lucida font box for the last-length line, the two NBSPs around the bold Arial
 Play label, and the 20px gap directly after the nickname border box. Creation
 and retained updates use the same measurements. The logo flow holder stays
 450x115. Native nickname, Play, tips and font fallbacks use ascent/descent baselines;
-tips use a normal line at the top of their reserved row. Nickname painting,
-pointer selection and IME anchoring share the single-line input content box.
-`menu_layout::single_line_field_placement(field, inset, font_size, ascent,
-descent)` is shared by all single-line painters: it returns the content left
-edge/alphabetic baseline and the centred font-size caret top/height. Insets
-are symmetric horizontal/vertical content padding in logical units; callers
-include borders only if their field rect still includes them. Values and
-placeholders share this placement; caret and IME hosts snap its outputs once.
-`tests/field_text.rs` independently checks line/caret centring at multiple font
-sizes, input/champion-sized boxes and DPRs. The champion TextField painter can
-call this same API without depending on the login renderer.
-The caret uses a 530ms on/off clock from the menu
-callback, restarted by focus/edit/movement; raw IME preedit stays separate.
+tips use a normal line at the top of their reserved row. Nickname painting and IME
+anchoring share the egui field's content box.
+The caret is egui's, restarted by focus/edit/movement; raw IME preedit stays
+separate.
 
 The native login always uses the authored
 [stroke wordmark](wordmark.md) swells and ripples into place on the retained

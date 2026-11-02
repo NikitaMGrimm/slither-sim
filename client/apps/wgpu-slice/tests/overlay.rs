@@ -412,16 +412,9 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
     for now in (16..=2400).step_by(16) {
         login.step(f64::from(now), true, false).unwrap();
     }
-    let menu = login.prepare_host(physical, 5., true, None).unwrap();
-    let resident = menu
-        .resources
-        .iter()
-        .map(|r| (r.asset.into(), r.asset))
-        .collect();
-    menu.frame.validate(&resident).unwrap();
-    // Login controls now paint through egui. Retain the physical texture and
-    // byte bounds against the host's actual allocations, including logo tiles.
-    assert!(menu.frame.draws.is_empty());
+    login.prepare_host(physical, 5., true, None).unwrap();
+    // Retain the physical texture and byte bounds against the host's actual
+    // allocations, including logo tiles.
     let textures = login.egui.context().unwrap().tex_manager();
     let textures = textures.read();
     assert!(
@@ -434,7 +427,7 @@ fn high_dpr_hud_and_login_keep_exact_rasters_within_texture_budgets() {
             .allocated()
             .map(|(_, meta)| meta.bytes_used())
             .sum::<usize>()
-            <= slither_wgpu_slice::text::MENU_CACHE_BYTES
+            <= 32 * 1024 * 1024
     );
 }
 

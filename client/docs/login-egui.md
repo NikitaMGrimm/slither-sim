@@ -3,7 +3,7 @@
 `login_egui.rs` renders the native start and after-death screen in the shared
 `NativeEguiHost`. `StartMenuState`, `MenuLayout` and session policy still own
 wording, measured geometry, reveal/return clocks and Play admission. Fonts come
-from the same installed font bytes as the retained menu painter; pills and link
+from the installed font bytes `TextCache` reads; pills and link
 glyphs use `egui_theme`. The authored stroke wordmark and spinner retain their
 procedural producers, with bounded egui texture uploads.
 
@@ -22,14 +22,11 @@ Committed edits keep their undo history without provisional candidates. Windows
 clipboard access uses the existing clipboard dependency, since egui-winit's
 optional system clipboard is disabled.
 
-Settings, the [server picker](server-picker.md) and the
-[skin studio](skin-studio.md) share the egui context during their fades; login
-paints below them without input. The champion editor keeps its old-toolkit
-panel and input adapter, but egui still paints the login below it in a
-paint-only host mode; the desktop host presents its draws, and the studio's
-preview snake, in a layer above egui. No screen transition swaps the login's
-renderer, so its text never shifts by the ~1–2 px the two renderers place text
-apart. On native non-Linux hosts (the app tests and specimen tool are not built
+Settings, the [server picker](server-picker.md), the
+[skin studio](skin-studio.md) and the [champion editor](menu-controls.md) share
+the egui context during their fades; login paints below them without input. The
+desktop host presents only the studio's preview snake in a layer above egui.
+On native non-Linux hosts (the app tests and specimen tool are not built
 on Linux), `menu_specimens OUTPUT --studio` renders that order offscreen for
 the studio entering and open over the settled login; elsewhere it fails rather
 than writing other specimens. The outgoing login fade still paints while gameplay owns
@@ -60,8 +57,6 @@ endpoint and in-game suites retain their integration rules. The inactive-host
 allocation regression remains in `tests/egui_inactive.rs`.
 
 The finite `menu_specimens OUTPUT --login` example renders authored offscreen
-before/after PNGs without a window or connection. It replaces the old retained-login
-export and rejects its former art-directory argument. Its before side is the retained
-toolkit specimen fed the same state/layout; it is not a desktop capture. These checks
+PNGs without a window or connection; it is not a desktop capture. These checks
 establish synthetic behavior and offscreen rendering, not physical IME or
 perceptual parity acceptance.

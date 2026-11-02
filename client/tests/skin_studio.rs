@@ -252,7 +252,7 @@ fn retained_wire_admission_does_not_validate_new_pattern_structure() {
 
 #[test]
 fn cosmetics_noop_scroll_preserves_generation_focus_capture_and_progress() {
-    use slither_client::{menu_controls::*, menu_input::MenuInputState};
+    use slither_client::menu_controls::*;
     for viewport in [[960., 540.], [360., 640.], [960., 360.], [240., 320.]] {
         for bottom in [false, true] {
             let mut studio = state(7);
@@ -265,37 +265,17 @@ fn cosmetics_noop_scroll_preserves_generation_focus_capture_and_progress() {
             let before = studio.cosmetic_range(viewport);
             let panel = studio.panel(viewport, "");
             let id = ControlId(COSMETIC_BASE + before.start as u16);
-            let rect = panel
-                .resolve(viewport)
-                .unwrap()
-                .iter()
-                .find(|c| c.control.id == id)
-                .unwrap()
-                .rect;
-            let point = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
-            let mut input = PanelInputState::default();
-            let mut edit = MenuInputState::default();
-            input.sync(&panel, &mut edit);
-            input.pointer(&panel, &panel.resolve(viewport).unwrap(), point, Some(true));
-            input.set_progress(id, [0.5, 0.75]);
+            assert!(panel.controls.iter().any(|c| c.id == id));
             for rows in [0, if bottom { 99 } else { -99 }] {
                 studio.scroll_cosmetics(rows, viewport);
                 let current = studio.panel(viewport, "");
                 assert_eq!(studio.cosmetic_range(viewport), before);
                 assert_eq!(current.generation, panel.generation);
-                input.sync(&current, &mut edit);
-                assert_eq!(input.focus(), Some(id));
-                assert_eq!(input.capture(), Some(id));
-                assert_eq!(input.progress(id), [0.5, 0.75]);
             }
             studio.scroll_cosmetics(if bottom { -1 } else { 1 }, viewport);
             let changed = studio.panel(viewport, "");
             assert_ne!(studio.cosmetic_range(viewport), before);
             assert_eq!(changed.generation, panel.generation + 1);
-            input.sync(&changed, &mut edit);
-            assert_eq!(input.focus(), Some(COSMETICS_TAB));
-            assert_eq!(input.capture(), None);
-            assert_eq!(input.progress(id), [0.; 2]);
         }
     }
 }

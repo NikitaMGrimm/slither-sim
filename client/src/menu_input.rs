@@ -542,19 +542,6 @@ impl MenuInputState {
     pub fn editor(&self, field: TextField) -> &TextEditState {
         &self.editors[&field]
     }
-    /// Fallible lookup for copied generic descriptions; registry exhaustion
-    /// rejects preparation instead of indexing an unregistered editor.
-    pub fn registered_editor(&self, id: EditorId) -> Option<&TextEditState> {
-        self.editors.get(&id)
-    }
-    /// Start a new policy generation without changing host focus/modifier state.
-    pub fn reset_editor(&mut self, id: EditorId, value: &str) {
-        if let Some(rule) = self.editors.get(&id).map(|e| e.rule) {
-            self.clear_composition();
-            self.editors
-                .insert(id, TextEditState::with_rule(rule, value));
-        }
-    }
     fn editor_mut(&mut self, field: TextField) -> &mut TextEditState {
         self.editors.get_mut(&field).expect("registered editor")
     }
@@ -912,8 +899,7 @@ pub struct AccessibleNode {
     pub actions: Vec<AccessibleAction>,
 }
 
-/// Project mounted ordinary login controls. Native champion controls publish
-/// their separate copied PanelView semantics, without an AccessKit dependency.
+/// Project mounted ordinary login controls, without an AccessKit dependency.
 pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<AccessibleNode> {
     if !view.visible {
         return Vec::new();

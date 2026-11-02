@@ -178,25 +178,16 @@ mod desktop {
         }
         fn edit_effects(&mut self, effects: Vec<slither_client::menu_input::HostEditEffect>) {
             use slither_client::menu_input::HostEditEffect;
-            let effects = if self.login.champion.policy.visible() {
-                let effects = self
-                    .login
-                    .champion
-                    .input
-                    .execute(effects, &mut WindowEditHost(&self.window));
-                self.login.champion.commit_effects(effects)
-            } else {
-                let effects = self
-                    .login
-                    .input
-                    .execute(effects, &mut WindowEditHost(&self.window));
-                let admission =
-                    self.game.can_play() && self.preparation.is_none() && self.can_play();
+            let effects = self
+                .login
+                .input
+                .execute(effects, &mut WindowEditHost(&self.window));
+            let admission = self.game.can_play() && self.preparation.is_none() && self.can_play();
+            let effects =
                 self.login
                     .input
                     .state
-                    .commit_menu(effects, &mut self.login.state, admission)
-            };
+                    .commit_menu(effects, &mut self.login.state, admission);
             for effect in effects {
                 match effect {
                     HostEditEffect::Gameplay { key, pressed } => {
@@ -216,8 +207,6 @@ mod desktop {
                 self.login.observe_game(&self.game)?;
                 self.effects()?;
             }
-            let effects = std::mem::take(&mut self.login.champion.effects);
-            self.edit_effects(effects);
             Ok(())
         }
         fn effects(&mut self) -> Result<()> {
@@ -619,10 +608,6 @@ mod desktop {
                 self.game.bank.cosmetics.as_mut(),
             )?;
             let view = self.login.state.view(admission);
-            // Where the layer presented above egui starts in the composed UI
-            // frame: the champion editor's old-toolkit draws, or the studio's
-            // preview snake appended below.
-            let mut top_at = None;
             let composed = (|| -> Result<_> {
                 Ok(if view.visible || view.spinner_visible {
                     let menu = self.login.prepare_host(
@@ -631,16 +616,7 @@ mod desktop {
                         admission,
                         self.game.menu_cosmetics(),
                     );
-                    let menu_draws = menu.as_ref().map_or(0, |m| m.frame.draws.len());
-                    let picture = slither_wgpu_slice::menu::MenuFrame::compose_optional(menu, &p)?;
-                    if (self.login.egui.paint_only() || self.login.studio.state.visible())
-                        && let Some(picture) = &picture
-                    {
-                        top_at = Some(picture.ui_frame().draws.len() - menu_draws);
-                    }
-                    let effects = self.login.cursor_area()?;
-                    self.edit_effects(effects);
-                    picture
+                    slither_wgpu_slice::menu::MenuFrame::compose_optional(menu, &p)?
                 } else {
                     None
                 })
@@ -649,30 +625,20 @@ mod desktop {
                 Ok(picture) => picture,
                 Err(error) => return self.skip_bad_frame(p.frame.identity, error),
             };
+            // The studio's preview snake presents above egui.
+            let mut top = None;
             if self.login.studio.state.visible()
                 && let Some(picture) = &mut composed
-                && let Err(error) = self
+            {
+                match self
                     .login
                     .studio
                     .append_preview(picture, self.game.menu_cosmetics())
-            {
-                return self.skip_bad_frame(p.frame.identity, error);
-            }
-            // The champion editor, or the studio preview, presents above egui.
-            let top = match (top_at, &mut composed) {
-                (Some(at), Some(picture)) => {
-                    let ui = picture.ui_frame_mut();
-                    Some(slither_wgpu_slice::frame::Frame {
-                        identity: ui.identity,
-                        extent: ui.extent,
-                        viewport_scale: ui.viewport_scale,
-                        tick: ui.tick,
-                        draws: ui.draws.split_off(at),
-                        snakes: Vec::new(),
-                    })
+                {
+                    Ok(preview) => top = Some(preview),
+                    Err(error) => return self.skip_bad_frame(p.frame.identity, error),
                 }
-                _ => None,
-            };
+            }
             let picture = composed.as_ref().unwrap_or(&p);
             let synced = {
                 let _sync = latency::PictureSpan::new("sync_begin", "sync_end");
@@ -933,19 +899,8 @@ mod desktop {
                 }
                 if let WindowEvent::ModifiersChanged(modifiers) = &event {
                     r.login.input.modifiers(modifiers.state());
-                    r.login.champion.input.modifiers(modifiers.state());
                 }
                 let admission = r.game.can_play() && r.preparation.is_none() && r.can_play();
-                let champion = r.login.champion.policy.visible();
-                if let WindowEvent::Focused(_) = &event {
-                    // The mapped owner below receives this event; keep the other informed.
-                    let inactive = if champion {
-                        &mut r.login.input
-                    } else {
-                        &mut r.login.champion.input
-                    };
-                    inactive.window_event(&event);
-                }
                 if r.login.egui_owns_input() {
                     if response.repaint {
                         r.schedule.invalidate();
@@ -967,6 +922,7 @@ mod desktop {
                             r.login.egui.platform_output(&r.window);
                             let effects = r.login.take_egui_effects();
                             r.edit_effects(effects);
+                            r.champion_submission()?;
                             r.effects()?;
                         }
                     }
@@ -997,13 +953,8 @@ mod desktop {
                     r.schedule.invalidate();
                     return Ok(());
                 }
-                let mapped = if champion {
-                    r.login.champion.event(&event)
-                } else {
-                    r.login.event(&event, admission)
-                };
+                let mapped = r.login.event(&event, admission);
                 r.edit_effects(mapped.effects);
-                r.champion_submission()?;
                 if mapped.consumed {
                     r.schedule.invalidate();
                     return Ok(());
@@ -1072,7 +1023,7 @@ mod desktop {
                         }
                     }
                     WindowEvent::CursorMoved { .. } => {
-                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
+                        if r.login.intercepts_pointer() {
                             let effects =
                                 r.login
                                     .pointer(r.login.egui.window.cursor(), None, admission);
@@ -1086,7 +1037,7 @@ mod desktop {
                         button: MouseButton::Left,
                         ..
                     } => {
-                        if r.login.intercepts_pointer(r.login.egui.window.cursor()) {
+                        if r.login.intercepts_pointer() {
                             let effects = r.login.pointer(
                                 r.login.egui.window.cursor(),
                                 Some(state == ElementState::Pressed),
@@ -1094,7 +1045,6 @@ mod desktop {
                             );
                             r.edit_effects(effects);
                             r.game.mouse_up();
-                            r.champion_submission()?;
                         } else if state == ElementState::Pressed {
                             r.pointer(true)?;
                         } else {

@@ -80,16 +80,6 @@ impl Rasterizer {
         style: TextStyle,
         max_width: Option<u32>,
     ) -> Result<Raster> {
-        self.rasterize_window(text, px, style, max_width, None)
-    }
-    pub fn rasterize_window(
-        &mut self,
-        text: &str,
-        px: f64,
-        style: TextStyle,
-        max_width: Option<u32>,
-        window: Option<[f64; 2]>,
-    ) -> Result<Raster> {
         let text = display_text(text);
         let color = style.color;
         let error = |e| format!("Canvas text: {e:?}");
@@ -104,12 +94,8 @@ impl Rasterizer {
         context.set_font(&font);
         let metrics = context.measure_text(&text).map_err(error)?;
         let advance = metrics.width();
-        let mut left = (-metrics.actual_bounding_box_left()).floor() - 1.;
-        let mut right = metrics.actual_bounding_box_right().ceil() + 1.;
-        if let Some([start, end]) = window {
-            left = left.max(start.floor() - 1.);
-            right = right.min(end.ceil() + 1.);
-        }
+        let left = (-metrics.actual_bounding_box_left()).floor() - 1.;
+        let right = metrics.actual_bounding_box_right().ceil() + 1.;
         let top = (-metrics.actual_bounding_box_ascent()).floor() - 1.;
         let width = (right - left).max(1.);
         let width = max_width.map_or(width, |limit| width.min(f64::from(limit) + 2.));

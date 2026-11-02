@@ -155,36 +155,47 @@ pub fn pump(g: &mut LocalGame, t: f64) -> Vec<Vec<u8>> {
 pub fn negotiating() -> LocalGame {
     let mut g = LocalGame::new(0.).unwrap();
     g.draw_diagnostics.strict_validation = true;
+    negotiate(&mut g);
+    g
+}
+fn negotiate(g: &mut LocalGame) {
     g.play("ws://127.0.0.1:19491/slither", "Player", 44)
         .unwrap();
-    pump(&mut g, 1.);
+    pump(g, 1.);
     let e = g.effect().unwrap();
     assert!(matches!(e.kind, EffectKind::Connect(_)));
     g.construct(e.generation, e.id, 1.).unwrap();
     g.acknowledge(e.generation, e.id, true).unwrap();
     g.opened(g.generation(), 2.).unwrap();
     assert_eq!(g.phase(), Phase::Opening);
-    assert_eq!(effects(&mut g), [vec![1], vec![99, 0]]);
+    assert_eq!(effects(g), [vec![1], vec![99, 0]]);
     assert_eq!(g.phase(), Phase::Challenge);
     g.receive(g.generation(), &bundle(&[challenge()]), 2.)
         .unwrap();
-    let packets = effects(&mut g);
+    let packets = effects(g);
     assert_eq!(packets[0], b"DHLPTXBFJNRVZDHLPTXBFJNRVZD");
     assert_eq!(packets[1][24], 44);
     assert_eq!(&packets[1][26..32], b"Player");
     assert_eq!(&packets[1][32..], [0, 255]);
     assert_eq!(g.phase(), Phase::Setup);
-    g
 }
 pub fn playing() -> LocalGame {
     let mut g = negotiating();
+    join(&mut g);
+    g
+}
+/// A replay on the same game, in a new session generation.
+pub fn rejoin(g: &mut LocalGame) {
+    negotiate(g);
+    join(g);
+}
+fn join(g: &mut LocalGame) {
     g.receive(
         g.generation(),
         &bundle(&[setup(), snake(44), food(), prey(), board()]),
         3.,
     )
     .unwrap();
-    pictures(&mut g);
-    pump(&mut g, 20.);
-    g
+    pictures(g);
+    pump(g, 20.);
 }

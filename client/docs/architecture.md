@@ -93,11 +93,8 @@ synchronizes the adapter from that state. Repeated key-down events are filtered
 before custom Tab traversal and egui processing. Keyboard, pointer, wheel, touch
 and IME events reach the owning screen at once, in order
 (`egui_native::immediate_menu_input`); leftover adapter input takes the same
-ordered route on the next frame, never one raw egui batch. While the
-champion editor owns input, the host stays active in paint-only mode (no
-translation, platform output or text input) so egui keeps painting the login,
-and the desktop presenter draws the editor's old-toolkit draws after egui. The
-skin studio is an egui screen; the presenter draws only its preview snake after
+ordered route on the next frame, never one raw egui batch. Every native menu is
+an egui screen; the presenter draws only the skin studio's preview snake after
 egui.
 
 The [native login](login-egui.md) uses `login_egui.rs` for editable nickname,

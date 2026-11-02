@@ -40,8 +40,8 @@ cargo test --manifest-path apps/wgpu-slice/Cargo.toml --locked --lib --tests
 The app `custom_servers` integration test uses synthetic documentation addresses,
 injected official acquisition callbacks and isolated temporary preference files.
 It covers direct selection without fetching, input/focus and malformed storage.
-The `menu_specimens --server-picker` mode captures the picker before and after, without
-art, a game session, a window or network work.
+The `menu_specimens --server-picker` mode captures the picker without art, a game
+session, a window or network work.
 
 The authored `protocol13` core/app tests cover explicit IDs, coordinate motion,
 appearance deltas, absolute food, HUD and death. The real Canvas Wasm session

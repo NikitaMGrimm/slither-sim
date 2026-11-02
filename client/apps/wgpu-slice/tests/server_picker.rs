@@ -390,7 +390,7 @@ fn open_picker_rows_stay_clickable_at_dpr_five_to_eight() {
                 let picture = login
                     .prepare_host(extent, dpr, true, None)
                     .unwrap_or_else(|e| panic!("picker 960x{height}, DPR {dpr}: {e}"));
-                assert_eq!(picture.frame.viewport_scale, dpr);
+                assert_eq!(picture.viewport_scale, dpr);
                 let resolved = login.picker.panel.resolve([960., height]).unwrap();
                 let row = resolved
                     .iter()
@@ -561,7 +561,7 @@ fn backdrop_and_escape_close_while_blank_panel_space_shields() {
         // Outgoing controls are disabled: clicks during the fade cannot act.
         click(&mut login, ADD_CUSTOM);
         assert!(login.picker.policy.custom_error.is_empty());
-        assert!(login.intercepts_pointer([4., 4.]));
+        assert!(login.intercepts_pointer());
         fade(&mut login, 9616, 10000);
         assert!(!login.picker.policy.visible());
         assert_eq!(login.focused(), Some(NICKNAME));
@@ -573,10 +573,7 @@ fn backdrop_and_escape_close_while_blank_panel_space_shields() {
 fn intercepts_pointer_agrees_with_dispatch_through_open_and_close() {
     let mut login = settled(true);
     for now in [9616, 9632] {
-        assert_eq!(
-            login.intercepts_pointer([480., 360.]),
-            login.egui_owns_input()
-        );
+        assert_eq!(login.intercepts_pointer(), login.egui_owns_input());
         login.step(f64::from(now), true, false).unwrap();
     }
     login.open_picker();
@@ -587,10 +584,7 @@ fn intercepts_pointer_agrees_with_dispatch_through_open_and_close() {
         login.step(f64::from(now), true, false).unwrap();
         login.prepare([960, 720], true, None).unwrap();
         assert!(login.egui.active());
-        assert_eq!(
-            login.intercepts_pointer([480., 360.]),
-            login.egui_owns_input()
-        );
+        assert_eq!(login.intercepts_pointer(), login.egui_owns_input());
         assert!(login.egui_owns_input());
     }
     assert!(!login.picker.policy.visible());
