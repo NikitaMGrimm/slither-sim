@@ -763,6 +763,7 @@ mod tests {
         let mut e = Encounters::default();
         let mut frame = Frame {
             identity: 7,
+            food_batch: None,
             extent: EXTENT,
             viewport_scale: 1.,
             tick: 0,

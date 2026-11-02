@@ -328,6 +328,7 @@ impl Scene {
             tick: self.tick,
             draws,
             snakes: Vec::new(),
+            food_batch: None,
         })
     }
     pub fn tick(&self) -> u32 {

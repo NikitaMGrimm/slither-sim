@@ -461,6 +461,7 @@ fn builder_quota_and_held_picture_retry_at_dpr_one_to_five() {
                         tick: 0,
                         draws: Vec::new(),
                         snakes: Vec::new(),
+                        food_batch: None,
                     },
                     overlay: None,
                     resources: menu.resources,

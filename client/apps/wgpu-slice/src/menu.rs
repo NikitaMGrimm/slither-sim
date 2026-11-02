@@ -135,6 +135,7 @@ impl MenuFrame {
         let ui_extra = usize::from(self.world_cover.is_some());
         frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
         let copy = |frame: &frame::Frame, extra: usize| -> Result<frame::Frame> {
+            let frame = frame.canonical()?;
             let mut draws = Vec::new();
             draws
                 .try_reserve_exact(frame.draws.len() + extra)
@@ -146,6 +147,7 @@ impl MenuFrame {
                 viewport_scale: frame.viewport_scale,
                 tick: frame.tick,
                 draws,
+                food_batch: None,
                 snakes: frame.snakes.clone(),
             })
         };

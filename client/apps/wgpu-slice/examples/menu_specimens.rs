@@ -27,6 +27,7 @@ fn page_frame(picture: &MenuFrame) -> Frame {
             .cloned()
             .collect(),
         snakes: Vec::new(),
+        food_batch: None,
     }
 }
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]

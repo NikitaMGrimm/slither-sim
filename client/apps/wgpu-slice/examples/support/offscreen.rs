@@ -126,6 +126,7 @@ pub fn scene(physical: [u32; 2]) -> (Frame, Frame, Vec<Resource>) {
         extent: [1500, 845],
         viewport_scale: 1.,
         snakes: Vec::new(),
+        food_batch: None,
         draws: Vec::new(),
     };
     // Thin diagonals and polygonal curves expose raster coverage, with no art input.
@@ -161,6 +162,7 @@ pub fn scene(physical: [u32; 2]) -> (Frame, Frame, Vec<Resource>) {
         extent: physical,
         viewport_scale: 1.,
         snakes: Vec::new(),
+        food_batch: None,
         draws: vec![draw(
             resources[1].asset,
             BodyRect {

@@ -32,6 +32,7 @@ fn frame(asset: slither_client::presentation::BodyAsset, size: f64, x: f64) -> F
         extent: [128, 128],
         viewport_scale: 1.,
         snakes: Vec::new(),
+        food_batch: None,
         draws: vec![Draw {
             asset,
             source: None,

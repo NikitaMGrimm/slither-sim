@@ -78,6 +78,7 @@ fn native_arial_preserves_style_alpha_scale_and_evicted_frame_pixels() {
     assert!(cache.cached_bytes() <= CACHE_BYTES);
     let frame = Frame {
         snakes: Vec::new(),
+        food_batch: None,
         identity: 1,
         extent: [960, 540],
         viewport_scale: 1.,

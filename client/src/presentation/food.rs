@@ -426,6 +426,17 @@ fn create(
     })
 }
 
+/// Opaque identity of dense food membership and its frozen source metadata.
+/// Retaining this token does not share the mutable food array.
+#[derive(Clone, Debug)]
+pub struct FoodSourceIdentity(Arc<()>);
+impl PartialEq for FoodSourceIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for FoodSourceIdentity {}
+
 /// Dense insertion-ordered food objects with reverse scans and swap removal.
 /// No connection, camera, quality or packet clock is owned by this world.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -434,6 +445,7 @@ pub struct FoodWorld {
     // when food changes, preserving independent rollback snapshots.
     foods: Arc<Vec<FoodPresentation>>,
     last_instance_serial: u64,
+    source_epoch: Arc<()>,
 }
 
 impl FoodWorld {
@@ -445,6 +457,13 @@ impl FoodWorld {
     /// Borrow current dense order, including duplicate keys and eaten objects.
     pub fn foods(&self) -> &[FoodPresentation] {
         &self.foods
+    }
+
+    /// Identify the dense instances and frozen sources without retaining food.
+    /// Animation and consumption flight may differ. A new epoch on insertion or
+    /// removal distinguishes rolled-back forks, even when their counts match.
+    pub fn source_identity(&self) -> FoodSourceIdentity {
+        FoodSourceIdentity(self.source_epoch.clone())
     }
 
     /// Append exactly one instance atomically, freezing source metadata and zoom.
@@ -482,6 +501,7 @@ impl FoodWorld {
         foods.try_reserve(1).map_err(|_| FoodError::Allocation)?;
         foods.push(food);
         self.last_instance_serial = serial;
+        self.source_epoch = Arc::new(());
         Ok(instance)
     }
 
@@ -529,6 +549,7 @@ impl FoodWorld {
             .map_err(|_| FoodError::Allocation)?;
         foods.extend(appended);
         self.last_instance_serial = serial;
+        self.source_epoch = Arc::new(());
         Ok(())
     }
 
@@ -541,6 +562,7 @@ impl FoodWorld {
         match consume {
             FoodConsume::Immediate => {
                 foods.swap_remove(index);
+                self.source_epoch = Arc::new(());
             }
             FoodConsume::Eaten(eater) => {
                 let food = &mut foods[index].state;
@@ -562,12 +584,18 @@ impl FoodWorld {
                 count += 1;
             }
         }
+        if count != 0 {
+            self.source_epoch = Arc::new(());
+        }
         count
     }
 
     /// Explicit world reset, releasing all source/token references. Caller-owned
     /// retained cull bounds and the serial sequence survive. Setup must not call this.
     pub fn clear(&mut self) {
+        if !self.foods.is_empty() {
+            self.source_epoch = Arc::new(());
+        }
         if let Some(foods) = Arc::get_mut(&mut self.foods) {
             foods.clear();
         } else {
@@ -590,6 +618,7 @@ impl FoodWorld {
             .any(|food| food.state.eater == Some(token))
         {
             Arc::make_mut(&mut self.foods).retain(|food| food.state.eater != Some(token));
+            self.source_epoch = Arc::new(());
         }
     }
 
@@ -616,6 +645,7 @@ impl FoodWorld {
         F: FnMut(SnakeObjectToken) -> Result<FoodEaterPose, FoodError>,
     {
         let foods = Arc::make_mut(&mut self.foods);
+        let mut removed = false;
         for index in (0..foods.len()).rev() {
             let f = &mut foods[index].state;
             f.animation_phase += delta * f.animation_rate;
@@ -626,6 +656,7 @@ impl FoodWorld {
                 f.consumption_progress += delta / 41.;
                 if f.consumption_progress >= 1. || f.eater.is_none() {
                     foods.swap_remove(index);
+                    removed = true;
                     continue;
                 }
                 let eater = pose(f.eater.expect("checked captured eater"))?;
@@ -679,6 +710,9 @@ impl FoodWorld {
                 return Err(FoodError::Arithmetic);
             }
         }
+        if removed {
+            self.source_epoch = Arc::new(());
+        }
         Ok(())
     }
 }
@@ -692,6 +726,7 @@ mod tests {
         let mut world = FoodWorld {
             foods: Arc::default(),
             last_instance_serial: u64::MAX,
+            source_epoch: Arc::default(),
         };
         world.clear();
         let before = world.clone();

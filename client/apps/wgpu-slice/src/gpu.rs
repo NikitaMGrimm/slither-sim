@@ -19,6 +19,8 @@ use draw_runs::{DrawState, Pipeline, draw_runs};
 #[path = "texture_arrays.rs"]
 mod texture_arrays;
 use texture_arrays::{Group, TextureArray};
+#[path = "pellet_gpu.rs"]
+mod pellet_gpu;
 #[path = "soft_layers.rs"]
 mod soft_layers;
 use soft_layers::{LayerHistory, covered_area, pays, select_glows};
@@ -64,6 +66,25 @@ fn additive_pair(a: &crate::frame::Quad, b: &crate::frame::Quad) -> bool {
             .iter()
             .zip(b.vertices.iter())
             .all(|(a, b)| a[..4] == b[..4])
+}
+
+fn glow_bin(quad: &crate::frame::Quad, second_alpha: f32, attachment: [u32; 2]) -> u8 {
+    let a = quad.vertices[0];
+    let b = quad.vertices[1];
+    let c = quad.vertices[5];
+    let edge = |v: [f32; 5]| {
+        ((f64::from(v[0] - a[0]) * f64::from(attachment[0])).powi(2)
+            + (f64::from(v[1] - a[1]) * f64::from(attachment[1])).powi(2))
+        .sqrt()
+            / 2.
+    };
+    let side = edge(b).min(edge(c));
+    // Preserve the existing size/opacity guard for every reduced attachment.
+    let opacity = quad.vertices[0][4].max(second_alpha);
+    [(3, 8.), (2, 4.), (1, 2.)]
+        .into_iter()
+        .find(|&(_, factor)| side >= 4. * factor && f64::from(opacity) * factor / side <= 0.004)
+        .map_or(0, |(scale, _)| scale)
 }
 
 fn zero_pair(a: f32, b: f32) -> bool {
@@ -195,6 +216,7 @@ pub struct Renderer {
     lost: Arc<AtomicBool>,
     multisample: Option<Multisample>,
     vertices: Vec<VertexChunk>,
+    pellets: Option<pellet_gpu::Pellets>,
     glow_sort: Vec<(DrawState, [u8; QUAD_VERTEX_BYTES])>,
     glow: Option<LayerTarget>,
     fine_glow: Option<LayerTarget>,
@@ -521,6 +543,12 @@ impl Renderer {
             mapped_at_creation: false,
         });
         queue.write_buffer(&indices, 0, &index_bytes);
+        let pellets = Some(pellet_gpu::Pellets::new(
+            &device,
+            &layout,
+            format,
+            sample_count,
+        ));
         Ok(Self {
             sample_count,
             format,
@@ -546,6 +574,7 @@ impl Renderer {
             lost,
             multisample: None,
             vertices: Vec::new(),
+            pellets,
             glow_sort: Vec::new(),
             glow: None,
             fine_glow: None,
@@ -801,7 +830,7 @@ impl Renderer {
         if samples != 1 && samples != self.sample_count {
             return Err("Unsupported world sample count".into());
         }
-        self.render_inner(frame, target, false, attachment, samples)
+        self.render_inner(frame, target, false, attachment, samples, true)
     }
     /// Adjacent draw runs in prepared vertex chunks; read after a successful render.
     pub fn draw_call_count(&self) -> usize {
@@ -889,7 +918,7 @@ impl Renderer {
         frame: &Frame,
         target: &wgpu::TextureView,
     ) -> RenderResult<()> {
-        self.render_inner(frame, target, true, frame.extent, 1)
+        self.render_inner(frame, target, true, frame.extent, 1, false)
     }
     fn render_inner(
         &mut self,
@@ -898,11 +927,44 @@ impl Renderer {
         overlay: bool,
         attachment: [u32; 2],
         samples: u32,
+        clear: bool,
     ) -> RenderResult<()> {
         if self.lost.load(Ordering::SeqCst) {
             return Err(RenderError::Host(
                 "GPU device lost; no gameplay reset/retry".into(),
             ));
+        }
+        if frame.food_batch.is_some() {
+            frame.check_limits()?;
+            if frame.extent.contains(&0) {
+                return Ok(());
+            }
+            if overlay
+                || !clear
+                || !matches!(
+                    self.format,
+                    wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm
+                )
+            {
+                return self.render_inner(
+                    &frame.canonical()?,
+                    target,
+                    overlay,
+                    attachment,
+                    samples,
+                    clear,
+                );
+            }
+            crate::world_resolution::validate_target(
+                attachment,
+                samples,
+                self.device.limits().max_texture_dimension_2d,
+            )?;
+            self.validate_frame(frame)?;
+            let mut pellets = self.pellets.take().expect("pellet renderer");
+            let result = pellets.render(self, frame, target, attachment, samples);
+            self.pellets = Some(pellets);
+            return result;
         }
         let resident = self
             .textures
@@ -935,7 +997,7 @@ impl Renderer {
             self.format,
             wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm
         );
-        let soft_layers = !overlay && encoded_unorm8;
+        let soft_layers = !overlay && clear && encoded_unorm8;
         let mut glow_span: Option<std::ops::Range<usize>> = None;
         let mut glow_count = 0;
         let mut glow_coverage = [0.; 4];
@@ -990,27 +1052,7 @@ impl Renderer {
                 && self.textures[&quad.key].food_glow
                 && quad.blend == slither_client::presentation::BodyBlend::Lighter
             {
-                let a = quad.vertices[0];
-                let b = quad.vertices[1];
-                let c = quad.vertices[5];
-                let edge = |v: [f32; 5]| {
-                    ((f64::from(v[0] - a[0]) * f64::from(attachment[0])).powi(2)
-                        + (f64::from(v[1] - a[1]) * f64::from(attachment[1])).powi(2))
-                    .sqrt()
-                        / 2.
-                };
-                let side = edge(b).min(edge(c));
-                // Bound the opacity gradient per reduced pixel as well as the
-                // source footprint. Bright small glows need finer sampling;
-                // both contributions of a paired draw must qualify. The
-                // authored boundary sweep owns the isolated error budget.
-                let opacity = quad.vertices[0][4].max(second_alpha);
-                scale = [(3, 8.), (2, 4.), (1, 2.)]
-                    .into_iter()
-                    .find(|&(_, factor)| {
-                        side >= 4. * factor && f64::from(opacity) * factor / side <= 0.004
-                    })
-                    .map_or(0, |(scale, _)| scale);
+                scale = glow_bin(&quad, second_alpha, attachment);
                 if scale > 0 {
                     glow_coverage[scale as usize] += covered_area(&quad.vertices);
                 }
@@ -1420,7 +1462,7 @@ impl Renderer {
                     target: world,
                     resolve: msaa_view.map(|_| target),
                     samples,
-                    load: if overlay {
+                    load: if overlay || !clear {
                         wgpu::LoadOp::Load
                     } else {
                         wgpu::LoadOp::Clear(wgpu::Color::BLACK)
@@ -1935,6 +1977,10 @@ mod tests {
         assert!(28 <= limits.max_vertex_buffer_array_stride);
         assert!(3 <= limits.max_vertex_attributes);
         assert!(1 <= limits.max_vertex_buffers);
+        // Retained pellets use only instanced vertex inputs and uniforms, within
+        // the same downlevel contract (no storage buffers or optional features).
+        assert!(7 <= limits.max_vertex_attributes);
+        assert!(2 <= limits.max_vertex_buffers);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1997,6 +2043,7 @@ mod tests {
             extent: [64, 64],
             viewport_scale: 1.,
             snakes: Vec::new(),
+            food_batch: None,
             draws: vec![crate::frame::Draw {
                 corners: None,
                 asset: assets[0],

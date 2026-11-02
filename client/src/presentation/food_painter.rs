@@ -613,6 +613,20 @@ pub fn plan_food_with_zoom_and_index(
     plan_food_impl(input, early, late, zoom_factor, Some(index))
 }
 
+/// Validate frozen inputs and sources without materializing image commands.
+/// Retained renderers must still preflight their complete numeric output and
+/// preserve the early/late barriers before publishing a picture.
+pub fn validate_food_with_index(
+    input: FoodPaintInput<'_>,
+    index: &mut FoodAssetIndex,
+    zoom_factor: f64,
+) -> Result<(), FoodPaintError> {
+    if !zoom_factor.is_finite() || zoom_factor <= 0. {
+        return Err(FoodPaintError::InvalidView);
+    }
+    validate(input, Some(index), zoom_factor)
+}
+
 fn plan_food_impl(
     input: FoodPaintInput<'_>,
     mut early: Vec<FoodImageCommand>,

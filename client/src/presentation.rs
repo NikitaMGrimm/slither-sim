@@ -100,14 +100,14 @@ pub use face::{PairedFaceGeometry, PairedSideGeometry, PairedSideLayout};
 pub use follow_camera::{FollowCamera, INITIAL_ZOOM};
 pub use food::{
     FoodConsume, FoodEaterPose, FoodError, FoodFactory, FoodFactoryInput, FoodInstance,
-    FoodPalette, FoodPresentation, FoodSnapshot, FoodSource, FoodSources, FoodSpawn, FoodWorld,
-    MAX_RETAINED_FOODS, SnakeObjectToken, food_palette,
+    FoodPalette, FoodPresentation, FoodSnapshot, FoodSource, FoodSourceIdentity, FoodSources,
+    FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken, food_palette,
 };
 pub use food_painter::{
     FoodAssetIndex, FoodCullBounds, FoodImageCommand, FoodImageDraw, FoodPaintCounts,
     FoodPaintError, FoodPaintInput, FoodPaintPass, FoodPaintPlan, MAX_FOOD_PAINT_COMMANDS,
     plan_food, plan_food_with_index, plan_food_with_storage, plan_food_with_zoom,
-    plan_food_with_zoom_and_index,
+    plan_food_with_zoom_and_index, validate_food_with_index,
 };
 pub(crate) use hud::HudLeaderboardRowsBudget;
 pub use hud::{

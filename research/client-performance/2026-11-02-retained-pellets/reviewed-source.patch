@@ -1,0 +1,9 @@
+--- measured/client/apps/wgpu-slice/src/pellet_batch.rs
++++ reviewed/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -1,0 +2,2 @@
++//! Exact rectangles replace seven generic records without changing animation.
++//! Study: https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-retained-pellets/REPORT.md.
+@@ -563,0 +566,3 @@
++        // Rebuild against the current array so an accidental old cache snapshot
++        // cannot pass merely because the queued-picture check already detached it.
++        cache = Cache::default();

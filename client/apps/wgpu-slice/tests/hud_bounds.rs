@@ -9,6 +9,7 @@ fn bounded(extent: [u32; 2], scale: f64) -> usize {
         viewport_scale: scale,
         draws: Vec::new(),
         snakes: Vec::new(),
+        food_batch: None,
     };
     let out = render::finish(
         frame,

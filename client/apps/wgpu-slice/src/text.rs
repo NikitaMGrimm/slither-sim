@@ -1339,6 +1339,7 @@ mod hud_budget_tests {
                             viewport_scale: dpr,
                             draws: vec![],
                             snakes: vec![],
+                            food_batch: None,
                         },
                         resources: vec![],
                     },
