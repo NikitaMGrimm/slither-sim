@@ -18,6 +18,10 @@ def validate_primary(rows):
     expected = Counter((workload, zoom, side, str(pair)) for workload, zoom in EXPECTED_CELLS for side in ("before", "after") for pair in range(1, 6))
     actual = Counter((r["workload"], r["zoom"], r["side"], r["pair"]) for r in rows)
     assert actual == expected, "missing/duplicate/extra primary pair-arm rows"
+    ids = [r["id"] for r in rows]
+    assert len(set(ids)) == len(ids), "duplicate primary run ids"
+    for r in rows:
+        assert r["id"] == f"bench-{r['pair']}-{r['workload']}-{r['zoom']}-{r['side']}", ("run id does not match its labels", r["id"])
 
 
 def excluded_baseline_table():
