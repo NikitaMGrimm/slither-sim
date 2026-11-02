@@ -20,6 +20,8 @@ pub fn warm(r: &mut gpu::Renderer) -> Result<()> {
         status: BodyAssetStatus::Ready,
     };
     let resource = Resource {
+        food_glow: false,
+        food_outline: false,
         asset,
         image: std::sync::Arc::new(RgbaImage {
             width: 1,

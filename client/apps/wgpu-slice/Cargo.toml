@@ -41,6 +41,11 @@ name = "gpu-trace-json"
 path = "examples/gpu_trace_json.rs"
 required-features = ["frame-profile"]
 
+[[example]]
+name = "gpu_sprite_probe"
+path = "examples/gpu_sprite_probe.rs"
+required-features = ["frame-profile"]
+
 [dependencies]
 flate2 = "=1.1.10"
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }

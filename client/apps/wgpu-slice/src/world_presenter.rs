@@ -64,6 +64,15 @@ impl WorldPresenter {
         )?;
         let old_backing = self.backing_extent();
         let old_msaa = renderer.multisample_extent();
+        let layer_extents = |r: &Renderer| {
+            [
+                r.food_outline_extent(),
+                r.fine_glow_extent(),
+                r.food_glow_extent(),
+            ]
+        };
+        let bytes = |e: Option<[u32; 2]>| e.map_or(0, |e| u64::from(e[0]) * u64::from(e[1]) * 4);
+        let old_layers = layer_extents(renderer);
         let old_msaa_bytes = old_msaa.map_or(0, |(e, s)| {
             u64::from(e[0]) * u64::from(e[1]) * 4 * u64::from(s)
         });
@@ -87,7 +96,7 @@ impl WorldPresenter {
         } else {
             None
         };
-        let transient_target_bytes = old_msaa_bytes
+        let mut transient_target_bytes = old_msaa_bytes
             + old_backing_bytes
             + if old_msaa == Some((plan.attachment, plan.samples)) {
                 0
@@ -100,6 +109,7 @@ impl WorldPresenter {
                 0
             };
         let world_draws;
+        let world_passes;
         if plan.blit {
             let backing = replacement
                 .as_ref()
@@ -108,6 +118,7 @@ impl WorldPresenter {
                 .create_view(&Default::default());
             renderer.render_world_at(frame, &backing, plan.attachment, plan.samples)?;
             world_draws = renderer.draw_call_count();
+            world_passes = renderer.world_pass_count();
             let mut encoder = renderer.device.create_command_encoder(&Default::default());
             #[cfg(feature = "frame-profile")]
             let timing = renderer.begin_diagnostic_encoder_pass(&mut encoder, "blit")?;
@@ -121,7 +132,15 @@ impl WorldPresenter {
         } else {
             renderer.render_world_at(frame, target, plan.attachment, plan.samples)?;
             world_draws = renderer.draw_call_count();
+            world_passes = renderer.world_pass_count();
         }
+        let new_layers = layer_extents(renderer);
+        let layer_bytes = new_layers.into_iter().map(bytes).sum::<u64>();
+        transient_target_bytes += old_layers
+            .into_iter()
+            .zip(new_layers)
+            .map(|(old, new)| bytes(old) + if old == new { 0 } else { bytes(new) })
+            .sum::<u64>();
         let overlay_draws = if let Some(overlay) = overlay {
             renderer.render_overlay(overlay, target)?;
             renderer.draw_call_count()
@@ -137,16 +156,18 @@ impl WorldPresenter {
             self.backing = None;
         }
         self.effective = plan.effective;
-        let target_bytes = renderer.multisample_extent().map_or(0, |(e, s)| {
-            u64::from(e[0]) * u64::from(e[1]) * 4 * u64::from(s)
-        }) + self
-            .backing_extent()
-            .map_or(0, |e| u64::from(e[0]) * u64::from(e[1]) * 4);
+        let target_bytes = layer_bytes
+            + renderer.multisample_extent().map_or(0, |(e, s)| {
+                u64::from(e[0]) * u64::from(e[1]) * 4 * u64::from(s)
+            })
+            + self
+                .backing_extent()
+                .map_or(0, |e| u64::from(e[0]) * u64::from(e[1]) * 4);
         Ok(PresentationReport {
             plan,
             world_draws,
             overlay_draws,
-            passes: 1 + usize::from(plan.blit) + usize::from(overlay.is_some()),
+            passes: world_passes + usize::from(plan.blit) + usize::from(overlay.is_some()),
             target_bytes,
             transient_target_bytes,
         })

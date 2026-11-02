@@ -64,6 +64,10 @@ fn appearance() -> Vec<u8> {
 
 #[derive(Clone, Debug)]
 pub struct Resource {
+    /// Soft additive food glow; never a body, text or hard geometry edge.
+    pub food_glow: bool,
+    /// Padded black food outline, before bodies; its raster already carries edge coverage.
+    pub food_outline: bool,
     pub asset: BodyAsset,
     /// Cache eviction and retained pictures share immutable rasters without copying pixels.
     pub image: std::sync::Arc<RgbaImage>,
@@ -93,6 +97,8 @@ fn add(resources: &mut Vec<Resource>, r: &CanvasRecipe) -> Result<BodyAsset> {
         status: BodyAssetStatus::Ready,
     };
     resources.push(Resource {
+        food_glow: false,
+        food_outline: false,
         asset,
         image: image.into(),
     });

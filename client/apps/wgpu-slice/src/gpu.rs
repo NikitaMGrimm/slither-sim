@@ -16,6 +16,9 @@ use std::{
 #[path = "draw_runs.rs"]
 mod draw_runs;
 use draw_runs::{DrawState, Pipeline, draw_runs};
+#[path = "texture_arrays.rs"]
+mod texture_arrays;
+use texture_arrays::{Group, TextureArray};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenderError {
@@ -48,13 +51,24 @@ impl From<RenderError> for String {
 }
 type RenderResult<T> = std::result::Result<T, RenderError>;
 
+fn additive_pair(a: &crate::frame::Quad, b: &crate::frame::Quad) -> bool {
+    a.blend == slither_client::presentation::BodyBlend::Lighter
+        && b.blend == a.blend
+        && b.key == a.key
+        && b.repeat == a.repeat
+        && b.black_effect == a.black_effect
+        && a.vertices
+            .iter()
+            .zip(b.vertices.iter())
+            .all(|(a, b)| a[..4] == b[..4])
+}
 struct Texture {
     asset: BodyAsset,
-    bytes: usize,
-    _texture: wgpu::Texture,
-    bind: wgpu::BindGroup,
-    repeat_bind: wgpu::BindGroup,
+    array: Arc<TextureArray>,
+    layer: u32,
     black: bool,
+    food_glow: bool,
+    food_outline: bool,
 }
 #[derive(Default)]
 struct VertexChunk {
@@ -66,6 +80,73 @@ struct Multisample {
     extent: [u32; 2],
     samples: u32,
     view: wgpu::TextureView,
+}
+
+struct LayerTarget {
+    extent: [u32; 2],
+    view: wgpu::TextureView,
+    bind: wgpu::BindGroup,
+}
+impl LayerTarget {
+    fn new(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        format: wgpu::TextureFormat,
+        extent: [u32; 2],
+    ) -> Self {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("single-sample food layer"),
+            size: wgpu::Extent3d {
+                width: extent[0],
+                height: extent[1],
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&Default::default());
+        let sample_view = texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
+            ..Default::default()
+        });
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("food layer reconstruction"),
+            layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&sample_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
+        Self { extent, view, bind }
+    }
+}
+struct PaintPass<'a> {
+    target: &'a wgpu::TextureView,
+    resolve: Option<&'a wgpu::TextureView>,
+    samples: u32,
+    load: wgpu::LoadOp<wgpu::Color>,
+    range: std::ops::Range<usize>,
+    queries: Option<(u32, u32)>,
+    coarse: Option<&'a wgpu::BindGroup>,
+    fine: Option<&'a wgpu::BindGroup>,
+    small_glows: Option<std::ops::Range<usize>>,
+    filter: Option<u8>,
+    base: Option<&'a wgpu::BindGroup>,
 }
 pub struct Renderer {
     pub sample_count: u32,
@@ -79,12 +160,27 @@ pub struct Renderer {
     overlay_black_over: wgpu::RenderPipeline,
     overlay_lighter: wgpu::RenderPipeline,
     lighter: wgpu::RenderPipeline,
+    pair_lighter: wgpu::RenderPipeline,
+    overlay_pair_lighter: wgpu::RenderPipeline,
     black_over: wgpu::RenderPipeline,
     textures: BTreeMap<ResourceKey, Texture>,
+    arrays: BTreeMap<(u32, u32, u32, usize), Group>,
+    bindings: BTreeMap<ResourceKey, Arc<TextureArray>>,
+    next_array: u64,
+    indices: wgpu::Buffer,
     lost: Arc<AtomicBool>,
     multisample: Option<Multisample>,
     vertices: Vec<VertexChunk>,
+    glow_sort: Vec<(DrawState, [u8; QUAD_VERTEX_BYTES])>,
+    glow: Option<LayerTarget>,
+    fine_glow: Option<LayerTarget>,
+    fine_composite_single: wgpu::RenderPipeline,
+    outline_target: Option<LayerTarget>,
+    outline_composite: wgpu::RenderPipeline,
+    glow_composite: wgpu::RenderPipeline,
+    glow_composite_single: wgpu::RenderPipeline,
     draw_calls: usize,
+    pass_count: usize,
     diagnostic_timestamps: Option<wgpu::QuerySet>,
     #[cfg(feature = "frame-profile")]
     diagnostic_passes: Option<Vec<(&'static str, u32)>>,
@@ -98,6 +194,18 @@ impl Renderer {
             self.device.limits().max_texture_dimension_2d,
         )
         .is_ok()
+    }
+    pub fn food_outline_extent(&self) -> Option<[u32; 2]> {
+        self.outline_target.as_ref().map(|g| g.extent)
+    }
+    pub fn fine_glow_extent(&self) -> Option<[u32; 2]> {
+        self.fine_glow.as_ref().map(|g| g.extent)
+    }
+    pub fn food_glow_extent(&self) -> Option<[u32; 2]> {
+        self.glow.as_ref().map(|g| g.extent)
+    }
+    pub fn world_pass_count(&self) -> usize {
+        self.pass_count
     }
     pub fn multisample_extent(&self) -> Option<([u32; 2], u32)> {
         self.multisample.as_ref().map(|m| (m.extent, m.samples))
@@ -247,7 +355,7 @@ impl Renderer {
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
+                        view_dimension: wgpu::TextureViewDimension::D2Array,
                         multisampled: false,
                     },
                     count: None,
@@ -269,24 +377,28 @@ impl Renderer {
             label: Some("quad"),
             source: wgpu::ShaderSource::Wgsl(include_str!("quad.wgsl").into()),
         });
-        let pipeline =
-            |blend, fragment, samples| {
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let attributes = wgpu::vertex_attr_array![0=>Float32x2,1=>Float32x2,2=>Float32x2,3=>Uint32];
+        let vertex_buffers = [Some(wgpu::VertexBufferLayout {
+            array_stride: 28,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &attributes,
+        })];
+        let pipeline = |blend, fragment, samples, composite| {
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("ordered paint"),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: Some("vs"),
+                    entry_point: Some(if composite { "vs_composite" } else { "vs" }),
                     compilation_options: Default::default(),
-                    buffers: &[Some(wgpu::VertexBufferLayout {
-                        array_stride: 20,
-                        step_mode: wgpu::VertexStepMode::Vertex,
-                        attributes: &wgpu::vertex_attr_array![0=>Float32x2,1=>Float32x2,2=>Float32],
-                    })],
+                    buffers: if composite { &[] } else { &vertex_buffers },
                 },
                 primitive: Default::default(),
                 depth_stencil: None,
-                multisample: wgpu::MultisampleState{count:samples,..Default::default()},
+                multisample: wgpu::MultisampleState {
+                    count: samples,
+                    ..Default::default()
+                },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
                     entry_point: Some(fragment),
@@ -300,13 +412,19 @@ impl Renderer {
                 multiview_mask: None,
                 cache: None,
             })
-            };
+        };
         let over = pipeline(
             wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
             "fs",
             sample_count,
+            false,
         );
-        let overlay_over = pipeline(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING, "fs", 1);
+        let overlay_over = pipeline(
+            wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+            "fs",
+            1,
+            false,
+        );
         let black_blend = wgpu::BlendState {
             color: wgpu::BlendComponent {
                 src_factor: wgpu::BlendFactor::One,
@@ -315,8 +433,8 @@ impl Renderer {
             },
             alpha: wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING.alpha,
         };
-        let black_over = pipeline(black_blend, "fs_black", sample_count);
-        let overlay_black_over = pipeline(black_blend, "fs_black", 1);
+        let black_over = pipeline(black_blend, "fs_black", sample_count, false);
+        let overlay_black_over = pipeline(black_blend, "fs_black", 1, false);
         let add = wgpu::BlendComponent {
             src_factor: wgpu::BlendFactor::One,
             dst_factor: wgpu::BlendFactor::One,
@@ -329,6 +447,7 @@ impl Renderer {
             },
             "fs",
             sample_count,
+            false,
         );
         let overlay_lighter = pipeline(
             wgpu::BlendState {
@@ -337,14 +456,38 @@ impl Renderer {
             },
             "fs",
             1,
+            false,
         );
+        let glow_blend = wgpu::BlendState {
+            color: add,
+            alpha: add,
+        };
+        let pair_lighter = pipeline(glow_blend, "fs_pair", sample_count, false);
+        let overlay_pair_lighter = pipeline(glow_blend, "fs_pair", 1, false);
+        let outline_composite = pipeline(glow_blend, "fs", sample_count, true);
+        let fine_composite_single = pipeline(glow_blend, "fs", 1, true);
+        let glow_composite = pipeline(glow_blend, "fs_glow_composite", sample_count, true);
+        let glow_composite_single = pipeline(glow_blend, "fs_glow_composite", 1, true);
         let diagnostic_timestamps = timestamps.then(|| {
             device.create_query_set(&wgpu::QuerySetDescriptor {
                 label: Some("offscreen pass timings"),
                 ty: wgpu::QueryType::Timestamp,
-                count: 8,
+                count: 32,
             })
         });
+        let mut index_bytes = Vec::with_capacity(VERTEX_CHUNK_QUADS * 6 * 2);
+        for quad in 0..VERTEX_CHUNK_QUADS as u16 {
+            for index in [0, 1, 2, 0, 2, 3] {
+                index_bytes.extend_from_slice(&(quad * 4 + index).to_le_bytes());
+            }
+        }
+        let indices = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("shared quad indices"),
+            size: index_bytes.len() as u64,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&indices, 0, &index_bytes);
         Ok(Self {
             sample_count,
             format,
@@ -357,12 +500,27 @@ impl Renderer {
             overlay_black_over,
             overlay_lighter,
             lighter,
+            pair_lighter,
+            overlay_pair_lighter,
             black_over,
             textures: BTreeMap::new(),
+            arrays: BTreeMap::new(),
+            bindings: BTreeMap::new(),
+            next_array: 0,
+            indices,
             lost,
             multisample: None,
             vertices: Vec::new(),
+            glow_sort: Vec::new(),
+            glow: None,
+            fine_glow: None,
+            fine_composite_single,
+            outline_target: None,
+            outline_composite,
+            glow_composite,
+            glow_composite_single,
             draw_calls: 0,
+            pass_count: 0,
             diagnostic_timestamps,
             #[cfg(feature = "frame-profile")]
             diagnostic_passes: None,
@@ -401,94 +559,42 @@ impl Renderer {
         if self.textures.len() >= 2048 && !self.textures.keys().any(|k| k.handle == a.handle) {
             return Err("texture count budget".into());
         }
-        let retained = self
+        let retained_arrays: BTreeMap<_, _> = self
             .textures
             .values()
             .filter(|t| t.asset.handle != a.handle)
-            .map(|t| t.bytes)
+            .map(|t| (t.array.key, &t.array.texture))
+            .collect();
+        let retained = retained_arrays
+            .values()
+            .map(|t| {
+                let (mut width, mut height) = (t.width(), t.height());
+                let mut bytes = 0;
+                for _ in 0..t.mip_level_count() {
+                    bytes +=
+                        width as usize * height as usize * 4 * t.depth_or_array_layers() as usize;
+                    width = (width / 2).max(1);
+                    height = (height / 2).max(1);
+                }
+                bytes
+            })
             .sum::<usize>();
         if retained + r.image.pixels.len() > crate::bank::PIXEL_BUDGET {
             return Err("Resident GPU pixel budget".into());
         }
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("authored RGBA"),
-            size: wgpu::Extent3d {
-                width: r.image.width,
-                height: r.image.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-        let (mut width, mut height) = (r.image.width, r.image.height);
-        let mut offset = 0;
-        for mip_level in 0..mip_level_count {
-            let bytes = width as usize * height as usize * 4;
-            self.queue.write_texture(
-                wgpu::TexelCopyTextureInfo {
-                    texture: &texture,
-                    mip_level,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                &r.image.pixels[offset..offset + bytes],
-                wgpu::TexelCopyBufferLayout {
-                    offset: 0,
-                    bytes_per_row: Some(width * 4),
-                    rows_per_image: Some(height),
-                },
-                wgpu::Extent3d {
-                    width,
-                    height,
-                    depth_or_array_layers: 1,
-                },
-            );
-            offset += bytes;
-            width = (width / 2).max(1);
-            height = (height / 2).max(1);
-        }
-        let view = texture.create_view(&Default::default());
-        let binding = |address_mode| {
-            let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some("Canvas-like linear clamp"),
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Linear,
-                mipmap_filter: wgpu::MipmapFilterMode::Linear,
-                address_mode_u: address_mode,
-                address_mode_v: address_mode,
-                ..Default::default()
-            });
-            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("source"),
-                layout: &self.layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&sampler),
-                    },
-                ],
-            })
-        };
-        let bind = binding(wgpu::AddressMode::ClampToEdge);
-        let repeat_bind = binding(wgpu::AddressMode::Repeat);
+        let array = self.new_array([r.image.width, r.image.height], 1, mip_level_count)?;
+        array.write(&self.queue, 0, r);
+        self.arrays.clear();
         // A new revision retires all prior versions of this handle atomically after validation/upload.
         self.textures.retain(|k, _| k.handle != key.handle);
         self.textures.insert(
             key,
             Texture {
                 asset: a,
-                bytes: r.image.pixels.len(),
-                _texture: texture,
-                bind,
-                repeat_bind,
+                array,
+                layer: 0,
+                food_glow: r.food_glow,
+                food_outline: r.food_outline,
                 black: r
                     .image
                     .pixels
@@ -498,10 +604,43 @@ impl Renderer {
                     .all(|p| p[..3] == [0; 3]),
             },
         );
+        self.refresh_bindings();
         Ok(())
     }
+    fn refresh_bindings(&mut self) {
+        self.bindings = self
+            .textures
+            .values()
+            .map(|t| (t.array.key, t.array.clone()))
+            .collect();
+    }
+    fn new_array(
+        &mut self,
+        size: [u32; 2],
+        layers: u32,
+        mips: u32,
+    ) -> RenderResult<Arc<TextureArray>> {
+        self.next_array = self
+            .next_array
+            .checked_add(1)
+            .ok_or("image array identity exhausted")?;
+        Ok(Arc::new(TextureArray::new(
+            &self.device,
+            &self.layout,
+            ResourceKey {
+                handle: self.next_array,
+                revision: 0,
+            },
+            size,
+            layers,
+            mips,
+        )))
+    }
     pub fn release(&mut self, key: ResourceKey) -> bool {
-        self.textures.remove(&key).is_some()
+        self.arrays.clear();
+        let removed = self.textures.remove(&key).is_some();
+        self.refresh_bindings();
+        removed
     }
     pub fn sync_resources(&mut self, resources: &[Resource]) -> RenderResult<()> {
         if self.lost.load(Ordering::SeqCst) {
@@ -522,16 +661,98 @@ impl Renderer {
             .iter()
             .map(|r| ResourceKey::from(r.asset))
             .collect();
-        self.textures.retain(|key, _| wanted.contains(key));
+        if (!self.arrays.is_empty() || self.textures.is_empty())
+            && wanted.len() == self.textures.len()
+            && resources.iter().all(|r| {
+                self.textures.get(&r.asset.into()).is_some_and(|t| {
+                    t.asset == r.asset
+                        && t.food_glow == r.food_glow
+                        && t.food_outline == r.food_outline
+                })
+            })
+        {
+            return Ok(());
+        }
+        let mut sizes = BTreeMap::<(u32, u32, u32), BTreeMap<ResourceKey, &Resource>>::new();
+        let max_dimension = wgpu::Limits::downlevel_webgl2_defaults().max_texture_dimension_2d;
         for r in resources {
-            if let Some(t) = self.textures.get(&r.asset.into()) {
-                if t.asset != r.asset {
-                    return Err("Resident resource metadata changed".into());
+            let a = r.asset;
+            if a.status != BodyAssetStatus::Ready
+                || a.width == 0
+                || a.height == 0
+                || a.width > max_dimension
+                || a.height > max_dimension
+                || !([r.image.width, r.image.height] == [a.width, a.height]
+                    || [r.image.width, r.image.height] == [a.width * 4, a.height * 4])
+            {
+                return Err("invalid resource".into());
+            }
+            let mips = r.image.mip_level_count()?;
+            if self.textures.get(&a.into()).is_some_and(|t| {
+                t.asset != a || t.food_glow != r.food_glow || t.food_outline != r.food_outline
+            }) {
+                return Err("Resident resource metadata changed".into());
+            }
+            sizes
+                .entry((r.image.width, r.image.height, mips))
+                .or_default()
+                .insert(a.into(), r);
+        }
+        let max_layers = self.device.limits().max_texture_array_layers as usize;
+        let mut arrays = BTreeMap::new();
+        let mut textures = BTreeMap::new();
+        for ((width, height, mips), members) in sizes {
+            let members: Vec<_> = members.into_iter().collect();
+            for (index, chunk) in members.chunks(max_layers).enumerate() {
+                let group_key = (width, height, mips, index);
+                let previous = self
+                    .arrays
+                    .get(&group_key)
+                    .filter(|g| g.keys.len() == chunk.len());
+                let array = if let Some(g) = previous {
+                    g.array.clone()
+                } else {
+                    self.new_array([width, height], chunk.len() as u32, mips)?
+                };
+                let previous = self
+                    .arrays
+                    .get(&group_key)
+                    .filter(|g| Arc::ptr_eq(&g.array, &array));
+                let mut keys = Vec::with_capacity(chunk.len());
+                for (layer, &(key, r)) in chunk.iter().enumerate() {
+                    if previous.is_none_or(|g| g.keys[layer] != key) {
+                        array.write(&self.queue, layer as u32, r);
+                    }
+                    let black = self.textures.get(&key).map_or_else(
+                        || {
+                            r.image
+                                .pixels
+                                .as_chunks::<4>()
+                                .0
+                                .iter()
+                                .all(|p| p[..3] == [0; 3])
+                        },
+                        |t| t.black,
+                    );
+                    textures.insert(
+                        key,
+                        Texture {
+                            asset: r.asset,
+                            array: array.clone(),
+                            layer: layer as u32,
+                            black,
+                            food_glow: r.food_glow,
+                            food_outline: r.food_outline,
+                        },
+                    );
+                    keys.push(key);
                 }
-            } else {
-                self.upload(r)?;
+                arrays.insert(group_key, Group { array, keys });
             }
         }
+        self.arrays = arrays;
+        self.textures = textures;
+        self.refresh_bindings();
         Ok(())
     }
     pub fn render(&mut self, frame: &Frame, target: &wgpu::TextureView) -> RenderResult<()> {
@@ -583,7 +804,7 @@ impl Renderer {
             return Ok((0, 1));
         };
         let start = passes.len() as u32 * 2;
-        if start + 1 >= 8 {
+        if start + 1 >= 32 {
             return Err("diagnostic pass query limit".into());
         }
         passes.push((name, start));
@@ -678,8 +899,74 @@ impl Renderer {
             chunk.bytes.clear();
             chunk.states.clear();
         }
-        for (index, quad) in quads.enumerate() {
+        let mut glow_span: Option<std::ops::Range<usize>> = None;
+        let mut glow_count = 0;
+        let mut glow_bins = [false; 3];
+        let mut outline_span: Option<std::ops::Range<usize>> = None;
+        let mut outline_count = 0;
+        let mut unsafe_prefix = None;
+        let mut quads = quads.peekable();
+        let mut uploaded = 0;
+        while let Some(quad) = quads.next() {
             let quad = quad?;
+            let index = uploaded;
+            uploaded += 1;
+            let mut second_alpha = 0.;
+            let mut paired = false;
+            // UNORM8 is the product's encoded blend domain. Other diagnostic
+            // formats keep separate additions rather than inheriting this quantizer.
+            if matches!(
+                self.format,
+                wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm
+            ) && let Some(Ok(next)) = quads.peek()
+                && additive_pair(&quad, next)
+            {
+                second_alpha = next.vertices[0][4];
+                paired = true;
+                quads.next();
+            }
+            let mut scale = 0;
+            if !overlay && self.textures[&quad.key].food_outline {
+                outline_span.get_or_insert(index..index).end = index + 1;
+                outline_count += 1;
+            } else {
+                let covers = quad.vertices[0][0] <= -1.
+                    && quad.vertices[0][1] >= 1.
+                    && quad.vertices[1][0] >= 1.
+                    && quad.vertices[1][1] >= 1.
+                    && quad.vertices[2][0] >= 1.
+                    && quad.vertices[2][1] <= -1.
+                    && quad.vertices[5][0] <= -1.
+                    && quad.vertices[5][1] <= -1.;
+                if !covers {
+                    unsafe_prefix.get_or_insert(index);
+                }
+            }
+            if !overlay
+                && self.textures[&quad.key].food_glow
+                && quad.blend == slither_client::presentation::BodyBlend::Lighter
+            {
+                let a = quad.vertices[0];
+                let b = quad.vertices[1];
+                let c = quad.vertices[5];
+                let edge = |v: [f32; 5]| {
+                    ((f64::from(v[0] - a[0]) * f64::from(attachment[0])).powi(2)
+                        + (f64::from(v[1] - a[1]) * f64::from(attachment[1])).powi(2))
+                    .sqrt()
+                        / 2.
+                };
+                let side = edge(b).min(edge(c));
+                scale = if side >= 32. && quad.vertices[0][4] <= 0.05 {
+                    2
+                } else if side >= 16. {
+                    1
+                } else {
+                    0
+                };
+                glow_bins[scale as usize] = true;
+                glow_span.get_or_insert(index..index).end = index + 1;
+                glow_count += 1;
+            }
             let chunk = &mut self.vertices[index / VERTEX_CHUNK_QUADS];
             if chunk.states.is_empty() {
                 let count = (frame.draws.len() - index).min(VERTEX_CHUNK_QUADS);
@@ -690,14 +977,60 @@ impl Renderer {
                     chunk.states.reserve_exact(count);
                 }
             }
-            for vertex in quad.vertices {
+            let texture = &self.textures[&quad.key];
+            for vertex in [
+                quad.vertices[0],
+                quad.vertices[1],
+                quad.vertices[2],
+                quad.vertices[5],
+            ] {
                 for value in vertex {
                     chunk.bytes.extend_from_slice(&value.to_le_bytes());
                 }
+                chunk.bytes.extend_from_slice(&second_alpha.to_le_bytes());
+                chunk.bytes.extend_from_slice(&texture.layer.to_le_bytes());
             }
-            chunk
-                .states
-                .push(DrawState::new(&quad, self.textures[&quad.key].black));
+            let mut state = DrawState::new(&quad, self.textures[&quad.key].black);
+            state.glow_scale = scale;
+            if paired {
+                state.pipeline = Pipeline::PairLighter;
+            }
+            state.key = texture.array.key;
+            chunk.states.push(state);
+        }
+        let glow_span =
+            glow_span.filter(|span| span.len() == glow_count && (glow_bins[1] || glow_bins[2]));
+        if let Some(span) = &glow_span {
+            for (i, chunk) in self.vertices[..chunk_count].iter_mut().enumerate() {
+                let base = i * VERTEX_CHUNK_QUADS;
+                let start = span.start.saturating_sub(base).min(chunk.states.len());
+                let end = span.end.saturating_sub(base).min(chunk.states.len());
+                self.glow_sort.clear();
+                for j in start..end {
+                    self.glow_sort.push((
+                        chunk.states[j],
+                        chunk.bytes[j * QUAD_VERTEX_BYTES..(j + 1) * QUAD_VERTEX_BYTES]
+                            .try_into()
+                            .expect("complete quad"),
+                    ));
+                }
+                // Only the contiguous food glow barrier is additive throughout.
+                // Nonnegative additive layers commute; bodies and source-over
+                // geometry retain their original primitive order.
+                self.glow_sort.sort_unstable_by_key(|(state, _)| {
+                    (
+                        state.glow_scale,
+                        state.key,
+                        state.pipeline as u8,
+                        state.repeat,
+                    )
+                });
+                for (j, (state, bytes)) in (start..end).zip(self.glow_sort.iter()) {
+                    chunk.states[j] = *state;
+                    chunk.bytes[j * QUAD_VERTEX_BYTES..(j + 1) * QUAD_VERTEX_BYTES]
+                        .copy_from_slice(bytes);
+                }
+            }
         }
         // Validate every quad before touching GPU buffers. Exclusive calls submit
         // before the next write; queue ordering protects prior in-flight draws,
@@ -749,10 +1082,64 @@ impl Renderer {
         } else {
             None
         };
+
+        // Keep sharp edges at the world sample count. Only one contiguous,
+        // explicitly marked additive glow barrier can use a smaller attachment.
+        let outline_span = outline_span.filter(|span| {
+            samples > 1
+                && span.len() == outline_count
+                && unsafe_prefix.is_none_or(|i| i >= span.end)
+        });
+        let outline_replacement = outline_span.as_ref().and_then(|_| {
+            self.outline_target
+                .as_ref()
+                .is_none_or(|t| t.extent != attachment)
+                .then(|| LayerTarget::new(&self.device, &self.layout, self.format, attachment))
+        });
         #[cfg(feature = "frame-profile")]
-        let query_indices = self.diagnostic_pass(if overlay { "overlay" } else { "world" })?;
+        let outline_queries = if outline_span.is_some() {
+            Some(self.diagnostic_pass("food-outlines")?)
+        } else {
+            None
+        };
         #[cfg(not(feature = "frame-profile"))]
-        let query_indices = (0, 1);
+        let outline_queries = Some((0, 1));
+        let glow_replacement = glow_span.as_ref().filter(|_| glow_bins[2]).and_then(|_| {
+            let extent = attachment.map(|n| n.div_ceil(8));
+            self.glow
+                .as_ref()
+                .is_none_or(|g| g.extent != extent)
+                .then(|| LayerTarget::new(&self.device, &self.layout, self.format, extent))
+        });
+        let fine_replacement = glow_span.as_ref().filter(|_| glow_bins[1]).and_then(|_| {
+            let extent = attachment.map(|n| n.div_ceil(4));
+            self.fine_glow
+                .as_ref()
+                .is_none_or(|g| g.extent != extent)
+                .then(|| LayerTarget::new(&self.device, &self.layout, self.format, extent))
+        });
+        #[cfg(feature = "frame-profile")]
+        let queries = {
+            let mut q = vec![self.diagnostic_pass(if glow_span.is_some() {
+                "world-before-glows"
+            } else if overlay {
+                "overlay"
+            } else {
+                "world"
+            })?];
+            if glow_span.is_some() {
+                if glow_bins[2] {
+                    q.push(self.diagnostic_pass("food-glows-coarse")?);
+                }
+                if glow_bins[1] {
+                    q.push(self.diagnostic_pass("food-glows-fine")?);
+                }
+                q.push(self.diagnostic_pass("world-after-glows")?);
+            }
+            q
+        };
+        #[cfg(not(feature = "frame-profile"))]
+        let queries = [(0, 1); 4];
         let msaa_view = (samples > 1).then(|| {
             &replacement
                 .as_ref()
@@ -760,84 +1147,187 @@ impl Renderer {
                 .expect("MSAA target")
                 .view
         });
-        let mut draw_calls = 0;
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("offline gameplay"),
-                timestamp_writes: self.diagnostic_timestamps.as_ref().map(|query_set| {
-                    wgpu::RenderPassTimestampWrites {
-                        query_set,
-                        beginning_of_pass_write_index: Some(query_indices.0),
-                        end_of_pass_write_index: Some(query_indices.1),
-                    }
-                }),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: msaa_view.unwrap_or(target),
-                    depth_slice: None,
-                    resolve_target: msaa_view.map(|_| target),
-                    ops: wgpu::Operations {
-                        load: if overlay {
-                            wgpu::LoadOp::Load
-                        } else {
-                            wgpu::LoadOp::Clear(wgpu::Color::BLACK)
-                        },
-                        store: wgpu::StoreOp::Store,
+        #[cfg(feature = "frame-profile")]
+        let aggregate_queries =
+            self.diagnostic_timestamps.is_some() && self.diagnostic_passes.is_none();
+        #[cfg(not(feature = "frame-profile"))]
+        let aggregate_queries = self.diagnostic_timestamps.is_some();
+        if aggregate_queries {
+            encoder.write_timestamp(self.diagnostic_timestamps.as_ref().expect("queries"), 0);
+        }
+        let sprite = outline_replacement
+            .as_ref()
+            .or(self.outline_target.as_ref());
+        let mut outline_calls = 0;
+        let start = outline_span.as_ref().map_or(0, |span| span.end);
+        if outline_span.is_some() {
+            outline_calls = self.encode_pass(
+                &mut encoder,
+                PaintPass {
+                    target: &sprite.expect("sprite target").view,
+                    resolve: None,
+                    samples: 1,
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    range: 0..start,
+                    queries: if aggregate_queries {
+                        None
+                    } else {
+                        outline_queries
                     },
-                })],
-                ..Default::default()
+                    coarse: None,
+                    fine: None,
+                    small_glows: None,
+                    filter: None,
+                    base: None,
+                },
+            );
+        }
+        let base = outline_span
+            .as_ref()
+            .map(|_| &sprite.expect("sprite target").bind);
+        let world = msaa_view.unwrap_or(target);
+        let has_glows = glow_span.is_some();
+        let pass_count = 1
+            + usize::from(outline_span.is_some())
+            + if has_glows {
+                1 + usize::from(glow_bins[1]) + usize::from(glow_bins[2])
+            } else {
+                0
+            };
+        let query = |i| (!aggregate_queries).then_some(queries[i]);
+        let draw_calls = if let Some(span) = glow_span {
+            let before = self.encode_pass(
+                &mut encoder,
+                PaintPass {
+                    target: world,
+                    resolve: None,
+                    samples,
+                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                    range: start..span.start,
+                    queries: query(0),
+                    coarse: None,
+                    fine: None,
+                    small_glows: None,
+                    filter: None,
+                    base,
+                },
+            );
+            let mut soft = 0;
+            let mut i = 1;
+            let coarse = glow_bins[2].then(|| {
+                glow_replacement
+                    .as_ref()
+                    .or(self.glow.as_ref())
+                    .expect("coarse glow target")
             });
-            let mut previous: Option<DrawState> = None;
-            for chunk in &self.vertices[..chunk_count] {
-                pass.set_vertex_buffer(0, chunk.buffer.as_ref().expect("vertex buffer").slice(..));
-                for (state, vertices) in draw_runs(chunk.states.iter().copied()) {
-                    if previous.is_none_or(|p| p.pipeline != state.pipeline) {
-                        pass.set_pipeline(match state.pipeline {
-                            Pipeline::BlackOver => {
-                                if overlay || samples != self.sample_count {
-                                    &self.overlay_black_over
-                                } else {
-                                    &self.black_over
-                                }
-                            }
-                            Pipeline::Lighter => {
-                                if overlay || samples != self.sample_count {
-                                    &self.overlay_lighter
-                                } else {
-                                    &self.lighter
-                                }
-                            }
-                            Pipeline::Over => {
-                                if overlay || samples != self.sample_count {
-                                    &self.overlay_over
-                                } else {
-                                    &self.over
-                                }
-                            }
-                        });
-                    }
-                    if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
-                        let texture = &self.textures[&state.key];
-                        pass.set_bind_group(
-                            0,
-                            if state.repeat {
-                                &texture.repeat_bind
-                            } else {
-                                &texture.bind
-                            },
-                            &[],
-                        );
-                    }
-                    pass.draw(vertices, 0..1);
-                    draw_calls += 1;
-                    previous = Some(state);
-                }
+            if let Some(glow) = coarse {
+                soft += self.encode_pass(
+                    &mut encoder,
+                    PaintPass {
+                        target: &glow.view,
+                        resolve: None,
+                        samples: 1,
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        range: span.clone(),
+                        queries: query(i),
+                        coarse: None,
+                        fine: None,
+                        small_glows: None,
+                        filter: Some(2),
+                        base: None,
+                    },
+                );
+                i += 1;
             }
+            let fine = glow_bins[1].then(|| {
+                fine_replacement
+                    .as_ref()
+                    .or(self.fine_glow.as_ref())
+                    .expect("fine glow target")
+            });
+            if let Some(glow) = fine {
+                soft += self.encode_pass(
+                    &mut encoder,
+                    PaintPass {
+                        target: &glow.view,
+                        resolve: None,
+                        samples: 1,
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        range: span.clone(),
+                        queries: query(i),
+                        coarse: None,
+                        fine: None,
+                        small_glows: None,
+                        filter: Some(1),
+                        base: None,
+                    },
+                );
+                i += 1;
+            }
+            let after = self.encode_pass(
+                &mut encoder,
+                PaintPass {
+                    target: world,
+                    resolve: msaa_view.map(|_| target),
+                    samples,
+                    load: wgpu::LoadOp::Load,
+                    range: span.end..frame.draws.len(),
+                    queries: query(i),
+                    coarse: coarse.map(|g| &g.bind),
+                    fine: fine.map(|g| &g.bind),
+                    small_glows: Some(span.clone()),
+                    filter: None,
+                    base: None,
+                },
+            );
+            before + soft + after
+        } else {
+            self.encode_pass(
+                &mut encoder,
+                PaintPass {
+                    target: world,
+                    resolve: msaa_view.map(|_| target),
+                    samples,
+                    load: if overlay {
+                        wgpu::LoadOp::Load
+                    } else {
+                        wgpu::LoadOp::Clear(wgpu::Color::BLACK)
+                    },
+                    range: start..frame.draws.len(),
+                    queries: query(0),
+                    coarse: None,
+                    fine: None,
+                    small_glows: None,
+                    filter: None,
+                    base,
+                },
+            )
+        };
+        if aggregate_queries {
+            encoder.write_timestamp(self.diagnostic_timestamps.as_ref().expect("queries"), 1);
         }
         let submission = crate::latency::submit_begin();
         self.queue.submit([encoder.finish()]);
         crate::latency::submit_end(submission);
-        self.draw_calls = draw_calls;
+        self.draw_calls = draw_calls + outline_calls;
+        self.pass_count = pass_count;
+        if let Some(sprite) = outline_replacement {
+            self.outline_target = Some(sprite);
+        }
+        if !overlay && outline_span.is_none() {
+            self.outline_target = None;
+        }
+        if let Some(fine) = fine_replacement {
+            self.fine_glow = Some(fine);
+        }
+        if let Some(glow) = glow_replacement {
+            self.glow = Some(glow);
+        }
+        if !overlay && !has_glows {
+            self.glow = None;
+            self.fine_glow = None;
+        }
         // Allocation precedes publication; wgpu retains submitted attachment references
         // after the old host handles are dropped, without a CPU/GPU idle wait.
         if let Some(replacement) = replacement {
@@ -847,6 +1337,150 @@ impl Renderer {
             self.multisample = None;
         }
         Ok(())
+    }
+    fn encode_draws<'a>(
+        &'a self,
+        pass: &mut wgpu::RenderPass<'a>,
+        range: std::ops::Range<usize>,
+        samples: u32,
+        filter: Option<u8>,
+    ) -> usize {
+        let mut draw_calls = 0;
+        let mut previous: Option<DrawState> = None;
+        pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint16);
+        for (i, chunk) in self.vertices.iter().enumerate() {
+            let base = i * VERTEX_CHUNK_QUADS;
+            let start = range.start.saturating_sub(base).min(chunk.states.len());
+            let end = range.end.saturating_sub(base).min(chunk.states.len());
+            if start >= end {
+                continue;
+            }
+            pass.set_vertex_buffer(0, chunk.buffer.as_ref().expect("vertex buffer").slice(..));
+            for (state, vertices) in draw_runs(chunk.states[start..end].iter().copied()) {
+                if filter.is_some_and(|coarse| coarse != state.glow_scale) {
+                    continue;
+                }
+                if previous.is_none_or(|p| p.pipeline != state.pipeline) {
+                    pass.set_pipeline(match state.pipeline {
+                        Pipeline::BlackOver => {
+                            if samples == 1 {
+                                &self.overlay_black_over
+                            } else {
+                                &self.black_over
+                            }
+                        }
+                        Pipeline::PairLighter => {
+                            if samples == 1 {
+                                &self.overlay_pair_lighter
+                            } else {
+                                &self.pair_lighter
+                            }
+                        }
+                        Pipeline::Lighter => {
+                            if samples == 1 {
+                                &self.overlay_lighter
+                            } else {
+                                &self.lighter
+                            }
+                        }
+                        Pipeline::Over => {
+                            if samples == 1 {
+                                &self.overlay_over
+                            } else {
+                                &self.over
+                            }
+                        }
+                    });
+                }
+                if previous.is_none_or(|p| (p.key, p.repeat) != (state.key, state.repeat)) {
+                    let texture = &self.bindings[&state.key];
+                    pass.set_bind_group(
+                        0,
+                        if state.repeat {
+                            &texture.repeat_bind
+                        } else {
+                            &texture.bind
+                        },
+                        &[],
+                    );
+                }
+                pass.draw_indexed(
+                    vertices.start + start as u32 * 6..vertices.end + start as u32 * 6,
+                    0,
+                    0..1,
+                );
+                draw_calls += 1;
+                previous = Some(state);
+            }
+        }
+        draw_calls
+    }
+    fn encode_pass(&self, encoder: &mut wgpu::CommandEncoder, plan: PaintPass<'_>) -> usize {
+        let PaintPass {
+            target,
+            resolve,
+            samples,
+            load,
+            range,
+            queries,
+            coarse,
+            fine,
+            small_glows,
+            filter,
+            base,
+        } = plan;
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("ordered world layer"),
+            timestamp_writes: self.diagnostic_timestamps.as_ref().zip(queries).map(
+                |(query_set, queries)| wgpu::RenderPassTimestampWrites {
+                    query_set,
+                    beginning_of_pass_write_index: Some(queries.0),
+                    end_of_pass_write_index: Some(queries.1),
+                },
+            ),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target,
+                depth_slice: None,
+                resolve_target: resolve,
+                ops: wgpu::Operations {
+                    load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            ..Default::default()
+        });
+        if let Some(bind) = base {
+            pass.set_pipeline(&self.outline_composite);
+            pass.set_bind_group(0, bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        let mut small_draws = 0;
+        if let Some(bind) = fine {
+            pass.set_pipeline(if samples == 1 {
+                &self.fine_composite_single
+            } else {
+                &self.outline_composite
+            });
+            pass.set_bind_group(0, bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        if let Some(bind) = coarse {
+            pass.set_pipeline(if samples == 1 {
+                &self.glow_composite_single
+            } else {
+                &self.glow_composite
+            });
+            pass.set_bind_group(0, bind, &[]);
+            pass.draw(0..3, 0..1);
+        }
+        if let Some(range) = small_glows {
+            small_draws = self.encode_draws(&mut pass, range, samples, Some(0));
+        }
+        self.encode_draws(&mut pass, range, samples, filter)
+            + small_draws
+            + usize::from(coarse.is_some())
+            + usize::from(fine.is_some())
+            + usize::from(base.is_some())
     }
 }
 
@@ -1132,9 +1766,9 @@ mod tests {
         assert_eq!(std::mem::size_of::<crate::frame::Draw>(), 256);
         assert_eq!(std::mem::size_of::<DrawState>(), 24);
         assert_eq!(crate::frame::MAX_DRAWS, 262_144);
-        assert_eq!(VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES, 983_040);
+        assert_eq!(VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES, 917_504);
         assert!((VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES) as u64 <= limits.max_buffer_size);
-        assert!(20 <= limits.max_vertex_buffer_array_stride);
+        assert!(28 <= limits.max_vertex_buffer_array_stride);
         assert!(3 <= limits.max_vertex_attributes);
         assert!(1 <= limits.max_vertex_buffers);
     }
@@ -1161,6 +1795,8 @@ mod tests {
                 status: BodyAssetStatus::Ready,
             };
             r.upload(&Resource {
+                food_glow: false,
+                food_outline: false,
                 asset,
                 image: crate::materials::RgbaImage {
                     width: 1,

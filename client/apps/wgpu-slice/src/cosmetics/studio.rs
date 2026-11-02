@@ -207,6 +207,8 @@ impl Cosmetics {
             .ok_or("Cosmetic revision overflow")?;
         self.studio.revisions[usize::from(id)] = revision;
         Ok(Resource {
+            food_glow: false,
+            food_outline: false,
             asset: BodyAsset {
                 handle: crate::bank::COSMETIC_HANDLE_BASE
                     + if thumbnail { 4096 } else { 2048 }

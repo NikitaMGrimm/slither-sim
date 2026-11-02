@@ -232,7 +232,7 @@ fn pressure_quota_relationships_fit_the_fixed_draw_and_device_envelopes() {
     assert_eq!(
         slither_wgpu_slice::frame::VERTEX_CHUNK_QUADS
             * slither_wgpu_slice::frame::QUAD_VERTEX_BYTES,
-        983_040
+        917_504
     );
     // A complete duplicate replacement remains legal at the live boundary.
     let mut state = ClientState::default();

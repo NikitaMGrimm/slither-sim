@@ -204,6 +204,8 @@ fn draw(asset: BodyAsset, destination: BodyRect, source: Option<BodyRect>, alpha
 
 fn resource(handle: u64, revision: u64, image: RgbaImage) -> Resource {
     Resource {
+        food_glow: false,
+        food_outline: false,
         asset: BodyAsset {
             handle,
             revision,

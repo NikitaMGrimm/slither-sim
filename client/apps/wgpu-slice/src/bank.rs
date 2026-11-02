@@ -35,6 +35,7 @@ pub struct Bank {
     recipes: Vec<CanvasRecipe>,
     // Zero keeps the ordinary raster; food gradients use filtered mip levels.
     food_raster_scale: Vec<u32>,
+    food_outline: Vec<bool>,
     pub bodies: Vec<Family>,
     pub outline: BodyAssetUse,
     pub shadow: BodyAssetUse,
@@ -99,6 +100,7 @@ impl Bank {
             assets: Vec::new(),
             recipes: Vec::new(),
             food_raster_scale: Vec::new(),
+            food_outline: Vec::new(),
             bodies: Vec::new(),
             outline: use_at(0),
             shadow: use_at(0),
@@ -137,6 +139,7 @@ impl Bank {
                             let hh = r.half_height;
                             let u = b.add(r);
                             b.food_raster_scale[u.asset] = raster_scale;
+                            b.food_outline[u.asset] = raster_scale == 0;
                             FoodSource::new(b.assets[u.asset], f64::from(w), f64::from(h), hw, hh)
                                 .map_err(|e| e.to_string())
                         })
@@ -195,6 +198,7 @@ impl Bank {
         });
         self.recipes.push(r);
         self.food_raster_scale.push(0);
+        self.food_outline.push(false);
         use_at(index)
     }
     pub fn food(&self, raw: u8, units: [f64; 2]) -> FoodFactory {
@@ -282,6 +286,8 @@ impl Bank {
                 self.cache.insert(
                     *i,
                     Resource {
+                        food_glow: self.food_raster_scale[*i] == 1,
+                        food_outline: self.food_outline[*i],
                         asset: self.assets[*i],
                         image: image.into(),
                     },
