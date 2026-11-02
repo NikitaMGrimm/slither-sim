@@ -298,6 +298,43 @@ fn same_projection(a: &Draw, b: &Draw) -> bool {
             == b.corners.map(|p| p.map(|v| v.map(f64::to_bits)))
 }
 
+fn checked_source(d: &Draw, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<BodyRect> {
+    let key = ResourceKey::from(d.asset);
+    if d.asset.status != BodyAssetStatus::Ready
+        || d.asset.width == 0
+        || d.asset.height == 0
+        || resident.get(&key) != Some(&d.asset)
+    {
+        return Err("missing, stale or unready resource".into());
+    }
+    let source = d.source.unwrap_or(BodyRect {
+        x: 0.,
+        y: 0.,
+        width: f64::from(d.asset.width),
+        height: f64::from(d.asset.height),
+    });
+    if !rect_finite(source)
+        || d.repeat_uv.is_some_and(|uv| {
+            !rect_finite(uv) || uv.width <= 0. || uv.height <= 0. || d.source.is_some()
+        })
+        || !rect_finite(d.destination)
+        || !d.rotation.is_finite()
+        || !d.translation.into_iter().all(f64::is_finite)
+        || !(0. ..=1.).contains(&d.effective_alpha)
+        || source.width <= 0.
+        || source.height <= 0.
+        || source.x < 0.
+        || source.y < 0.
+        || source.x + source.width > f64::from(d.asset.width)
+        || source.y + source.height > f64::from(d.asset.height)
+        || d.destination.width < 0.
+        || d.destination.height < 0.
+    {
+        return Err("unsupported or invalid image rectangle/alpha/transform".into());
+    }
+    Ok(source)
+}
+
 impl Frame {
     pub fn check_limits(&self) -> Result<()> {
         check_draw_count(self.draws.len())?;
@@ -314,20 +351,104 @@ impl Frame {
         self.quad_iter(resident)?.collect()
     }
     pub fn validate(&self, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Result<()> {
-        self.quad_iter(resident)?
-            .try_for_each(|quad| quad.map(|_| ()))
+        self.check_limits()?;
+        if self.extent.contains(&0) {
+            return Ok(());
+        }
+        // Validation needs an overflow proof, not discarded GPU vertices. At
+        // this conservative bound, rectangle corners are <=2L, transformed
+        // positions <=5L, and clip coordinates <=10L*scale+1 < f32::MAX.
+        // Cropped UVs are already in [0,1]; repeated UV sums have their own
+        // bound. Unusual magnitudes keep the exact projection/error path.
+        // Study: research/client-performance/2026-11-02-art-validation/REPORT.md.
+        let limit = f64::from(f32::MAX) / 32. / self.viewport_scale.max(1.);
+        for d in &self.draws {
+            let source = checked_source(d, resident)?;
+            let r = d.destination;
+            let bounded = [
+                r.x,
+                r.y,
+                r.width,
+                r.height,
+                d.translation[0],
+                d.translation[1],
+            ]
+            .into_iter()
+            .all(|v| v.abs() <= limit)
+                && d.corners
+                    .is_none_or(|p| p.into_iter().flatten().all(|v| v.abs() <= limit))
+                && d.repeat_uv.is_none_or(|uv| {
+                    [uv.x, uv.y, uv.width, uv.height]
+                        .into_iter()
+                        .all(|v| v.abs() <= f64::from(f32::MAX) / 4.)
+                });
+            if !bounded {
+                self.project(d, source)?;
+            }
+        }
+        Ok(())
     }
+    fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
+        let key = ResourceKey::from(d.asset);
+        let r = d.destination;
+        let (sin, cos) = d.rotation.sin_cos();
+        let mut corners = [[0.; 5]; 4];
+        for (i, [u, v]) in [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
+            .into_iter()
+            .enumerate()
+        {
+            let [x, y] = d
+                .corners
+                .map_or([r.x + u * r.width, r.y + v * r.height], |p| p[i]);
+            if !x.is_finite() || !y.is_finite() {
+                return Err("nonfinite polygon corner".into());
+            }
+            let local_x = x;
+            let x = d.translation[0] + cos * x - sin * y;
+            let y = d.translation[1] + sin * local_x + cos * y;
+            let [uv_x, uv_y] = d.repeat_uv.map_or_else(
+                || {
+                    [
+                        (source.x + u * source.width) / f64::from(d.asset.width),
+                        (source.y + v * source.height) / f64::from(d.asset.height),
+                    ]
+                },
+                |uv| [uv.x + u * uv.width, uv.y + v * uv.height],
+            );
+            let values = [
+                2. * (x * self.viewport_scale) / f64::from(self.extent[0]) - 1.,
+                1. - 2. * (y * self.viewport_scale) / f64::from(self.extent[1]),
+                uv_x,
+                uv_y,
+                d.effective_alpha,
+            ];
+            if values
+                .iter()
+                .any(|v| !v.is_finite() || v.abs() > f64::from(f32::MAX))
+            {
+                return Err("GPU conversion overflow".into());
+            }
+            corners[i] = values.map(|v| v as f32);
+        }
+        Ok(Quad {
+            key,
+            repeat: d.repeat_uv.is_some(),
+            black_effect: d.black_effect,
+            blend: d.blend,
+            vertices: [
+                corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
+            ],
+        })
+    }
+
     /// Validate and convert each draw once, before the renderer submits any commands.
     pub fn quad_iter<'a>(
         &'a self,
         resident: &'a BTreeMap<ResourceKey, BodyAsset>,
     ) -> Result<impl Iterator<Item = Result<Quad>> + 'a> {
         self.check_limits()?;
-        // A frame and its resident catalog are immutable for this iterator.
-        // Paired pellet draws differ only in alpha; retain the last validated
-        // projection rather than repeating resource checks and f64 conversion.
-        // Bit comparisons preserve signed-zero distinctions in the input math.
-        // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
+        // The frame and resident catalog remain immutable for this iterator.
+        // Keep #441's exact paired-projection reuse for actual GPU conversion.
         let mut previous: Option<(&Draw, Quad)> = None;
         Ok(self
             .draws
@@ -352,88 +473,8 @@ impl Frame {
                     next.blend = d.blend;
                     return Ok(next);
                 }
-                let key = ResourceKey::from(d.asset);
-                if d.asset.status != BodyAssetStatus::Ready
-                    || d.asset.width == 0
-                    || d.asset.height == 0
-                    || resident.get(&key) != Some(&d.asset)
-                {
-                    return Err("missing, stale or unready resource".into());
-                }
-                let source = d.source.unwrap_or(BodyRect {
-                    x: 0.,
-                    y: 0.,
-                    width: f64::from(d.asset.width),
-                    height: f64::from(d.asset.height),
-                });
-                if !rect_finite(source)
-                    || d.repeat_uv.is_some_and(|uv| {
-                        !rect_finite(uv) || uv.width <= 0. || uv.height <= 0. || d.source.is_some()
-                    })
-                    || !rect_finite(d.destination)
-                    || !d.rotation.is_finite()
-                    || !d.translation.into_iter().all(f64::is_finite)
-                    || !(0. ..=1.).contains(&d.effective_alpha)
-                    || source.width <= 0.
-                    || source.height <= 0.
-                    || source.x < 0.
-                    || source.y < 0.
-                    || source.x + source.width > f64::from(d.asset.width)
-                    || source.y + source.height > f64::from(d.asset.height)
-                    || d.destination.width < 0.
-                    || d.destination.height < 0.
-                {
-                    return Err("unsupported or invalid image rectangle/alpha/transform".into());
-                }
-                let r = d.destination;
-                let (sin, cos) = d.rotation.sin_cos();
-                let mut corners = [[0.; 5]; 4];
-                for (i, [u, v]) in [[0., 0.], [1., 0.], [1., 1.], [0., 1.]]
-                    .into_iter()
-                    .enumerate()
-                {
-                    let [x, y] = d
-                        .corners
-                        .map_or([r.x + u * r.width, r.y + v * r.height], |p| p[i]);
-                    if !x.is_finite() || !y.is_finite() {
-                        return Err("nonfinite polygon corner".into());
-                    }
-                    let local_x = x;
-                    let x = d.translation[0] + cos * x - sin * y;
-                    let y = d.translation[1] + sin * local_x + cos * y;
-                    let [uv_x, uv_y] = d.repeat_uv.map_or_else(
-                        || {
-                            [
-                                (source.x + u * source.width) / f64::from(d.asset.width),
-                                (source.y + v * source.height) / f64::from(d.asset.height),
-                            ]
-                        },
-                        |uv| [uv.x + u * uv.width, uv.y + v * uv.height],
-                    );
-                    let values = [
-                        2. * (x * self.viewport_scale) / f64::from(self.extent[0]) - 1.,
-                        1. - 2. * (y * self.viewport_scale) / f64::from(self.extent[1]),
-                        uv_x,
-                        uv_y,
-                        d.effective_alpha,
-                    ];
-                    if values
-                        .iter()
-                        .any(|v| !v.is_finite() || v.abs() > f64::from(f32::MAX))
-                    {
-                        return Err("GPU conversion overflow".into());
-                    }
-                    corners[i] = values.map(|v| v as f32);
-                }
-                let projected = Quad {
-                    key,
-                    repeat: d.repeat_uv.is_some(),
-                    black_effect: d.black_effect,
-                    blend: d.blend,
-                    vertices: [
-                        corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
-                    ],
-                };
+                let source = checked_source(d, resident)?;
+                let projected = self.project(d, source)?;
                 previous = Some((d, projected.clone()));
                 Ok(projected)
             }))
@@ -619,6 +660,173 @@ mod tests {
             ..frame
         };
         assert_eq!(empty.quad_iter(&resident).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn validation_matches_projection_at_float_and_resource_boundaries() {
+        // ORIGINAL SYNTHETIC inputs. GPU conversion remains the exact fallback oracle.
+        let asset = BodyAsset {
+            handle: 1,
+            revision: 2,
+            width: 64,
+            height: 32,
+            status: BodyAssetStatus::Ready,
+        };
+        let draw = Draw {
+            corners: None,
+            asset,
+            source: None,
+            repeat_uv: None,
+            black_effect: false,
+            destination: BodyRect {
+                x: 1.,
+                y: -2.,
+                width: 24.,
+                height: 16.,
+            },
+            translation: [3., -4.],
+            rotation: 0.7,
+            effective_alpha: 0.5,
+            blend: BodyBlend::Lighter,
+        };
+        let resident = BTreeMap::from([(asset.into(), asset)]);
+        let frame = Frame {
+            identity: 1,
+            extent: [960, 540],
+            viewport_scale: 1.25,
+            tick: 0,
+            draws: vec![draw.clone()],
+            snakes: vec![],
+        };
+        let check = |f: &Frame, catalog: &BTreeMap<_, _>| {
+            let projected = f
+                .quad_iter(catalog)
+                .and_then(|mut iter| iter.try_for_each(|q| q.map(|_| ())));
+            assert_eq!(f.validate(catalog), projected, "frame={f:?}");
+        };
+        for scale in [
+            f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            0.5,
+            1.,
+            4.,
+            1e20,
+            f64::MAX,
+        ] {
+            let bound = f64::from(f32::MAX) / 32. / scale.max(1.);
+            let mut values = vec![
+                0.,
+                -0.,
+                bound.next_down(),
+                bound,
+                bound.next_up(),
+                f64::from(f32::MAX),
+                f64::MAX,
+                f64::INFINITY,
+                f64::NAN,
+            ];
+            values.extend((-1074..=1023).step_by(17).map(|e| 2_f64.powi(e)));
+            for value in values {
+                for sign in [1., -1.] {
+                    let v = value * sign;
+                    for field in 0..8 {
+                        let mut f = frame.clone();
+                        f.viewport_scale = scale;
+                        let d = &mut f.draws[0];
+                        match field {
+                            0 => d.destination.x = v,
+                            1 => d.destination.width = v,
+                            2 => d.translation[1] = v,
+                            3 => d.rotation = v,
+                            4 => d.corners = Some([[v, v]; 4]),
+                            5 => {
+                                d.repeat_uv = Some(BodyRect {
+                                    x: v,
+                                    y: 0.,
+                                    width: 1.,
+                                    height: 1.,
+                                })
+                            }
+                            6 => {
+                                d.repeat_uv = Some(BodyRect {
+                                    x: 0.,
+                                    y: 0.,
+                                    width: v,
+                                    height: v,
+                                })
+                            }
+                            _ => d.effective_alpha = v,
+                        }
+                        check(&f, &resident);
+                    }
+                }
+            }
+        }
+        for mutate in [
+            (|d: &mut Draw| d.asset.revision += 1) as fn(&mut Draw),
+            |d| d.asset.status = BodyAssetStatus::Pending,
+            |d| d.asset.height = 0,
+            |d| {
+                d.source = Some(BodyRect {
+                    x: 64.,
+                    y: 0.,
+                    width: 1.,
+                    height: 1.,
+                })
+            },
+            |d| {
+                d.source = Some(BodyRect {
+                    x: 0.,
+                    y: 0.,
+                    width: 1.,
+                    height: 1.,
+                });
+                d.repeat_uv = Some(BodyRect {
+                    x: 0.,
+                    y: 0.,
+                    width: 1.,
+                    height: 1.,
+                });
+            },
+        ] {
+            let mut f = frame.clone();
+            mutate(&mut f.draws[0]);
+            check(&f, &resident);
+            assert!(f.validate(&resident).is_err());
+        }
+        check(&frame, &BTreeMap::new());
+        for (extent, scale) in [
+            ([0, 540], 1.),
+            ([MAX_EXTENT + 1, 540], 1.),
+            ([960, 540], 0.),
+            ([960, 540], f64::NAN),
+        ] {
+            let f = Frame {
+                extent,
+                viewport_scale: scale,
+                ..frame.clone()
+            };
+            check(&f, &resident);
+        }
+        let mut packed = frame.clone();
+        packed.draws = (0..25_000)
+            .map(|i| {
+                let mut d = draw.clone();
+                d.destination.x = f64::from(i % 200) * 0.25;
+                d.destination.y = f64::from(i / 200) * 0.25;
+                d.effective_alpha = f64::from(i % 17) / 16.;
+                d
+            })
+            .collect();
+        check(&packed, &resident);
+        // The first failure is retained even when a later draw has invalid metadata.
+        packed.draws[0].corners = Some([[f64::NAN; 2]; 4]);
+        packed.draws[1].asset.status = BodyAssetStatus::Pending;
+        assert_eq!(
+            packed.validate(&resident),
+            Err("nonfinite polygon corner".into())
+        );
+        check(&packed, &resident);
     }
     #[test]
     fn strict_validation_returns_errors_and_release_skips_and_recovers() {

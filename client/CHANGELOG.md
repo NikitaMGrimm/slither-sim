@@ -12,6 +12,9 @@
 - Reduce CPU work for paired pellet draws by reusing identical validated quad
   projections within a picture, preserving vertex bits, alpha and draw order.
 
+- Reduce crowded picture validation by proving ordinary coordinate ranges safe
+  without projecting discarded vertices; keep exact projection for extreme inputs.
+
 - Let settled native menus sleep between input, result updates and egui repaint
   deadlines, while preserving menu animations, active gameplay and surface retries.
 

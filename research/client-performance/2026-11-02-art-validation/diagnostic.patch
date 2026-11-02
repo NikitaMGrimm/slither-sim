@@ -1,0 +1,539 @@
+--- a/client/src/state.rs
++++ b/client/src/state.rs
+@@ -614,7 +614,9 @@
+                 .try_reserve_exact(decoded.command_count())
+                 .map_err(|_| StateError::Hud(HudIngressError::LeaderboardRowsResource))?;
+         }
++        crate::state::transaction_phase("received_snapshot_begin",0);
+         let mut staged = self.clone();
++        crate::state::transaction_phase("received_snapshot_end",0);
+         let mut ignored = 0;
+         let mut captures = 0;
+         let mut row_budget = HudLeaderboardRowsBudget::default();
+@@ -1681,3 +1683,7 @@
+ fn food_key(sector: (u8, u8), rx: u8, ry: u8) -> u32 {
+     u32::from_be_bytes([sector.0, sector.1, rx, ry])
+ }
++
++thread_local! { static TRANSACTION_OBSERVER: std::cell::Cell<Option<fn(&'static str,u64)>> = const { std::cell::Cell::new(None) }; }
++#[allow(missing_docs)] pub fn set_transaction_observer(f:Option<fn(&'static str,u64)>){TRANSACTION_OBSERVER.with(|s|s.set(f));}
++#[allow(missing_docs)] pub fn transaction_phase(n:&'static str,id:u64){TRANSACTION_OBSERVER.with(|s|if let Some(f)=s.get(){f(n,id)});}
+--- a/client/src/presentation/client.rs
++++ b/client/src/presentation/client.rs
+@@ -2561,7 +2561,9 @@
+             self.trace_boundary("update", None, None, None, None);
+             return Ok((applied.report, None));
+         }
++        crate::state::transaction_phase("core_snapshot_begin",0);
+         let mut next = self.clone();
++        crate::state::transaction_phase("core_snapshot_end",0);
+         next.food_enabled |= enable_food;
+         next.detail_pressure |= received_detail_pressure(&received);
+         next.prey_enabled |= enable_prey;
+@@ -3001,6 +3003,7 @@
+             }
+             event_start = boundary.event_end;
+         }
++        crate::state::transaction_phase("core_events_end",0);
+         next.received = Arc::new(received);
+         next.sync_received_visual_tails();
+         #[cfg(feature = "feel-trace")]
+--- a/client/src/presentation/food_painter.rs
++++ b/client/src/presentation/food_painter.rs
+@@ -623,8 +623,12 @@
+     if !zoom_factor.is_finite() || zoom_factor <= 0. {
+         return Err(FoodPaintError::InvalidView);
+     }
++    crate::state::transaction_phase("food_validate_begin",0);
+     validate(input, index, zoom_factor)?;
++    crate::state::transaction_phase("food_validate_end",0);
++    crate::state::transaction_phase("food_preflight_begin",0);
+     let counts = generate(input, zoom_factor, |_| {})?;
++    crate::state::transaction_phase("food_preflight_end",0);
+     early.clear();
+     late.clear();
+     early
+@@ -632,6 +636,7 @@
+         .map_err(|_| FoodPaintError::Allocation)?;
+     late.try_reserve_exact(counts.late)
+         .map_err(|_| FoodPaintError::Allocation)?;
++    crate::state::transaction_phase("food_emit_begin",0);
+     generate(input, zoom_factor, |command| {
+         if matches!(command.pass, FoodPaintPass::Outline | FoodPaintPass::Body) {
+             early.push(command);
+@@ -639,6 +644,7 @@
+             late.push(command);
+         }
+     })?;
++    crate::state::transaction_phase("food_emit_end",0);
+     Ok(FoodPaintPlan {
+         early,
+         outline_barrier: counts.visible_foods,
+--- a/client/apps/wgpu-slice/src/game.rs
++++ b/client/apps/wgpu-slice/src/game.rs
+@@ -1059,7 +1059,9 @@
+                 death_pending: g.death_pending,
+             })
+             .collect();
++        slither_client::state::transaction_phase("host_snapshot_begin",0);
+         let mut client = self.client.clone();
++        slither_client::state::transaction_phase("host_snapshot_end",0);
+         let bank = RefCell::new(&mut self.bank);
+         let rng = Cell::new(self.rng);
+         let serial = Cell::new(self.identity);
+--- a/client/apps/wgpu-slice/src/bank.rs
++++ b/client/apps/wgpu-slice/src/bank.rs
+@@ -240,7 +240,9 @@
+     /// Only the frame's actual draw resources become pixel buffers. Metadata alone is not GPU residency.
+     pub fn resources(&mut self, frame: &Frame) -> Result<Vec<Resource>> {
+         frame.check_limits()?;
++        slither_client::state::transaction_phase("resource_keys_begin",frame.identity);
+         let keys: BTreeSet<ResourceKey> = frame.draws.iter().map(|d| d.asset.into()).collect();
++        slither_client::state::transaction_phase("resource_keys_end",frame.identity);
+         let indices: BTreeSet<usize> = keys
+             .iter()
+             .filter_map(|k| self.assets.iter().position(|a| ResourceKey::from(*a) == *k))
+@@ -278,11 +280,13 @@
+         for i in &indices {
+             if !self.cache.contains_key(i) {
+                 let scale = self.food_raster_scale[*i];
++                slither_client::state::transaction_phase("raster_begin",*i as u64);
+                 let image = if scale == 0 {
+                     materialize(&self.recipes[*i])?
+                 } else {
+                     crate::food_texture::materialize(&self.recipes[*i], scale)?
+                 };
++                slither_client::state::transaction_phase("raster_end",*i as u64);
+                 self.cache.insert(
+                     *i,
+                     Resource {
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -115,7 +115,7 @@
+         format: wgpu::TextureFormat,
+         extent: [u32; 2],
+     ) -> Self {
+-        let texture = device.create_texture(&wgpu::TextureDescriptor {
++        let texture = { slither_client::state::transaction_phase("gpu_create_texture_begin",0); let result = device.create_texture(&wgpu::TextureDescriptor {
+             label: Some("single-sample food layer"),
+             size: wgpu::Extent3d {
+                 width: extent[0],
+@@ -128,18 +128,18 @@
+             format,
+             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+             view_formats: &[],
+-        });
++        }); slither_client::state::transaction_phase("gpu_create_texture_end",0); result };
+         let view = texture.create_view(&Default::default());
+         let sample_view = texture.create_view(&wgpu::TextureViewDescriptor {
+             dimension: Some(wgpu::TextureViewDimension::D2Array),
+             ..Default::default()
+         });
+-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
++        let sampler = { slither_client::state::transaction_phase("gpu_create_sampler_begin",0); let result = device.create_sampler(&wgpu::SamplerDescriptor {
+             mag_filter: wgpu::FilterMode::Linear,
+             min_filter: wgpu::FilterMode::Linear,
+             ..Default::default()
+-        });
+-        let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
++        }); slither_client::state::transaction_phase("gpu_create_sampler_end",0); result };
++        let bind = { slither_client::state::transaction_phase("gpu_create_bind_group_begin",0); let result = device.create_bind_group(&wgpu::BindGroupDescriptor {
+             label: Some("food layer reconstruction"),
+             layout,
+             entries: &[
+@@ -152,7 +152,7 @@
+                     resource: wgpu::BindingResource::Sampler(&sampler),
+                 },
+             ],
+-        });
++        }); slither_client::state::transaction_phase("gpu_create_bind_group_end",0); result };
+         Self { extent, view, bind }
+     }
+ }
+@@ -376,7 +376,7 @@
+         device.set_device_lost_callback(move |_, _| {
+             flag.store(true, Ordering::SeqCst);
+         });
+-        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
++        let layout = { slither_client::state::transaction_phase("gpu_create_bind_group_layout_begin",0); let result = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+             label: Some("source"),
+             entries: &[
+                 wgpu::BindGroupLayoutEntry {
+@@ -396,16 +396,16 @@
+                     count: None,
+                 },
+             ],
+-        });
+-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
++        }); slither_client::state::transaction_phase("gpu_create_bind_group_layout_end",0); result };
++        let pipeline_layout = { slither_client::state::transaction_phase("gpu_create_pipeline_layout_begin",0); let result = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+             label: Some("paint"),
+             bind_group_layouts: &[Some(&layout)],
+             immediate_size: 0,
+-        });
+-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
++        }); slither_client::state::transaction_phase("gpu_create_pipeline_layout_end",0); result };
++        let shader = { slither_client::state::transaction_phase("gpu_create_shader_module_begin",0); let result = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+             label: Some("quad"),
+             source: wgpu::ShaderSource::Wgsl(include_str!("quad.wgsl").into()),
+-        });
++        }); slither_client::state::transaction_phase("gpu_create_shader_module_end",0); result };
+         let attributes = wgpu::vertex_attr_array![0=>Float32x2,1=>Float32x2,2=>Float32x2,3=>Uint32];
+         let vertex_buffers = [Some(wgpu::VertexBufferLayout {
+             array_stride: 28,
+@@ -413,7 +413,7 @@
+             attributes: &attributes,
+         })];
+         let pipeline = |blend, fragment, samples, composite| {
+-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
++            { slither_client::state::transaction_phase("gpu_create_render_pipeline_begin",0); let result = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                 label: Some("ordered paint"),
+                 layout: Some(&pipeline_layout),
+                 vertex: wgpu::VertexState {
+@@ -440,7 +440,7 @@
+                 }),
+                 multiview_mask: None,
+                 cache: None,
+-            })
++            }); slither_client::state::transaction_phase("gpu_create_render_pipeline_end",0); result }
+         };
+         let over = pipeline(
+             wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
+@@ -502,11 +502,11 @@
+         let glow_composite = pipeline(glow_blend, "fs_glow_composite", sample_count, true);
+         let glow_composite_single = pipeline(glow_blend, "fs_glow_composite", 1, true);
+         let diagnostic_timestamps = timestamps.then(|| {
+-            device.create_query_set(&wgpu::QuerySetDescriptor {
++            { slither_client::state::transaction_phase("gpu_create_query_set_begin",0); let result = device.create_query_set(&wgpu::QuerySetDescriptor {
+                 label: Some("offscreen pass timings"),
+                 ty: wgpu::QueryType::Timestamp,
+                 count: 32,
+-            })
++            }); slither_client::state::transaction_phase("gpu_create_query_set_end",0); result }
+         });
+         let mut index_bytes = Vec::with_capacity(VERTEX_CHUNK_QUADS * 6 * 2);
+         for quad in 0..VERTEX_CHUNK_QUADS as u16 {
+@@ -514,13 +514,13 @@
+                 index_bytes.extend_from_slice(&(quad * 4 + index).to_le_bytes());
+             }
+         }
+-        let indices = device.create_buffer(&wgpu::BufferDescriptor {
++        let indices = { slither_client::state::transaction_phase("gpu_create_buffer_begin",0); let result = device.create_buffer(&wgpu::BufferDescriptor {
+             label: Some("shared quad indices"),
+             size: index_bytes.len() as u64,
+             usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+             mapped_at_creation: false,
+-        });
+-        queue.write_buffer(&indices, 0, &index_bytes);
++        }); slither_client::state::transaction_phase("gpu_create_buffer_end",0); result };
++        { slither_client::state::transaction_phase("gpu_write_buffer_begin",0); let result = queue.write_buffer(&indices, 0, &index_bytes); slither_client::state::transaction_phase("gpu_write_buffer_end",0); result };
+         Ok(Self {
+             sample_count,
+             format,
+@@ -879,7 +879,7 @@
+     /// validation run, never in CPU/GPU timing captures.
+     #[cfg(feature = "frame-profile")]
+     pub fn diagnostic_trace_marker(&self, label: &str) {
+-        let mut encoder = self.device.create_command_encoder(&Default::default());
++        let mut encoder = { slither_client::state::transaction_phase("gpu_create_command_encoder_begin",0); let result = self.device.create_command_encoder(&Default::default()); slither_client::state::transaction_phase("gpu_create_command_encoder_end",0); result };
+         encoder.insert_debug_marker(label);
+         self.queue.submit([encoder.finish()]);
+     }
+@@ -950,6 +950,7 @@
+         let mut outline_span: Option<std::ops::Range<usize>> = None;
+         let mut outline_count = 0;
+         let mut unsafe_prefix = None;
++        slither_client::state::transaction_phase("gpu_pack_begin",0);
+         let mut quads = quads.peekable();
+         let mut uploaded = 0;
+         while let Some(quad) = quads.next() {
+@@ -1059,6 +1060,8 @@
+             state.key = texture.array.key;
+             chunk.states.push(state);
+         }
++        slither_client::state::transaction_phase("gpu_pack_end",0);
++        slither_client::state::transaction_phase("gpu_sort_begin",0);
+         let glow_bins = select_glows(glow_coverage, samples, previous);
+         let glow_span = glow_span.filter(|span| {
+             span.end > black_prefix && span.len() == glow_count && glow_bins[1..].contains(&true)
+@@ -1135,6 +1138,8 @@
+                 }
+             }
+         }
++        slither_client::state::transaction_phase("gpu_sort_end",0);
++        slither_client::state::transaction_phase("gpu_upload_begin",0);
+         // Validate every quad before touching GPU buffers. Exclusive calls submit
+         // before the next write; queue ordering protects prior in-flight draws,
+         // including when the overlay reuses the world's buffers.
+@@ -1144,26 +1149,27 @@
+                 let capacity = size
+                     .next_power_of_two()
+                     .min((VERTEX_CHUNK_QUADS * QUAD_VERTEX_BYTES) as u64);
+-                chunk.buffer = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
++                chunk.buffer = Some({ slither_client::state::transaction_phase("gpu_create_buffer_begin",0); let result = self.device.create_buffer(&wgpu::BufferDescriptor {
+                     label: Some("ordered vertex chunk"),
+                     size: capacity,
+                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                     mapped_at_creation: false,
+-                }));
++                }); slither_client::state::transaction_phase("gpu_create_buffer_end",0); result });
+             }
+-            self.queue.write_buffer(
++            { slither_client::state::transaction_phase("gpu_write_buffer_begin",0); let result = self.queue.write_buffer(
+                 chunk.buffer.as_ref().expect("vertex buffer"),
+                 0,
+                 &chunk.bytes,
+-            );
+-        }
++            ); slither_client::state::transaction_phase("gpu_write_buffer_end",0); result };
++        }
++        slither_client::state::transaction_phase("gpu_upload_end",0);
+         let replacement = if samples > 1
+             && self
+                 .multisample
+                 .as_ref()
+                 .is_none_or(|m| m.extent != attachment || m.samples != samples)
+         {
+-            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
++            let texture = { slither_client::state::transaction_phase("gpu_create_texture_begin",0); let result = self.device.create_texture(&wgpu::TextureDescriptor {
+                 label: Some("quad edge coverage"),
+                 size: wgpu::Extent3d {
+                     width: attachment[0],
+@@ -1176,7 +1182,7 @@
+                 format: self.format,
+                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                 view_formats: &[],
+-            });
++            }); slither_client::state::transaction_phase("gpu_create_texture_end",0); result };
+             Some(Multisample {
+                 extent: attachment,
+                 samples,
+@@ -1260,7 +1266,8 @@
+                 .expect("MSAA target")
+                 .view
+         });
+-        let mut encoder = self.device.create_command_encoder(&Default::default());
++        slither_client::state::transaction_phase("gpu_encode_begin",0);
++        let mut encoder = { slither_client::state::transaction_phase("gpu_create_command_encoder_begin",0); let result = self.device.create_command_encoder(&Default::default()); slither_client::state::transaction_phase("gpu_create_command_encoder_end",0); result };
+         #[cfg(feature = "frame-profile")]
+         let aggregate_queries =
+             self.diagnostic_timestamps.is_some() && self.diagnostic_passes.is_none();
+@@ -1441,6 +1448,7 @@
+         }
+         let submission = crate::latency::submit_begin();
+         self.queue.submit([encoder.finish()]);
++        slither_client::state::transaction_phase("gpu_encode_end",0);
+         crate::latency::submit_end(submission);
+         self.draw_calls = draw_calls + outline_calls;
+         self.pass_count = pass_count;
+--- a/client/apps/wgpu-slice/src/texture_arrays.rs
++++ b/client/apps/wgpu-slice/src/texture_arrays.rs
+@@ -21,7 +21,7 @@
+         layers: u32,
+         mip_level_count: u32,
+     ) -> Self {
+-        let texture = device.create_texture(&wgpu::TextureDescriptor {
++        let texture = { slither_client::state::transaction_phase("gpu_create_texture_begin",0); let result = device.create_texture(&wgpu::TextureDescriptor {
+             label: Some("equal-size image array"),
+             size: wgpu::Extent3d {
+                 width,
+@@ -34,13 +34,13 @@
+             format: wgpu::TextureFormat::Rgba8Unorm,
+             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+             view_formats: &[],
+-        });
++        }); slither_client::state::transaction_phase("gpu_create_texture_end",0); result };
+         let view = texture.create_view(&wgpu::TextureViewDescriptor {
+             dimension: Some(wgpu::TextureViewDimension::D2Array),
+             ..Default::default()
+         });
+         let binding = |address_mode| {
+-            let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
++            let sampler = { slither_client::state::transaction_phase("gpu_create_sampler_begin",0); let result = device.create_sampler(&wgpu::SamplerDescriptor {
+                 label: Some("Canvas-like linear clamp"),
+                 mag_filter: wgpu::FilterMode::Linear,
+                 min_filter: wgpu::FilterMode::Linear,
+@@ -48,8 +48,8 @@
+                 address_mode_u: address_mode,
+                 address_mode_v: address_mode,
+                 ..Default::default()
+-            });
+-            device.create_bind_group(&wgpu::BindGroupDescriptor {
++            }); slither_client::state::transaction_phase("gpu_create_sampler_end",0); result };
++            { slither_client::state::transaction_phase("gpu_create_bind_group_begin",0); let result = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                 label: Some("image array"),
+                 layout,
+                 entries: &[
+@@ -62,7 +62,7 @@
+                         resource: wgpu::BindingResource::Sampler(&sampler),
+                     },
+                 ],
+-            })
++            }); slither_client::state::transaction_phase("gpu_create_bind_group_end",0); result }
+         };
+         let bind = binding(wgpu::AddressMode::ClampToEdge);
+         let repeat_bind = binding(wgpu::AddressMode::Repeat);
+@@ -79,7 +79,7 @@
+         let mut offset = 0;
+         for level in 0..self.texture.mip_level_count() {
+             let bytes = width as usize * height as usize * 4;
+-            queue.write_texture(
++            { slither_client::state::transaction_phase("gpu_write_texture_begin",0); let result = queue.write_texture(
+                 wgpu::TexelCopyTextureInfo {
+                     texture: &self.texture,
+                     mip_level: level,
+@@ -101,7 +101,7 @@
+                     height,
+                     depth_or_array_layers: 1,
+                 },
+-            );
++            ); slither_client::state::transaction_phase("gpu_write_texture_end",0); result };
+             offset += bytes;
+             width = (width / 2).max(1);
+             height = (height / 2).max(1);
+--- a/client/apps/wgpu-slice/src/render.rs
++++ b/client/apps/wgpu-slice/src/render.rs
+@@ -1499,6 +1499,7 @@
+     plan: Result<crate::hud::Plan>,
+ ) -> Result<PreparedFrame> {
+     let identity = prepared.frame.identity;
++    slither_client::state::transaction_phase("finish_begin",identity);
+     let result = (|| {
+         let plan = plan?;
+         // Late overlays retain the captured scene's immutable resources. Text
+@@ -1532,6 +1533,7 @@
+         let draw_limit = frame.draws.len() + crate::hud::MAX_DRAWS;
+         let mut slot = 0;
+         let mut resources = std::collections::BTreeMap::new();
++        slither_client::state::transaction_phase("hud_text_begin",identity);
+         for line in &plan.lines {
+             let mut position = line.position;
+             for span in &line.spans {
+@@ -1568,6 +1570,7 @@
+                 }
+             }
+         }
++        slither_client::state::transaction_phase("hud_text_end",identity);
+         prepared.resources.extend(resources.into_values());
+         if prepared.pixel_bytes() > crate::bank::PIXEL_BUDGET {
+             return Err("Active resource pixel budget exceeded".into());
+@@ -1577,10 +1580,12 @@
+             .iter()
+             .map(|r| (r.asset.into(), r.asset))
+             .collect();
++        slither_client::state::transaction_phase("final_validate_begin",identity);
+         prepared.frame.validate(&resident)?;
+         if let Some(overlay) = &prepared.overlay {
+             overlay.validate(&resident)?;
+         }
++        slither_client::state::transaction_phase("final_validate_end",identity);
+         Ok(prepared)
+     })();
+     bank.discard_text(identity);
+--- a/client/apps/wgpu-slice/src/text_native.rs
++++ b/client/apps/wgpu-slice/src/text_native.rs
+@@ -133,9 +133,11 @@
+         let key = (style.family, style.weight, style.slant);
+         if let std::collections::btree_map::Entry::Vacant(slot) = self.faces.entry(key) {
+             let file = face_name(style);
++            slither_client::state::transaction_phase("font_load_begin",0);
+             let bytes = font_bytes(style)?;
+             let font = Font::from_bytes(bytes, FontSettings::default())
+                 .map_err(|e| format!("font ({file}): {e}"))?;
++            slither_client::state::transaction_phase("font_load_end",0);
+             let metrics = font
+                 .horizontal_line_metrics(1.)
+                 .ok_or("font line metrics")?;
+@@ -222,6 +224,7 @@
+         style: TextStyle,
+         max_width: Option<u32>,
+     ) -> Result<Raster> {
++        slither_client::state::transaction_phase("text_raster_begin",0);
+         let color = style.color;
+         let arial = self.face(style)?;
+         let font = &arial.font;
+@@ -299,6 +302,7 @@
+                 dst[3] = a;
+             }
+         }
++        slither_client::state::transaction_phase("text_raster_end",0);
+         Ok(Raster {
+             image: RgbaImage {
+                 width: width as u32,
+--- /dev/null
++++ b/client/apps/wgpu-slice/examples/join_profile.rs
+@@ -0,0 +1,74 @@
++use slither_wgpu_slice::{Result, endpoint_login, game::{LocalGame,EffectKind}, native::{Transport,Event}, gpu, latency, render};
++use std::{alloc::{GlobalAlloc,Layout,System},cell::{Cell,RefCell},time::{Instant,Duration},path::PathBuf,io::Write,hash::{Hash,Hasher}};
++struct Counting;
++thread_local! { static GPU_SAMPLES: RefCell<Vec<(u64,usize,&'static str,u64)>> = const {RefCell::new(Vec::new())}; static CURRENT_FRAME: Cell<usize> = const {Cell::new(0)}; static ALLOC: Cell<(u64,u64)> = const {Cell::new((0,0))}; static PHASES: RefCell<Vec<(&'static str,u64,u64)>> = const {RefCell::new(Vec::new())}; }
++unsafe impl GlobalAlloc for Counting {
++ unsafe fn alloc(&self,l:Layout)->*mut u8 {ALLOC.with(|s|{let (n,b)=s.get();s.set((n+1,b+l.size() as u64));});unsafe{System.alloc(l)}}
++ unsafe fn dealloc(&self,p:*mut u8,l:Layout){unsafe{System.dealloc(p,l)}}
++ unsafe fn alloc_zeroed(&self,l:Layout)->*mut u8 {ALLOC.with(|s|{let(n,b)=s.get();s.set((n+1,b+l.size() as u64));});unsafe{System.alloc_zeroed(l)}}
++ unsafe fn realloc(&self,p:*mut u8,l:Layout,n:usize)->*mut u8 {ALLOC.with(|s|{let(a,b)=s.get();s.set((a+1,b+n as u64));});unsafe{System.realloc(p,l,n)}}
++}
++#[global_allocator] static COUNTING:Counting=Counting;
++static EPOCH:std::sync::OnceLock<Instant>=std::sync::OnceLock::new();
++fn phase(s:&'static str,id:u64){PHASES.with_borrow_mut(|p| p.push((s,EPOCH.get_or_init(Instant::now).elapsed().as_nanos() as u64,id)));}
++fn ns(t:Instant)->u64 {t.elapsed().as_nanos() as u64}
++fn effects(g:&mut LocalGame,t:&mut Transport,live:bool,now:f64,hash:&mut impl Hasher)->Result<()> {
++ for _ in 0..256 {let Some(e)=g.effect() else {return Ok(())};let connect=matches!(e.kind,EffectKind::Connect(_));
++  if connect {g.construct(e.generation,e.id,now)?;}
++  if live {t.execute(&e)?;}
++  if let EffectKind::Send(b)=&e.kind {b.hash(hash);}
++  g.acknowledge(e.generation,e.id,true)?;
++  if connect && !live {g.opened(e.generation,now)?;}
++ } Err("effect budget".into())
++}
++struct Gpu {presenter:slither_wgpu_slice::world_presenter::WorldPresenter,r:gpu::Renderer,_target:wgpu::Texture,view:wgpu::TextureView}
++impl Gpu {
++ fn new()->Result<Self>{let i=gpu::instance();let adapters=pollster::block_on(i.enumerate_adapters(wgpu::Backends::DX12));let a=adapters.into_iter().find(|a|a.get_info().device_type==wgpu::DeviceType::IntegratedGpu).ok_or("integrated adapter missing")?;
++ let r=pollster::block_on(gpu::Renderer::from_adapter_for_diagnostics(a,wgpu::TextureFormat::Rgba8Unorm,4,true))?;println!("adapter={:?},samples={}",r.adapter_info,r.sample_count);
++ let target=r.device.create_texture(&wgpu::TextureDescriptor{label:Some("capture profile"),size:wgpu::Extent3d{width:960,height:540,depth_or_array_layers:1},mip_level_count:1,sample_count:1,dimension:wgpu::TextureDimension::D2,format:wgpu::TextureFormat::Rgba8Unorm,usage:wgpu::TextureUsages::RENDER_ATTACHMENT,view_formats:&[]});let view=target.create_view(&Default::default());let presenter=slither_wgpu_slice::world_presenter::WorldPresenter::new(&r);Ok(Self{presenter,r,_target:target,view})}
++ fn draw(&mut self,p:&render::PreparedFrame)->Result<(u64,u64,u64,f64)>{let t=Instant::now();self.r.sync_resources(&p.resources).map_err(String::from)?;let sync=ns(t);let t=Instant::now();self.r.begin_diagnostic_frame();self.presenter.render(&mut self.r,&p.frame,p.overlay.as_ref(),&self.view,[960,540],slither_client::settings::WorldResolution::Original).map_err(String::from)?;let submit=ns(t);
++ let gpu_ns=self.timestamp()?;
++ let t=Instant::now();self.r.device.poll(wgpu::PollType::Wait{submission_index:None,timeout:Some(Duration::from_secs(10))}).map_err(|e|e.to_string())?;Ok((sync,submit,ns(t),gpu_ns))}
++ fn timestamp(&self)->Result<f64>{let b=self.r.device.create_buffer(&wgpu::BufferDescriptor{label:None,size:256,usage:wgpu::BufferUsages::QUERY_RESOLVE|wgpu::BufferUsages::COPY_SRC,mapped_at_creation:false});let read=self.r.device.create_buffer(&wgpu::BufferDescriptor{label:None,size:256,usage:wgpu::BufferUsages::COPY_DST|wgpu::BufferUsages::MAP_READ,mapped_at_creation:false});let mut e=self.r.device.create_command_encoder(&Default::default());e.resolve_query_set(self.r.diagnostic_timestamps().unwrap(),0..(self.r.diagnostic_passes().len() as u32*2),&b,0);e.copy_buffer_to_buffer(&b,0,&read,0,256);self.r.queue.submit([e.finish()]);let(tx,rx)=std::sync::mpsc::channel();read.slice(..).map_async(wgpu::MapMode::Read,move|x|{let _=tx.send(x);});self.r.device.poll(wgpu::PollType::Wait{submission_index:None,timeout:Some(Duration::from_secs(10))}).map_err(|e|e.to_string())?;rx.recv().unwrap().map_err(|e|e.to_string())?;let d=read.slice(..).get_mapped_range().map_err(|e|e.to_string())?;let mut total=0;for i in 0..self.r.diagnostic_passes().len(){let a=u64::from_le_bytes(d[i*16..i*16+8].try_into().unwrap());let b=u64::from_le_bytes(d[i*16+8..i*16+16].try_into().unwrap());let dt=b.saturating_sub(a);total+=dt;GPU_SAMPLES.with_borrow_mut(|v|v.push((EPOCH.get().unwrap().elapsed().as_nanos() as u64,CURRENT_FRAME.get(),self.r.diagnostic_passes()[i].0,(dt as f64*self.r.queue.get_timestamp_period() as f64)as u64)));}Ok(total as f64*self.r.queue.get_timestamp_period() as f64)}
++}
++#[path="../../../tests/support/protocol13.rs"] mod authored;
++fn rectangle()->Vec<(f64,Vec<u8>)>{
++ let mut rows=vec![(1000.,authored::bundle(&[authored::challenge()])),(1020.,authored::bundle(&[authored::setup(),authored::snake(7)]))];
++ for block in 0..5_u16 {let mut packet=vec![b'F'];for i in block*5000..(block+1)*5000 {packet.extend(&authored::food(b'f',9,1200+i%200,1050+i/200,1)[1..]);}rows.push((1100.+f64::from(block),packet));}
++ rows.push((7500.,authored::bundle(&[vec![b'w',4,3]])));rows
++}
++fn main()->Result<()> {
++ EPOCH.get_or_init(Instant::now);
++
++ let a:Vec<_>=std::env::args().collect();if a.len()!=6{return Err("capture_profile live|replay INPUT NEW_DIR SECONDS ZOOM_NOTCHES".into())}let live=a[1]=="live";let output=PathBuf::from(&a[3]);std::fs::create_dir(&output).map_err(|e|e.to_string())?;let duration:f64=a[4].parse().unwrap();let zoom:f64=a[5].parse().unwrap();
++ let trace=if std::env::var_os("PROFILE_TRACE").is_some(){Some(latency::Recorder::new(900000))}else{None};let guard=trace.as_ref().map(|t|t.attach());
++ PHASES.with_borrow_mut(|p|p.reserve(2_000_000));if std::env::var_os("PROFILE_PHASES").is_some(){render::set_preparation_observer(Some(phase));slither_client::state::set_transaction_observer(Some(phase));}
++ let mut records=Vec::new();if !live && a[1]!="rectangle" {let b=std::fs::read(&a[2]).map_err(|e|e.to_string())?;let mut i=0;while i<b.len(){let t=u64::from_be_bytes(b[i..i+8].try_into().unwrap()) as f64/1000.;let n=u32::from_be_bytes(b[i+8..i+12].try_into().unwrap()) as usize;i+=12;records.push((t,b[i..i+n].to_vec()));i+=n;}}
++ if a[1]=="rectangle" {records=rectangle();}
++ let mut completed=true;let mut raw=if live {Some(std::io::BufWriter::new(std::fs::File::create(output.join("capture.bin")).map_err(|e|e.to_string())?))}else{None};
++ let mut gpu=if std::env::var_os("PROFILE_CPU_ONLY").is_some(){None}else{Some(Gpu::new()?)};
++ phase("game_new_begin",0);let start=Instant::now();let mut g=LocalGame::new(0.)?;phase("game_new_end",0);g.window_viewport([960,540],1.)?;let mut transport=Transport::default();let mut quad_digest=std::collections::hash_map::DefaultHasher::new();let mut digest=std::collections::hash_map::DefaultHasher::new();phase("connect_begin",0);endpoint_login::play(&mut g,if live{&a[2]}else{"ws://127.0.0.1:9/slither"},"",0)?;effects(&mut g,&mut transport,live,0.,&mut digest)?;
++ let mut packets=String::from("frame,model_ms,start_ns,elapsed_ns,opcode,bytes,alloc_bytes\n");let mut density=String::from("frame,model_ms,total,eaten,visible,bin16_max,size_min,size_max,colors\n");let mut resources=String::from("frame,identity,count,bytes,cache,vertex_capacity\n");let mut csv=String::from("frame,model_ms,wall_ns,poll_ns,ingress_ns,redraw_ns,sync_ns,submit_ns,wait_ns,gpu_ns,allocs,alloc_bytes,messages,foods,snakes,preys,draws,correction,lagging,zoom,own_exists,raw_x,raw_y,head_x,head_y,heading,speed_per_32ms\n");let mut types=[(0_u64,0_u64,0_u64,0_u64);256];let mut cursor=0;let mut frame=0;let mut last_model=0.;let mut zoomed=false;let parity=std::env::var_os("PROFILE_PARITY").is_some();
++ while (if live{start.elapsed().as_secs_f64()}else{frame as f64/60.})<duration {
++  CURRENT_FRAME.set(frame);let iteration = (|| -> Result<bool> {
++  let model=if live{start.elapsed().as_secs_f64()*1000.}else{frame as f64*1000./60.};let tick=Instant::now();if std::env::var_os("PROFILE_PHASES").is_some(){phase("tick_begin",0);}let alloc=ALLOC.with(Cell::get);if g.phase()==slither_client::session_policy::Phase::Playing {if !zoomed && zoom!=0. {g.wheel_zoom(zoom);zoomed=true;}let cb=latency::callback();let angle=model/1000.*0.017+0.55*(model/16000.).sin();g.pointer(480.+220.*angle.cos(),270.+220.*angle.sin(),960.,540.,false)?;g.key("Space",model%12000.>=8000.&&model%12000.<9000.);drop(cb);}let poll=Instant::now();let events=if live{transport.poll()}else{Vec::new()};let poll_ns=ns(poll);let ingress=Instant::now();let mut messages=0;
++  for e in events {match e {Event::Opened(generation)=>g.opened(generation,model)?,Event::Binary(generation,b)=>{if let Some(raw)=&mut raw {raw.write_all(&((model*1000.) as u64).to_be_bytes()).unwrap();raw.write_all(&(b.len() as u32).to_be_bytes()).unwrap();raw.write_all(&b).unwrap();}let id=transport.message_id();let t=Instant::now();let alloc_before=ALLOC.with(Cell::get).1;let begin=EPOCH.get().unwrap().elapsed().as_nanos();phase("receive_begin",b[if b[0]<32{2}else{0}] as u64);g.receive_message(generation,&b,model,id)?;phase("receive_end",b[if b[0]<32{2}else{0}] as u64);use std::fmt::Write as _;writeln!(packets,"{frame},{model},{begin},{},{},{},{}",ns(t),b[if b[0]<32{2}else{0}],b.len(),ALLOC.with(Cell::get).1-alloc_before).unwrap();let op=b[if b[0]<32{2}else{0}] as usize;types[op].0+=1;types[op].1+=ns(t);types[op].2+=b.len() as u64;messages+=1;effects(&mut g,&mut transport,live,model,&mut digest)?;},Event::Closed(generation)=>g.closed(generation),Event::Failed(_,e)=>{completed=false;eprintln!("transport_failed={e}");g.closed(g.generation());}}}
++  if !live {while cursor<records.len() && records[cursor].0<=model {let(t,b)=&records[cursor];let begin=Instant::now();let before_alloc=ALLOC.with(Cell::get);if std::env::var_os("PROFILE_PHASES").is_some(){phase("receive_begin",b[if b[0]<32{2}else{0}] as u64);}let packet_start=EPOCH.get().unwrap().elapsed().as_nanos();g.receive(g.generation(),b,*t)?;use std::fmt::Write as _;writeln!(packets,"{frame},{model},{packet_start},{},{},{},{}",ns(begin),b[if b[0]<32{2}else{0}],b.len(),ALLOC.with(Cell::get).1-before_alloc.1).unwrap();let op=b[if b[0]<32{2}else{0}] as usize;types[op].0+=1;types[op].1+=ns(begin);types[op].3+=ALLOC.with(Cell::get).1-before_alloc.1;if std::env::var_os("PROFILE_PHASES").is_some(){phase("receive_end",op as u64);}types[op].2+=b.len() as u64;effects(&mut g,&mut transport,false,*t,&mut digest)?;messages+=1;cursor+=1;}}
++  let ingress_ns=ns(ingress);if std::env::var_os("PROFILE_PHASES").is_some(){phase("redraw_begin",0);}
++  let t=Instant::now();g.begin_redraw(model,[960,540],1.)?;effects(&mut g,&mut transport,live,model,&mut digest)?;let redraw_ns=ns(t);if std::env::var_os("PROFILE_PHASES").is_some(){phase("redraw_end",0);}let(mut sync,mut submit,mut wait,mut gpu_ns,mut draws)=(0,0,0,0.,0);
++  while let Some(p)=g.take_frame(){draws+=p.draw_count();{use std::fmt::Write as _;writeln!(resources,"{frame},{},{},{},{},{}",p.frame.identity,p.resources.len(),p.resources.iter().map(|r|r.image.pixels.len()).sum::<usize>(),g.bank.cached_sources(),gpu.as_ref().map_or(0,|gpu|gpu.r.diagnostic_vertex_capacities().iter().sum::<u64>())).unwrap();}if let Some(gpu)=&mut gpu {let(s,u,w,n)=gpu.draw(&p)?;sync+=s;submit+=u;wait+=w;gpu_ns+=n;}if parity{format!("{:?}{:?}{:?}",p.frame,p.overlay,p.resources).hash(&mut digest);
++      let resident=std::collections::BTreeMap::from_iter(p.resources.iter().map(|r|(r.asset.into(),r.asset)));
++      for frame in std::iter::once(&p.frame).chain(p.overlay.iter()) {
++        for q in frame.quad_iter(&resident)? {let q=q?;q.key.handle.hash(&mut quad_digest);q.key.revision.hash(&mut quad_digest);q.repeat.hash(&mut quad_digest);q.black_effect.hash(&mut quad_digest);std::mem::discriminant(&q.blend).hash(&mut quad_digest);for v in q.vertices {for x in v {x.to_bits().hash(&mut quad_digest);}}}
++      }
++    }g.presented(true)?;g.bank.recycle_frame(p);effects(&mut g,&mut transport,live,model,&mut digest)?;}
++  let wall=ns(tick);let end_alloc=ALLOC.with(Cell::get);let c=g.client();let correction=c.own_snake().map_or(0.,|s|{let o=s.head_corrections().offset();o[0].hypot(o[1])});let own=c.own_snake().map(|s|s.metrics());let state=c.received();use std::fmt::Write as _;writeln!(csv,"{frame},{model},{wall},{poll_ns},{ingress_ns},{redraw_ns},{sync},{submit},{wait},{gpu_ns},{},{},{messages},{},{},{},{draws},{correction},{},{},{},{},{},{},{},{},{}",end_alloc.0-alloc.0,end_alloc.1-alloc.1,state.foods.len(),state.snakes.len(),c.preys().preys().len(),g.champion_session().lagging,c.camera().zoom(),u8::from(own.is_some()),own.map_or(0.,|s|s.raw_head.x),own.map_or(0.,|s|s.raw_head.y),own.map_or(0.,|s|s.corrected_head.x),own.map_or(0.,|s|s.corrected_head.y),own.map_or(0.,|s|s.corrected_heading),own.map_or(0.,|s|s.speed_per_32ms)).unwrap();
++  {use std::fmt::Write as _;let mut bins=std::collections::BTreeMap::new();let mut visible=0;let mut eaten=0;let mut low=f64::INFINITY;let mut high=0_f64;let mut colors=std::collections::BTreeSet::new();for f in c.foods().foods(){let f=f.snapshot();eaten+=usize::from(f.eaten);low=low.min(f.base_size);high=high.max(f.base_size);colors.insert(f.raw_color);let x=480.+(f.render_position.x-c.camera().position().x)*c.camera().zoom();let y=270.+(f.render_position.y-c.camera().position().y)*c.camera().zoom();if x>=0.&&x<960.&&y>=0.&&y<540.{visible+=1;*bins.entry(((x/16.)as i32,(y/16.)as i32)).or_insert(0)+=1;}}writeln!(density,"{frame},{model},{},{eaten},{visible},{},{low},{high},{}",c.foods().foods().len(),bins.values().copied().max().unwrap_or(0),colors.len()).unwrap();}
++  frame+=1;last_model=model;if matches!(g.phase(),slither_client::session_policy::Phase::Failed|slither_client::session_policy::Phase::Disconnected|slither_client::session_policy::Phase::Dead){return Ok(true);}
++  if live {std::thread::sleep(Duration::from_secs_f64((1./60.-tick.elapsed().as_secs_f64()).max(0.)));}
++  Ok(false)
++  })();
++  match iteration {Ok(false)=>{},Ok(true)=>break,Err(e)=>{completed=false;eprintln!("partial_run_error={e}");break;}}
++ }
++ std::fs::write(output.join("packets.csv"),packets).unwrap();std::fs::write(output.join("density.csv"),density).unwrap();std::fs::write(output.join("resources.csv"),resources).unwrap();let mut pass_csv=String::from("stamp_ns,frame,pass,gpu_ns\n");GPU_SAMPLES.with_borrow(|v|{use std::fmt::Write as _;for (stamp,frame,name,dt)in v{writeln!(pass_csv,"{stamp},{frame},{name},{dt}").unwrap();}});std::fs::write(output.join("gpu-passes.csv"),pass_csv).unwrap();println!("phase_before_stop={:?},complete={completed}",g.phase());g.stop();transport.close();drop(guard);if let Some(t)=trace{t.write(&output.join("latency.jsonl"),"3209d873",completed).map_err(|e|e.to_string())?;}std::fs::write(output.join("frames.csv"),csv).map_err(|e|e.to_string())?;let mut csv=String::from("opcode,count,receive_ns,bytes,alloc_bytes\n");for(op,(n,t,b,alloc))in types.into_iter().enumerate(){if n>0{use std::fmt::Write as _;writeln!(csv,"{op},{n},{t},{b},{alloc}").unwrap();}}std::fs::write(output.join("messages.csv"),csv).unwrap();let mut csv=String::from("stage,ns,id\n");PHASES.with_borrow(|p|{use std::fmt::Write as _;for(s,n,id)in p {writeln!(csv,"{s},{n},{id}").unwrap();}});std::fs::write(output.join("phases.csv"),csv).unwrap();println!("terminal_phase={:?},quad_digest={:016x}",g.phase(),quad_digest.finish());println!("frames={frame},model_ms={last_model},wall_s={},messages={},digest={:016x},skips={}",start.elapsed().as_secs_f64(),types.iter().map(|t|t.0).sum::<u64>(),digest.finish(),g.draw_diagnostics.skipped_frames);Ok(())
++}
