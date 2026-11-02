@@ -12,7 +12,10 @@ use crate::{
     presentation::{HudIngressError, HudIngressPlan, HudLeaderboardRows, HudLeaderboardRowsBudget},
     protocol::{self, ElapsedHeader, ProtocolError},
 };
-use std::{collections::BTreeMap, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 use slither_protocol::{
     DecodeAdmission, ErrorKind,
@@ -134,6 +137,10 @@ pub(crate) struct PreparedFood {
     pub spawn: FoodSpawnInput,
     food: Food,
     update_added_cache: bool,
+}
+
+pub(crate) struct PreparedSectorControl {
+    pub clear: Option<(u8, u8)>,
 }
 
 /// Validated consume caches and removal awaiting an atomic presentation commit.
@@ -1507,6 +1514,116 @@ impl ClientState {
             self.added_color = prepared.spawn.raw_color;
         }
         self.foods.insert(prepared.spawn.key, prepared.food);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
+    pub(crate) fn prepare_food_sector(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<Vec<PreparedFood>>, StateError> {
+        let Some(setup) = self.setup.as_ref() else {
+            return Ok(None);
+        };
+        if command.first() != Some(&b'F') {
+            return Ok(None);
+        }
+        if setup.protocol == 13 {
+            return self.prepare_v13_food_sector(command);
+        }
+        if setup.protocol != 19 {
+            return Ok(None);
+        }
+        let Message::FoodSector(raw) = v19::decode(command, DecodeAdmission::ClientPresentation)
+            .map_err(|_| StateError::InvalidPacket(command[0]))?
+        else {
+            return Ok(None);
+        };
+        if raw.foods().len() <= 1 {
+            return Ok(None);
+        }
+        let mut prepared = Vec::new();
+        let mut added = BTreeSet::new();
+        for food in raw.foods() {
+            let value = self.prepare_food(
+                setup,
+                (raw.sector[0], raw.sector[1]),
+                (food.offset[0], food.offset[1]),
+                food.size,
+                food.color,
+                true,
+            )?;
+            if !self.foods.contains_key(&value.spawn.key) {
+                added.insert(value.spawn.key);
+                if self.foods.len() + added.len() > MAX_FOODS {
+                    return Err(StateError::Limit);
+                }
+            }
+            prepared.push(value);
+        }
+        Ok(Some(prepared))
+    }
+
+    pub(crate) fn commit_food_sector(&mut self, prepared: Vec<PreparedFood>, elapsed: Option<u16>) {
+        // F is a split listing, not replacement, and does not change f/b caches.
+        for food in prepared {
+            self.foods.insert(food.spawn.key, food.food);
+        }
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
+    pub(crate) fn prepare_sector_control(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<PreparedSectorControl>, StateError> {
+        if self
+            .setup
+            .as_ref()
+            .is_none_or(|s| !matches!(s.protocol, 13 | 19))
+            || !matches!(command.first(), Some(b'w' | b'W'))
+        {
+            return Ok(None);
+        }
+        // The received reducer leaves W opaque before wire decoding, including
+        // malformed bodies. Preserve that ignored-lane contract in both readers.
+        if command[0] == b'W' {
+            return Ok(Some(PreparedSectorControl { clear: None }));
+        }
+        if self.setup.as_ref().expect("selected protocol").protocol == 13 {
+            return match slither_protocol::v13::decode(command, DecodeAdmission::ClientPresentation)
+                .map_err(|_| StateError::InvalidPacket(command[0]))?
+            {
+                slither_protocol::v13::Message::SectorClear([x, y]) => {
+                    Ok(Some(PreparedSectorControl {
+                        clear: Some((x, y)),
+                    }))
+                }
+                _ => Ok(None),
+            };
+        }
+        match v19::decode(command, DecodeAdmission::ClientPresentation)
+            .map_err(|_| StateError::InvalidPacket(command[0]))?
+        {
+            Message::SectorClear([x, y]) => Ok(Some(PreparedSectorControl {
+                clear: Some((x, y)),
+            })),
+            _ => Ok(None),
+        }
+    }
+
+    pub(crate) fn commit_sector_control(
+        &mut self,
+        prepared: PreparedSectorControl,
+        elapsed: Option<u16>,
+    ) {
+        if let Some(sector) = prepared.clear {
+            self.foods.retain(|_, food| food.sector != sector);
+        } else {
+            self.ignored_commands = self.ignored_commands.saturating_add(1);
+        }
         self.frames_applied = self.frames_applied.saturating_add(1);
         self.commands_applied = self.commands_applied.saturating_add(1);
         self.last_elapsed_ms = elapsed;

@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Pellet-art join and sector refresh](client-performance/2026-11-02-join-sectors/REPORT.md) | Restricted ten-second join timeline; stage only new food in sector listings and avoid world copies on clear/visibility notices, with exact output and authored packed-pellet controls. |
 | Client performance | [Overlapping sprites](client-performance/2026-11-02-overlapping-sprites/REPORT.md) | Current-main per-pass diagnostics, exact invisible-draw removal and one-pass world composition; authored crowded iGPU comparison and remaining target miss. |
 | Client performance | [Non-growing anchor ingress](client-performance/2026-11-02-anchor-ingress/REPORT.md) | Stage one canonical anchor context, with exact output, pressure fallback and per-run CPU burst evidence. |
 | Client performance | [Share unchanged snake snapshots](client-performance/2026-11-02-snakes-ingress/REPORT.md) | Independent and incremental restricted-input comparisons; share untouched animation objects, with exact-output and allocation/rollback controls. |

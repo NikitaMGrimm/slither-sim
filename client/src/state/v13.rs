@@ -53,6 +53,35 @@ impl<'a> From<v13::SnakeAppearanceRef<'a>> for AppearanceHeader<'a> {
 }
 
 impl ClientState {
+    pub(super) fn prepare_v13_food_sector(
+        &self,
+        command: &[u8],
+    ) -> Result<Option<Vec<PreparedFood>>, StateError> {
+        let raw = v13::decode(command, DecodeAdmission::ClientPresentation)
+            .map_err(|_| StateError::InvalidPacket(command[0]))?;
+        let Legacy::FoodBatch(raw) = raw else {
+            return Ok(None);
+        };
+        if raw.foods().len() <= 1 {
+            return Ok(None);
+        }
+        let setup = self.setup.as_ref().expect("selected protocol");
+        let mut prepared = Vec::new();
+        let mut added = BTreeSet::new();
+        for food in raw.foods() {
+            let value =
+                self.prepare_legacy_food(setup, food.position, food.size, food.color, true)?;
+            if !self.foods.contains_key(&value.spawn.key) {
+                added.insert(value.spawn.key);
+                if self.foods.len() + added.len() > MAX_FOODS {
+                    return Err(StateError::Limit);
+                }
+            }
+            prepared.push(value);
+        }
+        Ok(Some(prepared))
+    }
+
     pub(super) fn prepare_single_v13_consume(
         &self,
         command: &[u8],

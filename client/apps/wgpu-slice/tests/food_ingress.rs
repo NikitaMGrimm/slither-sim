@@ -105,6 +105,92 @@ fn own_move(protocol: u8) -> Vec<u8> {
 }
 
 #[test]
+fn packed_pellet_sector_refresh_does_not_copy_unrelated_history() {
+    for protocol in [13, 19] {
+        let mut requested = Vec::new();
+        for count in [64, 6000] {
+            let mut game = ready(protocol, count);
+            let mut packet = if protocol == 13 {
+                vec![b'F']
+            } else {
+                vec![b'F', 20, 20]
+            };
+            // Authored compact rectangle, not a server's art or layout.
+            for i in 0..32_u8 {
+                if protocol == 13 {
+                    packet.extend(
+                        &wire::food(b'f', 9, 6100 + u16::from(i % 8), 6100 + u16::from(i / 8), 1)
+                            [1..],
+                    );
+                } else {
+                    packet.extend([9, 100 + i % 8, 100 + i / 8, 1]);
+                }
+            }
+            game.receive(game.generation(), &packet, 301.).unwrap();
+            game.receive(game.generation(), &[b'w', 20, 20], 302.)
+                .unwrap();
+            BYTES.set(0);
+            ENABLED.set(true);
+            for i in 0..5 {
+                game.receive(game.generation(), &packet, 303. + f64::from(i))
+                    .unwrap();
+                game.receive(game.generation(), &[b'w', 20, 20], 304. + f64::from(i))
+                    .unwrap();
+            }
+            ENABLED.set(false);
+            requested.push(BYTES.get());
+            assert_eq!(game.client().received().foods.len(), usize::from(count));
+            assert_eq!(game.client().foods().foods().len(), usize::from(count));
+        }
+        assert!(
+            requested[1] <= requested[0] + 65_536,
+            "protocol={protocol}, requested bytes {requested:?}"
+        );
+        println!("sector refresh protocol={protocol} requested bytes {requested:?}");
+    }
+}
+
+#[test]
+fn packed_pellet_patch_animates_and_clears_without_touching_other_food() {
+    for protocol in [13, 19] {
+        let mut game = ready(protocol, 64);
+        for block in 0..5_u16 {
+            let mut packet = if protocol == 13 {
+                vec![b'F']
+            } else {
+                vec![b'F', 4, 3]
+            };
+            for i in block * 5000..(block + 1) * 5000 {
+                if protocol == 13 {
+                    packet.extend(&wire::food(b'f', 9, 1200 + i % 200, 1050 + i / 200, 1)[1..]);
+                } else {
+                    packet.extend([9, (i % 200) as u8, (i / 200) as u8, 1]);
+                }
+            }
+            game.receive(game.generation(), &packet, 301. + f64::from(block))
+                .unwrap();
+        }
+        assert_eq!(game.client().foods().foods().len(), 25_064);
+        let frozen = game.client().clone();
+        let before = format!("{frozen:?}");
+        host::pump(&mut game, 500.);
+        host::pump(&mut game, 1000.);
+        assert!(
+            game.client()
+                .foods()
+                .foods()
+                .iter()
+                .any(|f| f.snapshot().base_size == 0.2 && f.snapshot().fade > 0.)
+        );
+        game.receive(game.generation(), &[b'w', 4, 3], 1001.)
+            .unwrap();
+        assert_eq!(game.client().received().foods.len(), 64);
+        assert_eq!(game.client().foods().foods().len(), 64);
+        assert_eq!(format!("{frozen:?}"), before);
+    }
+}
+
+#[test]
 fn retained_food_is_not_recopied_by_read_only_world_snapshots() {
     let game = ready(13, 6000);
     let mut snapshots = Vec::with_capacity(3);

@@ -25,6 +25,16 @@ use crate::{
     },
 };
 
+enum FoodSectorError<E> {
+    Factory(E),
+    Food(FoodError),
+}
+impl<E> From<FoodError> for FoodSectorError<E> {
+    fn from(error: FoodError) -> Self {
+        Self::Food(error)
+    }
+}
+
 // Bound server-controlled resize/clear work before source or Setup draw
 // callbacks run; short map bodies can still request large pixel surfaces.
 fn validate_minimap_work(
@@ -1150,10 +1160,11 @@ impl AnimatedClient {
         self.detail_pressure
     }
 
-    /// Apply a singleton F/f/b frame without copying the existing world. Returns
+    /// Apply one F/f/b command without copying the existing world. Returns
     /// `None` for batches, other commands/protocols or a disabled factory lane.
     /// Framing, coordinates and received capacity are checked before the factory;
     /// a failed factory or presentation spawn leaves all model state unchanged.
+    /// An F listing stages only its new records, including duplicates.
     /// Individual food floods otherwise copy every retained food per message,
     /// delaying movement and pongs behind the initial listing.
     pub fn try_apply_single_food<E, G>(
@@ -1182,6 +1193,15 @@ impl AnimatedClient {
             return Ok(None);
         }
         let command = decoded.commands().next().expect("one command");
+        if let Some(prepared) = self
+            .received
+            .prepare_food_sector(command.bytes)
+            .map_err(ClientPresentationError::from)?
+        {
+            return self
+                .apply_prepared_food_sector(prepared, decoded.prefix(), resolve_food)
+                .map(Some);
+        }
         let Some(prepared) = self
             .received
             .prepare_single_food(command.bytes)
@@ -1283,6 +1303,41 @@ impl AnimatedClient {
         }))
     }
 
+    /// Apply one sector clear/visibility notice after canonical validation, without
+    /// cloning unrelated received/presentation state. Other cases keep staging.
+    pub fn try_apply_single_sector_control(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+    ) -> Result<Option<FrameReport>, ClientPresentationError> {
+        if !self.food_enabled {
+            return Ok(None);
+        }
+        let decoded = crate::protocol::read_frame(bytes, header).map_err(StateError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let Some(prepared) = self
+            .received
+            .prepare_sector_control(decoded.commands().next().expect("one command").bytes)?
+        else {
+            return Ok(None);
+        };
+        let ignored = usize::from(prepared.clear.is_none());
+        if let Some(sector) = prepared.clear {
+            self.foods.clear_sector(sector);
+            self.retire_entries();
+        }
+        Arc::make_mut(&mut self.received).commit_sector_control(prepared, decoded.prefix());
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(Some(FrameReport {
+            commands: 1,
+            ignored,
+        }))
+    }
+
     /// Stage a non-growing anchor using the canonical snake-local wire reducer.
     /// Pressure/capacity transitions, growth and batches retain full staging.
     pub fn try_apply_single_anchor(
@@ -1363,6 +1418,48 @@ impl AnimatedClient {
             commands: 1,
             ignored: 0,
         }))
+    }
+
+    fn apply_prepared_food_sector<E, G>(
+        &mut self,
+        prepared: Vec<crate::state::PreparedFood>,
+        elapsed: Option<u16>,
+        mut resolve_food: G,
+    ) -> Result<FrameReport, E>
+    where
+        E: From<ClientPresentationError>,
+        G: FnMut(&FoodSpawnInput, f64) -> Result<FoodFactory, E>,
+    {
+        let zoom = self.camera.automatic_zoom();
+        let spawns: Vec<_> = prepared
+            .iter()
+            .map(|p| FoodSpawn {
+                key: p.spawn.key,
+                sector: p.spawn.sector,
+                position: p.spawn.absolute_position,
+                base_size: p.spawn.base_size,
+                raw_color: p.spawn.raw_color,
+                rapid: p.spawn.rapid,
+            })
+            .collect();
+        // A failed later factory discards only the new records. Nothing is
+        // published until the entire listing succeeds, including duplicates.
+        self.foods
+            .spawn_sector::<FoodSectorError<E>, _>(&spawns, zoom, |i| {
+                resolve_food(&prepared[i].spawn, zoom).map_err(FoodSectorError::Factory)
+            })
+            .map_err(|error| match error {
+                FoodSectorError::Factory(error) => error,
+                FoodSectorError::Food(error) => ClientPresentationError::from(error).into(),
+            })?;
+        Arc::make_mut(&mut self.received).commit_food_sector(prepared, elapsed);
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(FrameReport {
+            commands: 1,
+            ignored: 0,
+        })
     }
 
     fn apply_prepared_food<E, G>(
@@ -2431,7 +2528,7 @@ impl AnimatedClient {
                 .map_err(ClientPresentationError::from)?;
             if decoded.command_count() == 1 {
                 let command = decoded.commands().next().expect("one command");
-                if matches!(command.bytes[0], b'c' | b'C' | b'<') {
+                if matches!(command.bytes[0], b'c' | b'C' | b'<' | b'w' | b'W') {
                     if let Some(plan) = plan {
                         plan.validate(decoded.commands())
                             .map_err(StateError::Hud)
@@ -2439,14 +2536,19 @@ impl AnimatedClient {
                     }
                     let report = FrameReport {
                         commands: 1,
-                        ignored: 0,
+                        ignored: usize::from(command.bytes[0] == b'W'),
                     };
                     let journal = plan
                         .map(|p| HudIngressReport::new(report, p.schema, 0))
                         .transpose()
                         .map_err(StateError::Hud)
                         .map_err(ClientPresentationError::from)?;
-                    if let Some(report) = self.try_apply_single_consume(bytes, header)? {
+                    let applied = if matches!(command.bytes[0], b'w' | b'W') {
+                        self.try_apply_single_sector_control(bytes, header)?
+                    } else {
+                        self.try_apply_single_consume(bytes, header)?
+                    };
+                    if let Some(report) = applied {
                         return Ok((report, journal));
                     }
                 }
@@ -2455,6 +2557,31 @@ impl AnimatedClient {
                         plan.validate(decoded.commands())
                             .map_err(StateError::Hud)
                             .map_err(ClientPresentationError::from)?;
+                    }
+                    if let Some(prepared) = self
+                        .received
+                        .prepare_food_sector(command.bytes)
+                        .map_err(ClientPresentationError::from)?
+                    {
+                        let report = FrameReport {
+                            commands: 1,
+                            ignored: 0,
+                        };
+                        let journal = plan
+                            .map(|p| HudIngressReport::new(report, p.schema, 0))
+                            .transpose()
+                            .map_err(StateError::Hud)
+                            .map_err(ClientPresentationError::from)?;
+                        let report = self.apply_prepared_food_sector::<E, _>(
+                            prepared,
+                            decoded.prefix(),
+                            |spawn, zoom| {
+                                resolve_food(spawn, zoom)?.ok_or_else(|| {
+                                    ClientPresentationError::FoodFactoryRequired.into()
+                                })
+                            },
+                        )?;
+                        return Ok((report, journal));
                     }
                     if let Some(prepared) = self
                         .received
@@ -5272,6 +5399,264 @@ mod resolved_draw_tests {
         }
         assert_eq!(fast.foods.foods().len(), 9);
         assert_eq!(fast.received.foods.len(), 6);
+    }
+
+    #[test]
+    fn food_sector_listings_and_clears_match_full_transactions() {
+        let mut fast = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut fast, &setup());
+        apply_factories(&mut fast, &spawn(0, 0));
+        let frozen = fast.clone();
+        let before = format!("{frozen:?}");
+        let mut ordinary = fast.clone();
+        for command in [
+            vec![b'F', 10, 10, 8, 1, 2, 1, 9, 1, 2, 255, 8, 3, 4, 1],
+            vec![b'f', 10, 10, 1, 2, 4, 1],
+            vec![b'F', 11, 12, 8, 3, 4, 0, 255, 5, 6, 1],
+            vec![b'F', 10, 10, 8, 3, 4, 1, 255, 5, 6, 1],
+        ] {
+            assert_single_food_matches_transaction(&mut fast, &mut ordinary, &command, true);
+        }
+        // Retained eaten duplicates and detached own objects must be retired in
+        // the same order as the full event loop, including repeated/empty clears.
+        for command in [vec![b'<', 10, 10, 1, 2, 0, 7], vec![b's', 0, 7, 1]] {
+            apply_factories(&mut fast, &command);
+            apply_factories(&mut ordinary, &command);
+        }
+        for command in [vec![b'w', 11, 12], vec![b'w', 10, 10], vec![b'w', 10, 10]] {
+            let packet = [vec![0x12, 0x34], command.clone()].concat();
+            fast.try_apply_single_sector_control(&packet, ElapsedHeader::TwoBytes)
+                .unwrap()
+                .unwrap();
+            let reference = [vec![0x12, 0x34], bundle(&[command, vec![b'?']])].concat();
+            ordinary
+                .apply_frame(&reference, ElapsedHeader::TwoBytes)
+                .unwrap();
+            Arc::make_mut(&mut ordinary.received).commands_applied -= 1;
+            Arc::make_mut(&mut ordinary.received).ignored_commands -= 1;
+            assert_exact_client(&fast, &ordinary);
+        }
+        assert_eq!(format!("{frozen:?}"), before);
+    }
+
+    #[test]
+    fn v13_sector_lists_keep_absolute_keys_split_listings_and_cache_order() {
+        let mut client = AnimatedClient::new(0.).unwrap();
+        let mut setup = setup();
+        setup[23] = 13;
+        apply_factories(&mut client, &setup);
+        let mut ordinary = client.clone();
+        for command in [
+            vec![b'F', 9, 4, 76, 4, 76, 1, 9, 4, 76, 4, 76, 2],
+            vec![b'F', 9, 4, 80, 4, 76, 1, 9, 4, 84, 4, 76, 1],
+        ] {
+            assert_single_food_matches_transaction(&mut client, &mut ordinary, &command, true);
+        }
+        assert_eq!(client.foods.foods().len(), 4);
+        assert_eq!(client.received.foods.len(), 3);
+        let frozen = client.clone();
+        let before = format!("{frozen:?}");
+        let command = vec![b'w', 11, 11];
+        client
+            .try_apply_single_sector_control(&command, ElapsedHeader::Absent)
+            .unwrap()
+            .unwrap();
+        ordinary
+            .apply_frame(&bundle(&[command, vec![b'?']]), ElapsedHeader::Absent)
+            .unwrap();
+        Arc::make_mut(&mut ordinary.received).commands_applied -= 1;
+        Arc::make_mut(&mut ordinary.received).ignored_commands -= 1;
+        assert_exact_client(&client, &ordinary);
+        assert!(client.foods.foods().is_empty());
+        assert_eq!(format!("{frozen:?}"), before);
+    }
+
+    #[test]
+    fn sector_controls_keep_protocol_specific_lengths_and_ignored_counts() {
+        for protocol in [13, 19] {
+            let mut base = AnimatedClient::new(0.).unwrap();
+            let mut setup = setup();
+            setup[23] = protocol;
+            apply_factories(&mut base, &setup);
+            for code in *b"wW" {
+                for len in 0..=6 {
+                    let mut command = vec![code];
+                    command.extend(std::iter::repeat_n(10, len));
+                    let mut fast = base.clone();
+                    let mut full = base.clone();
+                    let actual =
+                        fast.try_apply_single_sector_control(&command, ElapsedHeader::Absent);
+                    let expected =
+                        full.apply_frame(&bundle(&[command, vec![b'?']]), ElapsedHeader::Absent);
+                    match (actual, expected) {
+                        (Ok(Some(report)), Ok(reference)) => {
+                            assert_eq!(report.commands + 1, reference.commands);
+                            assert_eq!(report.ignored + 1, reference.ignored);
+                            Arc::make_mut(&mut full.received).commands_applied -= 1;
+                            Arc::make_mut(&mut full.received).ignored_commands -= 1;
+                        }
+                        (Err(a), Err(b)) => assert_eq!(a, b),
+                        result => panic!("protocol={protocol}, code={code}, len={len}, {result:?}"),
+                    }
+                    assert_exact_client(&fast, &full);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn food_sector_publication_synchronizes_reduced_rival_tails() {
+        let mut fast = AnimatedClient::new(0.).unwrap();
+        apply_factories(&mut fast, &setup());
+        apply_factories(&mut fast, &spawn(0, 0));
+        let mut rival = spawn(0, 0);
+        rival[2] = 8;
+        apply_factories(&mut fast, &rival);
+        // Authored reduced-state fixture with a retired-tail offset awaiting
+        // the ordinary post-ingress synchronization, independent of food.
+        fast.detail_pressure = true;
+        let snake = Arc::make_mut(&mut fast.entries[1].snake);
+        snake.compact_visual_body();
+        assert!(snake.body().detail_reduced());
+        snake.sync_received_visual_tail(Point { x: -400., y: 50. });
+        let frozen = fast.clone();
+        let before = format!("{frozen:?}");
+        let mut ordinary = fast.clone();
+        assert_single_food_matches_transaction(
+            &mut fast,
+            &mut ordinary,
+            &[b'F', 10, 10, 9, 1, 2, 1, 9, 3, 4, 1],
+            false,
+        );
+        assert_ne!(fast.entries[1].snake, frozen.entries[1].snake);
+        assert_eq!(format!("{frozen:?}"), before);
+    }
+
+    #[test]
+    fn food_sector_capacity_counts_new_keys_once_before_factories() {
+        for protocol in [13, 19] {
+            let mut client = AnimatedClient::new(0.).unwrap();
+            let mut setup = setup();
+            setup[23] = protocol;
+            apply_factories(&mut client, &setup);
+            let state = Arc::make_mut(&mut client.received);
+            // Authored received-capacity fixture; no raw server input.
+            for i in 0..crate::state::MAX_FOODS - 1 {
+                let x = (i / 256) as u16;
+                let y = (i % 256) as u16;
+                let key = if protocol == 13 {
+                    (u32::from(x) << 16) | u32::from(y)
+                } else {
+                    i as u32
+                };
+                state.foods.insert(
+                    key,
+                    crate::state::Food {
+                        position: Point {
+                            x: f64::from(x) - 1000.,
+                            y: f64::from(y) - 1000.,
+                        },
+                        size: 0.2,
+                        color: 9,
+                        sector: if protocol == 13 {
+                            ((x / 100) as u8, (y / 100) as u8)
+                        } else {
+                            (0, 0)
+                        },
+                    },
+                );
+            }
+            let repeated = if protocol == 13 {
+                vec![b'F', 9, 4, 76, 4, 76, 1, 9, 4, 76, 4, 76, 1]
+            } else {
+                vec![b'F', 10, 10, 9, 1, 2, 1, 9, 1, 2, 1]
+            };
+            assert_eq!(
+                client
+                    .received
+                    .prepare_food_sector(&repeated)
+                    .unwrap()
+                    .unwrap()
+                    .len(),
+                2
+            );
+            let packet = if protocol == 13 {
+                vec![b'F', 9, 4, 76, 4, 76, 1, 9, 4, 80, 4, 76, 1]
+            } else {
+                vec![b'F', 10, 10, 9, 1, 2, 1, 9, 3, 4, 1]
+            };
+            let before = client.received().clone();
+            let result = client.try_apply_single_food::<ClientPresentationError, _>(
+                &packet,
+                ElapsedHeader::Absent,
+                |_, _| panic!("capacity rejection must precede factories"),
+            );
+            assert_eq!(
+                result,
+                Err(ClientPresentationError::State(StateError::Limit))
+            );
+            assert_eq!(client.received(), &before);
+            assert!(client.foods.foods().is_empty());
+        }
+    }
+
+    #[test]
+    fn food_sector_late_factory_failure_preserves_owned_and_frozen_state() {
+        for protocol in [13, 19] {
+            let mut client = AnimatedClient::new(0.).unwrap();
+            let mut setup = setup();
+            setup[23] = protocol;
+            apply_factories(&mut client, &setup);
+            apply_factories(&mut client, &spawn(0, 0));
+            let initial = if protocol == 13 {
+                vec![b'f', 8, 3, 232, 3, 232, 1]
+            } else {
+                vec![b'f', 10, 10, 1, 2, 8, 1]
+            };
+            apply_factories(&mut client, &initial);
+            let frozen = client.clone();
+            let before = format!("{client:?}");
+            let mut calls = 0;
+            let packet = if protocol == 13 {
+                vec![b'F', 9, 4, 76, 4, 76, 1, 9, 4, 80, 4, 76, 1]
+            } else {
+                vec![b'F', 10, 10, 8, 3, 4, 1, 9, 5, 6, 1]
+            };
+            let result = client.try_apply_single_food::<ClientPresentationError, _>(
+                &packet,
+                ElapsedHeader::Absent,
+                |spawn, zoom| {
+                    calls += 1;
+                    if calls == 2 {
+                        return Err(ClientPresentationError::FoodFactoryRequired);
+                    }
+                    factory(spawn, zoom)
+                },
+            );
+            assert_eq!(result, Err(ClientPresentationError::FoodFactoryRequired));
+            assert_eq!(calls, 2);
+            assert_eq!(format!("{client:?}"), before);
+            assert_eq!(format!("{frozen:?}"), before);
+            for bad in [
+                vec![b'F', 10],
+                vec![b'F', 10, 10, 8],
+                vec![b'w'],
+                vec![b'w', 10, 10, 0],
+            ] {
+                assert!(
+                    client
+                        .apply_frame_with_factories::<ClientPresentationError, _, _>(
+                            &bad,
+                            ElapsedHeader::Absent,
+                            |_| Ok(PairedFaceGeometry::default()),
+                            factory
+                        )
+                        .is_err()
+                );
+                assert_eq!(format!("{client:?}"), before);
+                assert_eq!(format!("{frozen:?}"), before);
+            }
+        }
     }
 
     #[test]

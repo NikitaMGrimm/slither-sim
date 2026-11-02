@@ -485,6 +485,53 @@ impl FoodWorld {
         Ok(instance)
     }
 
+    pub(crate) fn spawn_sector<E, F>(
+        &mut self,
+        spawns: &[FoodSpawn],
+        zoom: f64,
+        mut factory: F,
+    ) -> Result<(), E>
+    where
+        E: From<FoodError>,
+        F: FnMut(usize) -> Result<FoodFactory, E>,
+    {
+        let mut appended = Vec::new();
+        appended
+            .try_reserve(spawns.len())
+            .map_err(|_| FoodError::Allocation)?;
+        let mut serial = self.last_instance_serial;
+        for (index, spawn) in spawns.iter().enumerate() {
+            // Preserve resolver/error order from the ordinary event loop.
+            let factory = factory(index)?;
+            if self.foods.len() + appended.len() >= MAX_RETAINED_FOODS {
+                return Err(FoodError::Capacity.into());
+            }
+            serial = serial.checked_add(1).ok_or(FoodError::SerialExhausted)?;
+            appended.push(create(FoodInstance(serial), *spawn, factory.input(zoom))?);
+        }
+        if appended.is_empty() {
+            return Ok(());
+        }
+        // Stage only new records. Copy retained records only for a genuinely
+        // shared external snapshot, after all factories and numeric checks pass.
+        // See https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-join-sectors/REPORT.md.
+        if Arc::get_mut(&mut self.foods).is_none() {
+            let mut foods = Vec::new();
+            foods
+                .try_reserve(self.foods.len() + appended.len())
+                .map_err(|_| FoodError::Allocation)?;
+            foods.extend_from_slice(&self.foods);
+            self.foods = Arc::new(foods);
+        }
+        let foods = Arc::get_mut(&mut self.foods).expect("unique food array");
+        foods
+            .try_reserve(appended.len())
+            .map_err(|_| FoodError::Allocation)?;
+        foods.extend(appended);
+        self.last_instance_serial = serial;
+        Ok(())
+    }
+
     /// Affect the newest equal key, even if it was already eaten. Repeat consumes
     /// reset progress and capture a new token, retaining fade and uneaten scale.
     pub fn consume(&mut self, key: u32, consume: FoodConsume) -> Option<FoodInstance> {
