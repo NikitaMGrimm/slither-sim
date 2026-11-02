@@ -447,8 +447,11 @@ impl Frame {
         resident: &'a BTreeMap<ResourceKey, BodyAsset>,
     ) -> Result<impl Iterator<Item = Result<Quad>> + 'a> {
         self.check_limits()?;
-        // The frame and resident catalog remain immutable for this iterator.
-        // Keep #441's exact paired-projection reuse for actual GPU conversion.
+        // A frame and its resident catalog are immutable for this iterator.
+        // Paired pellet draws differ only in alpha; retain the last validated
+        // projection rather than repeating resource checks and f64 conversion.
+        // Bit comparisons preserve signed-zero distinctions in the input math.
+        // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
         let mut previous: Option<(&Draw, Quad)> = None;
         Ok(self
             .draws

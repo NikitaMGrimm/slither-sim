@@ -5,7 +5,7 @@ ROOT=Path(__file__).resolve().parent
 def rows(name):
  with (ROOT/name).open(newline='',encoding='utf-8')as stream:return list(csv.DictReader(stream))
 def tables():
- data=rows('runs.csv');identity=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
+ data=rows('runs-current.csv');identity=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
  for r in data:
   assert int(r['callbacks'])==600 and int(r['skips'])==0
   assert r['binary_sha256']==identity['arms'][r['arm']]['binary_sha256']

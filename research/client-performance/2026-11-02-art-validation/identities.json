@@ -1,48 +1,50 @@
 {
-  "base": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+  "base": "0f45f4acb00431ba461c604340fa6b63428c2db4",
   "access": "Restricted owner-local join; original authored 25,000-pellet rectangle. Raw data is not published.",
   "input_sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43",
-  "driver_sha256": "f31099427df9b414425dd3c086488b8fd24bb01577d388c72ddf867c5fe5b93d",
-  "runner_sha256": "5b2b37867080ff34c791140a9994a52a9bee95c978a2de0277bd130efa5ed67b",
+  "driver_sha256": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9",
+  "runner_sha256": "7811580a795ffbba0eac281fcabfb1edbc4ef88f141c23b215e4259d3042c555",
   "arms": {
     "control": {
-      "binary_sha256": "b4af8bbe2f218b355af9ffb807568f18a9e8a6c1b550a119f772b8e420b5268c",
-      "frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
-      "reviewed_frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
+      "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4",
+      "frame_source_sha256": "86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee",
+      "reviewed_frame_source_sha256": "86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee",
+      "reviewed_frame_blob_oid": "55a5a56d79433e378e5d414344deb6217dcfd733",
       "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
-      "final_runtime_sha256": "974662291ec34cec1b22f794e7d13ed4b2293b25ab2aa75c48e68e10cc2a973f",
+      "final_runtime_sha256": "093ca1f06a721737e1e3722e8ea7faa9545e5554ea4fa7e5c2c06f1b9711f8c2",
       "instrumented_source_sha256": {
-        "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
-        "client/src/presentation/client.rs": "2f53021732295d393f1a952be0a3afdbddf870720801e2a5c8962b90f2b73f2a",
+        "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
+        "client/src/presentation/client.rs": "87a67a13e7350acb2fc8bf73af93b19075760cea3ebe8194c0de89b9236450c5",
         "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
-        "client/apps/wgpu-slice/src/game.rs": "9ef1df01c1d15324f55d0ab296952a0c177740c1ea1c58daf6725ec06b1d6337",
-        "client/apps/wgpu-slice/src/bank.rs": "775dbe031550dab50a18a93815f0ab839da6b7a091ffc511af9f3e428cfedd9a",
-        "client/apps/wgpu-slice/src/gpu.rs": "b076bc1abcc749a18d4c75f11d6faf736646c36297e53d174f7177f91cf83040",
-        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/game.rs": "7d64b3fe9931e4270a33f875cb771a3122f992bcefc9bc49cbdf8c83ef644e6f",
+        "client/apps/wgpu-slice/src/bank.rs": "8d66d871869ee7b6967daf413342c998307a08deeb14d23dd98ab281de8ff826",
+        "client/apps/wgpu-slice/src/gpu.rs": "01628cc74abb8e00c17d1db6786682c5e17f436099dc0c77d824c7d02b094a8a",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "ca23ed764ee122b91b884fc8db572ac02c46f886c732024c68da0f747bc2223a",
         "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
-        "client/apps/wgpu-slice/src/render.rs": "06d697b531ecf1795472dbc5e04813afa8e912b8b5b8413637cc1fa6166e00da",
-        "client/apps/wgpu-slice/src/text_native.rs": "2306c1a78f9e163f342f351c406e19cc13e631cdf0456fb36242f47f79a89c33",
-        "client/apps/wgpu-slice/examples/join_profile.rs": "f31099427df9b414425dd3c086488b8fd24bb01577d388c72ddf867c5fe5b93d"
+        "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
+        "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
       }
     },
     "candidate": {
-      "binary_sha256": "086f715e63468ad2de5f4a557a4590e13b612454199ac0e66e319eadf78861a8",
-      "frame_source_sha256": "1a8292dabd4e7a699999775b94211cf472c62a4f073aef1f8a88019c7ec5d035",
-      "reviewed_frame_source_sha256": "1a8292dabd4e7a699999775b94211cf472c62a4f073aef1f8a88019c7ec5d035",
+      "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90",
+      "frame_source_sha256": "81febecf004263eaa2b6e830acec2ffd963f33ae3c6c4d8d91a681bbc30d9138",
+      "reviewed_frame_source_sha256": "81febecf004263eaa2b6e830acec2ffd963f33ae3c6c4d8d91a681bbc30d9138",
+      "reviewed_frame_blob_oid": "ffb3301909380456d0c2578053a77588a51b98a3",
       "source_comparison": "Full measured frame.rs bytes and final branch frame.rs bytes are identical. No normalization is used for these two identities.",
-      "final_runtime_sha256": "7209307f714338cf9dc958819d6e8b808c9ffe49c20395f8583bcc35e5eb7dcd",
+      "final_runtime_sha256": "1466006cf252d4a93079e4eab63ddc23be269ef296ee9c20e5c39732dd2139da",
       "instrumented_source_sha256": {
-        "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
-        "client/src/presentation/client.rs": "2f53021732295d393f1a952be0a3afdbddf870720801e2a5c8962b90f2b73f2a",
+        "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
+        "client/src/presentation/client.rs": "87a67a13e7350acb2fc8bf73af93b19075760cea3ebe8194c0de89b9236450c5",
         "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
-        "client/apps/wgpu-slice/src/game.rs": "9ef1df01c1d15324f55d0ab296952a0c177740c1ea1c58daf6725ec06b1d6337",
-        "client/apps/wgpu-slice/src/bank.rs": "775dbe031550dab50a18a93815f0ab839da6b7a091ffc511af9f3e428cfedd9a",
-        "client/apps/wgpu-slice/src/gpu.rs": "b076bc1abcc749a18d4c75f11d6faf736646c36297e53d174f7177f91cf83040",
-        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/game.rs": "7d64b3fe9931e4270a33f875cb771a3122f992bcefc9bc49cbdf8c83ef644e6f",
+        "client/apps/wgpu-slice/src/bank.rs": "8d66d871869ee7b6967daf413342c998307a08deeb14d23dd98ab281de8ff826",
+        "client/apps/wgpu-slice/src/gpu.rs": "01628cc74abb8e00c17d1db6786682c5e17f436099dc0c77d824c7d02b094a8a",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "ca23ed764ee122b91b884fc8db572ac02c46f886c732024c68da0f747bc2223a",
         "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
-        "client/apps/wgpu-slice/src/render.rs": "06d697b531ecf1795472dbc5e04813afa8e912b8b5b8413637cc1fa6166e00da",
-        "client/apps/wgpu-slice/src/text_native.rs": "2306c1a78f9e163f342f351c406e19cc13e631cdf0456fb36242f47f79a89c33",
-        "client/apps/wgpu-slice/examples/join_profile.rs": "f31099427df9b414425dd3c086488b8fd24bb01577d388c72ddf867c5fe5b93d"
+        "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
+        "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
       }
     }
   },
@@ -52,21 +54,21 @@
         "callbacks": 600,
         "messages": 29044,
         "skips": 0,
-        "processing_s": 68.0249545,
+        "processing_s": 69.7898638,
         "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0",
         "command_digest": "4890089c3256d5b3",
         "quad_digest": "6e886002677d8939",
-        "binary_sha256": "b4af8bbe2f218b355af9ffb807568f18a9e8a6c1b550a119f772b8e420b5268c"
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
       },
       "candidate": {
         "callbacks": 600,
         "messages": 29044,
         "skips": 0,
-        "processing_s": 68.292715,
+        "processing_s": 73.8638726,
         "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0",
         "command_digest": "4890089c3256d5b3",
         "quad_digest": "6e886002677d8939",
-        "binary_sha256": "086f715e63468ad2de5f4a557a4590e13b612454199ac0e66e319eadf78861a8"
+        "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90"
       }
     },
     "join_whole_map": {
@@ -74,21 +76,21 @@
         "callbacks": 600,
         "messages": 29044,
         "skips": 0,
-        "processing_s": 8.0415487,
+        "processing_s": 8.6408006,
         "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa",
         "command_digest": "97d4e2489152d63c",
         "quad_digest": "003b7f4e45cb2dbc",
-        "binary_sha256": "b4af8bbe2f218b355af9ffb807568f18a9e8a6c1b550a119f772b8e420b5268c"
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
       },
       "candidate": {
         "callbacks": 600,
         "messages": 29044,
         "skips": 0,
-        "processing_s": 7.9576061,
+        "processing_s": 11.310319400000001,
         "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa",
         "command_digest": "97d4e2489152d63c",
         "quad_digest": "003b7f4e45cb2dbc",
-        "binary_sha256": "086f715e63468ad2de5f4a557a4590e13b612454199ac0e66e319eadf78861a8"
+        "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90"
       }
     },
     "rectangle_default": {
@@ -96,21 +98,21 @@
         "callbacks": 600,
         "messages": 8,
         "skips": 0,
-        "processing_s": 51.7815077,
+        "processing_s": 55.3207425,
         "numeric_sha256": "93c1a9aa389e76c55871dd6075b1a63cc7aff78bad62a8943ae36d49a0039e4e",
         "command_digest": "ad90cc8696ced847",
         "quad_digest": "fadd7bfa0a62a816",
-        "binary_sha256": "b4af8bbe2f218b355af9ffb807568f18a9e8a6c1b550a119f772b8e420b5268c"
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
       },
       "candidate": {
         "callbacks": 600,
         "messages": 8,
         "skips": 0,
-        "processing_s": 46.7884182,
+        "processing_s": 49.5146854,
         "numeric_sha256": "93c1a9aa389e76c55871dd6075b1a63cc7aff78bad62a8943ae36d49a0039e4e",
         "command_digest": "ad90cc8696ced847",
         "quad_digest": "fadd7bfa0a62a816",
-        "binary_sha256": "086f715e63468ad2de5f4a557a4590e13b612454199ac0e66e319eadf78861a8"
+        "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90"
       }
     }
   }
