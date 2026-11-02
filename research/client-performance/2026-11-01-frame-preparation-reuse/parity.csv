@@ -1,0 +1,5 @@
+workload,zoom,frames,exact_fields,mismatches,draw_resource_command_digest,exact_rgba_pairs
+replay,0,366,18,0,46fdb4b9136c161c,0
+replay,-120,366,18,0,7e2b4f68d35661f8,0
+synthetic,0,180,18,0,176a833148bcd467,3
+synthetic,-120,180,18,0,e14b3e51277742ef,3

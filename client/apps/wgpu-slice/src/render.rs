@@ -25,6 +25,12 @@ pub fn set_preparation_observer(
 ) -> Option<PreparationObserver> {
     PREPARATION_OBSERVER.with(|slot| slot.replace(observer))
 }
+#[cfg(feature = "frame-profile")]
+pub(crate) fn observe_preparation(stage: &'static str, identity: u64) {
+    if let Some(observer) = PREPARATION_OBSERVER.with(|slot| slot.get()) {
+        observer(stage, identity);
+    }
+}
 macro_rules! preparation_phase {
     ($stage:literal, $identity:expr) => {{
         #[cfg(feature = "frame-profile")]

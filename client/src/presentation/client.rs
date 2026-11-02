@@ -2909,18 +2909,22 @@ impl AnimatedClient {
         E: From<ClientPresentationError>,
         F: FnOnce(FrameStep, ClientControlView) -> Result<ClientControlActions, E>,
     {
-        let mut next = self.clone();
-        let step = next
-            .clock
+        // Native probes this boundary by returning an error from control. Stage
+        // only the clock until the callback accepts; copying the world first
+        // needlessly copies every retained packet object for that read-only probe.
+        let mut clock = self.clock.clone();
+        let step = clock
             .advance(now_ms, lagging, false)
             .map_err(ClientPresentationError::from)?;
-        let actions = control(step, next.control_view())?;
+        let actions = control(step, self.control_view())?;
         if let Some(heading) = actions.gaze_heading {
             finite(&[heading]).map_err(ClientPresentationError::from)?;
         }
         if let Some(fraction) = actions.minimap_ui_fraction {
             finite(&[fraction]).map_err(ClientPresentationError::from)?;
         }
+        let mut next = self.clone();
+        next.clock = clock;
         if let Some(heading) = actions.gaze_heading {
             next.set_own_gaze_heading(heading)?;
         }

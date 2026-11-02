@@ -205,3 +205,53 @@ fn measure_owned_state_and_presentation_separately_from_reader() {
     assert_eq!(state.frames_applied, 1);
     assert_eq!(client.received().frames_applied, 1);
 }
+
+#[test]
+fn read_only_control_probe_allocates_nothing_in_a_populated_world() {
+    use slither_client::presentation::ClientPresentationError;
+    let mut client = AnimatedClient::new(0.).unwrap();
+    client
+        .apply_frame(&bundle(&[&setup(), &appearance()]), ElapsedHeader::Absent)
+        .unwrap();
+    let snakes: Vec<_> = (100..140_u16)
+        .map(|id| {
+            let mut snake = appearance();
+            snake[1..3].copy_from_slice(&id.to_be_bytes());
+            snake
+        })
+        .collect();
+    for snake in snakes {
+        client
+            .apply_frame(&bundle(&[&snake]), ElapsedHeader::Absent)
+            .unwrap();
+    }
+    assert_eq!(client.received().snakes.len(), 41);
+    let before = client.clone();
+    let view = before.control_view();
+    for now in [0., 8., 80., 7.] {
+        let mut calls = 0;
+        assert_eq!(
+            allocations(|| {
+                let result = client.advance_with_control::<ClientPresentationError, _>(
+                    now,
+                    true,
+                    |_, actual| {
+                        calls += 1;
+                        assert_eq!(actual, view);
+                        Err(ClientPresentationError::Limit)
+                    },
+                );
+                assert_eq!(result, Err(ClientPresentationError::Limit));
+            }),
+            0
+        );
+        assert_eq!(calls, 1);
+        assert_eq!(client, before);
+    }
+    let mut expected = before;
+    assert_eq!(
+        client.advance(8., false).unwrap(),
+        expected.advance(8., false).unwrap()
+    );
+    assert_eq!(client, expected);
+}
