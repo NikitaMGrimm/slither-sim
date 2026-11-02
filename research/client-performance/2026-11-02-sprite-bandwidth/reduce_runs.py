@@ -276,12 +276,16 @@ def export_integration(root, output):
     write_csv(output / "integration-runs.csv", rows)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("raw", type=Path)
     parser.add_argument("--output", type=Path, default=Path(__file__).parent)
     parser.add_argument("--series", choices=("history", "frozen", "diagnostics", "parity", "profile", "integration", "all"), default="all")
-    args = parser.parse_args()
+    parser.add_argument("--reference", type=Path, help="parity only: retained control readback directory; baseline CSVs must already be in --output")
+    parser.add_argument("--prefix", default="", help="parity only: output filename prefix, e.g. pre-mip- or revision-")
+    args = parser.parse_args(argv)
+    if (args.reference is not None or args.prefix) and args.series != "parity":
+        parser.error("--reference and --prefix require --series parity")
     require(args.output.is_dir(), "output directory must already exist")
     for series in ("history", "frozen"):
         if args.series in (series, "all"):
@@ -289,7 +293,7 @@ def main():
     if args.series in ("diagnostics", "all"):
         export_diagnostics(args.raw, args.output)
     if args.series == "parity":
-        export_parity(args.raw, args.output)
+        export_parity(args.raw, args.output, args.reference, args.prefix)
     if args.series == "profile":
         export_profiles(args.raw, args.output)
     if args.series == "integration":

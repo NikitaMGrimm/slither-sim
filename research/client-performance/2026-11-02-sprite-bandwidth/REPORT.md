@@ -465,6 +465,11 @@ and from owner perceptual acceptance.
 - The stdlib recompute negative checks reject missing rows/cells, duplicate and
   mislabeled IDs, wrong executable bindings, incomplete diagnostics, altered
   report blocks and mismatched parity digests (12 tests).
+- Two authored CLI tests cover default/pre-mip/revision parity dispatch and reject
+  ignored parity options on other series. The documented reduction sequence
+  rebuilds all 16 generated CSVs byte-identically from retained inputs; the
+  curated interrupted-run manifest is copied unchanged. The rebuilt bundle passes
+  recompute without any new replay, rendering or timing run.
 
 ## Attempts and limitations
 
@@ -515,6 +520,72 @@ IDs and label consistency, chronological alternating arms, executable hashes,
 callback/sample selections and every generated table. `--write` replaces only
 marked generated blocks. [reduce_runs.py](reduce_runs.py) reduces the owner-local
 journals into the adjacent per-run summaries; raw inputs are not distributed.
+
+### Rebuild the retained CSVs without new measurements
+
+Run the following from this study directory with the **owner-retained raw
+journals and RGBA readbacks**. `$journals` denotes the initial journal directory;
+its `final-gradient`, `final-mip`, `post-studio` and `sparse-revision` subdirectories
+retain the later series. Set the two example paths before running. Use a fresh
+output directory so reductions cannot overwrite the committed evidence or raw
+inputs. These commands reduce existing bytes; they run no replay or GPU work.
+
+```powershell
+$journals='D:/path/to/retained/sprite-bandwidth-journals'
+$out='D:/new-reduction-output'
+New-Item -ItemType Directory -Path $out -ErrorAction Stop | Out-Null
+
+# Initial diagnostics and frozen runs; the initial history is the pre-boundary series.
+python -B reduce_runs.py $journals --output $out --series diagnostics
+python -B reduce_runs.py $journals --output $out --series frozen
+python -B reduce_runs.py $journals --output $out --series history
+Move-Item -LiteralPath "$out/history-runs.csv" -Destination "$out/pre-boundary-runs.csv"
+
+# Complete corrected history, its control/candidate parity and pass profile.
+python -B reduce_runs.py "$journals/final-mip" --output $out --series history
+python -B reduce_runs.py "$journals/final-mip" --output $out --series parity
+python -B reduce_runs.py "$journals/final-mip" --output $out --series profile
+
+# The pre-mip journal has both arms and its own control images; no --reference is needed.
+python -B reduce_runs.py "$journals/final-gradient" --output $out --series parity --prefix pre-mip-
+python -B reduce_runs.py "$journals/post-studio" --output $out --series integration
+
+# Sparse/caching/headline follow-up summaries, then post-champion correctness.
+python -B reduce_revision.py "$journals/sparse-revision" sparse --output $out
+python -B reduce_revision.py "$journals/sparse-revision" cache --output $out
+python -B reduce_revision.py "$journals/sparse-revision" revision --output $out
+python -B reduce_runs.py "$journals/sparse-revision/post-champion-parity" --output $out --series parity --reference "$journals/final-mip" --prefix revision-
+```
+
+`--reference` and `--prefix` apply only to `--series parity`; other series reject
+them. The reference mode reuses `parity-runs.csv` and `pixels.csv` already in
+`--output`, checks the control readback hashes, and writes the prefixed files.
+The corrected parity command above creates those baseline CSVs first. When
+reducing only the revision parity, copy the committed baseline pair into the
+fresh output directory before invoking it.
+
+These commands produce every retained CSV **except `interrupted-runs.csv`**.
+That file is a curated attempt manifest, not an `export_series` output: five
+completed receipts and the interrupted sixth receipt in `final-gradient` supply
+the exit/binary/receipt/available-CSV bindings; the `reason` column records the
+manual source-mip investigation decision. The raw receipts alone cannot recreate
+that annotation, and no automated exporter for this manifest is provided.
+Preserve the committed manifest as an input. `provenance.json` likewise retains
+curated source/build/access metadata. The following copies those inputs and the
+checker into the new output directory and verifies the regenerated tables:
+
+```powershell
+Copy-Item -LiteralPath ./interrupted-runs.csv,./provenance.json,./REPORT.md,./probe.patch,./cache-retirement.patch,./recompute.py,./recompute_revision.py,./reduce_runs.py -Destination $out
+python -B "$out/recompute.py" --check
+
+# Small synthetic CLI and dataset-completeness regressions, from the study directory.
+python -B -m unittest test_reduce_runs test_recompute
+```
+
+The public aggregate CSVs can regenerate every report table via `recompute.py`;
+they cannot regenerate raw journals, restricted recordings or RGBA images. The
+raw-to-CSV commands require the retained local inputs and are not a claim that
+those private inputs are distributed or independently remeasured.
 
 The authored workload needs no external recording. Its AMD-specific measurement
 drivers are retained in [probe.patch](probe.patch), outside the shipped examples.
