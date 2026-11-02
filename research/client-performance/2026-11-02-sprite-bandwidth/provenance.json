@@ -1,0 +1,107 @@
+{
+  "frozen": {
+    "control_commit": "ffc36bb0c21e060bd555a95ba76d9b4f35e2960d",
+    "candidate_commit": "d62eb2060780eac4d1fb9e876e53785ddeef699a",
+    "shared_driver_sha256": "588bf03eeda8f299c52b0df920156f85b3bf424512ee0a70afb9de32e44ddf2a",
+    "binaries": {
+      "before": "3f2b6af933e9cdcd6d107d375a8ddf8a5320df69e01a8a6dfae32b0d6a5448b0",
+      "after": "b4047950440d479f60b2ec1f8b5c821859134e39fff3f65f48935ebc00356610"
+    },
+    "status": "diagnostic; predates portable handle-ownership correction"
+  },
+  "diagnostics": {
+    "base_commit": "d325df3bb505fb10acbb39624e0f927c43747d08",
+    "binary_sha256": "ab8cc0817a7388e7efbea5684d3a0d8278205860edd0594a81cc04e03500249f",
+    "status": "initial hypothesis test; excluded from primary comparisons"
+  },
+  "input": {
+    "recording_sha256": "84d4c361ee9feb5369166858cabdca857f7f740a3f19d146cbd3e0eaf8902c82",
+    "access": "restricted owner-local recording; no redistribution",
+    "synthetic": "repository-authored 30,000-food/40-snake protocol-19 workload",
+    "synthetic_source_sha256": "163248697ef818ce9e6678e4486be3152e18313b082d232900c4c2e37a9222cb"
+  },
+  "adapter": {
+    "name": "AMD Radeon(TM) Graphics",
+    "vendor": 4098,
+    "device": 5056,
+    "type": "IntegratedGpu",
+    "backend": "Dx12",
+    "driver": "32.0.21001.9024"
+  },
+  "build": {
+    "os": "Windows x86-64",
+    "rust": "1.99.0",
+    "profile": "release, repository thin LTO, one codegen unit",
+    "features": [
+      "frame-profile"
+    ],
+    "cargo_jobs": 2,
+    "package_clean_before_each_binary": true,
+    "world_and_presentation_format": "Rgba8Unorm (offscreen)",
+    "world_samples": 4,
+    "physical_outputs": [
+      "960x540 Original",
+      "1920x1080 Original",
+      "1920x1080 Native"
+    ]
+  },
+  "pre-boundary": {
+    "control_commit": "ffc36bb0c21e060bd555a95ba76d9b4f35e2960d",
+    "candidate_commit": "232bfc39061b231f7bf8a31802cfeba9d1206d14",
+    "shared_driver_sha256": "84bf4b5c3d99a2b64a2cbea1403d814df6a03d5dd14eef44b7b8b52dc9305447",
+    "binaries": {
+      "before": "011ee39bd66c8366f14fe3866a4a3abb09c6a7f8881dc2b7dc2aa89e396409f7",
+      "after": "d733c3ff22180dfa0f751cdb03c51acf8d099a953260397be19d56a593c523fd"
+    },
+    "status": "diagnostic; predates the failing and corrected glow boundary sweep",
+    "source_blobs": {
+      "gpu.rs": "3377ecff440ae0f2de5ef360d274b111ec082aac",
+      "quad.wgsl": "dd57163838a4e0736a8aad88c32714c545cee4d3",
+      "frame.rs": "612f5e2eb79ba6d0416a4f87573e350a8299c815",
+      "draw_runs.rs": "b2b9f326b28f288ee9588a388ae8eadd300ee341",
+      "texture_arrays.rs": "8837fc1b9c4c5a81d918c43226f49a56518bc261",
+      "bank.rs": "4421e12f4cd27f7892617e740c13cadf4877bff7",
+      "scene.rs": "69eb0a98b9c4347a72eaef7c96c59a9d720f7646",
+      "world_presenter.rs": "68743be34384607e39dbbd23a64cc36a8e0d6d92"
+    }
+  },
+  "pre-mip": {
+    "control_commit": "ffc36bb0c21e060bd555a95ba76d9b4f35e2960d",
+    "candidate_commit": "34a9548848433b368a68e16f823a5ff8715fc5fb",
+    "shared_driver_sha256": "84bf4b5c3d99a2b64a2cbea1403d814df6a03d5dd14eef44b7b8b52dc9305447",
+    "binaries": {
+      "before": "011ee39bd66c8366f14fe3866a4a3abb09c6a7f8881dc2b7dc2aa89e396409f7",
+      "after": "f34512358d1dd921f9d8e3c24fc1c7bd09119caf75bbb49144977cd4d96a5781"
+    },
+    "source_blobs": {
+      "gpu.rs": "75ecf37ae66f1082e8b4a70f475d1d9c9228d1ea",
+      "quad.wgsl": "dd57163838a4e0736a8aad88c32714c545cee4d3",
+      "frame.rs": "612f5e2eb79ba6d0416a4f87573e350a8299c815",
+      "draw_runs.rs": "2aefcf083fc1ad1231b334ba6c3cab46c84cd797",
+      "texture_arrays.rs": "8837fc1b9c4c5a81d918c43226f49a56518bc261",
+      "bank.rs": "4421e12f4cd27f7892617e740c13cadf4877bff7",
+      "scene.rs": "69eb0a98b9c4347a72eaef7c96c59a9d720f7646",
+      "world_presenter.rs": "fe3e256778968622fc521b319518d9a9b19fbc35"
+    },
+    "status": "diagnostic; before source mip footprint correction; timing stopped for quality investigation"
+  },
+  "history": {
+    "control_commit": "ffc36bb0c21e060bd555a95ba76d9b4f35e2960d",
+    "candidate_commit": "3556082d38c7a6b012fd1ea4556bc19ad686ad56",
+    "shared_driver_sha256": "84bf4b5c3d99a2b64a2cbea1403d814df6a03d5dd14eef44b7b8b52dc9305447",
+    "binaries": {
+      "before": "011ee39bd66c8366f14fe3866a4a3abb09c6a7f8881dc2b7dc2aa89e396409f7",
+      "after": "6e2310d53faf0499f59e383276de5e3c39bcf24ad8ad462274e3599864c9db6b"
+    },
+    "source_blobs": {
+      "gpu.rs": "aad423a029e72df36ae67ed289266a0d8e16eb99",
+      "quad.wgsl": "66649a75c51f985a37228f526275a32b4ad9d695",
+      "frame.rs": "612f5e2eb79ba6d0416a4f87573e350a8299c815",
+      "draw_runs.rs": "2aefcf083fc1ad1231b334ba6c3cab46c84cd797",
+      "texture_arrays.rs": "8837fc1b9c4c5a81d918c43226f49a56518bc261",
+      "bank.rs": "4421e12f4cd27f7892617e740c13cadf4877bff7",
+      "scene.rs": "69eb0a98b9c4347a72eaef7c96c59a9d720f7646",
+      "world_presenter.rs": "fe3e256778968622fc521b319518d9a9b19fbc35"
+    }
+  }
+}
