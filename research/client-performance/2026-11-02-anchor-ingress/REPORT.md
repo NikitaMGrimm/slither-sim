@@ -24,14 +24,21 @@ The fast lane conservatively declines worlds with more than 256 received IDs
 or more than 65,536 received body points. The replay peaks at 31,467 received
 food keys, 40 snakes and zero prey; counts are retained in identities.json.
 
-The production diff is independent of the consume and snake-sharing PRs, based
-on main 1b09894d. A diagnostic-only composition applies all three changes to
-measure this fix's incremental benefit. The combined source is retained outside
-Git and is not a source dependency of this PR.
+The original measurements used an independent anchor diff on main 1b09894d and
+a separately retained diagnostic composition with consume and snake sharing.
+All timing numbers, allocation totals and stage durations below come from those
+earlier sources, not the rebased composition. No timings were rerun for the rebase.
+
+The production branch is now rebased onto main a23952d1 after the consume and
+snake-sharing merges (#436 and #437). Anchor staging explicitly clones the
+shared snake's value and publishes a new Arc only after validation. Named
+received-pressure thresholds and one shared predicate keep anchor admission and
+ordinary pressure transitions aligned. Fresh composed validation is described
+below; it does not relabel the historical measurements as new results.
 
 ## Workload and evidence
 
-- Source base: 1b09894d3d11ba819474381fc33c68bd705da933.
+- Timing source base: 1b09894d3d11ba819474381fc33c68bd705da933.
 - Restricted input SHA-256: 84d4c361ee9feb5369166858cabdca857f7f740a3f19d146cbd3e0eaf8902c82.
 - Same 6.1 s history, release profiles, Original quality, 960x540 procedural CPU
   presentation and fixed 60 Hz virtual schedule. Zero/-120 wheel notches select
@@ -190,6 +197,30 @@ and must not be added to them. Opcode labels classify a frame by its first comma
 
 ## Validation and limits
 
+Fresh release parity after rebasing onto a23952d1 compares current main against
+the actual composed candidate, including the Arc adaptation and shared pressure
+predicate. Each arm completes 366 callbacks and 32,106 messages without skips in
+each view. Every callback's numeric observations match byte-for-byte, and the
+complete prepared frame/overlay/resource/send consistency digests match current
+main and the historical controls: default `b9f2870246df9495`, whole map
+`78b36afd816d2773`. [rebased-parity.json](rebased-parity.json) binds the source,
+driver, diagnostic shim, binaries and bounded results. Raw journals stay outside
+Git. The unchanged retained driver runs in CPU-only parity mode; both diagnostic
+copies add only its unused transaction-observer registration seam. These are
+correctness controls, excluded from timing; the 64-bit output digests are
+consistency checks, not cryptographic proofs or GPU pixel comparisons.
+
+The new authored `staged_anchor_rejection_preserves_live_and_frozen_state` test
+covers both protocols. It preserves a frozen snapshot through a successful
+anchor, prepares visible geometry, then repeats a valid anchor. Canonical
+received application accepts the repeated anchor, but presentation rejects its
+zero-distance edge. Owned full-state strings, a cloned SnakePresentation and a
+cloned camera verify the live client and frozen snapshots after failure. A
+temporary mutation committed the staged received snake/caches/counters/elapsed
+header on that presentation error before returning it. The test compiled and
+failed at its independent live-state assertion. The production source was
+restored byte-for-byte, and all four anchor transaction tests then passed.
+
 - Exact authored comparisons against ordinary application cover both protocols,
   anchor shapes, explicit/compact targets, absent/unknown/reused own IDs, elapsed
   headers, malformed lengths and zero-distance error boundaries. Growth/batches
@@ -198,12 +229,13 @@ and must not be added to them. Opcode labels classify a frame by its first comma
 - All 366 callback state observations and complete prepared draw/resource/send
   consistency digests match in both views for independent and all-three binaries.
   Every timing run also matches the reference numeric-observation SHA-256.
-- Full npm run check passes on the independent source: core/native tests, strict
-  Windows native/profiling/Wasm Clippy, desktop/Wasm builds and real Canvas ABI.
-  Extra feature-gated feel/geometry checks pass. Builds use the dedicated D:
-  target, two jobs, dev opt-level 1 and disabled debug info. The diagnostic-only
-  composition is release-built and output-checked, not relabelled as the source
-  that ran the independent full suite.
+- Full npm run check passes on the actual rebased composition: core/native tests,
+  strict Windows native/profiling/Wasm Clippy, desktop/Wasm builds and real Canvas
+  ABI. The focused 224 core test executions also pass on this source. The original
+  independent full suite and extra feature-gated feel/geometry checks remain
+  historical evidence. Builds use the dedicated D: target, two jobs, dev opt-level
+  1 and disabled debug info. Fresh composed parity is release-built separately;
+  no timing samples are collected from it.
 - Both comparisons retain six complete accepted pairs per view: all 48 runs
   have no observed compiler overlap. Standalone and incremental regressions
   remain in the tables, including largest-callback and elapsed regressions.

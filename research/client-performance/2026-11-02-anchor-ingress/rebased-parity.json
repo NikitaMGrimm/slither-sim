@@ -1,0 +1,88 @@
+{
+  "schema": "rebased-anchor-parity-v1",
+  "timing_measurement": false,
+  "base": "a23952d16f6fdc39214570e52d645de78afa1528",
+  "rebased_commit_before_followup": "e83ece944c679a9994a1721fd1f0205f52072aa0",
+  "driver_sha256": "47c88eff74a0b88aa21765609e55743844ff0a8a944ff2438bae4fe79d0eae65",
+  "diagnostic_shim_sha256": "2a3abf031b17e176617f6f7fa880600a28706ea8ff68941b9e5fe43d351f6fcf",
+  "arms": {
+    "control": {
+      "production_files_sha256": {
+        "client/src/state.rs": "7230af43b8ec60e01cdb1dbe31bb9c707eb1aaf26c16d19fa709c77db67b5e4d",
+        "client/src/presentation/client.rs": "6300c89f7a2294467dabf159ac96d8623b6dc2ff1f13ec9ca42a61e48efe27f8",
+        "client/apps/wgpu-slice/src/game.rs": "63a4a110eb1c5f57dbe557b0707777303cca4b478d6586747ee64e71716fb7a1",
+        "client/apps/wgpu-slice/tests/food_ingress.rs": "58d146fbad27e72e15d525f2116191e22ecc73619f9e61f884c3d39ba576f5b8",
+        "client/apps/wgpu-slice/src/render.rs": "b2d230199242e475af99f7c179bbcfc7a45f83c15623af2785dc086612bde693",
+        "Cargo.lock": "99136643eb8ddb32ad0078160cb301b3f11458866cceaf8f82c34d7a7fed3b97"
+      }
+    },
+    "candidate": {
+      "production_files_sha256": {
+        "client/src/state.rs": "deb124b9134602ac2ef67163bd86d66a8199a5c3c9945ecfae2807b414603ecb",
+        "client/src/presentation/client.rs": "a94fff6da73467489cc5e543e3821d504b704ceebf718ee7372b2615638a7e8b",
+        "client/apps/wgpu-slice/src/game.rs": "3f10a7c9b650123c286f3482b16635f320fcfbce496613f5c3da15804c4e49b7",
+        "client/apps/wgpu-slice/tests/food_ingress.rs": "0e3f422ab25ff9b95eb781a9867813e4581d4d2c4bb21cd23e551207197e2894",
+        "client/tests/presentation_anchor_transaction.rs": "994959d46638890265a68f422cedbdc0c20280c19dcfffe54d25e230ac956c15",
+        "client/apps/wgpu-slice/src/render.rs": "b2d230199242e475af99f7c179bbcfc7a45f83c15623af2785dc086612bde693",
+        "Cargo.lock": "99136643eb8ddb32ad0078160cb301b3f11458866cceaf8f82c34d7a7fed3b97"
+      }
+    }
+  },
+  "views": {
+    "default": {
+      "wheel_notches": 0,
+      "all_callback_observations_equal": true,
+      "complete_output_digest_equal": true,
+      "historical_reference_equal": true,
+      "control": {
+        "callbacks": 366,
+        "messages": 32106,
+        "skips": 0,
+        "output_digest": "b9f2870246df9495",
+        "numeric_observations_sha256": "7e733b1c7bc1ae450cd60b81f6907f9728943a56f649f6137c38cdc569327d5a",
+        "binary_sha256": "795cd44797fd3f8dd849422d23eb95c0d0336f535f87ab7c1788ba8526bce19c",
+        "frames_journal_sha256": "948601766f71f332327278abc53573656b2c6df031452a95de25082314cf9a75"
+      },
+      "candidate": {
+        "callbacks": 366,
+        "messages": 32106,
+        "skips": 0,
+        "output_digest": "b9f2870246df9495",
+        "numeric_observations_sha256": "7e733b1c7bc1ae450cd60b81f6907f9728943a56f649f6137c38cdc569327d5a",
+        "binary_sha256": "7485cb0679ee78fcbb118e3e0bf8be15792747fd4dd9dd138da3c7d7c480274d",
+        "frames_journal_sha256": "f256a3ad0f51532a08ca56565bd151313c4ed59e4f4c18209d0b7d55ad56baf7"
+      }
+    },
+    "whole_map": {
+      "wheel_notches": -120,
+      "all_callback_observations_equal": true,
+      "complete_output_digest_equal": true,
+      "historical_reference_equal": true,
+      "control": {
+        "callbacks": 366,
+        "messages": 32106,
+        "skips": 0,
+        "output_digest": "78b36afd816d2773",
+        "numeric_observations_sha256": "c3ae6169eba05d9cd203b5601f797621025e0d9bf1a006985256aed7108bca97",
+        "binary_sha256": "795cd44797fd3f8dd849422d23eb95c0d0336f535f87ab7c1788ba8526bce19c",
+        "frames_journal_sha256": "d80367c72cc8883856dbd6d20a169e14051c386ab249b32ed90fc6eb97266a6e"
+      },
+      "candidate": {
+        "callbacks": 366,
+        "messages": 32106,
+        "skips": 0,
+        "output_digest": "78b36afd816d2773",
+        "numeric_observations_sha256": "c3ae6169eba05d9cd203b5601f797621025e0d9bf1a006985256aed7108bca97",
+        "binary_sha256": "7485cb0679ee78fcbb118e3e0bf8be15792747fd4dd9dd138da3c7d7c480274d",
+        "frames_journal_sha256": "1ef19734686e795f7777a033b5eeec47fb4fa86a583267f732f47616df178a22"
+      }
+    }
+  },
+  "rollback_mutation": {
+    "good_source_sha256": "a94fff6da73467489cc5e543e3821d504b704ceebf718ee7372b2615638a7e8b",
+    "restored": true,
+    "mutation": "commit_received_on_presentation_error",
+    "runtime_failure": true,
+    "failure_location": "client\\tests\\presentation_anchor_transaction.rs:205:9:"
+  }
+}

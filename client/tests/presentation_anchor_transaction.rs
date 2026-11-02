@@ -1,7 +1,10 @@
 //! Authored exact single-anchor comparisons against ordinary packet transactions.
 #[path = "support/protocol13.rs"]
 mod wire;
-use slither_client::{presentation::AnimatedClient, protocol::ElapsedHeader};
+use slither_client::{
+    presentation::{AnimatedClient, ClientPresentationError, SnakePresentation},
+    protocol::ElapsedHeader,
+};
 
 fn ready(protocol: u8) -> AnimatedClient {
     let mut setup = wire::setup();
@@ -154,5 +157,56 @@ fn consecutive_and_zero_distance_anchors_keep_the_ordinary_error_boundary() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn staged_anchor_rejection_preserves_live_and_frozen_state() {
+    for protocol in [13, 19] {
+        let mut client = ready(protocol);
+        let frozen = client.clone();
+        let frozen_before = format!("{frozen:?}");
+        let anchor = if protocol == 13 {
+            wire::anchor(b'g', 0, &[4, 176, 4, 76], None)
+        } else {
+            vec![b'=', 0, 0, 4, 176, 4, 76]
+        };
+        assert!(
+            client
+                .try_apply_single_anchor(&anchor, ElapsedHeader::Absent)
+                .unwrap()
+                .is_some()
+        );
+        assert_ne!(format!("{client:?}"), frozen_before);
+        assert_eq!(format!("{frozen:?}"), frozen_before);
+        client.prepare_draw(960, 540).unwrap();
+        assert!(client.own_snake().unwrap().metrics().visible);
+
+        let snapshot = client.clone();
+        // These owned observations cannot change through shared snapshot Arcs.
+        let before = format!("{client:?}");
+        let own_before: SnakePresentation = client.own_snake().unwrap().clone();
+        let camera_before = client.camera().clone();
+        let mut repeated = vec![0x12, 0x34];
+        repeated.extend(&anchor);
+        // The valid repeated anchor succeeds in received state, then fails in
+        // visible presentation at zero distance. It must not publish that staged
+        // received snake, elapsed header or counters before presentation accepts.
+        let mut received = client.received().clone();
+        received
+            .apply_frame(&repeated, ElapsedHeader::TwoBytes)
+            .unwrap();
+        assert_ne!(&received, client.received());
+        let rejected = client.try_apply_single_anchor(&repeated, ElapsedHeader::TwoBytes);
+        assert!(
+            matches!(rejected, Err(ClientPresentationError::Presentation(_))),
+            "protocol={protocol}, result={rejected:?}"
+        );
+        assert_eq!(format!("{client:?}"), before);
+        assert_eq!(format!("{snapshot:?}"), before);
+        assert_eq!(client.own_snake().unwrap(), &own_before);
+        assert_eq!(snapshot.own_snake().unwrap(), &own_before);
+        assert_eq!(client.camera(), &camera_before);
+        assert_eq!(format!("{frozen:?}"), frozen_before);
     }
 }

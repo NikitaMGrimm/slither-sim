@@ -76,6 +76,23 @@ pub const PRESSURE_PREY_DRAWS: usize = MAX_SNAKES * 32;
 /// Common pressure picture ceiling, checked against the GPU Draw-record quota.
 pub const PRESSURE_PICTURE_DRAWS: usize = 262_144;
 
+const RECEIVED_PRESSURE_SNAKES: usize = 256;
+const RECEIVED_PRESSURE_BODY_POINTS: usize = 65_536;
+
+// These presentation thresholds preserve the full-detail envelope; they are
+// not wire admission limits. Anchor staging must defer the same cross-object
+// pressure work as ordinary transactions, including a candidate crossing it.
+// See https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-anchor-ingress/REPORT.md#change-and-semantic-boundary.
+fn received_detail_pressure(received: &ClientState) -> bool {
+    received.snakes.len() > RECEIVED_PRESSURE_SNAKES
+        || received
+            .snakes
+            .values()
+            .map(|s| s.body.len())
+            .sum::<usize>()
+            > RECEIVED_PRESSURE_BODY_POINTS
+}
+
 /// Shared entity lanes, reserving full own geometry and bounded non-entity work.
 #[derive(Clone, Copy, Debug)]
 pub struct PressureEntityBudget {
@@ -1275,14 +1292,7 @@ impl AnimatedClient {
     ) -> Result<Option<FrameReport>, ClientPresentationError> {
         if self.detail_pressure
             || self.entries.len() > MAX_RETAINED_SNAKES
-            || self.received.snakes.len() > 256
-            || self
-                .received
-                .snakes
-                .values()
-                .map(|s| s.body.len())
-                .sum::<usize>()
-                > 65_536
+            || received_detail_pressure(&self.received)
         {
             return Ok(None);
         }
@@ -1296,7 +1306,7 @@ impl AnimatedClient {
         else {
             return Ok(None);
         };
-        if prepared.body_points > 65_536 {
+        if prepared.body_points > RECEIVED_PRESSURE_BODY_POINTS {
             return Ok(None);
         }
         let mut camera = self.camera.clone();
@@ -2553,13 +2563,7 @@ impl AnimatedClient {
         }
         let mut next = self.clone();
         next.food_enabled |= enable_food;
-        next.detail_pressure |= received.snakes.len() > 256
-            || received
-                .snakes
-                .values()
-                .map(|s| s.body.len())
-                .sum::<usize>()
-                > 65_536;
+        next.detail_pressure |= received_detail_pressure(&received);
         next.prey_enabled |= enable_prey;
         next.appearance_enabled |= enable_appearance;
         next.face_presentation_enabled |= enable_face_presentation;
