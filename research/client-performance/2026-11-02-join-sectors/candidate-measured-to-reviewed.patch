@@ -1,0 +1,52 @@
+--- a/client/src/state.rs
++++ b/client/src/state.rs
+@@ -621,9 +621,7 @@
+                 .try_reserve_exact(decoded.command_count())
+                 .map_err(|_| StateError::Hud(HudIngressError::LeaderboardRowsResource))?;
+         }
+-        crate::state::transaction_phase("received_snapshot_begin",0);
+         let mut staged = self.clone();
+-        crate::state::transaction_phase("received_snapshot_end",0);
+         let mut ignored = 0;
+         let mut captures = 0;
+         let mut row_budget = HudLeaderboardRowsBudget::default();
+@@ -1800,7 +1798,3 @@
+ fn food_key(sector: (u8, u8), rx: u8, ry: u8) -> u32 {
+     u32::from_be_bytes([sector.0, sector.1, rx, ry])
+ }
+-
+-thread_local! { static TRANSACTION_OBSERVER: std::cell::Cell<Option<fn(&'static str,u64)>> = const { std::cell::Cell::new(None) }; }
+-#[allow(missing_docs)] pub fn set_transaction_observer(f:Option<fn(&'static str,u64)>){TRANSACTION_OBSERVER.with(|s|s.set(f));}
+-#[allow(missing_docs)] pub fn transaction_phase(n:&'static str,id:u64){TRANSACTION_OBSERVER.with(|s|if let Some(f)=s.get(){f(n,id)});}
+--- a/client/src/presentation/client.rs
++++ b/client/src/presentation/client.rs
+@@ -2688,9 +2688,7 @@
+             self.trace_boundary("update", None, None, None, None);
+             return Ok((applied.report, None));
+         }
+-        crate::state::transaction_phase("core_snapshot_begin",0);
+         let mut next = self.clone();
+-        crate::state::transaction_phase("core_snapshot_end",0);
+         next.food_enabled |= enable_food;
+         next.detail_pressure |= received_detail_pressure(&received);
+         next.prey_enabled |= enable_prey;
+@@ -3130,7 +3128,6 @@
+             }
+             event_start = boundary.event_end;
+         }
+-        crate::state::transaction_phase("core_events_end",0);
+         next.received = Arc::new(received);
+         next.sync_received_visual_tails();
+         #[cfg(feature = "feel-trace")]
+--- a/client/apps/wgpu-slice/src/game.rs
++++ b/client/apps/wgpu-slice/src/game.rs
+@@ -1062,9 +1062,7 @@
+                 death_pending: g.death_pending,
+             })
+             .collect();
+-        slither_client::state::transaction_phase("host_snapshot_begin",0);
+         let mut client = self.client.clone();
+-        slither_client::state::transaction_phase("host_snapshot_end",0);
+         let bank = RefCell::new(&mut self.bank);
+         let rng = Cell::new(self.rng);
+         let serial = Cell::new(self.identity);

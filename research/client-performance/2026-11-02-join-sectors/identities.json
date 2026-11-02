@@ -62,6 +62,15 @@
         "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
         "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
         "client/apps/wgpu-slice/examples/join_profile.rs": "7a056481fdfb4ffafa995de0165c5b9e51f97f2ab491d2c47bd36f42ddac3a71"
+      },
+      "measured_source_label": "main439-source (retained release diagnostic source)",
+      "reviewed_commit": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+      "reviewed_source_sha256": {
+        "client/src/state.rs": "deb124b9134602ac2ef67163bd86d66a8199a5c3c9945ecfae2807b414603ecb",
+        "client/src/state/v13.rs": "07a97999eb961c317396e962df9e5c759306c71870eb3f5f396078f6296497be",
+        "client/src/presentation/client.rs": "a94fff6da73467489cc5e543e3821d504b704ceebf718ee7372b2615638a7e8b",
+        "client/src/presentation/food.rs": "99cdd39a678e5a548f1a50ee568ce5d0b72f8c1fc6a2c0d61255b00a9778cc74",
+        "client/apps/wgpu-slice/src/game.rs": "3f10a7c9b650123c286f3482b16635f320fcfbce496613f5c3da15804c4e49b7"
       }
     },
     "candidate": {
@@ -83,7 +92,24 @@
         "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
         "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
         "client/apps/wgpu-slice/examples/join_profile.rs": "7a056481fdfb4ffafa995de0165c5b9e51f97f2ab491d2c47bd36f42ddac3a71"
+      },
+      "measured_source_label": "candidate5-source (retained release diagnostic source)",
+      "reviewed_commit": "d4a9729970f4d0475ac35c36203918e020786db7",
+      "reviewed_source_sha256": {
+        "client/src/state.rs": "80fdc82f5a40fb53165612e0d8e8a5d554ea33b924a67da5b0cea96fb9229113",
+        "client/src/state/v13.rs": "c21ea39655ede8c0034bbe88b3bfa0dd21fc46039fe49c04b0d80a8d72bd9e24",
+        "client/src/presentation/client.rs": "e5ed7748cb3037f90ad123ab7eabee5734a4a93a93b479e7366794a36a37ac0c",
+        "client/src/presentation/food.rs": "5af103c30dd7fc262f327e0bc60858ecedcf81ad0d236bb383a216edde498e72",
+        "client/apps/wgpu-slice/src/game.rs": "683e2be09a6d14edfdd1c173e89190bf31ce56e2bf60ef55fe6fe7ca42c318b0"
       }
     }
+  },
+  "source_identity_notes": {
+    "runtime_source_sha256": "Historical normalized pre-test production text, not a full-file Git-blob hash. Values retained unchanged.",
+    "normalization": "LF text; cut before first newline #[cfg(test)] newline mod block and appended TRANSACTION_OBSERVER declaration; omit observer-call lines; trim outer whitespace and append newline.",
+    "instrumented_source_sha256": "Exact full bytes of the retained measured source files, including diagnostic observers and the tests present in those source copies.",
+    "reviewed_source_sha256": "Exact Git-blob bytes at reviewed_commit. Runtime files remain unchanged by this study-only correction.",
+    "candidate_comparison": "candidate-measured-to-reviewed.patch removes only passive diagnostic observer statements/declarations; food.rs is already byte-identical. Normalized production text matches for every listed file.",
+    "candidate_delta_sha256": "43b3a398301feb53a360bd4170dc81c333660c0d9ae718ea9255dae3f1933798"
   }
 }

@@ -199,6 +199,20 @@ Paired refresh reduction: median 96.5%, range 96.4–97.1%.
 
 ## Validation and remaining work
 
+Source identity correction after independent review: `candidate5-source` is the
+retained measured release diagnostic source. The historical
+`runtime_source_sha256` map hashes normalized pre-test text (with passive
+observer lines removed), rather than full Git blobs; those values are preserved.
+`instrumented_source_sha256` records the exact measured bytes. The newly added
+`reviewed_source_sha256` map records full Git blobs at reviewed head
+`d4a9729970f4d0475ac35c36203918e020786db7` separately. The
+[measured-to-reviewed delta](candidate-measured-to-reviewed.patch) removes only
+passive observer statements/declarations; `presentation/food.rs` is already
+byte-identical. Both forms normalize to the same production text. No measured
+identity was replaced with a final-file hash, and no timings were rerun.
+Check the source bindings with
+`python -m unittest discover -s research/client-performance/2026-11-02-join-sectors -p "test_*.py"`.
+
 - Exact numeric callback observations and complete prepared world/overlay/
   resource/send consistency digests are compared in default and whole-map views.
   These 64-bit digests are consistency controls, not cryptographic proofs or GPU
