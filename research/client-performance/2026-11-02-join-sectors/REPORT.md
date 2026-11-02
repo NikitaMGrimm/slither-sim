@@ -215,8 +215,9 @@ Check the source bindings with
 
 That check now reads [reviewed-sources.json.gz](reviewed-sources.json.gz), a
 gzip-compressed JSON map of arm, source path and exact UTF-8 reviewed text.
-It checks every retained full-file and normalized hash above without requiring
-old Git objects or today's runtime files. Missing or altered snapshots fail;
+It checks the retained reviewed text against `reviewed_source_sha256` and,
+after normalization, `runtime_source_sha256`, without requiring old Git objects
+or today's runtime files. Missing or altered snapshots fail;
 recorded commits, hashes, measured-to-reviewed delta and results are unchanged.
 This manual study suite is not discovered by CI; CI checks its documentation
 links/index placement. The snapshot makes it usable from a shallow checkout
