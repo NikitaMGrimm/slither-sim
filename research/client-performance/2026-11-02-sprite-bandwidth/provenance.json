@@ -124,5 +124,51 @@
     "reconstructed_tree": "0178a6f562c84bbc1c3817e987da1da811531cad",
     "reconstruction_patch_range": "5a00451bb521aa5be1b79adb269a4e6d57b34db0..0403dbdeeca4a237a6f24349a3448c8980a5b42e",
     "reconstruction_patch_sha256": "1da9cfbe9674d51f5f2556c6e871a42beedfcd46b2710fb2ba6a02488cde1883"
+  },
+  "revision": {
+    "reviewed_commit": "9b9bf5b14704966f0a0c6308376a964fd7411e84",
+    "candidate_commit": "2e8bf131f9a12545e4a62d74cfebc766f9568248",
+    "control_commit": "ffc36bb0c21e060bd555a95ba76d9b4f35e2960d",
+    "scope": "five alternating pairs in all nine sparse cells, all three cache cells and five headline crowded cells; new series, no old measurements relabelled",
+    "probe_patch_sha256": "31df153a7e7f7af760dcc6f447a6fe3e9ad57f8df908760c72cf462f460d881a",
+    "shared_driver_sha256": "84bf4b5c3d99a2b64a2cbea1403d814df6a03d5dd14eef44b7b8b52dc9305447",
+    "sparse_driver_sha256": "e4ee7459ac431468fcdf70823aeaf66db40d6c3d8b818d657b931db8e2d7e6dd",
+    "source_text_hashing": "UTF-8 with LF (disposable source exports have CRLF); binary hashes are raw bytes",
+    "source_blobs": {
+      "gpu.rs": "944b24f164dc5242fd7fd24da3edd1a551cfd244",
+      "quad.wgsl": "66649a75c51f985a37228f526275a32b4ad9d695",
+      "frame.rs": "612f5e2eb79ba6d0416a4f87573e350a8299c815",
+      "draw_runs.rs": "2aefcf083fc1ad1231b334ba6c3cab46c84cd797",
+      "texture_arrays.rs": "8837fc1b9c4c5a81d918c43226f49a56518bc261",
+      "bank.rs": "4421e12f4cd27f7892617e740c13cadf4877bff7",
+      "scene.rs": "69eb0a98b9c4347a72eaef7c96c59a9d720f7646",
+      "world_presenter.rs": "fe3e256778968622fc521b319518d9a9b19fbc35",
+      "soft_layers.rs": "37d4d21e7d74159bc3ab4312939dfaa6643b0a1d"
+    },
+    "retirement_patch_sha256": "f447facd22586fc575e50303ede55f3d358b885a5af3238f8e5276daf0cf8907",
+    "retirement_gpu_sha256": "1c559b3b26686e7e4a0f4f6443e733b083f314d407a4bd58b255c3163accbfa6",
+    "binaries": {
+      "sparse": {
+        "reviewed": "f3a1bee58cfd3ca16d9af933ea1ef0c3b0a64a7a184a8134d9fb3ac40ffa9a4f",
+        "fixed": "568ff857fe8871e45d033f29948f7b2d94cf6a51fbd44c4339090e47fdd95e19"
+      },
+      "cache": {
+        "fixed": "568ff857fe8871e45d033f29948f7b2d94cf6a51fbd44c4339090e47fdd95e19",
+        "retire": "e11e6101abcfaa3e9e77a4af20dda09809998f7134f94d3ded41bf8d0abae1f8"
+      },
+      "revision": {
+        "before": "011ee39bd66c8366f14fe3866a4a3abb09c6a7f8881dc2b7dc2aa89e396409f7",
+        "after": "38433778967cff195524fb2e8c9ffe8a0af5e3e89effee8ee253ae573913941d"
+      }
+    },
+    "build": {
+      "profile": "release, repository thin LTO, one codegen unit",
+      "features": [
+        "frame-profile"
+      ],
+      "cargo_jobs": 2,
+      "package_clean_before_each_source": true
+    },
+    "cache_control": "only the retained per-bin retirement patch differs from candidate; it is a diagnostic and is not shipped"
   }
 }

@@ -80,6 +80,98 @@ Its first one-byte test assumption failed and was replaced by this independently
 bounded two-addition allowance. Existing goldens and perceptual budgets were
 not regenerated or loosened.
 
+## Sparse-path review follow-up
+
+Review of `9b9bf5b1` found a fixed full-screen cost even for a single eligible
+glow, and an unnecessary outline pass for one Low-quality food. The corrected
+runtime `2e8bf131` measures clipped coverage per frame and per glow bin before
+admitting an intermediate. Each selected bin must pay its own estimated work;
+their sum must also pay the world-pass split. Outlines have their own cost guard.
+Entry requires 125% of fixed work; an active path remains above 100%, with
+history reset on attachment/sample changes. These are portable work estimates,
+not adapter-calibrated timing thresholds.
+
+The following **new** series uses five alternating pairs per cell. Sparse rows
+compare reviewed/fixed source; each launch covers all nine cells with ten warm
+and thirty measured frames per cell. Sparse GPU timestamps enclose the world
+renderer encoder, excluding Original's later blit, resource sync, CPU work and
+waits. Pass counts include the presenter's blit. The body-only control is retained.
+At Native 4K the existing world policy selects one sample; 1080p uses MSAA4.
+
+<!-- BEGIN SPARSE REVISION -->
+| Sparse authored picture / output | Reviewed GPU median / p95 ms | Fixed GPU median / p95 ms | Fixed median range ms | Reviewed → fixed passes |
+| --- | ---: | ---: | ---: | ---: |
+| body / 1920×1080 Original | 0.2667 / 0.2805 | 0.2669 / 0.2890 | 0.2661–0.2674 | 2 → 2 |
+| low-quality / 1920×1080 Original | 0.4202 / 0.4353 | 0.2665 / 0.2701 | 0.2662–0.2676 | 3 → 2 |
+| one-glow / 1920×1080 Original | 0.6979 / 0.7304 | 0.2841 / 0.2945 | 0.2824–0.2855 | 4 → 2 |
+| body / 1920×1080 Native | 0.3638 / 0.3845 | 0.3640 / 0.3755 | 0.3637–0.3643 | 1 → 1 |
+| low-quality / 1920×1080 Native | 0.6062 / 0.6405 | 0.3661 / 0.3708 | 0.3654–0.3686 | 2 → 1 |
+| one-glow / 1920×1080 Native | 1.0816 / 1.1182 | 0.3984 / 0.4082 | 0.3968–0.3998 | 3 → 1 |
+| body / 3840×2160 Native | 0.0120 / 0.0126 | 0.0119 / 0.0124 | 0.0119–0.0122 | 1 → 1 |
+| low-quality / 3840×2160 Native | 0.0127 / 0.0177 | 0.0126 / 0.0131 | 0.0125–0.0127 | 1 → 1 |
+| one-glow / 3840×2160 Native | 2.7103 / 2.7276 | 0.0386 / 0.0394 | 0.0384–0.0387 | 3 → 1 |
+<!-- END SPARSE REVISION -->
+
+An authored `Bank` crossover sequence enters and leaves the layered path with
+pass counts `1,1,4,4,1,1`. Rendering the **same** middle picture with both histories
+gives maximum RGB error three bytes / p95 one byte, within the existing isolated
+max-five/p95-two budget. Ordinary-path readbacks before and after the cycle are
+byte-identical. Sparse food/Low-quality tests assert no intermediate targets or
+extra passes at Original 1080p, Native 1080p and Native 4K.
+
+### Inactive-bin caching control
+
+The review also correctly found that unused glow targets remain cached when a
+different amortized bin is active; the earlier guide incorrectly described
+per-bin retirement. A diagnostic changes only that retirement condition (retained
+as [cache-retirement.patch](cache-retirement.patch)). Five alternating cache/retire
+pairs render a dense coarse layer with a half/quarter factor toggling every frame.
+Each launch moves through the three outputs below, with ten warm and ninety
+measured frames per cell. CPU submit includes presenter preparation, allocation
+and submission; it excludes completion waits. GPU scope matches the sparse series.
+
+<!-- BEGIN CACHE REVISION -->
+| Factor flicker / output | Cache GPU median / p95 ms | Retire GPU median / p95 ms | Cache → retire CPU submit median / p95 ms | Retained target bytes: cache / retire range |
+| --- | ---: | ---: | ---: | ---: |
+| 1920×1080 Original | 0.9861 / 1.1192 | 0.9789 / 1.1135 | 0.1941 / 0.2780 → 0.2307 / 0.3294 | 26,698,712–26,698,712 / 25,429,712–26,698,712 |
+| 1920×1080 Native | 1.5433 / 1.7826 | 1.5372 / 1.7785 | 0.1923 / 0.3558 → 0.2051 / 0.2682 | 35,380,800–35,380,800 / 33,307,200–35,380,800 |
+| 3840×2160 Native | 3.3140 / 3.8249 | 3.3091 / 3.8100 | 0.1863 / 0.3386 → 0.2218 / 0.3480 | 4,665,600–4,665,600 / 518,400–2,592,000 |
+<!-- END CACHE REVISION -->
+
+The GPU difference is smaller than the per-run variation. Caching wins CPU
+medians in all three cells; Native 1080p CPU p95 is noisy and does not favor the
+cache. Keep caching to avoid allocation churn, and correct the guide. The 4K
+sequence retains 4,147,200 bytes (3.955 MiB) of inactive targets, including the
+half target left by the preceding 1080p output. These are logical retained
+allocations, not driver residency. A focused regression checks cached extents,
+pass counts and `target_bytes`, then confirms complete retirement when the
+amortized glow path ends. The sparse guard also retires all glow targets when
+nominal glow draws cannot pay for an extra path.
+
+### Crowded remeasurement
+
+Five alternating main-control/fixed pairs rerun the five headline cells using
+the complete-history method below. This is a separate source-pinned series;
+earlier measurements are preserved. GPU sums include world/blit/HUD passes.
+
+<!-- BEGIN CROWDED REVISION -->
+| Crowded history / output | Main control GPU median / p95 ms | Fixed GPU median / p95 ms | Fixed run-median range ms |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 65.606 / 109.362 | 4.805 / 6.266 | 4.788–4.835 |
+| Replay / default / 1920×1080 Original | 65.720 / 109.566 | 4.941 / 6.393 | 4.919–4.982 |
+| Replay / default / 1920×1080 Native | 98.477 / 165.146 | 6.111 / 7.570 | 6.063–6.119 |
+| Authored / default / 1920×1080 Native | 67.419 / 94.126 | 18.795 / 19.364 | 18.755–19.000 |
+| Authored / whole map / 1920×1080 Native | 67.374 / 70.963 | 12.285 / 12.641 | 12.182–12.359 |
+<!-- END CROWDED REVISION -->
+
+The sparse, cache and crowded per-run summaries are [sparse-runs.csv](sparse-runs.csv),
+[cache-runs.csv](cache-runs.csv) and [revision-runs.csv](revision-runs.csv).
+[reduce_revision.py](reduce_revision.py) reduces owner-local receipts; all new
+tables, expected row sets/counts, interleaving and executable bindings are covered
+by `recompute.py --check`. The retained [probe.patch](probe.patch) contains both
+study-only probes and the original authored workload helper; none of that
+adapter-selection driver is a shipped example. Production paths are portable.
+
 ## Matched complete-history method
 
 The primary matrix has five alternating A/B pairs in each of twelve cells:
@@ -268,6 +360,9 @@ with both single and paired contributions.
 | history | 120 | 73 | 3–100% | 2 / 26 |
 | pre-boundary | 120 | 105 | 6–100% | 0 / 28 |
 | frozen | 120 | 92 | 3–100% | 29 / 29 |
+| sparse | 10 | 1 | 7–62% | 0 / 6 |
+| cache | 10 | 10 | 17–100% | 0 / 6 |
+| revision | 50 | 7 | 3–91% | 0 / 8 |
 <!-- END HOST OBSERVATIONS -->
 
 ## Exactness and picture checks
@@ -381,9 +476,11 @@ callback/sample selections and every generated table. `--write` replaces only
 marked generated blocks. [reduce_runs.py](reduce_runs.py) reduces the owner-local
 journals into the adjacent per-run summaries; raw inputs are not distributed.
 
-The authored workload needs no external recording. With a fresh external output
-directory, build and run from the repository root (the `unused` argument is not
-read in synthetic mode):
+The authored workload needs no external recording. Its AMD-specific measurement
+drivers are retained in [probe.patch](probe.patch), outside the shipped examples.
+Apply the patch with `git apply --unidiff-zero` in a disposable source checkout
+first. With a fresh external output directory, build and run from that root (the
+`unused` argument is not read in synthetic mode):
 
 ```powershell
 $env:CARGO_TARGET_DIR='D:/CargoTargets/frame-prep'

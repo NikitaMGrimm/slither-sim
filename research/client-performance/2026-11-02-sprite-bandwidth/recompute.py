@@ -7,7 +7,8 @@ import math
 from pathlib import Path
 from statistics import median
 
-from reduce_runs import PASS_NAMES, read_csv, require
+from reduce_runs import PASS_NAMES, read_csv, require, sha
+import recompute_revision as revision
 
 HERE = Path(__file__).parent
 WORKLOADS = ("replay", "synthetic")
@@ -216,6 +217,18 @@ def main():
         validate_runs(rows, "history" if series == "pre-boundary" else series, provenance[series]["binaries"])
         series_rows[series] = rows
         blocks[series.upper() + " RESULTS"] = result_table(rows)
+    followup = provenance["revision"]
+    require(sha(HERE / "probe.patch") == followup["probe_patch_sha256"], "revision probe patch changed")
+    require(sha(HERE / "cache-retirement.patch") == followup["retirement_patch_sha256"], "revision cache control changed")
+    revision_rows = {}
+    for suite in ("sparse", "cache", "revision"):
+        rows = read_csv(HERE / f"{suite}-runs.csv")
+        revision.validate(rows, suite, followup["binaries"][suite])
+        revision_rows[suite] = rows
+        series_rows[suite] = revision.host_rows(rows)
+    blocks["SPARSE REVISION"] = revision.sparse_table(revision_rows["sparse"])
+    blocks["CACHE REVISION"] = revision.cache_table(revision_rows["cache"])
+    blocks["CROWDED REVISION"] = revision.headline_table(revision_rows["revision"], cell_label)
     blocks["DIAGNOSTICS"], blocks["COVERAGE"] = diagnostics_tables(read_csv(HERE / "diagnostics.csv"), read_csv(HERE / "diagnostic-snapshots.csv"))
     blocks["HOST OBSERVATIONS"] = host_table(series_rows)
     blocks["PICTURE CHECKS"] = parity_table(read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"), provenance["history"]["binaries"])

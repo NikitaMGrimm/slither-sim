@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 
 import recompute as study
+import recompute_revision as revision
 
 HERE = Path(__file__).parent
 
@@ -102,6 +103,37 @@ class Completeness(unittest.TestCase):
         changed[0]["rgba_sha256s"] = "0" * 64
         with self.assertRaises(ValueError):
             study.validate_integration(changed, parity, pictures, provenance)
+
+    def test_revision_complete_sets_and_launches(self):
+        provenance = json.loads((HERE / "provenance.json").read_text(encoding="utf-8"))["revision"]
+        for suite in ("sparse", "cache", "revision"):
+            rows = study.read_csv(HERE / f"{suite}-runs.csv")
+            binaries = provenance["binaries"][suite]
+            revision.validate(rows, suite, binaries)
+            for invalid in (rows[1:], rows + [rows[0]], [r for r in rows if r["size"] != rows[0]["size"]]):
+                with self.subTest(suite=suite), self.assertRaises(ValueError):
+                    revision.validate(invalid, suite, binaries)
+            for field, wrong in (("run_id", rows[1]["run_id"]), ("launch_id", "mislabeled"),
+                                 ("binary_sha256", "0" * 64), ("samples", "1"),
+                                 ("launch_index", "100"), ("raw_csv_sha256", ""),
+                                 ("gpu_median_ms", "nan")):
+                invalid = copy.deepcopy(rows)
+                invalid[0][field] = wrong
+                with self.subTest(suite=suite, field=field), self.assertRaises(ValueError):
+                    revision.validate(invalid, suite, binaries)
+
+    def test_revision_rejects_extra_sparse_pass_and_changed_cpu_picture(self):
+        provenance = json.loads((HERE / "provenance.json").read_text(encoding="utf-8"))["revision"]
+        rows = study.read_csv(HERE / "sparse-runs.csv")
+        fixed = next(r for r in rows if r["side"] == "fixed")
+        fixed["passes_min"] = fixed["passes_max"] = "9"
+        with self.assertRaises(ValueError):
+            revision.validate(rows, "sparse", provenance["binaries"]["sparse"])
+        for field, wrong in (("glow_screen_area_peak", "999"), ("skips", "1"), ("callbacks", "1")):
+            rows = study.read_csv(HERE / "revision-runs.csv")
+            rows[0][field] = wrong
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                revision.validate(rows, "revision", provenance["binaries"]["revision"])
 
 
 if __name__ == "__main__":
