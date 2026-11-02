@@ -1,27 +1,26 @@
 """Bounded offline evidence checks; no recording, GPU or timing work."""
+import gzip
 import hashlib
 import json
 from pathlib import Path
 import runpy
-import subprocess
 import unittest
 
 FOLDER = Path(__file__).resolve().parent
-REPO = FOLDER.parents[2]
 
 
 class Study(unittest.TestCase):
     def test_exact_measured_frame_source_and_recomputed_tables(self):
         identities = json.loads((FOLDER / 'identities.json').read_text(encoding='utf-8'))
-        candidate = identities['arms']['candidate']
-        self.assertEqual(candidate['frame_source_sha256'], candidate['reviewed_frame_source_sha256'])
-        for arm in identities['arms'].values():
-            revision = arm['source_reference_revision']
-            self.assertTrue(len(revision) == 40 and all(c in '0123456789abcdef' for c in revision))
-            reviewed = subprocess.check_output(['git', 'show', f'{revision}:client/apps/wgpu-slice/src/frame.rs'], cwd=REPO)
-            self.assertEqual(hashlib.sha256(reviewed).hexdigest(), arm['frame_source_sha256'])
-        self.assertEqual(hashlib.sha256((REPO / 'client/apps/wgpu-slice/src/frame.rs').read_bytes()).hexdigest(),
-                         candidate['frame_source_sha256'])
+        sources = json.loads(gzip.decompress((FOLDER / identities['source_snapshot']).read_bytes()))
+        self.assertEqual(set(sources), {'current', 'earlier-composition'})
+        for composition, folder in [('current', FOLDER), ('earlier-composition', FOLDER / 'earlier-composition')]:
+            data = json.loads((folder / 'identities.json').read_text(encoding='utf-8'))
+            self.assertEqual(set(sources[composition]), set(data['arms']))
+            for name, arm in data['arms'].items():
+                source = sources[composition][name].encode('utf-8')
+                self.assertEqual(hashlib.sha256(source).hexdigest(), arm['frame_source_sha256'])
+                self.assertEqual(arm['frame_source_sha256'], arm['reviewed_frame_source_sha256'])
         module = runpy.run_path(str(FOLDER / 'recompute.py'))
         report = (FOLDER / 'REPORT.md').read_text(encoding='utf-8')
         self.assertEqual(report.split('<!-- BEGIN RESULTS -->\n', 1)[1].split('\n<!-- END RESULTS -->', 1)[0],

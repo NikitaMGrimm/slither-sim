@@ -202,6 +202,17 @@ each diagnostic, without world positions or identities.
 
 ## Reproduction and retained failures
 
+The source check reads [frame-sources.json.gz](frame-sources.json.gz), a
+gzip-compressed JSON map of composition, arm and exact UTF-8 `frame.rs` text.
+Both current and earlier-composition payloads match their original measured
+and reviewed SHA-256 values. Recorded commit IDs remain origin labels; the
+check needs neither those Git objects nor today's runtime file. Missing or
+altered snapshots fail validation, while squash merges, shallow checkout and
+later source edits leave the historical check usable. Run
+`python research/client-performance/2026-11-02-art-validation/test_study.py`.
+CI does not discover this manual study suite; its documentation checks validate
+links/index placement. No measured identities or results changed.
+
 Recompute every matched table and check run/source/parity assignment, using only
 the Python standard library:
 

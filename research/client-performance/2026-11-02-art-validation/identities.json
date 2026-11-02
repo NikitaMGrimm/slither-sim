@@ -117,5 +117,6 @@
         "binary_sha256": "e61e5d70a2257e121b4b83e4d9eb1d1bfe20eabeb3a95fd144822de2d8e43c90"
       }
     }
-  }
+  },
+  "source_snapshot": "frame-sources.json.gz"
 }
