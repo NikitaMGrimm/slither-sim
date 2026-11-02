@@ -1,4 +1,4 @@
-//! Shared WebGPU/DX12/Vulkan texture-quad renderer. No sorting, game clock or Canvas fallback.
+//! Shared WebGPU/DX12/Vulkan texture-quad renderer; no game clock or Canvas fallback.
 use crate::{
     Result,
     frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
