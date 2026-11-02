@@ -894,6 +894,11 @@ impl Renderer {
             chunk.bytes.clear();
             chunk.states.clear();
         }
+        let encoded_unorm8 = matches!(
+            self.format,
+            wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm
+        );
+        let soft_layers = !overlay && encoded_unorm8;
         let mut glow_span: Option<std::ops::Range<usize>> = None;
         let mut glow_count = 0;
         let mut glow_bins = [false; 3];
@@ -910,10 +915,8 @@ impl Renderer {
             let mut paired = false;
             // UNORM8 is the product's encoded blend domain. Other diagnostic
             // formats keep separate additions rather than inheriting this quantizer.
-            if matches!(
-                self.format,
-                wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm
-            ) && let Some(Ok(next)) = quads.peek()
+            if encoded_unorm8
+                && let Some(Ok(next)) = quads.peek()
                 && additive_pair(&quad, next)
             {
                 second_alpha = next.vertices[0][4];
@@ -921,7 +924,7 @@ impl Renderer {
                 quads.next();
             }
             let mut scale = 0;
-            if !overlay && self.textures[&quad.key].food_outline {
+            if soft_layers && self.textures[&quad.key].food_outline {
                 outline_span.get_or_insert(index..index).end = index + 1;
                 outline_count += 1;
             } else {
@@ -937,7 +940,7 @@ impl Renderer {
                     unsafe_prefix.get_or_insert(index);
                 }
             }
-            if !overlay
+            if soft_layers
                 && self.textures[&quad.key].food_glow
                 && quad.blend == slither_client::presentation::BodyBlend::Lighter
             {
