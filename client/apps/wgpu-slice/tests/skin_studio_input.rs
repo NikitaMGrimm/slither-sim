@@ -458,6 +458,37 @@ fn studio_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
 }
 
+/// A key the studio ignores leaves the held press; one it handles retires it, so
+/// the release can't act on top of the key.
+#[test]
+fn only_keys_the_studio_handles_retire_the_held_press() {
+    let tap = |key: egui::Key| {
+        let mut login = opened_studio();
+        let next = center(&login, NEXT);
+        login.pointer(next, Some(true), false);
+        for pressed in [true, false] {
+            login.settings_input(egui::RawInput {
+                events: vec![arrow(key, pressed)],
+                ..Default::default()
+            });
+        }
+        login.prepare([960, 540], false, None).unwrap();
+        let after_key = login.studio.state.draft().unwrap().record.builtin;
+        login.pointer(next, Some(false), false);
+        (
+            after_key,
+            login.studio.state.draft().unwrap().record.builtin,
+        )
+    };
+    for key in [egui::Key::A, egui::Key::F1] {
+        assert_eq!(tap(key), (0, 1), "{key:?}");
+    }
+    assert_eq!(tap(egui::Key::Enter), (1, 1));
+    let (left, released) = tap(egui::Key::ArrowLeft);
+    assert_ne!(left, 0);
+    assert_eq!(released, left);
+}
+
 /// Arrow keys can move the cosmetic window under a press, as the wheel can.
 #[test]
 fn a_keyboard_moved_cosmetic_window_retires_the_held_press() {

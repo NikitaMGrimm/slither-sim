@@ -1053,7 +1053,6 @@ impl NativeLogin {
                     self.studio_ui.keyboard_focus = true;
                     // Revealing the focus can move the pressed control.
                     self.studio_reveal = true;
-                    self.studio_ui.invalidate_press();
                 }
                 let direction = match key {
                     K::ArrowLeft => N::Left,
@@ -1062,7 +1061,14 @@ impl NativeLogin {
                     K::ArrowDown => N::Down,
                     K::Home => N::Home,
                     K::End => N::End,
-                    K::Tab | K::Enter | K::Space | K::Escape => return PickerEvent::Forward,
+                    K::Tab | K::Enter | K::Space | K::Escape => {
+                        // These act on the pressed control, or move focus and
+                        // reveal it, which can move the pressed control.
+                        if *pressed {
+                            self.studio_ui.invalidate_press();
+                        }
+                        return PickerEvent::Forward;
+                    }
                     _ => return PickerEvent::Handled,
                 };
                 // egui-winit reports native auto-repeats as fresh presses
@@ -1085,6 +1091,8 @@ impl NativeLogin {
                 else {
                     return PickerEvent::Handled;
                 };
+                // Navigation can act on the pressed control or move its window.
+                self.studio_ui.invalidate_press();
                 let next = self.studio.navigate(focus, direction);
                 self.studio.state.reveal_control(next, self.area);
                 self.studio_ui.request_focus(next);

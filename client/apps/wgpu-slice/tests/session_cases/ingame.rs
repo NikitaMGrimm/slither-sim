@@ -449,6 +449,74 @@ fn a_release_away_from_leave_does_not_leave_with_another_button_down() {
     }
 }
 
+/// egui's modal paints its panel in the backdrop's layer, so its own click on
+/// the backdrop doesn't look at the panel.
+#[test]
+fn the_backdrop_dismisses_only_for_a_press_and_release_on_it() {
+    use egui::PointerButton::Primary;
+    let button = |login: &mut NativeLogin, game: &mut LocalGame, pos, pressed| {
+        input(
+            login,
+            game,
+            vec![
+                Event::PointerMoved(pos),
+                Event::PointerButton {
+                    pos,
+                    button: Primary,
+                    pressed,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+        );
+    };
+    let opened = || {
+        let mut game = playing();
+        let mut login = login(&game);
+        escape(&mut login, &mut game, false);
+        release_escape(&mut login, &mut game);
+        let panel = login.ingame_ui.panel_rect;
+        let y = panel.center().y;
+        let (outside, inside) = (
+            egui::pos2(panel.left() - 1., y),
+            egui::pos2(panel.left() + 1., y),
+        );
+        assert!(!panel.contains(outside) && panel.contains(inside));
+        (game, login, outside, inside)
+    };
+    let (mut game, mut login, outside, inside) = opened();
+    button(&mut login, &mut game, outside, true);
+    button(&mut login, &mut game, inside, false);
+    assert!(game.ingame_menu_open());
+    let (mut game, mut login, outside, inside) = opened();
+    button(&mut login, &mut game, inside, true);
+    button(&mut login, &mut game, outside, false);
+    assert!(game.ingame_menu_open());
+    // A press on Leave, with another button seeding egui's click on the backdrop.
+    let (mut game, mut login, outside, _) = opened();
+    let leave = login.ingame_ui.leave_rect.center();
+    button(&mut login, &mut game, leave, true);
+    input(&mut login, &mut game, vec![Event::PointerMoved(outside)]);
+    login.prepare_ingame(&mut game, [960, 720], 1.).unwrap();
+    input(
+        &mut login,
+        &mut game,
+        vec![Event::PointerButton {
+            pos: outside,
+            button: egui::PointerButton::Secondary,
+            pressed: true,
+            modifiers: Modifiers::NONE,
+        }],
+    );
+    button(&mut login, &mut game, outside, false);
+    assert!(game.ingame_menu_open());
+    assert!(!game.stopping());
+    let (mut game, mut login, outside, _) = opened();
+    button(&mut login, &mut game, outside, true);
+    button(&mut login, &mut game, outside, false);
+    assert!(!game.ingame_menu_open());
+    assert!(!game.stopping());
+}
+
 #[test]
 fn leave_by_mouse_enter_and_space_returns_to_login_and_can_play_again() {
     for key in [None, Some(Key::Enter), Some(Key::Space)] {

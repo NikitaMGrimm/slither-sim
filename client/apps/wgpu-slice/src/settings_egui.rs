@@ -12,6 +12,7 @@ pub struct SettingsUi {
     pub panel_rect: Rect,
     pub scroll_id: Option<Id>,
     request_focus: Option<ControlId>,
+    scroll_offset: f32,
 }
 impl Default for SettingsUi {
     fn default() -> Self {
@@ -20,6 +21,7 @@ impl Default for SettingsUi {
             panel_rect: Rect::NOTHING,
             scroll_id: None,
             request_focus: None,
+            scroll_offset: 0.,
         }
     }
 }
@@ -81,6 +83,7 @@ impl SettingsUi {
                     ui.set_width((width - 2. * f32::from(theme::PANEL_PADDING)).max(1.));
                     theme::title(ui, "Settings");
                     ui.add_space(theme::ROW_GAP);
+                    let mut toggle_held = false;
                     let scroll = egui::ScrollArea::vertical()
                         .animated(false)
                         .max_height((area.y - 238.).max(24.))
@@ -120,6 +123,7 @@ impl SettingsUi {
                                     response.rect.intersect(ui.clip_rect()),
                                     response.has_focus(),
                                 ));
+                                toggle_held |= response.is_pointer_button_down_on();
                                 if crate::egui_panel::owned_click(&response) {
                                     actions.push((id, Some(!checked)));
                                 }
@@ -132,6 +136,13 @@ impl SettingsUi {
                             }
                         });
                     self.scroll_id = Some(scroll.id);
+                    // Scrolling moves a held toggle, so its release no longer
+                    // matches the press, even after scrolling back.
+                    let offset = scroll.state.clamped_offset().y;
+                    if self.scroll_offset != offset && toggle_held {
+                        crate::egui_panel::release_capture(ui.ctx());
+                    }
+                    self.scroll_offset = offset;
                     ui.add_space(theme::ROW_GAP);
                     ui.vertical_centered(|ui| {
                         let response = theme::pill_button(

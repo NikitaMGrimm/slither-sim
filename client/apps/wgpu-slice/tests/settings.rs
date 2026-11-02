@@ -515,6 +515,56 @@ fn another_button_cannot_hand_a_primary_press_to_a_settings_control() {
     }
 }
 
+/// Scrolling moves a held toggle, so its release no longer matches the press,
+/// even after scrolling back.
+#[test]
+fn a_scroll_that_moves_a_held_toggle_retires_its_press() {
+    const SMALL: [u32; 2] = [640, 360];
+    for wheels in [&[-2.][..], &[-10., 10.][..]] {
+        let mut login = settled();
+        login.prepare(SMALL, true, None).unwrap();
+        login.open_settings(true);
+        let mut now = 9616;
+        while now <= 10_000 {
+            login.step(f64::from(now), true, false).unwrap();
+            now += 16;
+        }
+        for _ in 0..3 {
+            login.prepare(SMALL, true, None).unwrap();
+        }
+        let p = point(&login, QUALITY, [640., 360.]);
+        login.pointer(p, Some(true), true);
+        for delta in wheels {
+            login.settings_input(egui::RawInput {
+                events: vec![egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Point,
+                    delta: egui::vec2(0., *delta),
+                    phase: egui::TouchPhase::Move,
+                    source: egui::MouseWheelSource::Unknown,
+                    modifiers: Default::default(),
+                }],
+                ..Default::default()
+            });
+            now += 16;
+            login.step(f64::from(now), true, false).unwrap();
+            for _ in 0..3 {
+                login.prepare(SMALL, true, None).unwrap();
+            }
+        }
+        let end = point(&login, QUALITY, [640., 360.]);
+        if wheels.len() == 1 {
+            assert_ne!(p, end);
+        }
+        login.pointer(end, Some(false), true);
+        assert_eq!(login.state.view(true).quality, Q::High, "{wheels:?}");
+        // A fresh click on the toggle acts.
+        login.prepare(SMALL, true, None).unwrap();
+        login.pointer(end, Some(true), true);
+        login.pointer(end, Some(false), true);
+        assert_eq!(login.state.view(true).quality, Q::Low, "{wheels:?}");
+    }
+}
+
 #[test]
 fn nickname_composition_blocks_settings_entry() {
     let mut login = settled();

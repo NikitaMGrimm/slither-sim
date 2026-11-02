@@ -22,8 +22,10 @@ press, however long it was held and even after the pointer left and came back:
 `egui_panel::pointer_click` is free of egui's 0.8-second and 6-point click limits.
 A blur, touch cancel, disable, screen replacement or moved list window cancels
 the press. Those limits stay global because text selection needs them. Settings
-and the in-game menu keep them through `owned_click`. On every screen, only a
-primary press on the widget counts: another mouse button can't hand one over. Two clicks within 0.5 s, the
+and the in-game menu keep them through `owned_click`, and scrolling a held Settings
+toggle cancels its press. The in-game backdrop dismisses only when the press and
+the release are both outside the panel. On every screen, only a primary press on
+the widget counts: another mouse button can't hand one over. Two clicks within 0.5 s, the
 Windows default, select a word on every platform; a custom OS double-click
 setting is not read.
 
