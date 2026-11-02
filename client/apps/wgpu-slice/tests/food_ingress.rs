@@ -154,6 +154,37 @@ fn received_history_is_not_recopied_by_ingress_snapshots() {
 }
 
 #[test]
+fn packet_snapshots_share_retained_snake_animation_storage() {
+    for protocol in [13, 19] {
+        let mut game = ready(protocol, 64);
+        let appearances: Vec<_> = (8..136).map(wire::snake).collect();
+        game.receive(game.generation(), &wire::bundle(&appearances), 301.)
+            .unwrap();
+        let count = game.client().retained_count();
+        let mut snapshots = Vec::with_capacity(3);
+        BYTES.set(0);
+        ENABLED.set(true);
+        for _ in 0..3 {
+            snapshots.push(game.client().clone());
+        }
+        ENABLED.set(false);
+        let bytes = BYTES.get();
+        let full_snakes =
+            3 * count * std::mem::size_of::<slither_client::presentation::SnakePresentation>();
+        assert!(
+            bytes < full_snakes / 2,
+            "protocol={protocol}, snapshots={bytes}, full_snakes={full_snakes}"
+        );
+        for frozen in snapshots {
+            assert_eq!(&frozen, game.client());
+        }
+        println!(
+            "protocol={protocol}, snakes={count}, snapshot_bytes={bytes}, full_snake_bytes={full_snakes}"
+        );
+    }
+}
+
+#[test]
 fn singleton_consume_allocation_does_not_copy_retained_food_or_snakes() {
     for protocol in [13, 19] {
         let mut bytes = Vec::new();
