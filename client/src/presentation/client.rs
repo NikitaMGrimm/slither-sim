@@ -76,6 +76,23 @@ pub const PRESSURE_PREY_DRAWS: usize = MAX_SNAKES * 32;
 /// Common pressure picture ceiling, checked against the GPU Draw-record quota.
 pub const PRESSURE_PICTURE_DRAWS: usize = 262_144;
 
+const RECEIVED_PRESSURE_SNAKES: usize = 256;
+const RECEIVED_PRESSURE_BODY_POINTS: usize = 65_536;
+
+// These presentation thresholds preserve the full-detail envelope; they are
+// not wire admission limits. Anchor staging must defer the same cross-object
+// pressure work as ordinary transactions, including a candidate crossing it.
+// See https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-anchor-ingress/REPORT.md#change-and-semantic-boundary.
+fn received_detail_pressure(received: &ClientState) -> bool {
+    received.snakes.len() > RECEIVED_PRESSURE_SNAKES
+        || received
+            .snakes
+            .values()
+            .map(|s| s.body.len())
+            .sum::<usize>()
+            > RECEIVED_PRESSURE_BODY_POINTS
+}
+
 /// Shared entity lanes, reserving full own geometry and bounded non-entity work.
 #[derive(Clone, Copy, Debug)]
 pub struct PressureEntityBudget {
@@ -1257,6 +1274,88 @@ impl AnimatedClient {
         self.foods.consume(prepared.key, consume);
         self.retire_entries();
         Arc::make_mut(&mut self.received).commit_single_consume(prepared, decoded.prefix());
+        self.sync_received_visual_tails();
+        #[cfg(feature = "feel-trace")]
+        self.trace_boundary("update", None, None, None, None);
+        Ok(Some(FrameReport {
+            commands: 1,
+            ignored: 0,
+        }))
+    }
+
+    /// Stage a non-growing anchor using the canonical snake-local wire reducer.
+    /// Pressure/capacity transitions, growth and batches retain full staging.
+    pub fn try_apply_single_anchor(
+        &mut self,
+        bytes: &[u8],
+        header: ElapsedHeader,
+    ) -> Result<Option<FrameReport>, ClientPresentationError> {
+        if self.detail_pressure
+            || self.entries.len() > MAX_RETAINED_SNAKES
+            || received_detail_pressure(&self.received)
+        {
+            return Ok(None);
+        }
+        let decoded = crate::protocol::read_frame(bytes, header).map_err(StateError::from)?;
+        if decoded.command_count() != 1 {
+            return Ok(None);
+        }
+        let Some(prepared) = self
+            .received
+            .prepare_single_anchor(decoded.commands().next().expect("one command"))?
+        else {
+            return Ok(None);
+        };
+        if prepared.body_points > RECEIVED_PRESSURE_BODY_POINTS {
+            return Ok(None);
+        }
+        let mut camera = self.camera.clone();
+        let mut changed = None;
+        if let Some(PresentationEvent::SnakeAnchor {
+            target,
+            absolute_position,
+            direction,
+            grew: false,
+            ..
+        }) = &prepared.event
+            && let Some(index) = self.target_index(*target)
+        {
+            let entry = &self.entries[index];
+            let previous = entry.snake.metrics().corrected_head;
+            let mut snake = entry.snake.as_ref().clone();
+            snake.apply_anchor(
+                *absolute_position,
+                *direction,
+                None,
+                AnchorView {
+                    zoom: camera.zoom(),
+                    extrapolated_distance: 0.,
+                },
+            )?;
+            if entry.own {
+                camera.reanchor(previous, snake.metrics().corrected_head)?;
+            }
+            let points = self.retained_body_points() - entry.snake.body().points().len()
+                + snake.body().points().len();
+            let storage = self
+                .entries
+                .iter()
+                .map(|e| e.snake.body().storage_slots())
+                .sum::<usize>()
+                - entry.snake.body().storage_slots()
+                + snake.body().storage_slots();
+            // Full staging owns cross-object compaction/reclamation. Decline
+            // without mutation whenever this anchor could trigger those paths.
+            if points > MAX_RETAINED_TOTAL_BODY_POINTS || storage > MAX_RETAINED_TOTAL_BODY_POINTS {
+                return Ok(None);
+            }
+            changed = Some((index, snake));
+        }
+        Arc::make_mut(&mut self.received).commit_single_anchor(prepared, decoded.prefix());
+        if let Some((index, snake)) = changed {
+            self.entries[index].snake = Arc::new(snake);
+        }
+        self.camera = camera;
         self.sync_received_visual_tails();
         #[cfg(feature = "feel-trace")]
         self.trace_boundary("update", None, None, None, None);
@@ -2464,13 +2563,7 @@ impl AnimatedClient {
         }
         let mut next = self.clone();
         next.food_enabled |= enable_food;
-        next.detail_pressure |= received.snakes.len() > 256
-            || received
-                .snakes
-                .values()
-                .map(|s| s.body.len())
-                .sum::<usize>()
-                > 65_536;
+        next.detail_pressure |= received_detail_pressure(&received);
         next.prey_enabled |= enable_prey;
         next.appearance_enabled |= enable_appearance;
         next.face_presentation_enabled |= enable_face_presentation;

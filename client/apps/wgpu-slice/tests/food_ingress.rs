@@ -221,6 +221,38 @@ fn singleton_consume_allocation_does_not_copy_retained_food_or_snakes() {
 }
 
 #[test]
+fn non_growing_anchors_do_not_copy_unrelated_received_food() {
+    for protocol in [13, 19] {
+        let mut bytes = Vec::new();
+        for count in [64, 6000] {
+            let mut game = ready(protocol, count);
+            let before = game.client().received().frames_applied;
+            BYTES.set(0);
+            ENABLED.set(true);
+            for i in 0..100 {
+                let x = (1200_u16 + i).to_be_bytes();
+                let packet = if protocol == 13 {
+                    wire::anchor(b'g', 7, &[x[0], x[1], 4, 76], None)
+                } else {
+                    vec![b'=', 0, 7, x[0], x[1], 4, 76]
+                };
+                game.receive(game.generation(), &packet, 301. + f64::from(i))
+                    .unwrap_or_else(|e| panic!("protocol={protocol}, i={i}: {e}"));
+            }
+            ENABLED.set(false);
+            bytes.push(BYTES.get());
+            assert_eq!(game.client().received().frames_applied, before + 100);
+            assert_eq!(game.client().received().foods.len(), usize::from(count));
+        }
+        assert!(
+            bytes[1] <= bytes[0] + 4096,
+            "protocol={protocol}, bytes={bytes:?}"
+        );
+        println!("anchor protocol={protocol}, requested_bytes={bytes:?}");
+    }
+}
+
+#[test]
 fn frozen_received_snapshots_survive_fast_and_full_ingress_and_rollback() {
     for protocol in [13, 19] {
         let mut game = ready(protocol, 64);

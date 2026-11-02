@@ -144,6 +144,16 @@ pub(crate) struct PreparedConsume {
     eater_cache: Option<u16>,
 }
 
+/// One non-growing anchor reduced in its complete, snake-local wire context.
+pub(crate) struct PreparedAnchor {
+    pub event: Option<PresentationEvent>,
+    pub body_points: usize,
+    id: Option<u16>,
+    snake: Option<Snake>,
+    legacy_front: Option<Point>,
+    legacy: bool,
+}
+
 /// Validated scalar motion awaiting the touched presentation object's admission.
 pub(crate) struct PreparedMotion {
     pub event: Option<PresentationEvent>,
@@ -1318,6 +1328,122 @@ impl ClientState {
         elapsed: Option<u16>,
     ) {
         self.commit_consume(prepared);
+        self.frames_applied = self.frames_applied.saturating_add(1);
+        self.commands_applied = self.commands_applied.saturating_add(1);
+        self.last_elapsed_ms = elapsed;
+    }
+
+    pub(crate) fn prepare_single_anchor(
+        &self,
+        command: CommandRef<'_>,
+    ) -> Result<Option<PreparedAnchor>, StateError> {
+        let Some(setup) = &self.setup else {
+            return Ok(None);
+        };
+        if !matches!(command.bytes[0], b'g' | b'G' | b'=') {
+            return Ok(None);
+        }
+        let id = match setup.protocol {
+            13 => {
+                let raw = slither_protocol::v13::decode_command(
+                    command,
+                    DecodeAdmission::ClientPresentation,
+                )
+                .map_err(|_| StateError::InvalidPacket(command.bytes[0]))?;
+                let slither_protocol::v13::Message::Anchor(raw) = raw else {
+                    return Ok(None);
+                };
+                if raw.grew {
+                    return Ok(None);
+                }
+                Some(raw.id)
+            }
+            19 => {
+                let raw = v19::decode_command(command, DecodeAdmission::ClientPresentation)
+                    .map_err(|_| StateError::InvalidPacket(command.bytes[0]))?;
+                let Message::Anchor(raw) = raw else {
+                    return Ok(None);
+                };
+                if raw.grew {
+                    return Ok(None);
+                }
+                match raw.target {
+                    v19::Target::Own => self.own_snake_id,
+                    v19::Target::Id(id) => Some(id),
+                    _ => return Ok(None),
+                }
+            }
+            _ => return Ok(None),
+        };
+        // Non-growing anchors read only Setup, this snake, own identity and its
+        // legacy absolute front. Run the canonical reducer with exactly that
+        // context, rather than copying unrelated received food/maps.
+        let mut local = Self {
+            setup: self.setup.clone(),
+            own_snake_id: self.own_snake_id,
+            ..Self::default()
+        };
+        if let Some(id) = id {
+            if let Some(snake) = self.snakes.get(&id) {
+                local.snakes.insert(id, snake.clone());
+            }
+            if let Some(front) = self.legacy_fronts.get(&id) {
+                local.legacy_fronts.insert(id, *front);
+            }
+        }
+        let mut events = Vec::new();
+        local.apply_command(command, Some(&mut events), false)?;
+        let snake = id.and_then(|id| local.snakes.remove(&id));
+        // A global capacity reclamation can mutate other received snakes. Let
+        // the ordinary transaction perform it, including its existing limits.
+        let points = self
+            .snakes
+            .iter()
+            .map(|(&other, s)| {
+                if Some(other) == id {
+                    snake.as_ref().map_or(0, |s| s.body.len())
+                } else {
+                    s.body.len()
+                }
+            })
+            .sum::<usize>();
+        let storage = self
+            .snakes
+            .iter()
+            .map(|(&other, s)| {
+                if Some(other) == id {
+                    snake.as_ref().map_or(0, |s| s.body.capacity())
+                } else {
+                    s.body.capacity()
+                }
+            })
+            .sum::<usize>();
+        if points > MAX_TOTAL_BODY_POINTS || storage > MAX_TOTAL_BODY_POINTS {
+            return Ok(None);
+        }
+        Ok(Some(PreparedAnchor {
+            event: events.pop(),
+            body_points: points,
+            id,
+            snake,
+            legacy_front: id.and_then(|id| local.legacy_fronts.get(&id).copied()),
+            legacy: setup.protocol == 13,
+        }))
+    }
+
+    pub(crate) fn commit_single_anchor(&mut self, prepared: PreparedAnchor, elapsed: Option<u16>) {
+        if let Some(id) = prepared.id {
+            if let Some(snake) = prepared.snake {
+                self.snakes.insert(id, snake);
+            }
+            if prepared.legacy {
+                if let Some(front) = prepared.legacy_front {
+                    self.legacy_fronts.insert(id, front);
+                } else {
+                    self.legacy_fronts.remove(&id);
+                }
+            }
+        }
         self.frames_applied = self.frames_applied.saturating_add(1);
         self.commands_applied = self.commands_applied.saturating_add(1);
         self.last_elapsed_ms = elapsed;
