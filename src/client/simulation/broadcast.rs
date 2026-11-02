@@ -223,7 +223,27 @@ impl SimulatorBackend {
             .snakes()
             .iter()
             .zip(&self.slots)
-            .map(|(snake, slot)| snake.alive.then_some(slot.control))
+            .enumerate()
+            .map(|(index, (snake, slot))| {
+                let control = slot.control;
+                // Same measurement-only orbit for every socket client. Normal
+                // collisions remain enabled; deaths invalidate, never disappear.
+                #[cfg(feature = "frame-bench")]
+                let control = if self.frame_bench && index < self.player_latency.slots {
+                    let radius = self.world.radius() * 0.75;
+                    let distance = snake.head.x.hypot(snake.head.y);
+                    crate::Action {
+                        heading: snake.head.y.atan2(snake.head.x)
+                            + std::f64::consts::FRAC_PI_2
+                            + ((distance - radius) / 200.).atan(),
+                        boost: false,
+                    }
+                } else {
+                    control
+                };
+                let _ = index;
+                snake.alive.then_some(control)
+            })
             .collect();
         let radius = self.world.radius();
         #[cfg(feature = "latency-rig")]
@@ -286,8 +306,17 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
-        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
+        for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate() {
             if slot.connection.setup {
+                #[cfg(feature = "frame-bench")]
+                if self.frame_bench
+                    && index < self.player_latency.slots
+                    && self.world.config().pit.is_some()
+                {
+                    slot.connection.food_interest.all(self.world.radius());
+                    continue;
+                }
+                let _ = index;
                 slot.connection
                     .food_interest
                     .advance(snake.head, snake.heading, now);
@@ -374,8 +403,18 @@ impl SimulatorBackend {
         // still need the refresh after an edited pose, even at the same time.
         // Dead clients keep their subscriptions for the rendered death fade.
         if advance_interest {
-            for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
+            for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate()
+            {
                 if slot.connection.setup {
+                    #[cfg(feature = "frame-bench")]
+                    if self.frame_bench
+                        && index < self.player_latency.slots
+                        && self.world.config().pit.is_some()
+                    {
+                        slot.connection.food_interest.all(self.world.radius());
+                        continue;
+                    }
+                    let _ = index;
                     slot.connection
                         .food_interest
                         .advance(snake.head, snake.heading, now);
@@ -477,6 +516,31 @@ impl SimulatorBackend {
         }
         if early >= self.slots.len() {
             self.hand_over_early(early, hand_over)?;
+        }
+        #[cfg(feature = "frame-bench")]
+        if self.frame_bench && self.tick.is_multiple_of(72) {
+            // Wire cells and physical pellets deliberately remain separate.
+            // This low-rate census contributes to measured host load.
+            let players: Vec<_> = self
+                .slots
+                .iter()
+                .zip(self.world.snakes())
+                .take(self.player_latency.slots)
+                .enumerate()
+                .map(|(id, (slot, snake))| {
+                    serde_json::json!({"slot": id, "setup": slot.connection.setup,
+                        "alive": snake.alive, "x": snake.head.x, "y": snake.head.y,
+                        "wireFood": slot.connection.food.perf_len(),
+                        "decoratedWireFood": slot.connection.decorated_food.perf_len()})
+                })
+                .collect();
+            eprintln!(
+                "frame-bench: {}",
+                serde_json::json!({"schema": 1,
+                "tick": self.tick, "radius": self.world.radius(),
+                "totalPellets": self.world.food().len(), "players": players,
+                "wholeMapFood": self.world.config().pit.is_some()})
+            );
         }
         self.coverage_grid = Some(grid);
         self.coverage_bounds = snakes.body_bounds;

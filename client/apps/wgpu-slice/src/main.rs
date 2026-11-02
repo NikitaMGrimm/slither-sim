@@ -717,6 +717,42 @@ mod desktop {
                 *count += 1;
                 let seconds = now.duration_since(*since).as_secs_f64();
                 if seconds >= 2. {
+                    let client = self.game.client();
+                    let camera = client.camera();
+                    let position = camera.position();
+                    let radius = client.boundary().map(|b| b.target().max(b.displayed()));
+                    let center = client.arena_edge_view().center();
+                    let size = self.window.inner_size();
+                    let dpr = self.window.scale_factor();
+                    let viewport = slither_wgpu_slice::render::backing_size([
+                        f64::from(size.width) / dpr,
+                        f64::from(size.height) / dpr,
+                    ])
+                    .ok();
+                    let bounds = client.food_bounds().map(|b| b.limits());
+                    let visible = client
+                        .foods()
+                        .foods()
+                        .iter()
+                        .filter(|food| {
+                            let p = food.snapshot().render_position;
+                            bounds.is_some_and(|[l, r, t, b]| {
+                                p.x >= l && p.x <= r && p.y >= t && p.y <= b
+                            })
+                        })
+                        .count();
+                    eprintln!(
+                        "frame-bench-client: {}",
+                        serde_json::json!({
+                        "schema": 1, "connected": client.connected(),
+                        "camera": [position.x, position.y], "zoom": camera.zoom(),
+                        "viewport": viewport,
+                        "userZoom": camera.user_zoom_factor(), "radius": radius,
+                        "center": center, "foodBounds": bounds,
+                        "retainedPellets": client.foods().foods().len(), "visiblePellets": visible,
+                        "quality": format!("{:?}", self.game.quality()),
+                        "presentMode": "Fifo"})
+                    );
                     eprintln!(
                         "native pacing: {:.1} presents/s, max gap {:.2}ms; monitor {:.1}Hz (submission, not scanout)",
                         f64::from(*count) / seconds,

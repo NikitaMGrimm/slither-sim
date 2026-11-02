@@ -90,6 +90,8 @@ use snakes::{BodyBounds, CoverageGrid, SnakeReports};
 /// `Simulator::respawn_body` at a clear pose drawn from `spawn::spawn_distance`.
 /// A living snake is first removed without death food.
 pub struct SimulatorBackend {
+    #[cfg(feature = "frame-bench")]
+    frame_bench: bool,
     config: SimulationConfig,
     player_latency: PlayerLatency,
     world: Simulator,
@@ -197,6 +199,8 @@ impl SimulatorBackend {
             food_births: true,
         });
         let mut backend = Self {
+            #[cfg(feature = "frame-bench")]
+            frame_bench: false,
             random: Random::new(u64::from(seed) ^ 0x6c61_7465_6e63_7900),
             spawn_random: Random::new(u64::from(seed) ^ 0x7370_6177_6e00),
             food_presentation: FoodPresentation::new(seed, config.agents),

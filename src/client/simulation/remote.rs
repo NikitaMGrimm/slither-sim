@@ -21,6 +21,10 @@ pub(crate) struct RawSimulator {
 }
 
 impl RawSimulator {
+    #[cfg(feature = "frame-bench")]
+    pub(crate) fn set_frame_bench(&mut self, enabled: bool) {
+        self.backend.frame_bench = enabled;
+    }
     #[cfg(feature = "latency-rig")]
     pub(crate) fn set_latency_truth(&mut self, recorder: crate::client::latency_truth::Recorder) {
         self.backend.latency_truth = Some(recorder);

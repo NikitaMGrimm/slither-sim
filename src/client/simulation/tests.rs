@@ -9,6 +9,52 @@ use crate::{
 };
 use std::collections::BTreeSet;
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_full_food_interest_is_only_for_socket_seats() {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::battledome();
+    config.world.dynamic_radius = false;
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    let mut host = RawSimulator::new(7, config, 2).unwrap();
+    host.set_player_latency(1, LatencyConfig::default());
+    host.set_frame_bench(true);
+    for slot in 0..2 {
+        assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+    }
+    host.advance_ticks(2).unwrap();
+    let player = &host.backend.slots[0].connection.food_interest;
+    let bot = &host.backend.slots[1].connection.food_interest;
+    assert!(player.subscribed().len() > 45);
+    assert_eq!(bot.subscribed().len(), 45);
+    let center = encode::GRID_CENTER as f64;
+    let size = encode::SECTOR_SIZE as f64;
+    for x in [-3584., 3584.] {
+        for y in [-3584., 3584.] {
+            assert!(player.subscribed().contains(&[
+                ((center + x) / size).floor() as u8,
+                ((center + y) / size).floor() as u8
+            ]));
+        }
+    }
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_public_bind_and_json_activation_are_rejected() {
+    let mut config = crate::client::HostConfig {
+        frame_bench: true,
+        ..Default::default()
+    };
+    config.bind = "0.0.0.0:0".parse().unwrap();
+    assert!(config.validate().unwrap_err().contains("loopback"));
+    assert!(serde_json::from_str::<crate::client::HostConfig>(r#"{"frameBench":true}"#).is_err());
+}
+
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},

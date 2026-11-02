@@ -1,0 +1,18 @@
+{
+  "bind": "127.0.0.1:0",
+  "seed": 7,
+  "players": {
+    "max": 1
+  },
+  "bots": {
+    "count": 100,
+    "threads": 2
+  },
+  "simulation": {
+    "world": {
+      "preset": "battledome",
+      "dynamicRadius": false,
+      "vision": 7200
+    }
+  }
+}

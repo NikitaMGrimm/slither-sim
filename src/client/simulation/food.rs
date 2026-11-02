@@ -124,7 +124,7 @@ pub(super) struct KnownSectors {
     subscription_revision: Option<Arc<()>>,
     food_revision: Option<Arc<()>>,
 }
-#[cfg(feature = "perf-internals")]
+#[cfg(any(feature = "perf-internals", feature = "frame-bench"))]
 impl KnownSectors {
     pub(super) fn perf_len(&self) -> usize {
         self.entries.iter().map(|(_, sector)| sector.0.len()).sum()

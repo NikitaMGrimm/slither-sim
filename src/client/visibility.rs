@@ -35,6 +35,22 @@ pub(super) struct SectorInterest {
 }
 
 impl SectorInterest {
+    /// Measurement-only: subscribe every sector in the arena bounds. Only the
+    /// actual socket seat uses this, never the internal bot seats.
+    #[cfg(feature = "frame-bench")]
+    pub(super) fn all(&mut self, radius: f64) {
+        let center = f64::from(encode::GRID_CENTER);
+        let size = f64::from(encode::SECTOR_SIZE);
+        let low = ((center - radius) / size).floor().clamp(0., 255.) as u8;
+        let high = ((center + radius) / size).floor().clamp(0., 255.) as u8;
+        let side = usize::from(high) - usize::from(low) + 1;
+        if self.subscribed.len() != side * side {
+            self.subscribed = (low..=high)
+                .flat_map(|x| (low..=high).map(move |y| [x, y]))
+                .collect();
+            self.revision = Arc::new(());
+        }
+    }
     /// Advance on every physics tick using finite, monotonic virtual time.
     /// The caller keeps the final pose for dead clients and resets on reconnect.
     pub(super) fn advance(&mut self, head: Point, heading: f64, now: f64) {
