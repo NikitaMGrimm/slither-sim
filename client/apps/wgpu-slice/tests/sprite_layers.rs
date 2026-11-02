@@ -619,9 +619,14 @@ fn sparse_food_uses_the_ordinary_pass_and_crossover_pictures_match() {
     }
     let a = ordinary.unwrap();
     let b = layered.unwrap();
+    for (a, b) in a.as_chunks::<4>().0.iter().zip(b.as_chunks::<4>().0) {
+        assert_eq!(a[3], b[3], "crossover alpha changed");
+    }
     let mut differences: Vec<_> = a
-        .chunks_exact(4)
-        .zip(b.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(b.as_chunks::<4>().0)
         .flat_map(|(a, b)| (0..3).map(move |c| a[c].abs_diff(b[c])))
         .collect();
     differences.sort_unstable();
@@ -629,5 +634,72 @@ fn sparse_food_uses_the_ordinary_pass_and_crossover_pictures_match() {
     let p95 = differences[(differences.len() * 95).div_ceil(100) - 1];
     println!("same crossover picture, max={max}, p95={p95}");
     assert!(max <= 5 && p95 <= 2, "crossover picture drift");
+    assert!(pollster::block_on(scope.pop()).is_none());
+}
+
+#[test]
+#[ignore = "explicit finite offscreen cached-bin accounting check"]
+fn unused_glow_bins_are_counted_until_the_glow_path_retires() {
+    use slither_client::settings::WorldResolution;
+    use slither_wgpu_slice::world_presenter::WorldPresenter;
+    let mut r = renderer(4);
+    let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let resources = shader_load_resources();
+    r.sync_resources(&resources).unwrap();
+    let mut mixed = frame([512, 512], Vec::new());
+    amortize_shader_fixture(&mut mixed);
+    let coarse = frame(
+        [512, 512],
+        (0..64)
+            .map(|_| draw(resources[1].asset, 0., 0., 512., 0.01, BodyBlend::Lighter))
+            .collect(),
+    );
+    let empty = frame([512, 512], Vec::new());
+    let mut presenter = WorldPresenter::new(&r);
+    let target = offscreen::target(&r, [512, 512]);
+    let view = target.create_view(&Default::default());
+    presenter
+        .render(
+            &mut r,
+            &mixed,
+            None,
+            &view,
+            [512, 512],
+            WorldResolution::Native,
+        )
+        .unwrap();
+    let report = presenter
+        .render(
+            &mut r,
+            &coarse,
+            None,
+            &view,
+            [512, 512],
+            WorldResolution::Native,
+        )
+        .unwrap();
+    assert_eq!(r.half_glow_extent(), Some([256, 256]));
+    assert_eq!(r.fine_glow_extent(), Some([128, 128]));
+    assert_eq!(r.food_glow_extent(), Some([64, 64]));
+    assert_eq!(report.passes, 3);
+    assert_eq!(
+        report.target_bytes,
+        512 * 512 * 4 * 4 + (256 * 256 + 128 * 128 + 64 * 64) * 4
+    );
+    let report = presenter
+        .render(
+            &mut r,
+            &empty,
+            None,
+            &view,
+            [512, 512],
+            WorldResolution::Native,
+        )
+        .unwrap();
+    assert_eq!(r.half_glow_extent(), None);
+    assert_eq!(r.fine_glow_extent(), None);
+    assert_eq!(r.food_glow_extent(), None);
+    assert_eq!(report.target_bytes, 512 * 512 * 4 * 4);
+    assert_eq!(offscreen::pixels(&r, &target).unwrap()[..4], [0, 0, 0, 255]);
     assert!(pollster::block_on(scope.pop()).is_none());
 }

@@ -101,6 +101,13 @@ Reports count these cached targets as retained storage, as well as
 layers and old/replacement coexistence; these are logical sizes, not driver
 residency measurements.
 
+The dated study compares caching with per-bin retirement during factor flicker:
+at Native 4K, retirement raised median calling-thread preparation/submission
+from 0.1863 to 0.2218 ms without a material GPU-time improvement. Caching retained
+up to 3.955 MiB of inactive targets in that resize/toggle sequence. This measured
+CPU/memory tradeoff motivates keeping the cache; the sparse cost guard still
+retires all glow targets when no bin pays for an extra path.
+
 The ignored `sprite_layers` checks exercise AMD/DX12 single-sample and MSAA4
 additions, small glows, unchanged body sources, isolated soft-layer error and
 resize-back/in-flight reuse. `texture_arrays` compares independent bindings
