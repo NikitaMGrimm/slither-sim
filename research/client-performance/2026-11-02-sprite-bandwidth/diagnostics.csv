@@ -1,0 +1,17 @@
+run_id,workload,zoom,variant,exit,samples,gpu_median_ms,gpu_p95_ms,compile_overlap,load_min,load_max,raw_csv_sha256
+diagnostic-1-replay--120-960-original-half-glow,replay,-120,half-glow,0,30,0.524460000,0.567360000,1,67.0,86.0,79e7c777c807f2891645700bca75bb14853b0c681532ec641aaf6f83cb0b2149
+diagnostic-1-replay--120-960-original-msaa1,replay,-120,msaa1,0,30,0.186940000,0.202600000,1,70.0,94.0,a3db783b255bdb416992b8cb5ccfc66fd89bc32fa02c1527fd5d0aa7c7c2ed65
+diagnostic-1-replay--120-960-original-msaa4,replay,-120,msaa4,0,30,0.501980000,0.518440000,1,74.0,88.0,cc0e9ab595ea35d2790d59c49825f30047de8a2c51415e1446045b2edbc76fa5
+diagnostic-1-replay--120-960-original-no-glow,replay,-120,no-glow,0,30,0.525440000,0.546880000,1,54.0,82.0,ea7ef10989d7efa233335463b0a947a42a5ad136114d1d00f161caa1411f1b18
+diagnostic-1-replay-0-960-original-half-glow,replay,0,half-glow,0,30,38.780620000,50.511760000,1,60.0,93.0,64849010c75e2d33b6e0db461a95bf857eca88bcdfa647839c7f81f60980568a
+diagnostic-1-replay-0-960-original-msaa1,replay,0,msaa1,0,30,49.311800000,50.374080000,1,63.0,100.0,47c260965fe686f7b851f2ecb7417df4537315aee0fd07ad58c202babff1a1c4
+diagnostic-1-replay-0-960-original-msaa4,replay,0,msaa4,0,30,84.733500000,113.006610000,1,71.0,100.0,4cfdb6b5ec33abe640f6255f9fc8be34f603ee4521e4dac55bb9badea96a517a
+diagnostic-1-replay-0-960-original-no-glow,replay,0,no-glow,0,30,3.225100000,3.861640000,1,74.0,100.0,42d9da5f791068d0bb8dd5dd1ea30e15938a410b16fe65be80a131892ec52cc0
+diagnostic-1-synthetic--120-960-original-half-glow,synthetic,-120,half-glow,0,30,29.302980000,30.848960000,1,74.0,87.0,b3895fece38838f0eab842dc202df187ecabc9c9a2e3c8be096e41cd5c602e00
+diagnostic-1-synthetic--120-960-original-msaa1,synthetic,-120,msaa1,0,30,42.164620000,43.170320000,1,65.0,88.0,9df290f25921523e62538d3a70431d701835ffbe4d541a1e7fd89151d2b4e47f
+diagnostic-1-synthetic--120-960-original-msaa4,synthetic,-120,msaa4,0,30,45.430020000,47.546120000,1,51.0,90.0,78ddb7f456c89a527b1f94b1fe4651ed03c8b7c4c285f1e510835c6ec604610a
+diagnostic-1-synthetic--120-960-original-no-glow,synthetic,-120,no-glow,0,30,4.422000000,4.508040000,1,76.0,94.0,1c57a7c6bab56519cb77d7a3fc65090bef9e5b16af72a48fafb4fa38529a4481
+diagnostic-1-synthetic-0-960-original-half-glow,synthetic,0,half-glow,0,30,29.102545000,39.325340000,1,57.0,85.0,f6571db66de3efa9da197e95398fddb471e3bcd30a4a6f86032bc50425e4203c
+diagnostic-1-synthetic-0-960-original-msaa1,synthetic,0,msaa1,0,30,41.026100000,47.492200000,1,80.0,97.0,352f3434c7fddb65671b1f99b38b560543752ec71df226b67350458403ae3506
+diagnostic-1-synthetic-0-960-original-msaa4,synthetic,0,msaa4,0,30,50.733020000,68.201760000,1,74.0,93.0,52c5975fc04326c22fa2c70c9119ec6408e535233cbe21e7b3f756984f76803c
+diagnostic-1-synthetic-0-960-original-no-glow,synthetic,0,no-glow,0,30,7.585850000,7.909580000,1,80.0,94.0,cca434f3d027d0a3c91f8eb940fbfcad01c1f37cb6fd4b0ceece7f481d10060d

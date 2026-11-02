@@ -1698,6 +1698,8 @@ mod text_staging_tests {
         bank.stage_text(
             identity,
             vec![Resource {
+                food_glow: false,
+                food_outline: false,
                 asset,
                 image: RgbaImage {
                     width: 1,

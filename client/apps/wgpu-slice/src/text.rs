@@ -570,6 +570,8 @@ impl TextCache {
                     .ok_or("text handle overflow")?;
                 tiles.push(Tile {
                     resource: Resource {
+                        food_glow: false,
+                        food_outline: false,
                         asset: BodyAsset {
                             handle: self.next_handle,
                             revision: 1,

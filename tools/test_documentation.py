@@ -81,6 +81,10 @@ class DocumentationTests(unittest.TestCase):
                      for p in (ROOT / directory).rglob("*") if p.is_file()}
         cls.files.update(p.name for p in ROOT.iterdir() if p.is_file())
         cls.markdown = sorted(p for p in cls.files if p.endswith(".md"))
+        # Client guides are maintained separately, but simulator/research guides
+        # may link into them. Include those destinations without scanning the
+        # independently packaged client's links as simulator package links.
+        cls.files.update(p.relative_to(ROOT).as_posix() for p in (ROOT / "client" / "docs").rglob("*") if p.is_file())
 
     def test_checkout_links_and_anchors(self):
         self.assertEqual(broken_links(self.markdown, self.files), [])

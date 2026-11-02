@@ -344,6 +344,8 @@ impl Cosmetics {
             bytes += image.pixels.len();
             next += 1;
             Some(Resource {
+                food_glow: false,
+                food_outline: false,
                 asset: BodyAsset {
                     handle: next,
                     revision: 1,

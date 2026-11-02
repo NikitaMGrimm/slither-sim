@@ -1,0 +1,609 @@
+# Crowded-frame food sprite bandwidth
+
+This study isolates the native client's GPU preparation/drawing problem after
+the received-snapshot, minimap and pellet-raster changes. Access labels:
+**restricted owner-local community recording** for the replay; **original
+authored synthetic** for the 30,000-food/40-snake workload. Only bounded aggregate
+statistics are retained here. Packets, identities, coordinates, replay images,
+raw journals and executables remain owner-local.
+
+## Question and initial profile
+
+The earlier preparation study found a GPU bottleneck, but its finite probe
+hardcoded a 960×540 world backing. The product computes a 1500×845 projection
+and Original world target at these 16:9 physical outputs. This study uses
+`LocalGame::window_viewport` and `WorldPresenter` directly, including Original's
+blit or Native's physical world target. Do not substitute the old probe's
+timings for this study's control.
+
+Before runtime changes, one offscreen observer series tested MSAA4, MSAA1,
+no food glows and half the food glow quads. These variants are diagnostics,
+not product quality settings. Each uses the same CPU picture and source mips;
+the latter two alter only the diagnostic GPU draw list. Three predetermined
+populated snapshots per workload/view have five warm pictures and ten measured
+repeats. The adapter is DX12 **AMD Radeon(TM) Graphics**, IntegratedGpu,
+vendor/device `1002:13c0`, driver `32.0.21001.9024`.
+
+<!-- BEGIN DIAGNOSTICS -->
+| Initial diagnostic / Original | MSAA4 median / p95 ms | MSAA1 median / p95 ms | No food glow median / p95 ms | Half food glow median / p95 ms |
+| --- | ---: | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 84.734 / 113.007 | 49.312 / 50.374 | 3.225 / 3.862 | 38.781 / 50.512 |
+| Replay / whole map / 960×540 Original | 0.502 / 0.518 | 0.187 / 0.203 | 0.525 / 0.547 | 0.524 / 0.567 |
+| Authored / default / 960×540 Original | 50.733 / 68.202 | 41.026 / 47.492 | 7.586 / 7.910 | 29.103 / 39.325 |
+| Authored / whole map / 960×540 Original | 45.430 / 47.546 | 42.165 / 43.170 | 4.422 / 4.508 | 29.303 / 30.849 |
+<!-- END DIAGNOSTICS -->
+
+Coverage is continuous clipped CPU-picture quad area before any diagnostic mask,
+divided by world attachment area. The coverage table uses only the unmasked
+MSAA4 pictures; masked-run CSV coverage columns retain that nominal CPU picture.
+It includes transparent/zero-contribution source pixels and repeated layers.
+Each triangle is clipped to the viewport; axis-aligned rectangles have an
+equivalent direct intersection calculation. Multiplying by attachment pixels
+and four gives **potential sample-equivalent area**, not measured fragment
+invocations, memory transactions or an overdraw counter from the driver.
+
+<!-- BEGIN COVERAGE -->
+| Initial maximum glow coverage / Original | Snapshot frame | Food body / outline / glow screen areas | Glow / all food MSAA4 sample-equivalent millions |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 365 | 0.498 / 9.304 / 392.287 | 1988.898 / 2038.594 |
+| Replay / whole map / 960×540 Original | 120 | 0.000 / 0.000 / 0.000 | 0.000 / 0.000 |
+| Authored / default / 960×540 Original | 60 | 1.028 / 6.497 / 281.984 | 1429.661 / 1467.816 |
+| Authored / whole map / 960×540 Original | 60 | 0.532 / 3.364 / 190.704 | 966.868 / 986.624 |
+<!-- END COVERAGE -->
+
+The ranked initial costs are food glow raster/blend work first, then the
+full-resolution food/body work, with blit and HUD much smaller. Turning off
+MSAA alone leaves a large glow cost. Removing glows is a strong diagnostic
+control; changing texture identities alone cannot remove this covered area.
+
+## Implementation
+
+Padded food outlines use a full-sized single-sample intermediate before the
+unchanged body/MSAA path. Soft food glows use half/quarter/eighth targets selected
+by projected size and opacity; small glows keep their world sample coverage.
+Five-tap cubic reconstruction preserves broad gradients on the coarser target.
+Only the contiguous additive glow barrier may regroup GPU work. All source
+rasters/mips from #427 are retained; resource arrays group exact physical
+dimensions and mip counts. Four indexed corners replace six duplicated
+vertices, and exact-geometry additive pairs retain both opacity contributions.
+The [current guide](../../../client/docs/sprite-bandwidth.md) owns thresholds,
+memory formulas, fallback conditions and the queue-ordering rationale.
+Reduced passes retain the world-sized source mip footprint with a negative
+`log2(factor)` bias. Without it, the reduced attachment's derivatives select
+extra mip reduction before reconstruction, softening overlapping glow energy.
+
+The pair shader separately quantizes the two original UNORM8 contributions.
+Simply summing opacity makes individually invisible contributions visible.
+Two original half-byte rounding decisions can differ by two output bytes;
+the authored sweep covers 18,504 cases at each of sample counts one and four.
+Its first one-byte test assumption failed and was replaced by this independently
+bounded two-addition allowance. Existing goldens and perceptual budgets were
+not regenerated or loosened.
+
+## Sparse-path review follow-up
+
+Review of `9b9bf5b1` found a fixed full-screen cost even for a single eligible
+glow, and an unnecessary outline pass for one Low-quality food. The corrected
+runtime `2e8bf131` measures clipped coverage per frame and per glow bin before
+admitting an intermediate. Each selected bin must pay its own estimated work;
+their sum must also pay the world-pass split. Outlines have their own cost guard.
+Entry requires 125% of fixed work; an active path remains above 100%, with
+history reset on attachment/sample changes. These are portable work estimates,
+not adapter-calibrated timing thresholds.
+
+The following **new** series uses five alternating pairs per cell. Sparse rows
+compare reviewed/fixed source; each launch covers all nine cells with ten warm
+and thirty measured frames per cell. Sparse GPU timestamps enclose the world
+renderer encoder, excluding Original's later blit, resource sync, CPU work and
+waits. Pass counts include the presenter's blit. The body-only control is retained.
+At Native 4K the existing world policy selects one sample; 1080p uses MSAA4.
+
+<!-- BEGIN SPARSE REVISION -->
+| Sparse authored picture / output | Reviewed GPU median / p95 ms | Fixed GPU median / p95 ms | Fixed median range ms | Reviewed → fixed passes |
+| --- | ---: | ---: | ---: | ---: |
+| body / 1920×1080 Original | 0.2667 / 0.2805 | 0.2669 / 0.2890 | 0.2661–0.2674 | 2 → 2 |
+| low-quality / 1920×1080 Original | 0.4202 / 0.4353 | 0.2665 / 0.2701 | 0.2662–0.2676 | 3 → 2 |
+| one-glow / 1920×1080 Original | 0.6979 / 0.7304 | 0.2841 / 0.2945 | 0.2824–0.2855 | 4 → 2 |
+| body / 1920×1080 Native | 0.3638 / 0.3845 | 0.3640 / 0.3755 | 0.3637–0.3643 | 1 → 1 |
+| low-quality / 1920×1080 Native | 0.6062 / 0.6405 | 0.3661 / 0.3708 | 0.3654–0.3686 | 2 → 1 |
+| one-glow / 1920×1080 Native | 1.0816 / 1.1182 | 0.3984 / 0.4082 | 0.3968–0.3998 | 3 → 1 |
+| body / 3840×2160 Native | 0.0120 / 0.0126 | 0.0119 / 0.0124 | 0.0119–0.0122 | 1 → 1 |
+| low-quality / 3840×2160 Native | 0.0127 / 0.0177 | 0.0126 / 0.0131 | 0.0125–0.0127 | 1 → 1 |
+| one-glow / 3840×2160 Native | 2.7103 / 2.7276 | 0.0386 / 0.0394 | 0.0384–0.0387 | 3 → 1 |
+<!-- END SPARSE REVISION -->
+
+An authored `Bank` crossover sequence enters and leaves the layered path with
+pass counts `1,1,4,4,1,1`. Rendering the **same** middle picture with both histories
+gives maximum RGB error three bytes / p95 one byte, within the existing isolated
+max-five/p95-two budget. Ordinary-path readbacks before and after the cycle are
+byte-identical. Sparse food/Low-quality tests assert no intermediate targets or
+extra passes at Original 1080p, Native 1080p and Native 4K.
+
+### Inactive-bin caching control
+
+The review also correctly found that unused glow targets remain cached when a
+different amortized bin is active; the earlier guide incorrectly described
+per-bin retirement. A diagnostic changes only that retirement condition (retained
+as [cache-retirement.patch](cache-retirement.patch)). Five alternating cache/retire
+pairs render a dense coarse layer with a half/quarter factor toggling every frame.
+Each launch moves through the three outputs below, with ten warm and ninety
+measured frames per cell. CPU submit includes presenter preparation, allocation
+and submission; it excludes completion waits. GPU scope matches the sparse series.
+
+<!-- BEGIN CACHE REVISION -->
+| Factor flicker / output | Cache GPU median / p95 ms | Retire GPU median / p95 ms | Cache → retire CPU submit median / p95 ms | Retained target bytes: cache / retire range |
+| --- | ---: | ---: | ---: | ---: |
+| 1920×1080 Original | 0.9861 / 1.1192 | 0.9789 / 1.1135 | 0.1941 / 0.2780 → 0.2307 / 0.3294 | 26,698,712–26,698,712 / 25,429,712–26,698,712 |
+| 1920×1080 Native | 1.5433 / 1.7826 | 1.5372 / 1.7785 | 0.1923 / 0.3558 → 0.2051 / 0.2682 | 35,380,800–35,380,800 / 33,307,200–35,380,800 |
+| 3840×2160 Native | 3.3140 / 3.8249 | 3.3091 / 3.8100 | 0.1863 / 0.3386 → 0.2218 / 0.3480 | 4,665,600–4,665,600 / 518,400–2,592,000 |
+<!-- END CACHE REVISION -->
+
+The GPU difference is smaller than the per-run variation. Caching wins CPU
+medians in all three cells; Native 1080p CPU p95 is noisy and does not favor the
+cache. Keep caching to avoid allocation churn, and correct the guide. The 4K
+sequence retains 4,147,200 bytes (3.955 MiB) of inactive targets, including the
+half target left by the preceding 1080p output. These are logical retained
+allocations, not driver residency. A focused regression checks cached extents,
+pass counts and `target_bytes`, then confirms complete retirement when the
+amortized glow path ends. The sparse guard also retires all glow targets when
+nominal glow draws cannot pay for an extra path.
+
+### Crowded remeasurement
+
+Five alternating main-control/fixed pairs rerun the five headline cells using
+the complete-history method below. This is a separate source-pinned series;
+earlier measurements are preserved. GPU sums include world/blit/HUD passes.
+The new CSV's `callbacks` counts all 366 replay or 181 authored callbacks;
+`samples` counts the selected 302 or 141 populated pictures.
+
+<!-- BEGIN CROWDED REVISION -->
+| Crowded history / output | Main control GPU median / p95 ms | Fixed GPU median / p95 ms | Fixed run-median range ms |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 65.606 / 109.362 | 4.805 / 6.266 | 4.788–4.835 |
+| Replay / default / 1920×1080 Original | 65.720 / 109.566 | 4.941 / 6.393 | 4.919–4.982 |
+| Replay / default / 1920×1080 Native | 98.477 / 165.146 | 6.111 / 7.570 | 6.063–6.119 |
+| Authored / default / 1920×1080 Native | 67.419 / 94.126 | 18.795 / 19.364 | 18.755–19.000 |
+| Authored / whole map / 1920×1080 Native | 67.374 / 70.963 | 12.285 / 12.641 | 12.182–12.359 |
+<!-- END CROWDED REVISION -->
+
+The sparse, cache and crowded per-run summaries are [sparse-runs.csv](sparse-runs.csv),
+[cache-runs.csv](cache-runs.csv) and [revision-runs.csv](revision-runs.csv).
+[reduce_revision.py](reduce_revision.py) reduces owner-local receipts; all new
+tables, expected row sets/counts, interleaving and executable bindings are covered
+by `recompute.py --check`. The retained [probe.patch](probe.patch) contains both
+study-only probes and the original authored workload helper; none of that
+adapter-selection driver is a shipped example. Production paths are portable.
+
+### Champion-menu integration
+
+The update rebases onto main `84757429` (#432), dropping the four Resource
+initializers with the deleted menu painter and retaining the surviving world
+crossfade initializer. `git range-diff` shows no other behavior reconciliation.
+Timing pins above remain unchanged. A separately built post-rebase executable
+processes all twelve complete histories with exact frame/resource/send digests
+checked against the retained main control. Its 36 new physical-size readbacks
+compare against the original control images, whose SHA-256 bindings are checked
+before reduction. The unchanged control receipts are reused, not remeasured or
+relabelled as new runs. [revision-parity-runs.csv](revision-parity-runs.csv) and
+[revision-pixels.csv](revision-pixels.csv) retain these correctness summaries.
+
+<!-- BEGIN REVISION PICTURE CHECKS -->
+| Picture check / output | Exact core/resource/send digest | RGB max / p95 bytes | RGB RMS range bytes |
+| --- | --- | ---: | ---: |
+| Replay / default / 960×540 Original | `75846df53ae4defc` | 37 / 4 | 1.337–1.704 |
+| Replay / default / 1920×1080 Original | `ba63b5047ff4b8b1` | 37 / 4 | 1.348–1.692 |
+| Replay / default / 1920×1080 Native | `ba63b5047ff4b8b1` | 31 / 4 | 1.314–1.723 |
+| Replay / whole map / 960×540 Original | `696e1b57cb0985e4` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Original | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Native | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Authored / default / 960×540 Original | `d5127c0955e212ea` | 17 / 4 | 0.013–1.636 |
+| Authored / default / 1920×1080 Original | `fd8de742e7647024` | 17 / 3 | 0.013–1.515 |
+| Authored / default / 1920×1080 Native | `fd8de742e7647024` | 17 / 3 | 0.010–1.435 |
+| Authored / whole map / 960×540 Original | `f81e81d9e9c70a67` | 21 / 3 | 0.023–1.283 |
+| Authored / whole map / 1920×1080 Original | `5cd558dbaddd85f2` | 19 / 3 | 0.023–1.189 |
+| Authored / whole map / 1920×1080 Native | `5cd558dbaddd85f2` | 22 / 3 | 0.020–1.170 |
+<!-- END REVISION PICTURE CHECKS -->
+
+## Matched complete-history method
+
+The primary matrix has five alternating A/B pairs in each of twelve cells:
+recorded/authored, default/whole-map, and 960×540 Original, 1920×1080 Original,
+1920×1080 Native. Odd pairs run control then candidate; even pairs reverse them.
+This original series is pinned to `3556082d`; the sparse follow-up above is a
+separate series with its own source and executable bindings.
+No quiet interval is reserved and no other process is stopped. All successful
+runs are included. CPU load and all process names/paths are sampled around and
+during runs; only load ranges and process-category maxima are exported.
+
+The replay reads the complete fixed 6.1-second input at 60 virtual callbacks/s,
+without a socket or window. Both peers acknowledge the same prepared pictures.
+Every picture is rendered once; summaries select model time at least one second
+and at least 10,000 received food keys (302 pictures/callbacks). The authored
+workload advances 181 callbacks after constructing its world; the last 141 are
+selected. Its toy map, grid and deliberate overlapping snakes stress drawing;
+they are not a live-server ecology or a 500-snake capacity test. One late authored
+phase has no food glow commands; it remains in both arms.
+
+Per-picture GPU time is the sum of timestamped render/blit/overlay passes.
+Resource upload copies, CPU frame preparation, inter-pass CPU supply gaps,
+timestamp resolve/readback and GPU completion waits are outside that metric.
+The calling-thread sync and renderer preparation/submission intervals are also
+retained. They do not include all client advance/planning work. The diagnostic
+driver waits for completion to collect timestamps, so neither GPU pass sums nor
+launcher elapsed time establish gameplay FPS or input/scanout latency.
+
+Per-run median is the median of selected picture values; p95 is nearest rank.
+The report aggregates the five per-run medians/p95s by median, without pooling
+quantiles or summing stage quantiles. Run-median ranges retain host drift.
+The primary binaries are rebuilt from clean client/app release packages with
+the same driver, features, Rust 1.99, thin LTO and two Cargo jobs. The baseline is
+main `ffc36bb0`, including #427, #428 and #429; the candidate runtime is
+`3556082d`. Full identities are in
+[provenance.json](provenance.json).
+
+Main subsequently gained the egui skin studio (#431). The branch was rebased
+onto `5a00451b`; all seven patches remain equivalent in `git range-diff` and all
+eight measured GPU/resource source blobs are identical. Full checks and the
+seven explicit GPU regressions pass after rebase. Twelve additional full-history
+candidate runs match every retained frame/resource/send digest and all 36 RGBA
+readbacks **byte-for-byte**; [integration-runs.csv](integration-runs.csv) and
+provenance bind the rebuilt executable. These are correctness checks, not new
+timing samples. The timing tables remain pinned to `3556082d` versus `ffc36bb0`.
+
+The public equivalent runtime commit is `0403dbde`. Applying its runtime patch
+range `5a00451b..0403dbde` to `ffc36bb0` reconstructs the exact measured source
+tree `0178a6f562c84bbc1c3817e987da1da811531cad`, verified with a separate temporary
+Git index. The historical measurement pin is preserved rather than relabelled
+as the post-studio binary.
+
+<!-- BEGIN HISTORY RESULTS -->
+| Workload / view / physical output | Before GPU median / p95 ms | After GPU median / p95 ms | After run-median range ms |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 65.622 / 109.827 | 4.696 / 6.283 | 4.689–4.918 |
+| Replay / default / 1920×1080 Original | 65.914 / 109.712 | 4.847 / 6.410 | 4.840–4.857 |
+| Replay / default / 1920×1080 Native | 98.467 / 166.400 | 6.105 / 7.442 | 6.091–6.157 |
+| Replay / whole map / 960×540 Original | 0.972 / 1.317 | 1.010 / 1.311 | 0.960–1.064 |
+| Replay / whole map / 1920×1080 Original | 1.118 / 1.414 | 1.137 / 1.409 | 1.052–1.220 |
+| Replay / whole map / 1920×1080 Native | 1.152 / 1.421 | 1.117 / 1.410 | 1.073–1.163 |
+| Authored / default / 960×540 Original | 45.891 / 64.372 | 13.752 / 14.968 | 13.696–14.527 |
+| Authored / default / 1920×1080 Original | 45.749 / 63.170 | 13.860 / 14.266 | 13.821–14.194 |
+| Authored / default / 1920×1080 Native | 69.557 / 94.688 | 18.940 / 19.507 | 18.784–19.182 |
+| Authored / whole map / 960×540 Original | 46.158 / 49.477 | 8.589 / 8.917 | 8.495–8.685 |
+| Authored / whole map / 1920×1080 Original | 46.429 / 50.084 | 8.763 / 9.048 | 8.627–8.798 |
+| Authored / whole map / 1920×1080 Native | 66.729 / 71.764 | 12.232 / 12.565 | 12.204–12.242 |
+<!-- END HISTORY RESULTS -->
+
+## Retained pre-sparse pass breakdown
+
+A separate `3556082d` diagnostic renders the three predetermined snapshots at
+1920×1080 Native, five warm pictures and ten measured repetitions per snapshot.
+The table sums **means** of disjoint timestamped passes, not stage quantiles.
+World passes include remaining geometry and the full-resolution composites;
+they do not isolate snake bodies from food bodies or composition. Absent passes
+contribute zero. These profiles are excluded from the matched-history table.
+
+<!-- BEGIN FINAL GPU PROFILE -->
+| Pre-sparse Native 1920×1080 diagnostic | Snapshot | World passes incl. composites ms | Glow targets ms | Outline target ms | Blit / HUD ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Replay / default / 1920×1080 Native | 120 | 2.515 | 1.048 | 0.379 | 0.000 / 0.048 |
+| Replay / default / 1920×1080 Native | 240 | 2.495 | 2.117 | 1.682 | 0.000 / 0.045 |
+| Replay / default / 1920×1080 Native | 365 | 2.820 | 2.445 | 2.124 | 0.000 / 0.045 |
+| Replay / whole map / 1920×1080 Native | 120 | 0.544 | 0.000 | 0.000 | 0.000 / 0.046 |
+| Replay / whole map / 1920×1080 Native | 240 | 0.562 | 0.000 | 0.000 | 0.000 / 0.045 |
+| Replay / whole map / 1920×1080 Native | 365 | 0.537 | 0.000 | 0.000 | 0.000 / 0.044 |
+| Authored / default / 1920×1080 Native | 60 | 8.893 | 8.390 | 1.523 | 0.000 / 0.000 |
+| Authored / default / 1920×1080 Native | 120 | 8.967 | 8.373 | 1.567 | 0.000 / 0.000 |
+| Authored / default / 1920×1080 Native | 180 | 5.515 | 0.000 | 1.763 | 0.000 / 0.000 |
+| Authored / whole map / 1920×1080 Native | 60 | 4.665 | 6.762 | 0.981 | 0.000 / 0.000 |
+| Authored / whole map / 1920×1080 Native | 120 | 4.523 | 6.666 | 0.986 | 0.000 / 0.000 |
+| Authored / whole map / 1920×1080 Native | 180 | 3.346 | 0.000 | 0.983 | 0.000 / 0.000 |
+<!-- END FINAL GPU PROFILE -->
+
+## Retained frozen-picture comparison
+
+An earlier matched matrix repeats three immutable snapshots per workload/view:
+replay frames 120/240/365 and authored frames 60/120/180. Each snapshot has five
+warmups and twenty measured repeats. These 120 runs are retained separately.
+They use the same rendering design but predate removal of a redundant outer
+GPU-handle `Arc` needed for strict Wasm Clippy. They are diagnostic evidence,
+not relabelled as final-source or changing-frame measurements.
+
+<!-- BEGIN FROZEN RESULTS -->
+| Workload / view / physical output | Before GPU median / p95 ms | After GPU median / p95 ms | After run-median range ms |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 82.514 / 110.395 | 3.788 / 4.636 | 3.765–3.794 |
+| Replay / default / 1920×1080 Original | 82.912 / 110.123 | 3.908 / 4.770 | 3.881–3.950 |
+| Replay / default / 1920×1080 Native | 125.133 / 166.399 | 5.534 / 6.862 | 5.390–5.672 |
+| Replay / whole map / 960×540 Original | 0.521 / 0.538 | 0.498 / 0.510 | 0.486–0.505 |
+| Replay / whole map / 1920×1080 Original | 0.623 / 0.639 | 0.599 / 0.682 | 0.596–0.647 |
+| Replay / whole map / 1920×1080 Native | 0.617 / 0.635 | 0.588 / 0.604 | 0.582–0.609 |
+| Authored / default / 960×540 Original | 43.301 / 60.548 | 7.736 / 7.989 | 7.687–7.956 |
+| Authored / default / 1920×1080 Original | 44.705 / 61.591 | 7.957 / 8.272 | 7.841–8.013 |
+| Authored / default / 1920×1080 Native | 67.787 / 93.556 | 11.676 / 12.105 | 11.372–12.152 |
+| Authored / whole map / 960×540 Original | 44.829 / 48.991 | 4.808 / 4.980 | 4.770–4.893 |
+| Authored / whole map / 1920×1080 Original | 44.750 / 48.085 | 4.952 / 5.057 | 4.926–4.980 |
+| Authored / whole map / 1920×1080 Native | 65.464 / 69.380 | 6.391 / 6.501 | 6.353–6.416 |
+<!-- END FROZEN RESULTS -->
+
+## Retained pre-boundary-sweep comparison
+
+The first complete-history series used runtime `232bfc39`. A subsequent
+authored boundary sweep found that its quarter target blurred small bright
+glows beyond the isolated max-five/p95-two-byte budget: up to ten/five bytes.
+Expanding the sweep to source index zero also rejected the first size/opacity
+gradient guard (six/three bytes). Both failures remain in local logs. The final
+guard chooses the coarsest factor 8/4/2 only when the shortest edge spans four
+reduced pixels and `max(opacity, paired opacity) * factor / edge <= 0.004`.
+It preserves the existing error limits. The original full-history series is
+retained below as diagnostic evidence, rather than relabelled as corrected-source
+measurements or silently discarded. The final matrix reruns both arms.
+
+<!-- BEGIN PRE-BOUNDARY RESULTS -->
+| Workload / view / physical output | Before GPU median / p95 ms | After GPU median / p95 ms | After run-median range ms |
+| --- | ---: | ---: | ---: |
+| Replay / default / 960×540 Original | 66.026 / 110.033 | 3.421 / 4.636 | 3.389–3.475 |
+| Replay / default / 1920×1080 Original | 65.973 / 109.986 | 3.560 / 4.764 | 3.547–3.576 |
+| Replay / default / 1920×1080 Native | 99.261 / 166.204 | 4.853 / 6.898 | 4.841–4.914 |
+| Replay / whole map / 960×540 Original | 1.081 / 1.317 | 1.001 / 1.307 | 0.976–1.073 |
+| Replay / whole map / 1920×1080 Original | 1.201 / 1.424 | 1.176 / 1.420 | 1.147–1.187 |
+| Replay / whole map / 1920×1080 Native | 1.181 / 1.415 | 1.148 / 1.390 | 1.063–1.171 |
+| Authored / default / 960×540 Original | 46.756 / 65.340 | 7.779 / 8.077 | 7.722–8.086 |
+| Authored / default / 1920×1080 Original | 46.709 / 64.574 | 7.908 / 8.173 | 7.836–7.969 |
+| Authored / default / 1920×1080 Native | 68.331 / 96.600 | 11.367 / 11.820 | 11.299–11.606 |
+| Authored / whole map / 960×540 Original | 46.516 / 49.641 | 4.805 / 4.974 | 4.776–5.095 |
+| Authored / whole map / 1920×1080 Original | 46.859 / 49.384 | 4.924 / 5.061 | 4.909–4.997 |
+| Authored / whole map / 1920×1080 Native | 67.677 / 72.245 | 6.377 / 6.531 | 6.325–6.408 |
+<!-- END PRE-BOUNDARY RESULTS -->
+
+## Retained pre-mip picture comparison
+
+The corrected size/opacity guard alone passed the isolated sweep but accumulated
+larger whole-map color drift. Its complete 24-run parity/readback matrix is
+retained below. This prompted stopping its timing series after five completed
+runs and one deliberately interrupted candidate run; all six receipts are bound
+in [interrupted-runs.csv](interrupted-runs.csv). None is a final timing sample.
+
+Higher-precision glow accumulation and cubic reconstruction on all bins did not
+reduce that drift; their diagnostic binaries, patches, readbacks and logs remain
+local. Correcting the implicit source mip footprint reduced the early authored
+whole-map p95 RGB error from 14 to 3 bytes in a subsequent diagnostic. The final
+matrix reruns both binaries after this correction. An authored distinct-mip-color
+regression checks the original source footprint for all three attachment factors,
+with both single and paired contributions.
+
+<!-- BEGIN PRE-MIP PICTURE CHECKS -->
+| Picture check / output | Exact core/resource/send digest | RGB max / p95 bytes | RGB RMS range bytes |
+| --- | --- | ---: | ---: |
+| Replay / default / 960×540 Original | `75846df53ae4defc` | 33 / 8 | 1.556–3.358 |
+| Replay / default / 1920×1080 Original | `ba63b5047ff4b8b1` | 33 / 8 | 1.619–3.309 |
+| Replay / default / 1920×1080 Native | `ba63b5047ff4b8b1` | 29 / 6 | 1.468–2.751 |
+| Replay / whole map / 960×540 Original | `696e1b57cb0985e4` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Original | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Native | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Authored / default / 960×540 Original | `d5127c0955e212ea` | 19 / 5 | 0.013–1.946 |
+| Authored / default / 1920×1080 Original | `fd8de742e7647024` | 18 / 4 | 0.013–1.843 |
+| Authored / default / 1920×1080 Native | `fd8de742e7647024` | 19 / 4 | 0.010–1.603 |
+| Authored / whole map / 960×540 Original | `f81e81d9e9c70a67` | 40 / 14 | 0.023–5.499 |
+| Authored / whole map / 1920×1080 Original | `5cd558dbaddd85f2` | 39 / 14 | 0.023–5.435 |
+| Authored / whole map / 1920×1080 Native | `5cd558dbaddd85f2` | 33 / 8 | 0.020–3.100 |
+<!-- END PRE-MIP PICTURE CHECKS -->
+
+<!-- BEGIN HOST OBSERVATIONS -->
+| Series | Runs retained | Observed compilation | CPU-load snapshot range | Maximum observed browser / Node processes |
+| --- | ---: | ---: | ---: | ---: |
+| history | 120 | 73 | 3–100% | 2 / 26 |
+| pre-boundary | 120 | 105 | 6–100% | 0 / 28 |
+| frozen | 120 | 92 | 3–100% | 29 / 29 |
+| sparse | 10 | 1 | 7–62% | 0 / 6 |
+| cache | 10 | 10 | 17–100% | 0 / 6 |
+| revision | 50 | 7 | 3–91% | 0 / 8 |
+<!-- END HOST OBSERVATIONS -->
+
+## Exactness and picture checks
+
+Each final binary also processes the entire history in a separate parity run
+for each cell. Every prepared CPU frame/overlay, source raster byte and sent
+command contributes in order to a 64-bit consistency digest. Only renderer
+classification hints are omitted; original assets, order, geometry, alpha and
+resource pixels remain included. This supports exact-boundary regression tests;
+it is not a cryptographic proof or GPU/owner acceptance.
+
+Three predetermined snapshots per cell are read back at physical output size.
+The table gives maximum/p95 RGB-component absolute differences and the RMS range
+across those three pictures. All components, including unchanged background,
+participate. Full per-picture statistics, signed means, differing-component
+counts and SHA-256 bindings are in [pixels.csv](pixels.csv). Replay images stay
+local. These composite RGB statistics are descriptive; they do not substitute
+for the policy's layer-alpha, geometry, exact-controls or lifecycle gates.
+
+<!-- BEGIN PICTURE CHECKS -->
+| Picture check / output | Exact core/resource/send digest | RGB max / p95 bytes | RGB RMS range bytes |
+| --- | --- | ---: | ---: |
+| Replay / default / 960×540 Original | `75846df53ae4defc` | 37 / 4 | 1.337–1.707 |
+| Replay / default / 1920×1080 Original | `ba63b5047ff4b8b1` | 37 / 4 | 1.348–1.694 |
+| Replay / default / 1920×1080 Native | `ba63b5047ff4b8b1` | 31 / 4 | 1.314–1.723 |
+| Replay / whole map / 960×540 Original | `696e1b57cb0985e4` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Original | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Native | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Authored / default / 960×540 Original | `d5127c0955e212ea` | 17 / 4 | 0.013–1.636 |
+| Authored / default / 1920×1080 Original | `fd8de742e7647024` | 17 / 3 | 0.013–1.515 |
+| Authored / default / 1920×1080 Native | `fd8de742e7647024` | 17 / 3 | 0.010–1.435 |
+| Authored / whole map / 960×540 Original | `f81e81d9e9c70a67` | 22 / 3 | 0.023–1.289 |
+| Authored / whole map / 1920×1080 Original | `5cd558dbaddd85f2` | 21 / 3 | 0.023–1.194 |
+| Authored / whole map / 1920×1080 Native | `5cd558dbaddd85f2` | 22 / 3 | 0.020–1.170 |
+<!-- END PICTURE CHECKS -->
+
+The CPU picture order, geometry, source pixels, protocol decisions and controls
+remain exact boundaries. GPU primitive/binding counts may differ under the
+existing perceptual policy. Isolated GPU tests preserve minified glows, original
+body source/mip ownership, additive contribution rounding, old resource revisions
+and resize-back pictures with work in flight. The isolated boundary sweep covers
+360 size/opacity/fractional-position cases across three source sizes, without
+changing pre-existing goldens. Whole-picture RGB differences are
+descriptive raster evidence, separate from the shared-core alpha/geometry budgets
+and from owner perceptual acceptance.
+
+## Verification
+
+- Full Windows `npm run check` passes after rebasing onto `84757429` with the
+  sparse guard (validation source `dc0d5f78`): JavaScript, shared
+  core/native regressions, strict native/profiling/Wasm Clippy, desktop build,
+  Canvas Wasm ABI checks and browser WebGPU Wasm build/bindings. The commands use
+  the dedicated target, two Cargo jobs, offline Cargo and the pinned CLI.
+- Twelve explicitly enabled offscreen GPU regressions pass: additive rounding,
+  small/body-layer preservation and resize/reuse, 360 boundary cases, six
+  distinct-mip footprint paths, array binding/revision restoration, the two
+  original pellet-raster quality checks, sparse/crossover and cached-bin accounting,
+  and three world-resolution checks. Existing goldens and budgets stay intact.
+  Normal CI compiles but does not run these ignored GPU tests. The new CPU
+  coverage/selection/hysteresis test does run normally. A cheap software-adapter
+  subset was considered; the production renderer intentionally rejects CPU
+  adapters, so this update does not introduce a separate device policy for CI.
+- The final full-history digests and image readbacks are reported above. Browser
+  runtime, physical display/input, outside-server play and owner perceptual
+  acceptance are unrun; no gameplay pacing or end-to-end frame-budget claim is made.
+- The stdlib recompute negative checks reject missing rows/cells, duplicate and
+  mislabeled IDs, wrong executable bindings, incomplete diagnostics, altered
+  report blocks and mismatched parity digests (12 tests).
+- Three authored CLI tests cover default/pre-mip/revision parity dispatch, reject
+  ignored parity options on other series, and preserve baseline files by rejecting
+  reference mode without a nonempty prefix. The documented reduction sequence
+  rebuilds all 16 generated CSVs byte-identically from retained inputs; the
+  curated interrupted-run manifest is copied unchanged. The rebuilt bundle passes
+  recompute without any new replay, rendering or timing run.
+
+## Attempts and limitations
+
+- Texture arrays alone did not materially improve the original fill bottleneck.
+  Grouping the additive glow barrier later reduced tens of thousands of binding
+  runs, but did not by itself remove the remaining shaded area.
+- Discarding sub-byte additive fragments did not materially improve GPU time.
+- An analytic radial shader was slower than the retained sampled source path.
+- A single coarse-target size gate sent too many growing glows back through
+  MSAA4. Separate half/quarter/eighth bins retain detail without that early replay
+  spike; the later gradient guard corrects the isolated small-bright-glow failure.
+- Single-sampling food bodies changed edges too much and was rejected. Only
+  padded outlines use that early intermediate; #427 body sampling stays intact.
+- Nine-tap reconstruction was more expensive than the retained five-tap
+  approximation. Raw exploratory binaries, CSVs, images and patches remain local;
+  they are excluded from primary performance tables.
+- The pre-mip full-history parity/readback run exposed accumulated color drift
+  missed by isolated tests. Higher-precision accumulation and broader cubic
+  reconstruction were rejected; source-footprint correction is retained. The
+  timing interruption and all earlier successful/failed runs remain documented.
+- The first full check could not find the pinned wasm-bindgen CLI on PATH. A
+  per-process absolute 0.2.129 path fixed it. Strict Wasm Clippy then caught the
+  redundant outer `Arc`; cloned wgpu handles retain native Send ownership and
+  browser-local ownership without a lint suppression.
+
+The remaining costs include crowded snake-body/boost overdraw and CPU
+advance/planning/preparation. This is one AMD iGPU and two bounded offline
+workloads. It does not establish a full 16.7 ms frame budget, smooth owner play,
+official/mod superiority, stock-art acceptance, browser runtime performance or
+other-iGPU/discrete-GPU results. No outside server or official website was used.
+
+The selected replay whole-map window has no food quads under the existing LOD;
+its low GPU times do not test crowded glow drawing. The authored whole-map
+workload supplies that stress case. The authored default scene deliberately
+overlaps 40 snakes and does not meet the 8 ms target after this change. Its
+remaining cost is retained, rather than treating the replay result as universal.
+
+## Recompute
+
+From this directory, Python 3.11+ and only the standard library:
+
+```sh
+python recompute.py --check
+```
+
+The script validates complete workload/view/resolution/pair/arm sets, unique
+IDs and label consistency, chronological alternating arms, executable hashes,
+callback/sample selections and every generated table. `--write` replaces only
+marked generated blocks. [reduce_runs.py](reduce_runs.py) reduces the owner-local
+journals into the adjacent per-run summaries; raw inputs are not distributed.
+
+### Rebuild the retained CSVs without new measurements
+
+Run the following from this study directory with the **owner-retained raw
+journals and RGBA readbacks**. `$journals` denotes the initial journal directory;
+its `final-gradient`, `final-mip`, `post-studio` and `sparse-revision` subdirectories
+retain the later series. Set the two example paths before running. Use a fresh
+output directory so reductions cannot overwrite the committed evidence or raw
+inputs. These commands reduce existing bytes; they run no replay or GPU work.
+
+```powershell
+$journals='D:/path/to/retained/sprite-bandwidth-journals'
+$out='D:/new-reduction-output'
+New-Item -ItemType Directory -Path $out -ErrorAction Stop | Out-Null
+
+# Initial diagnostics and frozen runs; the initial history is the pre-boundary series.
+python -B reduce_runs.py $journals --output $out --series diagnostics
+python -B reduce_runs.py $journals --output $out --series frozen
+python -B reduce_runs.py $journals --output $out --series history
+Move-Item -LiteralPath "$out/history-runs.csv" -Destination "$out/pre-boundary-runs.csv"
+
+# Complete corrected history, its control/candidate parity and pass profile.
+python -B reduce_runs.py "$journals/final-mip" --output $out --series history
+python -B reduce_runs.py "$journals/final-mip" --output $out --series parity
+python -B reduce_runs.py "$journals/final-mip" --output $out --series profile
+
+# The pre-mip journal has both arms and its own control images; no --reference is needed.
+python -B reduce_runs.py "$journals/final-gradient" --output $out --series parity --prefix pre-mip-
+python -B reduce_runs.py "$journals/post-studio" --output $out --series integration
+
+# Sparse/caching/headline follow-up summaries, then post-champion correctness.
+python -B reduce_revision.py "$journals/sparse-revision" sparse --output $out
+python -B reduce_revision.py "$journals/sparse-revision" cache --output $out
+python -B reduce_revision.py "$journals/sparse-revision" revision --output $out
+python -B reduce_runs.py "$journals/sparse-revision/post-champion-parity" --output $out --series parity --reference "$journals/final-mip" --prefix revision-
+```
+
+`--reference` and `--prefix` apply only to `--series parity`; other series reject
+them. `--reference` also requires a nonempty `--prefix` to protect the baseline
+filenames. The reference mode reuses `parity-runs.csv` and `pixels.csv` already in
+`--output`, checks the control readback hashes, and writes the prefixed files.
+The corrected parity command above creates those baseline CSVs first. When
+reducing only the revision parity, copy the committed baseline pair into the
+fresh output directory before invoking it.
+
+These commands produce every retained CSV **except `interrupted-runs.csv`**.
+That file is a curated attempt manifest, not an `export_series` output: five
+completed receipts and the interrupted sixth receipt in `final-gradient` supply
+the exit/binary/receipt/available-CSV bindings; the `reason` column records the
+manual source-mip investigation decision. The raw receipts alone cannot recreate
+that annotation, and no automated exporter for this manifest is provided.
+Preserve the committed manifest as an input. `provenance.json` likewise retains
+curated source/build/access metadata. The following copies those inputs and the
+checker into the new output directory and verifies the regenerated tables:
+
+```powershell
+Copy-Item -LiteralPath ./interrupted-runs.csv,./provenance.json,./REPORT.md,./probe.patch,./cache-retirement.patch,./recompute.py,./recompute_revision.py,./reduce_runs.py -Destination $out
+python -B "$out/recompute.py" --check
+
+# Small synthetic CLI and dataset-completeness regressions, from the study directory.
+python -B -m unittest test_reduce_runs test_recompute
+```
+
+The public aggregate CSVs can regenerate every report table via `recompute.py`;
+they cannot regenerate raw journals, restricted recordings or RGBA images. The
+raw-to-CSV commands require the retained local inputs and are not a claim that
+those private inputs are distributed or independently remeasured.
+
+The authored workload needs no external recording. Its AMD-specific measurement
+drivers are retained in [probe.patch](probe.patch), outside the shipped examples.
+Apply the patch with `git apply --unidiff-zero` in a disposable source checkout
+first. With a fresh external output directory, build and run from that root (the
+`unused` argument is not read in synthetic mode):
+
+```powershell
+$env:CARGO_TARGET_DIR='D:/CargoTargets/frame-prep'
+$env:CARGO_BUILD_JOBS='2'
+cargo build --offline --locked --release -p slither-wgpu-slice --features frame-profile --example gpu_sprite_probe
+$env:GPU_SPRITE_FULL='1'
+& "$env:CARGO_TARGET_DIR/release/examples/gpu_sprite_probe.exe" synthetic unused D:/new-output/scene.csv 0 1920 1080 native 4 all 0 1
+```
+
+Use zoom `-120` for whole map; use `original` for Original. The driver explicitly
+selects the AMD/DX12 adapter and fails if it is absent. That measurement selection
+does not introduce an adapter-specific production path. Preserve both executables
+before measuring and alternate five pairs without rebuilding between arms.

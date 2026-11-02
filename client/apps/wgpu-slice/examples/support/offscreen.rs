@@ -87,6 +87,8 @@ pub fn scene(physical: [u32; 2]) -> (Frame, Frame, Vec<Resource>) {
     .into_iter()
     .enumerate()
     .map(|(i, color)| Resource {
+        food_glow: false,
+        food_outline: false,
         asset: BodyAsset {
             handle: i as u64 + 1,
             revision: 1,

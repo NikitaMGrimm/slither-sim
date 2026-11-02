@@ -1,4 +1,4 @@
-//! Consecutive resolved paint states only; never sort or copy geometry.
+//! Consecutive resolved paint states after any additive-barrier grouping.
 use crate::frame::{Quad, ResourceKey};
 use slither_client::presentation::BodyBlend;
 use std::ops::Range;
@@ -7,6 +7,7 @@ use std::ops::Range;
 pub(super) enum Pipeline {
     Over,
     Lighter,
+    PairLighter,
     BlackOver,
 }
 
@@ -15,6 +16,7 @@ pub(super) struct DrawState {
     pub pipeline: Pipeline,
     pub key: ResourceKey,
     pub repeat: bool,
+    pub glow_scale: u8,
 }
 impl DrawState {
     pub fn new(quad: &Quad, black: bool) -> Self {
@@ -28,6 +30,7 @@ impl DrawState {
             },
             key: quad.key,
             repeat: quad.repeat,
+            glow_scale: 0,
         }
     }
 }
@@ -63,6 +66,7 @@ mod tests {
                 revision: 1,
             },
             repeat: false,
+            glow_scale: 0,
         }
     }
 

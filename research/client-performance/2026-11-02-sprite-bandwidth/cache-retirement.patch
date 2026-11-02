@@ -1,0 +1,17 @@
+--- a/client/apps/wgpu-slice/src/gpu.rs
++++ b/client/apps/wgpu-slice/src/gpu.rs
+@@ -1416,10 +1416,10 @@
+         if let Some(glow) = glow_replacement {
+             self.glow = Some(glow);
+         }
+-        if !overlay && !has_glows {
+-            self.glow = None;
+-            self.fine_glow = None;
+-            self.half_glow = None;
++        if !overlay {
++            if !has_glows || !glow_bins[3] { self.glow = None; }
++            if !has_glows || !glow_bins[2] { self.fine_glow = None; }
++            if !has_glows || !glow_bins[1] { self.half_glow = None; }
+         }
+         // Allocation precedes publication; wgpu retains submitted attachment references
+         // after the old host handles are dropped, without a CPU/GPU idle wait.

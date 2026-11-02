@@ -243,6 +243,10 @@ counter receipts and binaries remain outside Git.
 
 ## Dense singleton motion ingress
 
+For the later GPU fill/bandwidth work, see [food sprite bandwidth](sprite-bandwidth.md).
+Its offscreen workload uses the actual desktop backing-size policy and isolates
+GPU passes from replay ingress, CPU preparation and display pacing.
+
 The `food_ingress` test `singleton_motion_allocation_is_independent_of_retained_food`
 is an authored, socket/GPU-free allocation workload. For both protocols it sends
 100 scalar-motion packets with 64 and 6,000 retained foods, then checks allocation

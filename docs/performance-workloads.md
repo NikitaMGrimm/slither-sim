@@ -44,6 +44,9 @@ The Windows product's separate native frame workload (`client/docs/frame-perform
 measures synthetic offscreen preparation, resource synchronization, render
 submission and calling-thread heap bytes on each exposed hardware adapter.
 It is outside the simulator timing/trace suites below.
+The [food-sprite bandwidth study](https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-sprite-bandwidth/REPORT.md)
+retains its non-landed reproducibility probe as a patch. It is not a shipped
+workload, simulator tick benchmark or FPS case.
 
 - **Legacy:** `step-default`, `step-food`, `step-body`, `observe`, `portable` and
   `protocol` come first; the catalog holds their resolved definitions.

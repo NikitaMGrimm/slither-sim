@@ -85,6 +85,8 @@ impl MenuFrame {
             return Err("Invalid world opacity".into());
         }
         let resource = Resource {
+            food_glow: false,
+            food_outline: false,
             asset: BodyAsset {
                 handle: PAGE_HANDLE,
                 revision: 1,

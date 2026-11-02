@@ -19,6 +19,8 @@ fn upload(r: &mut Renderer, handle: u64, size: [u32; 2], pixels: Vec<u8>) -> Res
         status: BodyAssetStatus::Ready,
     };
     r.upload(&Resource {
+        food_glow: false,
+        food_outline: false,
         asset,
         image: RgbaImage {
             width: size[0],

@@ -205,6 +205,8 @@ impl MenuArtCache {
         self.resident.insert(
             art,
             Resource {
+                food_glow: false,
+                food_outline: false,
                 asset: BodyAsset {
                     handle: crate::bank::COSMETIC_HANDLE_BASE + 1024 + art.ordinal(),
                     revision,
