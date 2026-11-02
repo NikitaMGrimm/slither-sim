@@ -1,6 +1,10 @@
 //! One lazy native menu host. Closed menus do not translate or drain egui input.
 use crate::{Result, egui_theme, gpu};
 use egui::{Id, Key};
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 use winit::{
     event::{ElementState, WindowEvent},
     keyboard::{Key as NativeKey, ModifiersState, NamedKey},
@@ -134,8 +138,38 @@ pub struct NativeEguiHost {
     now: f64,
     error: Option<String>,
     restore_cursor: bool,
+    repaint: Arc<Mutex<Option<Instant>>>,
+    repaint_wake: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 impl NativeEguiHost {
+    /// Install before the lazy context is created. The callback also wakes a
+    /// sleeping event loop for repaint requests made outside a menu pass.
+    pub fn set_repaint_wake(&mut self, wake: impl Fn() + Send + Sync + 'static) {
+        self.repaint_wake = Some(Arc::new(wake));
+        if let Some(s) = &self.session {
+            self.install_repaint_callback(&s.context);
+        }
+    }
+    fn install_repaint_callback(&self, context: &egui::Context) {
+        let repaint = self.repaint.clone();
+        let wake = self.repaint_wake.clone();
+        context.set_request_repaint_callback(move |info| {
+            if info.viewport_id != egui::ViewportId::ROOT {
+                return;
+            }
+            if let Some(at) = Instant::now().checked_add(info.delay) {
+                let mut pending = repaint.lock().unwrap();
+                *pending = Some(pending.map_or(at, |old| old.min(at)));
+                drop(pending);
+                if let Some(wake) = &wake {
+                    wake();
+                }
+            }
+        });
+    }
+    pub fn repaint_deadline(&self) -> Option<Instant> {
+        self.active.then(|| *self.repaint.lock().unwrap()).flatten()
+    }
     pub fn active(&self) -> bool {
         self.active
     }
@@ -194,6 +228,7 @@ impl NativeEguiHost {
             return;
         }
         self.active = active;
+        *self.repaint.lock().unwrap() = None;
         self.restore_cursor = !active;
         self.reset_input();
         if !active && let Some(s) = &mut self.session {
@@ -211,6 +246,7 @@ impl NativeEguiHost {
         }
         if self.session.is_none() {
             let context = egui::Context::default();
+            self.install_repaint_callback(&context);
             if let Err(error) = egui_theme::install(&context) {
                 self.error = Some(error);
                 return None;
@@ -268,6 +304,9 @@ impl NativeEguiHost {
         if let Some(s) = self.ensure() {
             s.context.memory_mut(|m| m.request_focus(id));
             s.reveal_focus = true;
+            // Return admission can transfer focus after the last picture was
+            // presented, when no animation is left to request a successor.
+            s.context.request_repaint();
         }
     }
     pub fn input(&mut self, input: egui::RawInput) {
@@ -503,6 +542,7 @@ impl NativeEguiHost {
         mut draw: impl FnMut(&egui::Context, bool),
     ) {
         let now = self.now;
+        let repaint = self.repaint.clone();
         let Some(s) = self.ensure() else {
             return;
         };
@@ -580,7 +620,19 @@ impl NativeEguiHost {
             .entry(egui::ViewportId::ROOT)
             .or_default()
             .native_pixels_per_point = Some(s.dpr);
+        // This pass services the previous request. Keep any new requests from
+        // the pass (including caret blink and egui's settling passes).
+        *repaint.lock().unwrap() = None;
+        let began = Instant::now();
         let mut output = s.context.run_pass(input, |ctx| draw(ctx, reveal));
+        if let Some(at) = output
+            .viewport_output
+            .get(&egui::ViewportId::ROOT)
+            .and_then(|v| began.checked_add(v.repaint_delay))
+        {
+            let mut pending = repaint.lock().unwrap();
+            *pending = Some(pending.map_or(at, |old| old.min(at)));
+        }
         // The release has had its pass, or the captured widget is gone.
         if !s.context.input(|i| i.pointer.primary_down()) {
             crate::egui_panel::release_capture(&s.context);

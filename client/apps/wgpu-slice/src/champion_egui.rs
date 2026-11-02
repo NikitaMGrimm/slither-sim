@@ -67,6 +67,10 @@ impl ChampionUi {
             };
         }
     }
+    pub fn needs_animation(&self) -> bool {
+        self.fade[0] != f64::from(self.save_state[0])
+            || self.fade[1] != f64::from(self.save_state[0] && self.save_state[1])
+    }
     pub fn show(
         &mut self,
         ctx: &egui::Context,

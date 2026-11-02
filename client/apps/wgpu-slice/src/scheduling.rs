@@ -12,6 +12,7 @@ pub struct Schedule {
     dirty: bool,
     requested: bool,
     retry: Option<Instant>,
+    repaint: Option<Instant>,
 }
 impl Default for Schedule {
     fn default() -> Self {
@@ -21,6 +22,7 @@ impl Default for Schedule {
             dirty: true,
             requested: false,
             retry: None,
+            repaint: None,
         }
     }
 }
@@ -44,8 +46,13 @@ impl Schedule {
     pub fn invalidate(&mut self) {
         self.dirty = true;
     }
+    pub fn repaint_at(&mut self, at: Option<Instant>) {
+        self.repaint = at;
+    }
     fn ready(&self, now: Instant) -> bool {
-        self.visible && (self.active || self.dirty) && self.retry.is_none_or(|t| now >= t)
+        self.visible
+            && (self.active || self.dirty || self.repaint.is_some_and(|t| now >= t))
+            && self.retry.is_none_or(|t| now >= t)
     }
     pub fn request_redraw(&mut self, now: Instant) -> bool {
         if self.requested || !self.ready(now) {
@@ -60,6 +67,7 @@ impl Schedule {
             return false;
         }
         self.dirty = false;
+        self.repaint = None;
         true
     }
     pub fn presented(&mut self) {
@@ -70,8 +78,15 @@ impl Schedule {
         self.retry = Some(now + RETRY_DELAY);
     }
     pub fn deadline(&self) -> Option<Instant> {
-        self.retry
-            .filter(|_| !self.requested && self.visible && (self.active || self.dirty))
+        if self.requested || !self.visible {
+            return None;
+        }
+        if self.active || self.dirty {
+            return self.retry;
+        }
+        // A due egui wake must not spin the loop while surface recovery waits.
+        self.repaint
+            .map(|at| self.retry.map_or(at, |retry| at.max(retry)))
     }
 }
 
@@ -118,6 +133,7 @@ mod tests {
                                 dirty,
                                 requested,
                                 retry,
+                                repaint: None,
                             };
                             let ready =
                                 visible && (active || dirty) && retry.is_none_or(|t| t <= now);
@@ -178,5 +194,47 @@ mod tests {
         assert!(s.begin_redraw(now));
         s.presented();
         assert!(!s.request_redraw(now));
+    }
+
+    #[test]
+    fn egui_deadline_draws_once_and_can_be_replaced_or_cancelled() {
+        let now = Instant::now();
+        let mut s = Schedule::default();
+        assert!(s.request_redraw(now));
+        assert!(s.begin_redraw(now));
+        s.presented();
+        let blink = now + Duration::from_millis(500);
+        s.repaint_at(Some(blink));
+        assert_eq!(s.deadline(), Some(blink));
+        assert!(!s.request_redraw(blink - Duration::from_millis(1)));
+        assert!(s.request_redraw(blink));
+        assert_eq!(s.deadline(), None);
+        assert!(s.begin_redraw(blink));
+        s.presented();
+        assert!(!s.request_redraw(blink));
+        s.repaint_at(Some(blink));
+        s.repaint_at(None); // closed/replaced menu
+        assert_eq!(s.deadline(), None);
+        assert!(!s.request_redraw(blink));
+    }
+
+    #[test]
+    fn overdue_repaint_respects_recovery_and_visibility() {
+        let now = Instant::now();
+        let mut s = Schedule::default();
+        assert!(s.request_redraw(now));
+        assert!(s.begin_redraw(now));
+        s.retry(now);
+        s.repaint_at(Some(now));
+        assert_eq!(s.deadline(), Some(now + RETRY_DELAY));
+        assert!(!s.request_redraw(now));
+        s.visibility(false);
+        assert_eq!(s.deadline(), None);
+        s.visibility(true);
+        assert!(!s.request_redraw(now));
+        assert!(s.request_redraw(now + RETRY_DELAY));
+        assert!(s.begin_redraw(now + RETRY_DELAY));
+        s.presented();
+        assert!(!s.request_redraw(now + RETRY_DELAY));
     }
 }

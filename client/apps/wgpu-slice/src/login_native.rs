@@ -50,8 +50,31 @@ pub struct NativeLogin {
 }
 impl NativeLogin {
     pub fn needs_redraw(&self) -> bool {
+        use slither_client::start_page::MenuPhase;
+        let view = self.state.view(true);
+        let settings = &self.state.settings;
+        let picker = &self.picker.policy;
+        // Settings and the studio fade the login completely out. The initial
+        // login's rotating tips otherwise remain a continuous animation.
+        let login_visible = view.visible && settings.alpha() < 1. && self.studio.state.alpha() < 1.;
+        let login_animation = login_visible
+            && (matches!(view.phase, MenuPhase::Outgoing | MenuPhase::Returning)
+                || view.logo_alpha < 1.
+                || view.logo_reveal < 1.
+                || view.skin_alpha < 1.
+                || view.play_alpha < 1.
+                || (view.tips_visible
+                    && self.connection_error.is_none()
+                    && self.studio.status != "Saved for this run"));
         // A terminal socket must not idle the host during the hidden death hold.
-        self.state.view(true).visible || self.champion_session.death_pending
+        self.champion_session.death_pending
+            || login_animation
+            || view.spinner_visible
+            || settings.alpha() != f64::from(settings.is_open())
+            || picker.alpha != f64::from(picker.is_open())
+            || self.studio.state.visible()
+            || self.champion.policy.needs_animation()
+            || (self.champion.policy.visible() && self.champion.ui.needs_animation())
     }
     /// Whether this frame needs an egui pass. The champion editor stays mounted
     /// through the death hold, while the login below it is hidden.
@@ -145,6 +168,12 @@ impl NativeLogin {
     }
     pub fn set_admission(&mut self, admission: bool) {
         self.admission = admission;
+    }
+    /// Input can arrive long after the last presentation. Absolute studio
+    /// transitions and egui text interactions must start on this event's clock.
+    pub fn input_time(&mut self, now: f64) {
+        self.studio.now = now;
+        self.egui.step(now);
     }
     pub fn step(
         &mut self,
