@@ -1823,60 +1823,6 @@ impl Composition<'_> {
     }
 }
 impl Menu {
-    /// The shared control painter. Its resources and text publish together only
-    /// after all quotas and the immutable frame validate.
-    #[allow(clippy::too_many_arguments)]
-    pub fn prepare_panel(
-        &mut self,
-        text: &mut TextCache,
-        panel: &PanelView,
-        input: &PanelInputState,
-        edit: &MenuInputState,
-        scroll: &mut BTreeMap<EditorId, f64>,
-        theme: MenuTheme,
-        extent: [u32; 2],
-        dpr: f64,
-    ) -> Result<MenuFrame> {
-        crate::render::dimensions(extent, dpr)?;
-        let viewport = extent.map(|n| f64::from(n) / dpr);
-        let resolved = panel.resolve(viewport).map_err(str::to_owned)?;
-        let mut staged_scroll = scroll.clone();
-        let mut c = Composition {
-            component: Default::default(),
-            attribution: Default::default(),
-            old: &self.materials,
-            old_art: &self.art,
-            materials: BTreeMap::new(),
-            next_handle: self.next_handle.max(PAGE_HANDLE),
-            spinner_revision: self.spinner_revision,
-            scale: dpr.min(MAX_MENU_RASTER_DENSITY),
-            viewport_scale: dpr,
-            draws: Vec::new(),
-            art: BTreeMap::new(),
-            labels: Vec::new(),
-            wordmark: None,
-            old_stroke: self.stroke.as_ref(),
-            stroke: None,
-        };
-        c.panel(
-            text,
-            panel,
-            input,
-            edit,
-            &mut staged_scroll,
-            theme,
-            &resolved,
-        )?;
-        let (result, next, spinner, materials, art, stroke) =
-            c.finish(text, extent, dpr, None, None, Vec::new())?;
-        self.next_handle = next;
-        self.spinner_revision = spinner;
-        self.materials = materials;
-        self.art = art;
-        self.stroke = stroke;
-        *scroll = staged_scroll;
-        Ok(result)
-    }
     /// Rasterize at the physical overlay scale. Geometry comes from the core layout;
     /// optional local icons never replace the authored stroke logo.
     #[allow(clippy::too_many_arguments)]

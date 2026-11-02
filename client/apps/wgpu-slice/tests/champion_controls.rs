@@ -7,6 +7,8 @@ use slither_client::{
     session_policy::{Command, SessionPolicy},
 };
 use slither_wgpu_slice::{menu::Menu, text::TextCache};
+#[path = "support/panel_paint.rs"]
+mod panel_paint;
 use std::collections::BTreeMap;
 fn panel() -> PanelView {
     panel_at([960., 720.])
@@ -87,18 +89,18 @@ fn sliced_champion_shadow_keeps_full_padding_and_respects_explicit_clips() {
         let mut menu = Menu::default();
         let mut text = TextCache::menu();
         let mut scroll = BTreeMap::new();
-        let frame = menu
-            .prepare_panel(
-                &mut text,
-                &panel,
-                &input,
-                &edit,
-                &mut scroll,
-                MenuTheme::default(),
-                [(960. * scale) as u32, (720. * scale) as u32],
-                scale,
-            )
-            .unwrap();
+        let frame = panel_paint::prepare_panel(
+            &mut menu,
+            &mut text,
+            &panel,
+            &input,
+            &edit,
+            &mut scroll,
+            MenuTheme::default(),
+            [(960. * scale) as u32, (720. * scale) as u32],
+            scale,
+        )
+        .unwrap();
         let pad = (40. * scale) as u32;
         let width = (field.width * scale).round() as u32 + 2 * pad;
         let height = (field.height * scale).round() as u32 + 2 * pad;
@@ -169,18 +171,18 @@ fn sliced_champion_shadow_keeps_full_padding_and_respects_explicit_clips() {
             width: 444.,
             height: 48.,
         });
-        let clipped = menu
-            .prepare_panel(
-                &mut text,
-                &panel,
-                &input,
-                &edit,
-                &mut scroll,
-                MenuTheme::default(),
-                [(960. * scale) as u32, (720. * scale) as u32],
-                scale,
-            )
-            .unwrap();
+        let clipped = panel_paint::prepare_panel(
+            &mut menu,
+            &mut text,
+            &panel,
+            &input,
+            &edit,
+            &mut scroll,
+            MenuTheme::default(),
+            [(960. * scale) as u32, (720. * scale) as u32],
+            scale,
+        )
+        .unwrap();
         assert!(
             clipped
                 .frame
@@ -205,18 +207,18 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
     let mut text = TextCache::menu();
     let mut scroll = BTreeMap::new();
     let theme = MenuTheme::default();
-    let old = menu
-        .prepare_panel(
-            &mut text,
-            &p,
-            &input,
-            &edit,
-            &mut scroll,
-            theme,
-            [1440, 1080],
-            1.5,
-        )
-        .unwrap();
+    let old = panel_paint::prepare_panel(
+        &mut menu,
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut scroll,
+        theme,
+        [1440, 1080],
+        1.5,
+    )
+    .unwrap();
     assert!(scroll[&EditorId::Champion] > 0.);
     assert!(old.resources.len() <= 64);
     assert!(
@@ -255,18 +257,18 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
             .collect::<Vec<_>>()
     };
     edit.apply(EditIntent::SelectAll);
-    let selected = menu
-        .prepare_panel(
-            &mut text,
-            &p,
-            &input,
-            &edit,
-            &mut scroll,
-            theme,
-            [1440, 1080],
-            1.5,
-        )
-        .unwrap();
+    let selected = panel_paint::prepare_panel(
+        &mut menu,
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut scroll,
+        theme,
+        [1440, 1080],
+        1.5,
+    )
+    .unwrap();
     assert!(
         selected
             .resources
@@ -280,18 +282,18 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
     });
     p.alpha = 0.5;
     p.placement.offset[0] += 1.;
-    let moved = menu
-        .prepare_panel(
-            &mut text,
-            &p,
-            &input,
-            &edit,
-            &mut scroll,
-            theme,
-            [1440, 1080],
-            1.5,
-        )
-        .unwrap();
+    let moved = panel_paint::prepare_panel(
+        &mut menu,
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut scroll,
+        theme,
+        [1440, 1080],
+        1.5,
+    )
+    .unwrap();
     assert_eq!(keys(&old), keys(&moved));
     let retained = keys(&old);
     let previous_scroll = scroll.clone();
@@ -303,7 +305,8 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
         c
     }));
     assert!(
-        menu.prepare_panel(
+        panel_paint::prepare_panel(
+            &mut menu,
             &mut text,
             &p,
             &input,
@@ -317,18 +320,18 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
     );
     assert_eq!(scroll, previous_scroll);
     p = original;
-    let recovered = menu
-        .prepare_panel(
-            &mut text,
-            &p,
-            &input,
-            &edit,
-            &mut scroll,
-            theme,
-            [1440, 1080],
-            1.5,
-        )
-        .unwrap();
+    let recovered = panel_paint::prepare_panel(
+        &mut menu,
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut scroll,
+        theme,
+        [1440, 1080],
+        1.5,
+    )
+    .unwrap();
     assert_eq!(keys(&recovered), keys(&moved));
     let changed = MenuTheme {
         field: [90, 70, 130],
@@ -338,18 +341,18 @@ fn sliced_materials_theme_keys_scroll_clip_and_failed_publication() {
         theme.surface(ControlStyle::Field, ControlState::Idle),
         changed.surface(ControlStyle::Field, ControlState::Idle)
     );
-    let colored = menu
-        .prepare_panel(
-            &mut text,
-            &p,
-            &input,
-            &edit,
-            &mut scroll,
-            changed,
-            [1440, 1080],
-            1.5,
-        )
-        .unwrap();
+    let colored = panel_paint::prepare_panel(
+        &mut menu,
+        &mut text,
+        &p,
+        &input,
+        &edit,
+        &mut scroll,
+        changed,
+        [1440, 1080],
+        1.5,
+    )
+    .unwrap();
     assert_ne!(keys(&colored), keys(&moved));
     // Retirement cannot mutate an already prepared picture.
     assert_eq!(keys(&old), retained);
@@ -365,18 +368,18 @@ fn tall_surface_uses_nine_slice_and_charges_each_draw() {
     let mut input = PanelInputState::default();
     let mut edit = MenuInputState::default();
     input.sync(&p, &mut edit);
-    let frame = Menu::default()
-        .prepare_panel(
-            &mut TextCache::menu(),
-            &p,
-            &input,
-            &edit,
-            &mut BTreeMap::new(),
-            MenuTheme::default(),
-            [960, 720],
-            1.,
-        )
-        .unwrap();
+    let frame = panel_paint::prepare_panel(
+        &mut Menu::default(),
+        &mut TextCache::menu(),
+        &p,
+        &input,
+        &edit,
+        &mut BTreeMap::new(),
+        MenuTheme::default(),
+        [960, 720],
+        1.,
+    )
+    .unwrap();
     assert!(
         frame
             .resources
@@ -386,18 +389,18 @@ fn tall_surface_uses_nine_slice_and_charges_each_draw() {
     assert!(frame.frame.draws.len() > 9 && frame.frame.draws.len() <= 512);
     p.controls[0].placement.size = [960., 720.];
     assert!(
-        Menu::default()
-            .prepare_panel(
-                &mut TextCache::menu(),
-                &p,
-                &input,
-                &edit,
-                &mut BTreeMap::new(),
-                MenuTheme::default(),
-                [1920, 1440],
-                2.
-            )
-            .is_err(),
+        panel_paint::prepare_panel(
+            &mut Menu::default(),
+            &mut TextCache::menu(),
+            &p,
+            &input,
+            &edit,
+            &mut BTreeMap::new(),
+            MenuTheme::default(),
+            [1920, 1440],
+            2.
+        )
+        .is_err(),
         "all tiles charge producer cap"
     );
 }
@@ -417,18 +420,18 @@ fn high_dpr_fields_bound_text_rasters_and_slice_selection_ink() {
             if n == 50 {
                 edit.apply(EditIntent::SelectAll);
             }
-            let frame = menu
-                .prepare_panel(
-                    &mut text,
-                    &p,
-                    &input,
-                    &edit,
-                    &mut scroll,
-                    MenuTheme::default(),
-                    [(960. * dpr) as u32, (720. * dpr) as u32],
-                    dpr,
-                )
-                .unwrap();
+            let frame = panel_paint::prepare_panel(
+                &mut menu,
+                &mut text,
+                &p,
+                &input,
+                &edit,
+                &mut scroll,
+                MenuTheme::default(),
+                [(960. * dpr) as u32, (720. * dpr) as u32],
+                dpr,
+            )
+            .unwrap();
             assert!(frame.frame.draws.len() <= 512);
             assert!(
                 frame
@@ -574,7 +577,8 @@ fn menu_budget_failures_skip_overlay_and_preserve_picture() {
             c
         })
         .collect();
-    let failed = menu.prepare_panel(
+    let failed = panel_paint::prepare_panel(
+        &mut menu,
         &mut text,
         &p,
         &input,
@@ -632,7 +636,8 @@ fn optional_menu_propagates_non_quota_preparation_errors() {
             overlay: None,
             resources: vec![],
         };
-        let prepared = Menu::default().prepare_panel(
+        let prepared = panel_paint::prepare_panel(
+            &mut Menu::default(),
             &mut TextCache::menu(),
             &p,
             &input,
