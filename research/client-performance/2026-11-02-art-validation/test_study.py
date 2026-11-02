@@ -21,12 +21,12 @@ class Study(unittest.TestCase):
                 source = sources[composition][name].encode('utf-8')
                 self.assertEqual(hashlib.sha256(source).hexdigest(), arm['frame_source_sha256'])
                 self.assertEqual(arm['frame_source_sha256'], arm['reviewed_frame_source_sha256'])
-        module = runpy.run_path(str(FOLDER / 'recompute.py'))
-        report = (FOLDER / 'REPORT.md').read_text(encoding='utf-8')
-        self.assertEqual(report.split('<!-- BEGIN RESULTS -->\n', 1)[1].split('\n<!-- END RESULTS -->', 1)[0],
-                         module['tables']())
-        self.assertEqual(report.split('<!-- BEGIN DIAGNOSTICS -->\n', 1)[1].split('\n<!-- END DIAGNOSTICS -->', 1)[0],
-                         module['diagnostics']())
+            module = runpy.run_path(str(folder / 'recompute.py'))
+            report = (folder / 'REPORT.md').read_text(encoding='utf-8')
+            self.assertEqual(report.split('<!-- BEGIN RESULTS -->\n', 1)[1].split('\n<!-- END RESULTS -->', 1)[0],
+                             module['tables']())
+            self.assertEqual(report.split('<!-- BEGIN DIAGNOSTICS -->\n', 1)[1].split('\n<!-- END DIAGNOSTICS -->', 1)[0],
+                             module['diagnostics']())
 
 
 if __name__ == '__main__':

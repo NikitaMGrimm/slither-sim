@@ -13,7 +13,7 @@ preparation, 8.24 ms CPU submission (6.85 ms quad packing), and 2.31 ms actual
 GPU passes. Final picture validation alone cost 3.65 ms. Its largest cold
 preparation was 83.24 ms, of which procedural sprite rasterization cost 81.88 ms.
 Font loading accounts for another cold frame, separately from the sustained cost.
-The [bounded initial profile](initial-profile.csv) retains those initial medians
+The [bounded initial profile](earlier-composition/initial-profile.csv) retains those initial medians
 and the worst cold-preparation callback attribution for both scenes.
 
 The valid authored rectangle also exposes CPU work: 39.08 ms median callback,
