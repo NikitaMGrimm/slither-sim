@@ -19,6 +19,17 @@ Its padded raster already contains edge coverage. The result initializes the
 world attachment before bodies and snakes are painted. Other orders fall back
 to the ordinary world path.
 
+Each frame measures clipped quad coverage, including overlapping draws. Extra
+passes are admitted only when their estimated saved work pays for the full-screen
+operations. In attachment screen areas, outlines save `(samples - 1) * area`
+against fixed work `samples + 2`. Each glow bin saves
+`area * (1 + samples - 2 / factor²)` against `samples + taps + 2 / factor²`,
+where reconstruction uses one or five taps; selected bins also pay `2 * samples`
+for splitting the world pass. This is a portable work estimate, not a GPU timer.
+Each bin must pay independently. Entry requires 125% of fixed work; an active
+path remains selected above 100%. History resets on attachment/sample changes.
+Sparse pictures therefore keep ordinary drawing, including Low-quality outlines.
+
 A contiguous additive food glow barrier is divided by its projected shortest
 edge and effective opacity, without changing culling or the CPU draw commands:
 
@@ -83,8 +94,10 @@ and resolution policy remain owned by `WorldTargetPlan`.
 In addition to the existing MSAA/backing allocations, an active outline layer
 uses `4 * width * height` bytes. Glow targets use
 `4 * ceil(width / factor) * ceil(height / factor)` bytes, for factors two, four
-and eight. Single-sample worlds need no outline intermediate. Targets retire when
-the world no longer uses the corresponding outline/glow path. Reports count retained
+and eight. Single-sample worlds need no outline intermediate. Outlines retire
+when their path is inactive. Unused glow bins remain cached while another
+amortized glow bin is active; all glow targets retire when that path is absent.
+Reports count these cached targets as retained storage, as well as
 layers and old/replacement coexistence; these are logical sizes, not driver
 residency measurements.
 

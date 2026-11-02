@@ -19,6 +19,9 @@ use draw_runs::{DrawState, Pipeline, draw_runs};
 #[path = "texture_arrays.rs"]
 mod texture_arrays;
 use texture_arrays::{Group, TextureArray};
+#[path = "soft_layers.rs"]
+mod soft_layers;
+use soft_layers::{LayerHistory, covered_area, pays, select_glows};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenderError {
@@ -177,6 +180,7 @@ pub struct Renderer {
     glow: Option<LayerTarget>,
     fine_glow: Option<LayerTarget>,
     half_glow: Option<LayerTarget>,
+    layer_history: LayerHistory,
     fine_composite_single: wgpu::RenderPipeline,
     outline_target: Option<LayerTarget>,
     outline_composite: wgpu::RenderPipeline,
@@ -527,6 +531,7 @@ impl Renderer {
             glow: None,
             fine_glow: None,
             half_glow: None,
+            layer_history: LayerHistory::default(),
             fine_composite_single,
             outline_target: None,
             outline_composite,
@@ -914,7 +919,14 @@ impl Renderer {
         let soft_layers = !overlay && encoded_unorm8;
         let mut glow_span: Option<std::ops::Range<usize>> = None;
         let mut glow_count = 0;
-        let mut glow_bins = [false; 4];
+        let mut glow_coverage = [0.; 4];
+        let mut outline_coverage = 0.;
+        let previous =
+            if self.layer_history.extent == attachment && self.layer_history.samples == samples {
+                self.layer_history
+            } else {
+                LayerHistory::default()
+            };
         let mut outline_span: Option<std::ops::Range<usize>> = None;
         let mut outline_count = 0;
         let mut unsafe_prefix = None;
@@ -940,6 +952,7 @@ impl Renderer {
             if soft_layers && self.textures[&quad.key].food_outline {
                 outline_span.get_or_insert(index..index).end = index + 1;
                 outline_count += 1;
+                outline_coverage += covered_area(&quad.vertices);
             } else {
                 let covers = quad.vertices[0][0] <= -1.
                     && quad.vertices[0][1] >= 1.
@@ -978,7 +991,9 @@ impl Renderer {
                         side >= 4. * factor && f64::from(opacity) * factor / side <= 0.004
                     })
                     .map_or(0, |(scale, _)| scale);
-                glow_bins[scale as usize] = true;
+                if scale > 0 {
+                    glow_coverage[scale as usize] += covered_area(&quad.vertices);
+                }
                 glow_span.get_or_insert(index..index).end = index + 1;
                 glow_count += 1;
             }
@@ -1013,8 +1028,18 @@ impl Renderer {
             state.key = texture.array.key;
             chunk.states.push(state);
         }
+        let glow_bins = select_glows(glow_coverage, samples, previous);
         let glow_span =
             glow_span.filter(|span| span.len() == glow_count && glow_bins[1..].contains(&true));
+        // An individually unprofitable bin stays on the ordinary path even
+        // when another bin can pay for splitting the world pass.
+        for chunk in &mut self.vertices[..chunk_count] {
+            for state in &mut chunk.states {
+                if !glow_bins[state.glow_scale as usize] {
+                    state.glow_scale = 0;
+                }
+            }
+        }
         if let Some(span) = &glow_span {
             for (i, chunk) in self.vertices[..chunk_count].iter_mut().enumerate() {
                 let base = i * VERTEX_CHUNK_QUADS;
@@ -1104,6 +1129,11 @@ impl Renderer {
             samples > 1
                 && span.len() == outline_count
                 && unsafe_prefix.is_none_or(|i| i >= span.end)
+                && pays(
+                    outline_coverage * f64::from(samples - 1),
+                    f64::from(samples) + 2.,
+                    previous.outline,
+                )
         });
         let outline_replacement = outline_span.as_ref().and_then(|_| {
             self.outline_target
@@ -1362,6 +1392,15 @@ impl Renderer {
         crate::latency::submit_end(submission);
         self.draw_calls = draw_calls + outline_calls;
         self.pass_count = pass_count;
+        if !overlay {
+            self.layer_history = LayerHistory {
+                extent: attachment,
+                samples,
+                outline: outline_span.is_some(),
+                glow: has_glows,
+                glow_bins: if has_glows { glow_bins } else { [false; 4] },
+            };
+        }
         if let Some(sprite) = outline_replacement {
             self.outline_target = Some(sprite);
         }

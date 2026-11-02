@@ -6,7 +6,8 @@
   deadlines, while preserving menu animations, active gameplay and surface retries.
 
 - Reduce crowded-frame GPU bandwidth with single-sample padded food outlines,
-  smaller glow targets, preserved mip chains and combined additive draw pairs.
+  smaller glow targets, preserved mip chains and combined additive draw pairs;
+  keep sparse food on the ordinary path when extra passes cannot pay for themselves.
 
 - Smooth pellet rims and zoom-out glows with denser food body rasters and
   filtered food mip levels, preserving logical sizes and draw planning.
