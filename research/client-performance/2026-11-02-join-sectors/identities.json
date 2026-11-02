@@ -110,6 +110,7 @@
     "instrumented_source_sha256": "Exact full bytes of the retained measured source files, including diagnostic observers and the tests present in those source copies.",
     "reviewed_source_sha256": "Exact Git-blob bytes at reviewed_commit. Runtime files remain unchanged by this study-only correction.",
     "candidate_comparison": "candidate-measured-to-reviewed.patch removes only passive diagnostic observer statements/declarations; food.rs is already byte-identical. Normalized production text matches for every listed file.",
-    "candidate_delta_sha256": "43b3a398301feb53a360bd4170dc81c333660c0d9ae718ea9255dae3f1933798"
+    "candidate_delta_sha256": "43b3a398301feb53a360bd4170dc81c333660c0d9ae718ea9255dae3f1933798",
+    "reviewed_source_snapshot": "reviewed-sources.json.gz"
   }
 }

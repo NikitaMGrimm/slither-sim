@@ -1,4 +1,5 @@
 """Offline source reconstruction and retained-results checks; no timing or captures."""
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -7,7 +8,6 @@ import runpy
 import unittest
 
 FOLDER = Path(__file__).resolve().parent
-REPO = FOLDER.parents[2]
 
 
 def reverse_delta(reviewed, delta):
@@ -39,7 +39,7 @@ def reverse_delta(reviewed, delta):
 class Study(unittest.TestCase):
     def test_reconstructs_exact_measured_source_and_unchanged_production(self):
         data = json.loads((FOLDER / 'identities.json').read_text(encoding='utf-8'))
-        reviewed = (REPO / 'client/apps/wgpu-slice/src/frame.rs').read_bytes()
+        reviewed = gzip.decompress((FOLDER / data['source_comparison']['reviewed_source_snapshot']).read_bytes())
         delta = (FOLDER / 'frame-measured-to-reviewed.patch').read_bytes()
         measured = reverse_delta(reviewed.decode(), delta.decode()).encode()
         candidate = data['arms']['candidate']
