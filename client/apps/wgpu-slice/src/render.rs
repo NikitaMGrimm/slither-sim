@@ -1612,6 +1612,20 @@ pub fn finish_hud(
     hud: &crate::hud::View,
 ) -> Result<PreparedFrame> {
     let ui = prepared.ui_frame();
+    // The native login owns connection messages, with its own layout and fade.
+    // Browser adapters continue to use the shared HUD message.
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    let without_message;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+    let hud = if hud.message.is_some() {
+        without_message = crate::hud::View {
+            message: None,
+            ..hud.clone()
+        };
+        &without_message
+    } else {
+        hud
+    };
     let plan = crate::hud::plan(hud, ui.extent, ui.viewport_scale);
     let identity = prepared.frame.identity;
     let result = finish_plan(prepared, bank, plan.map_err(str::to_owned));

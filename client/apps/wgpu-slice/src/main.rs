@@ -248,7 +248,13 @@ mod desktop {
                     }
                     Err(error) => {
                         self.transport.close();
-                        self.game.fail(&error);
+                        if matches!(e.kind, slither_wgpu_slice::game::EffectKind::Close) {
+                            // The socket is gone even if its close handshake failed.
+                            self.game.acknowledge(e.generation, e.id, true)?;
+                        } else if let Err(error) = self.game.transport_failed(e.generation, &error)
+                        {
+                            self.game.fail(&error);
+                        }
                     }
                 }
             }
@@ -398,9 +404,16 @@ mod desktop {
                             self.game.fail(&e)
                         }
                     }
-                    Event::Closed(g) => self.game.closed(g),
+                    Event::Closed(g) => {
+                        if let Err(e) = self
+                            .game
+                            .transport_failed(g, "Connection closed before game-over")
+                        {
+                            self.game.fail(&e);
+                        }
+                    }
                     Event::Failed(g, e) => {
-                        if g == self.game.generation() && !self.game.stopping() {
+                        if let Err(e) = self.game.transport_failed(g, &e) {
                             self.game.fail(&e);
                         }
                     }
@@ -503,6 +516,7 @@ mod desktop {
                     intent
                 {
                     self.nickname = nickname;
+                    self.login.begin_play_attempt(&mut self.game)?;
                     self.play_appearance = self.login.studio.state.committed().selection();
                     self.game
                         .set_committed_cosmetic(self.login.studio.state.committed().cosmetic)?;

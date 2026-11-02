@@ -1,4 +1,4 @@
-//! ORIGINAL SYNTHETIC protocol/session integration; no socket, GPU or OS effects.
+//! ORIGINAL SYNTHETIC protocol/session integration; CPU sinks and loopback peers only.
 use slither_client::{presentation::*, session_policy::Phase};
 use slither_wgpu_slice::{
     bank::Bank,
@@ -6,6 +6,9 @@ use slither_wgpu_slice::{
     game::{EffectKind, LocalGame, loopback_endpoint},
     render,
 };
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "session_cases/disconnect.rs"]
+mod disconnect;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "session_cases/ingame.rs"]
 mod ingame;
@@ -1383,6 +1386,22 @@ fn death_final_score_and_explicit_stop() {
     pump(&mut g, 40.);
     assert_eq!(g.phase(), Phase::Disconnected);
     assert!(g.can_play());
+}
+#[test]
+fn post_death_disconnect_does_not_hide_a_later_sessions_failure() {
+    let mut game = playing();
+    let old = game.generation();
+    game.receive(old, &bundle(&[vec![b'v', 0]]), 30.).unwrap();
+    game.transport_failed(old, "synthetic reset").unwrap();
+    assert!(game.failure.is_none());
+    effects(&mut game);
+    game.play("ws://127.0.0.1:19491/slither", "Player", 0)
+        .unwrap();
+    game.transport_failed(old, "stale failure").unwrap();
+    assert!(game.failure.is_none());
+    game.transport_failed(game.generation(), "new connection failed")
+        .unwrap();
+    assert_eq!(game.failure.as_deref(), Some("new connection failed"));
 }
 #[test]
 fn handshake_timeout_closes_without_retry() {
