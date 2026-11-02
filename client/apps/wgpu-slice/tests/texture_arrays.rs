@@ -145,6 +145,7 @@ fn ordered_arrays_match_individual_bindings_and_restore_retained_revisions() {
         extent: [64, 64],
         viewport_scale: 1.,
         snakes: vec![],
+        food_batch: None,
         draws: (0..80).map(|i| draw(resources[i % 4].asset, i)).collect(),
     };
     // Clamp, repeat, black source-over, additive, crop and rotation share the

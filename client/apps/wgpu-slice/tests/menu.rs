@@ -219,6 +219,7 @@ fn picture(draws: usize) -> PreparedFrame {
             tick: 0,
             draws: vec![page.backdrop.clone().unwrap(); draws],
             snakes: Vec::new(),
+            food_batch: None,
         },
         overlay: None,
         resources: page.resources,

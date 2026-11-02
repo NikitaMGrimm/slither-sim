@@ -36,7 +36,12 @@ fn factor_one_stationary_and_repeated_cursor_preserve_entity_pictures_and_comman
                 picture.draw_count(),
                 row["draws"].as_u64().unwrap() as usize
             );
-            let debug = format!("{:?}\n{:?}", picture.frame, picture.overlay);
+            let debug = format!(
+                "{:?}\n{:?}",
+                picture.frame.canonical().unwrap(),
+                picture.overlay
+            )
+            .replace(", food_batch: None", "");
             let hash = debug.bytes().fold(0xcbf29ce484222325u64, |h, b| {
                 (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
             });

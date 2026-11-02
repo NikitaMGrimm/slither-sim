@@ -70,6 +70,7 @@ fn full_and_nearly_full_hud_reject_before_draw_capacity_exceeds_the_bound() {
             tick: 0,
             draws: vec![draw.clone(); count],
             snakes: vec![],
+            food_batch: None,
         };
         assert_eq!(frame.draws.capacity(), count);
         LARGEST.store(count * size_of::<Draw>(), Ordering::SeqCst);

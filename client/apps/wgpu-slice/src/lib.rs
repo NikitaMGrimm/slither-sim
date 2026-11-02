@@ -1,5 +1,7 @@
 //! Shared explicit local gameplay and offline diagnostics. The existing core owns state/plans.
 #![forbid(unsafe_code)]
+#[cfg(test)]
+extern crate self as slither_wgpu_slice;
 
 pub mod announcement;
 pub mod bank;
@@ -21,6 +23,7 @@ pub mod menu;
 pub mod menu_metrics;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod menu_storage;
+pub mod pellet_batch;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod skin_studio_native;
 // Same targets as the winit dependency (Cargo.toml); Linux builds only the GPU-free e2e probe.

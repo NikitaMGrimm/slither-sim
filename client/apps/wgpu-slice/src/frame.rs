@@ -257,6 +257,7 @@ pub struct Frame {
     pub viewport_scale: f64,
     pub tick: u32,
     pub draws: Vec<Draw>,
+    pub food_batch: Option<crate::pellet_batch::Batch>,
     /// Diagnostic only: does not participate in GPU submission or scene policy.
     pub snakes: Vec<SnakeDrawObservation>,
 }
@@ -336,8 +337,34 @@ fn checked_source(d: &Draw, resident: &BTreeMap<ResourceKey, BodyAsset>) -> Resu
 }
 
 impl Frame {
+    pub fn draw_count(&self) -> usize {
+        self.draws.len() + self.food_batch.as_ref().map_or(0, |b| b.draw_count())
+    }
+    /// Expand retained inputs into the unchanged ordered image stream for parity.
+    pub fn canonical(&self) -> Result<Self> {
+        if let Some(batch) = &self.food_batch {
+            self.check_limits()?;
+            return Ok(Self {
+                identity: self.identity,
+                extent: self.extent,
+                viewport_scale: self.viewport_scale,
+                tick: self.tick,
+                draws: batch.canonical(&self.draws)?,
+                food_batch: None,
+                snakes: self.snakes.clone(),
+            });
+        }
+        Ok(self.clone())
+    }
     pub fn check_limits(&self) -> Result<()> {
-        check_draw_count(self.draws.len())?;
+        check_draw_count(self.draw_count())?;
+        if self
+            .food_batch
+            .as_ref()
+            .is_some_and(|b| b.early_at > b.late_at || b.late_at > self.draws.len())
+        {
+            return Err("invalid retained food barriers".into());
+        }
         if self.extent.iter().any(|n| *n > MAX_EXTENT)
             || !self.viewport_scale.is_finite()
             || self.viewport_scale <= 0.
@@ -354,6 +381,11 @@ impl Frame {
         self.check_limits()?;
         if self.extent.contains(&0) {
             return Ok(());
+        }
+        if let Some(batch) = &self.food_batch
+            && (batch.validate(resident).is_err() || self.viewport_scale > 1e10)
+        {
+            return self.canonical()?.validate(resident);
         }
         // Validation needs an overflow proof, not discarded GPU vertices. At
         // this conservative bound, rectangle corners are <=2L, transformed
@@ -388,7 +420,7 @@ impl Frame {
         }
         Ok(())
     }
-    fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
+    pub(crate) fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
         let key = ResourceKey::from(d.asset);
         let r = d.destination;
         let (sin, cos) = d.rotation.sin_cos();
@@ -452,35 +484,38 @@ impl Frame {
         // projection rather than repeating resource checks and f64 conversion.
         // Bit comparisons preserve signed-zero distinctions in the input math.
         // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
-        let mut previous: Option<(&Draw, Quad)> = None;
-        Ok(self
-            .draws
-            .iter()
-            .take(if self.extent.contains(&0) {
-                0
-            } else {
-                self.draws.len()
-            })
-            .map(move |d| {
-                if let Some((last, projected)) = &previous
-                    && same_projection(last, d)
-                {
-                    if !(0. ..=1.).contains(&d.effective_alpha) {
-                        return Err("unsupported or invalid image rectangle/alpha/transform".into());
-                    }
-                    let mut next = projected.clone();
-                    for vertex in &mut next.vertices {
-                        vertex[4] = d.effective_alpha as f32;
-                    }
-                    next.black_effect = d.black_effect;
-                    next.blend = d.blend;
-                    return Ok(next);
+        let draws = if let Some(batch) = &self.food_batch {
+            std::borrow::Cow::Owned(batch.canonical(&self.draws)?)
+        } else {
+            std::borrow::Cow::Borrowed(self.draws.as_slice())
+        };
+        let mut previous: Option<(usize, Quad)> = None;
+        let count = if self.extent.contains(&0) {
+            0
+        } else {
+            draws.len()
+        };
+        Ok((0..count).map(move |index| {
+            let d = &draws[index];
+            if let Some((last, projected)) = &previous
+                && same_projection(&draws[*last], d)
+            {
+                if !(0. ..=1.).contains(&d.effective_alpha) {
+                    return Err("unsupported or invalid image rectangle/alpha/transform".into());
                 }
-                let source = checked_source(d, resident)?;
-                let projected = self.project(d, source)?;
-                previous = Some((d, projected.clone()));
-                Ok(projected)
-            }))
+                let mut next = projected.clone();
+                for vertex in &mut next.vertices {
+                    vertex[4] = d.effective_alpha as f32;
+                }
+                next.black_effect = d.black_effect;
+                next.blend = d.blend;
+                return Ok(next);
+            }
+            let source = checked_source(d, resident)?;
+            let projected = self.project(d, source)?;
+            previous = Some((index, projected.clone()));
+            Ok(projected)
+        }))
     }
 }
 
@@ -528,6 +563,7 @@ mod tests {
             tick: 0,
             draws: vec![],
             snakes: vec![],
+            food_batch: None,
         };
         let check = |draws: Vec<Draw>, extent, viewport_scale, resident: &BTreeMap<_, _>| {
             let f = Frame {
@@ -700,6 +736,7 @@ mod tests {
             tick: 0,
             draws: vec![draw.clone()],
             snakes: vec![],
+            food_batch: None,
         };
         let check = |f: &Frame, catalog: &BTreeMap<_, _>| {
             let projected = f

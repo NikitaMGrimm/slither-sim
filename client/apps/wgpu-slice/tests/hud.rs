@@ -44,6 +44,7 @@ fn frame(extent: [u32; 2], scale: f64) -> Frame {
         viewport_scale: scale,
         draws: vec![],
         snakes: vec![],
+        food_batch: None,
     }
 }
 fn finish(v: &View, bank: &mut Bank, frame: Frame) -> render::PreparedFrame {

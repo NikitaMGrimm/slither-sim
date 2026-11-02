@@ -606,6 +606,7 @@ mod tests {
                 tick: 0,
                 draws: vec![command],
                 snakes: Vec::new(),
+                food_batch: None,
             };
             assert_eq!(
                 frame.quads(&[(asset.into(), asset)].into()).unwrap().len(),
@@ -640,6 +641,7 @@ mod tests {
             viewport_scale: dpr,
             draws: vec![],
             snakes: vec![],
+            food_batch: None,
         }
     }
 

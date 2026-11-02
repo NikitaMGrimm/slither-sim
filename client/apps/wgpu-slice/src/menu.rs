@@ -135,6 +135,12 @@ impl MenuFrame {
         let ui_extra = usize::from(self.world_cover.is_some());
         frame::check_draw_count(picture.draw_count() + world_extra + ui_extra)?;
         let copy = |frame: &frame::Frame, extra: usize| -> Result<frame::Frame> {
+            let mut canonical;
+            if frame.food_batch.is_some() {
+                canonical = frame.canonical()?;
+                frame::reserve_draws(&mut canonical.draws, extra)?;
+                return Ok(canonical);
+            }
             let mut draws = Vec::new();
             draws
                 .try_reserve_exact(frame.draws.len() + extra)
@@ -146,6 +152,7 @@ impl MenuFrame {
                 viewport_scale: frame.viewport_scale,
                 tick: frame.tick,
                 draws,
+                food_batch: None,
                 snakes: frame.snakes.clone(),
             })
         };
@@ -197,14 +204,27 @@ impl MenuFrame {
             return Err(MENU_PICTURE_QUOTA.into());
         }
         frame::check_draw_count(picture.draw_count() + count)?;
+        // A page prefix invalidates the retained path's black-outline omission.
+        // Stage expansion and all admission before changing the issued picture.
+        let mut canonical = if self.backdrop.is_some() && picture.frame.food_batch.is_some() {
+            Some(picture.frame.canonical()?)
+        } else {
+            None
+        };
+        let world = canonical.as_mut().unwrap_or(&mut picture.frame);
         if let Some(overlay) = &mut picture.overlay {
             frame::reserve_draws(&mut overlay.draws, usize::from(self.world_cover.is_some()))?;
-            frame::reserve_draws(
-                &mut picture.frame.draws,
-                usize::from(self.backdrop.is_some()),
-            )?;
+            frame::reserve_draws(&mut world.draws, usize::from(self.backdrop.is_some()))?;
         } else {
-            frame::reserve_draws(&mut picture.frame.draws, count)?;
+            frame::reserve_draws(&mut world.draws, count)?;
+        }
+        let mut admitted_resources = Vec::new();
+        admitted_resources
+            .try_reserve_exact(resources.len())
+            .map_err(|_| frame::DRAW_ALLOCATION_FAILED)?;
+        admitted_resources.extend(resources.into_values());
+        if let Some(canonical) = canonical {
+            picture.frame = canonical;
         }
         if let Some(mut backdrop) = self.backdrop {
             // The page fills the world backing, whose scale can differ from the UI's.
@@ -223,7 +243,7 @@ impl MenuFrame {
                 picture.frame.draws.push(cover);
             }
         }
-        picture.resources = resources.into_values().collect();
+        picture.resources = admitted_resources;
         Ok(())
     }
 }

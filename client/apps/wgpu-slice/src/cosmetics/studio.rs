@@ -837,6 +837,7 @@ mod tests {
                 tick: 0,
                 draws: Vec::new(),
                 snakes: Vec::new(),
+                food_batch: None,
             },
             overlay: None,
             resources: vec![old.clone()],

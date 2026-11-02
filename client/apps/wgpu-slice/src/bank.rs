@@ -35,7 +35,7 @@ pub struct Bank {
     recipes: Vec<CanvasRecipe>,
     // Zero keeps the ordinary raster; food gradients use filtered mip levels.
     food_raster_scale: Vec<u32>,
-    food_outline: Vec<bool>,
+    pub(crate) food_outline: Vec<bool>,
     pub bodies: Vec<Family>,
     pub outline: BodyAssetUse,
     pub shadow: BodyAssetUse,
@@ -54,6 +54,7 @@ pub struct Bank {
     pub(crate) body_commands: Vec<BodyImageCommand>,
     pub(crate) food_commands: [Vec<FoodImageCommand>; 2],
     pub(crate) food_asset_index: FoodAssetIndex,
+    pub(crate) food_batch_cache: crate::pellet_batch::Cache,
 }
 fn use_at(i: usize) -> BodyAssetUse {
     BodyAssetUse {
@@ -119,6 +120,7 @@ impl Bank {
             body_commands: Vec::new(),
             food_commands: [Vec::new(), Vec::new()],
             food_asset_index: FoodAssetIndex::default(),
+            food_batch_cache: crate::pellet_batch::Cache::default(),
         };
         for p in r.body_sources.palettes {
             let variants = p.variants.into_iter().map(|r| b.add(r)).collect();
@@ -240,7 +242,10 @@ impl Bank {
     /// Only the frame's actual draw resources become pixel buffers. Metadata alone is not GPU residency.
     pub fn resources(&mut self, frame: &Frame) -> Result<Vec<Resource>> {
         frame.check_limits()?;
-        let keys: BTreeSet<ResourceKey> = frame.draws.iter().map(|d| d.asset.into()).collect();
+        let mut keys: BTreeSet<ResourceKey> = frame.draws.iter().map(|d| d.asset.into()).collect();
+        if let Some(batch) = &frame.food_batch {
+            keys.extend(batch.checked_sources());
+        }
         let indices: BTreeSet<usize> = keys
             .iter()
             .filter_map(|k| self.assets.iter().position(|a| ResourceKey::from(*a) == *k))

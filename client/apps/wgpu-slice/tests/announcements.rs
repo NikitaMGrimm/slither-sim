@@ -95,7 +95,7 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
     let (view, before_record) = prepare(&client, &mut g.bank, Some(alive), 100);
     assert!(!view.present && view.text.blocks.is_empty());
     let before_record = before_record.expect("no record must retain every world draw");
-    assert_eq!(before_record.frame.draws.len(), world_draws);
+    assert_eq!(before_record.frame.draw_count(), world_draws);
     // Production finishing still admits the HUD and validates the complete frame.
     let mut hud = g.hud_view();
     let ScoreStatus::Ready(score) = g.client().score_view().status else {
@@ -106,15 +106,15 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
     hud.opacity.header = 0.85;
     hud.opacity.rows = 1.;
     let finished = render::finish_hud(before_record, &mut g.bank, &hud).unwrap();
-    assert!(finished.frame.draws.len() > world_draws);
-    assert!(finished.frame.draws.len() <= MAX_DRAWS);
+    assert!(finished.frame.draw_count() > world_draws);
+    assert!(finished.frame.draw_count() <= MAX_DRAWS);
     assert!(finished.pixel_bytes() <= slither_wgpu_slice::bank::PIXEL_BUDGET);
 
     board_at(&mut g, 4.);
     let client = g.client().clone();
     let (view, no_projection) = prepare(&client, &mut g.bank, Some(alive), 101);
     assert!(view.opacity > 0. && !view.present && view.text.blocks.is_empty());
-    assert_eq!(no_projection.unwrap().frame.draws.len(), world_draws);
+    assert_eq!(no_projection.unwrap().frame.draw_count(), world_draws);
 
     g.receive(g.generation(), &bundle(&[message("N", "retained")]), 5.)
         .unwrap();
@@ -122,7 +122,7 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
     let (view, zero_fade) = prepare(&client, &mut g.bank, None, 102);
     assert!(view.present && !view.text.blocks.is_empty());
     assert_eq!(view.opacity, 0.);
-    assert_eq!(zero_fade.unwrap().frame.draws.len(), world_draws);
+    assert_eq!(zero_fade.unwrap().frame.draw_count(), world_draws);
     for (identity, fraction) in [(103, 0.01), (104, 0.5), (105, 1.)] {
         let (view, visible) = prepare(
             &client,
@@ -138,12 +138,15 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
         assert!(view.present);
         assert_eq!(view.opacity, fraction);
         let visible = visible.unwrap();
-        assert!(visible.frame.draws.len() > world_draws);
+        assert!(visible.frame.draw_count() > world_draws);
         // World order/geometry is identical; the panel is appended after it.
         let baseline = prepare(&client, &mut g.bank, None, identity + 100)
             .1
             .unwrap();
-        assert_eq!(&visible.frame.draws[..world_draws], baseline.frame.draws);
+        assert_eq!(
+            &visible.frame.canonical().unwrap().draws[..world_draws],
+            baseline.frame.canonical().unwrap().draws
+        );
     }
     let (view, returned) = prepare(
         &client,
@@ -158,7 +161,7 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
     );
     assert!(view.present);
     assert_eq!(view.opacity, -1.);
-    assert_eq!(returned.unwrap().frame.draws.len(), world_draws);
+    assert_eq!(returned.unwrap().frame.draw_count(), world_draws);
 
     // An actual next Setup hides the record while retaining the same geometry.
     g.receive(g.generation(), &bundle(&[setup()]), 6.).unwrap();
@@ -167,7 +170,7 @@ fn production_crowded_world_keeps_all_geometry_with_hidden_or_visible_announceme
     let (view, setup_hidden) = prepare(&client, &mut g.bank, Some(alive), 107);
     assert!(view.present);
     assert_eq!(view.opacity, 0.);
-    assert_eq!(setup_hidden.unwrap().frame.draws.len(), world_draws);
+    assert_eq!(setup_hidden.unwrap().frame.draw_count(), world_draws);
 }
 #[test]
 fn all_four_branches_preserve_fragment_alpha_gap_geometry_and_fade_resources() {
@@ -474,6 +477,7 @@ fn near_budget_world_long_record_ten_row_hud_and_maximal_minimap_compose_in_orde
             viewport_scale: scale,
             draws: Vec::new(),
             snakes: Vec::new(),
+            food_batch: None,
         };
         let overlay_capacity = render::PANEL_PRODUCER_DRAWS
             + slither_wgpu_slice::minimap::MAX_DRAWS

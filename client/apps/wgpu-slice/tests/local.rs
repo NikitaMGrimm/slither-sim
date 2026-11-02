@@ -1390,6 +1390,7 @@ fn lazy_resources_preserve_full_palette_and_reject_unknowns() {
         viewport_scale: 1.,
         draws: vec![],
         snakes: Vec::new(),
+        food_batch: None,
     };
     for color in 0..42 {
         frame.draws = vec![draw(bank.assets[bank.bodies[color].variants[0].asset])];
@@ -1620,17 +1621,17 @@ fn former_overflow_survives_production_preparation_retry_and_resize() {
     let first = g
         .take_frame()
         .expect("former overflow must produce a picture");
-    assert!(first.frame.draws.len() > 8192);
-    let commands = first.frame.draws.clone();
+    assert!(first.frame.draw_count() > 8192);
+    let commands = first.frame.canonical().unwrap().draws;
     let identity = first.frame.identity;
     g.retry_frame(first).unwrap();
     let retry = g.take_frame().unwrap();
     assert_eq!(retry.frame.identity, identity);
-    assert_eq!(retry.frame.draws, commands);
+    assert_eq!(retry.frame.canonical().unwrap().draws, commands);
     g.retry_frame(retry).unwrap();
     g.viewport([1200, 700], 1.).unwrap();
     let resized = g.take_frame().unwrap();
-    assert!(resized.frame.draws.len() > 8192);
+    assert!(resized.frame.draw_count() > 8192);
     assert_eq!(resized.frame.extent, [1200, 700]);
     assert!(resized.frame.identity > identity);
     let resident = resized

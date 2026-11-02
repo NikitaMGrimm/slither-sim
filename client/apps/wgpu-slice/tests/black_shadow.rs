@@ -88,6 +88,7 @@ async fn pixels() -> Result<Vec<u8>> {
         tick: 1,
         draws,
         snakes: Vec::new(),
+        food_batch: None,
     };
     let texture = r.device.create_texture(&wgpu::TextureDescriptor {
         label: Some("synthetic black-effect grid"),

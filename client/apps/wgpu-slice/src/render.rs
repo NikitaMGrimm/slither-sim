@@ -61,7 +61,7 @@ impl PreparedFrame {
         self.resources.iter().map(|r| r.image.pixels.len()).sum()
     }
     pub fn draw_count(&self) -> usize {
-        self.frame.draws.len() + self.overlay.as_ref().map_or(0, |f| f.draws.len())
+        self.frame.draw_count() + self.overlay.as_ref().map_or(0, |f| f.draw_count())
     }
     pub fn ui_frame(&self) -> &Frame {
         self.overlay.as_ref().unwrap_or(&self.frame)
@@ -576,6 +576,7 @@ pub fn prepare_studio_preview(
         viewport_scale: dpr,
         draws,
         snakes: vec![],
+        food_batch: None,
     };
     let mut resources = bank.resources(&frame)?;
     // Independent lazy disk allocation must never alias gameplay's body handles.
@@ -978,29 +979,69 @@ fn prepare_composed(
         client.food_bounds(),
         user_zoom,
     );
-    let food = plan_food_with_zoom_and_index(
-        FoodPaintInput {
-            foods: &foods,
+    let mut retained_food = if !pressure
+        && quality.high_quality
+        && quality.blend == 1.
+        && user_zoom == 1.
+        && draws.is_empty()
+    {
+        bank.food_batch_cache.prepare(
+            client.foods(),
             view,
-            quality,
-            bounds: client.food_bounds(),
-            assets: &bank.assets,
-            target_handle: None,
-            entry_alpha: 1.,
-            command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
-        },
-        &mut bank.food_asset_index,
-        early,
-        late,
-        user_zoom,
-    )
-    .map_err(|e| {
-        if e == FoodPaintError::CommandLimit {
-            DRAW_MEMORY_LIMIT.into()
-        } else {
-            e.to_string()
+            client.food_bounds(),
+            &bank.assets,
+            &bank.food_outline,
+            &mut bank.food_asset_index,
+            MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+        )?
+    } else {
+        None
+    };
+    let total_food_charge = retained_food.as_ref().map_or(0, |b| b.draw_count());
+    let food = if let Some(batch) = &retained_food {
+        FoodPaintPlan {
+            early: {
+                let mut v = early;
+                v.clear();
+                v
+            },
+            late: {
+                let mut v = late;
+                v.clear();
+                v
+            },
+            outline_barrier: batch.visible_count,
+            counts: FoodPaintCounts {
+                visible_foods: batch.visible_count,
+                early: 0,
+                late: 0,
+            },
         }
-    })?;
+    } else {
+        plan_food_with_zoom_and_index(
+            FoodPaintInput {
+                foods: &foods,
+                view,
+                quality,
+                bounds: client.food_bounds(),
+                assets: &bank.assets,
+                target_handle: None,
+                entry_alpha: 1.,
+                command_limit: MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+            },
+            &mut bank.food_asset_index,
+            early,
+            late,
+            user_zoom,
+        )
+        .map_err(|e| {
+            if e == FoodPaintError::CommandLimit {
+                DRAW_MEMORY_LIMIT.into()
+            } else {
+                e.to_string()
+            }
+        })?
+    };
     preparation_phase!("food_end", identity);
     let eaters: Vec<_> = client
         .snake_objects()
@@ -1030,8 +1071,9 @@ fn prepare_composed(
             target_handle: None,
             early_entry_alpha: 1.,
             late_entry_alpha: 1.,
-            command_limit: MAX_PREY_PAINT_COMMANDS
-                .min(MAX_DRAWS - draws.len() - food.early.len() - food.late.len()),
+            command_limit: MAX_PREY_PAINT_COMMANDS.min(
+                MAX_DRAWS - draws.len() - total_food_charge - food.counts.early - food.counts.late,
+            ),
         },
         user_zoom,
     )
@@ -1052,6 +1094,9 @@ fn prepare_composed(
         })
         .collect();
     reserve_draws(&mut draws, food.early.len() + prey_plan.early.len())?;
+    if let Some(batch) = &mut retained_food {
+        batch.early_at = draws.len();
+    }
     draws.extend(food.early.iter().map(Draw::from));
     draws.extend(prey_plan.early.iter().map(prey));
     let nickname_index = draws.len();
@@ -1095,7 +1140,8 @@ fn prepare_composed(
             let body_limit = if pressure && !snake.own {
                 let remaining = MAX_DRAWS.saturating_sub(
                     draws.len()
-                        + food.late.len()
+                        + total_food_charge
+                        + food.counts.late
                         + prey_plan.late.len()
                         + own_antenna_draws
                         + 16_384
@@ -1105,7 +1151,9 @@ fn prepare_composed(
                 ((remaining as u64 * geometry.samples.len() as u64) / rival_samples.max(1) as u64)
                     as usize
             } else {
-                MAX_DRAWS.saturating_sub(draws.len() + food.late.len() + prey_plan.late.len())
+                MAX_DRAWS.saturating_sub(
+                    draws.len() + total_food_charge + food.counts.late + prey_plan.late.len(),
+                )
             };
             // Below two logical pixels across, separate outline/shadow/inner
             // shimmer details cannot resolve. Reuse the existing low-quality
@@ -1213,7 +1261,13 @@ fn prepare_composed(
         });
         if !pressure
             || snake.own
-            || draws.len() + 9 + food.late.len() + prey_plan.late.len() + own_antenna_draws + 16_384
+            || draws.len()
+                + total_food_charge
+                + 9
+                + food.counts.late
+                + prey_plan.late.len()
+                + own_antenna_draws
+                + 16_384
                 <= MAX_DRAWS
         {
             submit_face(
@@ -1226,7 +1280,9 @@ fn prepare_composed(
                 &mut draws,
             )?;
         }
-        check_draw_count(draws.len() + food.late.len() + prey_plan.late.len())?;
+        check_draw_count(
+            draws.len() + total_food_charge + food.counts.late + prey_plan.late.len(),
+        )?;
         if let Some(mut antenna) = snake.antenna {
             if snake.own {
                 own_antenna_index = Some(antennas.len());
@@ -1241,6 +1297,9 @@ fn prepare_composed(
         if !snake.own {
             rival_count -= 1;
         }
+    }
+    if let Some(batch) = &mut retained_food {
+        batch.late_at = draws.len();
     }
     reserve_draws(&mut draws, food.late.len() + prey_plan.late.len())?;
     draws.extend(food.late.iter().map(Draw::from));
@@ -1360,10 +1419,13 @@ fn prepare_composed(
             },
             scale,
         )? {
-            if pressure && draws.len() + text_draws.len() + 1 + own_antenna_draws > MAX_DRAWS {
+            if pressure
+                && (draws.len() + total_food_charge) + text_draws.len() + 1 + own_antenna_draws
+                    > MAX_DRAWS
+            {
                 break;
             }
-            check_draw_count(draws.len() + text_draws.len() + 1)?;
+            check_draw_count((draws.len() + total_food_charge) + text_draws.len() + 1)?;
             text_resources.insert(resource.asset.handle, resource);
             text_draws.push(draw);
         }
@@ -1371,10 +1433,13 @@ fn prepare_composed(
     let nickname_count = text_draws.len();
     reserve_draws(&mut draws, nickname_count)?;
     draws.splice(nickname_index..nickname_index, text_draws);
+    if let Some(batch) = &mut retained_food {
+        batch.late_at += nickname_count;
+    }
     // Admit antennas against the complete non-antenna scene, then restore each
     // original barrier position (including its relation to death passes).
-    check_draw_count(draws.len())?;
-    let mut remaining = MAX_DRAWS - draws.len();
+    check_draw_count(draws.len() + total_food_charge)?;
+    let mut remaining = MAX_DRAWS - (draws.len() + total_food_charge);
     let mut inserted = 0;
     for (ordinal, (index, skin, antenna)) in antennas.into_iter().enumerate() {
         if pressure && own_antenna_index != Some(ordinal) && remaining == 0 {
@@ -1389,6 +1454,9 @@ fn prepare_composed(
             index + nickname_count + inserted..index + nickname_count + inserted,
             commands,
         );
+        if let Some(batch) = &mut retained_food {
+            batch.late_at += count;
+        }
         inserted += count;
     }
     bank.stage_text(identity, text_resources.into_values().collect())?;
@@ -1399,6 +1467,7 @@ fn prepare_composed(
         viewport_scale: scale,
         tick: 0,
         draws,
+        food_batch: retained_food,
         snakes,
     };
     let mut resources = bank.resources(&frame)?;
@@ -1411,6 +1480,7 @@ fn prepare_composed(
         viewport_scale,
         draws: bank.take_draws(true),
         snakes: Vec::new(),
+        food_batch: None,
     });
     let ui = overlay.as_mut().unwrap_or(&mut frame);
     preparation_phase!("resources_end", identity);
@@ -1422,7 +1492,7 @@ fn prepare_composed(
         .append(client, &mut bank.text, ui, &mut resources)?;
     preparation_phase!("minimap_end", identity);
     // Mandatory overlays must fit in full; never silently truncate a panel.
-    check_draw_count(frame.draws.len() + overlay.as_ref().map_or(0, |f| f.draws.len()))?;
+    check_draw_count(frame.draw_count() + overlay.as_ref().map_or(0, |f| f.draw_count()))?;
     if resources
         .iter()
         .map(|r| r.image.pixels.len())
@@ -1679,6 +1749,7 @@ mod text_staging_tests {
                 viewport_scale: scale,
                 draws: vec![draw],
                 snakes: Vec::new(),
+                food_batch: None,
             };
             assert!(
                 frame
@@ -1712,6 +1783,7 @@ mod text_staging_tests {
         .unwrap();
         Frame {
             snakes: Vec::new(),
+            food_batch: None,
             identity,
             extent: [960, 540],
             viewport_scale: 1.,

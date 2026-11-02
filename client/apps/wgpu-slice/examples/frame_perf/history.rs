@@ -68,6 +68,7 @@ pub fn warm(r: &mut gpu::Renderer) -> Result<()> {
         tick: 0,
         draws: vec![draw; QUADS],
         snakes: Vec::new(),
+        food_batch: None,
     };
     r.begin_diagnostic_frame();
     r.render_world_at(

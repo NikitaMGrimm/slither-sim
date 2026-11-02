@@ -45,6 +45,7 @@ fn frame(draws: Vec<Draw>) -> Frame {
         tick: 1,
         draws,
         snakes: Vec::new(),
+        food_batch: None,
     }
 }
 fn resident() -> BTreeMap<ResourceKey, BodyAsset> {

@@ -54,6 +54,7 @@ fn frame(extent: [u32; 2], draws: Vec<Draw>) -> Frame {
         extent,
         viewport_scale: 1.,
         snakes: Vec::new(),
+        food_batch: None,
         draws,
     }
 }

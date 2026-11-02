@@ -198,6 +198,7 @@ fn panels_replace_slots_preserve_other_groups_and_old_prepared_resources_at_dpr_
                 tick: 0,
                 draws,
                 snakes: vec![],
+                food_batch: None,
             },
             resources,
         };

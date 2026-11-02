@@ -1,0 +1,301 @@
+{
+  "base": "f3c5b51984fdec73f7f104a7d97610fae2a43dee",
+  "measured_candidate": "uncommitted working source over base; frozen before passive instrumentation",
+  "binaries": {
+    "baseline": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+    "candidate": "e03cbc9a55da2ba972ea948556413ab41de70d5bdab27713cbf59faf1052fff7"
+  },
+  "parity": {
+    "join-default": {
+      "baseline": {
+        "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 29044,
+        "output_digest": "01fcceaa5ee878c1",
+        "quad_digest": "c1504f711bbc51b0",
+        "numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
+      },
+      "candidate": {
+        "binary_sha256": "e03cbc9a55da2ba972ea948556413ab41de70d5bdab27713cbf59faf1052fff7",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 29044,
+        "output_digest": "01fcceaa5ee878c1",
+        "quad_digest": "c1504f711bbc51b0",
+        "numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
+      }
+    },
+    "join-whole": {
+      "baseline": {
+        "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 29044,
+        "output_digest": "dae73e1b06b748f0",
+        "quad_digest": "e01a42560c5f64e5",
+        "numeric_sha256": "f3b5d18e8d219029968755934705bb6da752c099296e0b95b599112d21a563f8"
+      },
+      "candidate": {
+        "binary_sha256": "e03cbc9a55da2ba972ea948556413ab41de70d5bdab27713cbf59faf1052fff7",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 29044,
+        "output_digest": "dae73e1b06b748f0",
+        "quad_digest": "e01a42560c5f64e5",
+        "numeric_sha256": "f3b5d18e8d219029968755934705bb6da752c099296e0b95b599112d21a563f8"
+      }
+    },
+    "rectangle": {
+      "baseline": {
+        "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 8,
+        "output_digest": "5e03fdf31b9f83fe",
+        "quad_digest": "397415fbac706ea5",
+        "numeric_sha256": "8b5aa95a67ade032c380e38e609537bca8c68fd479ef56387c7954686ab49e93"
+      },
+      "candidate": {
+        "binary_sha256": "e03cbc9a55da2ba972ea948556413ab41de70d5bdab27713cbf59faf1052fff7",
+        "callbacks": 600,
+        "skips": 0,
+        "messages": 8,
+        "output_digest": "5e03fdf31b9f83fe",
+        "quad_digest": "397415fbac706ea5",
+        "numeric_sha256": "8b5aa95a67ade032c380e38e609537bca8c68fd479ef56387c7954686ab49e93"
+      }
+    }
+  },
+  "pixel_parity": {
+    "exact-gpu-pixels-original": {
+      "callbacks": 600,
+      "max_rgb": 1,
+      "frames_over_2": 0,
+      "rows_sha256": "df04043a1d50f4de6f304ed8986b34b11cba2cf528db8fb2b9d60417b3422a58"
+    },
+    "exact-gpu-pixels-native": {
+      "callbacks": 600,
+      "max_rgb": 1,
+      "frames_over_2": 0,
+      "rows_sha256": "2d004a86a894fbfc2a85979482f4c20c8b4a3a756e6bad69afaa05eb855fd16d"
+    }
+  },
+  "authored_pixels": {
+    "settled_max_rgb": 0,
+    "fading_max_rgb": 1,
+    "consumed_max_rgb": 0,
+    "steps": 24
+  },
+  "measured_production_source_sha256": {
+    "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+    "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+    "client/apps/wgpu-slice/src/frame.rs": "fcbd5a1841e03a4af8158e3fbede951c5049c8a0a0580771786d1e6bb0b6ffc9",
+    "client/apps/wgpu-slice/src/gpu.rs": "1a4be019a29d737af539eba5576d6309397f378b637695c3263ff0ada3a85cb5",
+    "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+    "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+    "client/apps/wgpu-slice/src/menu.rs": "68ee79bf0602f1111baef0221e345e90b0df1d93adb22748465e0d7b7d9dd7e5",
+    "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+    "client/apps/wgpu-slice/src/pellet.wgsl": "447915c84f6468cc9b7fc9248c992edae1221b630e3ec692e889b40ffbcdbe04",
+    "client/apps/wgpu-slice/src/pellet_batch.rs": "9e4894d2a21f568563860142dc8857781259762257930de7bfe8977e8275034d",
+    "client/apps/wgpu-slice/src/pellet_gpu.rs": "28b7902566de12946d2b6e249ca15000ec471d2b70edbecbaeeea69a16694357",
+    "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+    "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+    "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+    "client/src/presentation.rs": "8e129f93c1c5bc3a54d00616e9bab745e2ef3b70380bf7ecc5b759feb4bc8b54",
+    "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+    "client/src/presentation/food_painter.rs": "1ffd6128b8d17d5161de648b7fe5af1c1150d57b58133e926e80f0dfad9e87f8"
+  },
+  "built_instrumented_source_sha256": {
+    "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+    "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+    "client/apps/wgpu-slice/src/frame.rs": "fcbd5a1841e03a4af8158e3fbede951c5049c8a0a0580771786d1e6bb0b6ffc9",
+    "client/apps/wgpu-slice/src/gpu.rs": "1a4be019a29d737af539eba5576d6309397f378b637695c3263ff0ada3a85cb5",
+    "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+    "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+    "client/apps/wgpu-slice/src/menu.rs": "68ee79bf0602f1111baef0221e345e90b0df1d93adb22748465e0d7b7d9dd7e5",
+    "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+    "client/apps/wgpu-slice/src/pellet.wgsl": "447915c84f6468cc9b7fc9248c992edae1221b630e3ec692e889b40ffbcdbe04",
+    "client/apps/wgpu-slice/src/pellet_batch.rs": "9e4894d2a21f568563860142dc8857781259762257930de7bfe8977e8275034d",
+    "client/apps/wgpu-slice/src/pellet_gpu.rs": "bd1a0ed6b79a53656ac5c721960943e9ff7e6e1357909615df5cdadcc9ed56cf",
+    "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+    "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+    "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+    "client/src/presentation.rs": "8e129f93c1c5bc3a54d00616e9bab745e2ef3b70380bf7ecc5b759feb4bc8b54",
+    "client/src/presentation/food.rs": "2794248c5967688f86f1e09e99d695ab206bda1442c7b937ef6f7f400b9fc0b2",
+    "client/src/presentation/food_painter.rs": "1ffd6128b8d17d5161de648b7fe5af1c1150d57b58133e926e80f0dfad9e87f8"
+  },
+  "reviewed_source_sha256": {
+    "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+    "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+    "client/apps/wgpu-slice/src/frame.rs": "fcbd5a1841e03a4af8158e3fbede951c5049c8a0a0580771786d1e6bb0b6ffc9",
+    "client/apps/wgpu-slice/src/gpu.rs": "1a4be019a29d737af539eba5576d6309397f378b637695c3263ff0ada3a85cb5",
+    "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+    "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+    "client/apps/wgpu-slice/src/menu.rs": "68ee79bf0602f1111baef0221e345e90b0df1d93adb22748465e0d7b7d9dd7e5",
+    "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+    "client/apps/wgpu-slice/src/pellet.wgsl": "447915c84f6468cc9b7fc9248c992edae1221b630e3ec692e889b40ffbcdbe04",
+    "client/apps/wgpu-slice/src/pellet_batch.rs": "284a1f0f090bf07cbb02b102b3a8ebffc3a8818f8aa2233c51f05f984f06db5d",
+    "client/apps/wgpu-slice/src/pellet_gpu.rs": "28b7902566de12946d2b6e249ca15000ec471d2b70edbecbaeeea69a16694357",
+    "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+    "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+    "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+    "client/src/presentation.rs": "8e129f93c1c5bc3a54d00616e9bab745e2ef3b70380bf7ecc5b759feb4bc8b54",
+    "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+    "client/src/presentation/food_painter.rs": "1ffd6128b8d17d5161de648b7fe5af1c1150d57b58133e926e80f0dfad9e87f8"
+  },
+  "reviewed_source_patch_sha256": "928c575793990204efea64f433a1670a5cba052038e3eea43872373fd360d5ff",
+  "source_delta": "Two module documentation comments and a fresh-cache reset in a cfg(test) regression differ from the measured production snapshot; no production expression changed. See reviewed-source.patch. Passive observer/driver copies and binaries stay local.",
+  "initial_review_head": "6293009a1fa3fef93b0ee2cee616c4e6cfa8683d",
+  "review_fixes": {
+    "base": "f3c5b51984fdec73f7f104a7d97610fae2a43dee",
+    "reviewed_parent": "6293009a1fa3fef93b0ee2cee616c4e6cfa8683d",
+    "binaries": {
+      "baseline": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "before_review": "e03cbc9a55da2ba972ea948556413ab41de70d5bdab27713cbf59faf1052fff7",
+      "candidate": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334"
+    },
+    "parity": {
+      "join-default": {
+        "baseline": {
+          "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 29044,
+          "output_digest": "01fcceaa5ee878c1",
+          "quad_digest": "c1504f711bbc51b0",
+          "numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
+        },
+        "candidate": {
+          "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 29044,
+          "output_digest": "01fcceaa5ee878c1",
+          "quad_digest": "c1504f711bbc51b0",
+          "numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
+        }
+      },
+      "join-whole": {
+        "baseline": {
+          "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 29044,
+          "output_digest": "dae73e1b06b748f0",
+          "quad_digest": "e01a42560c5f64e5",
+          "numeric_sha256": "f3b5d18e8d219029968755934705bb6da752c099296e0b95b599112d21a563f8"
+        },
+        "candidate": {
+          "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 29044,
+          "output_digest": "dae73e1b06b748f0",
+          "quad_digest": "e01a42560c5f64e5",
+          "numeric_sha256": "f3b5d18e8d219029968755934705bb6da752c099296e0b95b599112d21a563f8"
+        }
+      },
+      "rectangle": {
+        "baseline": {
+          "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 8,
+          "output_digest": "5e03fdf31b9f83fe",
+          "quad_digest": "397415fbac706ea5",
+          "numeric_sha256": "8b5aa95a67ade032c380e38e609537bca8c68fd479ef56387c7954686ab49e93"
+        },
+        "candidate": {
+          "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+          "callbacks": 600,
+          "skips": 0,
+          "messages": 8,
+          "output_digest": "5e03fdf31b9f83fe",
+          "quad_digest": "397415fbac706ea5",
+          "numeric_sha256": "8b5aa95a67ade032c380e38e609537bca8c68fd479ef56387c7954686ab49e93"
+        }
+      }
+    },
+    "pixel_parity": {
+      "review-pixels-original": {
+        "callbacks": 600,
+        "max_rgb": 1,
+        "frames_over_2": 0,
+        "rows_sha256": "df04043a1d50f4de6f304ed8986b34b11cba2cf528db8fb2b9d60417b3422a58"
+      },
+      "review-pixels-native": {
+        "callbacks": 600,
+        "max_rgb": 1,
+        "frames_over_2": 0,
+        "rows_sha256": "2d004a86a894fbfc2a85979482f4c20c8b4a3a756e6bad69afaa05eb855fd16d"
+      }
+    },
+    "measured_production_source_sha256": {
+      "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+      "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+      "client/apps/wgpu-slice/src/frame.rs": "d694a94bbf7327b7fe585e673672b70220729bb5a76cf6c3ff7a89c9cb826747",
+      "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+      "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+      "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+      "client/apps/wgpu-slice/src/menu.rs": "2c79acb87a83b29e4edb3033a417b0b6c94f3deb4f53e14f02b9811de345d6bc",
+      "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+      "client/apps/wgpu-slice/src/pellet.wgsl": "43f53dacca74cb15aca69e7b55a7f0d3ae2b2127b07b6c3988e400f15ba044ed",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0c2b939eec25038de3bc69d3384540530214790e665ee8cc055d19d77a45a806",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "e65c00a7ba00f42add9e55740686c43ce21b4bbbfed6a2b600eeaf7f27a32818",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+      "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+      "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+      "client/src/presentation.rs": "f8a08f288b795f38e8d1e443b7ed6cd996f28da5636e9a4cd490e603131f4cfe",
+      "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+      "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499"
+    },
+    "built_instrumented_source_sha256": {
+      "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+      "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+      "client/apps/wgpu-slice/src/frame.rs": "d694a94bbf7327b7fe585e673672b70220729bb5a76cf6c3ff7a89c9cb826747",
+      "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+      "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+      "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+      "client/apps/wgpu-slice/src/menu.rs": "2c79acb87a83b29e4edb3033a417b0b6c94f3deb4f53e14f02b9811de345d6bc",
+      "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+      "client/apps/wgpu-slice/src/pellet.wgsl": "43f53dacca74cb15aca69e7b55a7f0d3ae2b2127b07b6c3988e400f15ba044ed",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0c2b939eec25038de3bc69d3384540530214790e665ee8cc055d19d77a45a806",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "04f6c2a9407dc379312c7a445927cf5f1fb413a5d8c0e4987fe3e1c6bd1daf30",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+      "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+      "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+      "client/src/presentation.rs": "f8a08f288b795f38e8d1e443b7ed6cd996f28da5636e9a4cd490e603131f4cfe",
+      "client/src/presentation/food.rs": "2794248c5967688f86f1e09e99d695ab206bda1442c7b937ef6f7f400b9fc0b2",
+      "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499"
+    },
+    "final_source_sha256": {
+      "client/apps/wgpu-slice/src/bank.rs": "3d891f0c3adc174e33102ac41f7cfacaf209126bcda7e1caab1d1203b1f5adc7",
+      "client/apps/wgpu-slice/src/cosmetics/studio.rs": "5f711c9d5f5ace64525d89f5ecfb9c9302a29b3c38a733f665b7445b97a5cdc6",
+      "client/apps/wgpu-slice/src/frame.rs": "d694a94bbf7327b7fe585e673672b70220729bb5a76cf6c3ff7a89c9cb826747",
+      "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+      "client/apps/wgpu-slice/src/headless.rs": "d7754f62b819a96009176ff084b9f8c74a456ac93dc84df6b500f6a1486656bb",
+      "client/apps/wgpu-slice/src/lib.rs": "66f794982b0a8453a81d7165306f7fdcaef3b805e0d46850762f437bd16c0431",
+      "client/apps/wgpu-slice/src/menu.rs": "2c79acb87a83b29e4edb3033a417b0b6c94f3deb4f53e14f02b9811de345d6bc",
+      "client/apps/wgpu-slice/src/minimap.rs": "3c96c3da6d2a1f597f9de5342f470e189e3bbce013f1fc60dcba69e9b14b2040",
+      "client/apps/wgpu-slice/src/pellet.wgsl": "43f53dacca74cb15aca69e7b55a7f0d3ae2b2127b07b6c3988e400f15ba044ed",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0c2b939eec25038de3bc69d3384540530214790e665ee8cc055d19d77a45a806",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "42ffdcd5f0ae1892146ac323a22deba382bd407e1c84cd2e9ca0e5b9590f4b71",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d",
+      "client/apps/wgpu-slice/src/scene.rs": "c1fea1ba5ef32ff670a1c18ab398d884a73c0dfa9bcd90a7e6a06ad02b470deb",
+      "client/apps/wgpu-slice/src/text.rs": "5b60924029e148f6fa770e3464dc676a640369f854a04fe91746e3cc1890c2a4",
+      "client/src/presentation.rs": "f8a08f288b795f38e8d1e443b7ed6cd996f28da5636e9a4cd490e603131f4cfe",
+      "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+      "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499"
+    },
+    "final_source_delta_sha256": "7ceeb78257c04e52fe511e4a5c2bb5d9b04f9f72875f5924a8380c7ed3048e45",
+    "source_delta": "Only an unused-parameter identifier and the outline-rationale link differ between measured production and final source. No arithmetic, branching or GPU policy changed. Exact delta retained separately.",
+    "timing_mode": "Per-pass for all published GPU data: begin_diagnostic_frame, resolve every recorded pair, sum pass durations. No aggregate-mode timing is published.",
+    "gpu_pass_sum_audit": {
+      "timing_runs": 50,
+      "callbacks": 30000,
+      "maximum_sum_rounding_ns": 0,
+      "result": "Every callback GPU total equals its retained per-pass sum within nanosecond truncation; aggregate-mode overwrite did not produce these figures."
+    }
+  }
+}

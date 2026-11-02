@@ -1,0 +1,14 @@
+--- measured/client/apps/wgpu-slice/src/pellet_gpu.rs
++++ final/client/apps/wgpu-slice/src/pellet_gpu.rs
+@@ -26 +26 @@
+-    r: &mut Renderer,
++    _r: &mut Renderer,
+@@ -32,2 +32,2 @@
+-    let per_pass = if r.diagnostic_passes.is_some() {
+-        Some(r.diagnostic_pass(_name)?)
++    let per_pass = if _r.diagnostic_passes.is_some() {
++        Some(_r.diagnostic_pass(_name)?)
+@@ -397 +397,2 @@
+-        // canonicalizes the batch first. See research/client-performance/2026-11-02-retained-pellets/REPORT.md.
++        // canonicalizes the batch first. See
++        // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-retained-pellets/REPORT.md.
