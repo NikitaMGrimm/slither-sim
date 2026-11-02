@@ -993,7 +993,7 @@ impl LocalGame {
             session.prepare_controls(&commands, now).map_err(|e| e.0)?;
         }
         if decoded.command_count() == 1
-            && matches!(commands[0].opcode, b'c' | b'C' | b'<')
+            && matches!(commands[0].opcode, b'c' | b'C' | b'<' | b'w' | b'W')
             && self
                 .client
                 .received()
@@ -1005,12 +1005,15 @@ impl LocalGame {
             // committing the core's already-validated, infallible transition.
             session.match_report(&[], 0).map_err(|e| e.0)?;
             session.commit_controls().map_err(|e| e.0)?;
-            if self
-                .client
-                .try_apply_single_consume(bytes, ElapsedHeader::Absent)
-                .map_err(|e| e.to_string())?
-                .is_some()
-            {
+            let applied = if matches!(commands[0].opcode, b'w' | b'W') {
+                self.client
+                    .try_apply_single_sector_control(bytes, ElapsedHeader::Absent)
+            } else {
+                self.client
+                    .try_apply_single_consume(bytes, ElapsedHeader::Absent)
+            }
+            .map_err(|e| e.to_string())?;
+            if applied.is_some() {
                 self.session = session;
                 #[cfg(feature = "feel-trace")]
                 if self.trace.is_some() {

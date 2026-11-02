@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reduce community join/refresh hitches by staging only new food in sector
+  listings and applying sector clears/notices without whole-world copies.
+
 - Reduce crowded GPU work by skipping exactly invisible additive pairs and
   initial black shadows, grouping paired glow sources, and keeping world
   drawing and glow composition in one MSAA pass without changing source rasters.

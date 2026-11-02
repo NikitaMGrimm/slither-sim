@@ -1,0 +1,89 @@
+{
+  "base": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+  "recording_sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43",
+  "access": "restricted local-only; recording and raw journals are not published",
+  "driver_sha256": "7a056481fdfb4ffafa995de0165c5b9e51f97f2ab491d2c47bd36f42ddac3a71",
+  "measurement_script_sha256": "80cf459c5ea59d7527d76a0d502f67c885daa5e79569d60118d73406af7681e8",
+  "parity": {
+    "default": {
+      "control": {
+        "binary_sha256": "68f144760baeae9c1496ac467506fec8fe4c4e62e732961b04b3a22bddf4b38f",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "4890089c3256d5b3",
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0"
+      },
+      "candidate": {
+        "binary_sha256": "fb4ce6318dbc190673f6fa95c1182a33d4c40d17e0fcd3256d3ed4064f921493",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "4890089c3256d5b3",
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0"
+      }
+    },
+    "whole_map": {
+      "control": {
+        "binary_sha256": "68f144760baeae9c1496ac467506fec8fe4c4e62e732961b04b3a22bddf4b38f",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "97d4e2489152d63c",
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa"
+      },
+      "candidate": {
+        "binary_sha256": "fb4ce6318dbc190673f6fa95c1182a33d4c40d17e0fcd3256d3ed4064f921493",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "97d4e2489152d63c",
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa"
+      }
+    }
+  },
+  "arms": {
+    "control": {
+      "runtime_source_sha256": {
+        "client/src/state.rs": "deb124b9134602ac2ef67163bd86d66a8199a5c3c9945ecfae2807b414603ecb",
+        "client/src/state/v13.rs": "07a97999eb961c317396e962df9e5c759306c71870eb3f5f396078f6296497be",
+        "client/src/presentation/client.rs": "430ba92c9364badbe82317923274f20d100b418bc3f2f143192719280bed6196",
+        "client/src/presentation/food.rs": "a41ab44e4cdd53f841ce7fae073941ecb5791ec907eac675841bdfad33d7ce70",
+        "client/apps/wgpu-slice/src/game.rs": "53851c14d6ef5b00665988bf662053ffd1d171b4eca0cf2a43518beb5516b391"
+      },
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
+        "client/src/state/v13.rs": "07a97999eb961c317396e962df9e5c759306c71870eb3f5f396078f6296497be",
+        "client/src/presentation/client.rs": "2f53021732295d393f1a952be0a3afdbddf870720801e2a5c8962b90f2b73f2a",
+        "client/src/presentation/food.rs": "99cdd39a678e5a548f1a50ee568ce5d0b72f8c1fc6a2c0d61255b00a9778cc74",
+        "client/apps/wgpu-slice/src/game.rs": "9ef1df01c1d15324f55d0ab296952a0c177740c1ea1c58daf6725ec06b1d6337",
+        "client/apps/wgpu-slice/src/bank.rs": "e69957796c9bf6d944bcf3e3be5ad51a75709fe1b201087195242ae9471958e8",
+        "client/apps/wgpu-slice/src/gpu.rs": "99feb54f3ec5e64233ed030f73c6bf63692f347b4d2b576ccd44992c8ca1e01b",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "7a056481fdfb4ffafa995de0165c5b9e51f97f2ab491d2c47bd36f42ddac3a71"
+      }
+    },
+    "candidate": {
+      "runtime_source_sha256": {
+        "client/src/state.rs": "80fdc82f5a40fb53165612e0d8e8a5d554ea33b924a67da5b0cea96fb9229113",
+        "client/src/state/v13.rs": "c21ea39655ede8c0034bbe88b3bfa0dd21fc46039fe49c04b0d80a8d72bd9e24",
+        "client/src/presentation/client.rs": "4ad8747bfa1fadb4dbe76ca413da73b6e94442a591a03d8c663131ec561d4b10",
+        "client/src/presentation/food.rs": "00430668da847952554d230e936d5f3dd3c0a25edd5937f973c7832b95eef976",
+        "client/apps/wgpu-slice/src/game.rs": "978b6f3862418940d24360a03ac868548a3b41817e3d2695ccb463ff57786cc5"
+      },
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "28b09656f7a655c80f9d4f5626ec84d49aa27ea6c7cd44f031e57eba10a3dd86",
+        "client/src/state/v13.rs": "c21ea39655ede8c0034bbe88b3bfa0dd21fc46039fe49c04b0d80a8d72bd9e24",
+        "client/src/presentation/client.rs": "65dbe51bf42723ce0c86d5af0d174ef1240737e68b0dabc5352ed3b15bc4af5d",
+        "client/src/presentation/food.rs": "5af103c30dd7fc262f327e0bc60858ecedcf81ad0d236bb383a216edde498e72",
+        "client/apps/wgpu-slice/src/game.rs": "265880bc1ecc55d2d7a327ecc0edb0b470d058512d8ea0f830134ef31b24622a",
+        "client/apps/wgpu-slice/src/bank.rs": "e69957796c9bf6d944bcf3e3be5ad51a75709fe1b201087195242ae9471958e8",
+        "client/apps/wgpu-slice/src/gpu.rs": "99feb54f3ec5e64233ed030f73c6bf63692f347b4d2b576ccd44992c8ca1e01b",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "7a056481fdfb4ffafa995de0165c5b9e51f97f2ab491d2c47bd36f42ddac3a71"
+      }
+    }
+  }
+}
