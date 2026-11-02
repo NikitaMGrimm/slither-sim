@@ -224,6 +224,13 @@ def export_profiles(root, output):
                 current[stage].append(float(value) / 1e6)
             elif line.startswith("snapshot="):
                 frame = line.split(",")[0].split("=")[1]
+                require(any(current.values()), "missing per-pass timestamps")
+                totals = [float(r["gpu_ns"]) / 1e6 for r in raw if r["frame"] == frame]
+                for i, total in enumerate(totals):
+                    observed = sum(values[5 + i] for values in current.values() if values)
+                    # Printed pass values round to nanoseconds; at most nine
+                    # half-nanosecond decisions contribute to the total.
+                    require(abs(observed - total) <= 0.00001, "incomplete per-pass timestamp sum")
                 for stage, values in current.items():
                     require(len(values) in (0, 15), "incomplete profile repetitions")
                     values = values[5:] if values else [0.] * 10
@@ -238,11 +245,30 @@ def export_profiles(root, output):
     write_csv(output / "profile-stages.csv", results)
 
 
+def export_integration(root, output):
+    rows = []
+    for path in sorted(root.glob("integration-1-*-receipt.json")):
+        receipt = json.loads(path.read_text(encoding="utf-8-sig"))
+        name, workload = receipt["id"], receipt["workload"]
+        log = (root / f"{name}.log").read_text(encoding="utf-8-sig")
+        complete = re.search(r"complete=true,messages=(\d+),digest=([0-9a-f]{16}),skips=(\d+)", log)
+        require(receipt["exit"] == 0 and complete is not None, "incomplete integration run")
+        selected_rows = selected(read_csv(root / f"{name}.csv"), "history", workload)
+        frames = (120, 240, 365) if workload == "replay" else (60, 120, 180)
+        rows.append(dict(run_id=name, workload=workload, zoom=receipt["zoom"], size=receipt["size"],
+                         samples=len(selected_rows), messages=complete[1], digest=complete[2], skips=complete[3],
+                         rgba_sha256s=";".join(sha(root / f"{name}.{f}.rgba") for f in frames),
+                         binary_sha256=receipt["binarySha256"].lower(),
+                         raw_csv_sha256=sha(root / f"{name}.csv"), receipt_sha256=sha(path)))
+    require(len(rows) == 12, "incomplete post-rebase matrix")
+    write_csv(output / "integration-runs.csv", rows)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("raw", type=Path)
     parser.add_argument("--output", type=Path, default=Path(__file__).parent)
-    parser.add_argument("--series", choices=("history", "frozen", "diagnostics", "parity", "profile", "all"), default="all")
+    parser.add_argument("--series", choices=("history", "frozen", "diagnostics", "parity", "profile", "integration", "all"), default="all")
     args = parser.parse_args()
     require(args.output.is_dir(), "output directory must already exist")
     for series in ("history", "frozen"):
@@ -254,6 +280,8 @@ def main():
         export_parity(args.raw, args.output)
     if args.series == "profile":
         export_profiles(args.raw, args.output)
+    if args.series == "integration":
+        export_integration(args.raw, args.output)
     print("Reduced all requested journals; no packet, identity, position or process-path fields exported.")
 
 

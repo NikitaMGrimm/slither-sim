@@ -169,9 +169,27 @@ def profile_table(rows, binary):
         for frame in frames(w):
             values = {r["stage"]: float(r["mean_ms"]) for r in rows if (r["workload"], r["zoom"], r["frame"]) == (w, z, frame)}
             world = sum(values[k] for k in ("world", "world-before-glows", "world-after-glows"))
+            require(world > 0, "missing world-pass measurement")
             glow = sum(values[k] for k in ("food-glows-coarse", "food-glows-fine", "food-glows-half"))
             lines.append(f"| {cell_label(w,z,'1920-native')} | {frame} | {world:.3f} | {glow:.3f} | {values['food-outlines']:.3f} | {values['blit']:.3f} / {values['overlay']:.3f} |")
     return "\n".join(lines)
+
+
+def validate_integration(rows, parity, pictures, provenance):
+    require(Counter((r["workload"], r["zoom"], r["size"]) for r in rows) == Counter(CELLS), "incomplete post-rebase cells")
+    require(len({r["run_id"] for r in rows}) == 12, "duplicate integration ids")
+    require(provenance["integration"]["source_blobs"] == provenance["history"]["source_blobs"], "measured renderer source changed during integration")
+    require(provenance["integration"]["reconstructed_tree"] == provenance["integration"]["measured_source_tree"], "source reconstruction differs")
+    for r in rows:
+        cell = (r["workload"], r["zoom"], r["size"])
+        require(r["run_id"] == f"integration-1-{cell[0]}-{cell[1]}-{cell[2]}-after", "integration id/labels disagree")
+        require(r["binary_sha256"] == provenance["integration"]["binary_sha256"], "wrong post-rebase executable")
+        expected = next(p for p in parity if (p["workload"], p["zoom"], p["size"], p["side"]) == (*cell, "after"))
+        require(r["digest"] == expected["digest"] and r["messages"] == expected["messages"] and r["skips"] == "0", "post-rebase output mismatch")
+        require(int(r["samples"]) == (302 if cell[0] == "replay" else 141), "incomplete post-rebase pictures")
+        images = sorted((p for p in pictures if (p["workload"], p["zoom"], p["size"]) == cell), key=lambda p: int(p["frame"]))
+        require(r["rgba_sha256s"].split(";") == [p["after_rgba_sha256"] for p in images], "post-rebase raster mismatch")
+        require(len(r["raw_csv_sha256"]) == len(r["receipt_sha256"]) == 64, "missing integration journal binding")
 
 
 def replace_or_check(report, name, value, check):
@@ -203,6 +221,7 @@ def main():
     blocks["PICTURE CHECKS"] = parity_table(read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"), provenance["history"]["binaries"])
     blocks["PRE-MIP PICTURE CHECKS"] = parity_table(read_csv(HERE / "pre-mip-parity-runs.csv"), read_csv(HERE / "pre-mip-pixels.csv"), provenance["pre-mip"]["binaries"])
     blocks["FINAL GPU PROFILE"] = profile_table(read_csv(HERE / "profile-stages.csv"), provenance["history"]["binaries"]["after"])
+    validate_integration(read_csv(HERE / "integration-runs.csv"), read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"), provenance)
     interrupted = read_csv(HERE / "interrupted-runs.csv")
     require(Counter(r["run_id"] for r in interrupted) == Counter(f"history-1-replay-0-{size}-{side}" for size in SIZES for side in SIDES), "incomplete interrupted series journal")
     for r in interrupted:

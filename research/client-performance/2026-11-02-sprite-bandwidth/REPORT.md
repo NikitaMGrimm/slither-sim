@@ -115,6 +115,21 @@ main `ffc36bb0`, including #427, #428 and #429; the candidate runtime is
 `3556082d`. Full identities are in
 [provenance.json](provenance.json).
 
+Main subsequently gained the egui skin studio (#431). The branch was rebased
+onto `5a00451b`; all seven patches remain equivalent in `git range-diff` and all
+eight measured GPU/resource source blobs are identical. Full checks and the
+seven explicit GPU regressions pass after rebase. Twelve additional full-history
+candidate runs match every retained frame/resource/send digest and all 36 RGBA
+readbacks **byte-for-byte**; [integration-runs.csv](integration-runs.csv) and
+provenance bind the rebuilt executable. These are correctness checks, not new
+timing samples. The timing tables remain pinned to `3556082d` versus `ffc36bb0`.
+
+The public equivalent runtime commit is `0403dbde`. Applying its runtime patch
+range `5a00451b..0403dbde` to `ffc36bb0` reconstructs the exact measured source
+tree `0178a6f562c84bbc1c3817e987da1da811531cad`, verified with a separate temporary
+Git index. The historical measurement pin is preserved rather than relabelled
+as the post-studio binary.
+
 <!-- BEGIN HISTORY RESULTS -->
 | Workload / view / physical output | Before GPU median / p95 ms | After GPU median / p95 ms | After run-median range ms |
 | --- | ---: | ---: | ---: |

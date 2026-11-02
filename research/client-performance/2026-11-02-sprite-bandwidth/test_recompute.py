@@ -83,6 +83,25 @@ class Completeness(unittest.TestCase):
         changed[0]["binary_sha256"] = "0" * 64
         with self.assertRaises(ValueError):
             study.profile_table(changed, binary)
+        changed = copy.deepcopy(rows)
+        for r in changed:
+            r["mean_ms"] = "0"
+        with self.assertRaises(ValueError):
+            study.profile_table(changed, binary)
+
+    def test_post_rebase_requires_all_cells_and_exact_pictures(self):
+        provenance = json.loads((HERE / "provenance.json").read_text(encoding="utf-8"))
+        rows = study.read_csv(HERE / "integration-runs.csv")
+        parity = study.read_csv(HERE / "parity-runs.csv")
+        pictures = study.read_csv(HERE / "pixels.csv")
+        study.validate_integration(rows, parity, pictures, provenance)
+        for invalid in (rows[1:], rows + [rows[0]]):
+            with self.assertRaises(ValueError):
+                study.validate_integration(invalid, parity, pictures, provenance)
+        changed = copy.deepcopy(rows)
+        changed[0]["rgba_sha256s"] = "0" * 64
+        with self.assertRaises(ValueError):
+            study.validate_integration(changed, parity, pictures, provenance)
 
 
 if __name__ == "__main__":
