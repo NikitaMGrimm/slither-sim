@@ -351,16 +351,21 @@ pub fn settle_text(ctx: &egui::Context, id: Id, text: &str, composition: Option<
 // A capsule mesh carries the existing theme's two colour stops; its outer ring
 // feathers one physical pixel, avoiding a raster atlas or clipped image shadow.
 pub fn capsule(ui: &egui::Ui, rect: Rect, colors: [Color32; 2], brightness: f32) {
+    rounded(ui, rect, rect.height() / 2., colors, brightness);
+}
+
+/// A vertical two-stop fill with round corners, clamped to a capsule.
+pub fn rounded(ui: &egui::Ui, rect: Rect, radius: f32, colors: [Color32; 2], brightness: f32) {
     let mut mesh = egui::epaint::Mesh::default();
+    // Premultiplied stops interpolate as is; opaque stops stay opaque.
     let color = |y: f32| {
         let t = ((y - rect.top()) / rect.height()).clamp(0., 1.);
         let a = colors[0].to_array();
         let b = colors[1].to_array();
-        Color32::from_rgb(
-            ((a[0] as f32 * (1. - t) + b[0] as f32 * t) * brightness).min(255.) as u8,
-            ((a[1] as f32 * (1. - t) + b[1] as f32 * t) * brightness).min(255.) as u8,
-            ((a[2] as f32 * (1. - t) + b[2] as f32 * t) * brightness).min(255.) as u8,
-        )
+        let alpha = a[3] as f32 * (1. - t) + b[3] as f32 * t;
+        let channel =
+            |i: usize| ((a[i] as f32 * (1. - t) + b[i] as f32 * t) * brightness).min(alpha) as u8;
+        Color32::from_rgba_premultiplied(channel(0), channel(1), channel(2), alpha as u8)
     };
     let vertex = |pos, color| egui::epaint::Vertex {
         pos,
@@ -369,7 +374,7 @@ pub fn capsule(ui: &egui::Ui, rect: Rect, colors: [Color32; 2], brightness: f32)
     };
     mesh.vertices
         .push(vertex(rect.center(), color(rect.center().y)));
-    let radius = (rect.height() / 2.).min(rect.width() / 2.);
+    let radius = radius.min(rect.height() / 2.).min(rect.width() / 2.);
     let feather = 0.5 / ui.pixels_per_point();
     for (center, angle) in [
         (

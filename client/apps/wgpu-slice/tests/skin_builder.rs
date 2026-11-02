@@ -9,7 +9,7 @@ use slither_wgpu_slice::{
     menu_input_native::KeyInput,
 };
 use winit::{
-    event::{ElementState, MouseScrollDelta, TouchPhase, WindowEvent},
+    event::ElementState,
     keyboard::{Key, KeyCode, ModifiersState, NamedKey, PhysicalKey},
 };
 
@@ -125,12 +125,12 @@ fn action_labels_keep_theme_padding_at_nominal_size_in_every_layout() {
 #[test]
 fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
     let mut login = login();
-    assert_eq!(login.controls.focus(), Some(BUILDER_TAB));
+    assert_eq!(login.focused(), Some(BUILDER_TAB));
     assert_eq!(login.studio.state.section, StudioSection::Builder);
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(ControlId(SWATCH_BASE)));
+    assert_eq!(login.focused(), Some(ControlId(SWATCH_BASE)));
     key(&mut login, NamedKey::End);
-    assert_eq!(login.controls.focus(), Some(ControlId(SWATCH_BASE + 41)));
+    assert_eq!(login.focused(), Some(ControlId(SWATCH_BASE + 41)));
     key(&mut login, NamedKey::Home);
     key(&mut login, NamedKey::ArrowDown);
     key(&mut login, NamedKey::ArrowRight);
@@ -147,7 +147,7 @@ fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
         0
     );
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(ADD));
+    assert_eq!(login.focused(), Some(ADD));
     key(&mut login, NamedKey::Enter);
     assert_eq!(
         login.studio.state.draft().unwrap().builder.pattern().runs(),
@@ -169,15 +169,13 @@ fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
     let selected = login.studio.state.draft().unwrap().builder.selected;
     login.focus(ControlId(RUN_BASE + selected as u16));
     key(&mut login, NamedKey::Home);
-    assert_eq!(login.controls.focus(), Some(ControlId(RUN_BASE)));
+    assert_eq!(login.focused(), Some(ControlId(RUN_BASE)));
     key(&mut login, NamedKey::End);
-    assert_eq!(
-        login.controls.focus(),
-        Some(ControlId(RUN_BASE + selected as u16))
-    );
+    assert_eq!(login.focused(), Some(ControlId(RUN_BASE + selected as u16)));
+    // The core panel remains the reading order egui follows.
     let semantics = login
-        .panel
-        .semantics([960., 540.], &login.controls, &login.input.state)
+        .studio_panel
+        .semantics([960., 540.], &Default::default(), &Default::default())
         .unwrap();
     let position = |id| semantics.iter().position(|n| n.id == id).unwrap();
     assert!(position(BUILDER_TAB) < position(ControlId(SWATCH_BASE)));
@@ -225,7 +223,7 @@ fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
     login.focus(BUILDER_TAB);
     login.input.modifiers(ModifiersState::SHIFT);
     key(&mut login, NamedKey::Tab);
-    assert_eq!(login.controls.focus(), Some(SAVE));
+    assert_eq!(login.focused(), Some(SAVE));
     login.input.modifiers(ModifiersState::empty());
     key(&mut login, NamedKey::Escape);
     login.step(656., false, false).unwrap();
@@ -245,7 +243,7 @@ fn cap_reset_and_scroll_cancel_capture_and_keep_fixed_preview_footer() {
     login.prepare([960, 540], false, None).unwrap();
     assert!(
         !login
-            .panel
+            .studio_panel
             .controls
             .iter()
             .find(|c| c.id == ADD)
@@ -257,18 +255,21 @@ fn cap_reset_and_scroll_cancel_capture_and_keep_fixed_preview_footer() {
     let bounds = StudioState::preview_bounds(area);
     login.studio.state.reveal_control(RESET, area);
     login.prepare([360, 640], false, None).unwrap();
-    let resolved = login.panel.resolve(area).unwrap();
+    let resolved = login.studio_panel.resolve(area).unwrap();
     let reset = resolved.iter().find(|r| r.control.id == RESET).unwrap();
     let point = [reset.rect.x + reset.rect.width / 2., reset.rect.y + 14.];
     login.pointer(point, Some(true), false);
-    login.event(
-        &WindowEvent::MouseWheel {
-            device_id: winit::event::DeviceId::dummy(),
-            delta: MouseScrollDelta::LineDelta(0., 1.),
-            phase: TouchPhase::Moved,
-        },
-        false,
-    );
+    // egui-winit's translation of a one-line wheel notch.
+    login.settings_input(egui::RawInput {
+        events: vec![egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0., 1.),
+            phase: egui::TouchPhase::Move,
+            modifiers: Default::default(),
+            source: egui::MouseWheelSource::Unknown,
+        }],
+        ..Default::default()
+    });
     login.pointer(point, Some(false), false);
     assert_eq!(
         login

@@ -183,8 +183,10 @@ Run `cargo run --manifest-path apps/wgpu-slice/Cargo.toml --example menu_specime
 -- NEW_EXTERNAL_DIRECTORY --focus` from `client/`, with `CARGO_BUILD_JOBS=2`.
 The fixed-clock sweep covers DPR 1–8 plus 1.25/1.5/1.75, wide/narrow/short layouts,
 Settings, each studio section, section fades, return and early Builder entry.
-It checks 512 menu records, 64 slots, 13 MiB and the studio's 448-record envelope.
-Generated solid images exercise art-loaded budgets; all exported screenshots use
-only procedural geometry and placeholders. It never reads an art directory or
+It checks 512 menu records, 64 slots and 13 MiB for the host picture. Screenshots
+compose page, egui and the studio preview as the desktop host presents them.
+Generated solid images exercise art-loaded budgets and the egui studio's cosmetic
+thumbnails (`*-ready.png`); all exported screenshots use only procedural geometry
+and placeholders. It never reads an art directory or
 connects to a server. The ledger records copied focus states, not physical
 keyboard, accessibility or visible-window acceptance.

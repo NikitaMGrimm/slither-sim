@@ -29,7 +29,12 @@ fn key_admitted(login: &mut NativeLogin, named: NamedKey, admission: bool) {
     assert!(result.consumed);
 }
 fn click(login: &mut NativeLogin, id: ControlId, down: bool) {
-    let resolved = login.panel.resolve([960., 540.]).unwrap();
+    let panel = if login.studio.state.visible() {
+        &login.studio_panel
+    } else {
+        &login.panel
+    };
+    let resolved = panel.resolve([960., 540.]).unwrap();
     let r = resolved.iter().find(|c| c.control.id == id).unwrap();
     login.pointer(
         [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.],
@@ -324,7 +329,7 @@ fn login_constructor_and_champion_return_retain_their_existing_normalization_and
 
 #[test]
 fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
-    use slither_client::{desktop_input::mouse_client_position, menu_controls::*, menu_input::*};
+    use slither_client::desktop_input::mouse_client_position;
     for height in [540., 720.] {
         for dpr in [5., 6., 7., 8.] {
             let mut login = NativeLogin::new("Player").unwrap();
@@ -334,20 +339,12 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
             let extent = [(960. * dpr) as u32, (height * dpr) as u32];
             login.prepare_host(extent, dpr, false, None).unwrap();
             login.open_studio();
-            for time in [9715., 9830.] {
+            for (time, skin) in [(9715., 1), (9830., 2)] {
                 login.step(time, false, false).unwrap();
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
                 assert_eq!(menu.frame.viewport_scale, dpr);
                 assert_eq!(menu.frame.extent, extent);
-                assert!(menu.frame.draws.len() + usize::from(menu.backdrop.is_some()) <= 512);
-                assert!(
-                    menu.resources
-                        .iter()
-                        .map(|r| r.image.pixels.len())
-                        .sum::<usize>()
-                        <= 13 * 1024 * 1024
-                );
-                let resolved = login.panel.resolve([960., height]).unwrap();
+                let resolved = login.studio_panel.resolve([960., height]).unwrap();
                 let next = resolved.iter().find(|r| r.control.id == NEXT).unwrap();
                 let r = next.rect;
                 let point = mouse_client_position(
@@ -355,19 +352,18 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
                     dpr,
                 );
                 assert!(next.hit(point));
-                assert!(menu.frame.draws.iter().any(|d| point[0] >= d.destination.x
-                    && point[0] < d.destination.x + d.destination.width
-                    && point[1] >= d.destination.y
-                    && point[1] < d.destination.y + d.destination.height));
-                let mut hit = PanelInputState::default();
-                hit.sync(&login.panel, &mut MenuInputState::default());
-                hit.pointer(&login.panel, &resolved, point, Some(true));
-                assert_eq!(
-                    hit.pointer(&login.panel, &resolved, point, Some(false))
-                        .unwrap()
-                        .control,
-                    NEXT
-                );
+                // The egui widget is drawn and hit at the core rectangle.
+                let widget = login
+                    .studio_ui
+                    .controls
+                    .iter()
+                    .find(|c| c.0 == NEXT)
+                    .unwrap()
+                    .1;
+                assert!(widget.contains(egui::pos2(point[0] as f32, point[1] as f32)));
+                login.pointer(point, Some(true), false);
+                login.pointer(point, Some(false), false);
+                assert_eq!(login.studio.state.draft().unwrap().record.builtin, skin);
                 let mut picture = slither_wgpu_slice::render::PreparedFrame {
                     frame: menu.frame,
                     overlay: None,
@@ -435,4 +431,111 @@ fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
         let away = login.prepare([960, 540], false, None).unwrap();
         assert_eq!(returned.frame.draws.len(), away.frame.draws.len());
     }
+}
+
+fn center(login: &NativeLogin, id: ControlId) -> [f64; 2] {
+    let resolved = login.studio_panel.resolve([960., 540.]).unwrap();
+    let r = resolved.iter().find(|c| c.control.id == id).unwrap().rect;
+    [r.x + r.width / 2., r.y + r.height / 2.]
+}
+fn opened_studio() -> NativeLogin {
+    let mut login = NativeLogin::new("").unwrap();
+    login.step(0., false, false).unwrap();
+    login.prepare([960, 540], false, None).unwrap();
+    login.open_studio();
+    login.step(230., false, false).unwrap();
+    login
+}
+
+/// As with the old panel input, a press focuses its control without showing
+/// the keyboard ring, and the release activates it.
+#[test]
+fn a_press_focuses_its_control_and_the_release_activates_it() {
+    let mut login = opened_studio();
+    assert_eq!(login.focused(), Some(BUILT_IN_TAB));
+    let next = center(&login, NEXT);
+    login.pointer(next, Some(true), false);
+    assert_eq!(login.focused(), Some(NEXT));
+    assert!(!login.studio_ui.keyboard_focus);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    login.pointer(next, Some(false), false);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    // The keyboard continues from the pressed control.
+    key(&mut login, NamedKey::ArrowRight);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 2);
+    assert!(login.studio_ui.keyboard_focus);
+}
+
+/// A section switch starts a new panel generation: a press held across it
+/// never activates the control under its release, as the old capture rules.
+#[test]
+fn a_press_held_across_a_section_switch_never_clicks() {
+    let mut login = opened_studio();
+    let cancel = center(&login, CANCEL);
+    login.pointer(cancel, Some(true), false);
+    login.studio.activate(BUILDER_TAB, "");
+    login.step(300., false, false).unwrap();
+    assert_eq!(center(&login, CANCEL), cancel);
+    login.pointer(cancel, Some(false), false);
+    login.step(600., false, false).unwrap();
+    assert!(login.studio.state.visible());
+    assert_eq!(login.studio.state.section, StudioSection::Builder);
+    assert_eq!(login.focused(), Some(BUILDER_TAB));
+    // The next full press and release does.
+    login.pointer(cancel, Some(true), false);
+    login.pointer(cancel, Some(false), false);
+    login.step(900., false, false).unwrap();
+    assert!(!login.studio.state.visible());
+}
+
+/// Touch arrives as egui-winit translates it: a tap activates once; a tap
+/// that leaves its control before lifting does not.
+#[test]
+fn touch_taps_activate_through_egui() {
+    let mut login = opened_studio();
+    let tap = |at: [f64; 2], start: bool, end: bool| {
+        let pos = egui::pos2(at[0] as f32, at[1] as f32);
+        let touch = |phase| egui::Event::Touch {
+            device_id: egui::TouchDeviceId(1),
+            id: egui::TouchId(7),
+            phase,
+            pos,
+            force: None,
+        };
+        let button = |pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        let mut events = Vec::new();
+        if start {
+            events.extend([
+                touch(egui::TouchPhase::Start),
+                egui::Event::PointerMoved(pos),
+                button(true),
+            ]);
+        }
+        if end {
+            events.extend([
+                touch(egui::TouchPhase::End),
+                egui::Event::PointerMoved(pos),
+                button(false),
+                egui::Event::PointerGone,
+            ]);
+        }
+        egui::RawInput {
+            events,
+            ..Default::default()
+        }
+    };
+    let next = center(&login, NEXT);
+    login.settings_input(tap(next, true, true));
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    login.settings_input(tap(next, true, false));
+    login.settings_input(tap(center(&login, PREVIOUS), false, true));
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 1);
+    login.settings_input(tap(center(&login, PREVIOUS), true, true));
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    assert!(!login.studio_ui.keyboard_focus);
 }

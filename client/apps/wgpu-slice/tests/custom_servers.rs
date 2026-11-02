@@ -431,7 +431,7 @@ fn cosmetics_arrow_focus_uses_shared_modality() {
     login.studio.activate(COSMETICS_TAB, "Player");
     login.step(10020., true, false).unwrap();
     login.prepare_host([960, 720], 1., true, None).unwrap();
-    let resolved = login.panel.resolve([960., 720.]).unwrap();
+    let resolved = login.studio_panel.resolve([960., 720.]).unwrap();
     let cell = resolved
         .iter()
         .find(|r| r.control.id == ControlId(COSMETIC_BASE + 1))
@@ -443,52 +443,57 @@ fn cosmetics_arrow_focus_uses_shared_modality() {
     for down in [true, false] {
         login.pointer(point, Some(down), true);
     }
-    let logical = Key::Named(NamedKey::ArrowRight);
-    login.key(
-        KeyInput {
-            logical: &logical,
-            physical: PhysicalKey::Code(KeyCode::ArrowRight),
-            text: None,
-            state: ElementState::Pressed,
-            repeat: false,
-        },
-        true,
-    );
-    assert_eq!(login.controls.focus(), Some(ControlId(COSMETIC_BASE + 2)));
-    assert_eq!(login.controls.visible_focus(), login.controls.focus());
-    let before = login.prepare_host([960, 720], 1., true, None).unwrap();
-    let resolved = login.panel.resolve([960., 720.]).unwrap();
-    let target = resolved
-        .iter()
-        .find(|r| Some(r.control.id) == login.controls.focus())
-        .unwrap();
-    assert!(matches!(
-        target.control.kind,
-        ControlKind::CosmeticCell {
-            selected: false,
-            ..
-        }
-    ));
-    let point = [
-        target.rect.x + target.rect.width / 2.,
-        target.rect.y + target.rect.height / 2.,
-    ];
-    // Change only input modality; keep the selected cosmetic and focused cell fixed.
-    for down in [true, false] {
+    assert_eq!(login.studio.state.preview_cosmetic(), Some(0));
+    assert!(!login.studio_ui.keyboard_focus);
+    let key = |login: &mut NativeLogin, named| {
+        let logical = Key::Named(named);
+        login.key(
+            KeyInput {
+                logical: &logical,
+                physical: PhysicalKey::Code(KeyCode::ArrowRight),
+                text: None,
+                state: ElementState::Pressed,
+                repeat: false,
+            },
+            true,
+        );
+    };
+    key(&mut login, NamedKey::ArrowRight);
+    assert_eq!(login.focused(), Some(ControlId(COSMETIC_BASE + 2)));
+    assert!(login.studio_ui.keyboard_focus);
+    let shapes = |login: &mut NativeLogin| {
+        login.prepare_host([960, 720], 1., true, None).unwrap();
         login
-            .controls
-            .pointer(&login.panel, &resolved, point, Some(down));
-    }
-    assert!(login.controls.visible_focus().is_none());
-    let mouse = login.prepare_host([960, 720], 1., true, None).unwrap();
-    assert!(before.frame.draws.len() > mouse.frame.draws.len());
-    login.controls.keyboard_navigation();
-    let after = login.prepare_host([960, 720], 1., true, None).unwrap();
-    assert_eq!(before.frame.draws.len(), after.frame.draws.len());
-    for (a, b) in before.frame.draws.iter().zip(&after.frame.draws) {
-        assert_eq!(a.destination, b.destination);
-        assert_eq!(a.effective_alpha, b.effective_alpha);
-    }
+            .egui
+            .prepared_shapes()
+            .iter()
+            .map(|s| s.shape.visual_bounding_rect())
+            .collect::<Vec<_>>()
+    };
+    let before = shapes(&mut login);
+    // Pressing the focused cell and releasing outside it changes only the
+    // input modality: the selected cosmetic and the focused cell stay put.
+    let target = login
+        .studio_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == ControlId(COSMETIC_BASE + 2))
+        .unwrap()
+        .1
+        .center();
+    let surface = slither_client::skin_studio::StudioState::bounds([960., 720.]);
+    login.pointer([target.x.into(), target.y.into()], Some(true), true);
+    login.pointer([surface.x + 8., surface.y + 8.], Some(false), true);
+    assert!(!login.studio_ui.keyboard_focus);
+    assert_eq!(login.studio.state.preview_cosmetic(), Some(0));
+    assert_eq!(login.focused(), Some(ControlId(COSMETIC_BASE + 2)));
+    let mouse = shapes(&mut login);
+    assert!(before.len() > mouse.len(), "the focus ring hides");
+    // Arrow keys show the ring again; Left then Right return to the cell.
+    key(&mut login, NamedKey::ArrowLeft);
+    key(&mut login, NamedKey::ArrowRight);
+    assert_eq!(login.focused(), Some(ControlId(COSMETIC_BASE + 2)));
+    assert_eq!(shapes(&mut login), before);
 }
 #[test]
 fn dense_custom_and_mixed_windows_stay_inside_the_window() {

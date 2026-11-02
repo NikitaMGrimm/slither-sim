@@ -14,19 +14,16 @@ fn opened(record: AppearanceRecord, storage: MenuStorage) -> Result<NativeLogin>
     login.step(10010., false, false)?;
     Ok(login)
 }
-fn picture(
+fn shot(
+    renderer: &mut Renderer,
     login: &mut NativeLogin,
     logical: [f64; 2],
     dpr: f64,
-) -> Result<slither_wgpu_slice::menu::MenuFrame> {
+    path: &Path,
+) -> Result<()> {
     let extent = logical.map(|n| (n * dpr) as u32);
-    let mut picture = login.prepare_host(extent, dpr, false, None)?;
-    if login.studio.state.visible() {
-        let (preview, resources) = login.studio.prepare_preview(extent, dpr, None)?;
-        picture.frame.draws.extend(preview.draws);
-        picture.resources.extend(resources);
-    }
-    Ok(picture)
+    let (picture, _) = studio_picture(login, extent, dpr, false, None)?;
+    capture_layered(renderer, &picture, login, path)
 }
 fn record_ledger(
     login: &mut NativeLogin,
@@ -36,39 +33,19 @@ fn record_ledger(
 ) -> Result<()> {
     for logical in [[960., 540.], [360., 640.], [960., 360.]] {
         let extent = logical.map(|n| (n * dpr) as u32);
-        let picture = login.prepare_host(extent, dpr, false, None)?;
-        let (preview, _) = login.studio.prepare_preview(extent, dpr, None)?;
-        let bytes: usize = picture.resources.iter().map(|r| r.image.pixels.len()).sum();
-        if picture.frame.draws.len() > 384
-            || preview.draws.len() > 1024
-            || picture.resources.len() > 40
-            || bytes > 8 * 1024 * 1024
-        {
+        // The egui studio's controls are shapes in the shared egui pass; the
+        // menu picture holds only the page and the preview.
+        let (picture, [preview, slots, bytes]) = studio_picture(login, extent, dpr, false, None)?;
+        if preview > 1024 || picture.frame.draws.len() > preview {
             return Err(format!(
                 "Builder working envelope exceeded: {dpr} {name} {logical:?}"
             ));
         }
-        for (namespace, slots, limit) in [(7, 8, 2 * 1024 * 1024), (8, 20, 2 * 1024 * 1024)] {
-            let group: Vec<_> = picture
-                .resources
-                .iter()
-                .filter(|r| r.asset.handle >> 60 == namespace)
-                .collect();
-            if group.len() > slots
-                || group.iter().map(|r| r.image.pixels.len()).sum::<usize>() > limit
-            {
-                return Err(format!(
-                    "Builder group allocation exceeded: {dpr} {name} namespace {namespace}"
-                ));
-            }
-        }
         ledger.push(format!(
-            "{dpr},{name},{},{},{},{},{},{bytes}",
+            "{dpr},{name},{},{},{},{preview},{slots},{bytes}",
             logical[0],
             logical[1],
-            picture.frame.draws.len(),
-            preview.draws.len(),
-            picture.resources.len()
+            login.egui.prepared_shapes().len(),
         ));
     }
     Ok(())
@@ -130,9 +107,8 @@ pub fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
             if !["saved", "restored"].contains(&stage) {
                 login.step(10010. + index as f64 * 16., false, false)?;
             }
-            let picture = picture(&mut login, [960., 540.], dpr)?;
             let path = output.join(format!("builder-{stage}-{dpr}x.png"));
-            capture(renderer, &picture, &path)?;
+            shot(renderer, &mut login, [960., 540.], dpr, &path)?;
             let image = image::open(&path).map_err(|e| e.to_string())?.to_rgba8();
             image::imageops::replace(
                 &mut strip,
@@ -155,10 +131,11 @@ pub fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
                         logical,
                     );
                 }
-                let picture = picture(&mut login, logical, dpr)?;
-                capture(
+                shot(
                     renderer,
-                    &picture,
+                    &mut login,
+                    logical,
+                    dpr,
                     &output.join(format!(
                         "builder-{name}-{}-{dpr}x.png",
                         if bottom { "actions" } else { "swatches" }
@@ -170,7 +147,7 @@ pub fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     // Numeric resource envelope includes all 39 single-colour previews, the full pattern,
     // and large/opaque retained patterns. No official art or network adapter is used.
     let mut ledger = vec![
-        "dpr,case,logical_width,logical_height,control_draws,preview_draws,menu_slots,menu_bytes"
+        "dpr,case,logical_width,logical_height,egui_shapes,preview_draws,preview_slots,preview_bytes"
             .to_owned(),
     ];
     for dpr in [1., 1.5, 2., 3., 4., 5.] {
@@ -212,10 +189,11 @@ pub fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
             record_ledger(&mut login, dpr, name, &mut ledger)?;
             if dpr <= 2. && name == "legacy-large" {
                 renderer.sync_resources(&[])?;
-                let picture = picture(&mut login, [960., 540.], dpr)?;
-                capture(
+                shot(
                     renderer,
-                    &picture,
+                    &mut login,
+                    [960., 540.],
+                    dpr,
                     &output.join(format!("builder-legacy-large-{dpr}x.png")),
                 )?;
             }

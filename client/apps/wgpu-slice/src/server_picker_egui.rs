@@ -1,12 +1,15 @@
 //! Native server picker widgets. The shared core owns layout, list windows,
 //! choices and validation; egui resources and input belong to the native host.
-use crate::{Result, egui_theme as theme};
+use crate::{
+    Result,
+    egui_panel::{self as widgets, PressGuard, available, column, label, outline, rect},
+    egui_theme as theme,
+};
 use egui::{Align, Color32, Id, Rect, Sense, Stroke, pos2, vec2};
 use slither_client::{
     menu_controls::{Activation, Control, ControlId, ControlIntent, ControlKind, PanelView},
     menu_input::TextRule,
-    menu_layout::MenuRect,
-    menu_theme::{ControlState, ControlStyle, MenuTheme, SurfaceRecipe},
+    menu_theme::{ControlState, ControlStyle, MenuTheme},
     presentation::TextStyle,
     server_picker::{ADDRESS, BACKDROP, CLOSE, SEARCH},
 };
@@ -14,31 +17,14 @@ use slither_client::{
 pub fn widget_id(id: ControlId) -> Id {
     Id::unique(("picker", id.0))
 }
-fn available(panel: &PanelView, control: &Control) -> bool {
-    panel.visible
-        && panel.enabled
-        && control.visible
-        && control.enabled
-        && !matches!(control.kind, ControlKind::Label { .. })
-}
 /// Whether `id` can hold focus in the current panel. Cached focus can lag a
 /// queued wheel scroll until redraw; a row that left the window has none.
 pub fn focusable(panel: &PanelView, id: ControlId) -> bool {
-    panel
-        .controls
-        .iter()
-        .any(|c| c.id == id && c.tab_order.is_some() && available(panel, c))
+    widgets::focusable(panel, id)
 }
 /// Tab wraps within the modal in the core's tab order, skipping disabled controls.
 pub fn focus_order(panel: &PanelView) -> Vec<Id> {
-    let mut order: Vec<_> = panel
-        .controls
-        .iter()
-        .filter(|c| available(panel, c))
-        .filter_map(|c| c.tab_order.map(|n| (n, c.id)))
-        .collect();
-    order.sort();
-    order.into_iter().map(|(_, id)| widget_id(id)).collect()
+    widgets::focus_order(panel, widget_id)
 }
 pub fn rule(field: ControlId) -> Option<TextRule> {
     match field {
@@ -47,13 +33,6 @@ pub fn rule(field: ControlId) -> Option<TextRule> {
         _ => None,
     }
 }
-fn rect(r: MenuRect) -> Rect {
-    Rect::from_min_size(
-        pos2(r.x as f32, r.y as f32),
-        vec2(r.width as f32, r.height as f32),
-    )
-}
-
 #[derive(Default)]
 pub struct PickerUi {
     pub address: String,
@@ -64,11 +43,7 @@ pub struct PickerUi {
     composition: Option<(ControlId, theme::Composition)>,
     request_focus: Option<ControlId>,
     generation: Option<u64>,
-    /// The primary button was down at the end of the last pass.
-    primary_down: bool,
-    /// A primary press held across a generation change: its release must not
-    /// click whatever control now reuses the pressed ID.
-    stale_press: bool,
+    press: PressGuard,
 }
 impl PickerUi {
     pub fn focused(&self) -> Option<ControlId> {
@@ -148,24 +123,9 @@ impl PickerUi {
         if self.generation != Some(panel.generation) {
             self.generation = Some(panel.generation);
             self.request_focus = panel.initial_focus;
-            self.stale_press |= self.primary_down;
+            self.press.invalidate();
         }
-        // Only the release of that press is suppressed: any primary edge ends
-        // it, so a fresh press starts a new click. Other buttons never count.
-        let mut suppress = false;
-        ctx.input(|i| {
-            for event in &i.events {
-                if let egui::Event::PointerButton {
-                    button: egui::PointerButton::Primary,
-                    pressed,
-                    ..
-                } = event
-                {
-                    suppress |= !*pressed && self.stale_press;
-                    self.stale_press = false;
-                }
-            }
-        });
+        let suppress = self.press.suppress(ctx);
         let focused = ctx.memory(|m| m.focused()).and_then(|id| {
             panel
                 .controls
@@ -323,12 +283,7 @@ impl PickerUi {
         {
             self.cancel_composition(ctx);
         }
-        // Resyncing with egui also retires a press the host cancelled (resize,
-        // focus loss) without delivering its release.
-        self.primary_down = ctx.input(|i| i.pointer.button_down(egui::PointerButton::Primary));
-        if !self.primary_down {
-            self.stale_press = false;
-        }
+        self.press.settle(ctx);
         if interactive {
             ctx.input(|i| {
                 for event in &i.events {
@@ -367,13 +322,7 @@ impl PickerUi {
         let id = widget_id(control.id);
         match &control.kind {
             ControlKind::Surface => {
-                let surface = tokens.surface(control.style, ControlState::Idle);
-                let radius = f32::from(surface.radius) * scale;
-                compact_shadow(ui, r, radius, scale);
-                ui.painter()
-                    .rect_filled(r, radius, theme::ink(surface.colors[0]));
-                // Blank panel space shields the backdrop without taking focus.
-                ui.interact(r, id, Sense::CLICK);
+                widgets::surface(ui, control, r, scale, id, tokens);
                 None
             }
             ControlKind::Label { text: value } => {
@@ -440,44 +389,17 @@ impl PickerUi {
                 }
                 Some(response)
             }
-            ControlKind::Button { label: text } => {
-                let response = ui.interact(r, id, Sense::click());
-                response.widget_info(|| {
-                    egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), text)
-                });
-                let surface = tokens.surface(control.style, ControlState::Idle);
-                let radius = if surface.recipe == SurfaceRecipe::StudioButton {
-                    r.height() / 2.
-                } else {
-                    f32::from(surface.radius) * scale
-                };
-                compact_shadow(ui, r, radius, scale);
-                let colors = surface.colors.map(|rgb| {
-                    let color = theme::ink(rgb);
-                    // Compact actions dim their surface, not their label, while pressed.
-                    if response.is_pointer_button_down_on() {
-                        color.gamma_multiply(0.75)
-                    } else {
-                        color
-                    }
-                });
-                theme::capsule(ui, r, colors, 1.);
-                label(
-                    ui.painter(),
-                    text,
-                    r.shrink2(vec2(
-                        slither_client::menu_theme::STUDIO_ACTION_PADDING_X as f32 * scale,
-                        0.,
-                    )),
-                    style,
-                    Align::Center,
-                    control.style != ControlStyle::StudioAction,
-                );
-                if response.has_focus() && self.keyboard_focus && ui.is_enabled() {
-                    outline(ui, r, radius, tokens);
-                }
-                Some(response)
-            }
+            ControlKind::Button { label: text } => Some(widgets::button(
+                ui,
+                control,
+                text,
+                r,
+                scale,
+                style,
+                id,
+                self.keyboard_focus,
+                tokens,
+            )),
             ControlKind::ListRow {
                 label: name,
                 detail,
@@ -571,56 +493,4 @@ impl PickerUi {
             _ => None,
         }
     }
-}
-
-/// The retained toolkit's compact shadow: shifted 3px down with a short falloff.
-fn compact_shadow(ui: &egui::Ui, r: Rect, radius: f32, scale: f32) {
-    ui.painter().add(
-        egui::epaint::Shadow {
-            offset: [0, (3. * scale).round() as i8],
-            blur: (8. * scale).round() as u8,
-            spread: 0,
-            color: Color32::from_black_alpha(150),
-        }
-        .as_shape(r, radius.min(255.) as u8),
-    );
-}
-
-/// One logical-pixel keyboard-focus ring, kept inside the hit box.
-fn outline(ui: &egui::Ui, r: Rect, radius: f32, tokens: MenuTheme) {
-    ui.painter().rect_stroke(
-        r.shrink(1.),
-        (radius - 1.).max(0.),
-        Stroke::new(1., theme::ink(tokens.text)),
-        egui::StrokeKind::Inside,
-    );
-}
-
-/// Row columns crop to their own box; other labels crop only to the panel.
-fn column(ui: &egui::Ui, value: &str, r: Rect, style: TextStyle, align: Align) {
-    let painter = ui.painter().with_clip_rect(r.intersect(ui.clip_rect()));
-    label(&painter, value, r, style, align, false);
-}
-
-fn label(painter: &egui::Painter, value: &str, r: Rect, style: TextStyle, align: Align, fit: bool) {
-    if value.is_empty() {
-        return;
-    }
-    let family = theme::family(style);
-    let color = theme::ink(style.color);
-    let mut galley = painter.layout_no_wrap(
-        value.into(),
-        egui::FontId::new(style.size as f32, family.clone()),
-        color,
-    );
-    if fit && galley.size().x > r.width() && r.width() > 0. {
-        let size = style.size as f32 * r.width() / galley.size().x;
-        galley = painter.layout_no_wrap(value.into(), egui::FontId::new(size, family), color);
-    }
-    let x = match align {
-        Align::Min => r.left(),
-        Align::Center => r.center().x - galley.size().x / 2.,
-        Align::Max => r.right() - galley.size().x,
-    };
-    painter.galley(pos2(x, r.center().y - galley.size().y / 2.), galley, color);
 }

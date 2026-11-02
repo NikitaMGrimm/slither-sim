@@ -22,16 +22,17 @@ Committed edits keep their undo history without provisional candidates. Windows
 clipboard access uses the existing clipboard dependency, since egui-winit's
 optional system clipboard is disabled.
 
-Settings and the [server picker](server-picker.md) share the egui context during
-their fades; login paints below them without input. Skin studio and the
-champion editor keep their old-toolkit panels and input adapters, but egui
-still paints the login below them in a paint-only host mode; the desktop host
-presents their draws in a layer above egui. No screen transition swaps the
-login's renderer, so its text never shifts by the ~1–2 px the two renderers
-place text apart. On native non-Linux hosts (the app tests and specimen tool
-are not built on Linux), `menu_specimens OUTPUT --underlay` renders that order
-offscreen for the studio entering and open; elsewhere it fails rather than
-writing other specimens. The outgoing login fade still paints while gameplay owns
+Settings, the [server picker](server-picker.md) and the
+[skin studio](skin-studio.md) share the egui context during their fades; login
+paints below them without input. The champion editor keeps its old-toolkit
+panel and input adapter, but egui still paints the login below it in a
+paint-only host mode; the desktop host presents its draws, and the studio's
+preview snake, in a layer above egui. No screen transition swaps the login's
+renderer, so its text never shifts by the ~1–2 px the two renderers place text
+apart. On native non-Linux hosts (the app tests and specimen tool are not built
+on Linux), `menu_specimens OUTPUT --studio` renders that order offscreen for
+the studio entering and open over the settled login; elsewhere it fails rather
+than writing other specimens. The outgoing login fade still paints while gameplay owns
 steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.

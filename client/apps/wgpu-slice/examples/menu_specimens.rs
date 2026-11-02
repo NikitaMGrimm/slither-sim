@@ -200,19 +200,6 @@ async fn run(output: &Path) -> Result<()> {
         return focus::specimens(&mut renderer, output).await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    if std::env::args().nth(2).as_deref() == Some("--cosmetics") {
-        let directory = std::env::args_os()
-            .nth(3)
-            .ok_or("Authored local art directory required")?;
-        return cosmetics_studio::specimens(&mut renderer, output, Path::new(&directory)).await;
-    }
-    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    if std::env::args().nth(2).as_deref() == Some("--studio-panel") {
-        let reference = std::env::args_os().nth(3);
-        return studio_panel::specimens(&mut renderer, output, reference.as_deref().map(Path::new))
-            .await;
-    }
-    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--login") {
         if std::env::args_os().nth(3).is_some() {
             return Err("--login no longer accepts an art directory".into());
@@ -236,17 +223,13 @@ async fn run(output: &Path) -> Result<()> {
         return server_picker::specimens(&mut renderer, output).await;
     }
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-    if std::env::args().nth(2).as_deref() == Some("--underlay") {
-        return underlay_specimens(output, &mut renderer);
+    if std::env::args().nth(2).as_deref() == Some("--studio") {
+        return studio_specimens(&mut renderer, output);
     }
     // The native login host is not built here; never substitute default specimens.
     #[cfg(any(target_arch = "wasm32", target_os = "linux"))]
-    if std::env::args().nth(2).as_deref() == Some("--underlay") {
-        return Err("--underlay needs the native login host (not built on Linux or wasm)".into());
-    }
-    #[cfg(not(target_os = "linux"))]
     if std::env::args().nth(2).as_deref() == Some("--studio") {
-        return studio_specimens(&mut renderer, output);
+        return Err("--studio needs the native login host (not built on Linux or wasm)".into());
     }
     if std::env::args().nth(2).as_deref() == Some("--champion") {
         use slither_client::{
@@ -516,16 +499,48 @@ fn settings_trial(output: &Path, renderer: &mut Renderer) -> Result<()> {
     Ok(())
 }
 #[cfg(not(target_os = "linux"))]
+/// The studio as the desktop host presents it: page, egui login and studio,
+/// then the preview in the top layer.
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+fn studio_picture(
+    login: &mut slither_wgpu_slice::login_native::NativeLogin,
+    extent: [u32; 2],
+    dpr: f64,
+    admission: bool,
+    art: Option<&mut Cosmetics>,
+) -> Result<(MenuFrame, [usize; 3])> {
+    let logical = extent.map(|n| f64::from(n) / dpr);
+    let art = match art {
+        Some(art) => {
+            login.studio.sync_art(logical, Some(&mut *art))?;
+            Some(&*art)
+        }
+        None => None,
+    };
+    let mut picture = login.prepare_host(extent, dpr, admission, art)?;
+    let mut preview = [0; 3];
+    if login.studio.state.visible() {
+        let (frame, resources) = login.studio.prepare_preview(extent, dpr, art)?;
+        preview = [
+            frame.draws.len(),
+            resources.len(),
+            resources.iter().map(|r| r.image.pixels.len()).sum(),
+        ];
+        picture.frame.draws.extend(frame.draws);
+        picture.resources.extend(resources);
+    }
+    Ok((picture, preview))
+}
+
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     use slither_client::{
         presentation::{FaceGeometry, resolve_skin},
         skin_studio::*,
     };
-    use slither_wgpu_slice::{
-        login_native::NativeLogin, menu_storage::MenuStorage, skin_studio_native::SkinStudioNative,
-    };
+    use slither_wgpu_slice::{login_native::NativeLogin, menu_storage::MenuStorage};
     let png = synthetic_icon([180, 100, 210, 255])?;
-    let full = Cosmetics::load(
+    let mut full = Cosmetics::load(
         |path| {
             if slither_wgpu_slice::cosmetics::BackgroundArt::ALL
                 .iter()
@@ -539,83 +554,59 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
         },
         None,
     )?;
-    let mut ledger = vec!["dpr,skin,art,clock_ms,control_draws,preview_draws,menu_slots,menu_bytes,text_slots,text_bytes,preview_slots,preview_bytes".to_owned()];
-    let mut menu = Menu::default();
-    let mut text = TextCache::menu();
-    let mut controls = slither_client::menu_controls::PanelInputState::default();
-    let mut edit = slither_client::menu_input::MenuInputState::default();
-    let mut scroll = Default::default();
-    let mut studio = SkinStudioNative::new(AppearanceRecord::default(), MenuStorage::at(None))?;
+    let mut ledger = vec![
+        "dpr,skin,art,clock_ms,egui_shapes,egui_textures,preview_draws,preview_slots,preview_bytes"
+            .to_owned(),
+    ];
     for scale in [1., 1.5, 2., 3., 4., 5.] {
         let extent = [(960. * scale) as u32, (540. * scale) as u32];
         for skin in 0..=65 {
-            for (art, sources) in [("fallback", None), ("synthetic-ready", Some(&full))] {
-                studio.state = StudioState::new(AppearanceRecord {
-                    builtin: skin,
-                    ..Default::default()
-                })
-                .map_err(str::to_owned)?;
-                studio.step(0.);
-                studio.open(true);
+            for art in ["fallback", "synthetic-ready"] {
+                // Each fixture owns a fresh login and handle allocators.
+                renderer.sync_resources(&[])?;
+                let mut login = NativeLogin::with_preferences(
+                    AppearanceRecord {
+                        builtin: skin,
+                        ..Default::default()
+                    },
+                    MenuStorage::at(None),
+                )?;
+                login.step(0., false, false)?;
+                login.open_studio();
                 for time in [0., 230., 355., 730.] {
-                    studio.step(time);
-                    let (preview, resources) = studio.prepare_preview(extent, scale, sources)?;
-                    let panel = studio.state.panel([960., 540.], &studio.status);
-                    controls.sync(&panel, &mut edit);
-                    let mut picture = menu.prepare_panel(
-                        &mut text,
-                        &panel,
-                        &controls,
-                        &edit,
-                        &mut scroll,
-                        Default::default(),
-                        extent,
-                        scale,
-                    )?;
-                    let menu_slots = picture.resources.len();
-                    let menu_bytes: usize =
-                        picture.resources.iter().map(|r| r.image.pixels.len()).sum();
-                    let text_sources: Vec<_> = picture
-                        .resources
-                        .iter()
-                        .filter(|r| r.asset.handle >> 60 == 8)
-                        .collect();
-                    let text_bytes: usize = text_sources.iter().map(|r| r.image.pixels.len()).sum();
-                    ledger.push(format!("{scale},{skin},{art},{time},{},{},{menu_slots},{menu_bytes},{},{text_bytes},{},{}",
-                        picture.frame.draws.len(),preview.draws.len(),text_sources.len(),resources.len(),resources.iter().map(|r|r.image.pixels.len()).sum::<usize>()));
-                    if picture.frame.draws.len() > 384
-                        || preview.draws.len() > 1024
-                        || menu_slots > 40
-                        || menu_bytes > 8 * 1024 * 1024
-                        || text_sources.len() > 20
-                        || text_bytes > 2 * 1024 * 1024
-                    {
-                        return Err("Studio working allocation exceeded".into());
+                    login.step(time, false, false)?;
+                    let sources = (art != "fallback").then_some(&mut full);
+                    let (picture, [preview, slots, bytes]) =
+                        studio_picture(&mut login, extent, scale, false, sources)?;
+                    let textures = login
+                        .egui
+                        .context()
+                        .map_or(0, |c| c.tex_manager().read().num_allocated());
+                    ledger.push(format!(
+                        "{scale},{skin},{art},{time},{},{textures},{preview},{slots},{bytes}",
+                        login.egui.prepared_shapes().len(),
+                    ));
+                    if preview > 1024 {
+                        return Err("Studio preview allowance exceeded".into());
                     }
                     let requested = resolve_skin(skin, &[], false).map_err(|e| e.to_string())?;
                     let special =
                         requested.antenna.is_some() || requested.face != FaceGeometry::default();
                     if scale <= 2. && time == 730. && (skin == 0 || skin == 65 || special) {
-                        let page = MenuFrame::world_crossfade(extent, scale, 0.)?;
-                        picture.backdrop = page.backdrop;
-                        picture.resources.extend(page.resources);
-                        picture.frame.draws.extend(preview.draws);
-                        picture.resources.extend(resources);
-                        capture(
+                        capture_layered(
                             renderer,
                             &picture,
+                            &mut login,
                             &output.join(format!("studio-{skin:02}-{art}-{scale}x.png")),
                         )?;
                     }
-                    studio.presented();
+                    login.studio.presented();
                 }
             }
         }
     }
     std::fs::write(output.join("dpr-ledger.csv"), ledger.join("\n") + "\n")
         .map_err(|e| e.to_string())?;
-    // New fixture owners restart their handle allocators. Retire the previous
-    // fixture before reusing that namespace, as a new host would.
     renderer.sync_resources(&[])?;
     let mut login = NativeLogin::new("Player")?;
     for now in (0..=9600).step_by(16) {
@@ -632,14 +623,9 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
             login.studio.state.cancel(9830.);
         }
         login.step(9600. + time, false, false)?;
-        let mut picture = login.prepare_host([960, 540], 1., false, None)?;
-        if login.studio.state.visible() {
-            let (preview, resources) = login.studio.prepare_preview([960, 540], 1., None)?;
-            picture.frame.draws.extend(preview.draws);
-            picture.resources.extend(resources);
-        }
+        let (picture, _) = studio_picture(&mut login, [960, 540], 1., false, None)?;
         let path = output.join(format!("transition-{time:03}ms.png"));
-        capture(renderer, &picture, &path)?;
+        capture_layered(renderer, &picture, &mut login, &path)?;
         login.studio.presented();
         let frame = image::open(&path).map_err(|e| e.to_string())?.to_rgba8();
         image::imageops::replace(
@@ -657,13 +643,11 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
     narrow.step(0., false, false)?;
     narrow.open_studio();
     narrow.step(230., false, false)?;
-    let mut picture = narrow.prepare_host([360, 640], 1., false, None)?;
-    let (preview, resources) = narrow.studio.prepare_preview([360, 640], 1., None)?;
-    picture.frame.draws.extend(preview.draws);
-    picture.resources.extend(resources);
-    capture(
+    let (picture, _) = studio_picture(&mut narrow, [360, 640], 1., false, None)?;
+    capture_layered(
         renderer,
         &picture,
+        &mut narrow,
         &output.join("studio-narrow-360x640.png"),
     )?;
     for (name, logical) in [("narrow", [360., 640.]), ("short-wide", [960., 360.])] {
@@ -675,18 +659,48 @@ fn studio_specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
             login.step(230., false, false)?;
             login.studio.status = "Saved for this run".into();
             let extent = logical.map(|n| (n * scale) as u32);
-            let mut picture = login.prepare_host(extent, scale, false, None)?;
-            let (preview, resources) = login.studio.prepare_preview(extent, scale, None)?;
-            picture.frame.draws.extend(preview.draws);
-            picture.resources.extend(resources);
-            capture(
+            let (picture, _) = studio_picture(&mut login, extent, scale, false, None)?;
+            capture_layered(
                 renderer,
                 &picture,
+                &mut login,
                 &output.join(format!("studio-{name}-status-{scale}x.png")),
             )?;
         }
     }
-    std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
+    // Entry over the settled login, as the login's egui pass composes it.
+    for (extent, dpr) in [([960, 720], 1.), ([1440, 1080], 1.5), ([1920, 1440], 2.)] {
+        renderer.sync_resources(&[])?;
+        let mut login = NativeLogin::new("Player")?;
+        for now in (0..=9600).step_by(16) {
+            login.step(now as f64, true, false)?;
+        }
+        login.prepare_host(extent, dpr, true, None)?;
+        let (picture, _) = studio_picture(&mut login, extent, dpr, true, None)?;
+        capture_layered(
+            renderer,
+            &picture,
+            &mut login,
+            &output.join(format!("login-{dpr}x.png")),
+        )?;
+        login.open_studio();
+        let mut now = 9616;
+        for (name, alpha) in [("entering", 0.5), ("open", 1.)] {
+            while login.studio.state.alpha() < alpha {
+                login.step(f64::from(now), true, false)?;
+                now += 16;
+            }
+            let (picture, _) = studio_picture(&mut login, extent, dpr, true, None)?;
+            capture_layered(
+                renderer,
+                &picture,
+                &mut login,
+                &output.join(format!("studio-{name}-{dpr}x.png")),
+            )?;
+            login.studio.presented();
+        }
+    }
+    std::fs::write(output.join("README.txt"),"Authored offline specimens; no windows, sockets or official art. Synthetic-ready bulbs and decorations are placeholder images.\nThe studio is egui, composed as the desktop host presents it: page, egui login and studio, then the preview above them.\nLogical 960x540 at DPR 1, 1.5, 2. Numeric ledger additionally covers DPR 3, 4, 5.\nStrip: row 1 entry at 0,58,115,230 ms; row 2 return at 288,345,459,460 ms; Cancel at 230 ms.\nlogin/studio-entering/studio-open: 960x720 logical over the settled login at DPR 1, 1.5, 2.\nOwner appearance, physical input, display pacing and server acceptance are unverified.\n").map_err(|e|e.to_string())?;
     Ok(())
 }
 /// Authored string/raster probes and the production menu at frozen core times.
@@ -885,14 +899,6 @@ mod tests {
 mod builder;
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-#[path = "menu_specimens/studio_panel.rs"]
-mod studio_panel;
-
-#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-#[path = "menu_specimens/cosmetics.rs"]
-mod cosmetics_studio;
-
-#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[path = "menu_specimens/focus.rs"]
 mod focus;
 
@@ -924,11 +930,11 @@ fn capture_settings(
     .map_err(|e| e.to_string())
 }
 
-/// The desktop host's order below an old-toolkit screen: page, world cover,
-/// egui login, then that screen's draws above it. These login-only specimens
-/// have no game world between the page and its cover.
+/// The desktop host's layer order: page, world cover, egui, then the top
+/// layer (the studio preview) above it. These login-only specimens have no
+/// game world between the page and its cover.
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-fn capture_underlay(
+fn capture_layered(
     renderer: &mut Renderer,
     picture: &MenuFrame,
     login: &mut slither_wgpu_slice::login_native::NativeLogin,
@@ -957,52 +963,6 @@ fn capture_underlay(
         image::ColorType::Rgba8,
     )
     .map_err(|e| e.to_string())
-}
-
-/// Skin studio entry over the egui login, mid-fade and open, as presented.
-#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
-fn underlay_specimens(output: &Path, renderer: &mut Renderer) -> Result<()> {
-    use slither_wgpu_slice::login_native::NativeLogin;
-    for (extent, dpr) in [([960, 720], 1.), ([1440, 1080], 1.5)] {
-        // A new login restarts its handle allocators; drop the previous pass's resources.
-        renderer.sync_resources(&[])?;
-        let mut login = NativeLogin::new("Player")?;
-        for now in (0..=9600).step_by(16) {
-            login.step(now as f64, true, false)?;
-        }
-        login.prepare_host(extent, dpr, true, None)?;
-        let picture = login.prepare_host(extent, dpr, true, None)?;
-        capture_settings(
-            renderer,
-            &picture,
-            &mut login,
-            &output.join(format!("login-{dpr}x.png")),
-        )?;
-        login.open_studio();
-        let mut now = 9616;
-        for (name, alpha) in [("entering", 0.5), ("open", 1.)] {
-            while login.studio.state.alpha() < alpha {
-                login.step(f64::from(now), true, false)?;
-                now += 16;
-            }
-            let mut picture = login.prepare_host(extent, dpr, true, None)?;
-            if !login.egui.paint_only() {
-                return Err("The studio must keep the egui login below it".into());
-            }
-            // As on the desktop path, the preview presents with the studio above egui.
-            let (preview, resources) = login.studio.prepare_preview(extent, dpr, None)?;
-            picture.frame.draws.extend(preview.draws);
-            picture.resources.extend(resources);
-            capture_underlay(
-                renderer,
-                &picture,
-                &mut login,
-                &output.join(format!("studio-{name}-{dpr}x.png")),
-            )?;
-            login.studio.presented();
-        }
-    }
-    Ok(())
 }
 
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
