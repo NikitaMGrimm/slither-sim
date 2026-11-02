@@ -277,6 +277,27 @@ fn rect_finite(r: BodyRect) -> bool {
         .all(f64::is_finite)
 }
 
+fn same_rect_bits(a: BodyRect, b: BodyRect) -> bool {
+    [a.x, a.y, a.width, a.height].map(f64::to_bits)
+        == [b.x, b.y, b.width, b.height].map(f64::to_bits)
+}
+
+fn same_projection(a: &Draw, b: &Draw) -> bool {
+    let same_optional_rect = |a, b| match (a, b) {
+        (Some(a), Some(b)) => same_rect_bits(a, b),
+        (None, None) => true,
+        _ => false,
+    };
+    same_rect_bits(a.destination, b.destination)
+        && a.asset == b.asset
+        && same_optional_rect(a.source, b.source)
+        && same_optional_rect(a.repeat_uv, b.repeat_uv)
+        && a.rotation.to_bits() == b.rotation.to_bits()
+        && a.translation.map(f64::to_bits) == b.translation.map(f64::to_bits)
+        && a.corners.map(|p| p.map(|v| v.map(f64::to_bits)))
+            == b.corners.map(|p| p.map(|v| v.map(f64::to_bits)))
+}
+
 impl Frame {
     pub fn check_limits(&self) -> Result<()> {
         check_draw_count(self.draws.len())?;
@@ -302,6 +323,12 @@ impl Frame {
         resident: &'a BTreeMap<ResourceKey, BodyAsset>,
     ) -> Result<impl Iterator<Item = Result<Quad>> + 'a> {
         self.check_limits()?;
+        // A frame and its resident catalog are immutable for this iterator.
+        // Paired pellet draws differ only in alpha; retain the last validated
+        // projection rather than repeating resource checks and f64 conversion.
+        // Bit comparisons preserve signed-zero distinctions in the input math.
+        // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
+        let mut previous: Option<(&Draw, Quad)> = None;
         Ok(self
             .draws
             .iter()
@@ -310,7 +337,21 @@ impl Frame {
             } else {
                 self.draws.len()
             })
-            .map(|d| {
+            .map(move |d| {
+                if let Some((last, projected)) = &previous
+                    && same_projection(last, d)
+                {
+                    if !(0. ..=1.).contains(&d.effective_alpha) {
+                        return Err("unsupported or invalid image rectangle/alpha/transform".into());
+                    }
+                    let mut next = projected.clone();
+                    for vertex in &mut next.vertices {
+                        vertex[4] = d.effective_alpha as f32;
+                    }
+                    next.black_effect = d.black_effect;
+                    next.blend = d.blend;
+                    return Ok(next);
+                }
                 let key = ResourceKey::from(d.asset);
                 if d.asset.status != BodyAssetStatus::Ready
                     || d.asset.width == 0
@@ -384,7 +425,7 @@ impl Frame {
                     }
                     corners[i] = values.map(|v| v as f32);
                 }
-                Ok(Quad {
+                let projected = Quad {
                     key,
                     repeat: d.repeat_uv.is_some(),
                     black_effect: d.black_effect,
@@ -392,7 +433,9 @@ impl Frame {
                     vertices: [
                         corners[0], corners[1], corners[2], corners[0], corners[2], corners[3],
                     ],
-                })
+                };
+                previous = Some((d, projected.clone()));
+                Ok(projected)
             }))
     }
 }
@@ -400,6 +443,183 @@ impl Frame {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repeated_projection_matches_fresh_conversion_bit_for_bit() {
+        // ORIGINAL SYNTHETIC rectangles; singleton iterators always take the uncached path.
+        let asset = BodyAsset {
+            handle: 1,
+            revision: 1,
+            width: 64,
+            height: 32,
+            status: BodyAssetStatus::Ready,
+        };
+        let draw = Draw {
+            corners: None,
+            asset,
+            source: None,
+            repeat_uv: None,
+            black_effect: false,
+            destination: BodyRect {
+                x: -7.,
+                y: 9.,
+                width: 40.,
+                height: 24.,
+            },
+            translation: [3., -5.],
+            rotation: 0.3,
+            effective_alpha: 0.4,
+            blend: BodyBlend::SourceOver,
+        };
+        let resident = BTreeMap::from([(asset.into(), asset)]);
+        let mut positive_zero = draw.clone();
+        positive_zero.rotation = 0.;
+        let mut negative_zero = positive_zero.clone();
+        negative_zero.rotation = -0.;
+        assert!(!same_projection(&positive_zero, &negative_zero));
+        let frame = Frame {
+            identity: 1,
+            extent: [960, 540],
+            viewport_scale: 1.25,
+            tick: 0,
+            draws: vec![],
+            snakes: vec![],
+        };
+        let check = |draws: Vec<Draw>, extent, viewport_scale, resident: &BTreeMap<_, _>| {
+            let f = Frame {
+                draws,
+                extent,
+                viewport_scale,
+                ..frame.clone()
+            };
+            let cached = f.quad_iter(resident).unwrap();
+            for (d, actual) in f.draws.iter().zip(cached) {
+                let singleton = Frame {
+                    draws: vec![d.clone()],
+                    ..f.clone()
+                };
+                let expected = singleton.quad_iter(resident).unwrap().next().unwrap();
+                match (actual, expected) {
+                    (Ok(a), Ok(b)) => {
+                        assert_eq!(
+                            (a.key, a.repeat, a.black_effect, a.blend),
+                            (b.key, b.repeat, b.black_effect, b.blend)
+                        );
+                        assert_eq!(
+                            a.vertices.map(|v| v.map(f32::to_bits)),
+                            b.vertices.map(|v| v.map(f32::to_bits))
+                        );
+                    }
+                    (Err(a), Err(b)) => assert_eq!(a, b),
+                    other => panic!("cached/fresh mismatch: {other:?}"),
+                }
+            }
+        };
+        let mut geometries = vec![draw.clone()];
+        let mut cropped = draw.clone();
+        cropped.source = Some(BodyRect {
+            x: 2.,
+            y: 3.,
+            width: 12.,
+            height: 8.,
+        });
+        geometries.push(cropped);
+        let mut repeated = draw.clone();
+        repeated.repeat_uv = Some(BodyRect {
+            x: -0.2,
+            y: 1.4,
+            width: 3.,
+            height: 2.,
+        });
+        geometries.push(repeated);
+        let mut polygon = draw.clone();
+        polygon.corners = Some([[-0., 1.], [20., 2.], [17., 30.], [-3., 19.]]);
+        geometries.push(polygon);
+        for geometry in geometries {
+            let mut draws = vec![geometry.clone()];
+            for alpha in [0., -0., 1., 0.125, f64::NAN, f64::INFINITY, -0.1, 1.1, 0.5] {
+                let mut d = geometry.clone();
+                d.effective_alpha = alpha;
+                d.black_effect = true;
+                d.blend = BodyBlend::Lighter;
+                draws.push(d);
+            }
+            check(draws, frame.extent, frame.viewport_scale, &resident);
+        }
+        let mut packed = Vec::new();
+        for i in 0..512 {
+            let mut d = draw.clone();
+            d.destination.x = f64::from(i % 32) * 0.25;
+            d.destination.y = f64::from(i / 32) * 0.25;
+            d.blend = BodyBlend::Lighter;
+            packed.push(d.clone());
+            d.effective_alpha = f64::from(i % 17) / 16.;
+            packed.push(d);
+        }
+        check(packed, frame.extent, frame.viewport_scale, &resident);
+        let mutations: &[fn(&mut Draw)] = &[
+            |d| d.destination.x = -0.,
+            |d| d.destination.y += 1.,
+            |d| d.destination.width += 1.,
+            |d| d.destination.height = 0.,
+            |d| d.translation[0] = -0.,
+            |d| d.translation[1] += 1.,
+            |d| d.rotation = -0.,
+            |d| d.asset.revision += 1,
+            |d| d.asset.handle += 1,
+            |d| d.asset.width += 1,
+            |d| d.asset.height = 0,
+            |d| d.asset.status = BodyAssetStatus::Pending,
+            |d| {
+                d.source = Some(BodyRect {
+                    x: 64.,
+                    y: 0.,
+                    width: 1.,
+                    height: 1.,
+                })
+            },
+            |d| {
+                d.repeat_uv = Some(BodyRect {
+                    x: 0.,
+                    y: 0.,
+                    width: -1.,
+                    height: 1.,
+                })
+            },
+            |d| d.destination.width = -1.,
+            |d| d.destination.x = f64::NAN,
+            |d| d.translation[0] = f64::INFINITY,
+            |d| d.rotation = f64::NAN,
+            |d| d.destination.x = f64::MAX,
+            |d| d.corners = Some([[f64::NAN; 2]; 4]),
+        ];
+        for mutate in mutations {
+            let mut changed = draw.clone();
+            mutate(&mut changed);
+            check(
+                vec![draw.clone(), changed, draw.clone()],
+                frame.extent,
+                1.25,
+                &resident,
+            );
+        }
+        for (extent, scale) in [([320, 240], 2.), ([1920, 1080], 0.5)] {
+            check(vec![draw.clone(), draw.clone()], extent, scale, &resident);
+        }
+        let missing = BTreeMap::new();
+        check(
+            vec![draw.clone(), draw.clone()],
+            frame.extent,
+            1.25,
+            &missing,
+        );
+        let empty = Frame {
+            extent: [0, 0],
+            draws: vec![draw],
+            ..frame
+        };
+        assert_eq!(empty.quad_iter(&resident).unwrap().count(), 0);
+    }
     #[test]
     fn strict_validation_returns_errors_and_release_skips_and_recovers() {
         assert!(DrawDiagnostics::default().strict_validation);

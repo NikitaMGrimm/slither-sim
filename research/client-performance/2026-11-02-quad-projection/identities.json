@@ -1,0 +1,107 @@
+{
+  "base": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+  "access": "Restricted owner-local input and raw outputs; only bounded aggregate results published.",
+  "input_sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43",
+  "driver_sha256": "8d856af01a5f58872289f5eb10846c1f2a89a2426cee4d913efd9d041edc7637",
+  "runner_sha256": "9fe783fb16a4242f1bae9eb843b0771cc7f9940268da0ee55a12fe2e6361577d",
+  "arms": {
+    "control": {
+      "binary_sha256": "b8a881bb56a23efd4a830f5937e86a758ef590af7724b78ff31e58e91cda9e1d",
+      "measured_frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
+      "final_frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
+      "runtime_sha256": "974662291ec34cec1b22f794e7d13ed4b2293b25ab2aa75c48e68e10cc2a973f",
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
+        "client/src/presentation/client.rs": "2f53021732295d393f1a952be0a3afdbddf870720801e2a5c8962b90f2b73f2a",
+        "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
+        "client/apps/wgpu-slice/src/game.rs": "9ef1df01c1d15324f55d0ab296952a0c177740c1ea1c58daf6725ec06b1d6337",
+        "client/apps/wgpu-slice/src/bank.rs": "e69957796c9bf6d944bcf3e3be5ad51a75709fe1b201087195242ae9471958e8",
+        "client/apps/wgpu-slice/src/gpu.rs": "b076bc1abcc749a18d4c75f11d6faf736646c36297e53d174f7177f91cf83040",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "8d856af01a5f58872289f5eb10846c1f2a89a2426cee4d913efd9d041edc7637"
+      }
+    },
+    "candidate": {
+      "binary_sha256": "234f08022bbd284460a007f6533997da852f5a29bea7530526f9b621f32b4e80",
+      "measured_frame_source_sha256": "6f5632ac06df6ba7f4a656b6cbc6241d8946a919b00ba053c3eed584ec75da85",
+      "final_frame_source_sha256": "86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee",
+      "runtime_sha256": "093ca1f06a721737e1e3722e8ea7faa9545e5554ea4fa7e5c2c06f1b9711f8c2",
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "6ff1d514584161627c802ff0b31eaca9aefd0c918c590f65035e9512d260b275",
+        "client/src/presentation/client.rs": "2f53021732295d393f1a952be0a3afdbddf870720801e2a5c8962b90f2b73f2a",
+        "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
+        "client/apps/wgpu-slice/src/game.rs": "9ef1df01c1d15324f55d0ab296952a0c177740c1ea1c58daf6725ec06b1d6337",
+        "client/apps/wgpu-slice/src/bank.rs": "e69957796c9bf6d944bcf3e3be5ad51a75709fe1b201087195242ae9471958e8",
+        "client/apps/wgpu-slice/src/gpu.rs": "b076bc1abcc749a18d4c75f11d6faf736646c36297e53d174f7177f91cf83040",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "6373b77dada3ec13ac9467409daba372aa89a211b04b6c4ce68c23cb0494cb65",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "8d856af01a5f58872289f5eb10846c1f2a89a2426cee4d913efd9d041edc7637"
+      }
+    }
+  },
+  "parity": {
+    "default": {
+      "control": {
+        "binary_sha256": "b8a881bb56a23efd4a830f5937e86a758ef590af7724b78ff31e58e91cda9e1d",
+        "frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "4890089c3256d5b3",
+        "quad_digest": "6e886002677d8939",
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0"
+      },
+      "candidate": {
+        "binary_sha256": "234f08022bbd284460a007f6533997da852f5a29bea7530526f9b621f32b4e80",
+        "frame_source_sha256": "6f5632ac06df6ba7f4a656b6cbc6241d8946a919b00ba053c3eed584ec75da85",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "4890089c3256d5b3",
+        "quad_digest": "6e886002677d8939",
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0"
+      }
+    },
+    "whole_map": {
+      "control": {
+        "binary_sha256": "b8a881bb56a23efd4a830f5937e86a758ef590af7724b78ff31e58e91cda9e1d",
+        "frame_source_sha256": "d7350bc119b51717ac0ed0a76911c6eb3e33e65c3468f16bcf6d64768fb9e9bd",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "97d4e2489152d63c",
+        "quad_digest": "003b7f4e45cb2dbc",
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa"
+      },
+      "candidate": {
+        "binary_sha256": "234f08022bbd284460a007f6533997da852f5a29bea7530526f9b621f32b4e80",
+        "frame_source_sha256": "6f5632ac06df6ba7f4a656b6cbc6241d8946a919b00ba053c3eed584ec75da85",
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "output_digest": "97d4e2489152d63c",
+        "quad_digest": "003b7f4e45cb2dbc",
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa"
+      }
+    }
+  },
+  "source_comparison": {
+    "measured_source_origin": "Retained math-candidate-source/client/apps/wgpu-slice/src/frame.rs; exact measured hash is preserved in arms.candidate.measured_frame_source_sha256.",
+    "reviewed_commit": "9f9eab4684b578acdb668ab17b479238d817349f",
+    "delta": "frame-measured-to-reviewed.patch",
+    "delta_sha256": "acd6d6f923dea39d1ed61b72040e96a74a988d6b164f1cb62bf5d11084aecf7e",
+    "difference": "One study-link comment and two added regression blocks (signed-zero discrimination and packed rectangle); production expressions are identical. Reverse the published delta against the reviewed file to recover the exact measured bytes."
+  },
+  "independent_converter_review": {
+    "model": "GPT 6.1 Sol",
+    "harness": "Codex (T3 Code)",
+    "role": "independent review",
+    "base": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+    "candidate": "9f9eab4684b578acdb668ab17b479238d817349f",
+    "runs": "review-converter.csv",
+    "runs_sha256": "1db565f3355cd9c041f20f6aec50720671ff6e704e337ff757daad709288b417",
+    "probe_source_sha256": "9123ef2c0c674553ebf7aba924a315510ee97670add003b78bf03e19490c6f03",
+    "scope": "Retained release converter-only probe, ten alternating pairs per authored scene, every generated quad consumed via black_box; not gameplay or end-to-end FPS."
+  }
+}

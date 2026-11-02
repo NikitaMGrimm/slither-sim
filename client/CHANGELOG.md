@@ -9,6 +9,9 @@
   initial black shadows, grouping paired glow sources, and keeping world
   drawing and glow composition in one MSAA pass without changing source rasters.
 
+- Reduce CPU work for paired pellet draws by reusing identical validated quad
+  projections within a picture, preserving vertex bits, alpha and draw order.
+
 - Let settled native menus sleep between input, result updates and egui repaint
   deadlines, while preserving menu animations, active gameplay and surface retries.
 

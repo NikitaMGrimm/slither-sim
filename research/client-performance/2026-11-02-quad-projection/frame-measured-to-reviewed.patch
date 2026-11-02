@@ -1,0 +1,40 @@
+--- measured-frame.rs
++++ reviewed-frame.rs
+@@ -327,6 +327,7 @@
+         // Paired pellet draws differ only in alpha; retain the last validated
+         // projection rather than repeating resource checks and f64 conversion.
+         // Bit comparisons preserve signed-zero distinctions in the input math.
++        // Measured scope: research/client-performance/2026-11-02-quad-projection/REPORT.md.
+         let mut previous: Option<(&Draw, Quad)> = None;
+         Ok(self
+             .draws
+@@ -471,6 +472,11 @@
+             blend: BodyBlend::SourceOver,
+         };
+         let resident = BTreeMap::from([(asset.into(), asset)]);
++        let mut positive_zero = draw.clone();
++        positive_zero.rotation = 0.;
++        let mut negative_zero = positive_zero.clone();
++        negative_zero.rotation = -0.;
++        assert!(!same_projection(&positive_zero, &negative_zero));
+         let frame = Frame {
+             identity: 1,
+             extent: [960, 540],
+@@ -540,6 +546,17 @@
+             }
+             check(draws, frame.extent, frame.viewport_scale, &resident);
+         }
++        let mut packed = Vec::new();
++        for i in 0..512 {
++            let mut d = draw.clone();
++            d.destination.x = f64::from(i % 32) * 0.25;
++            d.destination.y = f64::from(i / 32) * 0.25;
++            d.blend = BodyBlend::Lighter;
++            packed.push(d.clone());
++            d.effective_alpha = f64::from(i % 17) / 16.;
++            packed.push(d);
++        }
++        check(packed, frame.extent, frame.viewport_scale, &resident);
+         let mutations: &[fn(&mut Draw)] = &[
+             |d| d.destination.x = -0.,
+             |d| d.destination.y += 1.,
