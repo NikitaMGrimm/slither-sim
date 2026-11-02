@@ -673,10 +673,7 @@ new file mode 100644
 diff --git a/client/apps/wgpu-slice/Cargo.toml b/client/apps/wgpu-slice/Cargo.toml
 --- a/client/apps/wgpu-slice/Cargo.toml
 +++ b/client/apps/wgpu-slice/Cargo.toml
-@@ -39,6 +39,16 @@
- [[example]]
- name = "gpu-trace-json"
- path = "examples/gpu_trace_json.rs"
+@@ -41,0 +42,10 @@
 +required-features = ["frame-profile"]
 +
 +[[example]]
@@ -687,6 +684,3 @@ diff --git a/client/apps/wgpu-slice/Cargo.toml b/client/apps/wgpu-slice/Cargo.to
 +[[example]]
 +name = "sparse_probe"
 +path = "examples/sparse_probe.rs"
- required-features = ["frame-profile"]
- 
- [dependencies]
