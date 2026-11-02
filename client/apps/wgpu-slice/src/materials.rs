@@ -203,6 +203,41 @@ fn over(target: &mut [f64; 4], c: [f64; 4], coverage: f64, alpha: f64, destinati
     }
 }
 
+// Shadow taps revisit the same coverage locations along a row. Preserve the
+// 4x4 sample counts once, including the horizontal halo, then keep the original
+// Gaussian accumulation order. The extent/blur guards bound this scratch to
+// (512 + 2*48)*512 bytes. No resource or mask survives materialization.
+// Study: research/client-performance/2026-11-02-cold-shadow-coverage/REPORT.md.
+fn horizontal_shadow(
+    w: usize,
+    h: usize,
+    radius: i32,
+    offset: f64,
+    weights: &[f64],
+    sum: f64,
+    coverage: impl Fn(f64, f64) -> f64,
+) -> Vec<f64> {
+    let stride = w + 2 * radius as usize;
+    let mut counts = Vec::with_capacity(stride * h);
+    for y in 0..h {
+        for x in -radius..w as i32 + radius {
+            // Coverage is an exact multiple of 1/16 from the existing 4x4 test.
+            counts.push((coverage(f64::from(x), y as f64 - offset) * 16.) as u8);
+        }
+    }
+    let mut horizontal = vec![0.; w * h];
+    for y in 0..h {
+        for x in 0..w {
+            for (k, weight) in (-radius..=radius).zip(weights) {
+                horizontal[y * w + x] +=
+                    f64::from(counts[y * stride + (x as i32 + k + radius) as usize]) / 16. * weight
+                        / sum;
+            }
+        }
+    }
+    horizontal
+}
+
 /// Finite CPU materialization for the slice's Pixels, full-circle mask/solid,
 /// concentric radial FillRect, and black disk-shadow tapes. Coverage is 4x4;
 /// shadow uses a truncated separable Gaussian (sigma=blur/2). Raster equality
@@ -368,16 +403,8 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
                         .map(|v| (-0.5 * (f64::from(v) / sigma).powi(2)).exp())
                         .collect();
                     let sum: f64 = weights.iter().sum();
-                    let mut horizontal = vec![0.; w * h];
-                    for y in 0..h {
-                        for x in 0..w {
-                            for (k, weight) in (-radius..=radius).zip(&weights) {
-                                horizontal[y * w + x] +=
-                                    coverage(x as f64 + f64::from(k), y as f64 - offset) * weight
-                                        / sum;
-                            }
-                        }
-                    }
+                    let horizontal =
+                        horizontal_shadow(w, h, radius, offset, &weights, sum, coverage);
                     for y in 0..h {
                         for x in 0..w {
                             let mut a = 0.;
@@ -447,5 +474,71 @@ mod spinner_tests {
         fill_nonzero(&mut image, &path, [96, 255, 112]);
         assert_eq!(&image.pixels[(3 * 8 + 3) * 4..][..4], &[96, 255, 112, 255]);
         assert_eq!(&image.pixels[(3 * 8 + 1) * 4..][..4], &[48, 128, 56, 128]);
+    }
+}
+
+#[cfg(test)]
+mod shadow_coverage_tests {
+    use super::*;
+    use std::cell::Cell;
+    #[test]
+    fn shadow_coverage_reuse_matches_every_scalar_accumulation_bit() {
+        // ORIGINAL SYNTHETIC circle/polygon masks, no captured assets or GPU.
+        for (w, h) in [(1, 1), (7, 9), (32, 24), (512, 1)] {
+            for blur in [0.01_f64, 1., 6., 22., 32.] {
+                let sigma = blur / 2.;
+                let radius = (sigma * 3.).ceil() as i32;
+                let weights: Vec<f64> = (-radius..=radius)
+                    .map(|v| (-0.5 * (f64::from(v) / sigma).powi(2)).exp())
+                    .collect();
+                let sum: f64 = weights.iter().sum();
+                for offset in [-32., -0.25, 0., 0.5, 3.125, 32.] {
+                    for polygon in [false, true] {
+                        let coverage = |x: f64, y: f64| {
+                            let mut n = 0.;
+                            for sy in 0..4 {
+                                for sx in 0..4 {
+                                    let px = x + (f64::from(sx) + 0.5) / 4.;
+                                    let py = y + (f64::from(sy) + 0.5) / 4.;
+                                    let inside = if polygon {
+                                        winding(&[[0.1, 0.5], [7.2, 1.1], [3.7, 9.3]], px, py) != 0
+                                    } else {
+                                        (px - 3.2).hypot(py - 4.1) <= 3.7
+                                    };
+                                    if inside {
+                                        n += 1.;
+                                    }
+                                }
+                            }
+                            n / 16.
+                        };
+                        let calls = Cell::new(0usize);
+                        let actual =
+                            horizontal_shadow(w, h, radius, offset, &weights, sum, |x, y| {
+                                calls.set(calls.get() + 1);
+                                coverage(x, y)
+                            });
+                        let mut expected = vec![0.; w * h];
+                        for y in 0..h {
+                            for x in 0..w {
+                                for (k, weight) in (-radius..=radius).zip(&weights) {
+                                    expected[y * w + x] +=
+                                        coverage(x as f64 + f64::from(k), y as f64 - offset)
+                                            * weight
+                                            / sum;
+                                }
+                            }
+                        }
+                        assert_eq!(
+                            actual.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                            expected.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                            "{w}x{h}, blur={blur}, offset={offset}, polygon={polygon}"
+                        );
+                        assert_eq!(calls.get(), (w + 2 * radius as usize) * h);
+                        assert!(calls.get() <= w * h * (2 * radius as usize + 1));
+                    }
+                }
+            }
+        }
     }
 }

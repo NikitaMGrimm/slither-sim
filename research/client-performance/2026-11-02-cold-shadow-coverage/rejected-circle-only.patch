@@ -1,0 +1,171 @@
+diff --git a/client/apps/wgpu-slice/src/bank.rs b/client/apps/wgpu-slice/src/bank.rs
+index 3b57f3c8..3ae56b7e 100644
+--- a/client/apps/wgpu-slice/src/bank.rs
++++ b/client/apps/wgpu-slice/src/bank.rs
+@@ -5 +5 @@ use crate::{
+-    materials::materialize,
++    materials::{CircleCoverageCache, materialize_cached},
+@@ -45,0 +46 @@ pub struct Bank {
++    circle_coverage: CircleCoverageCache,
+@@ -110,0 +112 @@ impl Bank {
++            circle_coverage: CircleCoverageCache::default(),
+@@ -282 +284 @@ impl Bank {
+-                    materialize(&self.recipes[*i])?
++                    materialize_cached(&self.recipes[*i], &mut self.circle_coverage)?
+diff --git a/client/apps/wgpu-slice/src/materials.rs b/client/apps/wgpu-slice/src/materials.rs
+index 8597d4d7..6461fecd 100644
+--- a/client/apps/wgpu-slice/src/materials.rs
++++ b/client/apps/wgpu-slice/src/materials.rs
+@@ -205,0 +206,41 @@ fn over(target: &mut [f64; 4], c: [f64; 4], coverage: f64, alpha: f64, destinati
++// One coverage mask, at most 512*512 bytes under materialize's extent limit.
++// Authored body palettes share the same circle while their color samples differ.
++// Cache only the exact 4x4 sample counts; painting and rounding remain unchanged.
++// Study: research/client-performance/2026-11-02-cold-sprite-masks/REPORT.md.
++#[derive(Default)]
++pub(crate) struct CircleCoverageCache {
++    key: Option<([usize; 2], [u64; 5])>,
++    counts: Vec<u8>,
++}
++impl CircleCoverageCache {
++    fn get(&mut self, w: usize, h: usize, circle: [f64; 5]) -> &[u8] {
++        let key = ([w, h], circle.map(f64::to_bits));
++        if self.key != Some(key) {
++            self.counts.clear();
++            self.counts.reserve_exact(w * h);
++            for y in 0..h {
++                for x in 0..w {
++                    let mut n = 0;
++                    for sy in 0..4 {
++                        for sx in 0..4 {
++                            let px = x as f64 + (sx as f64 + 0.5) / 4.;
++                            let py = y as f64 + (sy as f64 + 0.5) / 4.;
++                            n += u8::from((px - circle[0]).hypot(py - circle[1]) <= circle[2]);
++                        }
++                    }
++                    self.counts.push(n);
++                }
++            }
++            self.key = Some(key);
++        }
++        &self.counts
++    }
++}
++
++pub(crate) fn materialize_cached(
++    recipe: &CanvasRecipe,
++    cache: &mut CircleCoverageCache,
++) -> Result<RgbaImage> {
++    materialize_impl(recipe, Some(cache))
++}
++
+@@ -210,0 +252,7 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
++    materialize_impl(recipe, None)
++}
++
++fn materialize_impl(
++    recipe: &CanvasRecipe,
++    mut coverage_cache: Option<&mut CircleCoverageCache>,
++) -> Result<RgbaImage> {
+@@ -330,0 +379,4 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
++                let counts = match (circle, rect, shadow, coverage_cache.as_deref_mut()) {
++                    (Some(c), None, None, Some(cache)) => Some(cache.get(w, h, c)),
++                    _ => None,
++                };
+@@ -331,0 +384,4 @@ pub fn materialize(recipe: &CanvasRecipe) -> Result<RgbaImage> {
++                    if let Some(counts) = counts {
++                        // This branch has no shadow: callers are the integer in-bounds paint loop.
++                        return f64::from(counts[y as usize * w + x as usize]) / 16.;
++                    }
+@@ -451,0 +508,92 @@ mod spinner_tests {
++
++#[cfg(test)]
++mod circle_coverage_tests {
++    use super::*;
++    fn recipe(width: u32, height: u32, commands: Vec<PaintCommand>) -> CanvasRecipe {
++        CanvasRecipe {
++            width,
++            height,
++            half_width: f64::from(width) / 2.,
++            half_height: f64::from(height) / 2.,
++            commands,
++        }
++    }
++
++    #[test]
++    fn cached_circle_samples_preserve_authored_pixels_and_geometry_changes() {
++        let mut cache = CircleCoverageCache::default();
++        let mut cases = Vec::new();
++        for (w, h, circle) in [
++            (8, 8, [4., 4., 2., 0., std::f64::consts::TAU]),
++            (8, 8, [4., 4., 3., 0., std::f64::consts::TAU]),
++            (8, 8, [4.125, 3.75, 3., 0., std::f64::consts::TAU]),
++            (9, 8, [4., 4., 3., 0., std::f64::consts::TAU]),
++            (8, 9, [-0., 0., 2., 0., std::f64::consts::TAU]),
++            (8, 9, [0., -0., 2., 0., std::f64::consts::TAU]),
++            (8, 9, [1e100, -1e100, 1e100, 0., std::f64::consts::TAU]),
++        ] {
++            for color in ["#ff0000", "rgba(20,80,150,0.3)"] {
++                cases.push(recipe(
++                    w,
++                    h,
++                    vec![
++                        PaintCommand::FillStyle(color.into()),
++                        PaintCommand::BeginPath,
++                        PaintCommand::Arc(circle),
++                        PaintCommand::Fill,
++                    ],
++                ));
++            }
++        }
++        // Real authored palette/decoration tapes share the mask, not their paint.
++        for palette in slither_client::authored_sources::authored_source_recipes()
++            .body_sources
++            .palettes
++        {
++            cases.push(palette.variants.first().unwrap().clone());
++            cases.push(palette.variants.last().unwrap().clone());
++        }
++        let mut shadow = recipe(
++            8,
++            8,
++            vec![
++                PaintCommand::Shadow {
++                    blur: 2.,
++                    offset_y: 0.5,
++                    color: "#000000".into(),
++                },
++                PaintCommand::BeginPath,
++                PaintCommand::Arc([4., 4., 2., 0., std::f64::consts::TAU]),
++                PaintCommand::Fill,
++            ],
++        );
++        cases.push(shadow.clone());
++        shadow
++            .commands
++            .push(PaintCommand::Composite("destination-in"));
++        shadow.commands.push(PaintCommand::Fill);
++        cases.push(shadow); // An unsupported shadow operation must keep its error.
++        cases.push(recipe(
++            8,
++            8,
++            vec![
++                PaintCommand::FillStyle("#ffffff".into()),
++                PaintCommand::FillRect([0., 0., 8., 8.]),
++            ],
++        ));
++        for recipe in cases {
++            let expected = materialize(&recipe);
++            let actual = materialize_cached(&recipe, &mut cache);
++            match (actual, expected) {
++                (Ok(a), Ok(b)) => {
++                    assert_eq!((a.width, a.height), (b.width, b.height));
++                    assert_eq!(a.pixels, b.pixels);
++                }
++                (Err(a), Err(b)) => assert_eq!(a, b),
++                other => panic!("cached raster mismatch: {other:?}"),
++            }
++            assert!(cache.counts.len() <= 512 * 512);
++            assert!(cache.counts.capacity() <= 512 * 512);
++        }
++    }
++}

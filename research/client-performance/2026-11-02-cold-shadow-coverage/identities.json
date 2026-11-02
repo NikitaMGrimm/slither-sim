@@ -1,0 +1,124 @@
+{
+  "base": "0f45f4acb00431ba461c604340fa6b63428c2db4",
+  "access": "Restricted owner-local join and original authored rectangle; raw outputs/recording remain external.",
+  "input_sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43",
+  "driver_sha256": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9",
+  "runner_sha256": "59a74f0d3d9bdc4cf1fb8c484e9cc64390acf4600f29a0b99e2d2818cee1d347",
+  "arms": {
+    "control": {
+      "source_reference_revision": "0f45f4acb00431ba461c604340fa6b63428c2db4",
+      "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4",
+      "materials_source_sha256": "1af799418620ba6434c68a8f0f18962a77456a4850329be22e9bde9977458e33",
+      "reviewed_materials_source_sha256": "1af799418620ba6434c68a8f0f18962a77456a4850329be22e9bde9977458e33",
+      "source_comparison": "Exact measured materials.rs bytes match the control source at 0f45f4acb00431ba461c604340fa6b63428c2db4; no normalization.",
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
+        "client/src/presentation/client.rs": "87a67a13e7350acb2fc8bf73af93b19075760cea3ebe8194c0de89b9236450c5",
+        "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
+        "client/apps/wgpu-slice/src/game.rs": "7d64b3fe9931e4270a33f875cb771a3122f992bcefc9bc49cbdf8c83ef644e6f",
+        "client/apps/wgpu-slice/src/bank.rs": "8d66d871869ee7b6967daf413342c998307a08deeb14d23dd98ab281de8ff826",
+        "client/apps/wgpu-slice/src/gpu.rs": "01628cc74abb8e00c17d1db6786682c5e17f436099dc0c77d824c7d02b094a8a",
+        "client/apps/wgpu-slice/src/materials.rs": "1af799418620ba6434c68a8f0f18962a77456a4850329be22e9bde9977458e33",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "ca23ed764ee122b91b884fc8db572ac02c46f886c732024c68da0f747bc2223a",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
+        "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
+      }
+    },
+    "candidate": {
+      "source_reference_revision": "fcd43c9f8841bb1fd6899a3e46638fa56d1607d3",
+      "binary_sha256": "16d343a073a3329dafadc08ef92a56246a2bf32cd75c80f89891a124e68da736",
+      "materials_source_sha256": "f8b332598709db89f01a23ad7646bf4b8d572f0760ef0336351ba5d198e91c4a",
+      "reviewed_materials_source_sha256": "f8b332598709db89f01a23ad7646bf4b8d572f0760ef0336351ba5d198e91c4a",
+      "source_comparison": "Exact measured materials.rs bytes match the candidate source at fcd43c9f8841bb1fd6899a3e46638fa56d1607d3; no normalization.",
+      "instrumented_source_sha256": {
+        "client/src/state.rs": "30d2da5d12d77b08dcd50e1152b351547ff62b0e9b63f348970886c3d236a4a5",
+        "client/src/presentation/client.rs": "87a67a13e7350acb2fc8bf73af93b19075760cea3ebe8194c0de89b9236450c5",
+        "client/src/presentation/food_painter.rs": "3e9e9999bad4d5253d3019af61d6af63d4c1cd79aa7edbe14f8c9f9b97d4478b",
+        "client/apps/wgpu-slice/src/game.rs": "7d64b3fe9931e4270a33f875cb771a3122f992bcefc9bc49cbdf8c83ef644e6f",
+        "client/apps/wgpu-slice/src/bank.rs": "8d66d871869ee7b6967daf413342c998307a08deeb14d23dd98ab281de8ff826",
+        "client/apps/wgpu-slice/src/gpu.rs": "01628cc74abb8e00c17d1db6786682c5e17f436099dc0c77d824c7d02b094a8a",
+        "client/apps/wgpu-slice/src/materials.rs": "f8b332598709db89f01a23ad7646bf4b8d572f0760ef0336351ba5d198e91c4a",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "ca23ed764ee122b91b884fc8db572ac02c46f886c732024c68da0f747bc2223a",
+        "client/apps/wgpu-slice/src/world_presenter.rs": "c372c988875b43019b057cf0ad57057c16d947cb1b595630bbf63b0bb99f98fe",
+        "client/apps/wgpu-slice/src/render.rs": "2cc92415e4d083fc0afa82ed0eef3610779354ba15f0fface3dca109569a16aa",
+        "client/apps/wgpu-slice/src/text_native.rs": "1096dee65c032d0d67b47a19c987cc3158cc8b7c1996201b631a6c90a67c751d",
+        "client/apps/wgpu-slice/examples/join_profile.rs": "2a2beab3bda3e79eef465552ccc92cafb02d2a327df4d07c7a87033fecfc9dd9"
+      }
+    }
+  },
+  "parity": {
+    "join_default": {
+      "control": {
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "processing_s": 71.1752532,
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0",
+        "command_digest": "4890089c3256d5b3",
+        "quad_digest": "6e886002677d8939",
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
+      },
+      "candidate": {
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "processing_s": 68.5998295,
+        "numeric_sha256": "c3792af8b97e537f7464ccc9f0d0e1d09b29e888593be3c44f60fe094ab0bec0",
+        "command_digest": "4890089c3256d5b3",
+        "quad_digest": "6e886002677d8939",
+        "binary_sha256": "16d343a073a3329dafadc08ef92a56246a2bf32cd75c80f89891a124e68da736"
+      }
+    },
+    "join_whole_map": {
+      "control": {
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "processing_s": 8.3214928,
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa",
+        "command_digest": "97d4e2489152d63c",
+        "quad_digest": "003b7f4e45cb2dbc",
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
+      },
+      "candidate": {
+        "callbacks": 600,
+        "messages": 29044,
+        "skips": 0,
+        "processing_s": 7.6729847,
+        "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa",
+        "command_digest": "97d4e2489152d63c",
+        "quad_digest": "003b7f4e45cb2dbc",
+        "binary_sha256": "16d343a073a3329dafadc08ef92a56246a2bf32cd75c80f89891a124e68da736"
+      }
+    },
+    "rectangle_default": {
+      "control": {
+        "callbacks": 600,
+        "messages": 8,
+        "skips": 0,
+        "processing_s": 48.7728445,
+        "numeric_sha256": "93c1a9aa389e76c55871dd6075b1a63cc7aff78bad62a8943ae36d49a0039e4e",
+        "command_digest": "ad90cc8696ced847",
+        "quad_digest": "fadd7bfa0a62a816",
+        "binary_sha256": "f26e57c0e58a6db149ef68ec2a6416fb997ebe701790d28809e255b1df21bee4"
+      },
+      "candidate": {
+        "callbacks": 600,
+        "messages": 8,
+        "skips": 0,
+        "processing_s": 49.9479287,
+        "numeric_sha256": "93c1a9aa389e76c55871dd6075b1a63cc7aff78bad62a8943ae36d49a0039e4e",
+        "command_digest": "ad90cc8696ced847",
+        "quad_digest": "fadd7bfa0a62a816",
+        "binary_sha256": "16d343a073a3329dafadc08ef92a56246a2bf32cd75c80f89891a124e68da736"
+      }
+    }
+  },
+  "shared_diagnostic_patch": {
+    "url": "https://github.com/NikitaMGrimm/slither-sim/blob/ead00d6ffdf0b1c4ac7da8ba9b826fc2af2a9294/research/client-performance/2026-11-02-art-validation/diagnostic.patch",
+    "sha256": "66b494bc184f610c9a2b64937b83b25c58cb8db4d7e8adfc30a62c68d8d14c55"
+  },
+  "source_snapshot": "materials-sources.json.gz"
+}

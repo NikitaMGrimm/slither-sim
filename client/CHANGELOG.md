@@ -22,6 +22,9 @@
 - Smooth pellet rims and zoom-out glows with denser food body rasters and
   filtered food mip levels, preserving logical sizes and draw planning.
 
+- Reduce cold sprite preparation by reusing exact geometric coverage across
+  neighbouring shadow blur taps, preserving raster pixels and accumulation order.
+
 - Reduce crowded native frame preparation by reusing exact minimap blend
   arithmetic during crossfades and avoiding read-only control-probe snapshots.
 

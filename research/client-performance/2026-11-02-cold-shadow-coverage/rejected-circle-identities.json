@@ -1,0 +1,21 @@
+{
+  "base": "643e4b3ebcade027efd948858c44e0dc2b7430e7",
+  "access": "Original authored prototype and bounded summaries only; raw data remains owner-local.",
+  "patch_sha256": "1273bdbcfe1c58bea3deec374630a9a8b3919c6d16113000f5df8d641787bff3",
+  "runs_sha256": "ed0f647e007caec1edebe3e3ade837089d5b4d9727ea39ef7b92be4959fac796",
+  "runner_sha256": "1f35a4fdd093b257d39bb2336fb6c2e06071de8d4afa0018221dc83ec7c7257d",
+  "arms": {
+    "control": {
+      "binary_sha256": "56e9f3c64766699b9c33ad03a627e030523ba29a80828aecb755b63fb5577d29",
+      "materials_source_sha256": "1af799418620ba6434c68a8f0f18962a77456a4850329be22e9bde9977458e33",
+      "bank_source_sha256": "8d66d871869ee7b6967daf413342c998307a08deeb14d23dd98ab281de8ff826"
+    },
+    "candidate": {
+      "binary_sha256": "bf9ad34ac908612f666f2365a7ea31cee35b53b5ac40502cca7e226abf8a7017",
+      "materials_source_sha256": "35298b70aad95efc8b61d730cc64c041777a8e67a8c5fda8bbcfe1668094f4c9",
+      "bank_source_sha256": "cf12c793b0f2dfe225353b8b0381e5942a2bf643d12815463c2bf0e940cb7acb"
+    }
+  },
+  "original_local_patch_sha256": "760bc69c63988191943750267e63ed2be79114e6f69a3956365a5090a38f90fb",
+  "publication_patch_format": "Context-free unified diff; git apply --unidiff-zero. Original and published patches reconstruct identical source trees from the recorded base."
+}
