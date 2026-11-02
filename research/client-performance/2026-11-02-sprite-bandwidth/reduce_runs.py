@@ -286,6 +286,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if (args.reference is not None or args.prefix) and args.series != "parity":
         parser.error("--reference and --prefix require --series parity")
+    if args.reference is not None and not args.prefix:
+        parser.error("--reference requires --prefix so baseline CSVs are not overwritten")
     require(args.output.is_dir(), "output directory must already exist")
     for series in ("history", "frozen"):
         if args.series in (series, "all"):

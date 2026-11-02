@@ -465,8 +465,9 @@ and from owner perceptual acceptance.
 - The stdlib recompute negative checks reject missing rows/cells, duplicate and
   mislabeled IDs, wrong executable bindings, incomplete diagnostics, altered
   report blocks and mismatched parity digests (12 tests).
-- Two authored CLI tests cover default/pre-mip/revision parity dispatch and reject
-  ignored parity options on other series. The documented reduction sequence
+- Three authored CLI tests cover default/pre-mip/revision parity dispatch, reject
+  ignored parity options on other series, and preserve baseline files by rejecting
+  reference mode without a nonempty prefix. The documented reduction sequence
   rebuilds all 16 generated CSVs byte-identically from retained inputs; the
   curated interrupted-run manifest is copied unchanged. The rebuilt bundle passes
   recompute without any new replay, rendering or timing run.
@@ -558,7 +559,8 @@ python -B reduce_runs.py "$journals/sparse-revision/post-champion-parity" --outp
 ```
 
 `--reference` and `--prefix` apply only to `--series parity`; other series reject
-them. The reference mode reuses `parity-runs.csv` and `pixels.csv` already in
+them. `--reference` also requires a nonempty `--prefix` to protect the baseline
+filenames. The reference mode reuses `parity-runs.csv` and `pixels.csv` already in
 `--output`, checks the control readback hashes, and writes the prefixed files.
 The corrected parity command above creates those baseline CSVs first. When
 reducing only the revision parity, copy the committed baseline pair into the

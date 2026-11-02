@@ -31,6 +31,25 @@ class ParityCli(unittest.TestCase):
                 self.assertEqual(error.exception.code, 2)
                 export.assert_not_called()
 
+    def test_reference_requires_a_nonempty_prefix_before_touching_baselines(self):
+        with TemporaryDirectory() as directory:
+            output = Path(directory)
+            baselines = [output / name for name in ("parity-runs.csv", "pixels.csv")]
+            for path in baselines:
+                path.write_bytes(b"retained baseline\n")
+            for prefix in ([], ["--prefix", ""]):
+                error_text = StringIO()
+                args = ["retained-journals", "--output", str(output), "--series", "parity",
+                        "--reference", "retained-control", *prefix]
+                with self.subTest(prefix=prefix), patch.object(reducer, "export_parity") as export, redirect_stderr(error_text):
+                    with self.assertRaises(SystemExit) as error:
+                        reducer.main(args)
+                    self.assertEqual(error.exception.code, 2)
+                    self.assertIn("--reference requires --prefix", error_text.getvalue())
+                    export.assert_not_called()
+                for path in baselines:
+                    self.assertEqual(path.read_bytes(), b"retained baseline\n")
+
 
 if __name__ == "__main__":
     unittest.main()
