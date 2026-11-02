@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.10.0](https://github.com/NikitaMGrimm/slither-sim/compare/v0.9.0...v0.10.0) - 2026-11-02
+
 ### Added
 
 - An opt-in `latency-rig` build feature lets a local host record every
