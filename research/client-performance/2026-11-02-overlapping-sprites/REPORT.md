@@ -116,6 +116,15 @@ RGB-zero/unused-alpha shader work. `noop-trial` restores the original shader and
 skips zero pairs but leaves fragmented runs. `combined-trial` adds source-layer
 grouping and pass hoisting. Retained patches: [R8](r8.patch), [RGB](rgb.patch),
 [uncompacted no-ops](noop.patch). The selected shader is identical to main.
+The R8 patch includes the measured `texture_arrays.rs` changes: `R8Unorm`
+allocation for alpha-only arrays and alpha-byte packing at every mip upload.
+The original retained patch omitted that module; it was present in the measured
+source export and binary. Its before/after source hashes are now retained in
+`sources.json`, and the study regression reconstructs all three changed R8
+modules and checks them against the measured hashes. No timings were rerun or
+changed. Reconstruct the initial diagnostic baseline with the previous study's
+probe patch and this study's `profile.patch`, then apply `r8.patch` with
+`git apply --unidiff-zero`.
 A [stable-order variant](stable-order.patch) removed a one-byte difference in two
 red channels in one exploratory capture by retaining visible pair order. Its
 attempted A/B series is invalid for comparison for the build-cache reason below;
@@ -256,11 +265,15 @@ python -B research/client-performance/2026-11-02-overlapping-sprites/test_recomp
 python -B research/client-performance/2026-11-02-overlapping-sprites/recompute.py --check
 ```
 
+The patch reconstruction regression also needs Git and the pinned baseline
+commit locally. Its per-command line-ending overrides retain the measured LF
+bytes without modifying shared Git configuration.
+
 `--write` updates marked tables. Validation requires complete expected cells,
 unique IDs matching labels, sample counts, alternating order, finite metrics,
 matched CPU-quad counts and executable bindings before aggregation. With local
 scratch as `$raw`, use [reduce.py](reduce.py) `$raw` for profile/coverage; use
-`--series <name>` for each named timing series, `sparse`, or `parity`.
+`--series <name>` for each named timing series, `sparse`, `parity`, or `frozen`.
 
 Export baseline or PR revision to fresh external source directories. Apply the
 previous study's `probe.patch` with `git apply --unidiff-zero`, then this study's

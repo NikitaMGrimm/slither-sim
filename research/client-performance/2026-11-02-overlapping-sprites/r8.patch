@@ -63,3 +63,27 @@
 @@ -93 +97 @@
 -    return pair(textureSampleBias(source,source_sampler,v.uv,i32(v.layer),-3.),v.alpha);
 +    return pair(unpack_source(textureSampleBias(source,source_sampler,v.uv,source_layer(v.layer),-3.),v.layer),v.alpha);
+--- a/client/apps/wgpu-slice/src/texture_arrays.rs
++++ b/client/apps/wgpu-slice/src/texture_arrays.rs
+@@ -5,0 +6 @@
++    pub alpha_only: bool,
+@@ -22,0 +24 @@
++        alpha_only: bool,
+@@ -34 +36 @@
+-            format: wgpu::TextureFormat::Rgba8Unorm,
++            format: if alpha_only { wgpu::TextureFormat::R8Unorm } else { wgpu::TextureFormat::Rgba8Unorm },
+@@ -69,0 +72 @@
++            alpha_only,
+@@ -81,0 +85,6 @@
++            let packed;
++            let rgba = &resource.image.pixels[offset..offset + bytes];
++            let pixels = if self.alpha_only {
++                packed = rgba.as_chunks::<4>().0.iter().map(|p| p[3]).collect::<Vec<_>>();
++                &packed[..]
++            } else { rgba };
+@@ -93 +102 @@
+-                &resource.image.pixels[offset..offset + bytes],
++                pixels,
+@@ -96 +105 @@
+-                    bytes_per_row: Some(width * 4),
++                    bytes_per_row: Some(width * if self.alpha_only {1} else {4}),

@@ -35,7 +35,8 @@
         "client/apps/wgpu-slice/src/quad.wgsl": "4212269381deb459f547b84fb57067dd0242e14747c556c97d58fc32cd7d30fd",
         "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
         "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
-        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "e1cfe9413a8667e6282a86f8f8326aba68724f5d51746cef1873fa3acf10154b"
       }
     },
     "after": {
@@ -47,7 +48,8 @@
         "client/apps/wgpu-slice/src/quad.wgsl": "4bb541bc3ebf58d09afcae597aea390e5457c42bb7b27c9fb86b394ba82df7f7",
         "client/apps/wgpu-slice/examples/gpu_sprite_probe.rs": "dfc89b44a486a6b26a84fde9dc312727acd1d71b1969ba8675d7c791539d8c6a",
         "client/apps/wgpu-slice/examples/sparse_probe.rs": "c7a071f8a9098c5657fe0147750965fb0d40af648f45466640b849aef1f8db10",
-        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6"
+        "client/apps/wgpu-slice/examples/frame_perf/probe_synthetic.rs": "4eed9714f96992e4ff536a525e25759e580b60518703d25e839f6cb7db050bf6",
+        "client/apps/wgpu-slice/src/texture_arrays.rs": "67bf88be93ca1dae22b1173476fbf5105d48f199e1ceed39701398f803851eed"
       }
     }
   },

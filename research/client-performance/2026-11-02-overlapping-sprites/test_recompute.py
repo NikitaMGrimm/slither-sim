@@ -1,8 +1,11 @@
 """Negative controls for retained complete matrices; stdlib only."""
 import copy
 import csv
+import hashlib
+import json
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -54,6 +57,7 @@ class MatrixTests(unittest.TestCase):
                 for file in r.ROOT.iterdir():
                     if file.suffix in ('.csv', '.json'):
                         shutil.copyfile(file, root/file.name)
+                r.tables(root)
                 data = r.rows(filename, root)
                 with (root/filename).open('w', encoding='utf-8', newline='') as stream:
                     writer = csv.DictWriter(stream, fieldnames=list(data[0]))
@@ -61,6 +65,34 @@ class MatrixTests(unittest.TestCase):
                     writer.writerows(data[1:])
                 with self.assertRaises(ValueError):
                     r.tables(root)
+
+    def test_r8_patch_reconstructs_every_changed_measured_module(self):
+        repo = r.ROOT.resolve().parents[2]
+        sources = json.loads((r.ROOT/'sources.json').read_text(encoding='utf-8'))
+        modules = ['client/apps/wgpu-slice/src/'+name
+                   for name in ('gpu.rs', 'quad.wgsl', 'texture_arrays.rs')]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            # Match the measured LF bytes without changing shared Git config.
+            git_apply = ['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'apply']
+            for path in modules:
+                target = root/path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(subprocess.run(
+                    ['git', 'show', sources['baseline_commit']+':'+path],
+                    cwd=repo, check=True, capture_output=True).stdout)
+            subprocess.run(git_apply+['--include='+modules[0],
+                            str(r.ROOT.resolve()/'profile.patch')],
+                           cwd=root, check=True, capture_output=True)
+            for side in ('before', 'after'):
+                if side == 'after':
+                    subprocess.run(git_apply+['--unidiff-zero',
+                                    str(r.ROOT.resolve()/'r8.patch')],
+                                   cwd=root, check=True, capture_output=True)
+                for path in modules:
+                    with self.subTest(side=side, module=path):
+                        self.assertEqual(hashlib.sha256((root/path).read_bytes()).hexdigest(),
+                                         sources['r8-trial'][side]['module_sha256'][path])
 
 
 if __name__ == '__main__':
