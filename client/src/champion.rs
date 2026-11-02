@@ -28,6 +28,10 @@ impl ChampionState {
     pub fn finished(&self) -> bool {
         self.finished
     }
+    /// Exit and ordinary-control fades still need callbacks after transport ends.
+    pub fn needs_animation(&self) -> bool {
+        (self.visible() && self.ending) || (self.finished && self.ordinary_alpha < 1.)
+    }
     /// Sampled ordinary-control fade after the editor exits.
     pub fn ordinary_alpha(&self) -> f64 {
         if self.generation.is_none() {

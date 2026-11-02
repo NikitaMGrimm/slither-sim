@@ -88,6 +88,21 @@ editor state intact.
 
 ## Offline checks
 
+Native presentation sleeps when the visible menu has settled. Input, discovery
+results and session changes invalidate the picture; egui repaint deadlines wake
+it for caret blink and widget updates. Surface retries retain their backoff.
+The initial login's rotating tips, connecting spinner, skin studio snake preview
+and retained active game continue presenting. Settings fully hides the login
+animation once its entry fade finishes. A returned login has no rotating tips.
+Menu fades and the session's hidden death hold keep their existing clocks.
+
+`idle_menu` is a CPU-only regression: over 600 synthetic 60-Hz opportunities in
+10 seconds, after an initial picture, the old visibility decision presents 600
+frames for both settled Settings and returned login; the animation decision
+presents zero. Initial login tips present 600 on both sides. The counter excludes
+egui settling/caret repaints, OS events, real vsync and GPU submission; it measures
+scheduling decisions, not desktop frame rate, CPU use or power.
+
 Core regressions: `cargo test --locked --test menu_controls --test menu_input`
 from `client/`. App regressions: `champion_egui`, `login_native` and the
 `champion` tests in `local`, which feed raw egui events with authored synthetic

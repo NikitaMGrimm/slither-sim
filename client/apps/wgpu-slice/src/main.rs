@@ -327,6 +327,7 @@ mod desktop {
             if let Some(preparation) = &mut self.preparation
                 && let Some(completion) = preparation.poll()
             {
+                self.schedule.invalidate();
                 let cancelled = preparation.cancelled();
                 self.preparation.take();
                 if self.directory.is_none() {
@@ -370,6 +371,9 @@ mod desktop {
                 None
             };
             for event in self.transport.poll() {
+                // Terminal phases can both be idle; their changed menu/error
+                // still needs one picture even if activity does not change.
+                self.schedule.invalidate();
                 match event {
                     Event::Opened(g) => {
                         if let Err(e) = self
@@ -421,6 +425,7 @@ mod desktop {
                 Phase::Ready | Phase::Failed | Phase::Disconnected
             );
             self.schedule.activity(active || self.login.needs_redraw());
+            self.schedule.repaint_at(self.login.egui.repaint_deadline());
             if !matches!(
                 self.game.phase(),
                 Phase::Opening | Phase::Challenge | Phase::Setup
@@ -801,6 +806,10 @@ mod desktop {
             game.set_committed_cosmetic(restored.record.cosmetic)?;
             let play_appearance = restored.record.selection();
             let mut login = NativeLogin::with_preferences(restored.record, storage)?;
+            let repaint_proxy = proxy.clone();
+            login.egui.set_repaint_wake(move || {
+                let _ = repaint_proxy.send_event(TransportWake);
+            });
             login.restore_settings(slither_wgpu_slice::menu_storage::SettingsStorage::native());
             if let Some(path) = slither_wgpu_slice::server_picker_native::preference_path() {
                 slither_wgpu_slice::server_picker_native::read_custom(
@@ -873,6 +882,8 @@ mod desktop {
             )
             .then(latency::callback);
             let result = (|| -> Result<()> {
+                r.login
+                    .input_time(r.started.elapsed().as_secs_f64() * 1000.);
                 // Raw window state belongs to the host, before any modal can consume delivery.
                 let response = if r.login.egui_owns_input() {
                     r.login
