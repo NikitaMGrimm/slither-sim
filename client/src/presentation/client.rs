@@ -4836,10 +4836,46 @@ mod resolved_draw_tests {
             &client.entries[1].snake,
             &frozen.entries[1].snake
         ));
-        let invalid = bundle(&[vec![b'h', 0, 7, 0x12, 0x34, 0x56], vec![b'g']]);
         let snapshot = client.clone();
-        assert!(client.apply_frame(&invalid, ElapsedHeader::Absent).is_err());
-        assert_eq!(client, snapshot);
+        // Owned observations cannot change through the Arcs shared by these clients.
+        let client_before = format!("{client:?}");
+        let snapshot_before = format!("{snapshot:?}");
+        let own_before: SnakePresentation = client.own_snake().unwrap().clone();
+        let own_references = Arc::strong_count(&snapshot.entries[0].snake);
+        let rejected = bundle(&[
+            vec![b'h', 0, 7, 0x12, 0x34, 0x56],
+            vec![b'f', 1, 2, 3, 4, 7, 25],
+        ]);
+        let sentinel = Rc::new(());
+        let mut calls = 0;
+        let error = client
+            .apply_frame_with_factories::<HookError, _, _>(
+                &rejected,
+                ElapsedHeader::Absent,
+                |_| Ok(PairedFaceGeometry::default()),
+                |_, _| {
+                    calls += 1;
+                    // Staging adds a shared reference; the preceding own-snake
+                    // mutation must detach it before this later callback fails.
+                    assert_eq!(
+                        Arc::strong_count(&snapshot.entries[0].snake),
+                        own_references,
+                        "own-snake mutation must detach before food resolution"
+                    );
+                    Err(HookError::Callback(Rc::clone(&sentinel)))
+                },
+            )
+            .unwrap_err();
+        match error {
+            HookError::Callback(actual) => assert!(Rc::ptr_eq(&actual, &sentinel)),
+            HookError::Model(error) => panic!("unexpected model failure: {error}"),
+        }
+        assert_eq!(calls, 1);
+        assert_eq!(format!("{client:?}"), client_before);
+        assert_eq!(format!("{snapshot:?}"), snapshot_before);
+        assert_eq!(client.own_snake().unwrap(), &own_before);
+        assert_eq!(snapshot.own_snake().unwrap(), &own_before);
+        assert_eq!(format!("{frozen:?}"), before);
         client.advance(100., false).unwrap();
         client.prepare_draw(960, 540).unwrap();
         client
