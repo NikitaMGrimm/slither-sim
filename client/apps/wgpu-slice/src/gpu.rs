@@ -941,6 +941,7 @@ impl Renderer {
             }
             if overlay
                 || !clear
+                || frame.food_batch.as_ref().is_some_and(|b| b.early_at != 0)
                 || !matches!(
                     self.format,
                     wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Bgra8Unorm

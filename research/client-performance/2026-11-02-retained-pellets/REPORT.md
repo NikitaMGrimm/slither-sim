@@ -9,6 +9,15 @@ pellets close to free: art-period CPU stages still cost about 8 ms, GPU time
 increases, p95 remains above 16.7 ms, and cold spikes remain. These synchronized
 offscreen callbacks are not gameplay FPS or owner-play acceptance.
 
+The halving applies to the default view after menu composition ends. The original
+replay skipped native menu composition, and the join fade, spinner tail and any
+wheel zoom still use the generic path; see the review-fix section for their
+measured cost.
+
+The original results and phase-profile tables below retain the pre-review
+composition measured for 6293009a. The review-fix section adds final measurements
+and makes the omitted native crossfade and wheel-zoom paths explicit.
+
 Access: the ten-second community recording, images, packet/position journals,
 source copies, binaries and full process/load samples are restricted local
 material. They remain outside Git. Selected aggregate counts and hashes here
@@ -52,7 +61,12 @@ and texture arrays. The existing WebGL2 downlevel device limits admit it; no
 compute/storage/f64/optional feature or CPU-specific code was added. The actual
 repository browser backend is WebGPU, not a running WebGL backend. Native and
 Wasm build/Clippy checks are distinct from browser/WebGL runtime or pixel proof.
-Canvas drawing is unchanged; the shared core adds only opaque identity tracking.
+Canvas drawing policy is unchanged; the shared core exposes opaque identity tracking.
+Review fixes also move the existing glow alpha/centre, pulse, body centre/alpha
+and image-rectangle formulas into inline shared-core helpers used by both paths;
+the formula order and Canvas outputs remain exact. WGSL has no animation or
+glow-policy formulas: its endpoint/UV and flag expansion is a GPU input-layout
+adapter, while the existing shared quad fragments own paired-addition rounding.
 
 ## Measurement
 
@@ -81,6 +95,17 @@ collects density outside callback wall time; process elapsed includes that
 instrumentation and is not a client-throughput claim. Cold renderer construction
 is before connect; cold food buffers/bindings and scene/font preparation remain
 inside callbacks. GPU pipelines are created before connect.
+
+All GPU figures in this report (matched runs, profiles and measurement-only
+counterfactuals) used **per-pass mode**: `Gpu::draw` in the retained private
+`join_profile.rs` calls `begin_diagnostic_frame()` before the presenter, and
+`Gpu::timestamp` resolves every recorded query pair and sums their durations.
+Glow/world/blit/overlay passes are included. The aggregate 0/1-query overwrite
+found during review did not produce any published figure here. The fix brackets
+the first submitted glow/world pass and the last world pass in aggregate mode,
+using optional pass-boundary writes without adding a device feature. Per-pass
+query assignment is unchanged; aggregate spans can include gaps between passes,
+whereas published per-pass totals sum only the recorded pass intervals.
 
 <!-- BEGIN RESULTS -->
 | Quality / median of per-run quantiles | Before ms | After ms | Paired reduction range |
@@ -120,6 +145,141 @@ native candidate: 5 runs; art p50 range 14.807 to 15.483 ms; load 3.5 to 84.2%; 
 
 All runs: 20; accepted 20; excluded 0.
 <!-- END RESULTS -->
+
+## Review fixes and final remeasurement
+
+The aggregate query fix, fallible menu batch expansion, non-batch single-copy
+composition and shared-core food-policy extraction are included in the final
+source. A public menu backdrop now canonicalizes before insertion, preserving
+outlines over the page; merely shifting barriers is insufficient. A cover with
+no overlay stays at the end and does not invalidate the black prefix. Both
+orders and whole-picture rejection are authored regressions. A renderer guard
+also falls back for any nonempty prefix before a batch. The rationale sits at
+the instanced encode boundary. Timestamp-index tests cover zero to three glow
+passes, and an offscreen validation test exercises aggregate query writes and
+the non-black-prefix fallback without requiring an additional device feature.
+
+The final release repeats exact canonical/numeric/vertex parity against main
+on all three 600-callback scenes, and all 1,200 community pixel comparisons stay
+within one RGB byte. The oracle test is retained after formula extraction.
+
+Five alternating triples per resolution mode compare main, the pre-review
+candidate and the final candidate on the same input. Triple and quality order
+reverse on alternate repetitions. All 30 new runs remain in `review-runs.csv`,
+including the high-load samples; the original 20 rows remain unchanged in
+`runs.csv`. No compiler, test or archive overlap was observed. Small additions
+to the diagnostic driver are disabled outside the menu diagnostic. The final
+vs pre-review columns measure the combined fixes, not an isolated helper call.
+
+<!-- BEGIN REVIEW RESULTS -->
+| Review-fix comparison / median of per-run quantiles | Main ms | Before review ms | Final ms | Final vs before review paired range |
+| --- | ---: | ---: | ---: | ---: |
+| original / art callback p50 | 29.679 | 14.587 | 14.992 | -1.3 to +17.6% |
+| original / art callback p95 | 33.425 | 17.852 | 18.115 | -4.6 to +34.5% |
+| original / art preparation p50 | 10.731 | 2.483 | 2.562 | -7.0 to +45.1% |
+| original / art CPU submit p50 | 10.807 | 5.274 | 5.426 | +0.5 to +21.1% |
+| original / art GPU p50 | 4.324 | 4.956 | 4.978 | -1.7 to +0.8% |
+| original / art CPU stages p50 | 22.851 | 8.214 | 8.516 | -1.2 to +30.7% |
+| original / 10 s callback p50 | 28.546 | 13.491 | 13.935 | -0.2 to +7.8% |
+| original / 10 s callback p95 | 33.425 | 17.354 | 17.433 | -5.2 to +26.9% |
+| native / art callback p50 | 29.437 | 14.549 | 14.824 | -3.8 to +2.1% |
+| native / art callback p95 | 33.150 | 17.382 | 18.007 | -5.9 to +4.5% |
+| native / art preparation p50 | 10.840 | 2.380 | 2.377 | -18.8 to +0.4% |
+| native / art CPU submit p50 | 10.556 | 5.055 | 5.156 | -1.2 to +4.2% |
+| native / art GPU p50 | 4.599 | 5.113 | 5.076 | -1.3 to -0.1% |
+| native / art CPU stages p50 | 21.988 | 7.835 | 7.971 | -8.4 to +1.9% |
+| native / 10 s callback p50 | 28.279 | 13.861 | 14.046 | -2.7 to +1.7% |
+| native / 10 s callback p95 | 32.985 | 17.150 | 17.272 | -7.1 to +2.7% |
+
+original: 5 complete triples; load 0.7 to 90.4%; cargo/test/archive samples 0/0/0.
+
+original callback: paired final-minus-before-review median +0.124 ms; range -0.212 to +2.602 ms.
+
+original CPU submit: paired final-minus-before-review median +0.098 ms; range +0.024 to +1.110 ms.
+
+native: 5 complete triples; load 0.7 to 94.5%; cargo/test/archive samples 0/0/0.
+
+native callback: paired final-minus-before-review median +0.255 ms; range -0.586 to +0.301 ms.
+
+native CPU submit: paired final-minus-before-review median +0.084 ms; range -0.064 to +0.211 ms.
+
+Review-fix runs retained: 30; excluded: 0.
+<!-- END REVIEW RESULTS -->
+
+The inline shared-core extraction is not described as free. The combined
+fixes show a small positive paired CPU-submit difference, with noisier callback
+differences retained above. Main-to-final still roughly halves default-view
+steady art cost. These figures do not fix the live-path gaps below.
+
+### Native join crossfade is missing from the original replay comparison
+
+The original comparison drives `LocalGame` and the world presenter directly;
+it does **not** run `NativeLogin::step/observe_game/prepare_host`, menu composition
+or egui painting. Therefore even its first-ten-second callback figures omit the
+visible native login crossfade. The [2,7) art window begins after that fade.
+
+The session's separate UI clock increases world alpha by 0.05 per 25 ms: a
+500 ms fade, not a fixed frame count. On this retained 60 Hz join schedule it
+remains outgoing for 31 callbacks, frames 60-90, at model times 1000-1500 ms;
+floating-point accumulation reaches the fully-visible endpoint at frame 91,
+1516.667 ms. The spinner keeps `needs_menu_pass` true for 11 more callbacks,
+frames 91-101, about 183 ms. Menu composition first stops at 1700 ms, so this
+recording has 42 callbacks spanning about 700 ms of generic-path composition
+after the first gameplay callback. Real frame counts depend on callback timing.
+
+A separate four-run diagnostic uses the same recording and frozen world clock
+with NativeLogin's live ordering, actual `prepare_host`/`compose_optional`, and
+offscreen egui paint. The direct controls observe the same menu clock but skip
+menu preparation/composition/paint. Each row is one run, not a matched speed
+claim; `menu-runs.csv` retains the per-run quantiles, clock/counts, identities and
+load. There was no compiler/test overlap. Wall time includes egui submission and
+completion; GPU query totals still cover the world-presenter passes, not egui.
+
+<!-- BEGIN MENU RESULTS -->
+| Single diagnostic / fade callbacks | Frame median ms | Frame p95 ms | Composition median ms | Spinner-tail median ms |
+| --- | ---: | ---: | ---: | ---: |
+| original direct world | 7.205 | 15.749 | 0.000 | 11.789 |
+| original menu composed | 12.906 | 34.342 | 3.723 | 41.347 |
+| native direct world | 7.521 | 15.008 | 0.000 | 13.775 |
+| native menu composed | 13.345 | 36.066 | 3.711 | 42.242 |
+<!-- END MENU RESULTS -->
+
+The gap is material, particularly the 41-42 ms spinner-tail medians. Every fade
+callback initially has a retained batch, but menu composition canonicalizes all
+of them. It also expands the batch during the hidden-login/spinner-only tail.
+This PR's five review fixes do not remove that fallback.
+
+The smallest safe next step is to preserve batches when the menu has neither
+backdrop nor cover, while keeping the spinner's egui pass. That removes needless
+canonicalization in the tail without changing page composition. During the
+actual fade, retain compact body/glow pairs but submit the original food outline
+stream over the page backdrop in its original order. Simply deleting the page
+backdrop or omitting outlines changes pixels. That second step needs composed
+pixel parity before shipping; no visible or smoothing change is proposed here.
+
+### A zoomed player still uses the previous food path
+
+`user_zoom != 1` declines the retained batch. Modest wheel zoom therefore gets
+the old generic per-pellet planning/packing cost, even when the art is dense.
+Zooming out can admit more pellets; at extreme zoom the existing subpixel LOD
+may instead remove them, so cost is not constant across zoom levels.
+
+Four single-run diagnostics on the same input confirm zero retained-batch art
+callbacks at one and four zoom-out notches, with counts and quantiles retained
+in `zoom-runs.csv`. They are diagnostic observations, not an A/B claim.
+
+<!-- BEGIN ZOOM RESULTS -->
+| Single diagnostic / zoom-out notches | Visible pellet median | Art callback median ms | Art callback p95 ms | Retained art callbacks |
+| --- | ---: | ---: | ---: | ---: |
+| original / 1 | 19509.0 | 30.028 | 34.894 | 0 / 300 |
+| original / 4 | 22631.5 | 33.505 | 36.770 | 0 / 300 |
+| native / 1 | 19509.0 | 29.803 | 33.014 | 0 / 300 |
+| native / 4 | 22631.5 | 34.872 | 38.779 | 0 / 300 |
+<!-- END ZOOM RESULTS -->
+
+Supporting wheel zoom safely requires applying the shared core's exact
+zoom eligibility, source-overload and rectangle policy to compact records and
+validating all modes again. That expansion is not part of these review fixes.
 
 ## Remaining work and owner's glow question
 
@@ -182,13 +342,27 @@ an explanation consistent with the owner report, not proof about NTL internals.
 
 All 600 callbacks of default view, whole-map view and the authored rectangle
 match main in canonical commands/resources/sends, projected vertex bits and
-numeric-state digests, with zero skips. Every one of 600 rendered community
-frames in each resolution mode was compared to an independent canonical
-renderer: max RGB difference one byte, zero frames beyond the existing two-byte
+numeric-state digests, with zero skips. The digest path reconstructs the original
+image stream through `Batch::canonical`; that alone cannot detect a retained
+GPU packing/order bug. For the community pixel check, the private driver renders
+each prepared picture twice at the same virtual time: one renderer instance
+submits the retained batch, and a second submits `p.frame.canonical()` through
+the generic image path, with the same overlay and resource list. The two share
+the core world/animation inputs, authored texture bytes, quad fragment math,
+glow admission/target policy and presenter; they have separate renderer objects
+and GPU resources. This is a comparison of submission paths, not an independent
+visual implementation. All 600 rendered community frames in each resolution
+mode were compared: max RGB difference one byte, zero frames beyond the existing two-byte
 paired-addition allowance. Overlapping pixels cannot identify an individual
 pellet's contribution; the separate authored lifetime controls establish maxima
 of zero for settled pellets, one while fading and zero for consumed flights.
 No wider visual tolerance was accepted.
+
+The committed authored pixel regression also compares retained submission with
+the generic canonical submission path and shares textures and fragment math.
+The separate reviewer inspected that committed test and the canonical-digest
+construction; the private community driver and its per-frame outputs were not
+inspected in that review. Their result above is implementation-run evidence.
 
 Authored regressions cover exact projection/alpha bits, dense order, membership
 replacement/rollback forks, flight/expiry, camera/animation reuse, frozen queued
@@ -197,8 +371,16 @@ pictures and static-cache lifetime. Intentionally restoring a retained
 mutation was reverted. Announcement, retry/resize and zoom golden tests compare
 the canonical stream and retain their original expectations.
 
-`identities.json` records separate measured production, built instrumented and
-reviewed source hashes. The measured source was an uncommitted candidate over
+`identities.json` preserves the original measured production, built instrumented
+and reviewed source hashes under their original keys. `review_fixes` records the
+new measured production, instrumented binary and final runtime source identities;
+`review-fixes-source.patch` retains their exact delta (an unused-parameter rename
+and the outline-rationale URL, with no arithmetic or branching change). The
+GPU pass-sum audit checks all 30,000 callbacks of the original and new timing
+runs against their retained per-pass sums.
+
+The rest of this paragraph describes the initial source snapshot, not the final
+review-fix source. That measured source was an uncommitted candidate over
 f3c5b519, frozen in local diagnostic copies; it was not a fabricated commit.
 Only two documentation comments and a fresh-cache reset in the cfg(test)
 regression differ between measured production and reviewed files. The exact
@@ -213,10 +395,9 @@ python -B research/client-performance/2026-11-02-retained-pellets/recompute.py -
 python -B -m unittest discover -s research/client-performance/2026-11-02-retained-pellets -p test_study.py
 ```
 
-`npm run check` passed on Windows, including strict native test Clippy, desktop
+`npm run check` passed on Windows on the final source, including strict native test Clippy, desktop
 build, Canvas ABI and Wasm/browser checks. The study recomputation/tests and an
 isolated study-only copy pass; the explicit authored offscreen GPU check passes.
-Actual
-browser GPU/WebGL runtime, Vulkan/other hardware, owner play, physical input/
+Actual browser GPU/WebGL runtime, Vulkan/other hardware, owner play, physical input/
 display latency and gameplay FPS remain unverified. Exact CPU/source parity and
 the DX12 picture gate do not establish those acceptance axes.

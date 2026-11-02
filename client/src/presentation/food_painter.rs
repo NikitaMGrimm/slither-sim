@@ -330,7 +330,9 @@ fn validate(
     Ok(())
 }
 
-fn draw(
+/// Exact Canvas overload and rectangle policy for one already selected food image.
+#[inline]
+pub fn food_image_draw(
     source: FoodSource,
     center: Point,
     scale: f64,
@@ -409,7 +411,7 @@ impl<F: FnMut(FoodImageCommand)> Recorder<F> {
         // Keep Canvas's assignment rule explicit even though valid food state
         // normally requests bounded alpha. Do not clamp or elide zero calls.
         let alpha = alpha_assignment(alpha, self.previous_alpha);
-        let draw = draw(source, center, food.scale, self.zoom_factor)?;
+        let draw = food_image_draw(source, center, food.scale, self.zoom_factor)?;
         let sequence = self.counts.total();
         if sequence >= self.limit || sequence >= MAX_FOOD_PAINT_COMMANDS {
             return Err(FoodPaintError::CommandLimit);
@@ -438,6 +440,88 @@ impl<F: FnMut(FoodImageCommand)> Recorder<F> {
         (self.emit)(command);
         Ok(())
     }
+}
+
+/// The unchanged pulse term shared by the body and both glow pairs.
+#[inline]
+pub fn food_pulse(food: FoodSnapshot) -> f64 {
+    0.5 + 0.5 * (food.animation_phase / 13.).cos()
+}
+
+/// Backing-pixel body/outline centre for an already prepared view.
+#[inline]
+pub fn food_body_center(food: FoodSnapshot, view: BodyPaintView) -> Point {
+    Point {
+        x: view.half_width + view.zoom * (food.render_position.x - view.camera.x),
+        y: view.half_height + view.zoom * (food.render_position.y - view.camera.y),
+    }
+}
+
+/// Requested base and pulse body alpha, before Canvas assignment retention.
+#[inline]
+pub fn food_body_alpha(food: FoodSnapshot, blend: f64, pulse: f64) -> [f64; 2] {
+    [
+        food.fade,
+        (if blend == 1. { 1. } else { blend }) * pulse * food.fade,
+    ]
+}
+
+/// Source, backing-pixel centre and requested alphas of one additive glow pair.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FoodGlowPaint {
+    /// Frozen inner or outer glow source.
+    pub source: FoodSource,
+    /// Pixel-space centre after the core's distance-dependent offset.
+    pub center: Point,
+    /// Requested base and pulse alpha, in their original multiplication order.
+    pub alpha: [f64; 2],
+}
+
+/// Shared glow policy; preserve the multiplication order before f32 projection.
+/// Callers supply the same pulse once per food; view/quality admission is theirs.
+#[inline]
+pub fn food_glow_paint(
+    food: FoodSnapshot,
+    view: BodyPaintView,
+    outer: bool,
+    blend: f64,
+    pulse: f64,
+) -> Result<FoodGlowPaint, FoodPaintError> {
+    let dx = food.render_position.x - view.camera.x;
+    let dy = food.render_position.y - view.camera.y;
+    let distance = dx * dx + dy * dy;
+    if !distance.is_finite() {
+        return Err(FoodPaintError::Arithmetic);
+    }
+    let (source, shift, mut alpha) = if outer {
+        (
+            food.sources.outer,
+            0.32,
+            0.085 * (1. - distance / (16500. + distance)),
+        )
+    } else {
+        (
+            food.sources.inner,
+            0.06,
+            0.005 + 0.09 * (1. - distance / (86000. + distance)),
+        )
+    };
+    let t = 1. + shift * food.scale;
+    let center = Point {
+        x: dx * t * view.zoom + view.half_width,
+        y: dy * t * view.zoom + view.half_height,
+    };
+    if food.scale != 1. {
+        alpha *= food.scale.powf(0.25);
+    }
+    if blend != 1. {
+        alpha *= blend;
+    }
+    Ok(FoodGlowPaint {
+        source,
+        center,
+        alpha: [alpha * food.fade, alpha * pulse * food.fade],
+    })
 }
 
 fn generate<F: FnMut(FoodImageCommand)>(
@@ -471,10 +555,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
             .filter(|(_, f)| zoom_eligible(*f, zoom_factor))
     };
     for (index, food) in visible() {
-        let center = Point {
-            x: v.half_width + v.zoom * (food.render_position.x - v.camera.x),
-            y: v.half_height + v.zoom * (food.render_position.y - v.camera.y),
-        };
+        let center = food_body_center(food, v);
         recorder.image(
             food,
             index,
@@ -487,10 +568,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
     }
     recorder.previous_alpha = input.entry_alpha;
     for (index, food) in visible() {
-        let center = Point {
-            x: v.half_width + v.zoom * (food.render_position.x - v.camera.x),
-            y: v.half_height + v.zoom * (food.render_position.y - v.camera.y),
-        };
+        let center = food_body_center(food, v);
         recorder.image(
             food,
             index,
@@ -500,9 +578,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
             food.fade,
         )?;
         if detailed {
-            let alpha = (if q.blend == 1. { 1. } else { q.blend })
-                * (0.5 + 0.5 * (food.animation_phase / 13.).cos())
-                * food.fade;
+            let alpha = food_body_alpha(food, q.blend, food_pulse(food))[1];
             recorder.image(
                 food,
                 index,
@@ -516,46 +592,14 @@ fn generate<F: FnMut(FoodImageCommand)>(
     recorder.previous_alpha = input.entry_alpha;
     if detailed {
         for (index, food) in visible() {
-            let dx = food.render_position.x - v.camera.x;
-            let dy = food.render_position.y - v.camera.y;
-            let distance = dx * dx + dy * dy;
-            if !distance.is_finite() {
-                return Err(FoodPaintError::Arithmetic);
-            }
-            for (pass, source, shift, mut alpha) in [
-                (
-                    FoodPaintPass::InnerGlow,
-                    food.sources.inner,
-                    0.06,
-                    0.005 + 0.09 * (1. - distance / (86000. + distance)),
-                ),
-                (
-                    FoodPaintPass::OuterGlow,
-                    food.sources.outer,
-                    0.32,
-                    0.085 * (1. - distance / (16500. + distance)),
-                ),
+            let pulse = food_pulse(food);
+            for (pass, outer) in [
+                (FoodPaintPass::InnerGlow, false),
+                (FoodPaintPass::OuterGlow, true),
             ] {
-                let t = 1. + shift * food.scale;
-                let center = Point {
-                    x: dx * t * v.zoom + v.half_width,
-                    y: dy * t * v.zoom + v.half_height,
-                };
-                if food.scale != 1. {
-                    alpha *= food.scale.powf(0.25);
-                }
-                if q.blend != 1. {
-                    alpha *= q.blend;
-                }
-                recorder.image(food, index, pass, source, center, alpha * food.fade)?;
-                recorder.image(
-                    food,
-                    index,
-                    pass,
-                    source,
-                    center,
-                    alpha * (0.5 + 0.5 * (food.animation_phase / 13.).cos()) * food.fade,
-                )?;
+                let glow = food_glow_paint(food, v, outer, q.blend, pulse)?;
+                recorder.image(food, index, pass, glow.source, glow.center, glow.alpha[0])?;
+                recorder.image(food, index, pass, glow.source, glow.center, glow.alpha[1])?;
             }
         }
     }

@@ -1,4 +1,7 @@
 // Exact projected pellet pairs use the unchanged shared image fragments.
+// The CPU core owns animation, source rectangles, centres and alpha. WGSL only
+// selects packed endpoints and applies UV crop; this vertex-input expansion must
+// live in WGSL, while the shared quad.wgsl fragments own paired-addition rounding.
 struct PelletView { rules: vec4<u32> };
 struct PelletSource { selection: vec4<u32> };
 @group(1) @binding(0) var<uniform> pellet_view: PelletView;

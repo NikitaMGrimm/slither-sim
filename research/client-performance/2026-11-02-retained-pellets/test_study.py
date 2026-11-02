@@ -15,6 +15,9 @@ class StudyTests(unittest.TestCase):
         report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
         self.assertEqual(report.split('<!-- BEGIN RESULTS -->\n')[1].split('\n<!-- END RESULTS -->')[0], output)
         self.assertEqual(report.split('<!-- BEGIN DIAGNOSTICS -->\n')[1].split('\n<!-- END DIAGNOSTICS -->')[0], study.diagnostics())
+        self.assertEqual(report.split('<!-- BEGIN REVIEW RESULTS -->\n')[1].split('\n<!-- END REVIEW RESULTS -->')[0], study.review_tables())
+        self.assertEqual(report.split('<!-- BEGIN MENU RESULTS -->\n')[1].split('\n<!-- END MENU RESULTS -->')[0], study.menu_tables())
+        self.assertEqual(report.split('<!-- BEGIN ZOOM RESULTS -->\n')[1].split('\n<!-- END ZOOM RESULTS -->')[0], study.zoom_tables())
 
 
 if __name__ == '__main__':

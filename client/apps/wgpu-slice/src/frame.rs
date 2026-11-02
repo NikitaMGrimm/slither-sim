@@ -342,11 +342,19 @@ impl Frame {
     }
     /// Expand retained inputs into the unchanged ordered image stream for parity.
     pub fn canonical(&self) -> Result<Self> {
-        let mut frame = self.clone();
-        if let Some(batch) = frame.food_batch.take() {
-            frame.draws = batch.canonical(&frame.draws)?;
+        if let Some(batch) = &self.food_batch {
+            self.check_limits()?;
+            return Ok(Self {
+                identity: self.identity,
+                extent: self.extent,
+                viewport_scale: self.viewport_scale,
+                tick: self.tick,
+                draws: batch.canonical(&self.draws)?,
+                food_batch: None,
+                snakes: self.snakes.clone(),
+            });
         }
-        Ok(frame)
+        Ok(self.clone())
     }
     pub fn check_limits(&self) -> Result<()> {
         check_draw_count(self.draw_count())?;

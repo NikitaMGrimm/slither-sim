@@ -9,8 +9,50 @@ use crate::{
     frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
     pellet_batch::{Batch, Instance, Sources, exact_instance, glow_pair},
 };
-use slither_client::presentation::FoodSource;
+use slither_client::presentation::{FoodSource, food_body_alpha, food_pulse};
 use std::{ops::Range, sync::Arc};
+
+fn timestamp_indices(
+    per_pass: Option<(u32, u32)>,
+    first: bool,
+    last: bool,
+) -> (Option<u32>, Option<u32>) {
+    per_pass.map_or((first.then_some(0), last.then_some(1)), |(a, b)| {
+        (Some(a), Some(b))
+    })
+}
+
+fn pass_timestamp_indices(
+    _r: &mut Renderer,
+    _name: &'static str,
+    first: bool,
+    last: bool,
+) -> RenderResult<(Option<u32>, Option<u32>)> {
+    #[cfg(feature = "frame-profile")]
+    let per_pass = if _r.diagnostic_passes.is_some() {
+        Some(_r.diagnostic_pass(_name)?)
+    } else {
+        None
+    };
+    #[cfg(not(feature = "frame-profile"))]
+    let per_pass = None;
+    // Aggregate queries bracket all submitted glow/world passes; middle passes
+    // must not overwrite either endpoint. Per-pass diagnostics keep both writes.
+    Ok(timestamp_indices(per_pass, first, last))
+}
+
+fn timestamp_writes(
+    r: &Renderer,
+    (beginning, end): (Option<u32>, Option<u32>),
+) -> Option<wgpu::RenderPassTimestampWrites<'_>> {
+    r.diagnostic_timestamps.as_ref().and_then(|set| {
+        (beginning.is_some() || end.is_some()).then_some(wgpu::RenderPassTimestampWrites {
+            query_set: set,
+            beginning_of_pass_write_index: beginning,
+            end_of_pass_write_index: end,
+        })
+    })
+}
 
 struct SourceDraw {
     source: FoodSource,
@@ -276,13 +318,14 @@ impl Pellets {
                 continue;
             }
             let f = food.snapshot();
-            let pulse = 0.5 + 0.5 * (f.animation_phase / 13.).cos();
+            let pulse = food_pulse(f);
             let glows = [
                 glow_pair(frame, f, b.view, false, pulse)?,
                 glow_pair(frame, f, b.view, true, pulse)?,
             ];
             let mut bits = 1;
-            if zero_pair(f.fade as f32, (pulse * f.fade) as f32) {
+            let body_alpha = food_body_alpha(f, 1., pulse);
+            if zero_pair(body_alpha[0] as f32, body_alpha[1] as f32) {
                 bits |= 32;
             }
             for (outer, (q, second)) in glows.iter().enumerate() {
@@ -348,6 +391,11 @@ impl Pellets {
         b: &Batch,
         part: Range<usize>,
     ) -> usize {
+        // Batch admission requires black food outlines and an empty world prefix;
+        // render_inner requires a black clear. Those outlines cannot change black
+        // pixels, so only the body/inner/outer pairs are encoded. A menu backdrop
+        // canonicalizes the batch first. See
+        // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-retained-pellets/REPORT.md.
         pass.set_bind_group(1, &self.frame_bind, &[]);
         pass.set_index_buffer(r.indices.slice(0..12), wgpu::IndexFormat::Uint16);
         let mut draws = 0;
@@ -393,28 +441,11 @@ impl Pellets {
         clear: bool,
         parts: Range<usize>,
         name: &'static str,
+        first: bool,
     ) -> RenderResult<usize> {
         let mut encoder = r.device.create_command_encoder(&Default::default());
-        #[cfg(feature = "frame-profile")]
-        let queries = r.diagnostic_pass(name)?;
-        #[cfg(not(feature = "frame-profile"))]
-        let writes = r
-            .diagnostic_timestamps
-            .as_ref()
-            .map(|set| wgpu::RenderPassTimestampWrites {
-                query_set: set,
-                beginning_of_pass_write_index: Some(0),
-                end_of_pass_write_index: Some(1),
-            });
-        #[cfg(feature = "frame-profile")]
-        let writes = r
-            .diagnostic_timestamps
-            .as_ref()
-            .map(|set| wgpu::RenderPassTimestampWrites {
-                query_set: set,
-                beginning_of_pass_write_index: Some(queries.0),
-                end_of_pass_write_index: Some(queries.1),
-            });
+        let indices = pass_timestamp_indices(r, name, first, false)?;
+        let writes = timestamp_writes(r, indices);
         let draws = {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some(name),
@@ -498,31 +529,14 @@ impl Pellets {
                     true,
                     1..3,
                     ["food-glows-half", "food-glows-fine", "food-glows-coarse"][i],
+                    passes == 1,
                 )?;
                 passes += 1;
             }
         }
         let mut encoder = r.device.create_command_encoder(&Default::default());
-        #[cfg(feature = "frame-profile")]
-        let queries = r.diagnostic_pass("world")?;
-        #[cfg(not(feature = "frame-profile"))]
-        let writes = r
-            .diagnostic_timestamps
-            .as_ref()
-            .map(|set| wgpu::RenderPassTimestampWrites {
-                query_set: set,
-                beginning_of_pass_write_index: Some(0),
-                end_of_pass_write_index: Some(1),
-            });
-        #[cfg(feature = "frame-profile")]
-        let writes = r
-            .diagnostic_timestamps
-            .as_ref()
-            .map(|set| wgpu::RenderPassTimestampWrites {
-                query_set: set,
-                beginning_of_pass_write_index: Some(queries.0),
-                end_of_pass_write_index: Some(queries.1),
-            });
+        let indices = pass_timestamp_indices(r, "world", passes == 1, true)?;
+        let writes = timestamp_writes(r, indices);
         {
             let world = r
                 .multisample
@@ -674,5 +688,30 @@ impl Renderer {
             }
         }
         Ok(mapped)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::timestamp_indices;
+
+    #[test]
+    fn aggregate_timestamps_bracket_zero_to_three_glow_passes_and_world() {
+        for glows in 0..=3 {
+            let writes: Vec<_> = (0..=glows)
+                .map(|pass| timestamp_indices(None, pass == 0, pass == glows))
+                .collect();
+            assert_eq!(writes[0].0, Some(0));
+            assert_eq!(writes[glows].1, Some(1));
+            assert!(writes[1..].iter().all(|w| w.0.is_none()));
+            assert!(writes[..glows].iter().all(|w| w.1.is_none()));
+            for pass in 0..=glows {
+                let pair = (pass as u32 * 2, pass as u32 * 2 + 1);
+                assert_eq!(
+                    timestamp_indices(Some(pair), pass == 0, pass == glows),
+                    (Some(pair.0), Some(pair.1))
+                );
+            }
+        }
     }
 }

@@ -232,6 +232,11 @@ impl Batch {
         if self.early_at > self.late_at || self.late_at > draws.len() {
             return Err("invalid retained food barriers".into());
         }
+        let count = draws
+            .len()
+            .checked_add(self.draw_count())
+            .ok_or(crate::frame::DRAW_MEMORY_LIMIT)?;
+        crate::frame::check_draw_count(count)?;
         let mut index = FoodAssetIndex::default();
         let plan = plan_food_with_index(
             FoodPaintInput {
@@ -251,8 +256,17 @@ impl Batch {
             Vec::new(),
             Vec::new(),
         )
-        .map_err(|e| e.to_string())?;
-        let mut result = Vec::with_capacity(draws.len() + self.draw_count());
+        .map_err(|e| {
+            if e == FoodPaintError::Allocation {
+                crate::frame::DRAW_ALLOCATION_FAILED.to_owned()
+            } else {
+                e.to_string()
+            }
+        })?;
+        let mut result = Vec::new();
+        result
+            .try_reserve_exact(count)
+            .map_err(|_| crate::frame::DRAW_ALLOCATION_FAILED)?;
         result.extend_from_slice(&draws[..self.early_at]);
         result.extend(plan.early.iter().map(Draw::from));
         result.extend_from_slice(&draws[self.early_at..self.late_at]);
@@ -275,35 +289,27 @@ fn project_food(
     alpha: f64,
 ) -> Result<crate::frame::Quad> {
     let a = source.asset();
-    let whole = f.scale == 1.;
-    let destination = BodyRect {
-        x: center.x - source.half_width() * f.scale,
-        y: center.y - source.half_height() * f.scale,
-        width: if whole {
-            f64::from(a.width)
-        } else {
-            source.width() * f.scale
-        },
-        height: if whole {
-            f64::from(a.height)
-        } else {
-            source.height() * f.scale
-        },
-    };
-    let source = BodyRect {
-        x: 0.,
-        y: 0.,
-        width: if whole {
-            f64::from(a.width)
-        } else {
-            source.width()
-        },
-        height: if whole {
-            f64::from(a.height)
-        } else {
-            source.height()
-        },
-    };
+    let (source, destination) =
+        match food_image_draw(source, center, f.scale, 1.).map_err(|e| e.to_string())? {
+            FoodImageDraw::Whole { x, y } => (
+                BodyRect {
+                    x: 0.,
+                    y: 0.,
+                    width: f64::from(a.width),
+                    height: f64::from(a.height),
+                },
+                BodyRect {
+                    x,
+                    y,
+                    width: f64::from(a.width),
+                    height: f64::from(a.height),
+                },
+            ),
+            FoodImageDraw::Scaled {
+                source,
+                destination,
+            } => (source, destination),
+        };
     frame.project(
         &Draw {
             asset: a,
@@ -327,30 +333,10 @@ pub(crate) fn glow_pair(
     outer: bool,
     pulse: f64,
 ) -> Result<(crate::frame::Quad, f32)> {
-    let source = if outer {
-        f.sources.outer
-    } else {
-        f.sources.inner
-    };
-    let dx = f.render_position.x - view.camera.x;
-    let dy = f.render_position.y - view.camera.y;
-    let distance = dx * dx + dy * dy;
-    let mut alpha = if outer {
-        0.085 * (1. - distance / (16500. + distance))
-    } else {
-        0.005 + 0.09 * (1. - distance / (86000. + distance))
-    };
-    if f.scale != 1. {
-        alpha *= f.scale.powf(0.25);
-    }
-    let t = 1. + if outer { 0.32 } else { 0.06 } * f.scale;
-    let center = Point {
-        x: dx * t * view.zoom + view.half_width,
-        y: dy * t * view.zoom + view.half_height,
-    };
+    let glow = food_glow_paint(f, view, outer, 1., pulse).map_err(|e| e.to_string())?;
     Ok((
-        project_food(frame, f, source, center, alpha * f.fade)?,
-        (alpha * pulse * f.fade) as f32,
+        project_food(frame, f, glow.source, glow.center, glow.alpha[0])?,
+        glow.alpha[1] as f32,
     ))
 }
 pub(crate) fn exact_instance(
@@ -360,13 +346,10 @@ pub(crate) fn exact_instance(
     glows: &[(crate::frame::Quad, f32); 2],
     pulse: f64,
 ) -> Result<Instance> {
-    let center = Point {
-        x: view.half_width + view.zoom * (f.render_position.x - view.camera.x),
-        y: view.half_height + view.zoom * (f.render_position.y - view.camera.y),
-    };
+    let center = food_body_center(f, view);
     let body = project_food(frame, f, f.sources.body, center, f.fade)?;
     let pairs = [
-        (&body, (pulse * f.fade) as f32),
+        (&body, food_body_alpha(f, 1., pulse)[1] as f32),
         (&glows[0].0, glows[0].1),
         (&glows[1].0, glows[1].1),
     ];
@@ -548,6 +531,96 @@ mod tests {
     }
 
     #[test]
+    fn menu_backdrop_expands_batches_in_order_and_failed_admission_publishes_nothing() {
+        use crate::{menu::MenuFrame, render::PreparedFrame};
+        let mut bank = Bank::new().unwrap();
+        let world = rectangle(&bank);
+        let b = batch(&mut Cache::default(), &mut bank, &world, view());
+        let frame = Frame {
+            identity: 7,
+            extent: [1500, 844],
+            viewport_scale: 1.,
+            tick: 0,
+            draws: Vec::new(),
+            food_batch: Some(b),
+            snakes: Vec::new(),
+        };
+        let original = PreparedFrame {
+            resources: bank.resources(&frame).unwrap(),
+            frame,
+            overlay: None,
+        };
+        for overlay in [false, true] {
+            let mut actual = original.clone();
+            if overlay {
+                actual.overlay = Some(Frame {
+                    food_batch: None,
+                    ..actual.frame.clone()
+                });
+            }
+            let mut expected = actual.clone();
+            let composed = MenuFrame::world_crossfade([1500, 844], 1., 0.4)
+                .unwrap()
+                .compose_over(&actual)
+                .unwrap();
+            expected.frame = expected.frame.canonical().unwrap();
+            MenuFrame::world_crossfade([1500, 844], 1., 0.4)
+                .unwrap()
+                .append_to(&mut expected)
+                .unwrap();
+            assert!(
+                MenuFrame::append_optional(
+                    MenuFrame::world_crossfade([1500, 844], 1., 0.4),
+                    &mut actual,
+                )
+                .unwrap()
+            );
+            assert_eq!(actual.frame, expected.frame);
+            assert_eq!(actual.overlay, expected.overlay);
+            assert_eq!(actual.frame, composed.frame);
+            assert_eq!(actual.overlay, composed.overlay);
+            assert!(actual.frame.food_batch.is_none());
+        }
+
+        let mut cover_only = original.clone();
+        let mut page = MenuFrame::world_crossfade([1500, 844], 1., 0.4).unwrap();
+        page.backdrop = None;
+        let cover = page.world_cover.clone().unwrap();
+        page.append_to(&mut cover_only).unwrap();
+        assert!(cover_only.frame.food_batch.is_some());
+        let mut expected = original.frame.canonical().unwrap().draws;
+        expected.push(cover);
+        assert_eq!(cover_only.frame.canonical().unwrap().draws, expected);
+
+        for invalid_barrier in [false, true] {
+            let mut rejected = original.clone();
+            let b = rejected.frame.food_batch.as_mut().unwrap();
+            if invalid_barrier {
+                b.late_at = 1;
+            } else {
+                b.visible_count = crate::frame::MAX_DRAWS;
+            }
+            let before = rejected.frame.clone();
+            let resources: Vec<_> = rejected.resources.iter().map(|r| r.asset).collect();
+            assert!(
+                MenuFrame::world_crossfade([1500, 844], 1., 0.4)
+                    .unwrap()
+                    .append_to(&mut rejected)
+                    .is_err()
+            );
+            assert_eq!(rejected.frame, before);
+            assert_eq!(
+                rejected
+                    .resources
+                    .iter()
+                    .map(|r| r.asset)
+                    .collect::<Vec<_>>(),
+                resources
+            );
+        }
+    }
+
+    #[test]
     fn static_cache_does_not_share_live_food_but_queued_pictures_stay_frozen() {
         let mut bank = Bank::new().unwrap();
         let mut world = rectangle(&bank);
@@ -631,7 +704,7 @@ mod tests {
             world.advance(step(2.31), |_| unreachable!()).unwrap();
             for i in (0..world.foods().len()).step_by(179) {
                 let food = world.foods()[i].snapshot();
-                let pulse = 0.5 + 0.5 * (food.animation_phase / 13.).cos();
+                let pulse = food_pulse(food);
                 let glows = [
                     glow_pair(&frame, food, view(), false, pulse).unwrap(),
                     glow_pair(&frame, food, view(), true, pulse).unwrap(),
@@ -872,6 +945,110 @@ mod tests {
                 "instanced pixels exceed existing paired-addition rounding"
             );
         }
+        assert!(pollster::block_on(scope.pop()).is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "explicit authored offscreen timestamp and prefix validation"]
+    fn aggregate_queries_and_nonblack_prefix_use_complete_retained_picture() {
+        use crate::gpu::{Renderer, instance};
+        let adapter = pollster::block_on(instance().enumerate_adapters(wgpu::Backends::DX12))
+            .into_iter()
+            .find(|a| a.get_info().device_type == wgpu::DeviceType::IntegratedGpu)
+            .expect("explicit iGPU probe");
+        let mut renderer = pollster::block_on(Renderer::from_adapter_for_diagnostics(
+            adapter,
+            wgpu::TextureFormat::Rgba8Unorm,
+            4,
+            true,
+        ))
+        .unwrap();
+        let scope = renderer
+            .device
+            .push_error_scope(wgpu::ErrorFilter::Validation);
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        for _ in 0..12 {
+            world.advance(step(5.), |_| unreachable!()).unwrap();
+        }
+        let b = batch(&mut Cache::default(), &mut bank, &world, view());
+        let extent = [1500, 844];
+        let mut frame = Frame {
+            identity: 1,
+            extent,
+            viewport_scale: 1.,
+            tick: 0,
+            draws: Vec::new(),
+            food_batch: Some(b),
+            snakes: Vec::new(),
+        };
+        let target = offscreen::target(&renderer, extent);
+        let mut resources = bank.resources(&frame).unwrap();
+        renderer.sync_resources(&resources).unwrap();
+        renderer
+            .render(&frame, &target.create_view(&Default::default()))
+            .unwrap();
+        assert!(
+            renderer.world_pass_count() > 1,
+            "authored scene must exercise glow passes"
+        );
+        // Do not begin_diagnostic_frame: query 0 must survive the glow passes,
+        // and query 1 is written only after the final world pass.
+        let resolve = renderer.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 256,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let read = renderer.device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 16,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+        let mut encoder = renderer.device.create_command_encoder(&Default::default());
+        encoder.resolve_query_set(renderer.diagnostic_timestamps().unwrap(), 0..2, &resolve, 0);
+        encoder.copy_buffer_to_buffer(&resolve, 0, &read, 0, 16);
+        renderer.queue.submit([encoder.finish()]);
+        let (send, receive) = std::sync::mpsc::channel();
+        read.slice(..).map_async(wgpu::MapMode::Read, move |r| {
+            send.send(r).unwrap();
+        });
+        renderer
+            .device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: None,
+            })
+            .unwrap();
+        receive.recv().unwrap().unwrap();
+        let bytes = read.slice(..).get_mapped_range().unwrap();
+        let start = u64::from_le_bytes(bytes[..8].try_into().unwrap());
+        let end = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
+        assert!(end > start);
+        drop(bytes);
+        read.unmap();
+
+        let page = crate::menu::MenuFrame::world_crossfade(extent, 1., 1.).unwrap();
+        frame.draws.push(page.backdrop.clone().unwrap());
+        let b = frame.food_batch.as_mut().unwrap();
+        b.early_at += 1;
+        b.late_at += 1;
+        resources.extend(page.resources);
+        renderer.sync_resources(&resources).unwrap();
+        let canonical = frame.canonical().unwrap();
+        let reference = offscreen::target(&renderer, extent);
+        renderer
+            .render(&frame, &target.create_view(&Default::default()))
+            .unwrap();
+        renderer
+            .render(&canonical, &reference.create_view(&Default::default()))
+            .unwrap();
+        assert_eq!(
+            offscreen::pixels(&renderer, &target).unwrap(),
+            offscreen::pixels(&renderer, &reference).unwrap()
+        );
         assert!(pollster::block_on(scope.pop()).is_none());
     }
 }
