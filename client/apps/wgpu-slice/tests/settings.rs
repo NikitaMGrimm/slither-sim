@@ -165,7 +165,7 @@ fn pointer_blur_resize_and_mutually_exclusive_entry() {
         slither_client::settings::WorldResolution::Native
     );
     assert_eq!(login.state.view(true).quality, Q::Low);
-    login.close_settings(true);
+    login.close_settings();
     login.open_studio();
     login.open_settings(true);
     assert!(!login.state.settings.visible());
@@ -395,7 +395,7 @@ fn fade_reverses_continuously_and_return_keeps_modal_input_until_finished() {
     login.step(9715., true, false).unwrap();
     let alpha = login.state.settings.alpha();
     assert!(alpha > 0. && alpha < 1.);
-    login.close_settings(true);
+    login.close_settings();
     assert_eq!(login.state.settings.alpha(), alpha);
     assert!(login.egui.active());
     login.step(9945., true, false).unwrap();
@@ -411,7 +411,7 @@ fn native_settings_uses_the_shared_picker_fade_durations() {
         login.step(now as f64, true, false).unwrap();
     }
     assert_eq!(login.state.settings.alpha(), 1.);
-    login.close_settings(true);
+    login.close_settings();
     assert!(login.egui.active());
     for now in (10_016..=10_320).step_by(16) {
         login.step(now as f64, true, false).unwrap();
@@ -451,7 +451,7 @@ fn egui_shift_tab_repeats_and_previous_mount_pointer_release() {
     assert_eq!(login.state.settings.preferences().quality, Q::Low);
     let pos = point(&login, RESOLUTION, [960., 540.]);
     login.pointer(pos, Some(true), true);
-    login.close_settings(true);
+    login.close_settings();
     login.step(9916., true, false).unwrap();
     login.step(9932., true, false).unwrap();
     login.open_settings(true);
@@ -476,6 +476,93 @@ fn backdrop_closes_on_matching_release_and_retains_the_return_fade() {
     assert!(!login.state.settings.is_open());
     assert!(login.state.settings.visible());
     assert!(login.blocks_gameplay());
+}
+
+#[test]
+fn another_button_cannot_hand_a_primary_press_to_a_settings_control() {
+    use egui::PointerButton::{Middle, Primary, Secondary};
+    for other in [Secondary, Middle] {
+        let mut login = settled();
+        login.open_settings(true);
+        for now in (9616..=10_000).step_by(16) {
+            login.step(now as f64, true, false).unwrap();
+        }
+        login.prepare([960, 540], true, None).unwrap();
+        let [quality, done] = [QUALITY, DONE].map(|id| {
+            let p = point(&login, id, [960., 540.]);
+            egui::pos2(p[0] as f32, p[1] as f32)
+        });
+        for (pos, button, pressed) in [
+            (quality, Primary, true),
+            (done, other, true),
+            (done, Primary, false),
+            (done, other, false),
+        ] {
+            login.settings_input(egui::RawInput {
+                events: vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button,
+                        pressed,
+                        modifiers: Default::default(),
+                    },
+                ],
+                ..Default::default()
+            });
+        }
+        assert!(login.state.settings.is_open(), "{other:?}");
+    }
+}
+
+/// Scrolling moves a held toggle, so its release no longer matches the press,
+/// even after scrolling back.
+#[test]
+fn a_scroll_that_moves_a_held_toggle_retires_its_press() {
+    const SMALL: [u32; 2] = [640, 360];
+    for wheels in [&[-2.][..], &[-10., 10.][..]] {
+        let mut login = settled();
+        login.prepare(SMALL, true, None).unwrap();
+        login.open_settings(true);
+        let mut now = 9616;
+        while now <= 10_000 {
+            login.step(f64::from(now), true, false).unwrap();
+            now += 16;
+        }
+        for _ in 0..3 {
+            login.prepare(SMALL, true, None).unwrap();
+        }
+        let p = point(&login, QUALITY, [640., 360.]);
+        login.pointer(p, Some(true), true);
+        for delta in wheels {
+            login.settings_input(egui::RawInput {
+                events: vec![egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Point,
+                    delta: egui::vec2(0., *delta),
+                    phase: egui::TouchPhase::Move,
+                    source: egui::MouseWheelSource::Unknown,
+                    modifiers: Default::default(),
+                }],
+                ..Default::default()
+            });
+            now += 16;
+            login.step(f64::from(now), true, false).unwrap();
+            for _ in 0..3 {
+                login.prepare(SMALL, true, None).unwrap();
+            }
+        }
+        let end = point(&login, QUALITY, [640., 360.]);
+        if wheels.len() == 1 {
+            assert_ne!(p, end);
+        }
+        login.pointer(end, Some(false), true);
+        assert_eq!(login.state.view(true).quality, Q::High, "{wheels:?}");
+        // A fresh click on the toggle acts.
+        login.prepare(SMALL, true, None).unwrap();
+        login.pointer(end, Some(true), true);
+        login.pointer(end, Some(false), true);
+        assert_eq!(login.state.view(true).quality, Q::Low, "{wheels:?}");
+    }
 }
 
 #[test]
@@ -510,7 +597,7 @@ fn reopening_a_short_panel_reveals_its_initial_keyboard_control() {
         login.prepare([640, 360], true, None).unwrap();
     }
     assert_eq!(login.settings_ui.focused(), Some(RESOLUTION));
-    login.close_settings(true);
+    login.close_settings();
     login.open_settings(true);
     assert_eq!(login.settings_ui.focused(), Some(QUALITY));
     assert!(
@@ -949,14 +1036,14 @@ fn modal_cursor_handoff_uses_the_latest_physical_position_without_another_move()
     let mut login = settled();
     login.prepare([960, 540], true, None).unwrap();
     let opener = login
-        .panel
-        .resolve([960., 540.])
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == SETTINGS)
         .unwrap()
-        .into_iter()
-        .find(|r| r.control.id == SETTINGS)
-        .unwrap()
-        .rect;
-    let start = [opener.x + opener.width / 2., opener.y + opener.height / 2.];
+        .1
+        .center();
+    let start = [f64::from(opener.x), f64::from(opener.y)];
     let moved = |p: [f64; 2]| WindowEvent::CursorMoved {
         device_id: DeviceId::dummy(),
         position: PhysicalPosition::new(p[0], p[1]),

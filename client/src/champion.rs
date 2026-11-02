@@ -1,7 +1,6 @@
 //! Champion composition/policy, admitted only by committed session victory.
 use crate::{
     menu_controls::*,
-    menu_input::{EditorId, TextRule},
     menu_theme::ControlStyle,
     session_policy::{Phase, View},
 };
@@ -109,9 +108,7 @@ impl ChampionState {
             visible: self.visible(),
             enabled,
             alpha: self.alpha,
-            modal: true,
             initial_focus: Some(MESSAGE),
-            restore_focus: None,
             controls: vec![
                 control(
                     ControlId(0),
@@ -149,11 +146,8 @@ impl ChampionState {
                     1.,
                     Some(0),
                     ControlKind::TextField {
-                        editor: EditorId::Champion,
                         placeholder: String::new(),
-                        rule: TextRule::Champion,
                         inset: [12.; 4],
-                        fit: false,
                     },
                 ),
                 control(

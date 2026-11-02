@@ -16,6 +16,7 @@ pub struct InGameUi {
     pub panel_rect: Rect,
     pub leave_rect: Rect,
     pub focused: bool,
+    backdrop_press: bool,
 }
 impl Default for InGameUi {
     fn default() -> Self {
@@ -23,6 +24,7 @@ impl Default for InGameUi {
             panel_rect: Rect::NOTHING,
             leave_rect: Rect::NOTHING,
             focused: false,
+            backdrop_press: false,
         }
     }
 }
@@ -49,10 +51,25 @@ impl InGameUi {
                 }
                 self.leave_rect = response.rect;
                 self.focused = response.has_focus();
-                response.clicked()
+                crate::egui_panel::owned_click(&response)
             });
         self.panel_rect = modal.response.rect;
-        if modal.should_close() {
+        // egui's modal paints its panel in the backdrop's layer, so its backdrop
+        // click doesn't look at the panel.
+        let on_backdrop = ctx
+            .input(|i| i.pointer.interact_pos())
+            .is_some_and(|pos| !self.panel_rect.contains(pos));
+        if ctx.input(|i| i.pointer.primary_pressed()) {
+            self.backdrop_press = on_backdrop;
+        }
+        let backdrop_click = self.backdrop_press
+            && on_backdrop
+            && modal
+                .backdrop_response
+                .clicked_by(egui::PointerButton::Primary);
+        let escape = modal.is_top_modal
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        if backdrop_click || escape {
             Some(Action::Dismiss)
         } else if modal.inner {
             Some(Action::Leave)

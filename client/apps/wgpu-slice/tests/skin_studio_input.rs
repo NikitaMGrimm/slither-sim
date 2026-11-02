@@ -29,18 +29,21 @@ fn key_admitted(login: &mut NativeLogin, named: NamedKey, admission: bool) {
     assert!(result.consumed);
 }
 fn click(login: &mut NativeLogin, id: ControlId, down: bool) {
-    let panel = if login.studio.state.visible() {
-        &login.studio_panel
+    let point = if login.studio.state.visible() {
+        let resolved = login.studio_panel.resolve([960., 540.]).unwrap();
+        let r = resolved.iter().find(|c| c.control.id == id).unwrap().rect;
+        [r.x + r.width / 2., r.y + r.height / 2.]
     } else {
-        &login.panel
+        let r = login
+            .login_ui
+            .controls
+            .iter()
+            .find(|c| c.0 == id)
+            .unwrap()
+            .1;
+        [f64::from(r.center().x), f64::from(r.center().y)]
     };
-    let resolved = panel.resolve([960., 540.]).unwrap();
-    let r = resolved.iter().find(|c| c.control.id == id).unwrap();
-    login.pointer(
-        [r.rect.x + r.rect.width / 2., r.rect.y + r.rect.height / 2.],
-        Some(down),
-        false,
-    );
+    login.pointer(point, Some(down), false);
 }
 #[test]
 fn login_change_skin_opens_without_endpoint_and_save_returns_focus_after_fade() {
@@ -149,7 +152,10 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
         login.step(f64::from(now), true, false).unwrap();
     }
     login.prepare([960, 540], true, None).unwrap();
-    let resolved = login.panel.resolve([960., 540.]).unwrap();
+    let view = login.state.view(true);
+    let resolved = slither_client::login_controls::panel(&view, &login.layout, [960., 540.])
+        .resolve([960., 540.])
+        .unwrap();
     let skin = resolved
         .iter()
         .find(|r| r.control.id == CHANGE_SKIN)
@@ -161,10 +167,10 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
     assert_eq!(skin.rect.y, server.rect.y);
     assert!(settings.control.visible && settings.control.enabled);
     assert_eq!(skin.rect.y, settings.rect.y);
-    assert!(!skin.hit([
+    assert!(!skin.rect.contains(
         server.rect.x + server.rect.width / 2.,
         server.rect.y + server.rect.height / 2.
-    ]));
+    ));
     login.focus(NICKNAME);
     for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
         key_admitted(&mut login, NamedKey::Tab, true);
@@ -202,7 +208,6 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
 #[test]
 fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eight() {
     let mut peak = 0;
-    let mut admitted_peak = 0;
     for (section, save) in [
         (StudioSection::BuiltIn, false),
         (StudioSection::BuiltIn, true),
@@ -237,55 +242,29 @@ fn entry_return_overlap_and_rotated_preview_fit_shared_quotas_at_dpr_one_to_eigh
                     login.step(9600. + time, false, false).unwrap();
                 }
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
-                let draws = menu.frame.draws.len() + usize::from(menu.backdrop.is_some());
-                let counts = menu.draw_counts();
-                assert_eq!(counts.components.total(), menu.frame.draws.len());
-                assert_eq!(counts.reported_menu(), draws);
-                assert_eq!(
-                    counts.admitted_menu(),
-                    draws + usize::from(menu.world_cover.is_some())
-                );
-                admitted_peak = admitted_peak.max(counts.admitted_menu());
-                assert!(counts.admitted_menu() <= 512);
-                peak = peak.max(draws);
                 assert!(
-                    draws <= 512,
-                    "{section:?}, Save {save}, DPR {dpr}, t {time}: {draws}"
+                    menu.resources.len() <= 1,
+                    "{section:?}, Save {save}, DPR {dpr}"
                 );
-                assert!(menu.resources.len() <= 64);
-                assert!(
-                    menu.resources
-                        .iter()
-                        .map(|r| r.image.pixels.len())
-                        .sum::<usize>()
-                        <= 13 * 1024 * 1024
-                );
-                let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                    frame: menu.frame,
-                    overlay: None,
-                    resources: menu.resources,
-                };
                 if login.studio.state.visible() {
-                    login.studio.append_preview(&mut picture, None).unwrap();
+                    let (preview, resources) =
+                        login.studio.prepare_preview(extent, dpr, None).unwrap();
+                    peak = peak.max(preview.draws.len());
+                    assert!(preview.draws.len() <= 1024);
+                    preview
+                        .validate(
+                            &resources
+                                .iter()
+                                .map(|r| (r.asset.into(), r.asset))
+                                .collect(),
+                        )
+                        .unwrap();
                 }
-                picture
-                    .frame
-                    .validate(
-                        &picture
-                            .resources
-                            .iter()
-                            .map(|r| (r.asset.into(), r.asset))
-                            .collect(),
-                    )
-                    .unwrap();
-                assert!(picture.draw_count() <= 1536);
                 login.studio.presented();
             }
         }
     }
-    println!(
-        "Studio entry/return with Settings: {peak}/512 reported; {admitted_peak}/512 admitted, including cover"
-    );
+    println!("Studio entry/return preview: {peak}/1024 draws");
 }
 
 #[test]
@@ -308,23 +287,8 @@ fn login_constructor_and_champion_return_retain_their_existing_normalization_and
         login.champion.policy.step(time, 1.).unwrap();
     }
     login.prepare_host([960, 540], 1., true, None).unwrap();
-    for id in [
-        slither_client::login_controls::NICKNAME,
-        slither_client::login_controls::PLAY,
-        CHANGE_SKIN,
-        slither_client::login_controls::SERVER,
-    ] {
-        assert_eq!(
-            login
-                .panel
-                .controls
-                .iter()
-                .find(|c| c.id == id)
-                .unwrap()
-                .alpha,
-            0.
-        );
-    }
+    // The returning controls start invisible and fade in on the policy's clock.
+    assert_eq!(login.champion.policy.ordinary_alpha(), 0.);
 }
 
 #[test]
@@ -342,8 +306,8 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
             for (time, skin) in [(9715., 1), (9830., 2)] {
                 login.step(time, false, false).unwrap();
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
-                assert_eq!(menu.frame.viewport_scale, dpr);
-                assert_eq!(menu.frame.extent, extent);
+                assert_eq!(menu.viewport_scale, dpr);
+                assert_eq!(menu.extent, extent);
                 let resolved = login.studio_panel.resolve([960., height]).unwrap();
                 let next = resolved.iter().find(|r| r.control.id == NEXT).unwrap();
                 let r = next.rect;
@@ -351,7 +315,6 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
                     [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr],
                     dpr,
                 );
-                assert!(next.hit(point));
                 // The egui widget is drawn and hit at the core rectangle.
                 let widget = login
                     .studio_ui
@@ -364,19 +327,12 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
                 login.pointer(point, Some(true), false);
                 login.pointer(point, Some(false), false);
                 assert_eq!(login.studio.state.draft().unwrap().record.builtin, skin);
-                let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                    frame: menu.frame,
-                    overlay: None,
-                    resources: menu.resources,
-                };
-                login.studio.append_preview(&mut picture, None).unwrap();
-                assert!(picture.draw_count() <= 1536);
-                assert_eq!(picture.ui_frame().viewport_scale, dpr);
-                picture
-                    .frame
+                let (preview, resources) = login.studio.prepare_preview(extent, dpr, None).unwrap();
+                assert!(preview.draws.len() <= 1024);
+                assert_eq!(preview.viewport_scale, dpr);
+                preview
                     .validate(
-                        &picture
-                            .resources
+                        &resources
                             .iter()
                             .map(|r| (r.asset.into(), r.asset))
                             .collect(),
@@ -416,7 +372,6 @@ fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
         assert!(!login.studio.state.visible());
         assert_eq!(login.focused(), Some(CHANGE_SKIN));
         assert_eq!(login.login_ui.keyboard_focus, keyboard);
-        assert!(login.controls.capture().is_none());
         assert!(
             !login
                 .egui
@@ -425,11 +380,6 @@ fn studio_round_trip_restores_opener_modality_and_clears_pointer_feedback() {
                 .input(|i| i.pointer.any_down())
         );
         assert!(login.egui.context().unwrap().dragged_id().is_none());
-        let returned = login.prepare([960, 540], false, None).unwrap();
-        // Moving the pointer away cannot remove any additional stale ring/press paint.
-        login.pointer([-1., -1.], None, false);
-        let away = login.prepare([960, 540], false, None).unwrap();
-        assert_eq!(returned.frame.draws.len(), away.frame.draws.len());
     }
 }
 
@@ -464,6 +414,115 @@ fn a_press_focuses_its_control_and_the_release_activates_it() {
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 2);
     assert!(login.studio_ui.keyboard_focus);
+}
+
+#[test]
+fn studio_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
+    for drag in [false, true] {
+        let mut login = opened_studio();
+        let hold = |login: &mut NativeLogin, p: [f64; 2]| {
+            login.pointer(p, Some(true), false);
+            if drag {
+                login.pointer([p[0] + 200., 2.], None, false);
+                login.prepare([960, 540], false, None).unwrap();
+                login.pointer(p, None, false);
+            } else {
+                login.step(1500., false, false).unwrap();
+            }
+            login.prepare([960, 540], false, None).unwrap();
+            login.pointer(p, Some(false), false);
+        };
+        let next = center(&login, NEXT);
+        hold(&mut login, next);
+        assert_eq!(
+            login.studio.state.draft().unwrap().record.builtin,
+            1,
+            "{drag}"
+        );
+        hold(&mut login, [2., 2.]);
+        login.step(5000., false, false).unwrap();
+        assert!(!login.studio.state.visible(), "{drag}");
+    }
+    // A press on Next released elsewhere changes nothing.
+    let mut login = opened_studio();
+    let next = center(&login, NEXT);
+    login.pointer(next, Some(true), false);
+    login.pointer([next[0] + 200., 2.], Some(false), false);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    // A backdrop press released over the panel keeps the studio.
+    login.pointer([2., 2.], Some(true), false);
+    login.prepare([960, 540], false, None).unwrap();
+    login.pointer(next, Some(false), false);
+    login.step(5000., false, false).unwrap();
+    assert!(login.studio.state.visible());
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+}
+
+/// A key the studio ignores leaves the held press; one it handles retires it, so
+/// the release can't act on top of the key.
+#[test]
+fn only_keys_the_studio_handles_retire_the_held_press() {
+    let tap = |key: egui::Key| {
+        let mut login = opened_studio();
+        let next = center(&login, NEXT);
+        login.pointer(next, Some(true), false);
+        for pressed in [true, false] {
+            login.settings_input(egui::RawInput {
+                events: vec![arrow(key, pressed)],
+                ..Default::default()
+            });
+        }
+        login.prepare([960, 540], false, None).unwrap();
+        let after_key = login.studio.state.draft().unwrap().record.builtin;
+        login.pointer(next, Some(false), false);
+        (
+            after_key,
+            login.studio.state.draft().unwrap().record.builtin,
+        )
+    };
+    for key in [egui::Key::A, egui::Key::F1] {
+        assert_eq!(tap(key), (0, 1), "{key:?}");
+    }
+    assert_eq!(tap(egui::Key::Enter), (1, 1));
+    let (left, released) = tap(egui::Key::ArrowLeft);
+    assert_ne!(left, 0);
+    assert_eq!(released, left);
+}
+
+/// Arrow keys can move the cosmetic window under a press, as the wheel can.
+#[test]
+fn a_keyboard_moved_cosmetic_window_retires_the_held_press() {
+    let mut login = opened_studio();
+    login.studio.activate(COSMETICS_TAB, "Player");
+    login.step(500., false, false).unwrap();
+    login.prepare([960, 540], false, None).unwrap();
+    let cell = ControlId(COSMETIC_BASE + 5);
+    let middle = |login: &NativeLogin| {
+        let c = login
+            .studio_ui
+            .controls
+            .iter()
+            .find(|c| c.0 == cell)
+            .unwrap();
+        [f64::from(c.1.center().x), f64::from(c.1.center().y)]
+    };
+    let before = login.studio.state.preview_cosmetic();
+    let start = middle(&login);
+    login.pointer(start, Some(true), false);
+    assert_eq!(login.focused(), Some(cell));
+    for _ in 0..2 {
+        key(&mut login, NamedKey::ArrowDown);
+    }
+    login.prepare([960, 540], false, None).unwrap();
+    let end = middle(&login);
+    assert_ne!(start, end);
+    login.pointer(end, Some(false), false);
+    assert_eq!(login.studio.state.preview_cosmetic(), before);
+    // A fresh click on the same cell acts.
+    login.prepare([960, 540], false, None).unwrap();
+    login.pointer(end, Some(true), false);
+    login.pointer(end, Some(false), false);
+    assert_ne!(login.studio.state.preview_cosmetic(), before);
 }
 
 /// A section switch starts a new panel generation: a press held across it

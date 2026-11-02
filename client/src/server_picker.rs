@@ -1,10 +1,7 @@
 //! Server picker policy. Opening requests directory work only, never Play.
 #![allow(missing_docs)]
 use crate::{
-    menu_controls::*,
-    menu_input::{EditorId, TextRule},
-    menu_theme::ControlStyle as S,
-    server_directory::Server,
+    menu_controls::*, menu_input::TextRule, menu_theme::ControlStyle as S, server_directory::Server,
 };
 use std::collections::BTreeMap;
 
@@ -12,10 +9,8 @@ pub const SEARCH: ControlId = ControlId(2);
 pub const AUTOMATIC: ControlId = ControlId(3);
 pub const CLOSE: ControlId = ControlId(4);
 pub const BACKDROP: ControlId = ControlId(0);
-pub const SEARCH_EDITOR: EditorId = EditorId(2);
 pub const ADDRESS: ControlId = ControlId(9);
 pub const ADD_CUSTOM: ControlId = ControlId(10);
-pub const ADDRESS_EDITOR: EditorId = EditorId(3);
 pub const MAX_CUSTOM_SERVERS: usize = 32;
 pub const MAX_CUSTOM_ADDRESS: usize = 512;
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -538,11 +533,8 @@ impl ServerPicker {
             "Server address",
             Some(0),
             ControlKind::TextField {
-                editor: ADDRESS_EDITOR,
                 placeholder: "host:port".into(),
-                rule: TextRule::ServerAddress,
                 inset: [12., 0., 12., 0.],
-                fit: false,
             },
         );
         add(
@@ -581,11 +573,8 @@ impl ServerPicker {
             "Server ID",
             Some(2),
             ControlKind::TextField {
-                editor: SEARCH_EDITOR,
                 placeholder: "Server ID".into(),
-                rule: TextRule::NumericServer,
                 inset: [12., 0., 12., 0.],
-                fit: false,
             },
         );
         add(
@@ -773,9 +762,7 @@ impl ServerPicker {
             // Keep visual states through exit; activation still rechecks `open`.
             enabled: self.visible(),
             alpha: self.alpha,
-            modal: self.visible(),
             initial_focus: Some(ADDRESS),
-            restore_focus: None,
             controls,
         }
     }

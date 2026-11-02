@@ -38,7 +38,7 @@ fn aggregate_clipped_allocation_envelope_includes_overhang_rounding_and_tiles() 
     assert!(preflight_panel_totals(0, [89, 0]).is_err());
     assert_eq!(
         (PANEL_CACHE_RUNS, TOTAL_CACHE_RUNS, TOTAL_CACHE_BYTES),
-        (64, 386, 31 * 1024 * 1024)
+        (64, 322, 18 * 1024 * 1024)
     );
     assert_eq!((PANEL_PRODUCER_DRAWS, PANEL_CONTROL_DRAWS), (96, 8));
 }
@@ -67,12 +67,12 @@ fn plan(cache: &mut TextCache, text: &str, width: f64, max_runs: usize) -> Panel
 fn native_faces_are_real_and_family_slant_weight_change_pixels() {
     let mut c = TextCache::default();
     let mut images = Vec::new();
-    for (family, slant, weight, file) in [
-        (Family::Arial, Slant::Normal, Weight::Normal, "arial.ttf"),
-        (Family::Arial, Slant::Italic, Weight::Normal, "ariali.ttf"),
-        (Family::Arial, Slant::Italic, Weight::Bold, "arialbi.ttf"),
-        (Family::Lucida, Slant::Normal, Weight::Normal, "l_10646.ttf"),
-        (Family::Lucida, Slant::Normal, Weight::Bold, "arialbd.ttf"),
+    for (family, slant, weight) in [
+        (Family::Arial, Slant::Normal, Weight::Normal),
+        (Family::Arial, Slant::Italic, Weight::Normal),
+        (Family::Arial, Slant::Italic, Weight::Bold),
+        (Family::Lucida, Slant::Normal, Weight::Normal),
+        (Family::Lucida, Slant::Normal, Weight::Bold),
     ] {
         let style = TextStyle {
             family,
@@ -80,7 +80,6 @@ fn native_faces_are_real_and_family_slant_weight_change_pixels() {
             weight,
             ..style()
         };
-        assert_eq!(TextCache::native_face(style), file);
         let mut p = plan(&mut c, "AV fi café", 300., 48);
         p.runs[0].style = style;
         let out = c

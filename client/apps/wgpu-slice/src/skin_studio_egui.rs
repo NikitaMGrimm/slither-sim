@@ -154,7 +154,7 @@ impl StudioUi {
                         theme::ink(tokens.backdrop)
                             .gamma_multiply(backdrop.control.alpha as f32 * alpha),
                     );
-                    if interactive && response.clicked() && !suppress {
+                    if widgets::pointer_click(&response) && interactive && !suppress {
                         intents.push(intent(BACKDROP, Activation::Pointer));
                     }
                 });
@@ -230,16 +230,10 @@ impl StudioUi {
                         bounds.intersect(window),
                         response.has_focus(),
                     ));
-                    let pointer = response.clicked_by(egui::PointerButton::Primary);
-                    if interactive && response.clicked() && !(pointer && suppress) {
-                        intents.push(intent(
-                            control.id,
-                            if pointer {
-                                Activation::Pointer
-                            } else {
-                                Activation::Enter
-                            },
-                        ));
+                    if let Some(activation) = widgets::activation(&response, suppress)
+                        && interactive
+                    {
+                        intents.push(intent(control.id, activation));
                     }
                 }
             });
@@ -282,6 +276,7 @@ impl StudioUi {
                 style,
                 id,
                 self.keyboard_focus,
+                None,
                 tokens,
             )),
             ControlKind::SectionTab {
@@ -297,6 +292,7 @@ impl StudioUi {
                     style,
                     id,
                     self.keyboard_focus,
+                    None,
                     tokens,
                 );
                 if *selected {

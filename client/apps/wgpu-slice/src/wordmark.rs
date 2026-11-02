@@ -15,7 +15,7 @@ pub const COLORS: [[[u8; 3]; 2]; 2] = [
     [[183, 112, 255], [89, 38, 162]],
 ];
 pub const MAX_CHARACTERS: usize = 128;
-// Temporary full canvas; retained nonempty tiles share the 13 MiB Menu cap.
+// Temporary full canvas.
 pub const MAX_RASTER_BYTES: usize = 10 * 1024 * 1024;
 pub(crate) const RASTER_SCALE_QUOTA: &str = "Wordmark raster scale bounds";
 pub(crate) const RASTER_PIXEL_QUOTA: &str = "Wordmark raster byte budget";
@@ -26,9 +26,7 @@ const TRACKING: f64 = 1.25;
 pub struct Word {
     pub text: String,
     pub x: f64,
-    pub width: f64,
     pub color: usize,
-    pub fallback: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layout {
@@ -64,7 +62,7 @@ impl Layout {
         self.rect.y = center[1] - self.rect.height / 2.;
         raster_size(self, dpr).map(|_| ())
     }
-    /// Snapped raster origin; atlas pieces use integer offsets from this grid.
+    /// Snapped raster origin; tiles use integer offsets from this grid.
     pub fn origin_pixels(&self, dpr: f64) -> [f64; 2] {
         [self.rect.x * dpr, self.rect.y * dpr].map(f64::round)
     }
@@ -81,70 +79,14 @@ impl Layout {
     }
 }
 
-/// Unsupported scalars select installed-font rendering for their entire word.
-/// The callback measures that word at a ten-unit cap height, in alphabet units.
-pub fn layout(
-    value: &str,
-    holder: MenuRect,
-    viewport_width: f64,
-    fallback_width: impl FnMut(&str) -> Result<f64>,
-) -> Result<Layout> {
-    layout_impl(
-        value,
-        holder,
-        viewport_width,
-        false,
-        usize::MAX,
-        fallback_width,
-    )
-}
-pub(crate) fn fallback_layout(
-    value: &str,
-    holder: MenuRect,
-    viewport_width: f64,
-    max_runs: usize,
-    fallback_width: impl FnMut(&str) -> Result<f64>,
-) -> Result<Layout> {
-    // The legacy plain-font logo fits the holder, unlike the wider stroke line.
-    layout_impl(
-        value,
-        holder,
-        viewport_width.min(holder.width + 32.),
-        true,
-        max_runs,
-        fallback_width,
-    )
-}
-struct FontRun {
+struct Run {
     text: String,
     color: usize,
     spaces: usize,
 }
-fn bounded_font_runs(raw: Vec<FontRun>, limit: usize) -> (Vec<FontRun>, bool) {
-    let mut runs: Vec<FontRun> = Vec::new();
-    for run in raw {
-        if let Some(last) = runs.last_mut().filter(|last| last.color == run.color) {
-            last.text.push_str(&" ".repeat(run.spaces));
-            last.text.push_str(&run.text);
-        } else if runs.len() < limit {
-            runs.push(run);
-        } else {
-            if let Some(last) = runs.last_mut() {
-                last.text.push_str("...");
-            }
-            return (runs, true);
-        }
-    }
-    (runs, false)
-}
-fn layout_impl(
-    value: &str,
-    holder: MenuRect,
-    viewport_width: f64,
-    font_only: bool,
-    max_font_runs: usize,
-    mut fallback_width: impl FnMut(&str) -> Result<f64>,
-) -> Result<Layout> {
+/// Unsupported scalars select installed-font rendering for their entire word.
+/// The callback measures that word at a ten-unit cap height, in alphabet units.
+pub fn layout(value: &str, holder: MenuRect, viewport_width: f64) -> Result<Layout> {
     if value.chars().count() > MAX_CHARACTERS
         || !viewport_width.is_finite()
         || viewport_width <= 0.
@@ -173,43 +115,25 @@ fn layout_impl(
             spaces += 1;
             continue;
         }
-        raw.push(FontRun {
+        raw.push(Run {
             text,
             color: raw.len() % COLORS.len(),
             spaces,
         });
         spaces = 0;
     }
-    if font_only {
-        let (runs, truncated) = bounded_font_runs(raw, max_font_runs);
-        raw = runs;
-        if truncated {
-            spaces = 0;
-        }
-    }
     let mut words = Vec::new();
     let mut advance = 0.;
     for run in raw {
         advance += run.spaces as f64 * 4.;
-        let fallback = font_only || !run.text.chars().all(|c| glyph(c).is_some());
-        let width = if fallback {
-            fallback_width(&run.text)?
-        } else {
-            run.text
-                .chars()
-                .map(|c| glyph(c).unwrap().0 + TRACKING)
-                .sum::<f64>()
-                - TRACKING
-        };
-        if !width.is_finite() || width < 0. {
-            return Err("Wordmark advance bounds".into());
+        let mut width = -TRACKING;
+        for c in run.text.chars() {
+            width += glyph(c).ok_or("Wordmark glyph")?.0 + TRACKING;
         }
         words.push(Word {
             text: run.text,
             x: advance + 3.,
-            width,
             color: run.color,
-            fallback,
         });
         advance += width + TRACKING;
     }
@@ -311,7 +235,7 @@ pub fn samples(layout: &Layout, progress: f64) -> Result<Vec<Sample>> {
     }
     let progress = progress.clamp(0., 1.);
     let mut strokes = Vec::new();
-    for (word_index, word) in layout.words.iter().enumerate().filter(|(_, w)| !w.fallback) {
+    for (word_index, word) in layout.words.iter().enumerate() {
         let mut x = word.x;
         for c in word.text.chars() {
             let (advance, code) = glyph(c).unwrap();
@@ -626,8 +550,7 @@ pub fn raster(layout: &Layout, dpr: f64, progress: f64) -> Result<RgbaImage> {
         );
     }
     // At ordinary DPR the moving shadow uses half-resolution coverage. Higher
-    // densities keep the full shadow so the existing packed atlas byte proof
-    // remains valid (tests/menu.rs outgoing DPR5 case). Rest is always exact.
+    // densities keep the full shadow. Rest is always exact.
     let shadow_scale = if progress < 1. && dpr <= 3. { 2 } else { 1 };
     let shadow_size = size.map(|n| n.div_ceil(shadow_scale));
     let mut shadow = if shadow_scale == 1 {
@@ -809,7 +732,7 @@ mod raster_tests {
             height: 115.,
         };
         for value in [DEFAULT_TEXT, "Hello World 123"] {
-            let layout = layout(value, holder, 1920., |_| unreachable!()).unwrap();
+            let layout = layout(value, holder, 1920.).unwrap();
             for dpr in [1., 2., 5.] {
                 let actual = raster(&layout, dpr, 1.).unwrap();
                 let expected = scalar_reference(&layout, dpr, 1.).unwrap();
@@ -955,7 +878,6 @@ mod round_geometry_tests {
                 height: 115.,
             },
             1920.,
-            |_| unreachable!(),
         )
         .unwrap();
         let rest = samples(&geometry, 1.).unwrap()[0];
@@ -967,60 +889,6 @@ mod round_geometry_tests {
             assert!((ratio - 1.25 / 1.9).abs() < 1e-12);
             assert_eq!(sample.center[1], rest.center[1]);
             assert_eq!(sample.radius, rest.radius);
-        }
-    }
-}
-
-#[cfg(test)]
-mod font_run_tests {
-    use super::*;
-    fn run(text: &str, color: usize, spaces: usize) -> FontRun {
-        FontRun {
-            text: text.into(),
-            color,
-            spaces,
-        }
-    }
-    #[test]
-    fn equal_colour_words_share_a_label_and_overflow_gets_an_ellipsis() {
-        let (runs, truncated) = bounded_font_runs(
-            vec![run("One", 0, 0), run("Two", 0, 1), run("Three", 0, 2)],
-            1,
-        );
-        assert!(!truncated);
-        assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].text, "One Two  Three");
-        let (runs, truncated) = bounded_font_runs(
-            vec![
-                run("Slither", 0, 0),
-                run("Client", 1, 0),
-                run("Suffix", 0, 0),
-            ],
-            2,
-        );
-        assert!(truncated);
-        assert_eq!(runs.len(), 2);
-        assert_eq!(runs[1].text, "Client...");
-        for limit in [0, 1, 2, 60] {
-            let layout = fallback_layout(
-                &"Ab".repeat(60),
-                MenuRect {
-                    x: 0.,
-                    y: 0.,
-                    width: 450.,
-                    height: 115.,
-                },
-                960.,
-                limit,
-                |s| Ok(s.chars().count() as f64 * 7.),
-            )
-            .unwrap();
-            assert!(layout.words.len() <= limit);
-            assert!(layout.words.iter().all(|w| w.fallback));
-            assert!(layout.rect.width <= 450.);
-            if limit > 0 && limit < 60 {
-                assert!(layout.words.last().unwrap().text.ends_with("..."));
-            }
         }
     }
 }

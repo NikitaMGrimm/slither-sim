@@ -323,30 +323,21 @@ fn champion_send_uses_current_victory_session_once_and_exact_bytes() {
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 #[test]
 fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
-    use slither_client::{
-        champion::{MESSAGE, SAVE},
-        menu_input::{EditIntent, EditorId},
+    use slither_client::champion::{MESSAGE, SAVE};
+    use slither_wgpu_slice::login_native::NativeLogin;
+    let raw = |login: &mut NativeLogin, events: Vec<egui::Event>| {
+        login.settings_input(egui::RawInput {
+            events,
+            ..Default::default()
+        })
     };
-    use slither_wgpu_slice::{
-        login_native::NativeLogin,
-        menu_input_native::{EditHost, KeyInput},
+    let key = |key, pressed| egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: Default::default(),
     };
-    use winit::{
-        event::{ElementState, Ime, WindowEvent},
-        keyboard::{Key, KeyCode, NamedKey, PhysicalKey},
-    };
-    struct Host;
-    impl EditHost for Host {
-        fn ime_allowed(&mut self, _: bool) {}
-        fn ime_purpose_normal(&mut self) {}
-        fn ime_cursor_area(&mut self, _: [f64; 2], _: [f64; 2]) {}
-        fn read_clipboard(&mut self) -> Result<String, String> {
-            Ok("A😀".into())
-        }
-        fn write_clipboard(&mut self, _: &str) -> Result<(), String> {
-            Ok(())
-        }
-    }
     let mut game = playing();
     let mut login = NativeLogin::new("Player").unwrap();
     login.step(0., true, false).unwrap();
@@ -357,92 +348,49 @@ fn native_champion_handoff_composition_edit_send_ack_and_login_restoration() {
     game.receive(g, &[b'v', 1], 30.).unwrap();
     login.observe_game(&game).unwrap();
     assert!(login.champion.policy.visible());
-    assert_eq!(login.champion.controls.focus(), Some(MESSAGE));
     assert!(login.blocks_gameplay());
     login.step(32., false, false).unwrap();
     for scale in [1., 1.5, 2.] {
         let extent = [(960. * scale) as u32, (720. * scale) as u32];
         let frame = login.prepare_host(extent, scale, false, None).unwrap();
-        assert!(frame.frame.draws.len() <= 512);
-        assert!(frame.resources.len() <= 64);
-        assert!(
-            frame
-                .resources
-                .iter()
-                .all(|r| r.asset.width <= 512 && r.asset.height <= 512)
-        );
-        for d in &frame.frame.draws {
-            let pixel = |n: f64| (n - n.round()).abs() < 1e-7;
-            assert!(pixel((d.destination.x + d.translation[0]) * scale));
-            assert!(pixel((d.destination.y + d.translation[1]) * scale));
-            if let Some(src) = d.source
-                && (d.destination.width * scale - src.width).abs() >= 1e-7
-            {
-                // Stretched crops must be uniform across their horizontal sampling footprint.
-                let image = &frame
-                    .resources
-                    .iter()
-                    .find(|r| r.asset == d.asset)
-                    .unwrap()
-                    .image;
-                let start = (src.x.floor() as usize).saturating_sub(1);
-                let end = ((src.x + src.width).ceil() as usize + 1).min(image.width as usize);
-                for row in image.pixels.chunks_exact(image.width as usize * 4) {
-                    let pixels = &row[start * 4..end * 4];
-                    assert!(pixels.as_chunks::<4>().0.iter().all(|p| p == &pixels[..4]));
-                }
-            }
-        }
+        assert_eq!(frame.viewport_scale, scale);
+        assert_eq!(login.focused(), Some(MESSAGE));
     }
-    let e = login.champion.input.state.apply(EditIntent::Paste);
-    login.champion.input.execute(e, &mut Host);
-    assert_eq!(
-        login.champion.input.state.editor(EditorId::Champion).text(),
-        "A  "
+    login.prepare_host([960, 720], 1., false, None).unwrap();
+    raw(&mut login, vec![egui::Event::Paste("A😀".into())]);
+    assert_eq!(login.champion.ui.message, "A  ");
+    raw(
+        &mut login,
+        vec![egui::Event::Ime(egui::ImeEvent::Preedit {
+            text: "日".into(),
+            active_range_chars: None,
+        })],
     );
-    login
-        .champion
-        .input
-        .window_event(&WindowEvent::Ime(Ime::Preedit("日".into(), None)));
-    let mapped = login.champion.input.key(KeyInput {
-        logical: &Key::Named(NamedKey::Process),
-        physical: PhysicalKey::Code(KeyCode::Enter),
-        text: None,
-        state: ElementState::Pressed,
-        repeat: false,
-    });
-    login.champion.commit_effects(mapped.effects);
-    login
-        .champion
-        .input
-        .window_event(&WindowEvent::Ime(Ime::Commit("B".into())));
-    let mapped = login.champion.input.key(KeyInput {
-        logical: &Key::Named(NamedKey::Enter),
-        physical: PhysicalKey::Code(KeyCode::Enter),
-        text: None,
-        state: ElementState::Pressed,
-        repeat: false,
-    });
-    login.champion.commit_effects(mapped.effects);
+    login.prepare_host([960, 720], 1., false, None).unwrap();
+    // egui-winit turns the IME's Process key with physical Enter into this press.
+    raw(&mut login, vec![key(egui::Key::Enter, true)]);
+    raw(
+        &mut login,
+        vec![egui::Event::Ime(egui::ImeEvent::Commit("B".into()))],
+    );
+    raw(&mut login, vec![key(egui::Key::Enter, true)]);
     assert!(login.champion.take_submission().is_none());
-    login.champion.input.state.apply(EditIntent::Enter {
-        pressed: false,
-        repeat: false,
-    });
-    login.champion.controls.tab(&login.champion.panel, false);
-    assert_eq!(login.champion.controls.focus(), Some(SAVE));
-    let e = login
+    raw(&mut login, vec![key(egui::Key::Enter, false)]);
+    raw(
+        &mut login,
+        vec![key(egui::Key::Tab, true), key(egui::Key::Tab, false)],
+    );
+    assert_eq!(login.focused(), Some(SAVE));
+    let r = login
         .champion
+        .ui
         .controls
-        .sync_focus(&login.champion.panel, &mut login.champion.input.state);
-    login.champion.input.execute(e, &mut Host);
-    let resolved = login
-        .champion
-        .panel
-        .resolve(login.champion.viewport)
-        .unwrap();
-    let r = resolved[3].rect;
-    let point = [r.x + r.width / 2., r.y + r.height / 2.];
+        .iter()
+        .find(|c| c.0 == SAVE)
+        .unwrap()
+        .1
+        .center();
+    let point = [f64::from(r.x), f64::from(r.y)];
     login.pointer(point, Some(true), false);
     login.pointer(point, Some(false), false);
     let (generation, units, source) = login.champion.take_submission().unwrap();

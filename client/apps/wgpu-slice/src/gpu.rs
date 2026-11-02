@@ -1063,7 +1063,7 @@ impl SurfaceHost {
         }
         self.present_inner_with(frame, true, overlay, requested, |renderer, view| {
             menus.paint(renderer, view);
-            // An old-toolkit screen stays above the egui login it covers.
+            // The studio preview stays above the egui panel it sits in.
             top.map_or(Ok(()), |top| renderer.render_overlay(top, view))
         })
     }

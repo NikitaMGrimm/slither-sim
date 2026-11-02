@@ -39,62 +39,6 @@ impl GameplaySurface {
 fn js_error(e: String) -> JsValue {
     JsValue::from_str(&e)
 }
-/// Explicit offline diagnostic only; does not mount or enable a game menu.
-#[wasm_bindgen]
-pub struct MenuSpecimen {
-    host: SurfaceHost,
-    canvas: web_sys::HtmlCanvasElement,
-    menu: crate::menu::Menu,
-    text: crate::text::TextCache,
-}
-#[wasm_bindgen]
-impl MenuSpecimen {
-    pub fn render(&mut self, dpr: f64, state: u8) -> std::result::Result<(), JsValue> {
-        let extent = [self.canvas.width(), self.canvas.height()];
-        let view = crate::menu_specimen::view(state).map_err(js_error)?;
-        let layout =
-            crate::menu_specimen::layout(&mut self.text, &view, extent, dpr).map_err(js_error)?;
-        let mut p = self
-            .menu
-            .prepare(&mut self.text, &view, &layout, extent, dpr, None)
-            .map_err(js_error)?;
-        self.host.resize(extent).map_err(js_error)?;
-        if let Some(backdrop) = p.backdrop.take() {
-            p.frame.draws.insert(0, backdrop);
-        }
-        self.host
-            .renderer
-            .sync_resources(&p.resources)
-            .map_err(|e| js_error(e.into()))?;
-        if !self.host.present(&p.frame).map_err(js_error)? {
-            return Err(js_error("Menu specimen not presented".into()));
-        }
-        Ok(())
-    }
-}
-#[wasm_bindgen]
-pub async fn menu_specimen(
-    canvas: web_sys::HtmlCanvasElement,
-    dpr: f64,
-    state: u8,
-) -> std::result::Result<MenuSpecimen, JsValue> {
-    let extent = [canvas.width(), canvas.height()];
-    let i = instance();
-    let surface = i
-        .create_surface(wgpu::SurfaceTarget::Canvas(canvas.clone()))
-        .map_err(|e| js_error(e.to_string()))?;
-    let host = SurfaceHost::new(&i, surface, extent)
-        .await
-        .map_err(js_error)?;
-    let mut specimen = MenuSpecimen {
-        host,
-        canvas,
-        menu: crate::menu::Menu::default(),
-        text: crate::text::TextCache::menu(),
-    };
-    specimen.render(dpr, state)?;
-    Ok(specimen)
-}
 /// Shared desktop policy; JS supplies CSS content size without DPR multiplication.
 #[wasm_bindgen]
 pub fn game_backing_size(width: f64, height: f64) -> std::result::Result<Vec<u32>, JsValue> {

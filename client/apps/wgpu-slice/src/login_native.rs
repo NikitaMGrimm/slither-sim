@@ -1,15 +1,12 @@
 //! Native login composition and control focus; no transport or independent clock.
 use crate::{
-    Result,
-    cosmetics::Cosmetics,
-    menu::{Menu, MenuFrame},
-    menu_input_native::NativeMenuInput,
+    Result, cosmetics::Cosmetics, menu::MenuFrame, menu_input_native::NativeMenuInput,
     text::TextCache,
 };
 use slither_client::{
-    login_controls::{self, CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
-    menu_controls::{ControlId, PanelInputState, PanelView},
-    menu_input::{EditIntent, HostEditEffect, TextField},
+    login_controls::{CHANGE_SKIN, NICKNAME, PLAY, SERVER, SETTINGS},
+    menu_controls::{ControlId, PanelView},
+    menu_input::{EditIntent, HostEditEffect},
     menu_layout::MenuLayout,
     menu_preferences::MenuQuality,
     start_page::{MenuAction, MenuLocale, StartMenuIntent, StartMenuState},
@@ -41,14 +38,11 @@ pub struct NativeLogin {
     /// Studio navigation keys currently held down.
     studio_keys: Vec<egui::Key>,
     pub input: NativeMenuInput,
-    pub champion: crate::panel_native::NativePanel,
+    pub champion: crate::champion_egui::NativeChampion,
+    champion_shown: bool,
     pub picker: crate::server_picker_native::NativeServerPicker,
     pub state: StartMenuState,
     pub layout: MenuLayout,
-    pub controls: PanelInputState,
-    pub panel: PanelView,
-    scroll: std::collections::BTreeMap<TextField, f64>,
-    menu: Menu,
     text: TextCache,
     area: [f64; 2],
     pixel_scale: f64,
@@ -58,6 +52,12 @@ impl NativeLogin {
     pub fn needs_redraw(&self) -> bool {
         // A terminal socket must not idle the host during the hidden death hold.
         self.state.view(true).visible || self.champion_session.death_pending
+    }
+    /// Whether this frame needs an egui pass. The champion editor stays mounted
+    /// through the death hold, while the login below it is hidden.
+    pub fn needs_menu_pass(&self, admission: bool) -> bool {
+        let view = self.state.view(admission);
+        view.visible || view.spinner_visible || self.champion.policy.visible()
     }
     pub fn blocks_gameplay(&self) -> bool {
         self.ingame_visible
@@ -78,18 +78,13 @@ impl NativeLogin {
     pub fn zoom_input_available(&self) -> bool {
         !self.blocks_gameplay() && !self.state.settings.visible() && !self.studio.state.visible()
     }
-    pub fn intercepts_pointer(&self, point: [f64; 2]) -> bool {
-        if self.egui.active() && !self.egui.paint_only() {
+    pub fn intercepts_pointer(&self) -> bool {
+        if self.egui.active() {
             // Outgoing controls are disabled by shared policy. Their fading
             // rectangles must not swallow pointer input owned by gameplay.
             return self.egui_owns_input();
         }
         self.blocks_gameplay()
-            || self.controls.capture().is_some()
-            || (self.state.view(true).visible
-                && self.panel.resolve(self.area).is_ok_and(|controls| {
-                    controls.iter().any(|r| r.control.visible && r.hit(point))
-                }))
     }
     pub fn new(nickname: &str) -> Result<Self> {
         Self::with_preferences(
@@ -109,9 +104,8 @@ impl NativeLogin {
         state.edit_nickname(&nickname.encode_utf16().collect::<Vec<_>>());
         let mut input = NativeMenuInput::default();
         input.state.sync_menu(&state.view(true), &[]);
-        let mut text = TextCache::menu();
-        let layout = crate::menu_specimen::layout(&mut text, &state.view(true), [960, 540], 1.)?;
-        let panel = login_controls::panel(&state.view(true), &layout, [960., 540.]);
+        let mut text = TextCache::default();
+        let layout = crate::menu_metrics::layout(&mut text, &state.view(true), [960, 540], 1.)?;
         let studio = crate::skin_studio_native::SkinStudioNative::new(record, storage)?;
         let studio_panel = studio.state.panel([960., 540.], &studio.status);
         Ok(Self {
@@ -136,16 +130,13 @@ impl NativeLogin {
             studio_shown: false,
             studio_keys: Vec::new(),
             input,
-            champion: crate::panel_native::NativePanel::new(
+            champion: crate::champion_egui::NativeChampion::new(
                 &slither_client::session_policy::SessionPolicy::new().view(),
             ),
+            champion_shown: false,
             state,
             picker: crate::server_picker_native::NativeServerPicker::default(),
             layout,
-            panel,
-            controls: PanelInputState::default(),
-            scroll: std::collections::BTreeMap::new(),
-            menu: Menu::default(),
             text,
             area: [960., 540.],
             pixel_scale: 1.,
@@ -179,7 +170,6 @@ impl NativeLogin {
             .step_with_admission(now, false, admission)
             .map_err(str::to_owned)?;
         self.refresh_egui();
-        self.input.state.step_caret(now);
         if playing {
             self.state.begin_outgoing();
         }
@@ -193,18 +183,11 @@ impl NativeLogin {
             .input
             .state
             .sync_menu(&self.state.view(admission), &intents);
-        effects.extend(self.sync_controls(admission));
+        effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         if settings_visible && !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
             effects.extend(self.focus(SETTINGS));
         }
-        self.controls
-            .step(
-                &self.panel,
-                now,
-                slither_client::menu_theme::MenuTheme::default(),
-            )
-            .map_err(str::to_owned)?;
         self.picker.step(now)?;
         if studio_closed {
             // Drop the closed studio's widget state and thumbnail textures.
@@ -221,14 +204,11 @@ impl NativeLogin {
                 self.state.view(admission).login_alpha,
                 &self.champion_session,
             )?;
-            // Champion host executes these against its own clipboard/IME owner.
         }
         if self.champion.policy.finished() {
             self.state.champion_finished();
         }
-        if !self.champion.policy.visible() {
-            effects.extend(std::mem::take(&mut self.champion.effects));
-        }
+        self.sync_champion();
         effects.extend(self.take_egui_effects());
         self.refresh_egui();
         Ok((intents, effects))
@@ -249,8 +229,6 @@ impl NativeLogin {
         self.refresh_egui();
         if opened {
             self.egui.begin_screen();
-            self.controls.blur();
-            self.panel.visible = false;
             self.egui.focus(crate::ingame_egui::leave_id());
         }
         // A closing socket still owns admission. Keep the current screen until
@@ -263,6 +241,7 @@ impl NativeLogin {
         if self.champion.policy.finished() {
             self.state.champion_finished();
         }
+        self.sync_champion();
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
@@ -388,8 +367,7 @@ impl NativeLogin {
         if self.studio.state.take_return_focus()
             && self.state.view(true).phase == slither_client::start_page::MenuPhase::Login
         {
-            self.controls.blur();
-            let mut effects = self.sync_controls(admission);
+            let mut effects = self.input.state.apply(EditIntent::Focus(None));
             effects.extend(self.focus(CHANGE_SKIN));
             return effects;
         }
@@ -404,44 +382,29 @@ impl NativeLogin {
             .input
             .state
             .sync_menu(&self.state.view(admission), &intents);
-        effects.extend(self.sync_controls(admission));
+        effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         effects
     }
-    fn sync_controls(&mut self, admission: bool) -> Vec<HostEditEffect> {
-        if (self.egui.active() && !self.egui.paint_only()) || self.state.settings.visible() {
-            if self.state.settings.visible() {
-                self.controls.blur();
-            }
-            self.panel.visible = false;
-            return self.input.state.apply(EditIntent::Focus(None));
+    /// The editor owns input from the committed victory until its sampled
+    /// exit. Entry releases held gameplay input like other modals.
+    fn sync_champion(&mut self) {
+        let visible = self.champion.policy.visible();
+        if visible == self.champion_shown {
+            return;
         }
-        self.panel = {
-            let mut panel =
-                login_controls::panel(&self.state.view(admission), &self.layout, self.area);
-            if self.studio.status == "Saved for this run" {
-                panel.controls.push(slither_client::menu_controls::Control {
-                    id: ControlId(30),
-                    placement: slither_client::menu_controls::Placement::rect(
-                        self.area[0] / 2. - 120.,
-                        self.area[1] - 32.,
-                        240.,
-                        28.,
-                    ),
-                    clip: None,
-                    visible: true,
-                    enabled: false,
-                    alpha: 1.,
-                    name: self.studio.status.clone(),
-                    tab_order: None,
-                    style: slither_client::menu_theme::ControlStyle::HelpText,
-                    kind: slither_client::menu_controls::ControlKind::Label {
-                        text: self.studio.status.clone(),
-                    },
-                });
-            }
-            panel
-        };
-        self.controls.sync(&self.panel, &mut self.input.state)
+        self.champion_shown = visible;
+        self.refresh_egui();
+        self.egui.begin_screen();
+        let effects = self.modal_effects(visible);
+        self.egui_effects.extend(effects);
+        if visible {
+            // egui's initial Area sizing pass must settle before input reaches fields.
+            self.settings_frame();
+            self.settings_frame();
+        }
+    }
+    fn champion_owns_input(&self) -> bool {
+        self.champion.policy.visible() && !self.state.settings.visible() && !self.ingame_visible
     }
     pub fn open_studio(&mut self) -> Vec<HostEditEffect> {
         let admitted = self.state.action(MenuAction::Skin, true)
@@ -460,9 +423,8 @@ impl NativeLogin {
         self.refresh_egui();
         self.egui.begin_screen();
         self.state.play_pointer(false, false, true);
-        self.controls.blur();
         let mut effects = self.modal_effects(true);
-        effects.extend(self.sync_controls(true));
+        effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         // egui's initial Area sizing pass must settle before input reaches controls.
         self.settings_frame();
         self.settings_frame();
@@ -488,8 +450,16 @@ impl NativeLogin {
                 .iter()
                 .map(|c| c.id)
                 .find(|id| Some(crate::skin_studio_egui::widget_id(*id)) == focused)
+        } else if self.champion_owns_input() {
+            let focused = self.egui.context()?.memory(|m| m.focused());
+            self.champion
+                .panel
+                .controls
+                .iter()
+                .map(|c| c.id)
+                .find(|id| Some(crate::champion_egui::widget_id(*id)) == focused)
         } else {
-            self.controls.focus()
+            None
         }
     }
     pub fn focus(&mut self, focus: ControlId) -> Vec<HostEditEffect> {
@@ -512,10 +482,8 @@ impl NativeLogin {
         if self.login_owns_input() {
             self.login_ui.request_focus(focus);
             self.egui.focus(crate::login_egui::widget_id(focus));
-            return Vec::new();
         }
-        self.controls.set_focus(focus);
-        self.controls.sync_focus(&self.panel, &mut self.input.state)
+        Vec::new()
     }
     /// Startup-only restoration; never writes or changes appearance storage.
     pub fn restore_settings(&mut self, storage: crate::menu_storage::SettingsStorage) {
@@ -542,19 +510,19 @@ impl NativeLogin {
             self.settings_frame();
             self.settings_frame();
             let mut effects = self.input.state.apply(EditIntent::Modal(true));
-            effects.extend(self.sync_controls(admission));
+            effects.extend(self.input.state.apply(EditIntent::Focus(None)));
             effects
         } else {
             Vec::new()
         }
     }
-    pub fn close_settings(&mut self, admission: bool) -> Vec<HostEditEffect> {
+    pub fn close_settings(&mut self) -> Vec<HostEditEffect> {
         self.state.settings.close();
         self.refresh_egui();
         let mut effects = Vec::new();
         if !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
-            effects.extend(self.sync_controls(admission));
+            effects.extend(self.input.state.apply(EditIntent::Focus(None)));
             effects.extend(self.focus(SETTINGS));
         }
         effects
@@ -574,7 +542,7 @@ impl NativeLogin {
         self.refresh_egui();
         self.egui.begin_screen();
         let mut effects = self.modal_effects(true);
-        effects.extend(self.sync_controls(self.admission));
+        effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         // egui's initial Area sizing pass must settle before input reaches fields.
         self.settings_frame();
         self.settings_frame();
@@ -616,12 +584,13 @@ impl NativeLogin {
             && !self.ingame_visible
     }
     pub fn egui_owns_input(&self) -> bool {
-        if !self.egui.active() || self.egui.paint_only() {
+        if !self.egui.active() {
             return false;
         }
         self.state.settings.visible()
             || self.picker.policy.visible()
             || self.studio.state.visible()
+            || self.champion.policy.visible()
             || self.ingame_visible
             || self.closing
             || matches!(
@@ -636,22 +605,10 @@ impl NativeLogin {
             || self.state.settings.visible()
             || self.picker.policy.visible()
             || self.studio.state.visible()
+            || self.champion.policy.visible()
             || self.ingame_visible;
-        // The champion editor still owns input on the old toolkit; egui keeps
-        // painting the login below it, so no screen transition swaps the
-        // login's renderer.
-        let underlay = !owns && self.champion.policy.visible();
-        let opened = owns && !(self.egui.active() && !self.egui.paint_only());
-        self.egui.set_active(owns || underlay);
-        self.egui.set_paint_only(underlay);
-        if underlay && let Some(ctx) = self.egui.context() {
-            // The old toolkit blurred the opener; no focus ring stays below.
-            ctx.memory_mut(|m| {
-                if let Some(id) = m.focused() {
-                    m.surrender_focus(id);
-                }
-            });
-        }
+        let opened = owns && !self.egui.active();
+        self.egui.set_active(owns);
         if opened && self.login_owns_input() {
             self.login_ui.request_focus(NICKNAME);
             self.egui.focus(crate::login_egui::widget_id(NICKNAME));
@@ -673,16 +630,21 @@ impl NativeLogin {
             view.play_alpha *= alpha;
             view.skin_alpha *= alpha;
         }
-        // Below the champion editor's old toolkit: the login's fade and
-        // wording match what that toolkit painted, without input.
-        let underlay = self.egui.paint_only();
         let studio = !settings && self.studio.state.visible();
         if studio {
             view.login_alpha *= 1. - self.studio.state.alpha();
             self.sync_studio();
         }
+        let champion = self.champion_owns_input();
         if self.champion.policy.visible() {
             view.champion_pending = false;
+        }
+        if champion {
+            self.champion.viewport = self.area;
+            self.champion.panel = self
+                .champion
+                .policy
+                .panel(&self.champion_session, self.area);
         }
         if !self.login_ui.composing {
             self.login_ui.nickname.clone_from(&view.nickname);
@@ -693,7 +655,8 @@ impl NativeLogin {
             self.picker.viewport = self.area;
             self.picker.sync();
         }
-        let order = if underlay {
+        // The editor moves focus itself: unlike other screens, held Tab repeats.
+        let order = if champion {
             Vec::new()
         } else if settings {
             crate::settings_egui::focus_order().to_vec()
@@ -707,6 +670,7 @@ impl NativeLogin {
         let mut action = None;
         let mut intents = Vec::new();
         let mut studio_intents = Vec::new();
+        let mut champion_intents = Vec::new();
         self.egui.frame(
             self.area.map(|n| (n * self.pixel_scale).round() as u32),
             self.pixel_scale,
@@ -717,6 +681,7 @@ impl NativeLogin {
                     && !picker
                     && !studio
                     && !self.login_ui.composing
+                    && !self.champion.ui.composing
                     && ctx.input(|i| i.key_pressed(egui::Key::Enter))
                 {
                     self.replay_after_close = true;
@@ -724,6 +689,7 @@ impl NativeLogin {
                 if !settings
                     && !picker
                     && !studio
+                    && !champion
                     && !self.login_ui.composing
                     && ctx.input(|i| i.key_pressed(egui::Key::Escape))
                 {
@@ -737,7 +703,7 @@ impl NativeLogin {
                     ctx,
                     &view,
                     &self.layout,
-                    !settings && !picker && !studio && !underlay,
+                    !settings && !picker && !studio && !champion,
                     status,
                 ) {
                     Ok(value) => action = value,
@@ -758,6 +724,12 @@ impl NativeLogin {
                         Err(error) => self.render_error = Some(error),
                     }
                 }
+                if champion {
+                    match self.champion.ui.show(ctx, &self.champion.panel, self.area) {
+                        Ok(value) => champion_intents = value,
+                        Err(error) => self.render_error = Some(error),
+                    }
+                }
                 if picker {
                     match self.picker.ui.show(
                         ctx,
@@ -774,6 +746,9 @@ impl NativeLogin {
         if studio {
             self.apply_studio(studio_intents);
         }
+        if champion {
+            self.champion.apply(champion_intents);
+        }
         if picker {
             self.picker.apply(intents);
             if !self.picker.policy.is_open() {
@@ -788,18 +763,13 @@ impl NativeLogin {
             self.activate_login(id, enter);
         }
         if open && !self.state.settings.is_open() {
-            self.close_settings(self.admission);
+            self.close_settings();
         }
     }
     fn activate_login(&mut self, id: ControlId, enter: bool) {
         if self.login_ui.composing {
             return;
         }
-        let mut opener = PanelInputState::default();
-        if self.login_ui.keyboard_focus {
-            opener.keyboard_navigation();
-        }
-        self.controls.inherit_modality(&opener);
         let effects = match id {
             PLAY => {
                 self.state.action(
@@ -836,6 +806,11 @@ impl NativeLogin {
                     self.picker.ui.cancel_composition(ctx);
                 }
                 self.settings_frame();
+            } else if self.champion_owns_input() {
+                if let Some(ctx) = self.egui.context() {
+                    self.champion.ui.cancel_composition(ctx);
+                }
+                self.settings_frame();
             }
         }
         let events = std::mem::take(&mut input.events);
@@ -852,6 +827,8 @@ impl NativeLogin {
                 self.picker_event(&mut event)
             } else if self.studio_owns_input() {
                 self.studio_event(&event)
+            } else if self.champion_owns_input() {
+                self.champion_event(&mut event)
             } else {
                 PickerEvent::Forward
             };
@@ -1074,6 +1051,7 @@ impl NativeLogin {
             } => {
                 if *pressed {
                     self.studio_ui.keyboard_focus = true;
+                    // Revealing the focus can move the pressed control.
                     self.studio_reveal = true;
                 }
                 let direction = match key {
@@ -1083,7 +1061,14 @@ impl NativeLogin {
                     K::ArrowDown => N::Down,
                     K::Home => N::Home,
                     K::End => N::End,
-                    K::Tab | K::Enter | K::Space | K::Escape => return PickerEvent::Forward,
+                    K::Tab | K::Enter | K::Space | K::Escape => {
+                        // These act on the pressed control, or move focus and
+                        // reveal it, which can move the pressed control.
+                        if *pressed {
+                            self.studio_ui.invalidate_press();
+                        }
+                        return PickerEvent::Forward;
+                    }
                     _ => return PickerEvent::Handled,
                 };
                 // egui-winit reports native auto-repeats as fresh presses
@@ -1106,6 +1091,8 @@ impl NativeLogin {
                 else {
                     return PickerEvent::Handled;
                 };
+                // Navigation can act on the pressed control or move its window.
+                self.studio_ui.invalidate_press();
                 let next = self.studio.navigate(focus, direction);
                 self.studio.state.reveal_control(next, self.area);
                 self.studio_ui.request_focus(next);
@@ -1128,6 +1115,121 @@ impl NativeLogin {
                 self.studio_ui.invalidate_press();
                 self.sync_studio();
                 PickerEvent::Handled
+            }
+            _ => PickerEvent::Forward,
+        }
+    }
+    /// Editor-owned events egui must not see: traversal including held Tab,
+    /// keys egui would turn into caret or focus moves, and pointer input during
+    /// a composition.
+    fn champion_event(&mut self, event: &mut egui::Event) -> PickerEvent {
+        use crate::champion_egui::widget_id;
+        use egui::Key as K;
+        use slither_client::champion::MESSAGE;
+        let composing = self.champion.ui.composing;
+        match event {
+            egui::Event::Key {
+                key,
+                pressed,
+                modifiers,
+                ..
+            } => {
+                // Typing keeps a pointer-placed caret free of the keyboard ring.
+                if *pressed
+                    && matches!(
+                        key,
+                        K::Tab
+                            | K::Enter
+                            | K::Space
+                            | K::ArrowLeft
+                            | K::ArrowRight
+                            | K::Home
+                            | K::End
+                    )
+                {
+                    self.champion.ui.keyboard_focus = true;
+                }
+                let field = self.focused() == Some(MESSAGE);
+                match key {
+                    K::Tab => {
+                        if !*pressed || composing {
+                            return PickerEvent::Handled;
+                        }
+                        let order = crate::egui_panel::focus_order(&self.champion.panel, widget_id);
+                        if order.is_empty() {
+                            return PickerEvent::Handled;
+                        }
+                        let focused = self
+                            .egui
+                            .context()
+                            .and_then(|ctx| ctx.memory(|m| m.focused()));
+                        let step = if modifiers.shift { order.len() - 1 } else { 1 };
+                        let next = order
+                            .iter()
+                            .position(|id| Some(*id) == focused)
+                            .map_or(if modifiers.shift { order.len() - 1 } else { 0 }, |i| {
+                                (i + step) % order.len()
+                            });
+                        self.egui.focus(order[next]);
+                        PickerEvent::Pass
+                    }
+                    // Escape only ever cancelled a composition; egui's would
+                    // also surrender the field.
+                    K::Escape => {
+                        if *pressed
+                            && composing
+                            && let Some(ctx) = self.egui.context()
+                        {
+                            self.champion.ui.cancel_composition(ctx);
+                            return PickerEvent::Pass;
+                        }
+                        PickerEvent::Handled
+                    }
+                    K::ArrowUp | K::ArrowDown => PickerEvent::Handled,
+                    K::ArrowLeft | K::ArrowRight | K::Home | K::End if !field => {
+                        PickerEvent::Handled
+                    }
+                    _ => PickerEvent::Forward,
+                }
+            }
+            // The composition keeps its selection. A release retires a press
+            // from before it without a click.
+            egui::Event::PointerMoved(_) if composing => PickerEvent::Handled,
+            egui::Event::PointerButton { pressed, .. } if composing => {
+                if !*pressed {
+                    self.egui.cancel_pointer();
+                }
+                PickerEvent::Handled
+            }
+            egui::Event::WindowFocused(false) => {
+                self.egui.cancel_pointer();
+                if let Some(ctx) = self.egui.context() {
+                    self.champion.ui.cancel_composition(ctx);
+                }
+                PickerEvent::Forward
+            }
+            egui::Event::Ime(egui::ImeEvent::Preedit {
+                text,
+                active_range_chars,
+            }) => {
+                bound_preedit(text, active_range_chars);
+                if let Some(ctx) = self.egui.context() {
+                    if text.is_empty() {
+                        self.champion.ui.cancel_composition(ctx);
+                    } else if self.focused() == Some(MESSAGE) {
+                        self.champion.ui.begin_composition(ctx);
+                    }
+                }
+                PickerEvent::Forward
+            }
+            // Normalize inserted UTF-16 units first; the complete value is
+            // then truncated by the same rule after the pass.
+            egui::Event::Text(text)
+            | egui::Event::Paste(text)
+            | egui::Event::Ime(egui::ImeEvent::Commit(text)) => {
+                *text = slither_client::menu_input::TextRule::Champion
+                    .normalize_units(&text.encode_utf16().collect::<Vec<_>>());
+                PickerEvent::Forward
             }
             _ => PickerEvent::Forward,
         }
@@ -1168,7 +1270,7 @@ impl NativeLogin {
         });
     }
     pub fn activate(&mut self, admission: bool) {
-        if self.picker.policy.visible() {
+        if self.picker.policy.visible() || self.champion.policy.visible() {
             return;
         }
         if self.state.settings.visible() || self.studio.state.visible() {
@@ -1206,15 +1308,6 @@ impl NativeLogin {
         {
             self.egui.cancel_pointer();
         }
-        if matches!(event, WindowEvent::Focused(false)) {
-            self.controls.blur();
-        }
-        if matches!(
-            event,
-            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. }
-        ) {
-            self.controls.blur();
-        }
         if let WindowEvent::KeyboardInput { event, .. } = event {
             return self.key(event.into(), admission);
         }
@@ -1240,24 +1333,6 @@ impl NativeLogin {
             event::ElementState,
             keyboard::{Key, NamedKey},
         };
-        if event.state == ElementState::Pressed
-            && matches!(
-                event.logical,
-                Key::Named(
-                    NamedKey::Tab
-                        | NamedKey::Enter
-                        | NamedKey::Space
-                        | NamedKey::ArrowLeft
-                        | NamedKey::ArrowRight
-                        | NamedKey::ArrowUp
-                        | NamedKey::ArrowDown
-                        | NamedKey::Home
-                        | NamedKey::End
-                )
-            )
-        {
-            self.controls.keyboard_navigation();
-        }
         if self.egui_owns_input() {
             if event.state == ElementState::Pressed && !event.repeat {
                 let key = match event.logical {
@@ -1308,12 +1383,6 @@ impl NativeLogin {
             });
             return self.take_egui_effects();
         }
-        if self.champion.policy.visible() {
-            return self
-                .champion
-                .pointer_scaled(&mut self.text, point, down, self.pixel_scale)
-                .unwrap_or_else(|e| vec![HostEditEffect::ClipboardFailed(e)]);
-        }
         Vec::new()
     }
     pub fn prepare(
@@ -1342,21 +1411,14 @@ impl NativeLogin {
         cosmetics: Option<&Cosmetics>,
     ) -> Result<MenuFrame> {
         let mut view = self.state.view(admission);
-        if self.champion.policy.finished() {
-            let alpha = self.champion.policy.ordinary_alpha();
-            view.nickname_alpha *= alpha;
-            view.play_alpha *= alpha;
-            view.skin_alpha *= alpha;
-        }
         let area = extent.map(|n| f64::from(n) / dpr);
         self.studio.viewport = area;
         let resized = area != self.area || dpr != self.pixel_scale;
         if resized {
             self.egui.cancel_pointer();
-            self.controls.blur();
         }
         self.pixel_scale = dpr;
-        let mut fresh = crate::menu_specimen::layout(&mut self.text, &view, extent, dpr)?;
+        let mut fresh = crate::menu_metrics::layout(&mut self.text, &view, extent, dpr)?;
         if self.area == area {
             // Keep resize-time top across fade updates.
             fresh.top = self.layout.top;
@@ -1372,12 +1434,20 @@ impl NativeLogin {
         {
             self.studio.state.reveal_control(focus, area);
         }
+        let champion = self.champion.policy.visible();
         if self.login_owns_input()
             || self.state.settings.visible()
             || self.picker.policy.visible()
             || studio
+            || champion
         {
             self.egui_pass(cosmetics)?;
+            if champion && !view.visible {
+                return MenuFrame::hidden(extent, dpr);
+            }
+            if champion {
+                return MenuFrame::world_crossfade(extent, dpr, 1. - view.login_alpha);
+            }
             if !studio {
                 return MenuFrame::world_crossfade(extent, dpr, view.world_alpha);
             }
@@ -1392,72 +1462,7 @@ impl NativeLogin {
             }
             return Ok(page);
         }
-        // The champion editor still draws on the old toolkit: egui paints the
-        // login below it and the host presents the editor above egui, so the
-        // login never changes renderer.
-        if self.egui.paint_only() {
-            self.egui_pass(cosmetics)?;
-        }
-        view.nickname = self.displayed_nickname();
-        self.sync_controls(admission);
-        if self.champion.policy.finished() {
-            for control in &mut self.panel.controls {
-                if matches!(
-                    control.id,
-                    NICKNAME | PLAY | CHANGE_SKIN | SERVER | SETTINGS
-                ) {
-                    control.alpha *= self.champion.policy.ordinary_alpha();
-                }
-            }
-        }
-        let panel = if self.champion.policy.visible() {
-            self.champion.viewport = extent.map(|n| f64::from(n) / dpr);
-            self.champion.panel = self
-                .champion
-                .policy
-                .panel(&self.champion_session, self.champion.viewport);
-            // Keep specialized logo/result producers, suppress the old pending label.
-            view.champion_pending = false;
-            Some(crate::menu::PanelPaint {
-                panel: &self.champion.panel,
-                input: &self.champion.controls,
-                edit: &self.champion.input.state,
-                scroll: &mut self.champion.scroll,
-                theme: slither_client::menu_theme::MenuTheme::default(),
-            })
-        } else {
-            Some(crate::menu::PanelPaint {
-                panel: &self.panel,
-                input: &self.controls,
-                edit: &self.input.state,
-                scroll: &mut self.scroll,
-                theme: slither_client::menu_theme::MenuTheme::default(),
-            })
-        };
-        // Under the champion editor egui paints the login; keep only the page
-        // and world cover its old composition drew.
-        let login = view.visible.then_some(view.login_alpha);
-        let underlay = self.egui.paint_only();
-        if underlay {
-            view.visible = false;
-        }
-        let mut picture = self.menu.prepare_with_panel(
-            &mut self.text,
-            &view,
-            &self.layout,
-            extent,
-            dpr,
-            cosmetics,
-            Some(&self.input.state),
-            panel,
-        )?;
-        if underlay && let Some(alpha) = login {
-            let page = MenuFrame::world_crossfade(extent, dpr, 1. - alpha)?;
-            picture.backdrop = page.backdrop;
-            picture.world_cover = page.world_cover;
-            picture.resources.extend(page.resources);
-        }
-        Ok(picture)
+        MenuFrame::hidden(extent, dpr)
     }
     /// One egui pass for the login and the screen that owns it, if any.
     fn egui_pass(&mut self, cosmetics: Option<&Cosmetics>) -> Result<()> {
@@ -1482,12 +1487,6 @@ impl NativeLogin {
     }
     pub fn displayed_nickname(&self) -> String {
         self.login_ui.nickname.clone()
-    }
-    pub fn cursor_area(&mut self) -> Result<Vec<HostEditEffect>> {
-        if self.champion.policy.visible() {
-            return self.champion.cursor_area(&mut self.text, self.pixel_scale);
-        }
-        Ok(Vec::new())
     }
 }
 

@@ -164,39 +164,6 @@ fn resize_small_height_rounding_and_transform_origin() {
 }
 
 #[test]
-fn inverse_hit_test_round_trips() {
-    for (w, h) in [(1280., 720.), (960., 540.), (320., 180.), (200., 40.)] {
-        for p in [0., 0.5, 1.] {
-            let layout = MenuLayout::new(w, h, p, true, metrics()).unwrap();
-            for e in [
-                E::Logo,
-                E::LastLength,
-                E::Tips,
-                E::NicknameHolder,
-                E::Nickname,
-                E::Play,
-                E::Skin,
-                E::Server,
-                E::Quality,
-            ] {
-                let r = layout.viewport_rect(e);
-                assert!(layout.hit_test(e, r.x + r.width / 2., r.y + r.height / 2.));
-                assert!(!layout.hit_test(e, r.x - 1., r.y - 1.));
-            }
-            for (x, y) in [(0., 0.), (50., 355.), (500., 220.)] {
-                let v = layout.to_viewport(x, y);
-                let l = layout.to_login(v.0, v.1);
-                near(l.0, x);
-                near(l.1, y);
-            }
-        }
-    }
-    let layout = MenuLayout::new(1280., 720., 0., true, metrics()).unwrap();
-    let r = layout.viewport_rect(E::Play);
-    assert!(!layout.hit_test(E::Play, r.x + r.width, r.y));
-}
-
-#[test]
 fn translations_and_source_order() {
     let fixtures = [
         (
@@ -792,15 +759,23 @@ fn round1_return_removes_tips_from_flow_and_hits() {
             .unwrap();
         let tips = layout.viewport_rect(E::Tips);
         assert_eq!(tips.height, 0.);
-        assert!(!layout.hit_test(E::Tips, tips.x + tips.width / 2., tips.y));
+        assert!(
+            !layout
+                .viewport_rect(E::Tips)
+                .contains(tips.x + tips.width / 2., tips.y)
+        );
         let play = layout.viewport_rect(E::Play);
-        assert!(layout.hit_test(E::Play, play.x + play.width / 2., play.y + play.height / 2.));
+        assert!(
+            layout
+                .viewport_rect(E::Play)
+                .contains(play.x + play.width / 2., play.y + play.height / 2.)
+        );
     }
     assert_eq!(state.view(true).phase, P::Login);
     assert_eq!(layout.viewport_rect(E::Play).y, 396.);
     assert_eq!(layout.viewport_rect(E::NicknameHolder).y, 325.);
-    assert!(layout.hit_test(E::Play, 640., 400.));
-    assert!(!layout.hit_test(E::Play, 640., 460.)); // old row's lower hit area
+    assert!(layout.viewport_rect(E::Play).contains(640., 400.));
+    assert!(!layout.viewport_rect(E::Play).contains(640., 460.)); // old row's lower hit area
     state.disconnected();
     assert!(!state.view(true).tips_visible);
     state.action(A::Play, true);
@@ -815,7 +790,11 @@ fn round1_animation_retains_resize_top_when_scale_crosses_one() {
         layout.update(progress, true, metrics()).unwrap();
         assert_eq!(layout.top, -19.28571);
         let r = layout.viewport_rect(E::Nickname);
-        assert!(layout.hit_test(E::Nickname, r.x + r.width / 2., r.y + r.height / 2.));
+        assert!(
+            layout
+                .viewport_rect(E::Nickname)
+                .contains(r.x + r.width / 2., r.y + r.height / 2.)
+        );
         if progress == 0.60858 {
             assert_eq!(layout.scale, 1.);
             near(layout.viewport_rect(E::Logo).y, 94.71429);
@@ -891,8 +870,16 @@ fn round1_label_width_rounds_offset_width_before_adding_padding() {
             ] {
                 assert!((actual - baseline).abs() <= 2.);
             }
-            assert!(layout.hit_test(E::Play, current.x + 0.01, current.y + 0.01));
-            assert!(!layout.hit_test(E::Play, current.x + current.width + 0.01, current.y));
+            assert!(
+                layout
+                    .viewport_rect(E::Play)
+                    .contains(current.x + 0.01, current.y + 0.01)
+            );
+            assert!(
+                !layout
+                    .viewport_rect(E::Play)
+                    .contains(current.x + current.width + 0.01, current.y)
+            );
             let mut replay = m;
             replay.padded_play_label_width = 110.5;
             layout.update(progress, false, replay).unwrap();

@@ -550,8 +550,7 @@ fn dense_custom_and_mixed_windows_stay_inside_the_window() {
                     );
                 }
                 assert_eq!(ui.address.len(), 512);
-                // An atlas-only budget, not the retained toolkit's total raster
-                // bound. Picker text lives in the shared egui font atlas: 2048
+                // An atlas-only budget. Picker text lives in the shared egui font atlas: 2048
                 // wide (the host leaves max_texture_side at egui's default),
                 // growing in height and cleared above 80% fill. 16 MiB (2048²×4)
                 // is the maximum measured over this history, not a structural

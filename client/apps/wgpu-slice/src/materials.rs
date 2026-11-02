@@ -1,7 +1,6 @@
 //! Selected recipe adapter, not a general Canvas implementation. Unsupported tapes fail closed.
 use crate::Result;
 use slither_client::authored_sources::{CanvasRecipe, PaintCommand};
-pub(crate) const MENU_TEXTURE_QUOTA: &str = "Menu control texture budget";
 
 #[derive(Clone, Debug)]
 pub struct RgbaImage {
@@ -129,120 +128,6 @@ fn fill_nonzero(image: &mut RgbaImage, path: &[[f64; 2]], color: [u8; 3]) {
             pixel.copy_from_slice(&dst.map(|v| (v * 255.).round() as u8));
         }
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum MenuSurface {
-    Play,
-    Nickname,
-    Overlay,
-    Compact,
-    StudioCapsule,
-}
-impl MenuSurface {
-    pub fn padding(self) -> f64 {
-        match self {
-            Self::Nickname => 40.,
-            Self::Play => 20.,
-            Self::Overlay => 0.,
-            Self::Compact | Self::StudioCapsule => 12.,
-        }
-    }
-}
-
-/// Bounded role-specific capsules, not a CSS/Canvas layout engine.
-pub fn menu_control(
-    size: [u32; 2],
-    radius: f64,
-    colors: [[u8; 3]; 2],
-    scale: f64,
-    surface: MenuSurface,
-) -> Result<RgbaImage> {
-    let [w, h] = size;
-    if w == 0
-        || h == 0
-        || w > 2048
-        || h > 2048
-        || !radius.is_finite()
-        || radius < 0.
-        || !scale.is_finite()
-        || !(0. ..=2048.).contains(&scale)
-        || scale == 0.
-    {
-        return Err("Menu control material bounds".into());
-    }
-    let pad = (surface.padding() * scale).ceil() as u32;
-    let (width, height) = (w + 2 * pad, h + 2 * pad);
-    if width > 2048 || height > 2048 {
-        return Err(MENU_TEXTURE_QUOTA.into());
-    }
-    let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
-    let r = radius.min(f64::from(w.min(h)) / 2.);
-    let distance = |x: f64, y: f64| {
-        let qx = (x - f64::from(w) / 2.).abs() - (f64::from(w) / 2. - r);
-        let qy = (y - f64::from(h) / 2.).abs() - (f64::from(h) / 2. - r);
-        qx.max(0.).hypot(qy.max(0.)) + qx.max(qy).min(0.) - r
-    };
-    for y in 0..height {
-        for x in 0..width {
-            let px = f64::from(x) + 0.5 - f64::from(pad);
-            let py = f64::from(y) + 0.5 - f64::from(pad);
-            let d = distance(px, py);
-            let coverage = (0.5 - d).clamp(0., 1.);
-            let (offset, sigma, opacity) = match surface {
-                MenuSurface::Nickname => (6., 20., 1.),
-                MenuSurface::Play => (3., 8., 0.75),
-                MenuSurface::Overlay | MenuSurface::Compact | MenuSurface::StudioCapsule => {
-                    (0., 1., 0.)
-                }
-            };
-            let shadow = if matches!(surface, MenuSurface::Compact | MenuSurface::StudioCapsule) {
-                (-distance(px, py - 3. * scale).max(0.).powi(2) / (18. * scale * scale)).exp() * 0.6
-            } else {
-                0.5 * (1. - (distance(px, py - offset * scale) / (sigma * scale)).tanh()) * opacity
-            };
-            // Analytic shadows have infinite tails. Fade the last quarter of
-            // their padding to zero so a sliced atlas never ends in visible ink.
-            let edge = x.min(width - 1 - x).min(y).min(height - 1 - y);
-            let t = (f64::from(edge) / (f64::from(pad) / 4.).max(1.)).min(1.);
-            let shadow = shadow * t * t * (3. - 2. * t);
-            let t = (py / f64::from(h)).clamp(0., 1.);
-            let t = if matches!(
-                surface,
-                MenuSurface::Play | MenuSurface::Overlay | MenuSurface::StudioCapsule
-            ) {
-                (1. - (std::f64::consts::PI * t).cos()) / 2.
-            } else {
-                t
-            };
-            let mut color = [0., 0., 0., shadow];
-            let ink = if matches!(surface, MenuSurface::Nickname) {
-                // One shadow belongs to the outer border, not to both nested fills.
-                over(&mut color, [0., 0., 0., 1.], coverage, 1., false);
-                (0.5 - d - 2. * scale).clamp(0., 1.)
-            } else {
-                coverage
-            };
-            over(
-                &mut color,
-                [
-                    (f64::from(colors[0][0]) * (1. - t) + f64::from(colors[1][0]) * t) / 255.,
-                    (f64::from(colors[0][1]) * (1. - t) + f64::from(colors[1][1]) * t) / 255.,
-                    (f64::from(colors[0][2]) * (1. - t) + f64::from(colors[1][2]) * t) / 255.,
-                    1.,
-                ],
-                ink,
-                1.,
-                false,
-            );
-            pixels.extend(color.map(|v| (v * 255.).round() as u8));
-        }
-    }
-    Ok(RgbaImage {
-        width,
-        height,
-        pixels,
-    })
 }
 
 fn color(s: &str) -> Result<[f64; 4]> {

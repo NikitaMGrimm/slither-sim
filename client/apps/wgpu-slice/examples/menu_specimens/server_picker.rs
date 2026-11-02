@@ -1,48 +1,10 @@
-//! Finite server picker before/after specimens. Synthetic addresses and injected
+//! Finite server picker specimens. Synthetic addresses and injected
 //! pings; no window, socket, preference file or art.
 use super::*;
-use slither_client::{
-    menu_controls::{ControlId, PanelInputState},
-    menu_input::MenuInputState,
-    menu_theme::MenuTheme,
-    server_directory::Server,
-    server_picker::*,
-};
-use slither_wgpu_slice::{login_native::NativeLogin, menu::PanelPaint};
+use slither_client::{menu_controls::ControlId, server_directory::Server, server_picker::*};
+use slither_wgpu_slice::login_native::NativeLogin;
 use std::{collections::BTreeMap, net::SocketAddr};
 
-/// The retained toolkit painter fed the same core panel, field values and focus.
-fn before(login: &NativeLogin, extent: [u32; 2], dpr: f64) -> Result<MenuFrame> {
-    let picker = &login.picker;
-    let mut edit = MenuInputState::default();
-    let mut input = PanelInputState::default();
-    input.sync(&picker.panel, &mut edit);
-    edit.reset_editor(ADDRESS_EDITOR, &picker.ui.address);
-    edit.reset_editor(SEARCH_EDITOR, &picker.ui.search);
-    if let Some(focus) = picker.ui.focused() {
-        input.set_focus(focus);
-    }
-    if picker.ui.keyboard_focus {
-        input.keyboard_navigation();
-    }
-    input.sync_focus(&picker.panel, &mut edit);
-    Menu::default().prepare_with_panel(
-        &mut TextCache::menu(),
-        &login.state.view(true),
-        &login.layout,
-        extent,
-        dpr,
-        None,
-        Some(&edit),
-        Some(PanelPaint {
-            panel: &picker.panel,
-            input: &input,
-            edit: &edit,
-            scroll: &mut BTreeMap::new(),
-            theme: MenuTheme::default(),
-        }),
-    )
-}
 fn shot(
     renderer: &mut Renderer,
     login: &mut NativeLogin,
@@ -54,17 +16,7 @@ fn shot(
     login.prepare_host(extent, dpr, true, None)?;
     let after = login.prepare_host(extent, dpr, true, None)?;
     let shapes = login.egui.prepared_shapes().len();
-    capture(
-        renderer,
-        &before(login, extent, dpr)?,
-        &output.join(format!("{name}-before.png")),
-    )?;
-    capture_settings(
-        renderer,
-        &after,
-        login,
-        &output.join(format!("{name}-after.png")),
-    )?;
+    capture_settings(renderer, &after, login, &output.join(format!("{name}.png")))?;
     Ok(serde_json::json!({
         "state": name, "extent": extent, "dpr": dpr, "egui_shapes": shapes,
         "rows": login.picker.panel.controls.iter()
@@ -242,7 +194,7 @@ pub async fn specimens(renderer: &mut Renderer, output: &Path) -> Result<()> {
         output.join("server-picker.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
             "synthetic": true, "network": false, "art": false, "physical_input": false,
-            "before": "retained toolkit fed the same panel", "after": "egui host",
+            "host": "egui",
             "states": states,
         }))
         .map_err(|e| e.to_string())?,

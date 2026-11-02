@@ -1,7 +1,6 @@
 //! Copied menu editing policy. Hosts execute effects outside the core borrow.
 //! See docs/start-menu.md for source rules and composition timing limits.
 
-use crate::menu_preferences::MenuQuality;
 use crate::start_page::{MenuAction, StartMenuIntent, StartMenuState, StartMenuView};
 use std::ops::Range;
 
@@ -62,23 +61,6 @@ impl TextRule {
     fn normalize(self, text: &str) -> String {
         self.normalize_units(&text.encode_utf16().collect::<Vec<_>>())
     }
-}
-
-/// Convert a UTF-8 boundary to a UTF-16 offset. Interior bytes are rejected.
-pub fn byte_to_utf16(text: &str, byte: usize) -> Option<usize> {
-    text.get(..byte).map(|s| s.encode_utf16().count())
-}
-
-/// Convert a UTF-16 offset to UTF-8. Interior surrogate offsets are rejected.
-pub fn utf16_to_byte(text: &str, unit: usize) -> Option<usize> {
-    let mut units = 0;
-    for (byte, ch) in text.char_indices() {
-        if units == unit {
-            return Some(byte);
-        }
-        units += ch.len_utf16();
-    }
-    (units == unit).then_some(text.len())
 }
 
 fn boundary(text: &str, byte: usize) -> usize {
@@ -184,14 +166,6 @@ impl TextEditState {
     /// Committed value, excluding preedit.
     pub fn text(&self) -> &str {
         &self.current.text
-    }
-    /// Selection anchor and caret, in UTF-8 bytes.
-    pub fn selection(&self) -> (usize, usize) {
-        (self.current.anchor, self.current.caret)
-    }
-    /// Current raw IME preview.
-    pub fn preedit(&self) -> Option<&Preedit> {
-        self.preedit.as_ref()
     }
     /// A non-empty preedit currently owns keyboard text.
     pub fn composing(&self) -> bool {
@@ -475,9 +449,6 @@ pub struct MenuInputState {
     token: u64,
     pending: Option<(u64, bool)>,
     modal_focus: Option<TextField>,
-    caret_clock: f64,
-    caret_restart: f64,
-    caret_pending: bool,
 }
 impl Default for MenuInputState {
     fn default() -> Self {
@@ -500,60 +471,13 @@ impl Default for MenuInputState {
             token: 0,
             pending: None,
             modal_focus: None,
-            caret_clock: 0.,
-            caret_restart: 0.,
-            caret_pending: false,
         }
     }
 }
 impl MenuInputState {
-    /// Advance from the existing menu callback clock, never a host wall clock.
-    pub fn step_caret(&mut self, now_ms: f64) {
-        if now_ms.is_finite() {
-            self.caret_clock = self.caret_clock.max(now_ms);
-            if self.caret_pending {
-                self.caret_restart = self.caret_clock;
-                self.caret_pending = false;
-            }
-        }
-    }
-    /// A focus/edit starts a solid 530ms interval, followed by 530ms off.
-    pub fn caret_visible(&self) -> bool {
-        self.window_focused
-            && self.focus.is_some()
-            && (self.caret_clock - self.caret_restart) % 1060. < 530.
-    }
-    /// Register up to eight real editors. Equal rules preserve composition/history.
-    pub fn register(&mut self, id: EditorId, rule: TextRule, value: &str) -> bool {
-        if let Some(editor) = self.editors.get(&id)
-            && editor.rule == rule
-        {
-            return true;
-        }
-        if self.editors.len() >= 8 && !self.editors.contains_key(&id) {
-            return false;
-        }
-        self.clear_composition();
-        self.editors
-            .insert(id, TextEditState::with_rule(rule, value));
-        true
-    }
     /// Read an editor's copied state.
     pub fn editor(&self, field: TextField) -> &TextEditState {
         &self.editors[&field]
-    }
-    /// Fallible lookup for copied generic descriptions; registry exhaustion
-    /// rejects preparation instead of indexing an unregistered editor.
-    pub fn registered_editor(&self, id: EditorId) -> Option<&TextEditState> {
-        self.editors.get(&id)
-    }
-    /// Start a new policy generation without changing host focus/modifier state.
-    pub fn reset_editor(&mut self, id: EditorId, value: &str) {
-        if let Some(rule) = self.editors.get(&id).map(|e| e.rule) {
-            self.clear_composition();
-            self.editors
-                .insert(id, TextEditState::with_rule(rule, value));
-        }
     }
     fn editor_mut(&mut self, field: TextField) -> &mut TextEditState {
         self.editors.get_mut(&field).expect("registered editor")
@@ -597,29 +521,6 @@ impl MenuInputState {
     }
     /// Reduce one copied intent and return host work.
     pub fn apply(&mut self, intent: EditIntent) -> Vec<HostEditEffect> {
-        if matches!(
-            intent,
-            EditIntent::Focus(Some(_))
-                | EditIntent::WindowFocused(true)
-                | EditIntent::Modal(false)
-                | EditIntent::Select { .. }
-                | EditIntent::Move { .. }
-                | EditIntent::SelectAll
-                | EditIntent::KeyText(_)
-                | EditIntent::Preedit(..)
-                | EditIntent::ImeCommit(_)
-                | EditIntent::Backspace
-                | EditIntent::Delete
-                | EditIntent::Undo
-                | EditIntent::Redo
-                | EditIntent::ClipboardRead { .. }
-                | EditIntent::ClipboardWritten { .. }
-        ) {
-            self.caret_restart = self.caret_clock;
-            // Edits can arrive after a long idle interval. Start the solid
-            // phase at the next core-clock seam, not the previous picture.
-            self.caret_pending = true;
-        }
         let mut effects = Vec::new();
         match intent {
             EditIntent::Focus(focus) => {
@@ -822,21 +723,6 @@ impl MenuInputState {
         }
     }
 
-    /// Route committed nickname and Enter through the existing menu admission
-    /// gate. Play remains deferred until StartMenuState::step and grants no route.
-    pub fn apply_menu(
-        &mut self,
-        intent: EditIntent,
-        menu: &mut StartMenuState,
-        admission: bool,
-    ) -> Vec<HostEditEffect> {
-        let view = menu.view(admission);
-        let mut effects = self.sync_menu(&view, &[]);
-        let edited = self.apply(intent);
-        effects.extend(self.commit_menu(edited, menu, admission));
-        effects
-    }
-
     /// Complete an adapter event (including synchronous clipboard feedback),
     /// passing Enter to #300 and synchronizing its immediate disable/focus gate.
     pub fn commit_menu(
@@ -865,144 +751,4 @@ impl MenuInputState {
         remaining.extend(self.sync_menu(&menu.view(admission), &[]));
         remaining
     }
-}
-
-/// Minimal semantic roles for a later native accessibility bridge.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AccessibleRole {
-    /// Binary control exposing a committed checked state.
-    Checkbox,
-    /// Roving section tab.
-    Tab,
-    /// Roving palette or run cell.
-    GridCell,
-    /// Editable field.
-    TextInput,
-    /// Activatable control.
-    Button,
-    /// Read-only status or last-life result.
-    Status,
-}
-/// Supported semantic action; bridges dispatch it back to the policy owner.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AccessibleAction {
-    /// Focus the nickname input.
-    FocusNickname,
-    /// Change the committed nickname via editor intents.
-    EditNickname,
-    /// Existing menu action, subject to admission.
-    Menu(MenuAction),
-}
-/// A copied flat login tree in reading/tab order, with stable IDs.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AccessibleNode {
-    /// Stable semantic identifier.
-    pub id: &'static str,
-    /// Control role.
-    pub role: AccessibleRole,
-    /// Accessible plain name.
-    pub name: String,
-    /// Committed value; never preedit or transport details.
-    pub value: String,
-    /// Effective keyboard focus.
-    pub focused: bool,
-    /// Whether actions can currently execute.
-    pub enabled: bool,
-    /// Actions supported when enabled.
-    pub actions: Vec<AccessibleAction>,
-}
-
-/// Project mounted ordinary login controls. Native champion controls publish
-/// their separate copied PanelView semantics, without an AccessKit dependency.
-pub fn login_accessibility(view: &StartMenuView, input: &MenuInputState) -> Vec<AccessibleNode> {
-    if !view.visible {
-        return Vec::new();
-    }
-    let mut nodes = Vec::new();
-    let mut add = |id, role, name: String, value: String, focused, enabled, actions| {
-        nodes.push(AccessibleNode {
-            id,
-            role,
-            name,
-            value,
-            focused,
-            enabled,
-            actions,
-        });
-    };
-    if view.ordinary_controls_visible {
-        let enabled = !view.disabled && !input.modal;
-        add(
-            "nickname",
-            AccessibleRole::TextInput,
-            view.wording.nickname.into(),
-            view.nickname.clone(),
-            enabled && input.window_focused && input.focus == Some(TextField::Nickname),
-            enabled,
-            vec![
-                AccessibleAction::FocusNickname,
-                AccessibleAction::EditNickname,
-            ],
-        );
-        for (id, name, action) in [
-            ("play", view.play_label, MenuAction::Play),
-            ("skin", view.wording.change_skin, MenuAction::Skin),
-            ("server", view.wording.choose_server, MenuAction::Server),
-            (
-                "quality",
-                view.wording.graphics_quality,
-                MenuAction::Quality,
-            ),
-        ] {
-            add(
-                id,
-                AccessibleRole::Button,
-                name.into(),
-                if id == "quality" {
-                    match view.quality {
-                        MenuQuality::High => view.wording.quality_high,
-                        MenuQuality::Low => view.wording.quality_low,
-                    }
-                    .into()
-                } else {
-                    String::new()
-                },
-                false,
-                if id == "play" {
-                    !view.play_disabled && !input.modal
-                } else {
-                    enabled
-                },
-                vec![AccessibleAction::Menu(action)],
-            );
-        }
-    }
-    if !view.last_life.label.is_empty() {
-        add(
-            "last-life",
-            AccessibleRole::Status,
-            view.last_life.label.into(),
-            format!("{}{}", view.last_life.number, view.last_life.suffix),
-            false,
-            true,
-            vec![],
-        );
-    }
-    if view.spinner_visible || view.champion_pending {
-        add(
-            "status",
-            AccessibleRole::Status,
-            if view.champion_pending {
-                view.wording.champion_pending
-            } else {
-                view.wording.connecting
-            }
-            .into(),
-            String::new(),
-            false,
-            true,
-            vec![],
-        );
-    }
-    nodes
 }

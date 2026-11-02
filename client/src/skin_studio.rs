@@ -617,9 +617,7 @@ impl StudioState {
             visible: self.visible(),
             enabled: self.interactive(),
             alpha: self.alpha,
-            modal: true,
             initial_focus: Some(NEXT),
-            restore_focus: Some(crate::login_controls::CHANGE_SKIN),
             controls: vec![
                 control(
                     0,

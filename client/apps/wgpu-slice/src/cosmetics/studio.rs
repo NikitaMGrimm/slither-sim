@@ -800,8 +800,7 @@ mod tests {
     #[test]
     fn refreshed_preview_art_composes_with_an_older_world_revision() {
         use crate::{
-            frame::Draw, menu::MenuFrame, menu_storage::MenuStorage, render::PreparedFrame,
-            skin_studio_native::SkinStudioNative,
+            menu_storage::MenuStorage, render::PreparedFrame, skin_studio_native::SkinStudioNative,
         };
         use slither_client::skin_studio::AppearanceRecord;
         let directory = Directory::new();
@@ -828,36 +827,22 @@ mod tests {
             .asset;
         assert_ne!(fresh.handle, old.asset.handle);
         assert_ne!(fresh.revision, old.asset.revision);
-        let mut frame = MenuFrame::world_crossfade([960, 540], 1., 0.)
-            .unwrap()
-            .frame;
-        frame.draws.push(Draw {
-            corners: None,
-            asset: old.asset,
-            source: None,
-            repeat_uv: None,
-            black_effect: false,
-            destination: BodyRect {
-                x: 10.,
-                y: 10.,
-                width: 32.,
-                height: 24.,
-            },
-            translation: [0.; 2],
-            rotation: 0.,
-            effective_alpha: 1.,
-            blend: BodyBlend::SourceOver,
-        });
         let mut picture = PreparedFrame {
-            frame,
+            frame: crate::frame::Frame {
+                identity: 0,
+                extent: [960, 540],
+                viewport_scale: 1.,
+                tick: 0,
+                draws: Vec::new(),
+                snakes: Vec::new(),
+            },
             overlay: None,
             resources: vec![old.clone()],
         };
-        studio.append_preview(&mut picture, Some(&art)).unwrap();
+        let preview = studio.append_preview(&mut picture, Some(&art)).unwrap();
         assert!(picture.resources.iter().any(|r| r.asset == old.asset));
         assert!(picture.resources.iter().any(|r| r.asset == fresh));
-        picture
-            .frame
+        preview
             .validate(
                 &picture
                     .resources

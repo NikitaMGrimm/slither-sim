@@ -1,27 +1,21 @@
 # Menu resources
 
-`apps/wgpu-slice/src/menu.rs` prepares an immutable `MenuFrame` from the core's
-`StartMenuView` and `MenuLayout`. The native login enables it with the PR2 editor for caret, selection and preedit.
-Both browser clients use one semantic DOM overlay; their GPU/Canvas world
-renderers do not draw login controls. Chooser/picker screens remain later work.
-This layer owns no clock, hit test, focus or Play admission policy.
+`apps/wgpu-slice/src/menu.rs` composes the page and world below the egui menus: a
+`MenuFrame` carries only the page backdrop and the world crossfade cover. The menus'
+controls, wordmark and spinner are [egui screens](login-egui.md). Both browser
+clients use one semantic DOM overlay; their GPU/Canvas world renderers do not draw
+login controls. This layer owns no clock, hit test, focus or Play admission policy.
 
 Native login layout, pointer input and IME candidate rectangles use logical window
-pixels. `NativeLogin::prepare_host` prepares physical-resolution menu resources;
-`SurfaceHost` paints them directly over the world blit, alongside the DOM-style HUD
-and minimap. Nicknames remain in the capped world backing. The diagnostic
-`MenuFrame::into_backing` mapping remains available for retained comparisons.
+pixels. `SurfaceHost` paints egui directly over the world blit, alongside the
+DOM-style HUD and minimap. Nicknames remain in the capped world backing.
 A terminal connecting attempt returns to login without reconnecting; a fresh
 explicit Play is required. Gameplay/death returns remain separate work.
 
-Overlay image origins round to whole physical pixels after text baseline and
-alignment offsets. Menu texel density is `min(window DPR, 5)` through one
-`MAX_MENU_RASTER_DENSITY` constant. Windows scaling tops out at 500%; above that,
-the 13 MiB menu allowance cannot hold the picker at 1:1. Higher DPR keeps CSS
-layout, the real viewport scale and hit/IME coordinates, while sampling the
-5x textures. Up to DPR 5, one source pixel remains one physical pixel. Clipping keeps whole texels inside the CSS clip;
-world nicknames retain their canvas placement. Pointer hit targets keep the core
-CSS layout; caret and IME candidate rectangles share physical-pixel rounding.
+Wordmark and spinner raster density is `min(window DPR, 5)` through one
+`MAX_MENU_RASTER_DENSITY` constant. Windows scaling tops out at 500%. Higher DPR
+keeps CSS layout, the real viewport scale and hit/IME coordinates, while sampling
+the 5x textures. World nicknames retain their canvas placement.
 Menu art is CPU-filtered on premultiplied pixels with Catmull-Rom once per source
 revision and physical destination size, then cached at that exact size.
 
@@ -46,45 +40,33 @@ One quad applies alpha to the complete canvas,
 including folded/overlapping portions. A stable menu-material handle advances
 revision when time or raster size changes; frozen frames reuse their image.
 Hidden spinners allocate and rasterize nothing.
-Supported native logo glyphs use the [authored swelling stroke alphabet](wordmark.md);
-unsupported configurable text uses the installed bold-font fallback. Either path
+The native logo uses the [authored swelling stroke alphabet](wordmark.md), which
 settles to a cached raster and has no ongoing wiggle. `TextCache` uses installed real Arial Bold (Windows) or DejaVu
 Sans Bold (Linux). Labels fit core rectangles; no synthetic bold or copied art.
 
 Both browser art loaders share reserved cosmetic-path rejection with the bounded
 manifest parser. A leading UTF-8 BOM is retained and rejected, matching Rust.
-The no-art placeholder uses `#7070B0`; native caret, selection and preedit underline
-use solid materials without capsule shadows.
+The no-art placeholder uses `#7070B0`.
 
 ## Bounds and publication
 
-- Menu has **64 replacing slots / 13 MiB**, shared by text and authored materials,
-  isolated from nickname/HUD/minimap/panel allowances. Aggregate cache ceilings
-  are **386 slots / 31 MiB**; these are ceilings, not eager allocations. The Menu
-  allowance includes exact 5x control/shadow rasters and cropped wordmark tiles
-  through 1.1x outgoing growth; the active-picture 64 MiB limit is unchanged.
-  Champion controls retain compact sliced tiles and a separate 4 MiB regression.
-- Menu has a **512-draw producer limit**. `frame::push_draw`/`reserve_draws` also
-  enforce the final picture's 64 MiB Draw-record guard (262,144 draws). Menu
-  reserves no world capacity. Active pictures retain 64 MiB/2,048-texture limits.
-- Menu text uses the capped density and HUD text uses exact DPR, within the
-  2048px texture bound and their byte budgets; world nicknames retain the 128px font guard and backing-space
-  diagnostics retain their 3x raster bound. Control atlas tiles stay within 512px;
-  decoded menu art allows up to 2048px per axis. Menu decoding alone admits that
-  density; world cosmetic decoding keeps its 1024px bound. The picture/cosmetics
-  pixel budgets still apply.
+- `frame::push_draw`/`reserve_draws` enforce the final picture's 64 MiB Draw-record
+  guard (262,144 draws). Active pictures retain 64 MiB/2,048-texture limits.
+- HUD text uses exact DPR, within the 2048px texture bound and its byte budget;
+  world nicknames retain the 128px font guard and backing-space diagnostics retain
+  their 3x raster bound. Decoded menu art allows up to 2048px per axis. Menu
+  decoding alone admits that density; world cosmetic decoding keeps its 1024px
+  bound. The picture/cosmetics pixel budgets still apply.
 - External art shares the existing **16 MiB cosmetics allowance**. Authored
   menu art admission reserves the five procedural skin roles' 79,424 RGBA bytes;
-  those mandatory roles also precede optional images at construction. Authored
-  controls use the Menu group's own allowance, so a full cosmetics bank cannot
-  block essential controls; unadmitted art uses authored fallbacks.
+  those mandatory roles also precede optional images at construction. A full
+  cosmetics bank cannot block essential controls; unadmitted art uses authored
+  fallbacks.
   Prepared pictures and staged replacements own additional bounded
   copies; active-cache ceilings do not describe total process memory.
-- Changed/hidden Menu slots retire together in a staged cache. Materials, text
-  and picture validation must succeed before cache publication. A failure leaves
-  the prior cache intact. `MenuFrame::append_to` checks producer, extent and
-  picture draw/pixel/texture admission before appending. Prepared resources stay
-  immutable after resize, retirement and art replacement.
+- `MenuFrame::append_to` checks extent and picture draw/pixel/texture admission
+  before changing the picture. Prepared resources stay immutable after resize,
+  retirement and art replacement.
 
 ## One local art resolver
 
@@ -135,17 +117,13 @@ manifests, contained serving, icon replacement and prepared retention. With
 
 ```sh
 cargo test -p slither-wgpu-slice --locked --lib --test menu --test cosmetics --test panel_text
-cargo run -p slither-wgpu-slice --locked --example menu_specimens -- <new-output-dir>
+cargo run -p slither-wgpu-slice --locked --example menu_specimens -- <new-output-dir> --login
 ```
 
-After generating WebGPU bindings, from `client/`, run
-`node tools/menu-specimens.mjs <headless-browser-executable> <new-output-dir>`.
-It uses a temporary loopback asset server, blocks outside requests and closes its
-isolated browser; it never opens a game socket. Both hosts cover full controls
-at DPR 1/1.25/2/3; native also covers synthetic replacement, missing art, resize
-and retained pictures. Inspect recognizable states, no clipping and core edges
-within 2 CSS px. No reference-pixel equality. These specimens do not establish
-owner perceptual acceptance, physical IME/accessibility or real display pacing.
+The example needs a mode: `--login`, `--settings`, `--server-picker`, `--studio`,
+`--builder`, `--focus`, `--champion` or `--stroke`. Inspect recognizable states and
+no clipping. No reference-pixel equality. These specimens do not establish owner
+perceptual acceptance, physical IME/accessibility or real display pacing.
 
 The browser DOM loader uses the same role/path grammar, bounded same-origin
 streaming reads and PNG/JPEG dimensions checked before browser decode. Only
@@ -157,34 +135,19 @@ without decoding unused menu art into the GPU bank. Native retains the existing
 shared bank. Object URLs retire on generation teardown; stale async reads cannot
 publish into a replacement document. Missing images use authored controls.
 
-## Shared control adopter
-
-The native [champion editor](menu-controls.md) paints through the same transaction
-and physical overlay. Its 444px holder uses a bounded sliced atlas instead of a
-wide texture. Uniform tall surfaces tile in both axes. Each tile charges the
-existing producer cap; all material/text slots share the same Menu allowance.
-Theme raster content enters cache keys, while position, sampled alpha and
-horizontal text scroll do not. Login control migration remains a follow-up.
-
 ## Native focus outlines
 
 Keyboard focus outlines use the idle control radius, with half-height corners for
 studio capsules, inset inside the control bounds. Pointer focus stays silent;
 selection uses a separate marker. A studio round trip restores the opener's
-focus modality and clears pointer feedback. Fully visible controls retain their
-complete shadow padding outside the content window; partially scrolled controls
-remain clipped. Hollow, premultiplied half-rasters stretch into three strips; position,
-clip and fade opacity stay outside the cache key. Tall outlines retain 512px
-tiles. Checkbox focus shares its existing indicator raster, preserving Settings'
-32-slot envelope. The menu raster density cap remains 5, with the real DPR still
-controlling presentation and input.
+focus modality and clears pointer feedback.
 
 Run `cargo run --manifest-path apps/wgpu-slice/Cargo.toml --example menu_specimens
 -- NEW_EXTERNAL_DIRECTORY --focus` from `client/`, with `CARGO_BUILD_JOBS=2`.
 The fixed-clock sweep covers DPR 1–8 plus 1.25/1.5/1.75, wide/narrow/short layouts,
 Settings, each studio section, section fades, return and early Builder entry.
-It checks 512 menu records, 64 slots and 13 MiB for the host picture. Screenshots
-compose page, egui and the studio preview as the desktop host presents them.
+Screenshots compose page, egui and the studio preview as the desktop host presents
+them.
 Generated solid images exercise art-loaded budgets and the egui studio's cosmetic
 thumbnails (`*-ready.png`); all exported screenshots use only procedural geometry
 and placeholders. It never reads an art directory or

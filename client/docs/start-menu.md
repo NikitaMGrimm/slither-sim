@@ -1,7 +1,7 @@
 # Start menu
 
-All three product entries open on the shared login. Native uses `NativeLogin`,
-`MenuFrame` and the PR2 editor; Canvas and WebGPU use the same
+All three product entries open on the shared login. Native uses `NativeLogin`
+and its egui screens; Canvas and WebGPU use the same
 `apps/wgpu-slice/web/login-overlay.mjs` semantic DOM adapter. `LoginMenu` exports
 the copied core projection in both Wasm builds. Real input/button elements own
 browser editing, IME, clipboard and accessibility; Rust owns normalization,
@@ -33,19 +33,10 @@ Lucida font box for the last-length line, the two NBSPs around the bold Arial
 Play label, and the 20px gap directly after the nickname border box. Creation
 and retained updates use the same measurements. The logo flow holder stays
 450x115. Native nickname, Play, tips and font fallbacks use ascent/descent baselines;
-tips use a normal line at the top of their reserved row. Nickname painting,
-pointer selection and IME anchoring share the single-line input content box.
-`menu_layout::single_line_field_placement(field, inset, font_size, ascent,
-descent)` is shared by all single-line painters: it returns the content left
-edge/alphabetic baseline and the centred font-size caret top/height. Insets
-are symmetric horizontal/vertical content padding in logical units; callers
-include borders only if their field rect still includes them. Values and
-placeholders share this placement; caret and IME hosts snap its outputs once.
-`tests/field_text.rs` independently checks line/caret centring at multiple font
-sizes, input/champion-sized boxes and DPRs. The champion TextField painter can
-call this same API without depending on the login renderer.
-The caret uses a 530ms on/off clock from the menu
-callback, restarted by focus/edit/movement; raw IME preedit stays separate.
+tips use a normal line at the top of their reserved row. Nickname painting and IME
+anchoring share the egui field's content box.
+The caret is egui's, restarted by focus/edit/movement; raw IME preedit stays
+separate.
 
 The native login always uses the authored
 [stroke wordmark](wordmark.md) swells and ripples into place on the retained
@@ -56,7 +47,7 @@ curve-motion or physical IME parity. Login scales about the center
 of its viewport-sized border box, with its 64px margin outside that box. Fixed
 corner links and the centered 128px spinner are siblings: they never inherit the
 login transform. The spinner uses its own center-origin scale from the view.
-`hit_test` only tests geometry; adapters must also check visibility and enabled
+Layout rectangles only give geometry; hosts must also check visibility and enabled
 state before dispatching actions.
 
 Initialize `MenuLayout::new` only at creation or an actual viewport resize.
@@ -116,16 +107,14 @@ chooser owns the 0..64 inventory and 42 gate. Code redemption remains hidden.
 
 ## Opt-in text editing and native input
 
-`menu_input::MenuInputState` owns a bounded `EditorId`/`TextRule` registry of
-`TextEditState` values (including nickname and champion), directional UTF-8
+`menu_input::MenuInputState` owns the nickname and champion `TextEditState`
+values, directional UTF-8
 byte selections, focus, modality, composition and bounded undo/redo (64 edits).
 `EditIntent` and `HostEditEffect` contain copied data only. No DOM, window,
 clipboard, transport or accessibility-library handle enters the shared core.
 Movement and deletion use committed scalar boundaries; raw Unicode preedit,
 including combining marks, remains IME-owned. Word movement uses whitespace boundaries; this is a
 small native editing policy, not a locale-specific word/grapheme segmenter.
-`byte_to_utf16` and `utf16_to_byte` reject offsets inside a UTF-8 scalar or UTF-16
-surrogate pair rather than silently interpreting different coordinate systems.
 Selection intents clamp invalid byte positions backwards to a scalar boundary.
 
 Typing, paste and IME commit all replace the selection, normalize the complete
@@ -202,22 +191,15 @@ boost keys and pointer boost. Editing/modal state suspends gameplay presses;
 key-up always passes. This opt-in seam does not change the legacy
 `DesktopInput::blur` or its accumulated turn-debt semantics. Modal close restores
 the previous text focus. `sync_menu` consumes #300's focus intents and current
-hidden/disabled state. `apply_menu` (or `commit_menu` after adapter/clipboard
-work) updates the committed nickname and dispatches Enter through the existing
+hidden/disabled state. `commit_menu` updates the committed nickname and dispatches Enter through the existing
 admission gate; the once-only Play request still comes from the next menu step.
 
-`login_accessibility` returns stable copied nodes in reading order, with role,
-plain name, committed value, effective focus, enabled state and semantic actions.
-It covers the ordinary login, last-life status and busy/incomplete champion
-status. Actions must return through the menu/editor admission policy. It adds
-no AccessKit bridge or fake functioning champion editor.
 Skin, server and graphics-quality names and high/low values come from the shared
-`MenuWording` table in English, German, French and Portuguese. These accessible
-names/values are authored: the source image links at `site/index.html:288-301`
-and `347-350` provide neither alt nor title text. They are not claimed as official
-translations. Each locale has a projection test covering both quality states.
-Connecting and incomplete champion-handoff status names are also authored in
-the same table and covered in each locale's projection test.
+`MenuWording` table in English, German, French and Portuguese. These names and
+values are authored: the source image links at `site/index.html:288-301` and
+`347-350` provide neither alt nor title text. They are not claimed as official
+translations. Connecting and incomplete champion-handoff status names are also
+authored in the same table.
 
 The native adapter maps winit 0.30 logical editing keys, physical gameplay keys,
 modifiers (including Windows AltGr), IME and focus events. `NativeLogin` supplies
@@ -229,9 +211,9 @@ clipboard effects outside core borrows. No UI toolkit or accessibility bridge
 is added; physical-host IME and screen-reader acceptance remains open.
 
 The authored traces in `tests/menu_input.rs` and
-`apps/wgpu-slice/tests/menu_input_native.rs` exercise offsets, normalization,
+`apps/wgpu-slice/tests/menu_input_native.rs` exercise normalization,
 limits, selection/history, Windows IME/Enter and key-release traces, injected
-clipboard success/failure, gameplay releases and login semantic snapshots.
+clipboard success/failure and gameplay releases.
 winit's `KeyEvent` has a private platform payload, so synthetic key events inject
 the exact public fields production extracts through `KeyInput`; no fabricated
 platform payload or unsafe constructor is used. IME and focus tests use actual

@@ -21,52 +21,6 @@ impl MenuRect {
     }
 }
 
-/// Logical single-line text origin and a text-height caret before pixel snapping.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FieldTextPlacement {
-    /// Content left edge and alphabetic baseline.
-    pub origin: [f64; 2],
-    /// Top of the caret in viewport/CSS pixels.
-    pub caret_top: f64,
-    /// Caret height, limited to the available content height.
-    pub caret_height: f64,
-}
-
-/// Content rectangle after left/top/right/bottom field padding.
-/// The caller validates finite dimensions and padding before resolving controls.
-pub fn field_content_rect(field: MenuRect, inset: [f64; 4]) -> MenuRect {
-    MenuRect {
-        x: field.x + inset[0],
-        y: field.y + inset[1],
-        width: (field.width - inset[0] - inset[2]).max(0.),
-        height: (field.height - inset[1] - inset[3]).max(0.),
-    }
-}
-
-/// Place any single-line field's value or placeholder using the selected font.
-/// `inset` is symmetric horizontal/vertical content padding in the same logical
-/// units as `field`; include borders here if the rect still includes them.
-/// Callers supply validated finite geometry and nonnegative font metrics.
-/// Font ascent/descent are positive distances from the alphabetic baseline.
-/// Center the font line box in the content box and a font-size caret on that
-/// same centre. Painters and IME hosts snap these outputs once at their DPR.
-pub fn single_line_field_placement(
-    field: MenuRect,
-    inset: [f64; 2],
-    font_size: f64,
-    ascent: f64,
-    descent: f64,
-) -> FieldTextPlacement {
-    let height = (field.height - 2. * inset[1]).max(0.);
-    let center = field.y + inset[1] + height / 2.;
-    let caret_height = font_size.max(0.).min(height);
-    FieldTextPlacement {
-        origin: [field.x + inset[0], center + (ascent - descent) / 2.],
-        caret_top: center - caret_height / 2.,
-        caret_height,
-    }
-}
-
 /// Platform text/inline-flow measurements, independent of world rendering.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MenuMetrics {
@@ -260,14 +214,6 @@ impl MenuLayout {
         )
     }
 
-    /// Invert the complete login transform for a pointer in viewport pixels.
-    pub fn to_login(&self, x: f64, y: f64) -> (f64, f64) {
-        (
-            self.origin.0 + (x - self.origin.0) / self.scale,
-            self.origin.1 + (y - 64. - self.top - self.origin.1) / self.scale,
-        )
-    }
-
     /// Untransformed element rectangle (login-local or viewport-fixed).
     pub fn logical_rect(&self, element: MenuElement) -> MenuRect {
         self.rects
@@ -285,16 +231,6 @@ impl MenuLayout {
         }
         let (x, y) = self.to_viewport(r.x, r.y);
         rect(x, y, r.width * self.scale, r.height * self.scale)
-    }
-
-    /// Inverse hit-test a specified element. Visibility/admission is separate.
-    pub fn hit_test(&self, element: MenuElement, x: f64, y: f64) -> bool {
-        let (x, y) = if fixed(element) {
-            (x, y)
-        } else {
-            self.to_login(x, y)
-        };
-        self.logical_rect(element).contains(x, y)
     }
 }
 

@@ -49,7 +49,7 @@ fn action_labels_keep_theme_padding_at_nominal_size_in_every_layout() {
     login.studio.state.edit_builder(|b| {
         b.append(1);
     });
-    let mut text = TextCache::menu();
+    let mut text = TextCache::default();
     for dpr in [1., 1.25, 1.5, 1.75, 2., 3., 4., 5.] {
         for logical in [
             [960., 540.],
@@ -173,27 +173,24 @@ fn tabs_grid_and_windowed_strip_are_roving_and_do_not_save_or_connect() {
     key(&mut login, NamedKey::End);
     assert_eq!(login.focused(), Some(ControlId(RUN_BASE + selected as u16)));
     // The core panel remains the reading order egui follows.
-    let semantics = login
-        .studio_panel
-        .semantics([960., 540.], &Default::default(), &Default::default())
-        .unwrap();
-    let position = |id| semantics.iter().position(|n| n.id == id).unwrap();
+    let order = login.studio_panel.resolve([960., 540.]).unwrap();
+    let visible = || {
+        order
+            .iter()
+            .filter(|r| r.control.visible)
+            .map(|r| r.control.id)
+    };
+    let position = |id| visible().position(|n| n == id).unwrap();
     assert!(position(BUILDER_TAB) < position(ControlId(SWATCH_BASE)));
     assert!(position(RESET) < position(CANCEL));
     assert!(position(CANCEL) < position(SAVE));
-    assert!(
-        semantics
-            .iter()
-            .any(|n| n.id == BUILDER_TAB && n.selected == Some(true))
-    );
     assert_eq!(
-        semantics
-            .iter()
-            .filter(|n| n.id.0 >= SWATCH_BASE && n.id.0 < RUN_BASE)
+        visible()
+            .filter(|n| n.0 >= SWATCH_BASE && n.0 < RUN_BASE)
             .count(),
         39
     );
-    assert_eq!(semantics.iter().filter(|n| n.id.0 >= RUN_BASE).count(), 4);
+    assert_eq!(visible().filter(|n| n.0 >= RUN_BASE).count(), 4);
     // Pointer arrows can reach both ends without changing the pattern.
     let before = login
         .studio
@@ -456,43 +453,20 @@ fn builder_quota_and_held_picture_retry_at_dpr_one_to_five() {
                 login.focus(focus);
                 login.studio.state.reveal_control(focus, logical);
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
-                assert!(
-                    menu.frame.draws.len() <= 384,
-                    "DPR {dpr}: {} draws",
-                    menu.frame.draws.len()
-                );
-                assert!(menu.resources.len() <= 40, "{} slots", menu.resources.len());
-                assert!(
-                    menu.resources
-                        .iter()
-                        .map(|r| r.image.pixels.len())
-                        .sum::<usize>()
-                        <= 8 * 1024 * 1024
-                );
-                for (namespace, slots, bytes) in [(7, 8, 2 * 1024 * 1024), (8, 20, 2 * 1024 * 1024)]
-                {
-                    let group: Vec<_> = menu
-                        .resources
-                        .iter()
-                        .filter(|r| r.asset.handle >> 60 == namespace)
-                        .collect();
-                    assert!(
-                        group.len() <= slots,
-                        "DPR {dpr}, {logical:?}, namespace {namespace}: {} slots",
-                        group.len()
-                    );
-                    assert!(
-                        group.iter().map(|r| r.image.pixels.len()).sum::<usize>() <= bytes,
-                        "DPR {dpr}, {logical:?}, namespace {namespace}: byte allocation"
-                    );
-                }
                 let mut picture = slither_wgpu_slice::render::PreparedFrame {
-                    frame: menu.frame,
+                    frame: slither_wgpu_slice::frame::Frame {
+                        identity: 0,
+                        extent: menu.extent,
+                        viewport_scale: menu.viewport_scale,
+                        tick: 0,
+                        draws: Vec::new(),
+                        snakes: Vec::new(),
+                    },
                     overlay: None,
                     resources: menu.resources,
                 };
-                login.studio.append_preview(&mut picture, None).unwrap();
-                assert!(picture.draw_count() <= 1536);
+                let preview = login.studio.append_preview(&mut picture, None).unwrap();
+                assert!(preview.draws.len() <= 1024);
                 let held = picture.resources.clone();
                 let (a, _) = login.studio.prepare_preview(extent, dpr, None).unwrap();
                 let (b, _) = login.studio.prepare_preview(extent, dpr, None).unwrap();
@@ -501,38 +475,5 @@ fn builder_quota_and_held_picture_retry_at_dpr_one_to_five() {
                 login.studio.presented();
             }
         }
-    }
-}
-
-#[test]
-fn builder_preserves_the_landed_menu_density_cap_at_extreme_dpr() {
-    for dpr in [8., 16.] {
-        let mut login = login();
-        for palette in PALETTES {
-            login.studio.state.edit_builder(|b| {
-                b.append(palette);
-            });
-        }
-        let extent = [(360. * dpr) as u32, (240. * dpr) as u32];
-        let menu = login.prepare_host(extent, dpr, false, None).unwrap();
-        assert!(menu.frame.draws.len() <= 384);
-        for (namespace, slots) in [(7, 8), (8, 20)] {
-            let group: Vec<_> = menu
-                .resources
-                .iter()
-                .filter(|r| r.asset.handle >> 60 == namespace)
-                .collect();
-            assert!(group.len() <= slots);
-            assert!(group.iter().map(|r| r.image.pixels.len()).sum::<usize>() <= 2 * 1024 * 1024);
-        }
-        menu.frame
-            .validate(
-                &menu
-                    .resources
-                    .iter()
-                    .map(|r| (r.asset.into(), r.asset))
-                    .collect(),
-            )
-            .unwrap();
     }
 }

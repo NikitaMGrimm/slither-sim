@@ -1,6 +1,6 @@
 # Stroke wordmark
 
-The native login always selects `wordmark::DEFAULT_TEXT` (SlitherClient). Change that string, or set `Menu::wordmark_text`, to use other
+The native login always selects `wordmark::DEFAULT_TEXT` (SlitherClient). Change that string to use other
 text. All 95 printable ASCII characters have authored round-pen paths in
 `apps/wgpu-slice/src/wordmark_glyphs.rs`. This is an original alphabet under the
 repository MIT licence: no Hershey distribution, third-party glyph data, bundled
@@ -8,10 +8,8 @@ font, official stroke coordinates, code or artwork is included. No additional
 third-party font notice is required.
 
 Words split at capitals and spaces and alternate the green/purple gradients in
-`wordmark::COLORS`. An unsupported scalar selects the installed bold-font path
-for its whole word; supported parts of that word are never drawn separately.
-The same fallback policy applies to arbitrary strings, not just the default.
-Inputs are bounded to 128 characters and fail before unbounded allocation.
+`wordmark::COLORS`. An unsupported scalar fails the layout. Inputs are bounded to
+128 characters and fail before unbounded allocation.
 
 The 450x115 holder remains the vertical anchor. At natural size the ten-unit
 cap height is about 72 CSS pixels plus the 12px round pen. Lowercase ascenders
@@ -38,55 +36,30 @@ the retained reveal clock. Intervening frames keep the same shared image.
 Geometry/text changes invalidate that cache independently. Motion samples use
 the elapsed reveal fraction, so skipped updates do not change pacing; the exact
 final frame settles once and then keeps a static key.
-Cached atlases retain shared immutable `Arc<RgbaImage>` images; preparing another
-frame clones their handles rather than copying pixels. No idle rasterization or
-logo texture upload occurs. Size or centring-phase changes produce a new
-raster at the common capped menu density. Premultiplied CPU pixels are cropped to
-nonempty bounds including the shadow and tiled horizontally at 2048px. Each
-tile shares one snapped raster origin. Up to DPR 5 this is a 1:1 draw; above
-that, the menu-wide density cap samples the same 5x texels at the real viewport
-scale, keeping CSS layout and hit targets unchanged. The transient RGBA
-canvas is capped at 10 MiB; retained tiles share the existing 64-slot/13 MiB
-Menu allowance with controls and text. At extreme physical sizes, the stroke
-layout shrinks uniformly to the transient raster bound while keeping its centre
-and 1:1 texels; DPR alone never selects a different font. The installed-font
-path remains reachable for unsupported configurable text and the aggregate
-budget retry described below. Invalid input and other errors still propagate.
-Font colour runs are admitted
-only after the controls and spinner are known: adjacent equal-colour words share
-a label, and an over-budget suffix becomes an ellipsis. The whole font line fits
-the holder. Final slot/byte admission stays in the shared menu composition.
-Atlas admission reserves existing materials, label slots and draw capacity,
-including the spinner/backdrop. The final transaction checks actual text bytes
-and draws before inserting modal underlays or foreground labels; an aggregate quota failure
-retries only the logo with bounded font runs. That retry publishes only if the
-same full-menu admission succeeds, with failed staged draws restored first. Menus that cannot fit even then retain the
-existing quota skip. This also covers #366's picker limit at DPR 7-8. These are ceilings,
-not eager allocations.
+Each reveal raster uploads to egui textures, tiled horizontally at 2048px. Size or
+centring-phase changes produce a new raster at the common capped menu density.
+Premultiplied CPU pixels are cropped to nonempty bounds including the shadow, and
+each tile shares one snapped raster origin. Up to DPR 5 this is a 1:1 draw; above
+that, the density cap samples the same 5x texels at the real viewport scale, keeping
+CSS layout and hit targets unchanged. The transient RGBA canvas is capped at 10 MiB.
+At extreme physical sizes, the stroke layout shrinks uniformly to the transient
+raster bound while keeping its centre and 1:1 texels; DPR alone never selects a
+different font. Invalid input and other errors still propagate.
 
 The standalone Canvas/WebGPU DOM development pages retain their separate
 plain-text/art logo. This is a known reference-host difference; the future
 extension will reuse this native painter through WebGL2.
 
-Every word (including a font fallback) uses one snapped physical canvas origin
+Every word uses one snapped physical canvas origin
 plus its rounded relative advance. Absolute word origins never round separately;
 fractional-DPR regressions retain the same boundary rule as the prior font logo.
 The raster cache includes the first word's local physical offset from the snapped
 canvas origin. A centring phase change rebuilds it; integer translations reuse
 the same image at the new origin.
 
-Above DPR 3, nonempty horizontal bands are packed in bounded atlases to avoid
-charging transparent areas around the letters against essential controls. This
-keeps at most four regions per band, merging the smallest gaps to share the
-512-draw cap with sliced controls. Larger transparent gaps are not retained, so
-the outgoing wordmark, fading spinner and text fit the same 13 MiB ceiling. A
-pixel-exact reconstruction test
-checks that packing neither drops, overlaps nor changes the raster pixels.
-
-Offline authored tests: `cargo test -p slither-wgpu-slice --locked --test wordmark
---test menu`. `menu_specimens <new-output-dir> --stroke` renders frozen reveal
-times, full settled menus at DPR 1/2, arbitrary strings, alphabet sheets, and
-seven raster runs per DPR/progress pair (first warmup omitted in the JSON).
+Offline authored tests: `cargo test -p slither-wgpu-slice --locked --test wordmark`.
+`menu_specimens <new-output-dir> --stroke` renders frozen reveal times, arbitrary
+strings, alphabet sheets, and seven raster runs per DPR/progress pair (first warmup omitted in the JSON).
 Transparent string PNGs unpremultiply a copy; production texture pixels stay
 premultiplied. It opens no window, browser or game socket. Specimens are synthetic product
 output, not owner perceptual acceptance or original pixel parity.
@@ -94,9 +67,8 @@ output, not owner perceptual acceptance or original pixel parity.
 ## CPU reveal workload
 
 `wordmark_perf <new-output-dir> [samples=60] [progress=0.5]` is a finite,
-CPU-only release workload. It measures uncached production rasters at DPR 1/2/5
-and complete menu preparation across 40 ms reveal advances, excluding file I/O
-and output validation from timings. Four warmups precede each 16-128-sample
+CPU-only release workload. It measures uncached production rasters at DPR 1/2/5,
+excluding file I/O and output validation from timings. Four warmups precede each 16-128-sample
 series. `times.csv` retains every sample; raw RGBA settled/reveal pixels provide
 byte comparisons. No GPU, window, browser or network is created. Build with
 `cargo build --release --locked -p slither-wgpu-slice --example wordmark_perf`.

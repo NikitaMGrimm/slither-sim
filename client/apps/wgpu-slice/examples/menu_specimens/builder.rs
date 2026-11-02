@@ -22,8 +22,8 @@ fn shot(
     path: &Path,
 ) -> Result<()> {
     let extent = logical.map(|n| (n * dpr) as u32);
-    let (picture, _) = studio_picture(login, extent, dpr, false, None)?;
-    capture_layered(renderer, &picture, login, path)
+    let (picture, top, _) = studio_picture(login, extent, dpr, false, None)?;
+    capture_layered(renderer, &picture, &top, login, path)
 }
 fn record_ledger(
     login: &mut NativeLogin,
@@ -33,10 +33,9 @@ fn record_ledger(
 ) -> Result<()> {
     for logical in [[960., 540.], [360., 640.], [960., 360.]] {
         let extent = logical.map(|n| (n * dpr) as u32);
-        // The egui studio's controls are shapes in the shared egui pass; the
-        // menu picture holds only the page and the preview.
-        let (picture, [preview, slots, bytes]) = studio_picture(login, extent, dpr, false, None)?;
-        if preview > 1024 || picture.frame.draws.len() > preview {
+        // The egui studio's controls are shapes in the shared egui pass.
+        let (_, _, [preview, slots, bytes]) = studio_picture(login, extent, dpr, false, None)?;
+        if preview > 1024 {
             return Err(format!(
                 "Builder working envelope exceeded: {dpr} {name} {logical:?}"
             ));

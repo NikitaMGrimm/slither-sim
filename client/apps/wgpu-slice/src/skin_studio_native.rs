@@ -271,12 +271,14 @@ impl SkinStudioNative {
         self.staged = Some(pose.next);
         Ok(picture)
     }
-    /// Admit preview with the immutable menu/world picture before advancing antenna state.
+    /// Admit preview with the immutable menu/world picture before advancing
+    /// antenna state. Its resources join the picture; the frame is the layer
+    /// the host presents above egui, so the snake sits above the panel.
     pub fn append_preview(
         &mut self,
         picture: &mut PreparedFrame,
         cosmetics: Option<&Cosmetics>,
-    ) -> Result<()> {
+    ) -> Result<Frame> {
         let ui = picture.ui_frame();
         let (preview, resources) = self.prepare_preview(ui.extent, ui.viewport_scale, cosmetics)?;
         if preview.draws.len() > 1024 {
@@ -300,9 +302,8 @@ impl SkinStudioNative {
             return Err(crate::menu::MENU_PICTURE_QUOTA.into());
         }
         crate::frame::check_draw_count(picture.draw_count() + preview.draws.len())?;
-        picture.ui_frame_mut().draws.extend(preview.draws);
         picture.resources = all.into_values().collect();
-        Ok(())
+        Ok(preview)
     }
     pub fn presented(&mut self) {
         if let Some(next) = self.staged.take() {

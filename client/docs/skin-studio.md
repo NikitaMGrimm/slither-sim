@@ -144,8 +144,7 @@ Previous/Next go through `StudioState::key_navigation`, once per physical key pr
 cancel of the touch that owns the pointer drops the held press without a click;
 another touch's cancel leaves it alone.
 Cosmetic thumbnails upload once per handle and revision as egui textures and
-are dropped when evicted or the studio closes. The old toolkit no longer
-paints studio controls and rejects them.
+are dropped when evicted or the studio closes.
 
 Focused checks from `client/`: `cargo test --locked --test skin_studio` and
 `cargo test --locked --manifest-path apps/wgpu-slice/Cargo.toml --test skin_studio
