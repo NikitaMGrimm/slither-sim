@@ -31,8 +31,8 @@ the current physical-resolution, single-sample HUD/menu overlay loaded over the
 world. The public `present`/`present_scaled` entry points default to Original.
 
 [Soft food layers](sprite-bandwidth.md) have separate single-sample targets:
-padded outlines at the world extent and eligible glows at one quarter or one
-eighth of each axis. Body rasters keep the selected world sample count. These
+padded outlines at the world extent and eligible glows at one half, one quarter
+or one eighth of each axis. Body rasters keep the selected world sample count. These
 layers do not change projection, the requested resolution, the MSAA budget
 boundary or the Original backing/blit decision. `PresentationReport` includes
 their retained/transient bytes and actual pass counts.

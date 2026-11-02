@@ -1,11 +1,12 @@
 # Crowded wgpu frames
 
-The renderer preserves every eligible world quad and its original paint order.
+The renderer preserves every eligible world quad and its CPU paint order.
 It serializes into retained, growable 8,192-quad vertex chunks, bounded at
-30 MiB of CPU vertex bytes, then uploads and binds them in one render pass. Only
-adjacent equal pipeline/texture/sampler states batch together, including across
-the same texture's repeat/clamp states. A run crossing a chunk boundary splits without
-changing primitive order. MSAA is cleared and resolved once for the whole frame.
+28 MiB of CPU vertex bytes, then uploads and binds them in ordered render passes.
+Adjacent equal pipeline/texture/sampler states batch together. Only the explicitly
+additive food glow barrier can regroup by attachment and binding. A run crossing
+a chunk boundary splits without dropping primitives. MSAA is cleared and resolved
+once for the whole frame; soft food layers use separate single-sample passes.
 Canvas output and core painter traversal/quality semantics are unchanged.
 
 Native [wheel zoom](zoom.md) applies its subpixel food/name eligibility before
@@ -37,8 +38,9 @@ At the absolute bound, per-picture storage is:
 | --- | ---: |
 | Logical CPU Draw records | 67,108,864 (64 MiB) |
 | CPU resolved states, 24 bytes per quad | 6,291,456 (6 MiB) |
-| Retained CPU vertex bytes, at most 32 chunks | 31,457,280 (30 MiB) |
-| GPU vertex data across at most 32 chunks | 31,457,280 (30 MiB) |
+| Retained CPU vertex bytes, at most 32 chunks | 29,360,128 (28 MiB) |
+| GPU vertex data across at most 32 chunks | 29,360,128 (28 MiB) |
+| Reused additive sorting scratch, one chunk | 1,114,112 (1.06 MiB) |
 
 Chunk/state-vector headers, allocator and driver overhead are additional.
 Compositor appends and splices check the count before growing Draw storage and

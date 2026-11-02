@@ -171,6 +171,7 @@ fn food_layers_keep_small_glows_and_body_rasters_and_reuse_resized_targets() {
         .unwrap();
     assert_eq!(r.food_glow_extent(), None);
     assert_eq!(r.fine_glow_extent(), None);
+    assert_eq!(r.half_glow_extent(), None);
     let small_pixels = offscreen::pixels(&r, &a).unwrap();
     let mut reference = resources.clone();
     reference[0].food_glow = false;
@@ -186,7 +187,8 @@ fn food_layers_keep_small_glows_and_body_rasters_and_reuse_resized_targets() {
         vec![
             draw(outline, 32.25, 32.75, 112., 0.8, BodyBlend::SourceOver),
             draw(body, 45.25, 45.75, 86., 1., BodyBlend::Lighter),
-            draw(glow, 20.25, 20.75, 160., 0.08, BodyBlend::Lighter),
+            draw(glow, 20.25, 20.75, 88., 0.08, BodyBlend::Lighter),
+            draw(glow, 180.25, 20.75, 52., 0.095, BodyBlend::Lighter),
             draw(glow, 70.25, 70.75, 160., 0.02, BodyBlend::Lighter),
         ],
     );
@@ -196,6 +198,7 @@ fn food_layers_keep_small_glows_and_body_rasters_and_reuse_resized_targets() {
     r.render(&picture, &first.create_view(&Default::default()))
         .unwrap();
     assert_eq!(r.food_outline_extent(), Some([256, 256]));
+    assert_eq!(r.half_glow_extent(), Some([128, 128]));
     assert_eq!(r.fine_glow_extent(), Some([64, 64]));
     assert_eq!(r.food_glow_extent(), Some([32, 32]));
     let larger = offscreen::target(&r, [384, 256]);
@@ -207,6 +210,7 @@ fn food_layers_keep_small_glows_and_body_rasters_and_reuse_resized_targets() {
     )
     .unwrap();
     assert_eq!(r.food_outline_extent(), Some([384, 256]));
+    assert_eq!(r.half_glow_extent(), Some([192, 128]));
     assert_eq!(r.fine_glow_extent(), Some([96, 64]));
     assert_eq!(r.food_glow_extent(), Some([48, 32]));
     r.render(&picture, &a.create_view(&Default::default()))
@@ -240,7 +244,79 @@ fn food_layers_keep_small_glows_and_body_rasters_and_reuse_resized_targets() {
     println!("isolated layer max component difference={max}");
     assert!(max <= 5, "isolated soft-layer drift {max}");
     assert_eq!(r.food_outline_extent(), None);
+    assert_eq!(r.half_glow_extent(), None);
     assert_eq!(r.fine_glow_extent(), None);
     assert_eq!(r.food_glow_extent(), None);
+    assert!(pollster::block_on(scope.pop()).is_none());
+}
+#[test]
+#[ignore = "explicit finite AMD offscreen size/opacity sweep"]
+fn glow_resolution_boundaries_stay_within_isolated_layer_budget() {
+    let mut r = renderer(4);
+    let scope = r.device.push_error_scope(wgpu::ErrorFilter::Validation);
+    let mut bank = Bank::new().unwrap();
+    for source in [0, 8, 16] {
+        let glow = bank.food(0, [0., 0.]).glows[source].asset();
+        let mut cases = Vec::new();
+        let mut draws = Vec::new();
+        for alpha in [0.02, 0.05, 0.050001, 0.095] {
+            for phase in [0.125, 0.5, 0.875] {
+                for size in [12., 15.99, 16., 20., 24., 31.99, 32., 40., 64., 160.] {
+                    let index = draws.len();
+                    let x = (index % 10) as f64 * 192. + 12. + phase;
+                    let y = (index / 10) as f64 * 192. + 12. + phase;
+                    draws.push(draw(glow, x, y, size, alpha, BodyBlend::Lighter));
+                    cases.push((size, alpha, phase, x, y));
+                }
+            }
+        }
+        let extent = [1920, 2304];
+        let candidate = frame(extent, draws);
+        let resources = bank.resources(&candidate).unwrap();
+        let mut reference = resources.clone();
+        reference[0].food_glow = false;
+        reference[0].asset.handle += 1_000_000;
+        let mut control = candidate.clone();
+        for d in &mut control.draws {
+            d.asset = reference[0].asset;
+        }
+        let mut all = resources;
+        all.extend(reference);
+        r.sync_resources(&all).unwrap();
+        let a = offscreen::target(&r, extent);
+        let b = offscreen::target(&r, extent);
+        r.render(&candidate, &a.create_view(&Default::default()))
+            .unwrap();
+        r.render(&control, &b.create_view(&Default::default()))
+            .unwrap();
+        let actual = offscreen::pixels(&r, &a).unwrap();
+        let expected = offscreen::pixels(&r, &b).unwrap();
+        let mut failures = Vec::new();
+        for (size, alpha, phase, x, y) in cases {
+            let mut differences = Vec::new();
+            for yy in y.floor() as usize - 2..(y + size).ceil() as usize + 2 {
+                for xx in x.floor() as usize - 2..(x + size).ceil() as usize + 2 {
+                    let offset = (yy * extent[0] as usize + xx) * 4;
+                    if actual[offset..offset + 3]
+                        .iter()
+                        .chain(&expected[offset..offset + 3])
+                        .any(|c| *c != 0)
+                    {
+                        differences.extend(
+                            (0..3).map(|c| actual[offset + c].abs_diff(expected[offset + c])),
+                        );
+                    }
+                }
+            }
+            differences.sort_unstable();
+            let max = *differences.last().unwrap_or(&0);
+            let p95 = differences[(differences.len() * 95).div_ceil(100).saturating_sub(1)];
+            if max > 5 || p95 > 2 {
+                failures.push((size, alpha, phase, max, p95));
+            }
+        }
+        println!("glow boundary source={source}, violations: {failures:?}");
+        assert!(failures.is_empty(), "isolated glow budget violations");
+    }
     assert!(pollster::block_on(scope.pop()).is_none());
 }

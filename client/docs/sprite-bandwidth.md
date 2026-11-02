@@ -24,9 +24,15 @@ edge and effective opacity, without changing culling or the CPU draw commands:
 
 | Glow | Attachment extent | Reconstruction |
 | --- | --- | --- |
-| Edge below 16 physical attachment pixels | Existing world target/sample count | Existing texture sampling |
-| Edge at least 32 pixels and opacity at most 0.05 | Ceil(world extent / 8) | Five-tap cubic approximation |
-| Other glows with edge at least 16 pixels | Ceil(world extent / 4) | Linear |
+| Eligible at factor 8 | Ceil(world extent / 8) | Five-tap cubic approximation |
+| Eligible at factor 4 | Ceil(world extent / 4) | Linear |
+| Eligible at factor 2 | Ceil(world extent / 2) | Linear |
+| Other glows | Existing world target/sample count | Existing texture sampling |
+
+Choose the coarsest eligible factor. The shortest edge must span at least four
+reduced pixels, and `max(opacity, paired opacity) * factor / edge <= 0.004`.
+The latter bounds the opacity gradient per reduced pixel; it is an authored
+quality guard, verified by the source-size/opacity/fractional-position sweep.
 
 The cubic approximation folds the four small corner weights of a separable
 Catmull-Rom reconstruction into the center. Its weights sum to one, so constant
@@ -69,9 +75,9 @@ and resolution policy remain owned by `WorldTargetPlan`.
 ## Memory and checks
 
 In addition to the existing MSAA/backing allocations, an active outline layer
-uses `4 * width * height` bytes. The fine and coarse glow targets use
-`4 * ceil(width / factor) * ceil(height / factor)` bytes, for factors four and
-eight. Single-sample worlds need no outline intermediate. Targets retire when
+uses `4 * width * height` bytes. Glow targets use
+`4 * ceil(width / factor) * ceil(height / factor)` bytes, for factors two, four
+and eight. Single-sample worlds need no outline intermediate. Targets retire when
 the world no longer uses the corresponding outline/glow path. Reports count retained
 layers and old/replacement coexistence; these are logical sizes, not driver
 residency measurements.

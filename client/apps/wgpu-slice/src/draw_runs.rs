@@ -1,4 +1,4 @@
-//! Consecutive resolved paint states only; never sort or copy geometry.
+//! Consecutive resolved paint states after any additive-barrier grouping.
 use crate::frame::{Quad, ResourceKey};
 use slither_client::presentation::BodyBlend;
 use std::ops::Range;

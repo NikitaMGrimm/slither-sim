@@ -143,7 +143,7 @@ struct PaintPass<'a> {
     range: std::ops::Range<usize>,
     queries: Option<(u32, u32)>,
     coarse: Option<&'a wgpu::BindGroup>,
-    fine: Option<&'a wgpu::BindGroup>,
+    fine: [Option<&'a wgpu::BindGroup>; 2],
     small_glows: Option<std::ops::Range<usize>>,
     filter: Option<u8>,
     base: Option<&'a wgpu::BindGroup>,
@@ -174,6 +174,7 @@ pub struct Renderer {
     glow_sort: Vec<(DrawState, [u8; QUAD_VERTEX_BYTES])>,
     glow: Option<LayerTarget>,
     fine_glow: Option<LayerTarget>,
+    half_glow: Option<LayerTarget>,
     fine_composite_single: wgpu::RenderPipeline,
     outline_target: Option<LayerTarget>,
     outline_composite: wgpu::RenderPipeline,
@@ -200,6 +201,9 @@ impl Renderer {
     }
     pub fn fine_glow_extent(&self) -> Option<[u32; 2]> {
         self.fine_glow.as_ref().map(|g| g.extent)
+    }
+    pub fn half_glow_extent(&self) -> Option<[u32; 2]> {
+        self.half_glow.as_ref().map(|g| g.extent)
     }
     pub fn food_glow_extent(&self) -> Option<[u32; 2]> {
         self.glow.as_ref().map(|g| g.extent)
@@ -514,6 +518,7 @@ impl Renderer {
             glow_sort: Vec::new(),
             glow: None,
             fine_glow: None,
+            half_glow: None,
             fine_composite_single,
             outline_target: None,
             outline_composite,
@@ -901,7 +906,7 @@ impl Renderer {
         let soft_layers = !overlay && encoded_unorm8;
         let mut glow_span: Option<std::ops::Range<usize>> = None;
         let mut glow_count = 0;
-        let mut glow_bins = [false; 3];
+        let mut glow_bins = [false; 4];
         let mut outline_span: Option<std::ops::Range<usize>> = None;
         let mut outline_count = 0;
         let mut unsafe_prefix = None;
@@ -954,13 +959,17 @@ impl Renderer {
                         / 2.
                 };
                 let side = edge(b).min(edge(c));
-                scale = if side >= 32. && quad.vertices[0][4] <= 0.05 {
-                    2
-                } else if side >= 16. {
-                    1
-                } else {
-                    0
-                };
+                // Bound the opacity gradient per reduced pixel as well as the
+                // source footprint. Bright small glows need finer sampling;
+                // both contributions of a paired draw must qualify. The
+                // authored boundary sweep owns the isolated error budget.
+                let opacity = quad.vertices[0][4].max(second_alpha);
+                scale = [(3, 8.), (2, 4.), (1, 2.)]
+                    .into_iter()
+                    .find(|&(_, factor)| {
+                        side >= 4. * factor && f64::from(opacity) * factor / side <= 0.004
+                    })
+                    .map_or(0, |(scale, _)| scale);
                 glow_bins[scale as usize] = true;
                 glow_span.get_or_insert(index..index).end = index + 1;
                 glow_count += 1;
@@ -997,7 +1006,7 @@ impl Renderer {
             chunk.states.push(state);
         }
         let glow_span =
-            glow_span.filter(|span| span.len() == glow_count && (glow_bins[1] || glow_bins[2]));
+            glow_span.filter(|span| span.len() == glow_count && glow_bins[1..].contains(&true));
         if let Some(span) = &glow_span {
             for (i, chunk) in self.vertices[..chunk_count].iter_mut().enumerate() {
                 let base = i * VERTEX_CHUNK_QUADS;
@@ -1102,16 +1111,23 @@ impl Renderer {
         };
         #[cfg(not(feature = "frame-profile"))]
         let outline_queries = Some((0, 1));
-        let glow_replacement = glow_span.as_ref().filter(|_| glow_bins[2]).and_then(|_| {
+        let glow_replacement = glow_span.as_ref().filter(|_| glow_bins[3]).and_then(|_| {
             let extent = attachment.map(|n| n.div_ceil(8));
             self.glow
                 .as_ref()
                 .is_none_or(|g| g.extent != extent)
                 .then(|| LayerTarget::new(&self.device, &self.layout, self.format, extent))
         });
-        let fine_replacement = glow_span.as_ref().filter(|_| glow_bins[1]).and_then(|_| {
+        let fine_replacement = glow_span.as_ref().filter(|_| glow_bins[2]).and_then(|_| {
             let extent = attachment.map(|n| n.div_ceil(4));
             self.fine_glow
+                .as_ref()
+                .is_none_or(|g| g.extent != extent)
+                .then(|| LayerTarget::new(&self.device, &self.layout, self.format, extent))
+        });
+        let half_replacement = glow_span.as_ref().filter(|_| glow_bins[1]).and_then(|_| {
+            let extent = attachment.map(|n| n.div_ceil(2));
+            self.half_glow
                 .as_ref()
                 .is_none_or(|g| g.extent != extent)
                 .then(|| LayerTarget::new(&self.device, &self.layout, self.format, extent))
@@ -1126,18 +1142,21 @@ impl Renderer {
                 "world"
             })?];
             if glow_span.is_some() {
-                if glow_bins[2] {
+                if glow_bins[3] {
                     q.push(self.diagnostic_pass("food-glows-coarse")?);
                 }
-                if glow_bins[1] {
+                if glow_bins[2] {
                     q.push(self.diagnostic_pass("food-glows-fine")?);
+                }
+                if glow_bins[1] {
+                    q.push(self.diagnostic_pass("food-glows-half")?);
                 }
                 q.push(self.diagnostic_pass("world-after-glows")?);
             }
             q
         };
         #[cfg(not(feature = "frame-profile"))]
-        let queries = [(0, 1); 4];
+        let queries = [(0, 1); 5];
         let msaa_view = (samples > 1).then(|| {
             &replacement
                 .as_ref()
@@ -1174,7 +1193,7 @@ impl Renderer {
                         outline_queries
                     },
                     coarse: None,
-                    fine: None,
+                    fine: [None; 2],
                     small_glows: None,
                     filter: None,
                     base: None,
@@ -1189,7 +1208,7 @@ impl Renderer {
         let pass_count = 1
             + usize::from(outline_span.is_some())
             + if has_glows {
-                1 + usize::from(glow_bins[1]) + usize::from(glow_bins[2])
+                1 + glow_bins[1..].iter().filter(|&&active| active).count()
             } else {
                 0
             };
@@ -1205,7 +1224,7 @@ impl Renderer {
                     range: start..span.start,
                     queries: query(0),
                     coarse: None,
-                    fine: None,
+                    fine: [None; 2],
                     small_glows: None,
                     filter: None,
                     base,
@@ -1213,7 +1232,7 @@ impl Renderer {
             );
             let mut soft = 0;
             let mut i = 1;
-            let coarse = glow_bins[2].then(|| {
+            let coarse = glow_bins[3].then(|| {
                 glow_replacement
                     .as_ref()
                     .or(self.glow.as_ref())
@@ -1230,15 +1249,15 @@ impl Renderer {
                         range: span.clone(),
                         queries: query(i),
                         coarse: None,
-                        fine: None,
+                        fine: [None; 2],
                         small_glows: None,
-                        filter: Some(2),
+                        filter: Some(3),
                         base: None,
                     },
                 );
                 i += 1;
             }
-            let fine = glow_bins[1].then(|| {
+            let fine = glow_bins[2].then(|| {
                 fine_replacement
                     .as_ref()
                     .or(self.fine_glow.as_ref())
@@ -1255,7 +1274,32 @@ impl Renderer {
                         range: span.clone(),
                         queries: query(i),
                         coarse: None,
-                        fine: None,
+                        fine: [None; 2],
+                        small_glows: None,
+                        filter: Some(2),
+                        base: None,
+                    },
+                );
+                i += 1;
+            }
+            let half = glow_bins[1].then(|| {
+                half_replacement
+                    .as_ref()
+                    .or(self.half_glow.as_ref())
+                    .expect("half glow target")
+            });
+            if let Some(glow) = half {
+                soft += self.encode_pass(
+                    &mut encoder,
+                    PaintPass {
+                        target: &glow.view,
+                        resolve: None,
+                        samples: 1,
+                        load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                        range: span.clone(),
+                        queries: query(i),
+                        coarse: None,
+                        fine: [None; 2],
                         small_glows: None,
                         filter: Some(1),
                         base: None,
@@ -1273,7 +1317,7 @@ impl Renderer {
                     range: span.end..frame.draws.len(),
                     queries: query(i),
                     coarse: coarse.map(|g| &g.bind),
-                    fine: fine.map(|g| &g.bind),
+                    fine: [half.map(|g| &g.bind), fine.map(|g| &g.bind)],
                     small_glows: Some(span.clone()),
                     filter: None,
                     base: None,
@@ -1295,7 +1339,7 @@ impl Renderer {
                     range: start..frame.draws.len(),
                     queries: query(0),
                     coarse: None,
-                    fine: None,
+                    fine: [None; 2],
                     small_glows: None,
                     filter: None,
                     base,
@@ -1319,12 +1363,16 @@ impl Renderer {
         if let Some(fine) = fine_replacement {
             self.fine_glow = Some(fine);
         }
+        if let Some(half) = half_replacement {
+            self.half_glow = Some(half);
+        }
         if let Some(glow) = glow_replacement {
             self.glow = Some(glow);
         }
         if !overlay && !has_glows {
             self.glow = None;
             self.fine_glow = None;
+            self.half_glow = None;
         }
         // Allocation precedes publication; wgpu retains submitted attachment references
         // after the old host handles are dropped, without a CPU/GPU idle wait.
@@ -1453,7 +1501,7 @@ impl Renderer {
             pass.draw(0..3, 0..1);
         }
         let mut small_draws = 0;
-        if let Some(bind) = fine {
+        for bind in fine.into_iter().flatten() {
             pass.set_pipeline(if samples == 1 {
                 &self.fine_composite_single
             } else {
@@ -1477,7 +1525,7 @@ impl Renderer {
         self.encode_draws(&mut pass, range, samples, filter)
             + small_draws
             + usize::from(coarse.is_some())
-            + usize::from(fine.is_some())
+            + fine.iter().flatten().count()
             + usize::from(base.is_some())
     }
 }

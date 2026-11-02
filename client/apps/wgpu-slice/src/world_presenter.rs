@@ -67,6 +67,7 @@ impl WorldPresenter {
         let layer_extents = |r: &Renderer| {
             [
                 r.food_outline_extent(),
+                r.half_glow_extent(),
                 r.fine_glow_extent(),
                 r.food_glow_extent(),
             ]
