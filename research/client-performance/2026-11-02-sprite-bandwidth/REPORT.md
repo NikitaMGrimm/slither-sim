@@ -153,6 +153,8 @@ nominal glow draws cannot pay for an extra path.
 Five alternating main-control/fixed pairs rerun the five headline cells using
 the complete-history method below. This is a separate source-pinned series;
 earlier measurements are preserved. GPU sums include world/blit/HUD passes.
+The new CSV's `callbacks` counts all 366 replay or 181 authored callbacks;
+`samples` counts the selected 302 or 141 populated pictures.
 
 <!-- BEGIN CROWDED REVISION -->
 | Crowded history / output | Main control GPU median / p95 ms | Fixed GPU median / p95 ms | Fixed run-median range ms |
@@ -172,11 +174,43 @@ by `recompute.py --check`. The retained [probe.patch](probe.patch) contains both
 study-only probes and the original authored workload helper; none of that
 adapter-selection driver is a shipped example. Production paths are portable.
 
+### Champion-menu integration
+
+The update rebases onto main `84757429` (#432), dropping the four Resource
+initializers with the deleted menu painter and retaining the surviving world
+crossfade initializer. `git range-diff` shows no other behavior reconciliation.
+Timing pins above remain unchanged. A separately built post-rebase executable
+processes all twelve complete histories with exact frame/resource/send digests
+checked against the retained main control. Its 36 new physical-size readbacks
+compare against the original control images, whose SHA-256 bindings are checked
+before reduction. The unchanged control receipts are reused, not remeasured or
+relabelled as new runs. [revision-parity-runs.csv](revision-parity-runs.csv) and
+[revision-pixels.csv](revision-pixels.csv) retain these correctness summaries.
+
+<!-- BEGIN REVISION PICTURE CHECKS -->
+| Picture check / output | Exact core/resource/send digest | RGB max / p95 bytes | RGB RMS range bytes |
+| --- | --- | ---: | ---: |
+| Replay / default / 960×540 Original | `75846df53ae4defc` | 37 / 4 | 1.337–1.704 |
+| Replay / default / 1920×1080 Original | `ba63b5047ff4b8b1` | 37 / 4 | 1.348–1.692 |
+| Replay / default / 1920×1080 Native | `ba63b5047ff4b8b1` | 31 / 4 | 1.314–1.723 |
+| Replay / whole map / 960×540 Original | `696e1b57cb0985e4` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Original | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Replay / whole map / 1920×1080 Native | `06163a32960d79e9` | 0 / 0 | 0.000–0.000 |
+| Authored / default / 960×540 Original | `d5127c0955e212ea` | 17 / 4 | 0.013–1.636 |
+| Authored / default / 1920×1080 Original | `fd8de742e7647024` | 17 / 3 | 0.013–1.515 |
+| Authored / default / 1920×1080 Native | `fd8de742e7647024` | 17 / 3 | 0.010–1.435 |
+| Authored / whole map / 960×540 Original | `f81e81d9e9c70a67` | 21 / 3 | 0.023–1.283 |
+| Authored / whole map / 1920×1080 Original | `5cd558dbaddd85f2` | 19 / 3 | 0.023–1.189 |
+| Authored / whole map / 1920×1080 Native | `5cd558dbaddd85f2` | 22 / 3 | 0.020–1.170 |
+<!-- END REVISION PICTURE CHECKS -->
+
 ## Matched complete-history method
 
 The primary matrix has five alternating A/B pairs in each of twelve cells:
 recorded/authored, default/whole-map, and 960×540 Original, 1920×1080 Original,
 1920×1080 Native. Odd pairs run control then candidate; even pairs reverse them.
+This original series is pinned to `3556082d`; the sparse follow-up above is a
+separate series with its own source and executable bindings.
 No quiet interval is reserved and no other process is stopped. All successful
 runs are included. CPU load and all process names/paths are sampled around and
 during runs; only load ranges and process-category maxima are exported.
@@ -239,9 +273,9 @@ as the post-studio binary.
 | Authored / whole map / 1920×1080 Native | 66.729 / 71.764 | 12.232 / 12.565 | 12.204–12.242 |
 <!-- END HISTORY RESULTS -->
 
-## Final pass breakdown
+## Retained pre-sparse pass breakdown
 
-A separate final-binary diagnostic renders the three predetermined snapshots at
+A separate `3556082d` diagnostic renders the three predetermined snapshots at
 1920×1080 Native, five warm pictures and ten measured repetitions per snapshot.
 The table sums **means** of disjoint timestamped passes, not stage quantiles.
 World passes include remaining geometry and the full-resolution composites;
@@ -249,7 +283,7 @@ they do not isolate snake bodies from food bodies or composition. Absent passes
 contribute zero. These profiles are excluded from the matched-history table.
 
 <!-- BEGIN FINAL GPU PROFILE -->
-| Final Native 1920×1080 diagnostic | Snapshot | World passes incl. composites ms | Glow targets ms | Outline target ms | Blit / HUD ms |
+| Pre-sparse Native 1920×1080 diagnostic | Snapshot | World passes incl. composites ms | Glow targets ms | Outline target ms | Blit / HUD ms |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Replay / default / 1920×1080 Native | 120 | 2.515 | 1.048 | 0.379 | 0.000 / 0.048 |
 | Replay / default / 1920×1080 Native | 240 | 2.495 | 2.117 | 1.682 | 0.000 / 0.045 |
@@ -411,20 +445,26 @@ and from owner perceptual acceptance.
 
 ## Verification
 
-- Full Windows `npm run check` passes at runtime `3556082d`: JavaScript, shared
+- Full Windows `npm run check` passes after rebasing onto `84757429` with the
+  sparse guard (validation source `dc0d5f78`): JavaScript, shared
   core/native regressions, strict native/profiling/Wasm Clippy, desktop build,
   Canvas Wasm ABI checks and browser WebGPU Wasm build/bindings. The commands use
   the dedicated target, two Cargo jobs, offline Cargo and the pinned CLI.
-- Seven explicitly enabled offscreen GPU regressions pass: additive rounding,
+- Twelve explicitly enabled offscreen GPU regressions pass: additive rounding,
   small/body-layer preservation and resize/reuse, 360 boundary cases, six
-  distinct-mip footprint paths, array binding/revision restoration, and the two
-  original pellet-raster quality checks. Existing goldens and budgets stay intact.
+  distinct-mip footprint paths, array binding/revision restoration, the two
+  original pellet-raster quality checks, sparse/crossover and cached-bin accounting,
+  and three world-resolution checks. Existing goldens and budgets stay intact.
+  Normal CI compiles but does not run these ignored GPU tests. The new CPU
+  coverage/selection/hysteresis test does run normally. A cheap software-adapter
+  subset was considered; the production renderer intentionally rejects CPU
+  adapters, so this update does not introduce a separate device policy for CI.
 - The final full-history digests and image readbacks are reported above. Browser
   runtime, physical display/input, outside-server play and owner perceptual
   acceptance are unrun; no gameplay pacing or end-to-end frame-budget claim is made.
 - The stdlib recompute negative checks reject missing rows/cells, duplicate and
   mislabeled IDs, wrong executable bindings, incomplete diagnostics, altered
-  report blocks and mismatched parity digests.
+  report blocks and mismatched parity digests (12 tests).
 
 ## Attempts and limitations
 

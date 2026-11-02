@@ -164,7 +164,7 @@ def profile_table(rows, binary):
         require(r["samples"] == "10" and r["binary_sha256"] == binary, "profile source/samples disagree")
         require(math.isfinite(float(r["mean_ms"])) and float(r["mean_ms"]) >= 0, "invalid profile timing")
         require(len(r["raw_log_sha256"]) == len(r["raw_csv_sha256"]) == 64, "missing profile binding")
-    lines = ["| Final Native 1920×1080 diagnostic | Snapshot | World passes incl. composites ms | Glow targets ms | Outline target ms | Blit / HUD ms |",
+    lines = ["| Pre-sparse Native 1920×1080 diagnostic | Snapshot | World passes incl. composites ms | Glow targets ms | Outline target ms | Blit / HUD ms |",
              "| --- | ---: | ---: | ---: | ---: | ---: |"]
     for w, z in product(WORKLOADS, ZOOMS):
         for frame in frames(w):
@@ -232,6 +232,11 @@ def main():
     blocks["DIAGNOSTICS"], blocks["COVERAGE"] = diagnostics_tables(read_csv(HERE / "diagnostics.csv"), read_csv(HERE / "diagnostic-snapshots.csv"))
     blocks["HOST OBSERVATIONS"] = host_table(series_rows)
     blocks["PICTURE CHECKS"] = parity_table(read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"), provenance["history"]["binaries"])
+    revision_parity, revision_pixels = read_csv(HERE / "revision-parity-runs.csv"), read_csv(HERE / "revision-pixels.csv")
+    revision.validate_reference(revision_parity, revision_pixels, read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"))
+    blocks["REVISION PICTURE CHECKS"] = parity_table(
+        revision_parity, revision_pixels,
+        {"before": provenance["history"]["binaries"]["before"], "after": followup["integration"]["binary_sha256"]})
     blocks["PRE-MIP PICTURE CHECKS"] = parity_table(read_csv(HERE / "pre-mip-parity-runs.csv"), read_csv(HERE / "pre-mip-pixels.csv"), provenance["pre-mip"]["binaries"])
     blocks["FINAL GPU PROFILE"] = profile_table(read_csv(HERE / "profile-stages.csv"), provenance["history"]["binaries"]["after"])
     validate_integration(read_csv(HERE / "integration-runs.csv"), read_csv(HERE / "parity-runs.csv"), read_csv(HERE / "pixels.csv"), provenance)

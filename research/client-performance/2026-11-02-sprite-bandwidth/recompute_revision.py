@@ -124,3 +124,10 @@ def headline_table(rows, label):
 def host_rows(rows):
     """Multi-cell sparse/cache rows share a process; count each launch once."""
     return list({r["launch_id"]: r for r in rows}.values())
+
+
+def validate_reference(rows, pictures, original_rows, original_pictures):
+    require([r for r in rows if r["side"] == "before"] == [r for r in original_rows if r["side"] == "before"], "revision control receipts changed")
+    for r in pictures:
+        original = next(p for p in original_pictures if all(p[k] == r[k] for k in ("workload", "zoom", "size", "frame")))
+        require(r["before_rgba_sha256"] == original["before_rgba_sha256"], "revision control readback changed")

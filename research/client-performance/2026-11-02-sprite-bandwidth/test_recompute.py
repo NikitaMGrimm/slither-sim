@@ -135,6 +135,28 @@ class Completeness(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 revision.validate(rows, "revision", provenance["binaries"]["revision"])
 
+    def test_revision_parity_keeps_the_control_and_requires_the_new_executable(self):
+        provenance = json.loads((HERE / "provenance.json").read_text(encoding="utf-8"))
+        binaries = {"before": provenance["history"]["binaries"]["before"],
+                    "after": provenance["revision"]["integration"]["binary_sha256"]}
+        rows = study.read_csv(HERE / "revision-parity-runs.csv")
+        images = study.read_csv(HERE / "revision-pixels.csv")
+        study.parity_table(rows, images, binaries)
+        original = study.read_csv(HERE / "parity-runs.csv")
+        original_images = study.read_csv(HERE / "pixels.csv")
+        revision.validate_reference(rows, images, original, original_images)
+        for invalid, pictures in ((rows[1:], images), (rows, images[1:])):
+            with self.assertRaises(ValueError):
+                study.parity_table(invalid, pictures, binaries)
+        changed = copy.deepcopy(rows)
+        next(r for r in changed if r["side"] == "after")["binary_sha256"] = provenance["history"]["binaries"]["after"]
+        with self.assertRaises(ValueError):
+            study.parity_table(changed, images, binaries)
+        changed = copy.deepcopy(images)
+        changed[0]["before_rgba_sha256"] = "0" * 64
+        with self.assertRaises(ValueError):
+            revision.validate_reference(rows, changed, original, original_images)
+
 
 if __name__ == "__main__":
     unittest.main()

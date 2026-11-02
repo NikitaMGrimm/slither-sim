@@ -169,6 +169,23 @@
       "cargo_jobs": 2,
       "package_clean_before_each_source": true
     },
-    "cache_control": "only the retained per-bin retirement patch differs from candidate; it is a diagnostic and is not shipped"
+    "cache_control": "only the retained per-bin retirement patch differs from candidate; it is a diagnostic and is not shipped",
+    "integration": {
+      "base_commit": "847574296a4d5a865b63435d7b6691ea385a8b7b",
+      "validation_commit": "dc0d5f78172b7d227f3ac067804bf1ce905f4c48",
+      "binary_sha256": "ea58c70ade2570136f0cb5b4f991ed083c0901531b7997d9e84a84645acbb9f1",
+      "source_blobs": {
+        "gpu.rs": "a54b70ec68ecb39f8597bce35f5ed208c8f38ef6",
+        "quad.wgsl": "66649a75c51f985a37228f526275a32b4ad9d695",
+        "frame.rs": "612f5e2eb79ba6d0416a4f87573e350a8299c815",
+        "draw_runs.rs": "2aefcf083fc1ad1231b334ba6c3cab46c84cd797",
+        "texture_arrays.rs": "8837fc1b9c4c5a81d918c43226f49a56518bc261",
+        "bank.rs": "3b57f3c868a005121e71dd11126a2c14cb9d02b1",
+        "scene.rs": "69eb0a98b9c4347a72eaef7c96c59a9d720f7646",
+        "world_presenter.rs": "fe3e256778968622fc521b319518d9a9b19fbc35",
+        "soft_layers.rs": "37d4d21e7d74159bc3ab4312939dfaa6643b0a1d"
+      },
+      "scope": "post-champion correctness only; follow-up timing series remains pinned to pre-rebase candidate; retained main-control readbacks and parity receipts are reused without new control measurements"
+    }
   }
 }

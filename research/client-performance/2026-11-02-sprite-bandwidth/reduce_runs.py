@@ -150,8 +150,10 @@ def export_diagnostics(root, output):
     write_csv(output / "diagnostic-snapshots.csv", snapshots)
 
 
-def export_parity(root, output):
-    runs = []
+def export_parity(root, output, reference=None, prefix=""):
+    # Follow-up readbacks can reuse the source-pinned control, without relabeling
+    # its receipts or re-running unchanged control rendering.
+    runs = [] if reference is None else [r for r in read_csv(output / "parity-runs.csv") if r["side"] == "before"]
     pictures = []
     for path in sorted(root.glob("parity-*-receipt.json")):
         receipt = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -159,6 +161,11 @@ def export_parity(root, output):
         log = (root / f"{name}.log").read_text(encoding="utf-8-sig")
         complete = re.search(r"complete=true,messages=(\d+),digest=([0-9a-f]{16}),skips=(\d+)", log)
         require(receipt["exit"] == 0 and complete is not None, f"incomplete parity run {name}")
+        if reference is not None:
+            raw = read_csv(root / f"{name}.csv")
+            replay = receipt["workload"] == "replay"
+            require(len(raw) == (366 if replay else 181) and len({r["frame"] for r in raw}) == len(raw), "incomplete/repeated revision parity callbacks")
+            require(len(selected(raw, "history", receipt["workload"])) == (302 if replay else 141), "incomplete revision parity selection")
         runs.append(dict(run_id=name, workload=receipt["workload"], zoom=receipt["zoom"],
                          size=receipt["size"], side=receipt["variant"],
                          binary_sha256=receipt["binarySha256"].lower(),
@@ -171,7 +178,7 @@ def export_parity(root, output):
         frames = (60, 120, 180) if receipt["workload"] == "synthetic" else (120, 240, 365)
         for frame in frames:
             after = root / f"{name}.{frame}.rgba"
-            before = root / f"{name.removesuffix('after')}before.{frame}.rgba"
+            before = (reference or root) / f"{name.removesuffix('after')}before.{frame}.rgba"
             a, b = before.read_bytes(), after.read_bytes()
             require(len(a) == len(b) == width * height * 4, "incorrect readback size")
             histogram = Counter()
@@ -199,8 +206,13 @@ def export_parity(root, output):
                                  rgb_rms=f"{math.sqrt(squared/count):.9f}", rgb_signed_mean=f"{signed/count:.9f}",
                                  alpha_max=alpha_max, before_rgba_sha256=sha(before), after_rgba_sha256=sha(after)))
     require(len(runs) == 24 and len(pictures) == 36, "incomplete parity/readback matrix")
-    write_csv(output / "parity-runs.csv", runs)
-    write_csv(output / "pixels.csv", pictures)
+    if reference is not None:
+        original = read_csv(output / "pixels.csv")
+        for r in pictures:
+            baseline = next(p for p in original if all(p[k] == str(r[k]) for k in ("workload", "zoom", "size", "frame")))
+            require(r["before_rgba_sha256"] == baseline["before_rgba_sha256"], "retained control image changed")
+    write_csv(output / (prefix + "parity-runs.csv"), runs)
+    write_csv(output / (prefix + "pixels.csv"), pictures)
 
 
 def export_profiles(root, output):
