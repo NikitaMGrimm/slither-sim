@@ -43,7 +43,12 @@ pub fn install(context: &egui::Context) -> Result<()> {
         .families
         .insert(egui::FontFamily::Monospace, vec!["body".into()]);
     context.set_fonts(fonts);
-    context.options_mut(|options| options.zoom_with_keyboard = false);
+    context.options_mut(|options| {
+        options.zoom_with_keyboard = false;
+        // The Windows default, on every platform: egui's 0.3 s misses ordinary
+        // double-clicks. A custom OS setting is not read.
+        options.input_options.max_double_click_delay = 0.5;
+    });
     context.set_theme(egui::Theme::Dark);
     context.style_mut_of(egui::Theme::Dark, |style| {
         style.visuals = egui::Visuals::dark();

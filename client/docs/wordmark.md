@@ -8,9 +8,8 @@ font, official stroke coordinates, code or artwork is included. No additional
 third-party font notice is required.
 
 Words split at capitals and spaces and alternate the green/purple gradients in
-`wordmark::COLORS`. An unsupported scalar marks its whole word as a fallback, which
-the stroke raster skips; supported parts of that word are never drawn separately.
-Inputs are bounded to 128 characters and fail before unbounded allocation.
+`wordmark::COLORS`. An unsupported scalar fails the layout. Inputs are bounded to
+128 characters and fail before unbounded allocation.
 
 The 450x115 holder remains the vertical anchor. At natural size the ten-unit
 cap height is about 72 CSS pixels plus the 12px round pen. Lowercase ascenders
@@ -51,7 +50,7 @@ The standalone Canvas/WebGPU DOM development pages retain their separate
 plain-text/art logo. This is a known reference-host difference; the future
 extension will reuse this native painter through WebGL2.
 
-Every word (including a font fallback) uses one snapped physical canvas origin
+Every word uses one snapped physical canvas origin
 plus its rounded relative advance. Absolute word origins never round separately;
 fractional-DPR regressions retain the same boundary rule as the prior font logo.
 The raster cache includes the first word's local physical offset from the snapped

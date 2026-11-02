@@ -150,6 +150,7 @@ impl NativeEguiHost {
                 i.pointer = Default::default();
                 i.keys_down.clear();
             });
+            crate::egui_panel::release_capture(&s.context);
             s.context.memory_mut(|m| m.stop_text_input());
         }
     }
@@ -181,6 +182,7 @@ impl NativeEguiHost {
                 i.pointer = Default::default();
                 i.keys_down.clear();
             });
+            crate::egui_panel::release_capture(&s.context);
             s.context.memory_mut(|m| m.stop_text_input());
         }
     }
@@ -241,6 +243,7 @@ impl NativeEguiHost {
         }
         if let Some(s) = &mut self.session {
             s.context.input_mut(|i| i.pointer = Default::default());
+            crate::egui_panel::release_capture(&s.context);
             s.input.events.clear();
         }
     }
@@ -562,6 +565,7 @@ impl NativeEguiHost {
                 i.pointer = Default::default();
                 i.keys_down.clear();
             });
+            crate::egui_panel::release_capture(&s.context);
         }
         if reveal && let Some(id) = focus {
             s.context.memory_mut(|m| m.request_focus(id));
@@ -577,6 +581,10 @@ impl NativeEguiHost {
             .or_default()
             .native_pixels_per_point = Some(s.dpr);
         let mut output = s.context.run_pass(input, |ctx| draw(ctx, reveal));
+        // The release has had its pass, or the captured widget is gone.
+        if !s.context.input(|i| i.pointer.primary_down()) {
+            crate::egui_panel::release_capture(&s.context);
+        }
         s.textures
             .append(std::mem::take(&mut output.textures_delta));
         // Discrete callbacks may need ordered layout/action passes before redraw.

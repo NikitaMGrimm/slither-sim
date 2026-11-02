@@ -607,9 +607,8 @@ mod desktop {
                 physical.map(|n| f64::from(n) / dpr),
                 self.game.bank.cosmetics.as_mut(),
             )?;
-            let view = self.login.state.view(admission);
             let composed = (|| -> Result<_> {
-                Ok(if view.visible || view.spinner_visible {
+                Ok(if self.login.needs_menu_pass(admission) {
                     let menu = self.login.prepare_host(
                         physical,
                         dpr,

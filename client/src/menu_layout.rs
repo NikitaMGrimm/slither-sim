@@ -214,14 +214,6 @@ impl MenuLayout {
         )
     }
 
-    /// Invert the complete login transform for a pointer in viewport pixels.
-    pub fn to_login(&self, x: f64, y: f64) -> (f64, f64) {
-        (
-            self.origin.0 + (x - self.origin.0) / self.scale,
-            self.origin.1 + (y - 64. - self.top - self.origin.1) / self.scale,
-        )
-    }
-
     /// Untransformed element rectangle (login-local or viewport-fixed).
     pub fn logical_rect(&self, element: MenuElement) -> MenuRect {
         self.rects
@@ -239,16 +231,6 @@ impl MenuLayout {
         }
         let (x, y) = self.to_viewport(r.x, r.y);
         rect(x, y, r.width * self.scale, r.height * self.scale)
-    }
-
-    /// Inverse hit-test a specified element. Visibility/admission is separate.
-    pub fn hit_test(&self, element: MenuElement, x: f64, y: f64) -> bool {
-        let (x, y) = if fixed(element) {
-            (x, y)
-        } else {
-            self.to_login(x, y)
-        };
-        self.logical_rect(element).contains(x, y)
     }
 }
 

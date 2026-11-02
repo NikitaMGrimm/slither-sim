@@ -2,7 +2,6 @@
 use slither_client::{
     champion::*,
     menu_controls::*,
-    menu_input::*,
     menu_layout::MenuRect,
     protocol::encode_champion,
     session_policy::{Command, Phase, SessionPolicy},
@@ -39,15 +38,12 @@ fn center(r: MenuRect) -> [f64; 2] {
 }
 
 #[test]
-fn placements_inverse_half_open_clips_and_reverse_order() {
+fn placements_half_open_clips_and_reverse_order() {
     let mut p = panel();
     p.placement.scale = 1.5;
     let r = p.resolve([960., 720.]).unwrap();
     let field = &r[2];
     assert_eq!(field.rect.width, 444. * 1.5);
-    assert_eq!(field.local(center(field.rect)), [222., 24.]);
-    assert!(field.hit(center(field.rect)));
-    assert!(!field.hit([field.rect.x + field.rect.width, field.rect.y]));
     p.controls[2].clip = Some(MenuRect {
         x: 18.,
         y: 88.,
@@ -55,58 +51,13 @@ fn placements_inverse_half_open_clips_and_reverse_order() {
         height: 48.,
     });
     let r = p.resolve([960., 720.]).unwrap();
-    assert!(!r[2].hit(center(r[2].rect)));
+    let [x, y] = center(r[2].rect);
+    assert!(!r[2].clip.contains(x, y));
     p.controls[3].id = MESSAGE;
     assert!(p.resolve([960., 720.]).is_err());
     p.controls.pop();
     p.placement.scale = f64::INFINITY;
     assert!(p.resolve([960., 720.]).is_err());
-}
-
-#[test]
-fn registry_preserves_ime_undo_clipboard_tokens_and_numeric_rule() {
-    let id = EditorId(7);
-    let mut e = MenuInputState::default();
-    assert!(e.register(id, TextRule::NumericServer, "12a3"));
-    e.apply(EditIntent::Focus(Some(id)));
-    assert_eq!(e.editor(id).text(), "123");
-    e.apply(EditIntent::KeyText("456".into()));
-    assert_eq!(e.editor(id).text(), "1234");
-    e.apply(EditIntent::Undo);
-    assert_eq!(e.editor(id).text(), "123");
-    let effects = e.apply(EditIntent::Paste);
-    let HostEditEffect::ReadClipboard(token) = effects[0] else {
-        panic!()
-    };
-    e.apply(EditIntent::Focus(Some(EditorId::Champion)));
-    e.apply(EditIntent::ClipboardRead {
-        token,
-        result: Ok("stale".into()),
-    });
-    assert_eq!(e.editor(EditorId::Champion).text(), "");
-    e.apply(EditIntent::ImeEnterPressed);
-    e.apply(EditIntent::Preedit("日".into(), None));
-    e.register(EditorId::Champion, TextRule::Champion, "ignored");
-    e.apply(EditIntent::ImeCommit("😀".into()));
-    assert_eq!(e.editor(EditorId::Champion).text(), "  ");
-    assert!(
-        e.apply(EditIntent::Enter {
-            pressed: true,
-            repeat: false
-        })
-        .is_empty()
-    );
-    e.apply(EditIntent::Enter {
-        pressed: false,
-        repeat: false,
-    });
-    assert_eq!(
-        e.apply(EditIntent::Enter {
-            pressed: true,
-            repeat: false
-        }),
-        vec![HostEditEffect::Activate(EditorId::Champion)]
-    );
 }
 
 #[test]

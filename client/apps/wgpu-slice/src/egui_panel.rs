@@ -3,7 +3,7 @@
 use crate::egui_theme as theme;
 use egui::{Align, Color32, Id, Rect, Sense, Stroke, pos2, vec2};
 use slither_client::{
-    menu_controls::{Control, ControlKind, PanelView},
+    menu_controls::{Activation, Control, ControlKind, PanelView},
     menu_layout::MenuRect,
     menu_theme::{ControlState, ControlStyle, MenuTheme, SurfaceRecipe},
     presentation::TextStyle,
@@ -57,6 +57,46 @@ pub fn focus_order(
     order.into_iter().map(|(_, id)| widget_id(id)).collect()
 }
 
+fn capture_key() -> Id {
+    Id::unique("menu pointer capture")
+}
+/// Forget the press a pointer click would match: the host cancelled it or
+/// replaced the screen, or the button is no longer down.
+pub fn release_capture(ctx: &egui::Context) {
+    ctx.data_mut(|data| data.remove::<Id>(capture_key()));
+}
+/// A primary press and release on the same widget, however long it was held and
+/// wherever the pointer went between them. egui's own click gives up after 0.8 s
+/// or 6 points of movement, which the menus never did; those limits stay global
+/// because text selection needs them to tell a drag from a click.
+pub fn pointer_click(response: &egui::Response) -> bool {
+    let ctx = &response.ctx;
+    let captured = ctx.data(|data| data.get_temp::<Id>(capture_key())) == Some(response.id);
+    if !response.enabled() {
+        if captured {
+            release_capture(ctx);
+        }
+        return false;
+    }
+    let (pressed, released) =
+        ctx.input(|i| (i.pointer.primary_pressed(), i.pointer.primary_released()));
+    if pressed && response.is_pointer_button_down_on() {
+        ctx.data_mut(|data| data.insert_temp(capture_key(), response.id));
+    }
+    response.clicked_by(egui::PointerButton::Primary)
+        // `hovered` is egui's top-most hit test, so another control or the panel
+        // over a backdrop still takes the release.
+        || (released && captured && response.hovered() && response.contains_pointer())
+}
+/// How `response` was activated this pass. `suppress` retires a pointer release
+/// that belongs to a press from before a panel replacement.
+pub fn activation(response: &egui::Response, suppress: bool) -> Option<Activation> {
+    if pointer_click(response) {
+        (!suppress).then_some(Activation::Pointer)
+    } else {
+        response.clicked().then_some(Activation::Enter)
+    }
+}
 /// A primary press held across a panel generation change (open, section,
 /// directory or window replacement) must not click whatever control now
 /// reuses its ID. Only that press's release is suppressed.

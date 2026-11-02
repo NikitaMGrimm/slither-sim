@@ -16,7 +16,6 @@ fn run(output: &Path, count: usize, progress: f64) -> Result<()> {
             height: 115.,
         },
         1920.,
-        |_| Err("unexpected fallback".into()),
     )?;
     for dpr in [1., 2., 5.] {
         let mut last = None;

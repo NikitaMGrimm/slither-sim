@@ -1,7 +1,6 @@
 //! Native login controls copied from the existing layout and return projection.
 use crate::{
     menu_controls::*,
-    menu_input::{EditorId, TextRule},
     menu_layout::{MenuElement as E, MenuLayout},
     menu_theme::ControlStyle,
     start_page::{MenuPhase, StartMenuView},
@@ -66,9 +65,7 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
         visible: view.visible,
         enabled: true,
         alpha: view.login_alpha,
-        modal: false,
         initial_focus: Some(NICKNAME),
-        restore_focus: Some(NICKNAME),
         controls: vec![
             control(
                 CHANGE_SKIN,
@@ -90,11 +87,8 @@ pub fn panel(view: &StartMenuView, layout: &MenuLayout, viewport: [f64; 2]) -> P
                 view.nickname_alpha,
                 view.ordinary_controls_visible,
                 ControlKind::TextField {
-                    editor: EditorId::Nickname,
                     placeholder: view.wording.nickname.into(),
-                    rule: TextRule::Nickname,
                     inset: nickname_inset,
-                    fit: true,
                 },
                 view.wording.nickname.into(),
             ),

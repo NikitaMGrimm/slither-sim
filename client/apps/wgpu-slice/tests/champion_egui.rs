@@ -554,6 +554,165 @@ fn the_touch_that_owns_the_pointer_decides_the_click() {
     assert!(login.champion.take_submission().is_none());
 }
 
+/// The editor is up while the login below it is hidden: the desktop frame loop
+/// must keep giving it egui passes when no input arrives.
+#[test]
+fn frames_without_input_keep_the_editor_running_while_the_login_is_hidden() {
+    let (_, mut login) = victory_at(808);
+    let view = login.state.view(false);
+    assert!(!view.visible && !view.spinner_visible);
+    assert!(login.champion.policy.visible());
+    pass(&mut login);
+    let save = at(center(&login, SAVE));
+    login.pointer(save, None, false);
+    let context = login.egui.context().unwrap().clone();
+    let start = context.cumulative_pass_nr();
+    let mut now = 840.;
+    for _ in 0..4 {
+        login.step(now, false, false).unwrap();
+        assert!(login.needs_menu_pass(false));
+        pass(&mut login);
+        now += 16.;
+    }
+    assert_eq!(context.cumulative_pass_nr(), start + 4);
+    assert!(login.champion.ui.fade[0] > 0.);
+}
+
+#[test]
+fn save_answers_the_matching_release_however_long_or_far_the_press_went() {
+    // Longer than egui's 0.8 s click limit.
+    let (_, mut login) = opened();
+    let save = at(center(&login, SAVE));
+    login.pointer(save, Some(true), false);
+    login.step(7100., false, false).unwrap();
+    pass(&mut login);
+    login.pointer(save, Some(false), false);
+    let (_, _, source) = login.champion.take_submission().unwrap();
+    assert_eq!(source, Activation::Pointer);
+    assert!(login.champion.take_submission().is_none());
+    // Further than egui's 6 point click limit, then back.
+    let (_, mut login) = opened();
+    let save = at(center(&login, SAVE));
+    login.pointer(save, Some(true), false);
+    login.pointer([2., 2.], None, false);
+    pass(&mut login);
+    login.pointer(save, None, false);
+    pass(&mut login);
+    login.pointer(save, Some(false), false);
+    assert!(login.champion.take_submission().is_some());
+    assert!(login.champion.take_submission().is_none());
+    // Released elsewhere, and a later release there, send nothing.
+    let (_, mut login) = opened();
+    let save = at(center(&login, SAVE));
+    login.pointer(save, Some(true), false);
+    login.pointer([2., 2.], Some(false), false);
+    assert!(login.champion.take_submission().is_none());
+    login.pointer(save, None, false);
+    pass(&mut login);
+    login.pointer(save, Some(false), false);
+    assert!(login.champion.take_submission().is_none());
+    // A press elsewhere never captures Save.
+    login.pointer([2., 2.], Some(true), false);
+    login.pointer(save, None, false);
+    pass(&mut login);
+    login.pointer(save, Some(false), false);
+    assert!(login.champion.take_submission().is_none());
+}
+
+/// egui forgets the press on each of these, but still reports the later release.
+#[test]
+fn a_cancelled_or_disabled_save_press_never_clicks_after_a_long_hold() {
+    let hold = |login: &mut NativeLogin| {
+        let save = center(login, SAVE);
+        login.pointer(at(save), Some(true), false);
+        login.step(7100., false, false).unwrap();
+        pass(login);
+        save
+    };
+    // Window blur.
+    let (_, mut login) = opened();
+    let save = hold(&mut login);
+    raw(&mut login, vec![Event::WindowFocused(false)]);
+    raw(&mut login, vec![Event::WindowFocused(true)]);
+    login.pointer(at(save), Some(false), false);
+    assert!(login.champion.take_submission().is_none());
+    // The owning touch's cancel.
+    let (_, mut login) = opened();
+    let save = center(&login, SAVE);
+    owner_down(&mut login, 7, save);
+    login.step(7100., false, false).unwrap();
+    pass(&mut login);
+    raw(
+        &mut login,
+        vec![touch(7, TouchPhase::Cancel, save), Event::PointerGone],
+    );
+    login.pointer(at(save), None, false);
+    pass(&mut login);
+    login.pointer(at(save), Some(false), false);
+    assert!(login.champion.take_submission().is_none());
+    // Sending by key disables Save under the held press.
+    for redraw in [false, true] {
+        let (mut game, mut login) = opened();
+        text(&mut login, "A");
+        let save = hold(&mut login);
+        tap(&mut login, Key::Space);
+        let (g, units, source) = login.champion.take_submission().unwrap();
+        assert!(game.save_champion(g, &units, source).unwrap());
+        login.observe_game(&game).unwrap();
+        assert!(!login.champion.panel.enabled);
+        if redraw {
+            pass(&mut login);
+        }
+        login.pointer(at(save), Some(false), false);
+        assert!(login.champion.take_submission().is_none());
+    }
+    // Screen replacement.
+    let (mut game, mut login) = opened();
+    let save = hold(&mut login);
+    let generation = game.generation();
+    game.closed(generation);
+    login.observe_game(&game).unwrap();
+    let mut now = 7140.;
+    while !login.champion.policy.finished() {
+        tape::pump(&mut game, now);
+        login.observe_game(&game).unwrap();
+        login.step(now, game.can_play(), false).unwrap();
+        now += 40.;
+        assert!(now < 20_000.);
+    }
+    login.observe_game(&game).unwrap();
+    login.sync_return_focus(game.can_play());
+    login
+        .prepare_host(EXTENT, 1., game.can_play(), None)
+        .unwrap();
+    let before = login.state.view(game.can_play()).phase;
+    login.pointer(at(save), Some(false), game.can_play());
+    let (intents, _) = login.step(now, game.can_play(), false).unwrap();
+    assert!(login.champion.take_submission().is_none());
+    assert!(
+        !intents
+            .iter()
+            .any(|i| matches!(i, StartMenuIntent::Play { .. }))
+    );
+    assert_eq!(login.state.view(game.can_play()).phase, before);
+}
+
+#[test]
+fn two_clicks_within_half_a_second_select_a_word() {
+    for (gap, selects) in [(100., true), (400., true), (600., false)] {
+        let (_, mut login) = opened();
+        text(&mut login, "abcdef");
+        let point = at(center(&login, MESSAGE));
+        login.pointer(point, Some(true), false);
+        login.pointer(point, Some(false), false);
+        login.step(6048. + gap, false, false).unwrap();
+        pass(&mut login);
+        login.pointer(point, Some(true), false);
+        login.pointer(point, Some(false), false);
+        assert_eq!(!selection(&login).unwrap().is_empty(), selects, "{gap}");
+    }
+}
+
 #[test]
 fn a_press_across_the_handoff_or_the_exit_does_not_click() {
     // Pressed on the returning login, released over Save once the editor is up.

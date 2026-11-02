@@ -18,13 +18,12 @@ fn make(text: &str, width: f64) -> Layout {
             ..holder()
         },
         width,
-        |s| Ok(s.chars().count() as f64 * 7.),
     )
     .unwrap()
 }
 
 #[test]
-fn complete_printable_ascii_and_whole_word_fallback() {
+fn complete_printable_ascii_and_unsupported_scalars_fail() {
     for c in ' '..='~' {
         assert!(glyph(c).is_some(), "{c}");
         let l = make(&c.to_string(), 1920.);
@@ -33,13 +32,7 @@ fn complete_printable_ascii_and_whole_word_fallback() {
             assert!(!samples(&l, 1.).unwrap().is_empty(), "{c}");
         }
     }
-    let l = make("Hello Wørld 123", 1920.);
-    assert_eq!(
-        l.words.iter().map(|w| w.fallback).collect::<Vec<_>>(),
-        [false, true, false]
-    );
-    assert_eq!(l.words[1].text, "Wørld");
-    assert!(samples(&make("Wørld", 1920.), 1.).unwrap().is_empty());
+    assert!(layout("Hello Wørld 123", holder(), 1920.).is_err());
     assert_eq!(
         make("SlitherClient", 1920.)
             .words
@@ -62,7 +55,7 @@ fn layout_is_deterministic_natural_size_and_uniform_narrow_fit() {
     assert!((narrow.rect.width - 288.).abs() < 1e-8);
     assert!((narrow.rect.width / a.rect.width - narrow.rect.height / a.rect.height).abs() < 1e-8);
     assert!((narrow.rect.y + narrow.rect.height / 2. - 107.5).abs() < 1e-8);
-    assert!(layout(&"a".repeat(MAX_CHARACTERS + 1), holder(), 1920., |_| Ok(1.)).is_err());
+    assert!(layout(&"a".repeat(MAX_CHARACTERS + 1), holder(), 1920.).is_err());
 }
 
 #[test]
@@ -70,13 +63,12 @@ fn every_word_uses_one_snapped_origin_and_rounded_physical_advance() {
     for dpr in [1., 1.25, 1.5, 1.75, 2., 3., 5.] {
         for offset in [0., 0.13, 0.49, 0.77] {
             let l = layout(
-                "Hello Wørld 123",
+                "Hello World 123",
                 MenuRect {
                     x: holder().x + offset,
                     ..holder()
                 },
                 1920.,
-                |s| Ok(s.chars().count() as f64 * 7.),
             )
             .unwrap();
             let origin = ((l.rect.x + l.words[0].x * l.unit) * dpr).round();
@@ -191,7 +183,6 @@ fn extreme_dpr_fits_strokes_without_changing_ordinary_layouts() {
         let size = raster_size(&layout, dpr).unwrap();
         assert!(size[0] as usize * size[1] as usize * 4 <= MAX_RASTER_BYTES);
         assert!(size[1] <= 2048);
-        assert!(layout.words.iter().all(|w| !w.fallback));
         assert!((layout.rect.x + layout.rect.width / 2. - center[0]).abs() < 1e-9);
         assert!((layout.rect.y + layout.rect.height / 2. - center[1]).abs() < 1e-9);
         if dpr <= 5. {

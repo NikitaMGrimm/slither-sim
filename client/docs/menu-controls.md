@@ -12,13 +12,20 @@ or GL port.
 The login-only [Settings](settings.md) screen moves Quality out of the product
 login. Done/Escape restore the Settings entry focus after the return fade.
 
-The core resolves logical placements and clips with `MenuRect`, including
-half-open hits and inverse mapping. `egui_panel` paints the shared widgets;
-`login_native` routes each raw event to the owning screen, in order. Capture,
-held-key and touch-owner handling stay in that route and `egui_native`.
+The core resolves logical placements and half-open clips with `MenuRect`.
+`egui_panel` paints the shared widgets; `login_native` routes each raw event to
+the owning screen, in order. Capture, held-key and touch-owner handling stay in
+that route and `egui_native`.
 
-The small `EditorId` registry separates identity from `TextRule`. The champion
-field applies `TextRule::Champion`: 140 UTF-16 units, normalized on insertion
+Login, picker, studio and champion buttons act on the release matching their
+press, however long it was held and even after the pointer left and came back:
+`egui_panel::pointer_click` is free of egui's 0.8 s and 6 point click limits. A
+blur, touch cancel, disable or screen replacement cancels the press. Those limits
+stay global because text selection needs them. Two clicks within 0.5 s, the
+Windows default, select a word on every platform; a custom OS double-click
+setting is not read.
+
+The champion field applies `TextRule::Champion`: 140 UTF-16 units, normalized on insertion
 and again after each pass. Its Unicode preview retains at most 256 UTF-16 units,
 without splitting a scalar, and never counts as committed text.
 

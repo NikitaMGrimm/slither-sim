@@ -1,15 +1,19 @@
 //! Finite native offscreen controls, without windows, servers or external assets.
+use slither_wgpu_slice::Result;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 use slither_wgpu_slice::{
-    Result,
     cosmetics::{Cosmetics, Images},
     frame::Frame,
     gpu::{Renderer, instance},
     menu::MenuFrame,
     scene::Resource,
 };
-use std::{io::Cursor, path::Path, sync::mpsc, time::Duration};
+use std::path::Path;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+use std::{io::Cursor, sync::mpsc, time::Duration};
 
 /// The page and world cover below egui, as a frame the renderer can draw.
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn page_frame(picture: &MenuFrame) -> Frame {
     Frame {
         identity: 0,
@@ -25,6 +29,7 @@ fn page_frame(picture: &MenuFrame) -> Frame {
         snakes: Vec::new(),
     }
 }
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn readback_with(
     renderer: &mut Renderer,
     frame: &Frame,
@@ -122,6 +127,7 @@ fn straight_alpha(premultiplied: &[u8]) -> Vec<u8> {
     }
     pixels
 }
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
     let mut bytes = Cursor::new(Vec::new());
     // Deliberately synthetic icon; no external reference/brand artwork.
@@ -136,6 +142,7 @@ fn synthetic_icon(color: [u8; 4]) -> Result<Vec<u8>> {
 }
 async fn run(output: &Path) -> Result<()> {
     std::fs::create_dir(output).map_err(|e| e.to_string())?;
+    #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     let mut renderer = Renderer::new(&instance(), None, wgpu::TextureFormat::Rgba8Unorm).await?;
     #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
     if std::env::args().nth(2).as_deref() == Some("--focus") {
@@ -481,9 +488,7 @@ fn stroke_specimens(output: &Path) -> Result<()> {
     };
     let mut timings = Vec::new();
     for dpr in [1., 2., 5.] {
-        let layout = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| {
-            Err("unexpected fallback".into())
-        })?;
+        let layout = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920.)?;
         for progress in [0.15, 0.5, 1.] {
             let mut runs = Vec::new();
             for index in 0..7 {
@@ -521,7 +526,7 @@ fn stroke_specimens(output: &Path) -> Result<()> {
     .into_iter()
     .enumerate()
     {
-        let layout = wordmark::layout(value, holder, 1920., |_| Err("unexpected fallback".into()))?;
+        let layout = wordmark::layout(value, holder, 1920.)?;
         let raster = wordmark::raster(&layout, 1., 1.)?;
         image::save_buffer(
             output.join(format!("string-{index}.png")),
@@ -536,7 +541,7 @@ fn stroke_specimens(output: &Path) -> Result<()> {
     // external motion strip/video.
     let motion = output.join("motion");
     std::fs::create_dir(&motion).map_err(|e| e.to_string())?;
-    let geometry = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920., |_| unreachable!())?;
+    let geometry = wordmark::layout(wordmark::DEFAULT_TEXT, holder, 1920.)?;
     let mut state = StartMenuState::new(MenuLocale::English, true, MenuQuality::High);
     for frame in 0..=72 {
         let ms = frame * 100;

@@ -167,10 +167,10 @@ fn secondary_actions_share_a_row_and_focus_order_without_crossing_modals() {
     assert_eq!(skin.rect.y, server.rect.y);
     assert!(settings.control.visible && settings.control.enabled);
     assert_eq!(skin.rect.y, settings.rect.y);
-    assert!(!skin.hit([
+    assert!(!skin.rect.contains(
         server.rect.x + server.rect.width / 2.,
         server.rect.y + server.rect.height / 2.
-    ]));
+    ));
     login.focus(NICKNAME);
     for id in [PLAY, CHANGE_SKIN, SERVER, SETTINGS, NICKNAME] {
         key_admitted(&mut login, NamedKey::Tab, true);
@@ -315,7 +315,6 @@ fn studio_density_cap_preserves_real_dpr_paint_hits_and_preview() {
                     [(r.x + r.width / 2.) * dpr, (r.y + r.height / 2.) * dpr],
                     dpr,
                 );
-                assert!(next.hit(point));
                 // The egui widget is drawn and hit at the core rectangle.
                 let widget = login
                     .studio_ui
@@ -415,6 +414,48 @@ fn a_press_focuses_its_control_and_the_release_activates_it() {
     key(&mut login, NamedKey::ArrowRight);
     assert_eq!(login.studio.state.draft().unwrap().record.builtin, 2);
     assert!(login.studio_ui.keyboard_focus);
+}
+
+#[test]
+fn studio_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
+    for drag in [false, true] {
+        let mut login = opened_studio();
+        let hold = |login: &mut NativeLogin, p: [f64; 2]| {
+            login.pointer(p, Some(true), false);
+            if drag {
+                login.pointer([p[0] + 200., 2.], None, false);
+                login.prepare([960, 540], false, None).unwrap();
+                login.pointer(p, None, false);
+            } else {
+                login.step(1500., false, false).unwrap();
+            }
+            login.prepare([960, 540], false, None).unwrap();
+            login.pointer(p, Some(false), false);
+        };
+        let next = center(&login, NEXT);
+        hold(&mut login, next);
+        assert_eq!(
+            login.studio.state.draft().unwrap().record.builtin,
+            1,
+            "{drag}"
+        );
+        hold(&mut login, [2., 2.]);
+        login.step(5000., false, false).unwrap();
+        assert!(!login.studio.state.visible(), "{drag}");
+    }
+    // A press on Next released elsewhere changes nothing.
+    let mut login = opened_studio();
+    let next = center(&login, NEXT);
+    login.pointer(next, Some(true), false);
+    login.pointer([next[0] + 200., 2.], Some(false), false);
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
+    // A backdrop press released over the panel keeps the studio.
+    login.pointer([2., 2.], Some(true), false);
+    login.prepare([960, 540], false, None).unwrap();
+    login.pointer(next, Some(false), false);
+    login.step(5000., false, false).unwrap();
+    assert!(login.studio.state.visible());
+    assert_eq!(login.studio.state.draft().unwrap().record.builtin, 0);
 }
 
 /// A section switch starts a new panel generation: a press held across it

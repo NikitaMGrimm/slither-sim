@@ -7,7 +7,7 @@ use crate::{
 use egui::{Id, Rect, Sense, pos2, vec2};
 use slither_client::{
     login_controls::*,
-    menu_controls::ControlId,
+    menu_controls::{Activation, ControlId},
     menu_layout::{MenuElement as E, MenuLayout, MenuRect},
     menu_theme::MenuTheme,
     start_page::StartMenuView,
@@ -174,9 +174,7 @@ impl LoginUi {
                 ui.set_opacity(alpha);
                 let holder = layout.viewport_rect(E::Logo);
                 let mut logo =
-                    wordmark::layout(wordmark::DEFAULT_TEXT, holder, area.width() as f64, |_| {
-                        unreachable!("authored wordmark glyphs")
-                    })?;
+                    wordmark::layout(wordmark::DEFAULT_TEXT, holder, area.width() as f64)?;
                 let dpr = (ctx.pixels_per_point() as f64).min(crate::menu::MAX_MENU_RASTER_DENSITY);
                 logo.fit_raster(dpr)?;
                 let key = [
@@ -453,11 +451,8 @@ impl LoginUi {
                         response.request_focus();
                     }
                     self.controls.push((control.id, r, response.has_focus()));
-                    if response.clicked() {
-                        action = Some((
-                            control.id,
-                            !response.clicked_by(egui::PointerButton::Primary),
-                        ));
+                    if let Some(activation) = crate::egui_panel::activation(&response, false) {
+                        action = Some((control.id, activation != Activation::Pointer));
                     }
                 }
                 if let Some(status) = status {

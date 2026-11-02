@@ -133,7 +133,6 @@ fn scaled_icon_and_row_hits_are_isolated_from_play_and_gameplay() {
             .unwrap();
         let point =
             mouse_client_position([(row.rect.x + 12.) * dpr, (row.rect.y + 12.) * dpr], dpr);
-        assert!(row.hit(point));
         // The egui row covers exactly the shared hit rectangle.
         let painted = widget(&login, row.control.id);
         assert!(painted.contains(egui::pos2(point[0] as f32, point[1] as f32)));
@@ -398,7 +397,6 @@ fn open_picker_rows_stay_clickable_at_dpr_five_to_eight() {
                     .unwrap();
                 let r = row.rect;
                 let point = mouse_client_position([(r.x + 12.) * dpr, (r.y + 12.) * dpr], dpr);
-                assert!(row.hit(point));
                 assert!(
                     widget(&login, row.control.id)
                         .contains(egui::pos2(point[0] as f32, point[1] as f32))
@@ -864,6 +862,51 @@ fn preedit(login: &mut NativeLogin, text: &str) {
 
 /// A press held across a panel generation change cannot click the control
 /// that now reuses its ID, as the shared panel input cancelled capture.
+#[test]
+fn picker_controls_and_backdrop_answer_a_long_hold_and_a_drag_out_and_back() {
+    let remove = ControlId(8192);
+    for drag in [false, true] {
+        let mut login = opened(false);
+        login
+            .picker
+            .policy
+            .add_custom("192.0.2.1:80".into())
+            .unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        login.prepare([960, 720], true, None).unwrap();
+        let r = widget(&login, remove);
+        let p = [f64::from(r.center().x), f64::from(r.center().y)];
+        let hold = |login: &mut NativeLogin, p: [f64; 2]| {
+            login.pointer(p, Some(true), true);
+            if drag {
+                login.pointer([f64::from(r.right()) + 40., p[1]], None, true);
+                login.prepare([960, 720], true, None).unwrap();
+                login.pointer(p, None, true);
+            } else {
+                login.step(11_000., true, false).unwrap();
+            }
+            login.prepare([960, 720], true, None).unwrap();
+            login.pointer(p, Some(false), true);
+        };
+        hold(&mut login, p);
+        assert!(login.picker.policy.custom.is_empty(), "{drag}");
+        login.prepare([960, 720], true, None).unwrap();
+        hold(&mut login, [2., 2.]);
+        assert!(!login.picker.policy.is_open(), "{drag}");
+    }
+    // A backdrop press released over the panel does not close it.
+    let mut login = opened(false);
+    let r = widget(&login, CLOSE);
+    login.pointer([2., 2.], Some(true), true);
+    login.prepare([960, 720], true, None).unwrap();
+    login.pointer(
+        [f64::from(r.center().x), f64::from(r.center().y)],
+        Some(false),
+        true,
+    );
+    assert!(login.picker.policy.is_open());
+}
+
 #[test]
 fn a_press_held_across_a_generation_change_never_clicks() {
     // Keyboard Remove while the mouse holds the same Remove button.

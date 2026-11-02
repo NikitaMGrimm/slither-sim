@@ -53,6 +53,12 @@ impl NativeLogin {
         // A terminal socket must not idle the host during the hidden death hold.
         self.state.view(true).visible || self.champion_session.death_pending
     }
+    /// Whether this frame needs an egui pass. The champion editor stays mounted
+    /// through the death hold, while the login below it is hidden.
+    pub fn needs_menu_pass(&self, admission: bool) -> bool {
+        let view = self.state.view(admission);
+        view.visible || view.spinner_visible || self.champion.policy.visible()
+    }
     pub fn blocks_gameplay(&self) -> bool {
         self.ingame_visible
             || self.picker.policy.visible()
@@ -164,7 +170,6 @@ impl NativeLogin {
             .step_with_admission(now, false, admission)
             .map_err(str::to_owned)?;
         self.refresh_egui();
-        self.input.state.step_caret(now);
         if playing {
             self.state.begin_outgoing();
         }

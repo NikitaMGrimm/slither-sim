@@ -108,7 +108,6 @@ fn synthetic_key_fields_use_logical_editing_physical_gameplay_and_altgr_text() {
         true,
         false,
     );
-    assert_eq!(native.state.editor(TextField::Nickname).selection(), (3, 2));
     named(
         &mut native,
         NamedKey::Backspace,
@@ -164,15 +163,6 @@ fn windows_preedit_process_enter_commit_and_release() {
         let mut native = focused();
         native.window_event(&WindowEvent::Ime(Ime::Enabled));
         native.window_event(&WindowEvent::Ime(Ime::Preedit("😀é".into(), Some((4, 6)))));
-        assert_eq!(
-            native
-                .state
-                .editor(TextField::Nickname)
-                .preedit()
-                .unwrap()
-                .text,
-            "😀é"
-        );
         assert!(
             key(
                 &mut native,
@@ -284,7 +274,6 @@ fn injected_host_records_ime_admission_purpose_area_and_blur_releases() {
         key: GameplayKey::Space,
         pressed: false
     }));
-    assert!(native.state.editor(TextField::Nickname).preedit().is_none());
     let result = native.window_event(&WindowEvent::Focused(true));
     native.execute(result.effects, &mut host);
     character(&mut native, "a", KeyCode::KeyA, Some("a"));
@@ -488,7 +477,6 @@ fn round3_process_keys_never_insert_or_activate_shortcuts() {
         false,
     );
     assert!(process.consumed && process.effects.is_empty());
-    assert_eq!(native.state.editor(TextField::Nickname).selection(), (4, 4));
     // Process can carry text on Windows; that payload is still IME-owned.
     native.modifiers(ModifiersState::CONTROL | ModifiersState::ALT);
     let process = key(
@@ -553,7 +541,6 @@ fn windows_plain_typing_and_repeats_work_with_ime_enabled_without_preedit() {
     );
     character(&mut native, "b", KeyCode::KeyB, Some("b"));
     assert_eq!(native.state.editor(TextField::Nickname).text(), "aaab");
-    assert!(native.state.editor(TextField::Nickname).preedit().is_none());
 }
 
 #[test]

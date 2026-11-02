@@ -1,9 +1,5 @@
 //! Copied, bounded menu descriptions. No host handles or policy callbacks.
-use crate::{
-    menu_input::{EditorId, TextRule},
-    menu_layout::MenuRect,
-    menu_theme::ControlStyle,
-};
+use crate::{menu_layout::MenuRect, menu_theme::ControlStyle};
 
 /// Stable control identity within a panel generation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -168,16 +164,10 @@ pub enum ControlKind {
     },
     /// Single-line editor. Insets describe its content box within the holder.
     TextField {
-        /// Stable registered editor.
-        editor: EditorId,
         /// Empty-value hint.
         placeholder: String,
-        /// Committed normalization.
-        rule: TextRule,
         /// Logical left/top/right/bottom content padding.
         inset: [f64; 4],
-        /// Fit the complete value into the content width; otherwise scroll.
-        fit: bool,
     },
 }
 /// One copied control in paint/reading order.
@@ -219,12 +209,8 @@ pub struct PanelView {
     pub enabled: bool,
     /// Sampled panel opacity.
     pub alpha: f64,
-    /// Consume gameplay input while mounted.
-    pub modal: bool,
     /// Initial keyboard target.
     pub initial_focus: Option<ControlId>,
-    /// Preferred surviving parent control after closing a modal.
-    pub restore_focus: Option<ControlId>,
     /// Bounded controls in paint order.
     pub controls: Vec<Control>,
 }
@@ -239,27 +225,6 @@ pub struct ResolvedControl {
     pub clip: MenuRect,
     /// Complete local scale.
     pub scale: f64,
-}
-impl ResolvedControl {
-    /// Inverse map viewport input into the control's logical content.
-    pub fn local(&self, point: [f64; 2]) -> [f64; 2] {
-        [
-            (point[0] - self.rect.x) / self.scale,
-            (point[1] - self.rect.y) / self.scale,
-        ]
-    }
-    /// Half-open hit after clipping; opacity does not gate input.
-    pub fn hit(&self, point: [f64; 2]) -> bool {
-        let p = self.local(point);
-        self.clip.contains(point[0], point[1])
-            && MenuRect {
-                x: 0.,
-                y: 0.,
-                width: self.rect.width / self.scale,
-                height: self.rect.height / self.scale,
-            }
-            .contains(p[0], p[1])
-    }
 }
 /// Intersect axis-aligned clips using the same logical rectangle type as login.
 pub fn intersection(a: MenuRect, b: MenuRect) -> MenuRect {

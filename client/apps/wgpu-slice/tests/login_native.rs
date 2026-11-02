@@ -629,6 +629,52 @@ fn pointer_and_keyboard_entry_points_keep_the_legacy_screens() {
 }
 
 #[test]
+fn login_buttons_answer_a_long_hold_and_a_drag_out_and_back() {
+    for drag in [false, true] {
+        for id in [PLAY, SETTINGS, SERVER, CHANGE_SKIN] {
+            let mut login = settled("Player");
+            let r = login
+                .login_ui
+                .controls
+                .iter()
+                .find(|c| c.0 == id)
+                .unwrap()
+                .1;
+            let p = [r.center().x as f64, r.center().y as f64];
+            login.pointer(p, Some(true), true);
+            if drag {
+                login.pointer([2., 2.], None, true);
+                login.prepare([960, 540], true, None).unwrap();
+                login.pointer(p, None, true);
+            } else {
+                login.step(11_000., true, false).unwrap();
+            }
+            login.prepare([960, 540], true, None).unwrap();
+            login.pointer(p, Some(false), true);
+            assert_eq!(login.state.settings.is_open(), id == SETTINGS);
+            assert_eq!(login.picker.policy.visible(), id == SERVER);
+            assert_eq!(login.studio.state.visible(), id == CHANGE_SKIN);
+            assert_eq!(
+                login.state.view(true).phase == MenuPhase::Connecting,
+                id == PLAY
+            );
+        }
+    }
+    // Released elsewhere it stays a cancelled click.
+    let mut login = settled("Player");
+    let r = login
+        .login_ui
+        .controls
+        .iter()
+        .find(|c| c.0 == PLAY)
+        .unwrap()
+        .1;
+    login.pointer([r.center().x as f64, r.center().y as f64], Some(true), true);
+    login.pointer([2., 2.], Some(false), true);
+    assert_ne!(login.state.view(true).phase, MenuPhase::Connecting);
+}
+
+#[test]
 fn nickname_persists_at_the_existing_skin_save_boundary() {
     use slither_wgpu_slice::menu_storage::MenuStorage;
     let directory =
@@ -899,19 +945,27 @@ fn early_return_click_uses_animated_hit_rect_and_waits_for_close_ack() {
         if !clicked && view.phase == MenuPhase::Returning && view.transition < 0.8 {
             assert!(view.disabled && !view.play_disabled);
             assert_eq!(login.input.state.focus(), None);
-            login.input.state.apply_menu(
-                EditIntent::KeyText("Changed".into()),
-                &mut login.state,
-                false,
-            );
+            let effects = login
+                .input
+                .state
+                .apply(EditIntent::KeyText("Changed".into()));
+            login
+                .input
+                .state
+                .commit_menu(effects, &mut login.state, false);
             assert_eq!(login.state.view(false).nickname, "Stored");
             login.prepare_host([1920, 1080], 1., false, None).unwrap();
             let r = login.layout.viewport_rect(E::Play);
             let point = [r.x + r.width - 0.1, r.y + r.height / 2.];
             let mut settled = login.layout.clone();
             settled.scale = settled.base_scale;
-            assert!(!settled.hit_test(E::Play, point[0], point[1]));
-            assert!(login.layout.hit_test(E::Play, point[0], point[1]));
+            assert!(!settled.viewport_rect(E::Play).contains(point[0], point[1]));
+            assert!(
+                login
+                    .layout
+                    .viewport_rect(E::Play)
+                    .contains(point[0], point[1])
+            );
             for _ in 0..2 {
                 login.pointer(point, Some(true), false);
                 login.pointer(point, Some(false), false);

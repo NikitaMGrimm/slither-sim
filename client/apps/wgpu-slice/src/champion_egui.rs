@@ -188,16 +188,13 @@ impl ChampionUi {
                         continue;
                     }
                     self.save_state = [response.hovered(), response.is_pointer_button_down_on()];
-                    let pointer = response.clicked_by(egui::PointerButton::Primary);
-                    if response.clicked() && !(pointer && suppress) {
+                    if let Some(activation) = widgets::activation(&response, suppress) {
                         intents.push(intent(
                             SAVE,
-                            if pointer {
-                                Activation::Pointer
-                            } else if space {
+                            if activation == Activation::Enter && space {
                                 Activation::Space
                             } else {
-                                Activation::Enter
+                                activation
                             },
                         ));
                     }

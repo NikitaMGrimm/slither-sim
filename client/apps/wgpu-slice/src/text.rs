@@ -233,12 +233,6 @@ impl TextCache {
         platform::font_bytes(style)
     }
 
-    /// Installed native face selected for this display style.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn native_face(style: TextStyle) -> &'static str {
-        platform::face_name(style)
-    }
-
     /// Aggregate preflight, replacement and retirement form one transaction.
     /// No producer starts its own cleanup. An empty composition retires panels.
     /// Old prepared frames keep their owned resource copies after replacement.

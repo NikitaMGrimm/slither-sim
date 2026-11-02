@@ -26,9 +26,7 @@ const TRACKING: f64 = 1.25;
 pub struct Word {
     pub text: String,
     pub x: f64,
-    pub width: f64,
     pub color: usize,
-    pub fallback: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Layout {
@@ -88,12 +86,7 @@ struct Run {
 }
 /// Unsupported scalars select installed-font rendering for their entire word.
 /// The callback measures that word at a ten-unit cap height, in alphabet units.
-pub fn layout(
-    value: &str,
-    holder: MenuRect,
-    viewport_width: f64,
-    mut fallback_width: impl FnMut(&str) -> Result<f64>,
-) -> Result<Layout> {
+pub fn layout(value: &str, holder: MenuRect, viewport_width: f64) -> Result<Layout> {
     if value.chars().count() > MAX_CHARACTERS
         || !viewport_width.is_finite()
         || viewport_width <= 0.
@@ -133,25 +126,14 @@ pub fn layout(
     let mut advance = 0.;
     for run in raw {
         advance += run.spaces as f64 * 4.;
-        let fallback = !run.text.chars().all(|c| glyph(c).is_some());
-        let width = if fallback {
-            fallback_width(&run.text)?
-        } else {
-            run.text
-                .chars()
-                .map(|c| glyph(c).unwrap().0 + TRACKING)
-                .sum::<f64>()
-                - TRACKING
-        };
-        if !width.is_finite() || width < 0. {
-            return Err("Wordmark advance bounds".into());
+        let mut width = -TRACKING;
+        for c in run.text.chars() {
+            width += glyph(c).ok_or("Wordmark glyph")?.0 + TRACKING;
         }
         words.push(Word {
             text: run.text,
             x: advance + 3.,
-            width,
             color: run.color,
-            fallback,
         });
         advance += width + TRACKING;
     }
@@ -253,7 +235,7 @@ pub fn samples(layout: &Layout, progress: f64) -> Result<Vec<Sample>> {
     }
     let progress = progress.clamp(0., 1.);
     let mut strokes = Vec::new();
-    for (word_index, word) in layout.words.iter().enumerate().filter(|(_, w)| !w.fallback) {
+    for (word_index, word) in layout.words.iter().enumerate() {
         let mut x = word.x;
         for c in word.text.chars() {
             let (advance, code) = glyph(c).unwrap();
@@ -750,7 +732,7 @@ mod raster_tests {
             height: 115.,
         };
         for value in [DEFAULT_TEXT, "Hello World 123"] {
-            let layout = layout(value, holder, 1920., |_| unreachable!()).unwrap();
+            let layout = layout(value, holder, 1920.).unwrap();
             for dpr in [1., 2., 5.] {
                 let actual = raster(&layout, dpr, 1.).unwrap();
                 let expected = scalar_reference(&layout, dpr, 1.).unwrap();
@@ -896,7 +878,6 @@ mod round_geometry_tests {
                 height: 115.,
             },
             1920.,
-            |_| unreachable!(),
         )
         .unwrap();
         let rest = samples(&geometry, 1.).unwrap()[0];
