@@ -152,6 +152,15 @@ the measured source contains the current-alpha assignment, not the stale-alpha
 mutation. Independent review verified this linkage. No timing or parity rerun
 was needed for this study-only correction.
 
+The check now uses [frame-reviewed.rs.gz](frame-reviewed.rs.gz), the exact
+reviewed UTF-8 source compressed with gzip, rather than today's `frame.rs`.
+It still reverses the published delta, checks both original measured/reviewed
+hashes and proves unchanged production expressions. Missing or altered source
+evidence fails, with no dependency on old Git objects or current runtime files.
+Run `python research/client-performance/2026-11-02-quad-projection/test_study.py`.
+This manual study suite is not discovered by CI; CI checks its documentation
+links/index placement. No historical identity, delta or result changed.
+
 - Both views: every prepared frame/overlay/resource/send digest matches, every
   projected vertex component matches by f32 bits in order, all quad flags/resource
   identities match, and all non-timing numeric observations match. See the parity

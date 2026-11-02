@@ -213,6 +213,15 @@ identity was replaced with a final-file hash, and no timings were rerun.
 Check the source bindings with
 `python -m unittest discover -s research/client-performance/2026-11-02-join-sectors -p "test_*.py"`.
 
+That check now reads [reviewed-sources.json.gz](reviewed-sources.json.gz), a
+gzip-compressed JSON map of arm, source path and exact UTF-8 reviewed text.
+It checks every retained full-file and normalized hash above without requiring
+old Git objects or today's runtime files. Missing or altered snapshots fail;
+recorded commits, hashes, measured-to-reviewed delta and results are unchanged.
+This manual study suite is not discovered by CI; CI checks its documentation
+links/index placement. The snapshot makes it usable from a shallow checkout
+after squash merging and after legitimate later source edits.
+
 - Exact numeric callback observations and complete prepared world/overlay/
   resource/send consistency digests are compared in default and whole-map views.
   These 64-bit digests are consistency controls, not cryptographic proofs or GPU

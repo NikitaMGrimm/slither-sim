@@ -1,13 +1,12 @@
 """Offline source-binding regression; no recordings or performance reruns."""
+import gzip
 import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
 import unittest
 
 FOLDER = Path(__file__).resolve().parent
-REPO = FOLDER.parents[2]
 
 
 def normalized(text):
@@ -18,11 +17,15 @@ def normalized(text):
 
 
 class SourceIdentity(unittest.TestCase):
-    def test_reviewed_blobs_and_historical_normalized_identities(self):
+    def test_retained_sources_and_historical_normalized_identities(self):
         data = json.loads((FOLDER / "identities.json").read_text(encoding="utf-8"))
-        for arm in data["arms"].values():
+        sources = json.loads(gzip.decompress(
+            (FOLDER / data["source_identity_notes"]["reviewed_source_snapshot"]).read_bytes()))
+        self.assertEqual(set(sources), set(data["arms"]))
+        for name, arm in data["arms"].items():
+            self.assertEqual(set(sources[name]), set(arm["reviewed_source_sha256"]))
             for path, expected in arm["reviewed_source_sha256"].items():
-                blob = subprocess.check_output(["git", "show", f'{arm["reviewed_commit"]}:{path}'], cwd=REPO)
+                blob = sources[name][path].encode("utf-8")
                 self.assertEqual(hashlib.sha256(blob).hexdigest(), expected)
                 self.assertEqual(hashlib.sha256(normalized(blob.decode()).encode()).hexdigest(),
                                  arm["runtime_source_sha256"][path])

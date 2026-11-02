@@ -91,7 +91,8 @@
     "reviewed_commit": "9f9eab4684b578acdb668ab17b479238d817349f",
     "delta": "frame-measured-to-reviewed.patch",
     "delta_sha256": "acd6d6f923dea39d1ed61b72040e96a74a988d6b164f1cb62bf5d11084aecf7e",
-    "difference": "One study-link comment and two added regression blocks (signed-zero discrimination and packed rectangle); production expressions are identical. Reverse the published delta against the reviewed file to recover the exact measured bytes."
+    "difference": "One study-link comment and two added regression blocks (signed-zero discrimination and packed rectangle); production expressions are identical. Reverse the published delta against the reviewed file to recover the exact measured bytes.",
+    "reviewed_source_snapshot": "frame-reviewed.rs.gz"
   },
   "independent_converter_review": {
     "model": "GPT 6.1 Sol",
