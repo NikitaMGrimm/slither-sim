@@ -139,6 +139,19 @@ current error, transaction and exact-output guarantees rather than dropping work
 
 ## Correctness and validation
 
+The measured candidate `frame.rs` is
+`6f5632ac06df6ba7f4a656b6cbc6241d8946a919b00ba053c3eed584ec75da85`;
+the reviewed source at `9f9eab4684b578acdb668ab17b479238d817349f` is
+`86a3ba7e6bd4ea71244b04cd28b4ff477ac29f5cb44ee10d59d22795dade5dee`.
+Both identities are preserved. The measured bytes remain owner-local, and the
+[exact measured-to-reviewed delta](frame-measured-to-reviewed.patch) is published
+so reversing it against the reviewed source reconstructs those measured bytes.
+It adds only one study-link comment and two regression blocks (signed-zero key
+discrimination and the packed rectangle). No production expression differs;
+the measured source contains the current-alpha assignment, not the stale-alpha
+mutation. Independent review verified this linkage. No timing or parity rerun
+was needed for this study-only correction.
+
 - Both views: every prepared frame/overlay/resource/send digest matches, every
   projected vertex component matches by f32 bits in order, all quad flags/resource
   identities match, and all non-timing numeric observations match. See the parity
@@ -160,6 +173,27 @@ current error, transaction and exact-output guarantees rather than dropping work
   measurements are not promoted to current acceptance.
 
 ## Reproduction and retained attempts
+
+Independent review approved runtime correctness, edge cases, composition and
+measurement validity, while narrowing the performance claim. Seven of ten paired
+art medians improved; median paired reduction was 6.575%. Reversals are retained.
+The independent release converter probe found an approximately 9–10% all-miss
+tax, about 0.074 ms per 32,768-draw traversal, while paired conversion improved
+38.5% (21.660 to 13.320 ns/quad). This is converter-only work, not sparse-gameplay
+or end-to-end FPS. Ten alternating pairs per authored scene consume each quad
+through `black_box`; the retained probe and its limits are recorded in
+`identities.json`. [Bounded reviewer rows](review-converter.csv) recompute the
+following figures without rerunning measurements:
+
+<!-- BEGIN REVIEW -->
+7 of 10 paired default-art medians improve; median paired reduction 6.575%.
+
+| Independent converter-only scene | Main ns/quad | Candidate ns/quad | Change | Extra per traversal |
+| --- | ---: | ---: | ---: | ---: |
+| sparse-256 | 21.424 | 23.442 | +9.421% | +0.000517 ms |
+| miss-32768 | 21.470 | 23.719 | +10.476% | +0.073703 ms |
+| paired-32768 | 21.660 | 13.320 | -38.505% | -0.273297 ms |
+<!-- END REVIEW -->
 
 Recompute every table, verify run/source/parity bindings and check the published
 aggregates using only the Python standard library:

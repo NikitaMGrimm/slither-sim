@@ -79,11 +79,40 @@ def diagnostics():
     return '\n'.join(lines)
 
 
+def review_summary():
+    with (ROOT / 'runs.csv').open(newline='', encoding='utf-8') as stream:
+        runs = list(csv.DictReader(stream))
+    pairs = {}
+    for row in runs:
+        if row['view'] == 'default' and row['status'] == 'accepted':
+            pairs.setdefault(row['pair'], {})[row['arm']] = row
+    changes = [100 * (1 - float(p['candidate']['art_p50_ns']) / float(p['control']['art_p50_ns']))
+               for p in pairs.values() if set(p) == {'control', 'candidate'}]
+    lines = [f'{sum(c > 0 for c in changes)} of {len(changes)} paired default-art medians improve; '
+             f'median paired reduction {statistics.median(changes):.3f}%.', '',
+             '| Independent converter-only scene | Main ns/quad | Candidate ns/quad | Change | Extra per traversal |',
+             '| --- | ---: | ---: | ---: | ---: |']
+    with (ROOT / 'review-converter.csv').open(newline='', encoding='utf-8') as stream:
+        rows = list(csv.DictReader(stream))
+    for scene, count in [('sparse-256', 256), ('miss-32768', 32768), ('paired-32768', 32768)]:
+        selected = [r for r in rows if r['scene'] == scene]
+        assert len({(r['pair'], r['arm']) for r in selected}) == len(selected) == 20
+        values = {arm: [float(r['ns_per_quad']) for r in selected if r['arm'] == arm]
+                  for arm in ['base', 'candidate']}
+        assert all(len(v) == 10 for v in values.values())
+        before, after = (statistics.median(values[a]) for a in ['base', 'candidate'])
+        lines.append(f'| {scene} | {before:.3f} | {after:.3f} | {100*(after/before-1):+.3f}% | '
+                     f'{(after-before)*count/1e6:+.6f} ms |')
+    return '\n'.join(lines)
+
+
 if __name__ == '__main__':
     result = aggregate()
     print(result)
     print(diagnostics())
+    print(review_summary())
     if '--check' in sys.argv:
         report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
         assert report.split('<!-- BEGIN RESULTS -->\n', 1)[1].split('\n<!-- END RESULTS -->', 1)[0] == result
         assert report.split('<!-- BEGIN DIAGNOSTICS -->\n', 1)[1].split('\n<!-- END DIAGNOSTICS -->', 1)[0] == diagnostics()
+        assert report.split('<!-- BEGIN REVIEW -->\n', 1)[1].split('\n<!-- END REVIEW -->', 1)[0] == review_summary()

@@ -85,5 +85,23 @@
         "numeric_sha256": "d82c12527fbdd4897222b0a6cf3d1399f2f737ef4fe81c18ee00f707bf2ab2fa"
       }
     }
+  },
+  "source_comparison": {
+    "measured_source_origin": "Retained math-candidate-source/client/apps/wgpu-slice/src/frame.rs; exact measured hash is preserved in arms.candidate.measured_frame_source_sha256.",
+    "reviewed_commit": "9f9eab4684b578acdb668ab17b479238d817349f",
+    "delta": "frame-measured-to-reviewed.patch",
+    "delta_sha256": "acd6d6f923dea39d1ed61b72040e96a74a988d6b164f1cb62bf5d11084aecf7e",
+    "difference": "One study-link comment and two added regression blocks (signed-zero discrimination and packed rectangle); production expressions are identical. Reverse the published delta against the reviewed file to recover the exact measured bytes."
+  },
+  "independent_converter_review": {
+    "model": "GPT 6.1 Sol",
+    "harness": "Codex (T3 Code)",
+    "role": "independent review",
+    "base": "fde706f1600e7d0917bc467a9b578de1b3d3b724",
+    "candidate": "9f9eab4684b578acdb668ab17b479238d817349f",
+    "runs": "review-converter.csv",
+    "runs_sha256": "1db565f3355cd9c041f20f6aec50720671ff6e704e337ff757daad709288b417",
+    "probe_source_sha256": "9123ef2c0c674553ebf7aba924a315510ee97670add003b78bf03e19490c6f03",
+    "scope": "Retained release converter-only probe, ten alternating pairs per authored scene, every generated quad consumed via black_box; not gameplay or end-to-end FPS."
   }
 }
