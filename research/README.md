@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Singleton consume ingress](client-performance/2026-11-02-consume-ingress/REPORT.md) | Current-main default/whole-map replay; avoid unrelated world copies per consume, with exact output controls and bounded per-run evidence. |
 | Client performance | [Food sprite bandwidth](client-performance/2026-11-02-sprite-bandwidth/REPORT.md) | Offscreen food overdraw/MSAA diagnostics, portable soft-layer drawing, matched complete-history and frozen-picture GPU matrices, with exact core/image-input controls and bounded raster differences. |
 | Client performance | [Received snapshots in packet transactions](client-performance/2026-11-01-received-snapshots/REPORT.md) | Share immutable received state and stage it once per transaction; exact replay/rollback controls, bounded per-run summaries and remaining burst costs. |
 | Client performance | [Crowded frame preparation reuse](client-performance/2026-11-01-frame-preparation-reuse/REPORT.md) | Ranked restricted-replay/authored CPU and offscreen iGPU profiles; exact minimap blend tables and read-only control-probe snapshot removal, with exact output controls and alternating measurements. Texture-array/composition-cache trials rejected; no gameplay-FPS claim. |

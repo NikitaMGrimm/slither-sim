@@ -992,6 +992,35 @@ impl LocalGame {
             session = self.session.clone();
             session.prepare_controls(&commands, now).map_err(|e| e.0)?;
         }
+        if decoded.command_count() == 1
+            && matches!(commands[0].opcode, b'c' | b'C' | b'<')
+            && self
+                .client
+                .received()
+                .setup
+                .as_ref()
+                .is_some_and(|s| matches!(s.protocol, 13 | 19))
+        {
+            // Consume has no HUD/Setup output. Validate the session before
+            // committing the core's already-validated, infallible transition.
+            session.match_report(&[], 0).map_err(|e| e.0)?;
+            session.commit_controls().map_err(|e| e.0)?;
+            if self
+                .client
+                .try_apply_single_consume(bytes, ElapsedHeader::Absent)
+                .map_err(|e| e.to_string())?
+                .is_some()
+            {
+                self.session = session;
+                #[cfg(feature = "feel-trace")]
+                if self.trace.is_some() {
+                    self.ingress_observations.push(now);
+                }
+                return Ok(());
+            }
+            session = self.session.clone();
+            session.prepare_controls(&commands, now).map_err(|e| e.0)?;
+        }
         let guards: Vec<_> = plan
             .guards
             .iter()
