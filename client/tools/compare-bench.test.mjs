@@ -26,7 +26,7 @@ test('invalid/unknown validity cannot silently pass', () => {
     adapter: 'synthetic', renderAdapters: [{ name: 'Synthetic GPU', luid: 'luid1' }], refreshHz: 60, vsync: 'Fifo',
     windowSamples: [{ foreground: true, occluded: false, minimized: false, visible: true, width: 960, height: 540, display: 'D', dpi: 96 }],
     stats: [{ ticksPerSecond: 142.85, deferredTicks: 0, lostSeconds: 0, bots: 100, players: 1 }],
-    census: [{ wholeMapFood: true, players: [{ alive: true, setup: true }] }],
+    census: [{ wholeMapFood: true, admittedBotSlots: 100, totalAliveSnakes: 100, players: [{ alive: true, setup: true, protocol: 19, wireLivingSnakes: 100 }] }],
     views: [{ wholeMap: true, visiblePellets: 40, retainedPellets: 40 }] };
   assert.equal(validity(run).valid, true);
   for (const mutation of [r => r.windowSamples[0].foreground = false, r => r.windowSamples[0].occluded = true,

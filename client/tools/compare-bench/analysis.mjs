@@ -69,12 +69,18 @@ export function validity(run) {
     if (s.width !== run.width || s.height !== run.height || s.display !== run.display || s.dpi !== run.dpi) reasons.push('Window size/display/DPI changed');
     if (s.refreshHz !== undefined && s.refreshHz !== run.refreshHz) reasons.push('Monitor refresh changed');
   }
+  if ((run.windowSamples ?? []).some((s, i, a) => i > 0 && s.qpcMs - a[i-1].qpcMs > 750)) reasons.push('Window/load sampler gap exceeded 750 ms');
+  if (run.windowSamples?.length && Number.isFinite(run.endMs) && run.endMs - run.windowSamples.at(-1).qpcMs > 750) reasons.push('Window monitor ended before measurement');
+  if (run.views?.some((v, i, a) => i > 0 && Number.isFinite(v.atMs) && v.atMs - a[i-1].atMs > 3000)) reasons.push('View telemetry stalled');
   if (!run.stats?.length) reasons.push('No host tick stats');
   for (const s of run.stats ?? []) {
     if (s.ticksPerSecond < .98 / run.dt || s.deferredTicks > 0 || s.lostSeconds > 0) reasons.push('Host failed fixed tick cadence');
     if (s.bots !== run.bots || s.players !== 1) reasons.push('Wrong bot/player population');
   }
   if (!run.census?.length || run.census.some(s => !s.players?.[0]?.setup || !s.players[0].alive)) reasons.push('Player admission/alive state not verified throughout');
+  if (run.census?.some(s => s.admittedBotSlots !== run.bots)) reasons.push('Not all internal bot seats admitted');
+  if (run.census?.some(s => s.players?.[0]?.protocol !== (run.client === 'ntl' ? 13 : 19))) reasons.push('Unexpected negotiated protocol');
+  if (run.scenario === 'battledome' && run.census?.some(s => s.players?.[0]?.wireLivingSnakes !== s.totalAliveSnakes)) reasons.push('Host did not deliver every living snake');
   if (!run.views?.length) reasons.push('Camera/drawn-pellet evidence unavailable');
   if (run.views?.some(v => !Number.isInteger(v.visiblePellets) || !Number.isInteger(v.retainedPellets))) reasons.push('Pellet census unavailable');
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');

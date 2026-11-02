@@ -115,6 +115,10 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
       if (joined) break; await delay(100);
     }
     if (!joined) throw Error('NTL failed local protocol-13 join/preflight (playing, snake.xx, gsc). See CDP/netlog; no timing accepted.');
+    await fs.writeFile(path.join(directory, 'view-contract-preflight.json'), JSON.stringify(await page.evaluate(`(()=>{
+      const arrays=[]; for(const k of Object.keys(window)){try{const v=window[k]; if(Array.isArray(v))arrays.push({name:k,length:v.length,firstKeys:v.find(x=>x&&typeof x==='object')?Object.keys(v.find(x=>x&&typeof x==='object')).slice(0,40):[]});}catch{}}
+      return {arrays,scalars:Object.fromEntries(['mww','mhh','grd','gsc','view_xx','view_yy','real_flux_grd','flux_grd','foods_c'].map(k=>[k,window[k]]))};
+    })()`), null, 2));
     return { child, page, close, log, chromeVersion: version.Browser, gpuPid,
       adapter: JSON.stringify({ devices: gpu.gpu.devices, renderer: gpu.gpu.auxAttributes?.glRenderer }),
       async zoomOut() {
@@ -128,7 +132,7 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
           if(!Number.isFinite(w)||!Number.isFinite(h)||!Number.isFinite(window.foods_c))throw Error('NTL viewport/food contract changed');
           let visible=0,retained=0;
           for(let i=0;i<window.foods_c;i++){const f=window.foods[i];if(!f||!Number.isFinite(f.rx)||!Number.isFinite(f.ry))throw Error('NTL food contract changed: rx/ry');retained++;if(Math.abs(f.rx-window.view_xx)*z<=w/2&&Math.abs(f.ry-window.view_yy)*z<=h/2)visible++;}
-          return {camera:[window.view_xx,window.view_yy],center:window.grd,radius:Math.max(window.real_flux_grd,window.flux_grd),zoom:z,viewport:[w,h],retainedPellets:retained,visiblePellets:visible};
+          return {camera:[window.view_xx,window.view_yy],center:window.grd,radius:Math.max(window.real_flux_grd,window.flux_grd),zoom:z,viewport:[w,h],retainedSnakes:window.snakes?.length,retainedPellets:retained,visiblePellets:visible};
         })()`);
         return v;
       } };

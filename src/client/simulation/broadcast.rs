@@ -530,6 +530,8 @@ impl SimulatorBackend {
                 .map(|(id, (slot, snake))| {
                     serde_json::json!({"slot": id, "setup": slot.connection.setup,
                         "alive": snake.alive, "x": snake.head.x, "y": snake.head.y,
+                        "protocol": if slot.connection.legacy.is_some() { 13 } else { 19 },
+                        "wireLivingSnakes": slot.connection.snakes.frame_bench_len(),
                         "wireFood": slot.connection.food.perf_len(),
                         "decoratedWireFood": slot.connection.decorated_food.perf_len()})
                 })
@@ -539,6 +541,12 @@ impl SimulatorBackend {
                 serde_json::json!({"schema": 1,
                 "tick": self.tick, "radius": self.world.radius(),
                 "totalPellets": self.world.food().len(), "players": players,
+                "totalAliveSnakes": self.world.snakes().iter().filter(|s| s.alive).count(),
+                "foodTarget": self.world.config().food_count,
+                "ambientAttemptsPerSecond": self.world.config().ambient_replenish_per_second,
+                "sizeToPopulation": self.world.config().size_to_population,
+                "admittedBotSlots": self.slots.iter().skip(self.player_latency.slots).filter(|s| s.life > 0).count(),
+                "aliveBots": self.world.snakes().iter().skip(self.player_latency.slots).filter(|s| s.alive).count(),
                 "wholeMapFood": self.world.config().pit.is_some()})
             );
         }

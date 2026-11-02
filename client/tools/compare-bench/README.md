@@ -134,6 +134,8 @@ paths named `premake`, `make`, `gccDirectory`, `slangc`, `vulkanHeaders`, and
 the build adds a local `lib/libvulkan-1.a` import-library copy there. It uses
 `-j2`, records commands and errors under Vlither's `build/`, and compiles shaders.
 It does not install tools, change global PATH or edit upstream tracked sources.
+Each attempt has a fresh Vlither settings file; external resource junctions
+point to its checkout's assets, so owner settings are never reused or overwritten.
 
 **Vlither is a labelled instrumented build.** The authored `vlither-wrapper.c`
 replaces its main object in scratch, includes the checkout's unchanged main
@@ -174,10 +176,10 @@ Both committed scenarios start a fresh host at `127.0.0.1:0 --stats 0.5
 18885 are forbidden. `bots.count` and `bots.threads` are the existing host's
 **in-process A4 workers**, not socket bots. One socket player is reserved.
 
-* Battledome starts from `preset: battledome`, 100 bots, fixed radius 3584,
-  `dynamicRadius:false`, and `vision:7200` (larger than the diameter from any
-  in-arena player position). Fixing radius overrides the preset's seat-following
-  expansion to make equal world area repeatable. The feature-gated host hook
+* Battledome starts from `preset: battledome`, 100 bots, stock seat-following
+  radius (3584 reference, growing to approximately 6367 with 101 occupied seats),
+  and `vision:13000` (larger than that diameter from any in-arena player position).
+  Census records actual radius, admitted bot seats and alive bots. The feature-gated host hook
   gives **only the socket player** every food sector intersecting the arena
   bounds; internal bots retain ordinary 45-sector interest and normal visibility.
   Raising `vision` alone would not expand food interest. A camera fit test includes
@@ -201,7 +203,7 @@ setting. It can still collide: any dead or unadmitted sample invalidates the run
 The same hook reports authoritative total physical pellets and socket wire-cell
 counts. Wire cells may collapse co-located pellets; Battledome decorations add
 synthetic pit-marker food. Client `retainedPellets` and `visiblePellets` count
-retained instances and camera/cull-eligible instances, including eaten flights
+retained instances and camera-eligible instances, including eaten flights
 and markers; they are not counts of GPU quads or guaranteed opaque pixels.
 Subpixel LOD remains each client's own policy. Report all these separate counts.
 

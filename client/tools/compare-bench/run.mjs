@@ -133,7 +133,9 @@ async function runAttempt(config, root, item, provenance, machine) {
           || receipt.wrapperSha256 !== await sha(path.join(here, 'vlither-wrapper.c'))
           || receipt.commit !== provenance.vlither.commit || provenance.vlither.dirty) throw Error('Vlither wrapper/build provenance changed; prepare and rebuild before acquisition');
       r.vlitherBuild = receipt; r.vsync = 'FIFO, enabled by labelled benchmark wrapper';
-      native = spawn(config.vlitherBinary, [], { cwd: path.join(config.output, 'vlither'), env: { ...process.env,
+      // Fresh user.dat per attempt; assets remain in external upstream checkout.
+      for (const resource of ['app', 'thermite']) await fs.symlink(path.join(config.output, 'vlither', resource), path.join(directory, resource), 'junction');
+      native = spawn(config.vlitherBinary, [], { cwd: directory, env: { ...process.env,
         SLITHER_BENCH_SERVER: endpoint.replace('ws://', '').replace('/slither', ''),
         ...(item.scenario === 'battledome' ? { SLITHER_BENCH_WHOLE_MAP: '1' } : {}) }, windowsHide: false });
       register(native); native.stdout.on('data', b => clientLog += b); native.stderr.on('data', b => clientLog += b);
@@ -253,6 +255,9 @@ export async function main(args = process.argv.slice(2)) {
   Object.assign(config, { width: config.width ?? 1280, height: config.height ?? 720, x: config.x ?? 0, y: config.y ?? 0,
     seconds: args[0] === 'smoke' ? 5 : config.seconds ?? 60, warmupSeconds: config.warmupSeconds ?? 5 });
   if (!Number.isInteger(config.seconds) || config.seconds < 3 || config.seconds > 180) throw Error('seconds must be 3..180');
+  const clients = config.clients ?? ['original', 'native', 'ntl', 'vlither'];
+  if (!Array.isArray(clients) || !clients.length || new Set(clients).size !== clients.length || clients.some(c => !['original','native','ntl','vlither'].includes(c))) throw Error('clients must be a unique nonempty subset of original, native, ntl, vlither');
+  for (const key of ['width', 'height']) if (!Number.isInteger(config[key]) || config[key] < 320 || config[key] > 3840) throw Error(`${key} must be 320..3840 physical pixels`);
   config.experiment ??= 'primary';
   if (!['primary', 'secondary', 'rtx-optional'].includes(config.experiment)) throw Error('experiment must be primary, secondary or rtx-optional');
   if (args[0] === 'smoke' && config.experiment !== 'primary') throw Error('Smoke is restricted to the primary iGPU experiment');

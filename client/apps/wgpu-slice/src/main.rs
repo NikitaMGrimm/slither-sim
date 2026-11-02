@@ -736,8 +736,9 @@ mod desktop {
                         .iter()
                         .filter(|food| {
                             let p = food.snapshot().render_position;
-                            bounds.is_some_and(|[l, r, t, b]| {
-                                p.x >= l && p.x <= r && p.y >= t && p.y <= b
+                            viewport.is_some_and(|[w, h]| {
+                                (p.x - position.x).abs() * camera.zoom() <= f64::from(w) / 2.
+                                    && (p.y - position.y).abs() * camera.zoom() <= f64::from(h) / 2.
                             })
                         })
                         .count();
@@ -745,6 +746,8 @@ mod desktop {
                         "frame-bench-client: {}",
                         serde_json::json!({
                         "schema": 1, "connected": client.connected(),
+                        "alive": client.own_snake().is_some_and(|s| s.metrics().alive),
+                        "drawnLiveSnakes": client.snake_objects().filter(|(_,_,drawn,s)| *drawn && s.metrics().alive).count(),
                         "camera": [position.x, position.y], "zoom": camera.zoom(),
                         "viewport": viewport,
                         "userZoom": camera.user_zoom_factor(), "radius": radius,

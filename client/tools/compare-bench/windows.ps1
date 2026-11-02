@@ -75,6 +75,7 @@ if ($c.mode -eq 'setup') {
   [BenchWindow]::SetWindowPos($hwnd,[IntPtr]0,$c.x,$c.y,$c.width+$outer.R-$outer.L-$r.R,$c.height+$outer.B-$outer.T-$r.B,0x14) | Out-Null
   Start-Sleep -Milliseconds 800
   if ($c.client -eq 'ours') {
+    [BenchWindow]::PostMessage($hwnd,0x200,[IntPtr]0,[IntPtr](([int]($c.height/2) -shl 16) -bor [int]($c.width/2))) | Out-Null
     Key $hwnd 13
     Start-Sleep -Seconds 3
     if ($c.scenario -eq 'battledome') {

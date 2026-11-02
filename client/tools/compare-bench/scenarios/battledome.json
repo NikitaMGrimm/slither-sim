@@ -11,8 +11,7 @@
   "simulation": {
     "world": {
       "preset": "battledome",
-      "dynamicRadius": false,
-      "vision": 7200
+      "vision": 13000
     }
   }
 }
