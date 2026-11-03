@@ -54,6 +54,7 @@ export function hostStats(text) {
 }
 export function presentMonFailure(text) {
   if (/[1-9]\d*\s+ETW events were lost/i.test(text)) return 'PresentMon lost ETW events; presentation coverage is incomplete';
+  if (/[1-9]\d*\s+ETW buffers were lost/i.test(text)||/\b(?:EventsLost|BuffersLost|OverflowedPresents)=[1-9]\d*/.test(text)) return 'PresentMon ETW loss or present overflow; presentation coverage is incomplete';
   if (/access.*denied|error.*(?:trace|session)|failed to start/i.test(text)) return 'PresentMon ETW capture failed; inspect retained console output';
   return null;
 }
@@ -63,11 +64,11 @@ export function presentMonArguments({session,file,pid,seconds}) {
   // providers are unnecessary for the displayed timestamps measured here.
   return ['--session_name',session,'--output_file',file,'--process_id',String(pid),
     '--v2_metrics','--qpc_time_ms','--timed',String(seconds+12),'--terminate_after_timed',
-    '--no_track_gpu','--no_track_input','--no_console_stats'];
+    '--no_track_gpu','--no_track_input','--no_console_stats','--track_etw_status'];
 }
 export function transientFailure(run) {
   return (run.windowSamples??[]).some(s=>s.buildRunning||s.ownerInput||!s.foreground||s.occluded||s.minimized||!s.visible)
-    || /ETW events|Foreground acquisition|Owner input|Window obscured/.test(run.error??'');
+    || /ETW|PresentMon collection|presentation CSV|Foreground acquisition|Owner input|Window obscured/.test(run.error??'');
 }
 export function checkedPresentation(collector,{pids,seconds,startMs,endMs}) {
   if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??`exit ${collector.exitCode}`}`);
@@ -170,7 +171,7 @@ export function validity(run) {
   if (run.cleanupError) reasons.push('Acquisition cleanup failed');
   if (!run.metrics) reasons.push('No comparable displayed-frame measurement');
   if(run.client==='ntl'){
-    if(!run.networkVerified)reasons.push('Loopback-only game traffic not verified');
+    if(!run.networkVerified)reasons.push(run.networkProof?.failure??'Loopback game traffic and named probe allowance not verified');
   }else{
     if(!run.nativeNetwork||run.nativeNetwork.status==='unavailable')reasons.push('Native endpoint sampling unavailable');
     if(run.nativeNetwork?.rejectedEndpoints?.length)reasons.push('Non-loopback native endpoint observed');
@@ -198,8 +199,16 @@ export function validity(run) {
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
   if (run.scenario === 'normal' && ['original','native'].includes(run.client)
       && run.views?.some(v => v.userZoom !== 1)) reasons.push('Normal scenario left stock zoom');
-  if (run.scenario === 'battledome' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
-  if(run.scenario==='battledome'&&run.views?.some(v=>v.sceneEvidence==='image'))reasons.push('Image boundary is unanchored to outer map extent; whole-map acceptance unavailable');
+  if (run.scenario === 'battledome' && run.viewCondition!=='ntl-farthest' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
+  if(run.scenario==='battledome'&&run.views?.some(v=>v.sceneEvidence==='image'&&!v.boundaryAnchor))reasons.push('Image boundary is unanchored to outer map extent; whole-map acceptance unavailable');
+  if(run.viewCondition==='ntl-farthest'){
+    if(run.views?.some(v=>v.wholeMap===true))reasons.push('Limited-view row label conflicts with whole-map state');
+    const target=run.ntlViewCalibration?.physicalPixelsPerWorldUnit;
+    if(!Number.isFinite(target)||target<=0||!run.views?.length||run.views.some(v=>{
+      const scale=v.boundaryAnchor?.physicalPixelsPerWorldUnit??v.zoom*run.width/v.viewport?.[0];
+      return !Number.isFinite(scale)||Math.abs(scale/target-1)>.05;
+    }))reasons.push('Farthest NTL view scale not matched within 5%');
+  }
   if (run.scenario === 'battledome' && (!run.census?.length || run.census.some(v => !v.wholeMapFood))) reasons.push('Whole-map food delivery not enabled');
   if (run.metrics && (run.metrics.coveredMs < run.seconds * 1000 * .9 || run.metrics.boundaryGapMs.some(g => g > 250))) reasons.push('Incomplete display coverage at window boundaries');
   if (!run.vsync) reasons.push('Vsync state unknown');
@@ -216,6 +225,7 @@ export function validity(run) {
 export function comparison(a, b) {
   const reasons = [];
   const gpu = r => (r.renderAdapters ?? []).map(a => a.luid).sort().join(',');
+  if((a.viewCondition??'whole-map')!==(b.viewCondition??'whole-map'))reasons.push('different view conditions');
   if (!a.validity?.valid || !b.validity?.valid) reasons.push('invalid run');
   if (!gpu(a) || gpu(a) !== gpu(b)) reasons.push('different or unknown render adapters');
   for (const field of ['display', 'refreshHz', 'width', 'height', 'dpi', 'scenario', 'experiment', 'vsyncCondition']) {
@@ -242,14 +252,58 @@ export function netlogProof(log, endpoint) {
   const addresses = starts.map(e => e.params.address ?? e.params.remote_address);
   const successful = starts.filter(e => attempts.some(end => end.source?.id === e.source?.id && end.phase === 2 && !end.params?.net_error));
   const loopback = a => /^127\.\d+\.\d+\.\d+:\d+$/.test(a) || /^\[::1\]:\d+$/.test(a);
+  const probeEndpoint='[2001:4860:4860::8888]:443',allowance='no-packet reachability probe';
+  // Chromium's probe calls UDP ConnectAsync then GetLocalAddress, without I/O:
+  // https://github.com/chromium/chromium/blob/f842f52ef39fd97b449eb27cff414bf05a98ddce/net/dns/host_resolver_manager.cc#L1644
+  // The allowance is socket-scoped, not an endpoint whitelist. Both linked UDP
+  // lifetimes must close, contain only the verified non-I/O event shape, and
+  // resolve through source dependencies to an uncached reachability check.
+  const sourceTypes=Object.fromEntries(Object.entries(log.constants?.logSourceType??{}).map(([k,v])=>[v,k]));
+  const key=s=>Number.isInteger(s?.id)&&Number.isInteger(s?.type)?`${s.type}/${s.id}`:null;
+  const sources=new Map();
+  for(const event of log.events??[]){const k=key(event.source);if(k){if(!sources.has(k))sources.set(k,[]);sources.get(k).push(event);}}
+  const rows=s=>sources.get(key(s))??[];
+  const time=e=>e?.time!==null&&e?.time!==''&&Number.isFinite(Number(e?.time))?Number(e.time):NaN;
+  const ioParams=value=>value&&typeof value==='object'&&Object.entries(value).some(([k,v])=>/bytes?|payload|buffer|read|write|send|recv|sent|receiv/i.test(k)||ioParams(v));
+  const lifetime=events=>{
+    const begin=events.filter(e=>names[e.type]==='SOCKET_ALIVE'&&e.phase===1),end=events.filter(e=>names[e.type]==='SOCKET_ALIVE'&&e.phase===2);
+    if(begin.length!==1||end.length!==1||!Number.isFinite(time(begin[0]))||!Number.isFinite(time(end[0]))||time(end[0])<time(begin[0]))return null;
+    if(events.some(e=>!Number.isFinite(time(e))||time(e)<time(begin[0])||time(e)>time(end[0])||ioParams(e.params)))return null;
+    return {begin:begin[0],end:end[0]};
+  };
+  const allowedEvents=new Set(),probes=[];
+  for(const connect of log.events??[]){
+    if(names[connect.type]!=='UDP_CONNECT'||connect.phase!==1||connect.params?.address!==probeEndpoint||sourceTypes[connect.source?.type]!=='UDP_SOCKET')continue;
+    const udp=rows(connect.source),u=lifetime(udp);if(!u||udp.some(e=>!['SOCKET_ALIVE','UDP_CONNECT'].includes(names[e.type])))continue;
+    const connects=udp.filter(e=>names[e.type]==='UDP_CONNECT');
+    if(connects.length!==2||connects.filter(e=>e.phase===1).length!==1||connects.filter(e=>e.phase===2).length!==1)continue;
+    const end=connects.find(e=>e.phase===2);if(time(end)<time(connect))continue;
+    if(connects.some(e=>e.params?.address!==undefined&&e.params.address!==probeEndpoint))continue;
+    const wrapperSource=u.begin.params?.source_dependency;
+    if(sourceTypes[wrapperSource?.type]!=='UDP_CLIENT_SOCKET')continue;
+    const wrapper=rows(wrapperSource),w=lifetime(wrapper);if(!w||wrapper.some(e=>!['SOCKET_ALIVE','SOCKET_OPEN','SOCKET_CONNECT'].includes(names[e.type])))continue;
+    const opens=wrapper.filter(e=>names[e.type]==='SOCKET_OPEN'),connections=wrapper.filter(e=>names[e.type]==='SOCKET_CONNECT');
+    if(opens.length!==1||opens[0].phase!==0||connections.length!==1||connections[0].phase!==0||connections[0].params?.address!==probeEndpoint)continue;
+    const parent=w.begin.params?.source_dependency;
+    const checks=rows(parent).filter(e=>names[e.type]==='HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK'&&e.phase===0&&e.params?.cached===false&&typeof e.params.ipv6_available==='boolean'
+      &&time(e)>=time(connect)&&time(e)<=Math.max(time(u.end),time(w.end))+1);
+    if(checks.length!==1)continue;
+    for(const e of [...udp,...wrapper])allowedEvents.add(e);
+    probes.push({name:allowance,endpoint:probeEndpoint,udpSocket:connect.source,wrapperSocket:wrapperSource,
+      reachabilitySource:parent,closed:true,bytesSent:0,bytesReceived:0,socketIoEvents:0});
+  }
   const transportPeers=[];
   for(const event of log.events??[]){if(!/TCP|UDP|QUIC|SOCKET|WEBTRANSPORT/i.test(names[event.type]??''))continue;
     for(const key of ['address','remote_address','peer_address','destination','server_address']) {
-      const peer=event.params?.[key];if(typeof peer==='string')transportPeers.push({protocol:names[event.type],peer});
+      const peer=event.params?.[key];if(typeof peer==='string')transportPeers.push({protocol:names[event.type],peer,allowedProbe:allowedEvents.has(event)&&peer===probeEndpoint});
     }
   }
-  const rejectedPeers=transportPeers.filter(p=>!loopback(p.peer));
+  const rejectedPeers=transportPeers.filter(p=>!loopback(p.peer)&&!p.allowedProbe);
   const gameSocketVerified=successful.some(e => (e.params.address ?? e.params.remote_address) === endpoint);
+  const failure=rejectedPeers.length?`Non-loopback transport fails the "${allowance}" allowance (exact closed, attributed, zero-I/O UDP ${probeEndpoint} required): ${[...new Set(rejectedPeers.map(p=>p.peer))].slice(0,5).join(', ')}`:null;
   return { verified: addresses.length > 0 && addresses.every(loopback)&&rejectedPeers.length===0&&gameSocketVerified,
-    gameSocketVerified,addresses:[...new Set(addresses)],rejectedPeers };
+    gameSocketVerified,addresses:[...new Set(addresses)],rejectedPeers,failure,
+    externalSocketAttemptsObserved:transportPeers.some(p=>!loopback(p.peer)),
+    noPacketReachabilityProbeCount:probes.length,
+    allowances:[{name:allowance,endpoint:probeEndpoint,count:probes.length,probes}] };
 }

@@ -31,6 +31,22 @@ export class CDP {
   async call(functionDeclaration,args=[]){return value(await this.send('Runtime.callFunctionOn',{functionDeclaration,arguments:args.map(value=>({value})),executionContextId:this.context,returnByValue:true,awaitPromise:true}));}
 }
 function value(r){if(r.exceptionDetails)throw Error(`Browser preflight: ${r.exceptionDetails.exception?.description??r.exceptionDetails.text}`);return r.result.value;}
+export async function navigateLoaded(page,url,timeoutMs=15000){
+  await page.send('Page.setLifecycleEventsEnabled',{enabled:true});
+  const previous=page.onEvent,loads=new Set();let navigation,finish;
+  const loaded=new Promise(resolve=>{finish=resolve;});
+  const check=()=>{if(navigation&&loads.has(`${navigation.frameId}/${navigation.loaderId}`))finish(null);};
+  // A fast local page may finish before Page.navigate returns its loader ID.
+  page.onEvent=event=>{previous?.(event);if(event.method==='Page.lifecycleEvent'&&event.params.name==='load'){
+    loads.add(`${event.params.frameId}/${event.params.loaderId}`);check();
+  }};
+  const timer=setTimeout(()=>finish('Benchmark document load timed out'),timeoutMs);
+  try{
+    navigation=await page.send('Page.navigate',{url});
+    if(navigation.errorText||!navigation.loaderId)throw Error(`Benchmark navigation failed: ${navigation.errorText??'missing document loader'}`);
+    check();const error=await loaded;if(error)throw Error(error);
+  }finally{clearTimeout(timer);page.onEvent=previous;}
+}
 export function adapterFlags(adapter){
   if(!adapter||adapter==='default')return [];
   const m=adapter.match(/^luid_0x([0-9a-f]{8})_0x([0-9a-f]{8})$/i);
@@ -95,7 +111,7 @@ export async function chromeSession({chrome,mod,directory,width,height,x,y,regis
     page.onEvent=m=>{if(m.method==='Runtime.executionContextCreated'&&m.params.context.auxData?.isDefault)page.context=m.params.context.id;};
     await page.send('Page.enable');await page.send('Runtime.enable');
     if(productionProbe)await page.send('Page.addScriptToEvaluateOnNewDocument',{source:`(${installContentProbe.toString()})();`});
-    await page.send('Page.navigate',{url:`http://slither.io:${server.address().port}/`});
+    await navigateLoaded(page,`http://slither.io:${server.address().port}/`);
     return {child,page,browser,close,gpuPid,processIds:processes.processInfo.map(p=>p.id),chromeVersion:version.Browser,
       adapter:JSON.stringify({devices:gpu.gpu.devices,renderer:gpu.gpu.auxAttributes?.glRenderer}),
       async productionStart(){return page.evaluate('__frameBenchProduction.start()');},
@@ -126,7 +142,8 @@ export async function ntl(options){
     session=await chromeSession(options);const{page}=session;
     let ready=false;for(let i=0;i<150;i++){ready=await page.evaluate(`Boolean(document.querySelector('#ip-server')&&document.querySelector('#connect-btn')&&document.querySelector('#nick'))`);if(ready)break;await delay(100);}
     if(!ready)throw Error('NTL local UI bootstrap changed: #nick, #ip-server and #connect-btn required');
-    const settings=await configureNTL(page,{wholeMap:options.scenario==='battledome'});await fs.writeFile(path.join(options.directory,'ntl-settings.json'),JSON.stringify(settings,null,2));
+    const settings=await configureNTL(page,{enableZoom:options.scenario==='battledome'});session.ntlSettings=settings.zoomSettings;
+    await fs.writeFile(path.join(options.directory,'ntl-settings.json'),JSON.stringify(settings,null,2));
     let setup=false;page.onEvent=((previous)=>m=>{previous?.(m);if(m.method==='Network.webSocketFrameReceived'&&m.params.response.opcode===2&&Buffer.from(m.params.response.payloadData,'base64')[2]===97)setup=true;})(page.onEvent);
     await page.send('Network.enable');
     // Structured arguments keep endpoint/package data out of JavaScript source.

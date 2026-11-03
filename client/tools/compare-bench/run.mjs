@@ -4,12 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
-import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
+import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
+import {roundPlan,anchoredBoundary,settleNtlView,settleNativeView,collectRounds,requireNtlDisplayGate,sessionReport} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -28,6 +29,10 @@ export function lineJournal(accept,now) {
 }
 export function completeJsonLines(text, prefix) {
   return text.split(/\r?\n/).slice(0,-1).filter(l => l.startsWith(prefix)).map(l => JSON.parse(l.slice(prefix.length)));
+}
+export function nativeViewEvidence(view,atMs) {
+  // Setup-only receipts establish scale, not scene or whole-map acceptance.
+  return {...view,atMs,wholeMap:view.setupOnly?null:wholeMap(view)};
 }
 async function treeHash(directory) {
   const rows = [];
@@ -113,12 +118,14 @@ async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, pm, host, native,networkMonitor;
-  let pmLog = '',pmCompleted;
+  let pmLog = '',pmCompleted,setupViewStopFile,setupViewStoppedAtMs;const browserFrames=[];
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
     provenance, machine, telemetry:config.telemetry??'on', windowSamples: [], views: [], census: [], stats: [],
+    ntlViewCalibration:config.ntlViewCalibration,
+    browserViewSampling:item.client==='ntl'&&config.telemetry!=='off'?'CDP screenshots every 1.5 s plus capture time; decode after window; included in telemetry perturbation control':'no timed picture sampling',
     acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
@@ -130,8 +137,10 @@ async function runAttempt(config, root, item, provenance, machine) {
     else for(const stats of hostStats(line))r.stats.push({...stats,atMs});
   }catch(error){telemetryErrors.push(error.message);}},now);
   const clientJournal=lineJournal((line,atMs)=>{try{
+    if(line==='frame-bench-view-stopped')setupViewStoppedAtMs=atMs;
     if(line.startsWith('frame-bench-client: ')){
-      const v=JSON.parse(line.slice(20));r.views.push({...v,atMs,wholeMap:wholeMap(v)});
+      if(setupViewStoppedAtMs!==undefined)throw Error('Native view telemetry continued after its stop acknowledgement');
+      r.views.push(nativeViewEvidence(JSON.parse(line.slice(20)),atMs));
     }
   }catch(error){telemetryErrors.push(error.message);}},now);
   const cancel = () => {
@@ -164,7 +173,6 @@ async function runAttempt(config, root, item, provenance, machine) {
         await windows({ mode: 'setup', borderless:true,clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
         r.windowMode='Chrome app window, borderless task-owned HWND';
       }
-      if (item.scenario === 'battledome') await browser.zoomOut();
       r.vsync = 'Chrome default compositor pacing; verify PresentMon SyncInterval/mode'; r.chromeVersion = browser.chromeVersion;
     } else if (item.client === 'vlither') {
       const receipt = JSON.parse(await fs.readFile(path.join(config.output, 'vlither/build/compare-build.json'), 'utf8'));
@@ -188,13 +196,17 @@ async function runAttempt(config, root, item, provenance, machine) {
       await fs.writeFile(path.join(data, 'SlitherClient', 'settings.txt'), `2:1:${item.client === 'native' ? 'native' : 'original'}`);
       const clientEnv={...process.env,LOCALAPPDATA:data};
       delete clientEnv.SLITHER_FRAME_PACING;delete clientEnv.SLITHER_FRAME_PACING_JOURNAL;
+      delete clientEnv.SLITHER_FRAME_PACING_SETUP_STOP;
       if(config.telemetry!=='off')Object.assign(clientEnv,{SLITHER_FRAME_PACING:'1',SLITHER_FRAME_PACING_JOURNAL:path.join(directory,'native-production.json')});
+      else if(item.viewCondition==='ntl-farthest'){
+        setupViewStopFile=path.join(directory,'stop-setup-view');clientEnv.SLITHER_FRAME_PACING_SETUP_STOP=setupViewStopFile;
+      }
       r.nativeStartedUnixMs=Date.now();
       native = spawn(config.binary, ['--server', endpoint.replace('ws://', '').replace('/slither', ''), '--nickname', 'FrameBench', '--skin', '0'],
         { cwd: directory, env:clientEnv,windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
       networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.binary,directory,maxSeconds:nativeNetworkMaxSeconds(config),startedUnixMs:r.nativeStartedUnixMs});
-      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.viewCondition==='ntl-farthest'?'normal':item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Native winit window, borderless task-owned HWND';
       await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
         || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
@@ -205,6 +217,24 @@ async function runAttempt(config, root, item, provenance, machine) {
       if (!census) return null;
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
+    if(browser&&item.scenario==='battledome'){
+      r.viewSetup=await settleNtlView(browser,config.ntlViewCalibration,item.viewCondition,async index=>{
+        const file=await browser.capture(`before-warmup-${index}`),picture=pngEvidence(await fs.readFile(file));
+        return {file:path.basename(file),picture,census:r.census.at(-1),atMs:now()};
+      },delay);
+    }
+    if(item.viewCondition==='ntl-farthest'&&!browser){
+      r.viewSetup=await settleNativeView({target:config.ntlViewCalibration?.physicalPixelsPerWorldUnit,width:config.width,
+        readView:()=>waitFor(()=>r.views.at(-1),4000,'Native zoom telemetry (matched off rows require setup-only view support)'),
+        wheel:async(notches,i)=>{
+          const previous=r.views.length;
+          await windows({mode:'wheel',clientPid:native.pid,notches},directory,`match-zoom-${i}`,children);
+          await waitFor(()=>r.views.length>previous,4000,'Native post-wheel telemetry');
+        },stopTelemetry:setupViewStopFile?async()=>{
+          await save(setupViewStopFile,{stop:true});
+          return waitFor(()=>setupViewStoppedAtMs,4000,'Native setup-only telemetry stop acknowledgement; no warmup or timed capture');
+        }:undefined});
+    }
     await delay(config.warmupSeconds * 1000);
     await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
     if(browser){
@@ -218,16 +248,25 @@ async function runAttempt(config, root, item, provenance, machine) {
     }
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
-    r.presentMonArguments=presentMonArguments({session:`SlitherBench-${randomUUID()}`,file:csvPath,pid:browser?browser.gpuPid:native.pid,seconds:config.seconds});
+    r.presentMonSession=`SlitherBench-${randomUUID()}`;
+    r.presentMonArguments=presentMonArguments({session:r.presentMonSession,file:csvPath,pid:browser?browser.gpuPid:native.pid,seconds:config.seconds});
     pm = spawn(config.presentMon,r.presentMonArguments,{windowsHide:true});register(pm);
-    pmCompleted=collectorCompletion(pm);
+    pmCompleted=collectorCompletion(pm,log=>{r.collectorFailure??=presentMonFailure(log);});
     const early=await Promise.race([pmCompleted,delay(1000).then(()=>null)]);
     if (early) {pmLog=early.log;throw Error(`PresentMon preflight failed: ${early.error??early.exitCode}; ${pmLog}. No elevation or security changes attempted.`);}
     if(browser&&config.telemetry!=='off')r.productionStarted=await browser.productionStart();
     const samplesPromise = windows({ mode: 'sample', clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
     let monitoring = true;
+    const captureStarted=Date.now();let nextPicture=captureStarted+1500;
     samplesPromise.finally(() => { monitoring = false; }).catch(() => {});
     while (monitoring) {
+      if(r.collectorFailure)throw Error(r.collectorFailure);
+      if(pm.exitCode!==null)throw Error(`PresentMon collection ended early (${pm.exitCode})`);
+      if(Date.now()-captureStarted>10000&&!await fs.stat(csvPath).then(s=>s.size>0,()=>false))throw Error('No presentation CSV within ten seconds; collection unavailable');
+      if(browser&&config.telemetry!=='off'&&Date.now()>=nextPicture){
+        const before=now(),file=await browser.capture(`view-${browserFrames.length}`);
+        browserFrames.push({file,atMs:(before+now())/2});nextPicture=Date.now()+1500;
+      }
       await delay(250);
     }
     r.windowSamples = await samplesPromise;
@@ -245,6 +284,17 @@ async function runAttempt(config, root, item, provenance, machine) {
       r.contentMetrics=contentIntervals(r.production,{canvas:canvases[0].canvas,seconds:config.seconds,startMs:r.windowSamples[0].atMs-browserToQpc,endMs:r.windowSamples[0].atMs+config.seconds*1000-browserToQpc});
       const after=await browser.capture('after-window');r.postflightView={...pngEvidence(await fs.readFile(after)),atMs:now()};r.views.push(r.postflightView);
       r.contentDisplayCorrelation='unestablished';
+    }
+    for(const frame of browserFrames)r.views.push({...pngEvidence(await fs.readFile(frame.file)),atMs:frame.atMs});
+    if(browser){
+      for(const view of r.views){
+        const census=r.census.filter(c=>Math.abs(c.atMs-view.atMs)<=1200).sort((a,b)=>Math.abs(a.atMs-view.atMs)-Math.abs(b.atMs-view.atMs))[0];
+        if(item.scenario==='battledome'){
+          view.boundaryAnchor=anchoredBoundary(view,census);
+          view.wholeMap=view.boundaryAnchor?.wholeMap===true;
+        }
+      }
+      r.views.sort((a,b)=>a.atMs-b.atMs);
     }
     if (!r.windowSamples.length) throw Error('Window monitoring returned no samples');
     const first = r.windowSamples[0]; r.display = first.display; r.dpi = first.dpi;
@@ -298,6 +348,12 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.telemetryErrors=telemetryErrors;
     if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
+    if(pm&&pm.exitCode!==0&&r.presentMonSession){
+      // A force-killed ETW consumer leaves a live session. Stop only the exact
+      // unique session this attempt started before terminating owned children.
+      try{r.traceCleanup=cleanupPresentMon(pm,r.presentMonSession,session=>execute(config.presentMon,['--session_name',session,'--terminate_existing_session'],{timeout:5000}));}
+      catch(error){r.cleanupError??=`Owned ETW session cleanup failed: ${error.message}`;}
+    }
     for (const child of [...children].reverse()) await stop(child);
     if(networkMonitor){
       try{r.nativeNetwork=await networkMonitor.finish();}catch(error){r.networkError=error.message;}
@@ -318,7 +374,7 @@ async function runAttempt(config, root, item, provenance, machine) {
   return { directory, valid: r.validity.valid, run: r };
 }
 export async function main(args = process.argv.slice(2)) {
-  if (args.length !== 2 || !['inspect', 'prepare', 'smoke', 'run'].includes(args[0])) throw Error('Usage: node tools/compare-bench/run.mjs inspect|prepare|smoke|run EXTERNAL_CONFIG.json');
+  if (args.length !== 2 || !['inspect', 'prepare', 'preflight', 'smoke', 'run'].includes(args[0])) throw Error('Usage: node tools/compare-bench/run.mjs inspect|prepare|preflight|smoke|run EXTERNAL_CONFIG.json');
   if (process.platform !== 'win32') throw Error('Windows only; analysis/tests are portable');
   const config = JSON.parse(await fs.readFile(args[1], 'utf8'));
   const root = path.resolve(config.output);
@@ -337,6 +393,7 @@ export async function main(args = process.argv.slice(2)) {
   if(config.telemetry&&!['on','off'].includes(config.telemetry))throw Error('telemetry must be on or off (diagnostic only)');
   const clients = config.clients ?? ['original', 'native', 'ntl', 'vlither'];
   if (!Array.isArray(clients) || !clients.length || new Set(clients).size !== clients.length || clients.some(c => !['original','native','ntl','vlither'].includes(c))) throw Error('clients must be a unique nonempty subset of original, native, ntl, vlither');
+  if(args[0]==='preflight'&&!clients.includes('ntl'))throw Error('preflight requires NTL among the configured clients');
   for (const key of ['width', 'height']) if (!Number.isInteger(config[key]) || config[key] < 320 || config[key] > 3840) throw Error(`${key} must be 320..3840 physical pixels`);
   config.experiment ??= 'primary';
   if (!['primary', 'secondary', 'pixels-optional','igpu-future'].includes(config.experiment)) throw Error('Unknown experiment');
@@ -365,35 +422,38 @@ export async function main(args = process.argv.slice(2)) {
   }
   const rounds = args[0] === 'smoke' ? 1 : config.rounds ?? 3;
   if (args[0] === 'run' && rounds < 3) throw Error('Real runs require at least three rounds');
-  const results = [],roundAttempts=[];let pending=Array.from({length:rounds},(_,i)=>i+1);
   const maxAttempts=config.maxRoundAttempts??3;
   if(!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>3)throw Error('maxRoundAttempts must be 1..3');
-  for(let attempt=1;attempt<=maxAttempts&&pending.length&&!interrupted;attempt++){
-    const retry=[];
-    for(const round of pending){
-      const preflight=(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0];
-      const record={round,attempt,preflight,results:[]};roundAttempts.push(record);
-      if(preflight.competingWork.length||preflight.idleMs<5000){record.blocked='competing work or recent owner input';retry.push(round);continue;}
-      const order=schedule(rounds,clients).filter(item=>item.round===round);
-      let transient=false;
-      for(const item of order){for(const scenario of ['battledome','normal']){
-        if(interrupted)break;
-        const result=await runAttempt(config,session,{...item,scenario,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
-        transient=transientFailure(result.run);
-        if(transient)break;
-      }if(transient||interrupted)break;}
-      if(transient){record.blocked='transient validity failure; retained partial round';retry.push(round);}
-      await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(roundAttempts,null,2));
-    }
-    pending=retry;
-    if(pending.length&&attempt<maxAttempts)await delay(5000);
+  if(config.telemetryControls!==undefined&&typeof config.telemetryControls!=='boolean')throw Error('telemetryControls must be boolean');
+  if(clients.includes('ntl')){
+    if(provenance.ntl.error||!provenance.ntl.tree?.sha256)throw Error('NTL provenance unavailable; preflight will not load it');
+    const {calibrateNtl}=await import('./calibrate.mjs');
+    config.ntlViewCalibration=await calibrateNtl(config,session,provenance.ntl);
   }
-  await save(path.join(session,'round-summary.json'),{roundAttempts,uncollectedRounds:pending,maxAttempts});
-  const comparisons = [];
-  for (let i = 0; i < results.length; i++) for (let j = i + 1; j < results.length; j++) {
-    const a = results[i], b = results[j];
-    if (a.run.scenario === b.run.scenario && a.run.round === b.run.round) comparisons.push({ a: a.directory, b: b.directory, ...comparison(a.run, b.run) });
+  if(args[0]==='preflight'){
+    const report=config.ntlViewCalibration;
+    console.log(JSON.stringify({session,timedRoundsStarted:false,networkVerified:report.network.verified,
+      noPacketReachabilityProbeCount:report.network.noPacketReachabilityProbeCount,zoomPlateau:report.plateau,
+      displayGate:report.displayGate,readyForTimedRound:report.displayGate?.passed===true}));
+    if(report.displayGate?.passed!==true)process.exitCode=2;
+    return;
   }
-  await save(path.join(session, 'index.json'), { mode: args[0], results: results.map(({run, ...item}) => item), comparisons });
+  if(clients.includes('ntl'))requireNtlDisplayGate(config.ntlViewCalibration);
+  const plan=roundPlan(rounds,clients,{telemetryControls:args[0]==='run'&&config.telemetryControls!==false&&!config.telemetry,
+    limitedNtlView:config.ntlViewCalibration?.wholeMap===false}).map(item=>({...item,telemetry:config.telemetry??item.telemetry}));
+  await save(path.join(session,'run-plan.json'),plan);
+  const markInterrupted=()=>{interrupted=true;};let collection;
+  process.on('SIGINT',markInterrupted);process.on('SIGTERM',markInterrupted);
+  try{
+    collection=await collectRounds({rounds,maxAttempts,plan,isInterrupted:()=>interrupted,
+      preflight:async(round,attempt)=>(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0],
+      acquire:item=>runAttempt({...config,telemetry:item.telemetry},session,item,provenance,machine),
+      persist:records=>fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(records,null,2)),
+      betweenAttempts:()=>delay(5000)});
+  }finally{process.removeListener('SIGINT',markInterrupted);process.removeListener('SIGTERM',markInterrupted);}
+  const {summary,index}=sessionReport(collection,plan);
+  await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(summary.roundAttempts,null,2));
+  await save(path.join(session,'round-summary.json'),summary);
+  await save(path.join(session, 'index.json'), { mode: args[0],...index });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e.message); process.exitCode = 1; });

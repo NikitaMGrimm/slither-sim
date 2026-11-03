@@ -13,6 +13,16 @@ differences give median/p95/p99, longest stall, counts over 50/100/250 ms and
 achieved FPS over a fixed window after join. Gaps retain stalls; dropped presents
 do not become displayed frames. The collector targets the owned render PID and disables optional GPU-duration
 and input-latency tracking for every client; display tracking stays enabled.
+PresentMon 2.6's `--track_etw_status` reports loss, buffer pressure and present-ring
+overflow each second. Positive loss/overflow ends the attempt at the next monitor
+check; a missing CSV after ten seconds also ends it. Only that round enters the
+existing bounded retry queue. Failed evidence remains retained. On early exit,
+the exact task-owned trace is stopped before killing its consumer, avoiding an
+orphan. No unrelated trace is stopped. Historical loss without these live
+counters cannot be attributed retrospectively.
+Cleanup also runs after interruption or a nonzero consumer exit. PresentMon 2.6
+returns exit 7 if the session already disappeared; only its exact missing-session
+diagnostic for this owned name is harmless. Other cleanup failures remain errors.
 GPU Engine counters identify the adapter independently. Raw CSV, boundary gaps, actual present modes,
 SyncInterval and intervals in display-refresh periods are retained.
 
@@ -105,6 +115,7 @@ record a base commit, passive instrumentation patch hash and build command.
 ```
 node tools/compare-bench/run.mjs prepare <external-config.json>
 node tools/compare-bench/build-vlither.mjs <external-config.json>
+node tools/compare-bench/run.mjs preflight <external-config.json>
 node tools/compare-bench/run.mjs smoke <external-config.json>
 node tools/compare-bench/run.mjs run <external-config.json>
 ```
@@ -135,6 +146,26 @@ visible login/settings DOM labels, including the mod's zoom-enabled checkbox and
 slow zoom-return setting. No minified globals, functions or food arrays are read.
 Changed UI fails preflight clearly. Whole-map zoom uses repeated standard wheel
 events, then screenshot evidence. It never assigns a hidden zoom variable.
+Before any timed round, a fresh untimed NTL preflight joins local Battledome and
+checks 80, then 320, then 640 additional wheel notches, retaining every picture.
+Three outer-circle scales must plateau within 3%. Host radius and projected
+player offset anchor the circle (4% radius or 30-pixel camera/receipt allowance),
+rejecting an inner pit circle. Unknown extent stops preflight. The receipt is
+bound to this session's mod hash. If clipped, NTL Battledome is `ntl-farthest`;
+Original and Native each get an additional run at that physical scale in every
+round. Directed native wheel input targets that scale; timed views must remain
+within 5%. Whole-map runs remain separate. Different views cannot qualify as
+direct comparisons. Picture counts retain the qualifications below.
+Each Battledome NTL row applies the same UI settings used by calibration: zoom
+enabled and slow return disabled, even when the calibrated extent is limited.
+Visible zoom-control settings must match the reference receipt. It repeats all
+1,040 notches and checks two anchored pictures against the reference before
+warmup: scale within 5%, settled within 3%, and the same whole-map state/row label.
+Calibration with inconsistent whole-map states fails rather than choosing a
+label. A limited-view row that reports whole-map state is invalid. The wheel
+cadence and settling never count as warmup or measured time. This adds about
+77 seconds of wheel input across the first session's four Battledome NTL rows
+compared with 80-notch setup, plus untimed settled-view pictures.
 
 ## Isolation and overhead
 
@@ -144,10 +175,36 @@ report the bootstrap requirement. A new throwaway profile carries disabled local
 network access experiments; the owner's profile is untouched. DNS denies all
 other hosts, a loopback deny proxy rejects external requests/CONNECT, QUIC is off,
 and WebRTC `disable_non_proxied_udp` is set before loading the extension. Netlog
-Default records transport peers; remote TCP/UDP/QUIC/socket evidence or absence
-of the successful loopback game connection fails proof. Keep logs private.
+Default records transport peers; remote TCP/UDP/QUIC/socket evidence outside the
+named allowance below, or a missing successful loopback game connection, fails
+proof. Keep logs private.
 NTL negotiates protocol 13; host census checks the negotiated protocol and life.
 Untrusted endpoint values use structured CDP arguments, not constructed source.
+The untimed preflight closes Chrome and checks its complete netlog before timed
+rounds. One named allowance, **no-packet reachability probe**, permits only UDP
+connects to exactly `[2001:4860:4860::8888]:443`. The underlying UDP socket and its
+UDP-client wrapper must both have complete closed lifetimes, only the recognized
+non-I/O event shape, and source dependencies linking them to an uncached IPv6
+reachability check in that lifetime. Any sent/received bytes or socket I/O event
+(even a zero-byte event), TCP, another endpoint, unknown event shape, missing
+attribution or missing closure rejects the allowance. Port changes fail closed
+with an error naming this allowance and the rejected peer.
+
+The [verified Chromium revision](https://github.com/chromium/chromium/blob/f842f52ef39fd97b449eb27cff414bf05a98ddce/net/dns/host_resolver_manager.cc#L1644)
+connects a datagram socket and inspects its local address on success, without
+socket reads/writes; its configured probe port is 443. Retained netlogs confirmed
+the closed, zero-I/O source chain. This is an explicit external socket attempt,
+not a claim of no external socket attempts. Each network proof records
+`noPacketReachabilityProbeCount`, the named `allowances` with per-socket receipts,
+and `externalSocketAttemptsObserved`. All other non-loopback traffic fails.
+
+`preflight` runs only NTL's untimed local join, zoom, network and display checks;
+it never starts PresentMon or timed rounds. Its single display snapshot is not
+continuous run acceptance. A display-only failure returns exit 2 with the network
+and zoom results retained, without touching an occluding owner window.
+For `run` and `smoke`, any missing or non-passing NTL display gate raises the
+named `NTL display preflight rejected` error with its reasons before a run plan
+is written or any round begins.
 
 Native clients have a separate, explicitly incomplete safety record. An
 unprivileged helper starts just after client launch and periodically samples
@@ -155,8 +212,11 @@ TCP connections (including non-established states) and UDP local bindings for
 the observed owned process tree, with process creation times guarding PID reuse.
 It continues through client shutdown; actual sample timestamps, startup delay,
 errors and observed process IDs are retained. The requested interval is one
-second plus collection time. Any observed non-loopback or wildcard endpoint
-invalidates, including a connection present only in an early sample.
+second plus collection time. Any observed non-loopback or wildcard communicating
+endpoint invalidates, including a connection present only in an early sample.
+Windows wildcard TCP `Bound` reservations with unspecified peer and remote port
+zero are retained separately: they are not connections or listeners. Wildcard
+TCP listeners and UDP bindings still invalidate.
 The record is labelled sampled and complete:false, never networkVerified.
 Windows UDP tables do not expose per-datagram destinations; short connections or
 children between polls can be missed. Incompleteness alone does not invalidate a
@@ -166,16 +226,33 @@ CPU load during measurement and remains enabled in both telemetry controls.
 CDP Network is enabled only for join confirmation and disabled immediately on
 Setup. Events have a fixed bound; no WebSocket frame serialization or game-state
 polling continues during the window. Screenshots run before/after the timed
-window. The production probe still adds per-draw/rAF observation, and Default
+window and, with telemetry on, every 1.5 seconds plus capture time for bounded
+view coverage. Timestamped PNGs are decoded after the window. Capture/readback
+itself can perturb the client; the control below includes that cost.
+The production probe still adds per-draw/rAF observation, and Default
 netlog still adds logging. These costs must not be assumed negligible.
 Our opt-in telemetry still scans food/snakes and logs every two seconds; the
 food census uses one traversal. The native journal adds one bounded append per
 successful present and no per-frame I/O. Vlither's wrapper census also has cost.
 
-Measure perturbation separately: alternate otherwise identical `telemetry:"on"`
-and `telemetry:"off"` configs for Original/Native and NTL, retain ETW intervals
+Real runs pair telemetry on/off in their first round for Original, Native and
+NTL, alternating the order by client. When NTL is clipped, first-round Original
+and Native controls include both whole-map and `ntl-farthest` on/off pairs.
+`run-plan.json` records the full matrix. This adds two 60-second acquisitions,
+about 4-5 minutes including startup, scale matching, warmup and cleanup. Budget
+about 66-82 minutes for the complete 38-row session before retries.
+Set `telemetryControls:false` only after the initial perturbation session; an
+explicit `telemetry:on|off` selects a separate diagnostic. Retain ETW intervals
 and per-process CPU for both, and report changes in median/p95/p99. Off omits the
-browser production hook and both native telemetry paths. It deliberately fails
+browser production hook, timed screenshots and both native telemetry paths. A
+matched native off row enables only a setup view line with zoom and viewport,
+without food/snake scans or a present journal. Directed wheel input measures its
+own scale, rather than inheriting another row's wheel response. After matching,
+the harness creates its private stop file and requires the client's explicit
+stop acknowledgement before warmup. The client drops both telemetry and the
+file-polling path; neither continues in the measured window. `viewSetup` records
+the measured scale, method and stop time. Binaries without setup-only telemetry
+support fail before warmup; supply a binary built with that support. Off deliberately fails
 scene/content acceptance and cannot become comparison evidence. Both variants
 retain safety netlog, window/GPU sampling and host stats; that residual common
 cost is not isolated by this control. If foreground/load gates block the paired
@@ -230,10 +307,10 @@ invalidate. Missing counts (including NTL without game internals) explicitly
 leave drawn-snake scene acceptance unestablished and prevent direct comparison.
 
 NTL screenshots report colored small-component **pellet candidates**, not exact
-pellet counts; a fitted red/gold circle is a candidate visible boundary. Presence-only
-image evidence cannot establish complete scene delivery or identify an inner
-pit circle as the outer map. Exact NTL counts and whole-map extent remain
-qualified until independently anchored. No image-derived count is invented.
+pellet counts; a fitted red/gold circle is a candidate visible boundary. Host
+radius/player-offset anchoring qualifies its extent, not exact scene completeness.
+Missing or contradictory anchors fail Battledome acceptance. Presence-only images
+do not establish exact delivered snake/pellet counts. No exact count is invented.
 
 Every stream carries a QPC-domain receipt timestamp: host stats/census and native
 logs are mapped from UNIX receipt time using a fresh per-attempt QPC/UNIX pair, while
@@ -241,9 +318,10 @@ window samples use QPC directly and browser rAF uses timeOrigin. This mapping
 includes IPC/scheduling delay and is not hardware synchronization. Current clock
 mapping disagreement fails acceptance. Stream coverage needs both boundaries and
 bounded gaps (window 750 ms; host stats/census 1200 ms; native views 3000 ms).
-Endpoint-only browser screenshots intentionally do not satisfy continuous view
-coverage for long windows; those attempts remain invalid, not silently filled
-with stale observations. Host life/delivery census continues throughout.
+Browser screenshots must satisfy the bounded view coverage; slow captures or
+missing anchors invalidate rather than filling gaps with stale observations.
+Telemetry-off diagnostics deliberately lack continuous scene proof. Host
+life/delivery census continues throughout.
 
 Foreground, full visibility, containment, fixed size/display/DPI/refresh, known
 render LUID, loopback proof, scene evidence and host tick health are required.
@@ -258,6 +336,15 @@ reversing order each round. At most three attempts per round retain all failures
 no quiet-time booking occurs. Foreground is requested once only after five seconds
 without physical input. Input/focus loss or occlusion stops sampling; obstructing HWND classes/PIDs
 are recorded privately, and no focus fighting occurs.
+Interrupting collection stops the round loop without another preflight. The
+current and remaining rounds stay in `uncollectedRounds`; retained attempts are
+written before the summary, including when interruption occurs during preflight.
+All acquisitions remain in the index and on disk. Comparisons select only one
+unblocked, complete attempt per round, requiring exactly the planned row set.
+Abandoned, interrupted, incomplete and superseded attempts are explicitly
+excluded with reasons in the index, attempt log and round summary. The index
+and summary share `selection` (selected attempts/directories and row count);
+downstream aggregates must use that selection, never all retained acquisitions.
 Readiness (all bot seats plus living player) has a 60-second bound. Smoke uses
 primary, one round and five-second windows; real runs require at least three.
 Original/Native are separate full High-effects variants with isolated preferences;

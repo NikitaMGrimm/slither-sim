@@ -34,7 +34,8 @@ Put this config and all inputs/results outside Git:
   "x": 0,
   "y": 0,
   "seconds": 60,
-  "rounds": 3
+  "rounds": 3,
+  "telemetryControls": true
 }
 ```
 
@@ -45,6 +46,7 @@ Use Node 24 and existing locked dependencies (`npm ci --ignore-scripts --no-audi
 node tools/compare-bench/run.mjs inspect <external-config.json>
 node tools/compare-bench/run.mjs prepare <external-config.json>
 node tools/compare-bench/build-vlither.mjs <external-config.json>
+node tools/compare-bench/run.mjs preflight <external-config.json>
 node tools/compare-bench/run.mjs smoke <external-config.json>
 node tools/compare-bench/run.mjs run <external-config.json>
 ```
@@ -66,6 +68,15 @@ Apply local Cargo target/jobs limits per command. No build/test runs during timi
   failures. Full High-effects Original/Native are separate variants. Smoke uses
   primary with five-second windows. Foreground/input/occlusion, host tick health,
   stream coverage, scene evidence, GPU and refresh changes are validity gates.
+  The first real round also pairs telemetry on/off for Original, Native and NTL,
+  including Original/Native at NTL's limited view. Matched native off controls
+  require a binary with setup-only view telemetry and its stop acknowledgement;
+  they measure scale before warmup, then disable all client telemetry.
+  Each session first calibrates NTL zoom and verifies its closed netlog under the
+  documented named no-packet reachability-probe allowance; all other non-loopback
+  transport evidence stops before timed rounds. If its farthest
+  view is limited, additional Original/Native Battledome runs match that scale.
+  These remain labelled comparisons alongside separate whole-map runs.
 
 Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
 500 internal bots; stress triples ambient attempts and initial/refill target.
@@ -76,8 +87,9 @@ steering and socket-player collision protection; bots still die on its body.
 
 Replace `mod` to use updated NTL. Manifest/package/tree hashes are recorded;
 changed visible UI contracts fail preflight in one small adapter. No minified game
-globals are read. The local shell needs no official page/assets. Screenshots
-provide presence/extent candidates, not exact counts or continuous camera proof.
+globals are read. The local shell needs no official page/assets. Timed screenshots
+provide bounded presence/extent evidence, not exact counts; their acquisition
+cost is included in the telemetry on/off control. Image analysis runs afterwards.
 Set `vlitherRef` to pin upstream; omission fetches the default tip and records its
 commit. The user-space build uses a labelled authored launch/telemetry wrapper
 without changing stock render or zoom limits.
@@ -86,6 +98,9 @@ See [method.md](method.md) for tool paths, PresentMon rights, isolation, adapter
 controls, coverage limits and telemetry on/off perturbation controls. Unknown
 overhead or content equivalence blocks a verdict. The harness never elevates,
 changes group membership, kills competing work or fights for foreground.
+Use `preflight` to check NTL without starting timed rounds. It discloses the exact
+closed, attributed, zero-I/O UDP reachability probes; runs are not described as
+having no external socket attempts. A display-only failure returns exit 2.
 
 Offline checks: `node --test tools/compare-bench.test.mjs`. The authored 60 Hz
 canvas/fast compositor control has a separate manual `synthetic-check.mjs` runner;
