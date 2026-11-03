@@ -25,7 +25,12 @@ def validate(rows,parity,identities):
         assert set(pair)=={'baseline','candidate'}
         for field in ['command_digest','quad_digest']:assert pair['baseline'][field]==pair['candidate'][field]
     assert set(parity)==EXPECTED_PARITY_KEYS,'parity configurations differ from the expected matrix'
+    baseline_image=identities['baseline_image_binary_sha256']
+    candidate_image=identities['candidate_image_binary_sha256']
+    assert baseline_image!=candidate_image,'parity arms must use distinct binaries'
     for record in parity.values():
+        assert record['baseline_binary_sha256']==baseline_image,'baseline parity binary does not match identity'
+        assert record['binary_sha256']==candidate_image,'candidate parity binary does not match identity'
         assert record['callbacks']==600 and record['skips']==0
         assert record['image_sequence_sha256']==record['baseline_image_sequence_sha256']
     return grouped

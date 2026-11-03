@@ -31,4 +31,21 @@ class Study(unittest.TestCase):
         self.assertEqual(len(changed),10)
         with self.assertRaisesRegex(AssertionError,'parity configurations'):
             recompute.validate(self.rows,changed,self.identities)
+    def test_wrong_parity_binary_in_either_arm_is_rejected(self):
+        for field in ['baseline_binary_sha256','binary_sha256']:
+            with self.subTest(field=field):
+                changed=copy.deepcopy(self.parity)
+                next(iter(changed.values()))[field]='0'*64
+                with self.assertRaisesRegex(AssertionError,'parity binary'):
+                    recompute.validate(self.rows,changed,self.identities)
+    def test_baseline_binary_for_both_parity_arms_is_rejected(self):
+        changed=copy.deepcopy(self.parity)
+        for record in changed.values():
+            record['binary_sha256']=record['baseline_binary_sha256']
+        with self.assertRaisesRegex(AssertionError,'candidate parity binary'):
+            recompute.validate(self.rows,changed,self.identities)
+        identities=copy.deepcopy(self.identities)
+        identities['candidate_image_binary_sha256']=identities['baseline_image_binary_sha256']
+        with self.assertRaisesRegex(AssertionError,'distinct binaries'):
+            recompute.validate(self.rows,changed,identities)
 if __name__=='__main__':unittest.main()

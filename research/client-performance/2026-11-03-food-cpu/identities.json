@@ -39,5 +39,6 @@
     "driver_sha256": "ee94d1b6cc997fad57c3223341547c4acfa15586a6a8ff68267c330103f99764"
   },
   "candidate_image_binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
-  "candidate_image_driver_sha256": "5d132698641b3fe8c5c98d6eb3179ffd7eb46e1c4891619a12ecfb606293b4b4"
+  "candidate_image_driver_sha256": "5d132698641b3fe8c5c98d6eb3179ffd7eb46e1c4891619a12ecfb606293b4b4",
+  "baseline_image_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
 }
