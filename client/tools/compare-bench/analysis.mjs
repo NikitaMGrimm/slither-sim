@@ -57,6 +57,18 @@ export function presentMonFailure(text) {
   if (/access.*denied|error.*(?:trace|session)|failed to start/i.test(text)) return 'PresentMon ETW capture failed; inspect retained console output';
   return null;
 }
+export function presentMonArguments({session,file,pid,seconds}) {
+  if(!Number.isInteger(pid)||pid<=0)throw Error('PresentMon requires an owned render process ID');
+  // GPU Engine counters identify the adapter separately. Duration/input ETW
+  // providers are unnecessary for the displayed timestamps measured here.
+  return ['--session_name',session,'--output_file',file,'--process_id',String(pid),
+    '--v2_metrics','--qpc_time_ms','--timed',String(seconds+12),'--terminate_after_timed',
+    '--no_track_gpu','--no_track_input','--no_console_stats'];
+}
+export function transientFailure(run) {
+  return (run.windowSamples??[]).some(s=>s.buildRunning||s.ownerInput||!s.foreground||s.occluded||s.minimized||!s.visible)
+    || /ETW events|Foreground acquisition|Owner input|Window obscured/.test(run.error??'');
+}
 export function checkedPresentation(collector,{pids,seconds,startMs,endMs}) {
   if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??`exit ${collector.exitCode}`}`);
   const failure=presentMonFailure(collector.log??'');if(failure)throw Error(failure);

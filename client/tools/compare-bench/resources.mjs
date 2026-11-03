@@ -27,3 +27,11 @@ export function collectorCompletion(child) {
     child.once('close',exitCode=>resolve({exitCode,log}));
   });
 }
+export async function recoverCollectorLog(completed,existing='',timeoutMs=2000) {
+  if(existing||!completed)return existing;
+  let timer;
+  try{
+    const done=await Promise.race([completed,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),timeoutMs);})]);
+    return done?.log??existing;
+  }finally{clearTimeout(timer);}
+}

@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
-import {collectorCompletion} from './resources.mjs';
+import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -62,7 +62,7 @@ async function stop(child) {
   await Promise.race([new Promise(resolve => child.once('close', resolve)), delay(2000)]);
 }
 export async function windows(config, directory, label, children) {
-  const file = path.join(directory, `${label}-config.json`); await save(file, config);
+  const file = path.join(directory, `${label}-config.json`); await save(file, {...config,callerPid:process.pid});
   const child = spawn('powershell.exe', ['-NoProfile', '-File', path.join(here, 'windows.ps1'), '-Config', file], { windowsHide: true });
   children.push(child); let out = '', err = '';
   child.stdout.on('data', b => out += b); child.stderr.on('data', b => err += b);
@@ -155,8 +155,14 @@ async function runAttempt(config, root, item, provenance, machine) {
       native = browser.child;
       r.adapter = browser.adapter; r.chromeVersion = browser.chromeVersion;
       r.adapterRequest = config.adapter; r.vsync = 'Chrome default compositor pacing; actual SyncInterval unmeasured until ETW';
-      await windows({ mode: 'setup', borderless:true,clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
-      r.windowMode='Chrome app window, borderless task-owned HWND';
+      if(config.width===3840&&config.height===2160){
+        const idle=(await windows({mode:'preflight'},directory,'before-browser-fullscreen',children))[0];
+        if(idle.idleMs<5000)throw Error('Owner input before browser fullscreen; deferred');
+        r.browserWindow=await browser.fullscreen();r.windowMode='Chrome app window, browser fullscreen requested through CDP';
+      }else{
+        await windows({ mode: 'setup', borderless:true,clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+        r.windowMode='Chrome app window, borderless task-owned HWND';
+      }
       if (item.scenario === 'battledome') await browser.zoomOut();
       r.vsync = 'Chrome default compositor pacing; verify PresentMon SyncInterval/mode'; r.chromeVersion = browser.chromeVersion;
     } else if (item.client === 'vlither') {
@@ -208,8 +214,8 @@ async function runAttempt(config, root, item, provenance, machine) {
     }
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
-    pm = spawn(config.presentMon, ['--session_name', `SlitherBench-${randomUUID()}`, '--output_file', csvPath,
-      '--v2_metrics', '--qpc_time_ms', '--timed', String(config.seconds + 12), '--terminate_after_timed', '--no_console_stats'], { windowsHide: true }); register(pm);
+    r.presentMonArguments=presentMonArguments({session:`SlitherBench-${randomUUID()}`,file:csvPath,pid:browser?browser.gpuPid:native.pid,seconds:config.seconds});
+    pm = spawn(config.presentMon,r.presentMonArguments,{windowsHide:true});register(pm);
     pmCompleted=collectorCompletion(pm);
     const early=await Promise.race([pmCompleted,delay(1000).then(()=>null)]);
     if (early) {pmLog=early.log;throw Error(`PresentMon preflight failed: ${early.error??early.exitCode}; ${pmLog}. No elevation or security changes attempted.`);}
@@ -221,10 +227,15 @@ async function runAttempt(config, root, item, provenance, machine) {
       await delay(250);
     }
     r.windowSamples = await samplesPromise;
+    if(r.windowSamples.some(s=>s.ownerInput||!s.foreground||s.occluded||s.minimized||!s.visible)){
+      if(browser&&config.telemetry!=='off')await save(path.join(directory,'canvas-production-partial.json'),await browser.productionStop());
+      throw Error('Window obscured or owner input/foreground loss; stopped without reclaiming focus');
+    }
     if(browser&&config.telemetry!=='off'){
       r.production=await browser.productionStop();
       await save(path.join(directory,'canvas-production.json'),r.production);
-      const canvases=r.production.canvases.filter(c=>c.rect[2]>=config.width*.8&&c.rect[3]>=config.height*.8);
+      r.devicePixelRatio=r.production.devicePixelRatio;
+      const canvases=r.production.canvases.filter(c=>c.rect[2]*r.devicePixelRatio>=config.width*.8&&c.rect[3]*r.devicePixelRatio>=config.height*.8);
       if(canvases.length!==1)throw Error('Game canvas not uniquely identified by visible viewport coverage');
       const browserToQpc=r.production.timeOrigin+offset;
       r.contentMetrics=contentIntervals(r.production,{canvas:canvases[0].canvas,seconds:config.seconds,startMs:r.windowSamples[0].atMs-browserToQpc,endMs:r.windowSamples[0].atMs+config.seconds*1000-browserToQpc});
@@ -267,6 +278,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     const collector=await pmCompleted;pmLog=collector.log;
     await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
     if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??collector.exitCode}; ${pmLog}`);
+    const etwFailure=presentMonFailure(pmLog);if(etwFailure)throw Error(etwFailure);
     const text = await fs.readFile(csvPath, 'utf8');
     // Chrome GPU process owns presents. Require an explicit single active
     // surface in this dedicated process tree; never pick the fastest surface.
@@ -289,6 +301,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
     for (const child of [...children].reverse()) await stop(child);
+    pmLog=await recoverCollectorLog(pmCompleted,pmLog);
     await fs.writeFile(path.join(directory, 'host.txt'), hostLog);
     await fs.writeFile(path.join(directory, 'client.txt'), clientLog);
     await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
@@ -363,8 +376,7 @@ export async function main(args = process.argv.slice(2)) {
       for(const item of order){for(const scenario of ['battledome','normal']){
         if(interrupted)break;
         const result=await runAttempt(config,session,{...item,scenario,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
-        transient=result.run.windowSamples.some(s=>s.buildRunning||s.ownerInput||!s.foreground)
-          || /ETW events|Foreground acquisition|Owner input/.test(result.run.error??'');
+        transient=transientFailure(result.run);
         if(transient)break;
       }if(transient||interrupted)break;}
       if(transient){record.blocked='transient validity failure; retained partial round';retry.push(round);}

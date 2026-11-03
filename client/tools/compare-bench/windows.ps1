@@ -7,6 +7,8 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Text;
 public static class BenchWindow {
   [StructLayout(LayoutKind.Sequential)] public struct Rect { public int L,T,R,B; }
   [StructLayout(LayoutKind.Sequential)] public struct Point { public int X,Y; }
@@ -15,6 +17,7 @@ public static class BenchWindow {
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out Rect r);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out Rect r);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h,StringBuilder name,int size);
   [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref Point p);
   [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint flag);
   [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
@@ -35,15 +38,20 @@ public static class BenchWindow {
   public static long Counter() { long n; QueryPerformanceCounter(out n); return n; }
   public static double QpcMs() { long f; QueryPerformanceFrequency(out f); return 1000.0*Counter()/f; }
   public static long[] Cpu() { long i,k,u; GetSystemTimes(out i,out k,out u); return new long[]{i,k+u}; }
-  public static bool Occluded(IntPtr target) {
+  public class Obstruction { public long hwnd;public uint pid;public string windowClass;public int[] rect; }
+  public static Obstruction[] Occluders(IntPtr target) {
+    var found=new List<Obstruction>();
     Rect r; GetWindowRect(target,out r);
     for (IntPtr h=GetWindow(target,3); h!=IntPtr.Zero; h=GetWindow(h,3)) {
       int cloaked; DwmGetWindowAttribute(h,14,out cloaked,4);
       if (!IsWindowVisible(h)||IsIconic(h)||cloaked!=0) continue;
       Rect a; GetWindowRect(h,out a);
-      if (Math.Min(r.R,a.R)>Math.Max(r.L,a.L)&&Math.Min(r.B,a.B)>Math.Max(r.T,a.T)) return true;
+      if (Math.Min(r.R,a.R)>Math.Max(r.L,a.L)&&Math.Min(r.B,a.B)>Math.Max(r.T,a.T)) {
+        uint pid;GetWindowThreadProcessId(h,out pid);var name=new StringBuilder(256);GetClassName(h,name,256);
+        found.Add(new Obstruction{hwnd=h.ToInt64(),pid=pid,windowClass=name.ToString(),rect=new int[]{a.L,a.T,a.R-a.L,a.B-a.T}});
+      }
     }
-    return false;
+    return found.ToArray();
   }
 }
 '@
@@ -66,9 +74,11 @@ function Click([IntPtr]$h, [int]$x, [int]$y) {
 }
 function Competing-Work {
   @(Get-CimInstance Win32_Process | Where-Object {
+    $_.ProcessId -ne $c.callerPid -and (
     $_.Name -match '^(cargo|rustc|cl|link|gcc|cc1|cc1plus|make|ninja|cmake|wasm-bindgen)\.exe$' -or
     ($_.Name -eq 'node.exe' -and $_.CommandLine -match '(--test|check\.mjs|build-web\.mjs|npm.*(test|check))') -or
     ($_.Name -match '^(frame_perf|menu_specimens|slither-wgpu-diagnostic)\.exe$')
+    )
   } | Select-Object ProcessId,Name)
 }
 if ($c.mode -eq 'preflight') {
@@ -172,9 +182,10 @@ while ([DateTime]::UtcNow -lt $end) {
   catch { $gpuError = $_.Exception.Message; $gpuEngines = @() }
   $clientOrigin=New-Object BenchWindow+Point
   [BenchWindow]::ClientToScreen($hwnd,[ref]$clientOrigin)|Out-Null
+  $occluders=@([BenchWindow]::Occluders($hwnd))
   $stamp=[BenchWindow]::QpcMs()
   @{ atMs=$stamp; qpcMs=$stamp; unixMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(); foreground=([BenchWindow]::GetForegroundWindow() -eq $hwnd);
-     occluded=[BenchWindow]::Occluded($hwnd); minimized=[BenchWindow]::IsIconic($hwnd); visible=[BenchWindow]::IsWindowVisible($hwnd);
+     occluded=($occluders.Count -gt 0); occludingWindows=$occluders; minimized=[BenchWindow]::IsIconic($hwnd); visible=[BenchWindow]::IsWindowVisible($hwnd);
      width=$r.R; height=$r.B; dpi=[BenchWindow]::GetDpiForWindow($hwnd); display=$screen.DeviceName;
      refreshHz=$binding.refreshHz; nominalRefreshHz=[BenchGraphics]::Refresh($screen.DeviceName); gpuEngines=$gpuEngines; gpuCounterError=$gpuError;
      displayBinding=$binding;
@@ -185,7 +196,7 @@ while ([DateTime]::UtcNow -lt $end) {
      machineCpuPercent=$load; hostCpuCores= $(if ($elapsed -gt 0) {($hostCpu-$prevHost)/$elapsed} else {0}); buildRunning=$build } | ConvertTo-Json -Depth 5 -Compress
   # CPU deltas include all dedicated Chrome children, not only the GPU process.
   $prevCpu=$cpu; $prevHost=$hostCpu; $prevAt=$now
-  if ([BenchWindow]::LastInputTick() -ne $inputAtStart -or [BenchWindow]::GetForegroundWindow() -ne $hwnd) { break }
+  if ($occluders.Count -gt 0 -or [BenchWindow]::LastInputTick() -ne $inputAtStart -or [BenchWindow]::GetForegroundWindow() -ne $hwnd) { break }
   Start-Sleep -Milliseconds 250
 }
 if ($gpuQuery) { $gpuQuery.Dispose() }

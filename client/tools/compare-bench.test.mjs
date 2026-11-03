@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP } from './compare-bench/browser.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
-import {resourceScope,collectorCompletion} from './compare-bench/resources.mjs';
-import {spawn} from 'node:child_process';
+import {resourceScope,collectorCompletion,recoverCollectorLog} from './compare-bench/resources.mjs';
+import {spawn,execFileSync} from 'node:child_process';
 import vm from 'node:vm';
 import path from 'node:path';
 import http from 'node:http';
@@ -122,6 +122,35 @@ test('a missing collector returns a handled launch failure through the cleanup p
   finally{await scope.close();}
   assert.match(result.error,/ENOENT/);assert.equal(result.exitCode,null);assert.equal(closed,true);
 });
+test('early acquisition failure retains collector diagnostics with a bounded cleanup wait',async()=>{
+  const lost='warning: 123 ETW events were lost';
+  assert.equal(await recoverCollectorLog(Promise.resolve({log:lost}),''),lost);
+  assert.equal(await recoverCollectorLog(Promise.resolve({log:lost}),'existing evidence'),'existing evidence');
+  assert.equal(await recoverCollectorLog(new Promise(()=>{}),'',5),'');
+});
+test('collector targets the owned process and keeps display tracking without escalation or trace takeover',()=>{
+  const args=presentMonArguments({pid:7,seconds:5,session:'authored',file:'trace.csv'});
+  assert.equal(args[args.indexOf('--process_id')+1],'7');assert.ok(args.includes('--v2_metrics'));
+  for(const forbidden of ['--no_track_display','--restart_as_admin','--stop_existing_session','--terminate_existing_session'])assert.equal(args.includes(forbidden),false);
+  assert.throws(()=>presentMonArguments({pid:0}),/owned render process/);
+});
+test('an occluding owner window stops the round and qualifies for bounded retry',()=>{
+  const clean={foreground:true,visible:true,occluded:false,minimized:false,buildRunning:false};
+  assert.equal(transientFailure({windowSamples:[clean]}),false);
+  assert.equal(transientFailure({windowSamples:[{...clean,occluded:true}]}),true);
+  assert.equal(transientFailure({error:'PresentMon lost ETW events'}),true);
+});
+test('Windows load gate excludes its own harness but retains another worker', {skip:process.platform!=='win32'},async()=>{
+  const text=await fs.readFile(new URL('./compare-bench/windows.ps1',import.meta.url),'utf8');
+  const classifier=text.match(/function Competing-Work \{[\s\S]*?\r?\n\}/)?.[0];assert.ok(classifier);
+  const script=`$c=@{callerPid=11}; function Get-CimInstance { @(
+    [pscustomobject]@{ProcessId=11;Name='node.exe';CommandLine='node synthetic-check.mjs'},
+    [pscustomobject]@{ProcessId=22;Name='node.exe';CommandLine='node synthetic-check.mjs'},
+    [pscustomobject]@{ProcessId=33;Name='rustc.exe';CommandLine='rustc authored.rs'}
+  ) }; ${classifier}; @(Competing-Work) | ConvertTo-Json -Compress`;
+  const rows=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',script],{encoding:'utf8',windowsHide:true}));
+  assert.deepEqual(rows.map(p=>p.ProcessId),[22,33]);
+});
 test('60 Hz canvas activity beside 240 Hz callbacks/compositor is counted as 60, not 240',()=>{
   class Context { constructor(canvas){this.canvas=canvas;} fillRect(){} }
   const canvas={width:960,height:540,getBoundingClientRect:()=>({x:0,y:0,width:960,height:540})};
@@ -132,6 +161,10 @@ test('60 Hz canvas activity beside 240 Hz callbacks/compositor is counted as 60,
   const observed=sandbox.__frameBenchProduction.stop();
   const metrics=contentIntervals(observed,{canvas:1,seconds:1,startMs:0,endMs:1000});
   assert.equal(metrics.frames,60);assert.equal(metrics.achievedFps,60);assert.ok(Math.abs(metrics.medianMs-1000/60)<.001);
+  assert.equal(metrics.rafFramesDuringWindow,240);
+  const guarded={...observed,records:[{at:-100,canvas:1},...observed.records,{at:0,canvas:1}]};
+  const sliced=contentIntervals(guarded,{canvas:1,seconds:1,startMs:0,endMs:1000});
+  assert.equal(sliced.duplicateCallbacksRemoved,1);assert.equal(sliced.outsideWindowProductions,1);
   assert.throws(()=>contentIntervals({...observed,outsideRaf:[[1,10]]},{canvas:1,seconds:1,startMs:0,endMs:1000}),/outside rAF/);
 });
 test('duplicate native picture presents cannot masquerade as new content',()=>{

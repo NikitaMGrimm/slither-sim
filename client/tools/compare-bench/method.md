@@ -11,7 +11,9 @@ PresentMon 2.x `--v2_metrics --qpc_time_ms` supplies display timestamps from
 `CPUStartQPCTime + DisplayLatency`, for exactly one owned PID/swapchain. Timestamp
 differences give median/p95/p99, longest stall, counts over 50/100/250 ms and
 achieved FPS over a fixed window after join. Gaps retain stalls; dropped presents
-do not become displayed frames. Raw CSV, boundary gaps, actual present modes,
+do not become displayed frames. The collector targets the owned render PID and disables optional GPU-duration
+and input-latency tracking for every client; display tracking stays enabled.
+GPU Engine counters identify the adapter independently. Raw CSV, boundary gaps, actual present modes,
 SyncInterval and intervals in display-refresh periods are retained.
 
 **Compositor presents are not necessarily new game pictures.** NTL additionally
@@ -78,11 +80,18 @@ verify counters; explicit Vulkan selection may ignore that preference. Cross-GPU
 pairs always remain labelled. DisplayConfig is queried on every sample: render
 and output LUIDs can differ, and a change or disagreement in refresh invalidates.
 
-All clients use a borderless task-owned HWND, resized in physical coordinates.
-Chrome runs an app window, native uses winit and Vlither uses GLFW. This is
-borderless windowed presentation, not a promise of exclusive fullscreen. The
-entire client rectangle must lie inside the target monitor; spanning/clipping
-fails. Actual mode, refresh and present mode still determine the experiment.
+Native (winit) and Vlither (GLFW) use borderless task-owned HWNDs, resized in
+physical coordinates. At 4K, Chrome positions its app window through CDP and
+uses the standard Fullscreen API; the browser owns its frame insets. Its
+throwaway profile uses --test-type=gpu to suppress startup infobars that would
+otherwise shrink even a fullscreen web viewport (see Chromium's
+[infobar setup](https://github.com/chromium/chromium/blob/main/chrome/browser/ui/startup/infobar_utils.cc)).
+The captured browser viewport must also match the requested physical client area
+exactly. Chrome retains the OS device scale and records devicePixelRatio;
+CSS rectangles are converted to physical pixels for canvas selection.
+This is not a promise of exclusive fullscreen. The entire client
+rectangle must lie inside the target monitor; spanning/clipping fails. Actual
+refresh and presentation mode still determine the experiment.
 
 ## Builds, provenance and updates
 
@@ -224,7 +233,8 @@ processes invalidate; the harness never terminates competing owner work.
 A round checks competing work and owner input first, then alternates clients,
 reversing order each round. At most three attempts per round retain all failures;
 no quiet-time booking occurs. Foreground is requested once only after five seconds
-without physical input. Input/focus loss stops sampling; no focus fighting occurs.
+without physical input. Input/focus loss or occlusion stops sampling; obstructing HWND classes/PIDs
+are recorded privately, and no focus fighting occurs.
 Readiness (all bot seats plus living player) has a 60-second bound. Smoke uses
 primary, one round and five-second windows; real runs require at least three.
 Original/Native are separate full High-effects variants with isolated preferences;

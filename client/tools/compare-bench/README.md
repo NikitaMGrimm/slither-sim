@@ -54,8 +54,9 @@ Build the host separately: `cargo build --release --locked -p slither-sim
 its hash identifies it. View telemetry/journal support is required for acceptance.
 Apply local Cargo target/jobs limits per command. No build/test runs during timing.
 
-* Primary: same RTX adapter, 3840x2160 borderless client area on the selected
-  4K/240 Hz display. Chrome gets an ANGLE LUID flag in a throwaway profile. Actual
+* Primary: same RTX adapter, 3840x2160 physical client area on the selected
+  4K/240 Hz display. Chrome uses browser fullscreen; native/Vlither use borderless
+  windows. Chrome gets an ANGLE LUID flag in a throwaway profile. Actual
   per-process GPU engine counters must resolve to that LUID. Native/Vlither have
   no adapter selector; no Windows graphics preference or client default changes.
 * Secondary: Chrome unforced (`clients:["ntl"]`, `experiment:"secondary"`), same

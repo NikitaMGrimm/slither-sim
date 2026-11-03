@@ -70,7 +70,10 @@ export async function chromeSession({chrome,mod,directory,width,height,x,y,regis
       `--proxy-server=http://127.0.0.1:${proxy.address().port}`,'--proxy-bypass-list=127.0.0.1;localhost;slither.io;slither.com',
       '--force-webrtc-ip-handling-policy=disable_non_proxied_udp','--disable-quic','--disable-background-networking','--no-first-run','--no-default-browser-check',
       '--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets',`--log-net-log=${path.join(directory,'netlog.json')}`,'--net-log-capture-mode=Default',
-      '--force-device-scale-factor=1',`--window-size=${width},${height}`,`--window-position=${x},${y}`,'--app=about:blank'],{stdio:['ignore','pipe','pipe'],windowsHide:false});
+      // Suppress startup infobars in this throwaway GPU-test profile; otherwise
+      // they shrink the web viewport even in fullscreen. Size is still verified.
+      // chromium/chrome/browser/ui/startup/infobar_utils.cc (IsGpuTest).
+      '--test-type=gpu',`--window-size=${width},${height}`,`--window-position=${x},${y}`,'--app=about:blank'],{stdio:['ignore','pipe','pipe'],windowsHide:false});
     register(child);scope.add(async()=>{
       try{
         try{await browser?.send('Browser.close');}catch{}
@@ -84,7 +87,8 @@ export async function chromeSession({chrome,mod,directory,width,height,x,y,regis
     const version=await(await fetch(`http://127.0.0.1:${port}/json/version`)).json();
     browser=await CDP.open(version.webSocketDebuggerUrl);
     const targets=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-    page=await CDP.open(targets.find(t=>t.type==='page').webSocketDebuggerUrl);
+    const target=targets.find(t=>t.type==='page');
+    page=await CDP.open(target.webSocketDebuggerUrl);
     const gpu=await browser.send('SystemInfo.getInfo'),processes=await browser.send('SystemInfo.getProcessInfo');
     const gpuPid=processes.processInfo.find(p=>p.type==='GPU')?.id;
     await fs.writeFile(path.join(directory,'browser-gpu.json'),JSON.stringify({gpu,processes,gpuPid,adapterRequest:adapter??null},null,2));
@@ -97,7 +101,22 @@ export async function chromeSession({chrome,mod,directory,width,height,x,y,regis
       async productionStart(){return page.evaluate('__frameBenchProduction.start()');},
       async productionStop(){return page.evaluate('__frameBenchProduction.stop()');},
       async capture(label){const{data}=await page.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});const file=path.join(directory,`${label}.png`);await fs.writeFile(file,Buffer.from(data,'base64'));return file;},
-      async zoomOut(notches=80){for(let i=0;i<notches;i++){await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:width/2,y:height/2,deltaX:0,deltaY:120});await delay(20);}await delay(1000);},
+      async fullscreen(){
+        const{windowId}=await browser.send('Browser.getWindowForTarget',{targetId:target.id});
+        // Let Chrome manage its frame insets; editing HWND styles can leave its
+        // web viewport shorter than the nominal physical client rectangle.
+        await browser.send('Browser.setWindowBounds',{windowId,bounds:{windowState:'normal'}});
+        await browser.send('Browser.setWindowBounds',{windowId,bounds:{left:x??0,top:y??0,width,height}});
+        value(await page.send('Runtime.evaluate',{expression:'document.documentElement.requestFullscreen({navigationUI:"hide"}).then(()=>true)',userGesture:true,awaitPromise:true,returnByValue:true}));
+        let viewport;
+        for(let i=0;i<50;i++){
+          viewport=await page.evaluate('({width:innerWidth,height:innerHeight,devicePixelRatio,fullscreen:Boolean(document.fullscreenElement)})');
+          if(Math.round(viewport.width*viewport.devicePixelRatio)===width&&Math.round(viewport.height*viewport.devicePixelRatio)===height)break;
+          await delay(100);
+        }
+        return {...await browser.send('Browser.getWindowBounds',{windowId}),viewport};
+      },
+      async zoomOut(notches=80){const view=await page.evaluate('({width:innerWidth,height:innerHeight})');for(let i=0;i<notches;i++){await page.send('Input.dispatchMouseEvent',{type:'mouseWheel',x:view.width/2,y:view.height/2,deltaX:0,deltaY:120});await delay(20);}await delay(1000);},
     };
   }catch(error){try{await close();}catch(cleanup){error.cleanup=cleanup.message;}throw error;}
 }
