@@ -1,0 +1,9 @@
+{
+  "observation": "second frozen checkout build reported Fresh/finished without recompiling; native test then linked a core missing the new API",
+  "binary_sha256": {
+    "source-groups-current-base.exe": "147006e92cd3bf19d4ff03977db8249a593e4ccf9800979bc6d62b1eb98dd445",
+    "source-groups-current-candidate.exe": "147006e92cd3bf19d4ff03977db8249a593e4ccf9800979bc6d62b1eb98dd445"
+  },
+  "timed": false,
+  "inference": "shared target artifact reuse; not established as a Cargo defect"
+}

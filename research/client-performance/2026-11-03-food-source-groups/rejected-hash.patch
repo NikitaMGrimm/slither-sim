@@ -1,0 +1,68 @@
+diff --git a/client/apps/wgpu-slice/src/pellet_batch.rs b/client/apps/wgpu-slice/src/pellet_batch.rs
+index 1b568798..8a7da507 100644
+--- a/client/apps/wgpu-slice/src/pellet_batch.rs
++++ b/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -10 +10 @@ use std::{
+-    collections::{BTreeMap, BTreeSet},
++    collections::{BTreeMap, BTreeSet, HashMap},
+@@ -79,2 +79 @@ impl Cache {
+-            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> =
+-                BTreeMap::new();
++            let mut families: HashMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> = HashMap::new();
+@@ -114,0 +114,6 @@ impl Cache {
++            // Membership changes rebuild these groups even when source families
++            // stay unchanged. Hash each pellet once, then order only distinct
++            // keys: preserves the original BTreeMap validation/group/draw order.
++            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-food-source-groups/REPORT.md.
++            let mut families: Vec<_> = families.into_iter().collect();
++            families.sort_unstable_by_key(|(key, _)| *key);
+@@ -117,2 +122,2 @@ impl Cache {
+-                .values()
+-                .map(|(_, indices)| world.foods()[indices[0]].clone())
++                .iter()
++                .map(|(_, (_, indices))| world.foods()[indices[0]].clone())
+@@ -463,0 +469,44 @@ mod tests {
++    #[test]
++    fn hash_grouping_preserves_tree_key_and_reverse_world_order_after_removal() {
++        let mut bank = Bank::new().unwrap();
++        let mut world = rectangle(&bank);
++        for round in 0..4 {
++            if round > 0 {
++                for key in [17, 202, 1009] {
++                    world.consume(key, FoodConsume::Immediate);
++                }
++                world.advance(step(5.), |_| unreachable!()).unwrap();
++            }
++            let mut ordered = BTreeMap::<[ResourceKey; 4], (FoodSources, Vec<usize>)>::new();
++            for (i, food) in world.foods().iter().enumerate().rev() {
++                let s = food.snapshot().sources;
++                let key = [
++                    s.outline.asset().into(),
++                    s.body.asset().into(),
++                    s.inner.asset().into(),
++                    s.outer.asset().into(),
++                ];
++                ordered
++                    .entry(key)
++                    .or_insert_with(|| (s, Vec::new()))
++                    .1
++                    .push(i);
++            }
++            // A fresh map seed must never change validation, group or slot order.
++            for _ in 0..3 {
++                let b = batch(&mut Cache::default(), &mut bank, &world, view());
++                assert_eq!(b.sources.groups.len(), ordered.len());
++                let mut slot = 0;
++                for (group, (_, (sources, indices))) in b.sources.groups.iter().zip(&ordered) {
++                    assert_eq!(group.sources, *sources);
++                    assert_eq!(group.range, slot..slot + indices.len());
++                    for index in indices {
++                        assert_eq!(b.sources.slots[*index], slot);
++                        slot += 1;
++                    }
++                }
++                assert_eq!(slot, world.foods().len());
++            }
++        }
++    }
++

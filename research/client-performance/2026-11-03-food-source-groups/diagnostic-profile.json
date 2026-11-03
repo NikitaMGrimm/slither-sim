@@ -1,0 +1,98 @@
+{
+  "access": "local-only restricted recording; aggregated counts only",
+  "qualification": "Compiler overlap: triggers and substages only, not adoption timing",
+  "profiles": [
+    {
+      "quality": "original",
+      "callbacks": 600,
+      "art_callbacks": 300,
+      "rebuilds": 65,
+      "miss_categories": {
+        "sources_miss_membership": 65
+      },
+      "change_events_in_rebuild_callbacks": {
+        "spawn": 70,
+        "advance_expiry": 43
+      },
+      "rebuild_callback_trigger_sets": {
+        "spawn": 22,
+        "advance_expiry": 41,
+        "advance_expiry,spawn": 2
+      },
+      "families_range": [
+        132,
+        132
+      ],
+      "rebuild_p50_p95_ms": {
+        "pellet_sources_ns": [
+          1.7279,
+          2.7501
+        ],
+        "source_gather_ns": [
+          1.6823,
+          2.6807
+        ],
+        "source_validate_ns": [
+          0.0187,
+          0.0343
+        ],
+        "source_regroup_ns": [
+          0.0243,
+          0.0417
+        ]
+      },
+      "slow16_median_ms": {
+        "pellet_sources_ns": 2.1918,
+        "source_gather_ns": 2.13215,
+        "source_validate_ns": 0.02655,
+        "source_regroup_ns": 0.032
+      }
+    },
+    {
+      "quality": "native",
+      "callbacks": 600,
+      "art_callbacks": 300,
+      "rebuilds": 65,
+      "miss_categories": {
+        "sources_miss_membership": 65
+      },
+      "change_events_in_rebuild_callbacks": {
+        "spawn": 70,
+        "advance_expiry": 43
+      },
+      "rebuild_callback_trigger_sets": {
+        "spawn": 22,
+        "advance_expiry": 41,
+        "advance_expiry,spawn": 2
+      },
+      "families_range": [
+        132,
+        132
+      ],
+      "rebuild_p50_p95_ms": {
+        "pellet_sources_ns": [
+          1.7504,
+          2.4283
+        ],
+        "source_gather_ns": [
+          1.6965,
+          2.3566
+        ],
+        "source_validate_ns": [
+          0.024,
+          0.0334
+        ],
+        "source_regroup_ns": [
+          0.0247,
+          0.0437
+        ]
+      },
+      "slow16_median_ms": {
+        "pellet_sources_ns": 2.0755,
+        "source_gather_ns": 1.98395,
+        "source_validate_ns": 0.02645,
+        "source_regroup_ns": 0.03085
+      }
+    }
+  ]
+}

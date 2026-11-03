@@ -7,7 +7,7 @@ use crate::{
 };
 use slither_client::{presentation::*, state::Point};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, btree_map::Entry},
     ops::Range,
     sync::Arc,
 };
@@ -50,6 +50,9 @@ pub(crate) struct Sources {
 #[derive(Default)]
 pub(crate) struct Cache {
     sources: Option<Arc<Sources>>,
+    // CPU-only lookup state stays here, not in queued pictures or GPU/worker
+    // source objects. Weak-token reclamation therefore stays on the owner thread.
+    identities: Vec<FoodStaticIdentity>,
 }
 
 impl Cache {
@@ -78,54 +81,94 @@ impl Cache {
             .as_ref()
             .filter(|s| s.source_identity == world.source_identity() && s.assets == assets);
         if current.is_none() {
-            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> =
-                BTreeMap::new();
-            for (i, f) in world.foods().iter().enumerate().rev() {
-                let f = f.snapshot();
-                if f.position.x.abs() > 1e9 || f.position.y.abs() > 1e9 {
+            // Rebuild dense membership but reuse classification at unchanged indices.
+            // Weak creation tokens distinguish rollback forks without retaining the
+            // mutable food array. Only new/swapped records read full source metadata.
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-food-source-groups/REPORT.md.
+            let previous = self.sources.as_ref();
+            let mut families: Vec<_> = previous
+                .into_iter()
+                .flat_map(|s| &s.groups)
+                .map(|g| Family {
+                    sources: g.sources,
+                    indices: Vec::new(),
+                    same_previous: true,
+                })
+                .collect();
+            let mut by_key: BTreeMap<_, _> = families
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (source_key(f.sources), i))
+                .collect();
+            for (i, food) in world.foods().iter().enumerate().rev() {
+                let inherited = previous.and_then(|p| {
+                    self.identities
+                        .get(i)
+                        .filter(|id| food.matches_static_identity(id))
+                        .map(|_| p.slot_groups[p.slots[i]])
+                });
+                let group = if let Some(group) = inherited {
+                    if !families[group].same_previous {
+                        return Ok(None);
+                    }
+                    group
+                } else {
+                    let f = food.snapshot();
+                    if f.position.x.abs() > 1e9 || f.position.y.abs() > 1e9 {
+                        return Ok(None);
+                    }
+                    let s = f.sources;
+                    match by_key.entry(source_key(s)) {
+                        Entry::Occupied(entry) => {
+                            let group = *entry.get();
+                            let family = &mut families[group];
+                            if family.indices.is_empty() {
+                                family.same_previous = family.sources == s;
+                                // The first current member owns the exact metadata,
+                                // including signed zero, of the original tree path.
+                                family.sources = s;
+                            } else if family.sources != s {
+                                return Ok(None);
+                            }
+                            group
+                        }
+                        Entry::Vacant(entry) => {
+                            let group = families.len();
+                            families.push(Family {
+                                sources: s,
+                                indices: Vec::new(),
+                                same_previous: false,
+                            });
+                            entry.insert(group);
+                            group
+                        }
+                    }
+                };
+                let family = &mut families[group];
+                if family.indices.is_empty() && !source_admitted(family.sources, outlines) {
                     return Ok(None);
                 }
-                let s = f.sources;
-                let outline = s
-                    .outline
-                    .asset()
-                    .handle
-                    .checked_sub(crate::bank::BODY_HANDLE_BASE + 1)
-                    .and_then(|i| outlines.get(i as usize));
-                if outline != Some(&true)
-                    || [s.body, s.inner, s.outer].iter().any(|s| {
-                        s.width() > f64::from(s.asset().width)
-                            || s.height() > f64::from(s.asset().height)
-                            || s.half_width().abs() > 1e8
-                            || s.half_height().abs() > 1e8
-                    })
-                {
-                    return Ok(None);
-                }
-                let key = [
-                    s.outline.asset().into(),
-                    s.body.asset().into(),
-                    s.inner.asset().into(),
-                    s.outer.asset().into(),
-                ];
-                let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
-                if family.0 != s {
-                    return Ok(None);
-                }
-                family.1.push(i);
+                family.indices.push(i);
             }
-            // Compact projections substitute family metadata. Finite, nonzero
-            // dimensions compare bit-exactly with numeric equality. Zero halves
-            // may differ only in sign, so use the canonical path for that rare
-            // family instead of rechecking every pellet's source bits.
+            let order: Vec<_> = by_key
+                .into_values()
+                .filter(|i| !families[*i].indices.is_empty())
+                .collect();
+            // Compact projection substitutes family metadata. Source creation
+            // guarantees finite values and positive full sizes; excluding zero
+            // halves makes numeric family equality bit-exact for cached members.
+            // Preserve the existing canonical fallback for signed-zero recipes.
             // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
-            if families.values().any(|(s, _)| source_has_zero_half(s)) {
+            if order
+                .iter()
+                .any(|i| source_has_zero_half(&families[*i].sources))
+            {
                 return Ok(None);
             }
             // Source readiness still covers all retained sources, including culled food.
-            let representatives: Vec<_> = families
-                .values()
-                .map(|(_, indices)| world.foods()[indices[0]].clone())
+            let representatives: Vec<_> = order
+                .iter()
+                .map(|i| world.foods()[families[*i].indices[0]].clone())
                 .collect();
             validate_food_with_index(
                 FoodPaintInput {
@@ -152,18 +195,24 @@ impl Cache {
             slot_groups
                 .try_reserve_exact(world.foods().len())
                 .map_err(|_| crate::frame::DRAW_ALLOCATION_FAILED)?;
-            for (_, (sources, indices)) in families {
+            for i in order {
+                let family = &families[i];
                 let start = grouped;
-                for i in indices {
-                    slots[i] = grouped;
+                for index in &family.indices {
+                    slots[*index] = grouped;
                     grouped += 1;
                 }
                 slot_groups.resize(grouped, groups.len());
                 groups.push(Group {
-                    sources,
+                    sources: family.sources,
                     range: start..grouped,
                 });
             }
+            let mut identities = Vec::new();
+            identities
+                .try_reserve_exact(world.foods().len())
+                .map_err(|_| "food source identity cache allocation failed")?;
+            identities.extend(world.foods().iter().map(FoodPresentation::static_identity));
             self.sources = Some(Arc::new(Sources {
                 source_identity: world.source_identity(),
                 groups,
@@ -171,6 +220,7 @@ impl Cache {
                 slot_groups,
                 assets: assets.to_vec(),
             }));
+            self.identities = identities;
         }
         let sources = self.sources.as_ref().expect("retained sources").clone();
         let mut visible = vec![false; world.foods().len()];
@@ -197,6 +247,36 @@ impl Cache {
             late_at: 0,
         }))
     }
+}
+
+struct Family {
+    sources: FoodSources,
+    indices: Vec<usize>,
+    same_previous: bool,
+}
+
+fn source_key(s: FoodSources) -> [ResourceKey; 4] {
+    [
+        s.outline.asset().into(),
+        s.body.asset().into(),
+        s.inner.asset().into(),
+        s.outer.asset().into(),
+    ]
+}
+
+fn source_admitted(s: FoodSources, outlines: &[bool]) -> bool {
+    s.outline
+        .asset()
+        .handle
+        .checked_sub(crate::bank::BODY_HANDLE_BASE + 1)
+        .and_then(|i| outlines.get(i as usize))
+        == Some(&true)
+        && ![s.body, s.inner, s.outer].iter().any(|s| {
+            s.width() > f64::from(s.asset().width)
+                || s.height() > f64::from(s.asset().height)
+                || s.half_width().abs() > 1e8
+                || s.half_height().abs() > 1e8
+        })
 }
 
 #[inline]
@@ -592,6 +672,312 @@ pub(crate) mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn new_metadata_cannot_replace_a_family_while_cached_members_still_use_it() {
+        let mut bank = Bank::new().unwrap();
+        let good = bank.food(0, [0., 0.]);
+        let mut changed = good.clone();
+        for source in &mut changed.bodies {
+            *source = FoodSource::new(
+                source.asset(),
+                source.width() * 0.5,
+                source.height(),
+                source.half_width(),
+                source.half_height(),
+            )
+            .unwrap();
+        }
+        let mut world = FoodWorld::new();
+        for i in 0..1024 {
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: i,
+                        sector: (0, 0),
+                        position: view().camera,
+                        base_size: 0.2,
+                        raw_color: 0,
+                        rapid: true,
+                    },
+                    good.input(1.),
+                )
+                .unwrap();
+        }
+        let mut cache = Cache::default();
+        drop(batch(&mut cache, &mut bank, &world, view()));
+        let previous = cache.sources.as_ref().unwrap().clone();
+        world
+            .spawn(
+                FoodSpawn {
+                    key: 1024,
+                    sector: (0, 0),
+                    position: view().camera,
+                    base_size: 0.2,
+                    raw_color: 0,
+                    rapid: true,
+                },
+                changed.input(1.),
+            )
+            .unwrap();
+        assert!(
+            cache
+                .prepare(
+                    &world,
+                    view(),
+                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    MAX_FOOD_PAINT_COMMANDS
+                )
+                .unwrap()
+                .is_none()
+        );
+        assert!(Arc::ptr_eq(cache.sources.as_ref().unwrap(), &previous));
+        world.consume(1024, FoodConsume::Immediate);
+        let restored = batch(&mut cache, &mut bank, &world, view());
+        assert_eq!(restored.sources.groups.len(), 1);
+    }
+
+    #[test]
+    fn failed_source_validation_keeps_previous_lookup_coherent_for_retry() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        let mut cache = Cache::default();
+        let old = batch(&mut cache, &mut bank, &world, view());
+        let old_groups = old.sources.slot_groups.clone();
+        world.consume(17, FoodConsume::Immediate);
+        let mut invalid = bank.assets.clone();
+        let handle = world.foods()[0].snapshot().sources.body.asset().handle;
+        invalid
+            .iter_mut()
+            .find(|a| a.handle == handle)
+            .unwrap()
+            .revision += 1;
+        assert!(
+            cache
+                .prepare(
+                    &world,
+                    view(),
+                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    &invalid,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    MAX_FOOD_PAINT_COMMANDS
+                )
+                .is_err()
+        );
+        assert!(Arc::ptr_eq(cache.sources.as_ref().unwrap(), &old.sources));
+        assert_eq!(cache.sources.as_ref().unwrap().slot_groups, old_groups);
+        assert_eq!(cache.identities.len(), old.world.foods().len());
+        assert!(
+            old.world
+                .foods()
+                .iter()
+                .zip(&cache.identities)
+                .all(|(food, id)| food.matches_static_identity(id))
+        );
+        let retry = batch(&mut cache, &mut bank, &world, view());
+        let fresh = batch(&mut Cache::default(), &mut bank, &world, view());
+        assert_eq!(retry.sources.slots, fresh.sources.slots);
+        assert_eq!(retry.sources.groups.len(), fresh.sources.groups.len());
+        for (a, b) in retry.sources.groups.iter().zip(&fresh.sources.groups) {
+            assert_eq!(a.sources, b.sources);
+            assert_eq!(a.range, b.range);
+        }
+    }
+
+    #[test]
+    fn sibling_creations_with_equal_serials_cannot_reuse_static_classification() {
+        let mut bank = Bank::new().unwrap();
+        let base = rectangle(&bank);
+        let mut first = base.clone();
+        let mut second = base;
+        for (world, color) in [(&mut first, 0), (&mut second, 3)] {
+            let factory = bank.food(color, [0., 0.]);
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: 50_000,
+                        sector: (0, 0),
+                        position: view().camera,
+                        base_size: 1.4,
+                        raw_color: color,
+                        rapid: true,
+                    },
+                    factory.input(1.),
+                )
+                .unwrap();
+        }
+        assert_eq!(
+            first.foods().last().unwrap().snapshot().instance,
+            second.foods().last().unwrap().snapshot().instance
+        );
+        let mut cache = Cache::default();
+        drop(batch(&mut cache, &mut bank, &first, view()));
+        drop(first);
+        let changed = batch(&mut cache, &mut bank, &second, view());
+        let fresh = batch(&mut Cache::default(), &mut bank, &second, view());
+        assert_eq!(changed.sources.slots, fresh.sources.slots);
+        assert_eq!(changed.sources.groups.len(), fresh.sources.groups.len());
+        for (a, b) in changed.sources.groups.iter().zip(&fresh.sources.groups) {
+            assert_eq!(a.sources, b.sources);
+            assert_eq!(a.range, b.range);
+        }
+    }
+
+    #[test]
+    fn zero_half_fallback_does_not_publish_a_lookup() {
+        let mut bank = Bank::new().unwrap();
+        let mut factory = bank.food(0, [0., 0.]);
+        for source in &mut factory.bodies {
+            *source = FoodSource::new(
+                source.asset(),
+                source.width(),
+                source.height(),
+                -0.,
+                source.half_height(),
+            )
+            .unwrap();
+        }
+        let mut world = FoodWorld::new();
+        for i in 0..1025 {
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: i,
+                        sector: (0, 0),
+                        position: view().camera,
+                        base_size: 0.2,
+                        raw_color: 0,
+                        rapid: true,
+                    },
+                    factory.input(1.),
+                )
+                .unwrap();
+        }
+        let mut cache = Cache::default();
+        for remove in [false, true] {
+            if remove {
+                world.consume(1024, FoodConsume::Immediate);
+            }
+            assert!(
+                cache
+                    .prepare(
+                        &world,
+                        view(),
+                        Some(FoodCullBounds::from_view(view()).unwrap()),
+                        &bank.assets,
+                        &bank.food_outline,
+                        &mut bank.food_asset_index,
+                        MAX_FOOD_PAINT_COMMANDS
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(cache.sources.is_none());
+            assert!(cache.identities.is_empty());
+        }
+    }
+
+    #[test]
+    fn static_admission_rejects_bad_metadata_in_first_or_later_family_members() {
+        let mut bank = Bank::new().unwrap();
+        let good = bank.food(0, [0., 0.]);
+        let mut bad = good.clone();
+        for source in &mut bad.bodies {
+            *source = FoodSource::new(
+                source.asset(),
+                f64::from(source.asset().width) + 1.,
+                source.height(),
+                source.half_width(),
+                source.half_height(),
+            )
+            .unwrap();
+        }
+        for bad_index in [0, 1023] {
+            let mut world = FoodWorld::new();
+            for i in 0..1024 {
+                world
+                    .spawn(
+                        FoodSpawn {
+                            key: i,
+                            sector: (0, 0),
+                            position: view().camera,
+                            base_size: 1.4,
+                            raw_color: 0,
+                            rapid: true,
+                        },
+                        if i == bad_index {
+                            bad.input(1.)
+                        } else {
+                            good.input(1.)
+                        },
+                    )
+                    .unwrap();
+            }
+            assert!(
+                Cache::default()
+                    .prepare(
+                        &world,
+                        view(),
+                        Some(FoodCullBounds::from_view(view()).unwrap()),
+                        &bank.assets,
+                        &bank.food_outline,
+                        &mut bank.food_asset_index,
+                        MAX_FOOD_PAINT_COMMANDS
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn source_grouping_preserves_tree_key_and_reverse_world_order_after_removal() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        let mut cache = Cache::default();
+        for round in 0..4 {
+            if round > 0 {
+                for key in [17, 202, 1009] {
+                    world.consume(key, FoodConsume::Immediate);
+                }
+                world.advance(step(5.), |_| unreachable!()).unwrap();
+            }
+            let mut ordered = BTreeMap::<[ResourceKey; 4], (FoodSources, Vec<usize>)>::new();
+            for (i, food) in world.foods().iter().enumerate().rev() {
+                let s = food.snapshot().sources;
+                let key = [
+                    s.outline.asset().into(),
+                    s.body.asset().into(),
+                    s.inner.asset().into(),
+                    s.outer.asset().into(),
+                ];
+                ordered
+                    .entry(key)
+                    .or_insert_with(|| (s, Vec::new()))
+                    .1
+                    .push(i);
+            }
+            // Fresh rebuilds must preserve validation, group and dense-slot order.
+            for _ in 0..3 {
+                let b = batch(&mut cache, &mut bank, &world, view());
+                assert_eq!(b.sources.groups.len(), ordered.len());
+                let mut slot = 0;
+                for (group, (_, (sources, indices))) in b.sources.groups.iter().zip(&ordered) {
+                    assert_eq!(group.sources, *sources);
+                    assert_eq!(group.range, slot..slot + indices.len());
+                    for index in indices {
+                        assert_eq!(b.sources.slots[*index], slot);
+                        slot += 1;
+                    }
+                }
+                assert_eq!(slot, world.foods().len());
+            }
+        }
     }
 
     #[test]
