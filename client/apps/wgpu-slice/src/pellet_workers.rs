@@ -676,45 +676,139 @@ mod tests {
         }
     }
 
-    #[cfg(all(windows,feature="frame-profile"))]
+    #[cfg(all(windows, feature = "frame-profile"))]
     #[test]
-    #[ignore="explicit authored offscreen pool/serial lifecycle pixels"]
+    #[ignore = "explicit authored offscreen pool/serial lifecycle pixels"]
     fn pool_pixels_match_serial_across_quality_overlay_prefix_resize_and_reconnect() {
-        use crate::{gpu::{Renderer,instance},menu::MenuFrame,world_presenter::WorldPresenter};
-        use slither_client::{presentation::*,settings::WorldResolution};
-        let integrated=std::env::var_os("PELLET_TEST_IGPU").is_some();
-        let backend=if integrated{wgpu::Backends::DX12}else{wgpu::Backends::VULKAN};
-        let make=|| {
-            let adapter=pollster::block_on(instance().enumerate_adapters(backend)).into_iter().find(|a|(a.get_info().device_type==wgpu::DeviceType::IntegratedGpu)==integrated).expect("explicit offscreen adapter");
-            pollster::block_on(Renderer::from_adapter_with_max_samples(adapter,wgpu::TextureFormat::Rgba8Unorm,4)).unwrap()
+        use crate::{
+            gpu::{Renderer, instance},
+            menu::MenuFrame,
+            world_presenter::WorldPresenter,
         };
-        let mut serial=make();let mut parallel=make();
-        serial.configure_pellet_workers(1,Duration::ZERO);parallel.configure_pellet_workers(4,Duration::ZERO);
-        let mut sp=WorldPresenter::new(&serial);let mut pp=WorldPresenter::new(&parallel);
-        let mut bank=Bank::new().unwrap();let mut world=rectangle(&bank);let mut cache=crate::pellet_batch::Cache::default();
+        use slither_client::{presentation::*, settings::WorldResolution, state::Point};
+        let integrated = std::env::var_os("PELLET_TEST_IGPU").is_some();
+        let backend = if integrated {
+            wgpu::Backends::DX12
+        } else {
+            wgpu::Backends::VULKAN
+        };
+        let make = || {
+            let adapter = pollster::block_on(instance().enumerate_adapters(backend))
+                .into_iter()
+                .find(|a| {
+                    (a.get_info().device_type == wgpu::DeviceType::IntegratedGpu) == integrated
+                })
+                .expect("explicit offscreen adapter");
+            pollster::block_on(Renderer::from_adapter_with_max_samples(
+                adapter,
+                wgpu::TextureFormat::Rgba8Unorm,
+                4,
+            ))
+            .unwrap()
+        };
+        let mut serial = make();
+        let mut parallel = make();
+        serial.configure_pellet_workers(1, Duration::ZERO);
+        parallel.configure_pellet_workers(4, Duration::ZERO);
+        let mut sp = WorldPresenter::new(&serial);
+        let mut pp = WorldPresenter::new(&parallel);
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        let mut cache = crate::pellet_batch::Cache::default();
         for tick in 0..12 {
-            if tick==6 {world=rectangle(&bank);cache=Default::default();}
-            if tick==4 {world.consume(17,FoodConsume::Eaten(Some(SnakeObjectToken::new(1).unwrap())));}
-            world.advance(crate::pellet_batch::tests::step(5.),|_|Ok(FoodEaterPose{head:Point{x:16190.,y:16130.},head_offset:Point::default(),heading:0.3,angle_offset:0.1})).unwrap();
-            let physical=if tick%3==0{[1920,1080]}else{[3840,2160]};
-            let quality=if tick%2==0{WorldResolution::Original}else{WorldResolution::Native};
-            let mut frame=Frame{identity:tick+1,extent:[1500,844],viewport_scale:1.,tick:tick as u32,draws:Vec::new(),food_batch:Some(batch(&mut cache,&mut bank,&world,view())),snakes:Vec::new()};
-            let page=MenuFrame::world_crossfade(frame.extent,1.,0.4).unwrap();
-            let overlay=(tick%3==1).then(||Frame{identity:tick+10,extent:physical,viewport_scale:1.,tick:tick as u32,draws:vec![page.world_cover.clone().unwrap()],food_batch:None,snakes:Vec::new()});
-            if tick%3==2 {
-                frame.draws.push(page.backdrop.clone().unwrap());
-                let b=frame.food_batch.as_mut().unwrap();b.early_at+=1;b.late_at+=1;
+            if tick == 6 {
+                world = rectangle(&bank);
+                cache = Default::default();
             }
-            let mut resources=bank.resources(&frame).unwrap();resources.extend(page.resources);
-            serial.sync_resources(&resources).unwrap();parallel.sync_resources(&resources).unwrap();
-            let actual=super::super::offscreen::target(&parallel,physical);let expected=super::super::offscreen::target(&serial,physical);
-            sp.render(&mut serial,&frame,overlay.as_ref(),&expected.create_view(&Default::default()),physical,quality).unwrap();
-            pp.render(&mut parallel,&frame,overlay.as_ref(),&actual.create_view(&Default::default()),physical,quality).unwrap();
-            assert_eq!(super::super::offscreen::pixels(&parallel,&actual).unwrap(),super::super::offscreen::pixels(&serial,&expected).unwrap(),"tick={tick} quality={quality:?}");
+            if tick == 4 {
+                world.consume(
+                    17,
+                    FoodConsume::Eaten(Some(SnakeObjectToken::new(1).unwrap())),
+                );
+            }
+            world
+                .advance(crate::pellet_batch::tests::step(5.), |_| {
+                    Ok(FoodEaterPose {
+                        head: Point {
+                            x: 16190.,
+                            y: 16130.,
+                        },
+                        head_offset: Point::default(),
+                        heading: 0.3,
+                        angle_offset: 0.1,
+                    })
+                })
+                .unwrap();
+            let physical = if tick % 3 == 0 {
+                [1920, 1080]
+            } else {
+                [3840, 2160]
+            };
+            let quality = if tick % 2 == 0 {
+                WorldResolution::Original
+            } else {
+                WorldResolution::Native
+            };
+            let mut frame = Frame {
+                identity: tick + 1,
+                extent: [1500, 844],
+                viewport_scale: 1.,
+                tick: tick as u32,
+                draws: Vec::new(),
+                food_batch: Some(batch(&mut cache, &mut bank, &world, view())),
+                snakes: Vec::new(),
+            };
+            let page = MenuFrame::world_crossfade(frame.extent, 1., 0.4).unwrap();
+            let overlay = (tick % 3 == 1).then(|| Frame {
+                identity: tick + 10,
+                extent: physical,
+                viewport_scale: 1.,
+                tick: tick as u32,
+                draws: vec![page.world_cover.clone().unwrap()],
+                food_batch: None,
+                snakes: Vec::new(),
+            });
+            if tick % 3 == 2 {
+                frame.draws.push(page.backdrop.clone().unwrap());
+                let b = frame.food_batch.as_mut().unwrap();
+                b.early_at += 1;
+                b.late_at += 1;
+            }
+            let mut resources = bank.resources(&frame).unwrap();
+            resources.extend(page.resources);
+            serial.sync_resources(&resources).unwrap();
+            parallel.sync_resources(&resources).unwrap();
+            let actual = super::super::offscreen::target(&parallel, physical);
+            let expected = super::super::offscreen::target(&serial, physical);
+            sp.render(
+                &mut serial,
+                &frame,
+                overlay.as_ref(),
+                &expected.create_view(&Default::default()),
+                physical,
+                quality,
+            )
+            .unwrap();
+            pp.render(
+                &mut parallel,
+                &frame,
+                overlay.as_ref(),
+                &actual.create_view(&Default::default()),
+                physical,
+                quality,
+            )
+            .unwrap();
+            assert_eq!(
+                super::super::offscreen::pixels(&parallel, &actual).unwrap(),
+                super::super::offscreen::pixels(&serial, &expected).unwrap(),
+                "tick={tick} quality={quality:?}"
+            );
         }
         // CPU workers hold no device handles. Exercise dropping a used renderer
         // after explicit device teardown as well as normal owner teardown.
-        parallel.device.destroy();drop(parallel);drop(serial);
+        parallel.device.destroy();
+        drop(parallel);
+        drop(serial);
     }
 
     #[test]
