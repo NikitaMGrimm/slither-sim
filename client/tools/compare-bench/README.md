@@ -68,7 +68,10 @@ Apply local Cargo target/jobs limits per command. No build/test runs during timi
   failures. Full High-effects Original/Native are separate variants. Smoke uses
   primary with five-second windows. Foreground/input/occlusion, host tick health,
   stream coverage, scene evidence, GPU and refresh changes are validity gates.
-  The first real round also pairs telemetry on/off for Original, Native and NTL.
+  The first real round also pairs telemetry on/off for Original, Native and NTL,
+  including Original/Native at NTL's limited view. Matched native off controls
+  require a binary with setup-only view telemetry and its stop acknowledgement;
+  they measure scale before warmup, then disable all client telemetry.
   Each session first calibrates NTL zoom and verifies its closed netlog under the
   documented named no-packet reachability-probe allowance; all other non-loopback
   transport evidence stops before timed rounds. If its farthest

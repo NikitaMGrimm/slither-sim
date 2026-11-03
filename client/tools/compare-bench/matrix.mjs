@@ -1,11 +1,14 @@
-import {schedule,transientFailure} from './analysis.mjs';
+import {schedule,transientFailure,comparison} from './analysis.mjs';
 
 export function roundPlan(rounds,clients,{telemetryControls=true,limitedNtlView=false}={}) {
   return schedule(rounds,clients).flatMap(({round,client},index)=>['battledome','normal'].flatMap(scenario=>{
     const base={round,client,scenario,viewCondition:scenario==='normal'?'stock':client==='ntl'&&limitedNtlView?'ntl-farthest':'whole-map'};
     const on={...base,telemetry:'on'},off={...base,telemetry:'off'};
     const rows=round===1&&telemetryControls&&client!=='vlither'?(index%2?[off,on]:[on,off]):[on];
-    if(scenario==='battledome'&&limitedNtlView&&['original','native'].includes(client))rows.push({...on,viewCondition:'ntl-farthest'});
+    if(scenario==='battledome'&&limitedNtlView&&['original','native'].includes(client)){
+      const matched={...on,viewCondition:'ntl-farthest'};
+      rows.push(...(round===1&&telemetryControls?(index%2?[{...matched,telemetry:'off'},matched]:[matched,{...matched,telemetry:'off'}]):[matched]));
+    }
     return rows;
   }));
 }
@@ -62,6 +65,51 @@ export async function settleNtlView(browser,calibration,viewCondition,capture,pa
   }
   if(Math.max(...samples.map(s=>s.anchor.physicalPixelsPerWorldUnit))/Math.min(...samples.map(s=>s.anchor.physicalPixelsPerWorldUnit))>1.03)throw Error('NTL calibrated view preflight: view has not settled');
   return {wheelNotches:calibration.totalWheelNotches,viewCondition,settings:browser.ntlSettings,samples};
+}
+
+export async function settleNativeView({target,width,readView,wheel,stopTelemetry}) {
+  if(!Number.isFinite(target)||target<=0)throw Error('Matched NTL view calibration unavailable');
+  for(let i=0;i<8;i++){
+    const view=await readView(),scale=view.zoom*width/view.viewport?.[0];
+    if(!Number.isFinite(scale)||scale<=0)throw Error('Native physical zoom unavailable');
+    if(Math.abs(scale/target-1)<=.03){
+      const setup={method:stopTelemetry?'measured setup-only view telemetry; stopped before warmup':'measured continuous view telemetry',
+        physicalPixelsPerWorldUnit:scale,target,view};
+      if(stopTelemetry)setup.stoppedAtMs=await stopTelemetry();
+      return setup;
+    }
+    await wheel(Math.log(target/scale)/Math.log(1.12),i);
+  }
+  throw Error('Native wheel input did not reach the calibrated NTL view');
+}
+
+// Acquisition retention and comparison eligibility are separate. Select a whole
+// attempt, never individual successful rows from an abandoned attempt.
+export function sessionReport(collection,plan) {
+  const {results,roundAttempts,...rest}=collection,selectedAttempts=[];
+  const identity=row=>JSON.stringify(['round','client','scenario','viewCondition','telemetry'].map(k=>row[k]));
+  const attempts=roundAttempts.map(record=>{
+    const expected=plan.filter(row=>row.round===record.round).map(identity).sort();
+    const rows=record.results.map(directory=>results.find(row=>row.directory===directory));
+    const actual=rows.filter(row=>row?.run.attempt===record.attempt&&row.run.round===record.round).map(row=>identity(row.run)).sort();
+    const complete=expected.length>0&&actual.length===expected.length&&new Set(record.results).size===expected.length&&actual.every((key,i)=>key===expected[i]);
+    const selected=complete&&!record.blocked&&!selectedAttempts.some(row=>row.round===record.round);
+    if(selected)selectedAttempts.push({round:record.round,attempt:record.attempt});
+    return {...record,comparisonSelection:{included:selected,reason:selected?'complete round attempt':record.blocked??(!complete?'incomplete planned row set':'another complete attempt selected')}};
+  });
+  const included=new Set(attempts.filter(row=>row.comparisonSelection.included).flatMap(row=>row.results));
+  const selected=results.filter(row=>included.has(row.directory)),comparisons=[];
+  for(let i=0;i<selected.length;i++)for(let j=i+1;j<selected.length;j++){
+    const a=selected[i],b=selected[j];
+    if(a.run.round===b.run.round&&a.run.scenario===b.run.scenario)comparisons.push({a:a.directory,b:b.directory,...comparison(a.run,b.run)});
+  }
+  const selection={selectedAttempts,selectedDirectories:selected.map(row=>row.directory),selectedRowCount:selected.length};
+  return {summary:{...rest,roundAttempts:attempts,selection},index:{selection,results:results.map(({run,...row})=>{
+    const attempt=attempts.find(a=>a.round===run.round&&a.attempt===run.attempt);
+    const comparisonSelection=included.has(row.directory)?attempt.comparisonSelection
+      :{included:false,reason:attempt?.comparisonSelection.included?'acquisition outside selected planned row set':attempt?.comparisonSelection.reason??'no recorded round attempt'};
+    return {...row,round:run.round,attempt:run.attempt,client:run.client,scenario:run.scenario,viewCondition:run.viewCondition,telemetry:run.telemetry,comparisonSelection};
+  }),comparisons}};
 }
 
 export async function collectRounds({rounds,maxAttempts,plan,isInterrupted,preflight,acquire,persist,betweenAttempts}) {

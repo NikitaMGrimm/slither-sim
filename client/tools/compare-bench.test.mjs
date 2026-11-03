@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
-import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
+import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,collectRounds,requireNtlDisplayGate} from './compare-bench/matrix.mjs';
+import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,collectRounds,requireNtlDisplayGate,sessionReport} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
@@ -37,10 +37,15 @@ test('navigation waits for the matching document, including load before command 
 
 test('first-round controls and limited-view pairs retain reversed client ordering',()=>{
   const plan=roundPlan(3,['original','native','ntl','vlither'],{limitedNtlView:true});
-  assert.equal(plan.length,36);assert.equal(plan.filter(r=>r.telemetry==='off').length,6);
+  assert.equal(plan.length,38);assert.equal(plan.filter(r=>r.telemetry==='off').length,8);
   assert.ok(plan.filter(r=>r.telemetry==='off').every(r=>r.round===1&&r.client!=='vlither'));
   assert.deepEqual([...new Set(plan.filter(r=>r.round===2).map(r=>r.client))],['vlither','ntl','native','original']);
   for(const round of [1,2,3])for(const client of ['original','native'])assert.ok(plan.some(r=>r.round===round&&r.client===client&&r.scenario==='battledome'&&r.viewCondition==='ntl-farthest'&&r.telemetry==='on'));
+  for(const client of ['original','native']){
+    const matched=plan.filter(r=>r.round===1&&r.client===client&&r.viewCondition==='ntl-farthest');
+    assert.deepEqual(matched.map(r=>r.telemetry),client==='original'?['on','off']:['off','on']);
+    assert.ok(matched.every(r=>r.scenario==='battledome'));
+  }
   assert.equal(roundPlan(3,['original','native','ntl','vlither'],{telemetryControls:false}).length,24);
 });
 test('run/smoke require a passing NTL display gate before planning',()=>{
@@ -97,6 +102,48 @@ test('a transient capture retries only its affected round and keeps prior failur
     acquire:async item=>({directory:`round-${item.round}-${item.attempt}`,run:item.round===1&&item.attempt===1?{error:'PresentMon lost ETW events'}:{}}),
     persist:async()=>{},betweenAttempts:async()=>{}});
   assert.deepEqual(calls,[[1,1],[2,1],[3,1],[1,2]]);assert.deepEqual(result.uncollectedRounds,[]);assert.equal(result.results.length,4);
+});
+
+test('retry index and summary select one complete attempt, retaining abandoned rows with reasons',async()=>{
+  const plan=['original','ntl'].map(client=>({round:1,client,scenario:'battledome',viewCondition:'ntl-farthest',telemetry:'on'}));
+  const collection=await collectRounds({rounds:1,maxAttempts:2,plan,isInterrupted:()=>false,
+    preflight:async()=>({competingWork:[],idleMs:10000}),persist:async()=>{},betweenAttempts:async()=>{},
+    acquire:async item=>({directory:`${item.client}-${item.attempt}`,valid:item.attempt===2||item.client==='original',
+      run:{...item,error:item.client==='ntl'&&item.attempt===1?'PresentMon lost ETW events':undefined}})});
+  const {summary,index}=sessionReport(collection,plan);
+  assert.equal(index.results.length,4);assert.deepEqual(summary.selection,index.selection);
+  assert.deepEqual(index.selection.selectedAttempts,[{round:1,attempt:2}]);
+  assert.deepEqual(index.selection.selectedDirectories,['original-2','ntl-2']);
+  assert.equal(index.selection.selectedRowCount,2);
+  assert.deepEqual(index.comparisons.map(({a,b})=>[a,b]),[['original-2','ntl-2']]);
+  assert.ok(index.results.filter(r=>r.attempt===1).every(r=>!r.comparisonSelection.included&&/transient/.test(r.comparisonSelection.reason)));
+  assert.equal(summary.roundAttempts[0].comparisonSelection.included,false);
+  for(const blocked of ['interrupted; current and remaining rounds uncollected',undefined]){
+    const incomplete={...collection,results:collection.results.slice(0,1),roundAttempts:[{round:1,attempt:1,results:['original-1'],blocked}]};
+    const report=sessionReport(incomplete,plan);assert.equal(report.index.comparisons.length,0);
+    assert.equal(report.summary.selection.selectedRowCount,0);assert.equal(report.index.results[0].comparisonSelection.included,false);
+  }
+  const interrupted=sessionReport({...collection,roundAttempts:collection.roundAttempts.map(r=>({...r,blocked:'interrupted'}))},plan);
+  assert.equal(interrupted.index.comparisons.length,0);
+  const duplicate=sessionReport({...collection,roundAttempts:[{round:1,attempt:2,results:['original-2','original-2']}]},plan);
+  assert.equal(duplicate.summary.selection.selectedRowCount,0);
+  const extra=sessionReport({...collection,results:[...collection.results,{directory:'unrecorded',run:{...plan[0],attempt:2}}]},plan);
+  assert.equal(extra.index.results.at(-1).comparisonSelection.included,false);
+  assert.deepEqual(extra.summary.selection,index.selection);
+});
+
+test('matched native off control measures scale then acknowledges telemetry silence before warmup',async()=>{
+  const calls=[];let zoom=.36,stopped=false;
+  const options={target:.18,width:3840,readView:async()=>{calls.push('view');return nativeViewEvidence({setupOnly:true,zoom,viewport:[3840,2160]},1000);},
+    wheel:async()=>{calls.push('wheel');zoom=.18;},stopTelemetry:async()=>{calls.push('stop');stopped=true;return 1234;}};
+  const setup=await settleNativeView(options);assert.ok(stopped);calls.push('warmup');
+  assert.deepEqual(calls,['view','wheel','view','stop','warmup']);
+  assert.equal(setup.stoppedAtMs,1234);assert.match(setup.method,/measured setup-only.*stopped before warmup/);
+  assert.equal(setup.physicalPixelsPerWorldUnit,.18);
+  assert.equal(setup.view.wholeMap,null);assert.equal(setup.view.atMs,1000);
+  await assert.rejects(settleNativeView({...options,stopTelemetry:async()=>{throw Error('Missing stop acknowledgement');}}),/Missing stop acknowledgement/);
+  const on=await settleNativeView({...options,stopTelemetry:undefined});assert.match(on.method,/continuous/);assert.equal(on.stoppedAtMs,undefined);
+  await assert.rejects(settleNativeView({...options,readView:async()=>({}),stopTelemetry:()=>assert.fail('Unmeasured scale must not stop setup')}),/physical zoom unavailable/);
 });
 
 test('collector exposes split live ETW loss before capture completion',async()=>{

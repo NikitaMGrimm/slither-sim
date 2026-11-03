@@ -32,6 +32,14 @@ mod desktop {
         keyboard::{KeyCode, PhysicalKey},
         window::{Window, WindowId},
     };
+    fn take_setup_stop(path: &mut Option<std::path::PathBuf>) -> bool {
+        if path.as_ref().is_some_and(|path| path.is_file()) {
+            *path = None;
+            true
+        } else {
+            false
+        }
+    }
     #[derive(Debug)]
     pub struct TransportWake;
     #[derive(Default)]
@@ -173,6 +181,7 @@ mod desktop {
         discovery_poll: Option<Instant>,
         handshake_wake: Option<Instant>,
         pacing_log: Option<(Instant, u32, Instant, f64)>,
+        pacing_setup_stop: Option<std::path::PathBuf>,
         pacing_journal: Option<crate::pacing_journal::Journal>,
     }
     impl Running {
@@ -712,6 +721,13 @@ mod desktop {
             self.effects()
         }
         fn log_present(&mut self) {
+            // Setup-only view telemetry must stop before the off control warms
+            // up. Drop the path as well, so measured frames do no file polling.
+            if take_setup_stop(&mut self.pacing_setup_stop) {
+                self.pacing_log = None;
+                eprintln!("frame-bench-view-stopped");
+                return;
+            }
             if let Some((since, count, last, max_gap)) = &mut self.pacing_log {
                 let now = Instant::now();
                 if *count == 0 {
@@ -735,6 +751,16 @@ mod desktop {
                         f64::from(size.height) / dpr,
                     ])
                     .ok();
+                    if self.pacing_setup_stop.is_some() {
+                        eprintln!(
+                            "frame-bench-client: {}",
+                            serde_json::json!({"setupOnly": true, "zoom": camera.zoom(), "viewport": viewport})
+                        );
+                        *since = now;
+                        *count = 0;
+                        *max_gap = 0.;
+                        return;
+                    }
                     let bounds = client.food_bounds().map(|b| b.limits());
                     let mut visible = 0;
                     let mut uneaten = 0;
@@ -892,7 +918,10 @@ mod desktop {
                 discovery_poll: None,
                 handshake_wake: None,
                 pacing_journal: crate::pacing_journal::Journal::from_env(),
+                pacing_setup_stop: std::env::var_os("SLITHER_FRAME_PACING_SETUP_STOP")
+                    .map(std::path::PathBuf::from),
                 pacing_log: std::env::var_os("SLITHER_FRAME_PACING")
+                    .or_else(|| std::env::var_os("SLITHER_FRAME_PACING_SETUP_STOP"))
                     .map(|_| (Instant::now(), 0, Instant::now(), 0.)),
             })
         }
@@ -1215,6 +1244,24 @@ mod desktop {
     #[cfg(test)]
     mod tests {
         use super::*;
+        #[test]
+        fn setup_view_stop_is_acknowledged_once_and_drops_polling_path() {
+            let file = std::env::temp_dir().join(format!(
+                "slither-setup-stop-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            let mut stop = Some(file.clone());
+            assert!(!super::take_setup_stop(&mut stop));
+            std::fs::write(&file, b"stop").unwrap();
+            assert!(super::take_setup_stop(&mut stop));
+            assert!(stop.is_none());
+            assert!(!super::take_setup_stop(&mut stop));
+            std::fs::remove_file(file).unwrap();
+        }
         fn parse(args: &[&str]) -> Result<Option<Options>> {
             parse_options(args.iter().map(|s| s.to_string()))
         }

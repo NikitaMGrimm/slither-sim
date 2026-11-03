@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
-import {roundPlan,anchoredBoundary,settleNtlView,collectRounds,requireNtlDisplayGate} from './matrix.mjs';
+import {roundPlan,anchoredBoundary,settleNtlView,settleNativeView,collectRounds,requireNtlDisplayGate,sessionReport} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -29,6 +29,10 @@ export function lineJournal(accept,now) {
 }
 export function completeJsonLines(text, prefix) {
   return text.split(/\r?\n/).slice(0,-1).filter(l => l.startsWith(prefix)).map(l => JSON.parse(l.slice(prefix.length)));
+}
+export function nativeViewEvidence(view,atMs) {
+  // Setup-only receipts establish scale, not scene or whole-map acceptance.
+  return {...view,atMs,wholeMap:view.setupOnly?null:wholeMap(view)};
 }
 async function treeHash(directory) {
   const rows = [];
@@ -114,7 +118,7 @@ async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, pm, host, native,networkMonitor;
-  let pmLog = '',pmCompleted;const browserFrames=[];
+  let pmLog = '',pmCompleted,setupViewStopFile,setupViewStoppedAtMs;const browserFrames=[];
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
@@ -133,8 +137,10 @@ async function runAttempt(config, root, item, provenance, machine) {
     else for(const stats of hostStats(line))r.stats.push({...stats,atMs});
   }catch(error){telemetryErrors.push(error.message);}},now);
   const clientJournal=lineJournal((line,atMs)=>{try{
+    if(line==='frame-bench-view-stopped')setupViewStoppedAtMs=atMs;
     if(line.startsWith('frame-bench-client: ')){
-      const v=JSON.parse(line.slice(20));r.views.push({...v,atMs,wholeMap:wholeMap(v)});
+      if(setupViewStoppedAtMs!==undefined)throw Error('Native view telemetry continued after its stop acknowledgement');
+      r.views.push(nativeViewEvidence(JSON.parse(line.slice(20)),atMs));
     }
   }catch(error){telemetryErrors.push(error.message);}},now);
   const cancel = () => {
@@ -190,7 +196,11 @@ async function runAttempt(config, root, item, provenance, machine) {
       await fs.writeFile(path.join(data, 'SlitherClient', 'settings.txt'), `2:1:${item.client === 'native' ? 'native' : 'original'}`);
       const clientEnv={...process.env,LOCALAPPDATA:data};
       delete clientEnv.SLITHER_FRAME_PACING;delete clientEnv.SLITHER_FRAME_PACING_JOURNAL;
+      delete clientEnv.SLITHER_FRAME_PACING_SETUP_STOP;
       if(config.telemetry!=='off')Object.assign(clientEnv,{SLITHER_FRAME_PACING:'1',SLITHER_FRAME_PACING_JOURNAL:path.join(directory,'native-production.json')});
+      else if(item.viewCondition==='ntl-farthest'){
+        setupViewStopFile=path.join(directory,'stop-setup-view');clientEnv.SLITHER_FRAME_PACING_SETUP_STOP=setupViewStopFile;
+      }
       r.nativeStartedUnixMs=Date.now();
       native = spawn(config.binary, ['--server', endpoint.replace('ws://', '').replace('/slither', ''), '--nickname', 'FrameBench', '--skin', '0'],
         { cwd: directory, env:clientEnv,windowsHide: false });
@@ -214,18 +224,16 @@ async function runAttempt(config, root, item, provenance, machine) {
       },delay);
     }
     if(item.viewCondition==='ntl-farthest'&&!browser){
-      const target=config.ntlViewCalibration?.physicalPixelsPerWorldUnit;
-      if(!Number.isFinite(target)||target<=0)throw Error('Matched NTL view calibration unavailable');
-      let matched=false;
-      for(let i=0;i<8;i++){
-        const view=await waitFor(()=>r.views.at(-1),4000,'Native zoom telemetry');
-        const scale=view.zoom*config.width/view.viewport?.[0];
-        if(!Number.isFinite(scale)||scale<=0)throw Error('Native physical zoom unavailable');
-        if(Math.abs(scale/target-1)<=.03){matched=true;break;}
-        await windows({mode:'wheel',clientPid:native.pid,notches:Math.log(target/scale)/Math.log(1.12)},directory,`match-zoom-${i}`,children);
-        const previous=r.views.length;await waitFor(()=>r.views.length>previous,4000,'Native post-wheel telemetry');
-      }
-      if(!matched)throw Error('Native wheel input did not reach the calibrated NTL view');
+      r.viewSetup=await settleNativeView({target:config.ntlViewCalibration?.physicalPixelsPerWorldUnit,width:config.width,
+        readView:()=>waitFor(()=>r.views.at(-1),4000,'Native zoom telemetry (matched off rows require setup-only view support)'),
+        wheel:async(notches,i)=>{
+          const previous=r.views.length;
+          await windows({mode:'wheel',clientPid:native.pid,notches},directory,`match-zoom-${i}`,children);
+          await waitFor(()=>r.views.length>previous,4000,'Native post-wheel telemetry');
+        },stopTelemetry:setupViewStopFile?async()=>{
+          await save(setupViewStopFile,{stop:true});
+          return waitFor(()=>setupViewStoppedAtMs,4000,'Native setup-only telemetry stop acknowledgement; no warmup or timed capture');
+        }:undefined});
     }
     await delay(config.warmupSeconds * 1000);
     await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
@@ -443,13 +451,9 @@ export async function main(args = process.argv.slice(2)) {
       persist:records=>fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(records,null,2)),
       betweenAttempts:()=>delay(5000)});
   }finally{process.removeListener('SIGINT',markInterrupted);process.removeListener('SIGTERM',markInterrupted);}
-  const {results,...summary}=collection;
+  const {summary,index}=sessionReport(collection,plan);
+  await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(summary.roundAttempts,null,2));
   await save(path.join(session,'round-summary.json'),summary);
-  const comparisons = [];
-  for (let i = 0; i < results.length; i++) for (let j = i + 1; j < results.length; j++) {
-    const a = results[i], b = results[j];
-    if (a.run.scenario === b.run.scenario && a.run.round === b.run.round) comparisons.push({ a: a.directory, b: b.directory, ...comparison(a.run, b.run) });
-  }
-  await save(path.join(session, 'index.json'), { mode: args[0], results: results.map(({run, ...item}) => item), comparisons });
+  await save(path.join(session, 'index.json'), { mode: args[0],...index });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(e => { console.error(e.message); process.exitCode = 1; });

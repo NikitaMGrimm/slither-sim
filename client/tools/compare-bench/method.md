@@ -236,11 +236,23 @@ food census uses one traversal. The native journal adds one bounded append per
 successful present and no per-frame I/O. Vlither's wrapper census also has cost.
 
 Real runs pair telemetry on/off in their first round for Original, Native and
-NTL, alternating the order by client. `run-plan.json` records the full matrix.
+NTL, alternating the order by client. When NTL is clipped, first-round Original
+and Native controls include both whole-map and `ntl-farthest` on/off pairs.
+`run-plan.json` records the full matrix. This adds two 60-second acquisitions,
+about 4-5 minutes including startup, scale matching, warmup and cleanup. Budget
+about 66-82 minutes for the complete 38-row session before retries.
 Set `telemetryControls:false` only after the initial perturbation session; an
 explicit `telemetry:on|off` selects a separate diagnostic. Retain ETW intervals
 and per-process CPU for both, and report changes in median/p95/p99. Off omits the
-browser production hook, timed screenshots and both native telemetry paths. It deliberately fails
+browser production hook, timed screenshots and both native telemetry paths. A
+matched native off row enables only a setup view line with zoom and viewport,
+without food/snake scans or a present journal. Directed wheel input measures its
+own scale, rather than inheriting another row's wheel response. After matching,
+the harness creates its private stop file and requires the client's explicit
+stop acknowledgement before warmup. The client drops both telemetry and the
+file-polling path; neither continues in the measured window. `viewSetup` records
+the measured scale, method and stop time. Binaries without setup-only telemetry
+support fail before warmup; supply a binary built with that support. Off deliberately fails
 scene/content acceptance and cannot become comparison evidence. Both variants
 retain safety netlog, window/GPU sampling and host stats; that residual common
 cost is not isolated by this control. If foreground/load gates block the paired
@@ -327,6 +339,12 @@ are recorded privately, and no focus fighting occurs.
 Interrupting collection stops the round loop without another preflight. The
 current and remaining rounds stay in `uncollectedRounds`; retained attempts are
 written before the summary, including when interruption occurs during preflight.
+All acquisitions remain in the index and on disk. Comparisons select only one
+unblocked, complete attempt per round, requiring exactly the planned row set.
+Abandoned, interrupted, incomplete and superseded attempts are explicitly
+excluded with reasons in the index, attempt log and round summary. The index
+and summary share `selection` (selected attempts/directories and row count);
+downstream aggregates must use that selection, never all retained acquisitions.
 Readiness (all bot seats plus living player) has a 60-second bound. Smoke uses
 primary, one round and five-second windows; real runs require at least three.
 Original/Native are separate full High-effects variants with isolated preferences;
