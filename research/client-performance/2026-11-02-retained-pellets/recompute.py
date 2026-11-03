@@ -17,6 +17,7 @@ def records():
             assert (r['callbacks'], r['skips']) == (600, 0)
             assert r['messages'] == (8 if scene == 'rectangle' else 29044)
             assert r['binary_sha256'] == identity['binaries'][arm]
+            assert r['quad_digest'] != 'd1fba762150c532c', 'inactive canonical accumulator'
         for key in ['output_digest', 'quad_digest', 'numeric_sha256']:
             assert arms['baseline'][key] == arms['candidate'][key]
     for r in identity['pixel_parity'].values():
@@ -103,6 +104,7 @@ def review_tables():
         for arm, r in arms.items():
             assert (r['callbacks'], r['skips'], r['messages']) == (600, 0, 8 if scene == 'rectangle' else 29044)
             assert r['binary_sha256'] == identity['binaries'][arm]
+            assert r['quad_digest'] != 'd1fba762150c532c', 'inactive canonical accumulator'
         for key in ['output_digest', 'quad_digest', 'numeric_sha256']:
             assert arms['baseline'][key] == arms['candidate'][key]
     for r in identity['pixel_parity'].values():

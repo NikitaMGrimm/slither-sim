@@ -1,0 +1,95 @@
+{
+  "date": "2026-11-03",
+  "original_explicit_controls": {
+    "initial/join-default/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "c1504f711bbc51b0",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "0e1908157e5533dbe2ef5ff615221f2b985844255aac16b934177926896998b5"
+    },
+    "initial/join-default/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "c1504f711bbc51b0",
+      "binary_sha256": "d571e1f7f560a883afe69a408712d9e84fcc7fcd807da35d590348a358e49818",
+      "log_sha256": "a4ea7229934a019881f4b7032819538a52a14e27dfe485eeb1543e46a6f918ae"
+    },
+    "initial/join-whole/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "e01a42560c5f64e5",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "71b8a13a1d277b5578d3532303d892045e786403b8abc33e28fa4c6e27c1ee68"
+    },
+    "initial/join-whole/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "e01a42560c5f64e5",
+      "binary_sha256": "d571e1f7f560a883afe69a408712d9e84fcc7fcd807da35d590348a358e49818",
+      "log_sha256": "22d0f207ae62ca3819bcbf18d3dbdd87b6910fc9372f32f8f0fd690ec7c55d82"
+    },
+    "initial/rectangle/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "397415fbac706ea5",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "078b1cf68f1ac5d50f3969f8e39ef5d64db668ffe7445b7d0e3ab4b8c0b1cd3c"
+    },
+    "initial/rectangle/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "397415fbac706ea5",
+      "binary_sha256": "d571e1f7f560a883afe69a408712d9e84fcc7fcd807da35d590348a358e49818",
+      "log_sha256": "6dd4dc920f5363aabf5bbef2ca87700b9cb64aef9b6a6613b5248a36f254be27"
+    },
+    "reviewed/join-default/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "c1504f711bbc51b0",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "0e1908157e5533dbe2ef5ff615221f2b985844255aac16b934177926896998b5"
+    },
+    "reviewed/join-default/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "c1504f711bbc51b0",
+      "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+      "log_sha256": "92cf88bbe3ceef481790ec6040a8e825b4560121a597a3cb47b0e684abe00075"
+    },
+    "reviewed/join-whole/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "e01a42560c5f64e5",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "71b8a13a1d277b5578d3532303d892045e786403b8abc33e28fa4c6e27c1ee68"
+    },
+    "reviewed/join-whole/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "e01a42560c5f64e5",
+      "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+      "log_sha256": "e00ec1ec9ae67deb862c367999dbad3413aaf87e41066885c9f0d1fb7c1531d2"
+    },
+    "reviewed/rectangle/baseline": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "397415fbac706ea5",
+      "binary_sha256": "0783da125d54bf10261fc7bb743d3faa9e722903c1e8d6901ed18b9ebc087194",
+      "log_sha256": "078b1cf68f1ac5d50f3969f8e39ef5d64db668ffe7445b7d0e3ab4b8c0b1cd3c"
+    },
+    "reviewed/rectangle/candidate": {
+      "callbacks": 600,
+      "skips": 0,
+      "quad_digest": "397415fbac706ea5",
+      "binary_sha256": "d180a72f97df483022c2fb494d56075ae192a94e14db5b65483db8d6d94ea334",
+      "log_sha256": "2fee914c29e69c79045a0ccb7d02ed7685d18bfee60c262c68b71d7c48e2052c"
+    }
+  },
+  "launcher_sha256": {
+    "run_resumed.py": "cdb81c1f6292c76a2afce80d51e3697d57131b814ee25f5b4b6874c08dd4a006",
+    "parity_exact_gpu.py": "1ca6432912da244fa59bcd4d195db2e11edc1c9655191caf84eaf78edfdcbc5d",
+    "run_review.py": "ee1f75ecccc1220ba6b8efc32df5dce966d40f916dd7013e29087619d22f96d2"
+  },
+  "conclusion": "Original retained-batch canonical controls are active. Later serial-specialization and upload-mirror timing accumulators are inactive; their reports already exclude them as parity evidence. Actual-image controls remain separate."
+}
