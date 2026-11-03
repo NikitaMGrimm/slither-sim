@@ -76,9 +76,11 @@ export async function settleVlitherView({calibration,width,height,readView,wheel
   const target=calibration?.physicalPixelsPerWorldUnit,adjustments=[];
   if(calibration?.wholeMap!==false)throw Error('Vlither zoom preflight: missing limited-view calibration');
   let matched=false;
-  for(let i=0;i<8;i++){
+  // One read beyond the last wheel, so the final adjustment's result is judged.
+  for(let i=0;i<=8;i++){
     const view=await readView(),adjustment=vlitherWheel(view,target,width,height);
     if(Math.abs(vlitherPhysicalScale(view,width,height)/target-1)<=.05){matched=true;break;}
+    if(i===8)break;
     adjustments.push(adjustment);await wheel(adjustment.notches,i);
   }
   if(!matched)throw Error('Vlither zoom preflight: stock wheel did not reach target');

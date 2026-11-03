@@ -203,6 +203,11 @@ test('Vlither prefers whole stock notches and uses bounded fractional callback o
   calls.push('warmup');assert.deepEqual(calls,['wheel','picture','settle','picture','warmup']);
   assert.equal(setup.pictureSamples.length,2);
   await assert.rejects(settleVlitherView({calibration:{wholeMap:true}}),/limited-view calibration/);
+  const stepped=reachedAt=>{let wheels=0,current=1.5;return {calibration:{wholeMap:false,physicalPixelsPerWorldUnit:.14},width:480,height:360,
+    readView:async()=>({...initial,zoom:current,wheelZoom:current}),wheel:async()=>{if(++wheels===reachedAt)current=.14;},
+    capture:async i=>vlitherPicture(current,-10000+i*500),pause:async()=>{}};};
+  assert.equal((await settleVlitherView(stepped(8))).adjustments.length,8,'the eighth wheel may be the one that lands');
+  await assert.rejects(settleVlitherView(stepped(9)),/stock wheel did not reach target/);
 });
 
 test('collector exposes split live ETW loss before capture completion',async()=>{
