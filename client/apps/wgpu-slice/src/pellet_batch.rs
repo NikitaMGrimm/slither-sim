@@ -14,7 +14,7 @@ use std::{
 #[cfg(all(test, windows))]
 #[allow(dead_code)]
 #[path = "../examples/support/offscreen.rs"]
-mod offscreen;
+pub(crate) mod offscreen;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Group {

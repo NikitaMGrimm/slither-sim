@@ -835,8 +835,8 @@ mod tests {
             resources.extend(page.resources);
             serial.sync_resources(&resources).unwrap();
             parallel.sync_resources(&resources).unwrap();
-            let actual = super::super::offscreen::target(&parallel, physical);
-            let expected = super::super::offscreen::target(&serial, physical);
+            let actual = crate::pellet_batch::offscreen::target(&parallel, physical);
+            let expected = crate::pellet_batch::offscreen::target(&serial, physical);
             sp.render(
                 &mut serial,
                 &frame,
@@ -856,8 +856,8 @@ mod tests {
             )
             .unwrap();
             assert_eq!(
-                super::super::offscreen::pixels(&parallel, &actual).unwrap(),
-                super::super::offscreen::pixels(&serial, &expected).unwrap(),
+                crate::pellet_batch::offscreen::pixels(&parallel, &actual).unwrap(),
+                crate::pellet_batch::offscreen::pixels(&serial, &expected).unwrap(),
                 "tick={tick} quality={quality:?}"
             );
         }
