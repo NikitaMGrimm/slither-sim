@@ -1,0 +1,90 @@
+diff --git a/client/apps/wgpu-slice/src/pellet_batch.rs b/client/apps/wgpu-slice/src/pellet_batch.rs
+index 34339656..62768007 100644
+--- a/client/apps/wgpu-slice/src/pellet_batch.rs
++++ b/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -14,7 +14,7 @@ use std::{
+ #[cfg(all(test, windows))]
+ #[allow(dead_code)]
+ #[path = "../examples/support/offscreen.rs"]
+-mod offscreen;
++pub(crate) mod offscreen;
+ 
+ #[derive(Clone, Debug)]
+ pub(crate) struct Group {
+diff --git a/client/apps/wgpu-slice/src/pellet_cpu.rs b/client/apps/wgpu-slice/src/pellet_cpu.rs
+index 373b8a33..c85420bb 100644
+--- a/client/apps/wgpu-slice/src/pellet_cpu.rs
++++ b/client/apps/wgpu-slice/src/pellet_cpu.rs
+@@ -84,8 +84,3 @@ pub(super) fn project(
+ #[cfg(not(target_arch = "wasm32"))]
+ #[path = "pellet_workers.rs"]
+ pub(super) mod workers;
+-
+-#[cfg(all(test, windows))]
+-#[allow(dead_code)]
+-#[path = "../examples/support/offscreen.rs"]
+-mod offscreen;
+diff --git a/client/apps/wgpu-slice/src/pellet_workers.rs b/client/apps/wgpu-slice/src/pellet_workers.rs
+index 86d54654..ab94e848 100644
+--- a/client/apps/wgpu-slice/src/pellet_workers.rs
++++ b/client/apps/wgpu-slice/src/pellet_workers.rs
+@@ -16,12 +16,12 @@ use std::{
+     thread::{self, JoinHandle},
+ };
+ 
+-// Main participates. The earlier 4->8 pilot saved only 0.2-0.25 ms for
+-// twice the participants; cap portable available_parallelism at four.
++// Resource cap including main: leave CPU capacity for other applications.
++// available_parallelism limits this further; Wasm does not instantiate a pool.
+ const MAX_PARTICIPANTS: usize = 4;
+-// With 4 ms gaps, two participants at 1,024 settled pellets were effectively
+-// tied with serial (0.0954/0.0959 ms). At 2,048, two/four took 0.124/0.094 ms
+-// versus 0.190 ms serial. Below that, neither copy inputs nor start workers.
++// Paced density controls show only tens of microseconds saved at 1,024 visible
++// pellets, versus a repeatable reduction with two/four participants at 2,048.
++// Below that, neither copy inputs nor start workers.
+ // Measured cutoff, not a gameplay or visual limit:
+ // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
+ const MIN_VISIBLE: usize = 2048;
+@@ -534,7 +534,7 @@ mod tests {
+     fn all_participant_counts_preserve_ordered_bytes_flags_and_coverage() {
+         let (frame, b) = scene();
+         let expected = expected(&job(&frame, &b));
+-        for n in [2, 4] {
++        for n in [2, 3, 4] {
+             let pool = Pool::new(n, Behavior::default()).unwrap();
+             ready(&pool);
+             for _ in 0..5 {
+@@ -612,6 +612,10 @@ mod tests {
+     #[ignore]
+     fn measure_pool_density() {
+         let mut bank = Bank::new().unwrap();
++        println!(
++            "available_parallelism={:?}",
++            thread::available_parallelism()
++        );
+         let paced = std::env::var_os("PELLET_DENSITY_PACED").is_some();
+         println!("density,settled,participants,repeat,p50_ns,p95_ns");
+         for settled in [false, true] {
+@@ -835,8 +839,8 @@ mod tests {
+             resources.extend(page.resources);
+             serial.sync_resources(&resources).unwrap();
+             parallel.sync_resources(&resources).unwrap();
+-            let actual = super::super::offscreen::target(&parallel, physical);
+-            let expected = super::super::offscreen::target(&serial, physical);
++            let actual = crate::pellet_batch::offscreen::target(&parallel, physical);
++            let expected = crate::pellet_batch::offscreen::target(&serial, physical);
+             sp.render(
+                 &mut serial,
+                 &frame,
+@@ -856,8 +860,8 @@ mod tests {
+             )
+             .unwrap();
+             assert_eq!(
+-                super::super::offscreen::pixels(&parallel, &actual).unwrap(),
+-                super::super::offscreen::pixels(&serial, &expected).unwrap(),
++                crate::pellet_batch::offscreen::pixels(&parallel, &actual).unwrap(),
++                crate::pellet_batch::offscreen::pixels(&serial, &expected).unwrap(),
+                 "tick={tick} quality={quality:?}"
+             );
+         }
