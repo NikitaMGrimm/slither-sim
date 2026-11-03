@@ -20,12 +20,17 @@ function circle(a,b,c){const d=2*(a[0]*(b[1]-c[1])+b[0]*(c[1]-a[1])+c[0]*(a[1]-b
   const aa=a[0]**2+a[1]**2,bb=b[0]**2+b[1]**2,cc=c[0]**2+c[1]**2;
   const x=(aa*(b[1]-c[1])+bb*(c[1]-a[1])+cc*(a[1]-b[1]))/d,y=(aa*(c[0]-b[0])+bb*(a[0]-c[0])+cc*(b[0]-a[0]))/d;return {x,y,radius:Math.hypot(x-a[0],y-a[1])};}
 export function pictureEvidence({width,height,channels,pixels}) {
-  const red=[],mask=new Uint8Array(width*height),step=Math.max(1,Math.floor(width/960));
+  const red=[],redMask=new Uint8Array(width*height),mask=new Uint8Array(width*height),step=Math.max(1,Math.floor(width/960));
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){const p=(y*width+x)*channels,r=pixels[p],g=pixels[p+1],b=pixels[p+2];
     // Accept red/gold boundary candidates. Colour alone never anchors a fitted
     // circle to the outer world instead of a pit or other drawing.
-    if(x%step===0&&y%step===0&&r>35&&r>g*1.2&&r>b*1.8)red.push([x,y]);
+    if(r>35&&r>g*1.2&&r>b*1.8)redMask[y*width+x]=1;
     if(x>width*.05&&x<width*.8&&y>height*.08&&y<height*.9&&Math.max(r,g,b)>85&&Math.max(r,g,b)-Math.min(r,g,b)>55)mask[y*width+x]=1;
+  }
+  // Some stock clients tint the entire region outside the arena. Fit its edge,
+  // not arbitrary samples from that filled area; ignore the screenshot border.
+  for(let y=step;y<height-step;y+=step)for(let x=step;x<width-step;x+=step){const i=y*width+x;
+    if(redMask[i]&&[i-step,i+step,i-step*width,i+step*width].some(n=>!redMask[n]))red.push([x,y]);
   }
   let pelletCandidates=0;const queue=[];
   for(let i=0;i<mask.length;i++)if(mask[i]){mask[i]=0;queue.length=0;queue.push(i);let head=0,minX=width,maxX=0,minY=height,maxY=0;

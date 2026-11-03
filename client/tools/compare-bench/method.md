@@ -151,21 +151,50 @@ checks 80, then 320, then 640 additional wheel notches, retaining every picture.
 Three outer-circle scales must plateau within 3%. Host radius and projected
 player offset anchor the circle (4% radius or 30-pixel camera/receipt allowance),
 rejecting an inner pit circle. Unknown extent stops preflight. The receipt is
-bound to this session's mod hash. If clipped, NTL Battledome is `ntl-farthest`;
-Original and Native each get an additional run at that physical scale in every
-round. Directed native wheel input targets that scale; timed views must remain
-within 5%. Whole-map runs remain separate. Different views cannot qualify as
-direct comparisons. Picture counts retain the qualifications below.
+bound to this session's mod hash. If clipped and NTL participates, **every**
+Battledome row (Original, Native, NTL and Vlither) is `ntl-farthest`, including
+first-round telemetry controls. Separate whole-map rows are omitted. Normal
+remains stock zoom. Without NTL, or when a new package actually fits the map,
+Battledome retains whole-map behavior. Directed stock wheel input targets the
+calibrated physical scale; timed views must remain within 5%. Matching the view
+removes only the different-view qualification: unestablished content/display
+correlation, missing exact scene evidence and different/unknown presentation
+modes still prevent a direct comparison. No acceptance gate is relaxed.
 Each Battledome NTL row applies the same UI settings used by calibration: zoom
 enabled and slow return disabled, even when the calibrated extent is limited.
-Visible zoom-control settings must match the reference receipt. It repeats all
-1,040 notches and checks two anchored pictures against the reference before
+Visible zoom-control settings must match the reference receipt. Rows use 80
+notches (the calibration's first plateau sample) and check two anchored pictures against the reference before
 warmup: scale within 5%, settled within 3%, and the same whole-map state/row label.
 Calibration with inconsistent whole-map states fails rather than choosing a
 label. A limited-view row that reports whole-map state is invalid. The wheel
-cadence and settling never count as warmup or measured time. This adds about
-77 seconds of wheel input across the first session's four Battledome NTL rows
-compared with 80-notch setup, plus untimed settled-view pictures.
+cadence and settling never count as warmup or measured time. Calibration still
+uses all 1,040 notches. The shorter row setup saves about 77 seconds of wheel
+cadence across the four NTL Battledome acquisitions, without reusing acceptance
+from another package or skipping the scale/settling checks.
+
+Vlither's stock wheel path multiplies `ms_zoom` by an exponential with its
+configured `zoom_step` (fresh settings default 0.1); the GLFW scroll callback
+accepts fractional offsets. The adapter reads that step and the resulting zoom
+from the 0.5 s census. It checks both adjacent whole notches and prefers the one
+with the smaller relative error when it fits the same 5% reference tolerance.
+Only when neither fits, directed `WM_MOUSEWHEEL` supplies a
+fractional offset in 1/120-notch units through the same stock GLFW callback.
+Every adjustment and its method is recorded. Clamps and renderer stay unchanged;
+an unreachable target or unsettled camera fails before warmup. The 5% timed
+tolerance is unchanged. See upstream [input](https://github.com/for-loop9/vlither/blob/8612bc12186547fc385ea38a399b144973338384/app/src/game/input.c)
+and [callback](https://github.com/for-loop9/vlither/blob/8612bc12186547fc385ea38a399b144973338384/thermite/src/framework/tmouse.c).
+
+Vlither `gsc` is already in physical framebuffer pixels per world unit, as used
+by [redraw](https://github.com/for-loop9/vlither/blob/8612bc12186547fc385ea38a399b144973338384/app/src/game/redraw.c).
+Do not apply the native client's backing-size conversion or a CSS/DPI multiplier.
+The wrapper reports framebuffer, renderer and context sizes; all must equal the
+measured physical client area. Two unobscured, foreground client-area PNGs must
+show an outer circle anchored to nearby host radius/player receipts, with pellet
+presence, within 5% of both telemetry and NTL's reference and settled within 3%.
+The circle fitter uses red/gold edges, including a filled exterior tint, rather
+than arbitrary samples inside a filled region. Pictures are captured/decoded
+before warmup, not during measurement. Missing/contradictory picture evidence
+fails closed. This is scale and presence evidence, not exact pixel scene counts.
 
 ## Isolation and overhead
 
@@ -236,11 +265,13 @@ food census uses one traversal. The native journal adds one bounded append per
 successful present and no per-frame I/O. Vlither's wrapper census also has cost.
 
 Real runs pair telemetry on/off in their first round for Original, Native and
-NTL, alternating the order by client. When NTL is clipped, first-round Original
-and Native controls include both whole-map and `ntl-farthest` on/off pairs.
-`run-plan.json` records the full matrix. This adds two 60-second acquisitions,
-about 4-5 minutes including startup, scale matching, warmup and cleanup. Budget
-about 66-82 minutes for the complete 38-row session before retries.
+NTL, alternating the order by client. When NTL is clipped, Battledome controls
+use only `ntl-farthest`. `run-plan.json` records the full matrix: four client/
+quality variants, two scenarios, three rounds and six first-round off controls
+give 30 acquisitions. Budget about 50-65 minutes before retries, a planning
+estimate rather than a measured session duration. Dropping eight whole-map
+acquisitions and shortening NTL's wheel sequence saves time; Vlither adds
+untimed wheel matching and picture checks.
 Set `telemetryControls:false` only after the initial perturbation session; an
 explicit `telemetry:on|off` selects a separate diagnostic. Retain ETW intervals
 and per-process CPU for both, and report changes in median/p95/p99. Off omits the
@@ -293,7 +324,7 @@ without `last_seen`; connection reset discards this transient state.
 
 Census records current admitted connections, actual alive population, physical
 pellets and delivered wire cells. Co-located pellets collapse in wire cells;
-Battledome adds synthetic pit-marker food. Native received-uneaten counts are
+Battledome adds synthetic pit-marker food. Both our client and Vlither expose received-uneaten counts, which are
 checked against nearby decorated wire counts with an explicit 32 + 5% allowance
 for delivery/sampling lag; retained eaten flights are excluded where exposed.
 Visible/retained counts are instances, not opaque pixels or GPU quads.
@@ -305,6 +336,11 @@ Normal/limited views check the delivered upper bound and living local player,
 because the host does not know the precise visible subset. Contradictions
 invalidate. Missing counts (including NTL without game internals) explicitly
 leave drawn-snake scene acceptance unestablished and prevent direct comparison.
+Vlither's census counts living snakes selected by stock redraw visibility and
+positive live opacity, not every delivered snake. Clipped views must not claim
+that all delivered snakes are visible. The **host** still delivers whole-map
+food and living-snake interest identically to every Battledome client, even when
+the client camera is clipped; delivery and visible extent are separate evidence.
 
 NTL screenshots report colored small-component **pellet candidates**, not exact
 pellet counts; a fitted red/gold circle is a candidate visible boundary. Host
@@ -334,7 +370,9 @@ processes invalidate; the harness never terminates competing owner work.
 A round checks competing work and owner input first, then alternates clients,
 reversing order each round. At most three attempts per round retain all failures;
 no quiet-time booking occurs. Foreground is requested once only after five seconds
-without physical input. Input/focus loss or occlusion stops sampling; obstructing HWND classes/PIDs
+without physical input, before view setup/pictures. The same physical-input token
+is checked again after warmup and carried into window sampling; setup input or
+focus loss never causes a second foreground request. Input/focus loss or occlusion stops sampling; obstructing HWND classes/PIDs
 are recorded privately, and no focus fighting occurs.
 Interrupting collection stops the round loop without another preflight. The
 current and remaining rounds stay in `uncollectedRounds`; retained attempts are

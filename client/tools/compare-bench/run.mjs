@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
-import {roundPlan,anchoredBoundary,settleNtlView,settleNativeView,collectRounds,requireNtlDisplayGate,sessionReport} from './matrix.mjs';
+import {roundPlan,settleNtlView,settleNativeView,settleVlitherView,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -183,9 +183,10 @@ async function runAttempt(config, root, item, provenance, machine) {
       // Fresh user.dat per attempt; assets remain in external upstream checkout.
       for (const resource of ['app', 'thermite']) await fs.symlink(path.join(config.output, 'vlither', resource), path.join(directory, resource), 'junction');
       r.nativeStartedUnixMs=Date.now();
-      native = spawn(config.vlitherBinary, [], { cwd: directory, env: { ...process.env,
-        SLITHER_BENCH_SERVER: endpoint.replace('ws://', '').replace('/slither', ''),
-        ...(item.scenario === 'battledome' ? { SLITHER_BENCH_WHOLE_MAP: '1' } : {}) }, windowsHide: false });
+      const clientEnv={...process.env,SLITHER_BENCH_SERVER:endpoint.replace('ws://','').replace('/slither','')};
+      delete clientEnv.SLITHER_BENCH_WHOLE_MAP;
+      if(item.viewCondition==='whole-map')clientEnv.SLITHER_BENCH_WHOLE_MAP='1';
+      native = spawn(config.vlitherBinary, [], { cwd: directory, env:clientEnv, windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
       networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.vlitherBinary,directory,maxSeconds:nativeNetworkMaxSeconds(config),startedUnixMs:r.nativeStartedUnixMs});
       await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'vlither', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
@@ -217,13 +218,28 @@ async function runAttempt(config, root, item, provenance, machine) {
       if (!census) return null;
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
+    [r.setupFocus]=await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
     if(browser&&item.scenario==='battledome'){
       r.viewSetup=await settleNtlView(browser,config.ntlViewCalibration,item.viewCondition,async index=>{
         const file=await browser.capture(`before-warmup-${index}`),picture=pngEvidence(await fs.readFile(file));
         return {file:path.basename(file),picture,census:r.census.at(-1),atMs:now()};
       },delay);
     }
-    if(item.viewCondition==='ntl-farthest'&&!browser){
+    if(item.viewCondition==='ntl-farthest'&&item.client==='vlither'){
+      r.viewSetup=await settleVlitherView({calibration:config.ntlViewCalibration,width:config.width,height:config.height,
+        readView:()=>waitFor(()=>r.views.at(-1),4000,'Vlither stock wheel census'),
+        wheel:async(notches,i)=>{
+          await windows({mode:'wheel',clientPid:native.pid,notches},directory,`match-vlither-zoom-${i}`,children);
+          const previous=r.views.length;await waitFor(()=>r.views.length>previous,4000,'Vlither post-wheel census');
+        },capture:async index=>{
+          const file=path.join(directory,`vlither-before-warmup-${index}.png`);
+          const [receipt]=await windows({mode:'capture',clientPid:native.pid,file,width:config.width,height:config.height},directory,`vlither-picture-${index}`,children);
+          const picture=pngEvidence(await fs.readFile(file)),atMs=receipt.atMs;
+          const nearby=rows=>rows.filter(row=>Math.abs(row.atMs-atMs)<=1200).sort((a,b)=>Math.abs(a.atMs-atMs)-Math.abs(b.atMs-atMs))[0];
+          return {file:path.basename(file),atMs,picture,census:nearby(r.census),view:nearby(r.views)};
+        },pause:delay});
+    }
+    if(item.viewCondition==='ntl-farthest'&&['original','native'].includes(item.client)){
       r.viewSetup=await settleNativeView({target:config.ntlViewCalibration?.physicalPixelsPerWorldUnit,width:config.width,
         readView:()=>waitFor(()=>r.views.at(-1),4000,'Native zoom telemetry (matched off rows require setup-only view support)'),
         wheel:async(notches,i)=>{
@@ -236,7 +252,6 @@ async function runAttempt(config, root, item, provenance, machine) {
         }:undefined});
     }
     await delay(config.warmupSeconds * 1000);
-    await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
     if(browser){
       const before=await browser.capture('before-window');const evidence=pngEvidence(await fs.readFile(before));
       r.preflightView={...evidence,atMs:now()};r.views.push(r.preflightView);
@@ -246,6 +261,8 @@ async function runAttempt(config, root, item, provenance, machine) {
       browser.gpuPid=processes.processInfo.find(p=>p.type==='GPU')?.id;
       r.clientProcessSnapshot=processes;
     }
+    [r.setupAvailability]=await windows({mode:'visibility',clientPid:native.pid},directory,'after-warmup-visibility',children);
+    requireSetupAvailability(r.setupFocus,r.setupAvailability);
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
     r.presentMonSession=`SlitherBench-${randomUUID()}`;
@@ -255,7 +272,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     const early=await Promise.race([pmCompleted,delay(1000).then(()=>null)]);
     if (early) {pmLog=early.log;throw Error(`PresentMon preflight failed: ${early.error??early.exitCode}; ${pmLog}. No elevation or security changes attempted.`);}
     if(browser&&config.telemetry!=='off')r.productionStarted=await browser.productionStart();
-    const samplesPromise = windows({ mode: 'sample', clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
+    const samplesPromise = windows({ mode: 'sample',initialInputTick:r.setupFocus.lastInputTick, clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
     let monitoring = true;
     const captureStarted=Date.now();let nextPicture=captureStarted+1500;
     samplesPromise.finally(() => { monitoring = false; }).catch(() => {});

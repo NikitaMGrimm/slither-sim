@@ -90,6 +90,40 @@ export function wholeMap({ camera, center, radius, zoom, viewport }) {
   return (radius + Math.abs(camera[0] - center)) * zoom <= viewport[0] / 2 + .01
     && (radius + Math.abs(camera[1] - center)) * zoom <= viewport[1] / 2 + .01;
 }
+export function anchoredBoundary(view,census) {
+  const b=view.boundary,p=census?.players?.[0],radius=census?.radius;
+  if(!b||!p?.alive||!p.setup||!Number.isFinite(radius)||radius<=0)return null;
+  if(![b.x,b.y,b.radius,p.x,p.y,...(view.viewport??[])].every(Number.isFinite)||b.radius<=0||view.viewport?.length!==2||view.viewport.some(n=>n<=0))return null;
+  const scale=b.radius/radius,[width,height]=view.viewport;
+  const predicted=[width/2-p.x*scale,height/2-p.y*scale];
+  // Camera smoothing and receipt lag are allowed; a pit circle at a different
+  // radius cannot also explain the projected outer-map origin at the orbit.
+  const error=Math.hypot(b.x-predicted[0],b.y-predicted[1]);
+  if(error>Math.max(30,b.radius*.04))return null;
+  return {physicalPixelsPerWorldUnit:scale,centerErrorPixels:error,
+    wholeMap:b.x-b.radius>=0&&b.y-b.radius>=0&&b.x+b.radius<=width&&b.y+b.radius<=height,
+    confidence:'outer-circle candidate anchored to host radius and projected player offset; camera smoothing tolerance 4% or 30 pixels'};
+}
+export function vlitherPhysicalScale(view={},width,height) {
+  // Vlither redraw uses gsc in ctx->size framebuffer pixels, not CSS/logical
+  // pixels. Require the renderer, framebuffer and measured client area to agree.
+  if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0||view.zoomUnits!=='framebuffer-pixels-per-world-unit'||!Number.isFinite(view.zoom)||view.zoom<=0
+    ||![view.viewport,view.framebuffer,view.rendererViewport].every(v=>v?.[0]===width&&v?.[1]===height))return NaN;
+  return view.zoom;
+}
+export function checkVlitherPicture(sample,calibration,width,height) {
+  const fail=reason=>{throw Error(`Vlither zoom picture preflight: ${reason}`);};
+  const {picture,census,view,atMs}=sample,scale=vlitherPhysicalScale(view,width,height),target=calibration?.physicalPixelsPerWorldUnit;
+  if(calibration?.wholeMap!==false||!Number.isFinite(target)||target<=0)fail('missing limited-view reference');
+  if(!Number.isFinite(scale)||picture?.viewport?.[0]!==width||picture.viewport[1]!==height)fail('framebuffer/physical viewport mismatch');
+  if(!Array.isArray(view.camera)||view.camera.length!==2||![...view.camera,view.center,view.radius].every(Number.isFinite)||view.radius<=0)fail('camera/arena receipt unavailable');
+  if(!Number.isFinite(atMs)||!Number.isFinite(view.atMs)||!Number.isFinite(census?.atMs)||Math.abs(view.atMs-atMs)>1200||Math.abs(census.atMs-atMs)>1200)fail('picture lacks nearby view/census receipts');
+  const anchor=anchoredBoundary(picture,census);
+  if(!anchor||picture.imageSha256?.length!==64||!picture.gameCanvasVisible||picture.pelletCandidates<=0)fail('outer-map/pellet picture not established');
+  if(anchor.wholeMap||wholeMap(view))fail('limited-view label conflicts with whole-map state');
+  if(Math.abs(anchor.physicalPixelsPerWorldUnit/target-1)>.05||Math.abs(scale/target-1)>.05||Math.abs(anchor.physicalPixelsPerWorldUnit/scale-1)>.05)fail('anchored physical scale differs by more than 5%');
+  return anchor;
+}
 export function streamCoverage(rows,startMs,endMs,maxGapMs) {
   if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs||!rows?.length)return false;
   if(rows.some(r=>!Number.isFinite(r.atMs)))return false;
@@ -197,6 +231,7 @@ export function validity(run) {
   reasons.push(...drawnSnakeEvidence(run).reasons);
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
+  if(run.client==='vlither'&&(!run.views?.length||run.views.some(v=>!Number.isFinite(vlitherPhysicalScale(v,run.width,run.height)))))reasons.push('Vlither framebuffer/physical viewport scale unavailable');
   if (run.scenario === 'normal' && ['original','native'].includes(run.client)
       && run.views?.some(v => v.userZoom !== 1)) reasons.push('Normal scenario left stock zoom');
   if (run.scenario === 'battledome' && run.viewCondition!=='ntl-farthest' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
@@ -205,9 +240,18 @@ export function validity(run) {
     if(run.views?.some(v=>v.wholeMap===true))reasons.push('Limited-view row label conflicts with whole-map state');
     const target=run.ntlViewCalibration?.physicalPixelsPerWorldUnit;
     if(!Number.isFinite(target)||target<=0||!run.views?.length||run.views.some(v=>{
-      const scale=v.boundaryAnchor?.physicalPixelsPerWorldUnit??v.zoom*run.width/v.viewport?.[0];
+      const scale=v.boundaryAnchor?.physicalPixelsPerWorldUnit??(run.client==='vlither'?vlitherPhysicalScale(v,run.width,run.height):v.zoom*run.width/v.viewport?.[0]);
       return !Number.isFinite(scale)||Math.abs(scale/target-1)>.05;
     }))reasons.push('Farthest NTL view scale not matched within 5%');
+  }
+  if(run.client==='vlither'&&run.viewCondition==='ntl-farthest'){
+    try{
+      const samples=run.viewSetup?.pictureSamples;
+      if(samples?.length!==2)throw Error('missing two pre-warmup pictures');
+      if(samples.some(s=>!Number.isFinite(s.atMs)||s.atMs>=run.startMs))throw Error('pictures were not established before measurement');
+      const scales=samples.map(s=>checkVlitherPicture(s,run.ntlViewCalibration,run.width,run.height).physicalPixelsPerWorldUnit);
+      if(Math.max(...scales)/Math.min(...scales)>1.03)throw Error('pictures not settled');
+    }catch(error){reasons.push(`Vlither anchored matched view unavailable: ${error.message}`);}
   }
   if (run.scenario === 'battledome' && (!run.census?.length || run.census.some(v => !v.wholeMapFood))) reasons.push('Whole-map food delivery not enabled');
   if (run.metrics && (run.metrics.coveredMs < run.seconds * 1000 * .9 || run.metrics.boundaryGapMs.some(g => g > 250))) reasons.push('Incomplete display coverage at window boundaries');
