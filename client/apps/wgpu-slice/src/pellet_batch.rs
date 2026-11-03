@@ -148,7 +148,10 @@ impl Cache {
             let mut groups = Vec::new();
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
-            let mut slot_groups = Vec::with_capacity(world.foods().len());
+            let mut slot_groups = Vec::new();
+            slot_groups
+                .try_reserve_exact(world.foods().len())
+                .map_err(|_| crate::frame::DRAW_ALLOCATION_FAILED)?;
             for (_, (sources, indices)) in families {
                 let start = grouped;
                 for i in indices {
