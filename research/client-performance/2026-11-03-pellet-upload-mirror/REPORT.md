@@ -209,3 +209,8 @@ measured instrumented and reviewed full-file hashes separately; none is silently
 substituted for another or used as a current-file test gate. Frozen source
 copies, binaries, per-callback journals and process/GPU load remain local-only
 beside the restricted recording. There are no new measurements from a game server.
+
+
+## Evidence clarification, 2026-11-03
+
+The [canonical-parity audit](../2026-11-03-canonical-parity-audit/REPORT.md) distinguishes the original explicit controls from later inactive timing accumulators. Historical data is preserved; actual-image and timing evidence is unchanged.

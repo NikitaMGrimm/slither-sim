@@ -14,6 +14,16 @@ spec.loader.exec_module(study)
 
 
 class StudyTests(unittest.TestCase):
+    def test_audit_uses_the_recorded_candidate_controls(self):
+        identity = json.loads((ROOT / 'identities.json').read_text(encoding='utf-8'))
+        audit = json.loads((ROOT.parent / '2026-11-03-canonical-parity-audit' / 'canonical-evidence-audit.json').read_text(encoding='utf-8'))
+        for phase, source in [('initial', identity), ('reviewed', identity['review_fixes'])]:
+            for scene, arms in source['parity'].items():
+                for arm, expected in arms.items():
+                    actual = audit['original_explicit_controls'][f'{phase}/{scene}/{arm}']
+                    self.assertEqual(actual['binary_sha256'], expected['binary_sha256'])
+                    self.assertEqual(actual['quad_digest'], expected['quad_digest'])
+
     def test_retained_results_and_parity(self):
         output = study.tables()
         report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
@@ -38,6 +48,22 @@ class StudyTests(unittest.TestCase):
                     (root / 'serial-identities.json').write_text(json.dumps(identity), encoding='utf-8')
                     with patch.object(study, 'ROOT', root), self.assertRaises(AssertionError):
                         study.serial_tables()
+
+    def test_explicit_canonical_gates_reject_the_inactive_accumulator(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ['identities.json', 'reviewed-source.patch', 'review-fixes-source.patch']:
+                shutil.copyfile(ROOT / name, root / name)
+            original = (root / 'identities.json').read_text(encoding='utf-8')
+            for reviewed in [False, True]:
+                identity = json.loads(original)
+                gate = identity['review_fixes'] if reviewed else identity
+                for record in next(iter(gate['parity'].values())).values():
+                    record['quad_digest'] = 'd1fba762150c532c'
+                (root / 'identities.json').write_text(json.dumps(identity), encoding='utf-8')
+                check = study.review_tables if reviewed else study.records
+                with patch.object(study, 'ROOT', root), self.assertRaisesRegex(AssertionError, 'inactive canonical'):
+                    check()
 
 
 if __name__ == '__main__':
