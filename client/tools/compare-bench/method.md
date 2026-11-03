@@ -156,7 +156,8 @@ Battledome row (Original, Native, NTL and Vlither) is `ntl-farthest`, including
 first-round telemetry controls. Separate whole-map rows are omitted. Normal
 remains stock zoom. Without NTL, or when a new package actually fits the map,
 Battledome retains whole-map behavior. Directed stock wheel input targets the
-calibrated physical scale; timed views must remain within 5%. Matching the view
+calibrated physical scale; timed views must remain within 5% of that reference, so
+two accepted rows can differ by up to 10.53% (1.05 / 0.95). Matching the view
 removes only the different-view qualification: unestablished content/display
 correlation, missing exact scene evidence and different/unknown presentation
 modes still prevent a direct comparison. No acceptance gate is relaxed.
@@ -262,7 +263,8 @@ The production probe still adds per-draw/rAF observation, and Default
 netlog still adds logging. These costs must not be assumed negligible.
 Our opt-in telemetry still scans food/snakes and logs every two seconds; the
 food census uses one traversal. The native journal adds one bounded append per
-successful present and no per-frame I/O. Vlither's wrapper census also has cost.
+successful present and no per-frame I/O. Vlither's wrapper census also has cost;
+Vlither has no telemetry-off control, so its instrumentation cost is unmeasured.
 
 Real runs pair telemetry on/off in their first round for Original, Native and
 NTL, alternating the order by client. When NTL is clipped, Battledome controls
