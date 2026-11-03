@@ -167,6 +167,16 @@ test('native network observations retain early TCP and UDP violations without cl
   udp.udp[0]={pid:7,localAddress:'127.0.0.1',remoteAddress:'203.0.113.1'};
   assert.equal(nativeNetworkEvidence([udp]).rejectedEndpoints.length,1);
 });
+test('unpeered TCP Bound reservations are retained separately from traffic and listeners',()=>{
+  const endpoint={pid:7,state:'Bound',localAddress:'0.0.0.0',localPort:12345,remoteAddress:'0.0.0.0',remotePort:0};
+  const sample={atUnixMs:0,pids:[7],tcpCollected:true,udpCollected:true,tcp:[endpoint],udp:[]};
+  const evidence=nativeNetworkEvidence([sample]);assert.equal(evidence.rejectedEndpoints.length,0);
+  assert.equal(evidence.unconnectedReservations.length,1);assert.equal(evidence.complete,false);
+  for(const change of [e=>e.state='Listen',e=>e.state='Established',e=>e.remoteAddress='203.0.113.1',e=>e.remotePort=80,e=>e.localAddress='192.0.2.1']){
+    const changed=structuredClone(sample);change(changed.tcp[0]);assert.equal(nativeNetworkEvidence([changed]).rejectedEndpoints.length,1);
+  }
+  assert.equal(nativeNetworkEvidence([{...sample,tcp:[],udp:[endpoint]}]).rejectedEndpoints.length,1);
+});
 test('native endpoint sampling outlives a long warmup and the measured window',()=>{
   for(const warmupSeconds of [0,5,600]){
     const seconds=60,deadline=nativeNetworkMaxSeconds({seconds,warmupSeconds});

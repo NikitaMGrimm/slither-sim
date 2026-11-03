@@ -178,8 +178,11 @@ TCP connections (including non-established states) and UDP local bindings for
 the observed owned process tree, with process creation times guarding PID reuse.
 It continues through client shutdown; actual sample timestamps, startup delay,
 errors and observed process IDs are retained. The requested interval is one
-second plus collection time. Any observed non-loopback or wildcard endpoint
-invalidates, including a connection present only in an early sample.
+second plus collection time. Any observed non-loopback or wildcard communicating
+endpoint invalidates, including a connection present only in an early sample.
+Windows wildcard TCP `Bound` reservations with unspecified peer and remote port
+zero are retained separately: they are not connections or listeners. Wildcard
+TCP listeners and UDP bindings still invalidate.
 The record is labelled sampled and complete:false, never networkVerified.
 Windows UDP tables do not expose per-datagram destinations; short connections or
 children between polls can be missed. Incompleteness alone does not invalidate a

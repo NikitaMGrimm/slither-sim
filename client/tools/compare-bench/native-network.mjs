@@ -12,9 +12,16 @@ export function nativeNetworkMaxSeconds({seconds,warmupSeconds}) {
   return seconds+warmupSeconds+240;
 }
 export function nativeNetworkEvidence(samples,details={}) {
-  const rejectedEndpoints=[];
+  const rejectedEndpoints=[],unconnectedReservations=[];
   for(const sample of samples){
     for(const [protocol,endpoints] of [['tcp',sample.tcp??[]],['udp',sample.udp??[]]])for(const endpoint of endpoints){
+      // Windows also reports a wildcard Bound reservation for a TCP socket's
+      // ephemeral port. With no peer/remote port it is neither a connection nor
+      // a listener. Retain it separately; UDP wildcard bindings still reject.
+      if(protocol==='tcp'&&endpoint.state==='Bound'&&endpoint.remotePort===0
+        &&['0.0.0.0','::'].includes(endpoint.remoteAddress)&&['0.0.0.0','::'].includes(endpoint.localAddress)){
+        unconnectedReservations.push({atUnixMs:sample.atUnixMs,...endpoint});continue;
+      }
       const remoteAbsent=endpoint.remoteAddress===null||endpoint.remoteAddress===undefined
         ||(protocol==='tcp'&&['Listen','Bound','Closed'].includes(endpoint.state)&&['0.0.0.0','::'].includes(endpoint.remoteAddress));
       if(!loopback(endpoint.localAddress)||(!remoteAbsent&&!loopback(endpoint.remoteAddress)))rejectedEndpoints.push({protocol,atUnixMs:sample.atUnixMs,...endpoint});
@@ -25,7 +32,7 @@ export function nativeNetworkEvidence(samples,details={}) {
     status:rejectedEndpoints.length?'non-loopback-observed':observed?'sampled-loopback-only':'unavailable',
     limitations:['Connections and children that live between polls may be missed.','Windows UDP endpoint tables expose local bindings, not per-datagram destinations.'],
     firstSampleUnixMs:samples[0]?.atUnixMs,lastSampleUnixMs:samples.at(-1)?.atUnixMs,
-    sampleErrors:samples.flatMap(s=>s.errors??[]),rejectedEndpoints,samples};
+    sampleErrors:samples.flatMap(s=>s.errors??[]),rejectedEndpoints,unconnectedReservations,samples};
 }
 export async function startNativeNetwork({pid,executable,directory,maxSeconds,startedUnixMs}) {
   const stopFile=path.join(directory,'native-network-stop');
