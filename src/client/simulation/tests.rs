@@ -11,6 +11,41 @@ use std::collections::BTreeSet;
 
 #[cfg(feature = "frame-bench")]
 #[test]
+fn frame_bench_reports_the_applied_orbit_target_and_current_admission() {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::sandbox();
+    config.world.food_count = 0;
+    let mut host = RawSimulator::new(7, config, 2).unwrap();
+    host.set_player_latency(1, LatencyConfig::default());
+    host.set_frame_bench(true);
+    for slot in 0..2 {
+        assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+    }
+    host.backend.slots[0].control.heading = 0.123;
+    host.advance_ticks(2).unwrap();
+    let control = host.backend.slots[0].control;
+    assert_ne!(control.heading, 0.123);
+    assert_eq!(
+        host.backend.slots[0]
+            .connection
+            .snakes
+            .get_mut(0)
+            .unwrap()
+            .wanted,
+        encode::angle_byte(physics::quantize_heading(control.heading))
+    );
+    assert_eq!(host.backend.frame_bench_admitted_bots(), 1);
+    assert!(host.backend.slots[1].life > 0);
+    host.disconnect(1).unwrap();
+    assert!(host.backend.slots[1].life > 0);
+    assert_eq!(host.backend.frame_bench_admitted_bots(), 0);
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
 fn frame_bench_full_food_interest_is_only_for_socket_seats() {
     let mut config = SimulationConfig {
         agents: 2,

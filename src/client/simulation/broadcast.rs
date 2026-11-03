@@ -112,14 +112,23 @@ fn wire_score(snake: &Snake) -> f64 {
 
 impl SimulatorBackend {
     #[cfg(feature = "frame-bench")]
+    pub(super) fn frame_bench_admitted_bots(&self) -> usize {
+        self.slots
+            .iter()
+            .skip(self.player_latency.slots)
+            .filter(|s| s.connection.open && s.connection.setup)
+            .count()
+    }
+    #[cfg(feature = "frame-bench")]
     fn frame_bench_actions(
-        &self,
+        &mut self,
         mut actions: Vec<Option<crate::Action>>,
     ) -> Vec<Option<crate::Action>> {
         if self.frame_bench {
-            for (action, snake) in actions
+            for ((action, snake), slot) in actions
                 .iter_mut()
                 .zip(self.world.snakes())
+                .zip(&mut self.slots)
                 .take(self.player_latency.slots)
             {
                 // Same measurement-only orbit for every socket client. Socket
@@ -133,6 +142,9 @@ impl SimulatorBackend {
                         + ((distance - radius) / 200.).atan(),
                     boost: false,
                 });
+                if let Some(applied) = *action {
+                    slot.control = applied;
+                }
             }
         }
         actions
@@ -543,7 +555,7 @@ impl SimulatorBackend {
                 "foodTarget": self.world.config().food_count,
                 "ambientAttemptsPerSecond": self.world.config().ambient_replenish_per_second,
                 "sizeToPopulation": self.world.config().size_to_population,
-                "admittedBotSlots": self.slots.iter().skip(self.player_latency.slots).filter(|s| s.life > 0).count(),
+                "admittedBotSlots": self.frame_bench_admitted_bots(),
                 "aliveBots": self.world.snakes().iter().skip(self.player_latency.slots).filter(|s| s.alive).count(),
                 "wholeMapFood": self.world.config().pit.is_some()})
             );
