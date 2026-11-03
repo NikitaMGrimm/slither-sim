@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Exact native pellet workers](client-performance/2026-11-03-pellet-workers/REPORT.md) | Bounded sleeping workers; interleaved RTX/Vulkan 4K and AMD/DX12 guards, exact world-image controls and retained idle/stress costs; high-refresh p95 remains over budget. |
 | Client performance | [Smaller food frame copies](client-performance/2026-11-03-food-cpu/REPORT.md) | Separate frozen food metadata from numeric frame state; matched current-main RTX/Vulkan 4K pairs, AMD guardrails and exact image controls, with native worker adoption kept separate. |
 | Client performance | [Serialized pellet upload mirror](client-performance/2026-11-03-pellet-upload-mirror/REPORT.md) | Retain exact little-endian instance bytes; alternating RTX/Vulkan 4K and AMD/DX12 guardrails, complete-image controls and remaining CPU/refresh-budget limits. |
 | Client performance | [Pellet-art join and sector refresh](client-performance/2026-11-02-join-sectors/REPORT.md) | Restricted ten-second join timeline; stage only new food in sector listings and avoid world copies on clear/visibility notices, with exact output and authored packed-pellet controls. |

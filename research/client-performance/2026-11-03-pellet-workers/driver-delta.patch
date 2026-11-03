@@ -1,0 +1,66 @@
+--- baseline-driver
++++ candidate-driver
+@@ -116,12 +116,13 @@
+                 }
+             })
+             .ok_or("integrated adapter missing")?;
+-        let r = pollster::block_on(gpu::Renderer::from_adapter_for_diagnostics(
++        let mut r = pollster::block_on(gpu::Renderer::from_adapter_for_diagnostics(
+             a,
+             wgpu::TextureFormat::Rgba8Unorm,
+             4,
+             true,
+         ))?;
++        if let Ok(n)=std::env::var("PROFILE_WORKERS"){r.configure_pellet_workers(n.parse().unwrap(),Duration::from_millis(std::env::var("PROFILE_WORKER_DELAY_MS").ok().and_then(|s|s.parse().ok()).unwrap_or(0)));}
+         println!("adapter={:?},samples={}", r.adapter_info, r.sample_count);
+         let target = r.device.create_texture(&wgpu::TextureDescriptor {
+             label: Some("capture profile"),
+@@ -324,6 +325,7 @@
+     } else { None };
+     let mut menu_csv = String::from("frame,model_ms,world_alpha,visible,spinner,needs_menu,batch_before,batch_after,menu_step_ns,compose_ns,egui_cpu_ns\n");
+     let mut quad_digest = std::collections::hash_map::DefaultHasher::new();
++    let mut canonical_quads=0u64;
+     let mut digest = std::collections::hash_map::DefaultHasher::new();
+     phase("connect_begin", 0);
+     if a[1]!="menu" {
+@@ -571,6 +573,7 @@
+                     for frame in std::iter::once(&rendered.frame).chain(rendered.overlay.iter()) {
+                         for q in frame.quad_iter(&resident)? {
+                             let q = q?;
++                            canonical_quads+=1;
+                             q.key.handle.hash(&mut quad_digest);
+                             q.key.revision.hash(&mut quad_digest);
+                             q.repeat.hash(&mut quad_digest);
+@@ -709,9 +712,9 @@
+     std::fs::write(output.join("allocation-totals.json"),format!("{{\"from_replay_start_requests\":{},\"from_replay_start_bytes\":{},\"drain_requests\":{},\"drain_bytes\":{},\"whole_process_requests\":{},\"whole_process_bytes\":{}}}\n",after_drop.0-replay_alloc_start.0,after_drop.1-replay_alloc_start.1,after_drop.0-before_drop.0,after_drop.1-before_drop.1,after_drop.0,after_drop.1)).unwrap();
+     if let Some((wall,cpu))=idle_totals {std::fs::write(output.join("process-cpu.json"),format!("{{\"wall_s\":{wall},\"cpu_s\":{cpu},\"one_core_percent\":{}}}\n",100.*cpu/wall)).unwrap();}
+     println!(
+-        "terminal_phase={:?},quad_digest={:016x}",
++        "terminal_phase={:?},quad_digest={},canonical_active={parity},canonical_quads={canonical_quads}",
+         g.phase(),
+-        quad_digest.finish()
++        quad_digest_status(parity,canonical_quads,quad_digest.finish())
+     );
+     println!(
+         "frames={frame},model_ms={last_model},wall_s={},messages={},digest={:016x},skips={}",
+@@ -738,3 +741,20 @@
+ #[link(name="kernel32")]
+ unsafe extern "system" {fn GetProcessTimes(h:*mut std::ffi::c_void,c:*mut u64,e:*mut u64,k:*mut u64,u:*mut u64)->i32;}
+ fn process_cpu_ns()->u64 {let(mut c,mut e,mut k,mut u)=(0u64,0u64,0u64,0u64);assert_ne!(unsafe{GetProcessTimes(-1isize as *mut _,&mut c,&mut e,&mut k,&mut u)},0);(k+u)*100}
++
++fn quad_digest_status(active:bool,quads:u64,digest:u64)->String {
++    if !active { "absent".into() }
++    else if quads==0 { "empty".into() }
++    else { format!("{digest:016x}") }
++}
++
++#[cfg(test)]
++mod parity_output_tests {
++    use super::quad_digest_status;
++    #[test] fn inactive_and_empty_gates_cannot_look_like_matches() {
++        assert_eq!(quad_digest_status(false,0,0xd1fba762150c532c),"absent");
++        assert_eq!(quad_digest_status(false,17,42),"absent");
++        assert_eq!(quad_digest_status(true,0,0xd1fba762150c532c),"empty");
++        assert_eq!(quad_digest_status(true,17,42),"000000000000002a");
++    }
++}

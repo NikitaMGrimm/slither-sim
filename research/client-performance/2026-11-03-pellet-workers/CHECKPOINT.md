@@ -1,3 +1,5 @@
+> Historical intermediate checkpoint. The final [REPORT.md](REPORT.md) records the adopted composition, final checks and remaining limitations. Numbers and identities below describe the earlier composition.
+
 # Local validation checkpoint (not a published adoption study)
 
 The bounded worker implementation is committed on perf/client-pellet-workers. This checkpoint preserves ongoing evidence preparation while #450 review finishes. It is not a ready PR or a passing study-check claim: REPORT.md still needs to be composed from recompute.py, then recompute/test validation and integration onto main are pending.
