@@ -80,3 +80,7 @@ pub(super) fn project(
         bins,
     })
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "pellet_workers.rs"]
+pub(super) mod workers;

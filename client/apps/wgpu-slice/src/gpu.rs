@@ -851,6 +851,14 @@ impl Renderer {
             .filter_map(|chunk| chunk.buffer.as_ref().map(wgpu::Buffer::size))
             .collect()
     }
+    /// Select bounded CPU projection participants for explicit offline diagnostics.
+    #[cfg(all(feature = "frame-profile", not(target_arch = "wasm32")))]
+    pub fn configure_pellet_workers(&mut self, participants: usize, delay: std::time::Duration) {
+        if let Some(pellets) = &mut self.pellets {
+            pellets.workers.configure(participants, delay);
+        }
+    }
+
     /// Start a multi-pass diagnostic picture; timing callers resolve after the
     /// complete presenter. Legacy single-pass callers still use queries 0/1.
     #[cfg(feature = "frame-profile")]

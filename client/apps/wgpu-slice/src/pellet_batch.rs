@@ -408,13 +408,16 @@ pub(crate) fn exact_instance(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::bank::Bank;
 
-    fn rectangle(bank: &Bank) -> FoodWorld {
+    pub(crate) fn rectangle(bank: &Bank) -> FoodWorld {
+        rectangle_count(bank, 25_000)
+    }
+    pub(crate) fn rectangle_count(bank: &Bank, count: usize) -> FoodWorld {
         let mut world = FoodWorld::new();
-        for i in 0..25_000 {
+        for i in 0..count {
             let factory = bank.food(
                 (i % 10) as u8,
                 [
@@ -452,7 +455,7 @@ mod tests {
             doubled_accumulated: delta * 2.,
         }
     }
-    fn view() -> BodyPaintView {
+    pub(crate) fn view() -> BodyPaintView {
         BodyPaintView {
             camera: Point {
                 x: 16_200.,
@@ -463,7 +466,12 @@ mod tests {
             half_height: 422.,
         }
     }
-    fn batch(cache: &mut Cache, bank: &mut Bank, world: &FoodWorld, view: BodyPaintView) -> Batch {
+    pub(crate) fn batch(
+        cache: &mut Cache,
+        bank: &mut Bank,
+        world: &FoodWorld,
+        view: BodyPaintView,
+    ) -> Batch {
         cache
             .prepare(
                 world,
@@ -476,6 +484,29 @@ mod tests {
             )
             .unwrap()
             .unwrap()
+    }
+
+    #[test]
+    fn signed_zero_source_metadata_uses_the_canonical_fallback() {
+        let mut bank=Bank::new().unwrap();
+        let mut positive=bank.food(0,[0.,0.]);
+        for s in &mut positive.bodies {
+            *s=FoodSource::new(s.asset(),s.width(),s.height(),0.,s.half_height()).unwrap();
+        }
+        let mut negative=positive.clone();
+        for s in &mut negative.bodies {
+            *s=FoodSource::new(s.asset(),s.width(),s.height(),-0.,s.half_height()).unwrap();
+        }
+        let mut world=FoodWorld::new();
+        for i in 0..1024 {
+            let factory=if i%2==0 {&positive}else{&negative};
+            world.spawn(FoodSpawn{key:i,sector:(0,0),position:view().camera,base_size:0.2,raw_color:0,rapid:true},factory.input(1.)).unwrap();
+        }
+        let a=world.foods()[0].snapshot().sources;
+        let b=world.foods()[1].snapshot().sources;
+        assert_eq!(a,b);
+        assert_ne!(a.body.half_width().to_bits(),b.body.half_width().to_bits());
+        assert!(Cache::default().prepare(&world,view(),Some(FoodCullBounds::from_view(view()).unwrap()),&bank.assets,&bank.food_outline,&mut bank.food_asset_index,MAX_FOOD_PAINT_COMMANDS).unwrap().is_none());
     }
 
     #[test]

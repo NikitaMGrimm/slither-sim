@@ -1,9 +1,7 @@
 //! Ordered instanced pellet passes using the renderer's existing texture arrays.
 use super::{
     DrawState, LayerHistory, LayerTarget, Multisample, Pipeline, RenderResult, Renderer,
-    VertexChunk, additive_pair,
-    soft_layers::select_glows,
-    zero_pair,
+    VertexChunk, additive_pair, soft_layers::select_glows, zero_pair,
 };
 use crate::{
     frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
@@ -76,6 +74,8 @@ pub(super) struct Pellets {
     // entire mirror each frame. See
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-upload-mirror/REPORT.md.
     mirror: Vec<[u8; 96]>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) workers: super::pellet_cpu::workers::Workers,
     bindings: Vec<[Option<SourceDraw>; 3]>,
 }
 fn uniform(
@@ -219,6 +219,8 @@ impl Pellets {
             dynamic: None,
             sources: None,
             mirror: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            workers: Default::default(),
             bindings: Vec::new(),
         }
     }
@@ -317,22 +319,35 @@ impl Pellets {
         self.ensure_sources(r, b)?;
         let mut flags = vec![0u32; b.visible.len()];
         let mut coverage = [0.; 4];
-        for (i, food) in b.world.foods().iter().enumerate().rev() {
-            let slot = b.sources.slots[i];
-            if !b.visible[slot] {
-                continue;
+        #[cfg(not(target_arch = "wasm32"))]
+        let parallel = self.workers.prepare(
+            frame,
+            b,
+            attachment,
+            &mut self.mirror,
+            &mut flags,
+            &mut coverage,
+        )?;
+        #[cfg(target_arch = "wasm32")]
+        let parallel = false;
+        if !parallel {
+            for (i, food) in b.world.foods().iter().enumerate().rev() {
+                let slot = b.sources.slots[i];
+                if !b.visible[slot] {
+                    continue;
+                }
+                project(
+                    frame,
+                    Input {
+                        slot,
+                        animation: food.paint_state(),
+                    },
+                    &b.sources,
+                    b.view,
+                    attachment,
+                )?
+                .apply(&mut self.mirror, &mut flags, &mut coverage);
             }
-            project(
-                frame,
-                Input {
-                    slot,
-                    animation: food.paint_state(),
-                },
-                &b.sources,
-                b.view,
-                attachment,
-            )?
-            .apply(&mut self.mirror, &mut flags, &mut coverage);
         }
         r.queue.write_buffer(
             self.dynamic.as_ref().expect("dynamic instances"),
