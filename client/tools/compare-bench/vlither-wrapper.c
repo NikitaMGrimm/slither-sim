@@ -54,7 +54,7 @@ void trender(tenv* env) {
     for (int i = 0; i < count; i++) {
       food* f = &g->data.foods[i];
       if (!f->eaten) uneaten++;
-      if (!f->eaten && fabsf(f->rx - g->data.view_xx) * g->data.gsc <= env->ctx->size[0] / 2.f &&
+      if (fabsf(f->rx - g->data.view_xx) * g->data.gsc <= env->ctx->size[0] / 2.f &&
           fabsf(f->ry - g->data.view_yy) * g->data.gsc <= env->ctx->size[1] / 2.f)
         visible++;
     }
