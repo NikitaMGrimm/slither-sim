@@ -801,6 +801,7 @@ mod desktop {
                         if let Some(food) = food_submission {
                             view["submittedPellets"] = food.counts.visible_foods.into();
                             view["pelletsBeforeOmission"] = food.counts.before_zoom_foods.into();
+                            view["pictureRetainedPellets"] = food.retained_pellets.into();
                             view["foodBudgetApplied"] = food.budget_applied.into();
                         }
                         view

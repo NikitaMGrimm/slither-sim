@@ -250,11 +250,19 @@ impl Cache {
         let sources = self.sources.as_ref().expect("retained sources").clone();
         let mut visible = vec![false; world.foods().len()];
         let mut count = 0;
+        #[cfg(feature = "frame-bench")]
+        let mut before_zoom_count = 0;
         for (i, f) in world.foods().iter().enumerate() {
             let f = f.paint_state();
             let p = f.render_position;
             let inside =
                 p.x >= limits[0] && p.x <= limits[1] && p.y >= limits[2] && p.y <= limits[3];
+            // Count before eligibility in this existing traversal. Zoomed
+            // retained batches can submit only part of this cull rectangle.
+            #[cfg(feature = "frame-bench")]
+            {
+                before_zoom_count += usize::from(inside);
+            }
             let slot = sources.slots[i];
             let inside = inside
                 && (user_zoom >= 1.
@@ -279,6 +287,8 @@ impl Cache {
             visible,
             visible_count: count,
             user_zoom,
+            #[cfg(feature = "frame-bench")]
+            before_zoom_count,
             early_at: 0,
             late_at: 0,
         }))
@@ -350,6 +360,8 @@ pub struct Batch {
     // camera zoom alone cannot recover the user factor or stock whole-source rule.
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-retained-pellet-zoom/REPORT.md.
     pub(crate) user_zoom: f64,
+    #[cfg(feature = "frame-bench")]
+    pub(crate) before_zoom_count: usize,
     pub(crate) early_at: usize,
     pub(crate) late_at: usize,
 }

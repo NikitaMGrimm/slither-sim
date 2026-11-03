@@ -60,6 +60,8 @@ pub struct PreparedFrame {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FoodSubmission {
     pub counts: FoodPaintCounts,
+    /// All retained food in the same prepared picture, before culling/budgeting.
+    pub retained_pellets: usize,
     /// Pressure selection precedes the planner and can itself omit food.
     pub budget_applied: bool,
 }
@@ -1021,7 +1023,7 @@ fn prepare_composed(
             counts: FoodPaintCounts {
                 visible_foods: batch.visible_count,
                 #[cfg(feature = "frame-bench")]
-                before_zoom_foods: batch.visible_count,
+                before_zoom_foods: batch.before_zoom_count,
                 early: 0,
                 late: 0,
             },
@@ -1519,6 +1521,7 @@ fn prepare_composed(
         #[cfg(feature = "frame-bench")]
         food_submission: Some(FoodSubmission {
             counts: food.counts,
+            retained_pellets: client.foods().foods().len(),
             budget_applied: pressure,
         }),
     })

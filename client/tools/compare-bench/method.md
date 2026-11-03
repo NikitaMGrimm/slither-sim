@@ -303,7 +303,11 @@ Food submission is separate from reception and viewport membership. Build the
 native input with `--features frame-bench`: each successful picture carries
 `submittedPellets` (distinct planner foods, not draw calls) and
 `pelletsBeforeOmission` from the same inclusive culling bounds, counted during
-the existing outline traversal. These counters are absent in ordinary builds.
+the existing planner traversal (including retained batches, before zoom
+eligibility). `pictureRetainedPellets` is frozen with those counts, before
+culling/budgeting: submitted <= before omission <= picture retained is required.
+The ordinary `retainedPellets` census may be newer after worker/retry handoff
+and is not substituted for this bound. These counters are absent in ordinary builds.
 Results retain `foodOmissionShare` per view, including zero, and the full
 submission evidence in `sceneAcceptance` and comparisons. Missing/contradictory
 counts, an empty denominator, or upstream capacity-pressure selection leave

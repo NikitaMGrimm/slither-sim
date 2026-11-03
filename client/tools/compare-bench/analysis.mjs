@@ -157,8 +157,11 @@ export function sceneChecks(run) {
 // See method.md, Worlds and validity; matching zoom alone does not match the work.
 export const materialFoodOmission = .05;
 export function foodSubmission(view) {
-  const before=view.pelletsBeforeOmission,submitted=view.submittedPellets;
-  const countsValid=Number.isSafeInteger(before)&&before>=0&&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
+  // The ordinary retainedPellets census can already be newer than this picture
+  // after worker/retry handoff; use the population frozen with its planner counts.
+  const before=view.pelletsBeforeOmission,submitted=view.submittedPellets,retained=view.pictureRetainedPellets;
+  const countsValid=Number.isSafeInteger(retained)&&retained>=0&&Number.isSafeInteger(before)&&before>=0&&before<=retained
+    &&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
   const omissionShare=countsValid&&before>0?(before-submitted)/before:null;
   const reason=!countsValid?'missing or contradictory planner counts':before===0?'empty culling bounds':
     view.foodBudgetApplied!==false?'upstream food selection is applied or unestablished':null;
