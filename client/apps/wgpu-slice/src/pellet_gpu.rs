@@ -342,10 +342,7 @@ impl Pellets {
             self.mirror[slot] = exact;
             flags[slot] = bits;
         }
-        let mut bytes = Vec::with_capacity(self.mirror.len() * 96);
-        for instance in &self.mirror {
-            bytes.extend_from_slice(&instance.bytes());
-        }
+        let bytes: Vec<_> = self.mirror.iter().flat_map(|i| i.bytes()).collect();
         r.queue
             .write_buffer(self.dynamic.as_ref().expect("dynamic instances"), 0, &bytes);
         let previous = if r.layer_history.extent == attachment && r.layer_history.samples == samples
