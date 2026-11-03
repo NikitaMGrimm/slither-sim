@@ -58,12 +58,76 @@ fn benchmark_food_counts_follow_retained_batch_and_picture_retry() {
     assert!(!food.budget_applied);
     assert_eq!(food.counts.visible_foods, 1024);
     assert_eq!(food.counts.before_zoom_foods, 1024);
+    assert_eq!(food.retained_pellets, 1025);
     let identity = picture.frame.identity;
     game.retry_frame(picture).unwrap();
     let retry = game.take_frame().unwrap();
     assert_eq!(retry.frame.identity, identity);
     assert_eq!(retry.food_submission, Some(food));
     game.presented(true).unwrap();
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
+fn benchmark_partial_zoom_retained_batch_counts_candidates_before_eligibility() {
+    let mut game = tape::playing();
+    let mut radius = vec![b'z'];
+    radius.extend(tape::u24(10000));
+    let mut food = vec![b'F', 11, 10];
+    for i in 0..1000_u16 {
+        food.extend([
+            0,
+            (i % 32) as u8,
+            (i / 32) as u8,
+            if i < 200 { 100 } else { 20 },
+        ]);
+    }
+    let mut outside = vec![b'F', 200, 200];
+    for i in 0..24_u8 {
+        outside.extend([0, i, 0, 100]);
+    }
+    game.receive(
+        game.generation(),
+        &tape::bundle(&[radius, vec![b'c', 41, 4, 3, 232], food, outside]),
+        40.,
+    )
+    .unwrap();
+    assert_eq!(game.client().foods().foods().len(), 1024);
+    assert!(game.wheel_zoom(-20.));
+    for i in 0..120 {
+        game.begin_frame(60. + f64::from(i) * 16., [1500, 844], 1.)
+            .unwrap();
+        tape::effects(&mut game);
+        let picture = game.take_frame().unwrap();
+        if i == 119 {
+            assert!(
+                game.client()
+                    .foods()
+                    .foods()
+                    .iter()
+                    .all(|f| f.snapshot().scale == 1.)
+            );
+            let batch = picture
+                .frame
+                .food_batch
+                .as_ref()
+                .expect("partially omitted zoom must use the retained path");
+            let food = picture.food_submission.unwrap();
+            assert!(!food.budget_applied);
+            assert_eq!(food.retained_pellets, 1024);
+            assert_eq!(food.counts.before_zoom_foods, 1000);
+            assert_eq!(food.counts.visible_foods, 200);
+            assert_eq!(batch.draw_count(), 200 * 7);
+            let canonical = picture.frame.canonical().unwrap();
+            let identity = picture.frame.identity;
+            game.retry_frame(picture).unwrap();
+            let retry = game.take_frame().unwrap();
+            assert_eq!(retry.frame.identity, identity);
+            assert_eq!(retry.frame.canonical().unwrap(), canonical);
+            assert_eq!(retry.food_submission, Some(food));
+        }
+        game.presented(true).unwrap();
+    }
 }
 
 // Native trig/Debug float text is platform-specific. This independent golden was
