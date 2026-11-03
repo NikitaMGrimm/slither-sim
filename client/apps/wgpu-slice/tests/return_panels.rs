@@ -76,6 +76,175 @@ impl Trial {
             .filter(|i| matches!(i, StartMenuIntent::Play { .. }))
             .count()
     }
+    fn key(&mut self, key: egui::Key) {
+        self.login.settings_input(egui::RawInput {
+            events: [true, false]
+                .into_iter()
+                .map(|pressed| egui::Event::Key {
+                    key,
+                    physical_key: None,
+                    pressed,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                })
+                .collect(),
+            ..Default::default()
+        });
+    }
+    fn request_close(&mut self) -> slither_wgpu_slice::game::Effect {
+        self.key(egui::Key::Escape);
+        assert!(self.login.take_cancel_request());
+        self.login.cancel_game(&mut self.game);
+        assert!(self.game.stopping());
+        let close = self.game.effect().unwrap();
+        assert_eq!(close.kind, slither_wgpu_slice::game::EffectKind::Close);
+        close
+    }
+    fn pending_close_frame(&mut self, close: &slither_wgpu_slice::game::Effect) {
+        self.now += 16;
+        let now = f64::from(self.now);
+        self.intents
+            .extend(self.login.step(now, false, false).unwrap().0);
+        self.game.begin_redraw(now, [960, 720], 1.).unwrap();
+        self.login.observe_game(&self.game).unwrap();
+        let picture = self.game.take_frame().unwrap();
+        self.login
+            .prepare_host([960, 720], 1., false, None)
+            .unwrap();
+        self.game.presented(true).unwrap();
+        self.game.bank.recycle_frame(picture);
+        assert_eq!(self.game.effect().unwrap().id, close.id);
+    }
+    fn close_panel(&mut self, panel: E) {
+        if panel == E::Server {
+            self.login.picker.policy.close();
+        } else {
+            self.login.close_settings();
+        }
+    }
+    fn panel_visible(&self, panel: E) -> bool {
+        if panel == E::Server {
+            self.login.picker.policy.visible()
+        } else {
+            self.login.state.settings.visible()
+        }
+    }
+    fn service_frame(&mut self) {
+        // Running::service observes Close completion before the next menu step.
+        self.login.observe_game(&self.game).unwrap();
+        self.frame();
+    }
+}
+
+#[test]
+fn closing_panel_enter_and_space_never_create_a_replay_request() {
+    for panel in [E::Server, E::Settings] {
+        for key in [egui::Key::Space, egui::Key::Enter] {
+            let mut trial = Trial::new();
+            trial.until(3308);
+            let close = trial.request_close();
+            trial.click(panel);
+            assert!(trial.panel_visible(panel));
+            for _ in 0..26 {
+                trial.pending_close_frame(&close);
+            }
+            let quality = trial.login.state.settings.preferences().quality;
+            trial.key(key);
+            if panel == E::Settings {
+                assert_ne!(trial.login.state.settings.preferences().quality, quality);
+            }
+            trial
+                .game
+                .acknowledge(close.generation, close.id, true)
+                .unwrap();
+            while trial.now < 5000 {
+                trial.service_frame();
+            }
+            assert_eq!(trial.plays(), 0);
+            trial.close_panel(panel);
+            assert!(trial.panel_visible(panel), "exit fade remains modal");
+            while trial.panel_visible(panel) {
+                trial.key(key);
+                trial.service_frame();
+                assert_eq!(trial.plays(), 0, "{panel:?} {key:?} cannot queue replay");
+            }
+            trial.service_frame();
+            assert_eq!(
+                trial.plays(),
+                0,
+                "panel input must not become Play after close"
+            );
+        }
+    }
+}
+
+#[test]
+fn closing_panel_exit_keys_never_create_a_replay_request() {
+    for panel in [E::Server, E::Settings] {
+        for key in [egui::Key::Space, egui::Key::Enter] {
+            let mut trial = Trial::new();
+            trial.until(3308);
+            let close = trial.request_close();
+            trial.click(panel);
+            for _ in 0..26 {
+                trial.pending_close_frame(&close);
+            }
+            trial.close_panel(panel);
+            assert!(trial.panel_visible(panel));
+            // Keep Close pending while the panel still owns the exit fade.
+            while trial.panel_visible(panel) {
+                trial.key(key);
+                trial.pending_close_frame(&close);
+            }
+            trial
+                .game
+                .acknowledge(close.generation, close.id, true)
+                .unwrap();
+            while trial.now < 5000 {
+                trial.service_frame();
+            }
+            assert_eq!(
+                trial.plays(),
+                0,
+                "{panel:?} {key:?} exit cannot queue replay"
+            );
+        }
+    }
+}
+
+#[test]
+fn buffered_close_replay_waits_for_return_panels_and_their_exit_fades() {
+    for panel in [E::Settings, E::Server] {
+        let mut trial = Trial::new();
+        trial.until(3308);
+        let close = trial.request_close();
+        trial.key(egui::Key::Enter); // A deliberate request on the closing login.
+        trial.click(panel);
+        assert!(trial.panel_visible(panel));
+        for _ in 0..26 {
+            trial.pending_close_frame(&close);
+        }
+        trial
+            .game
+            .acknowledge(close.generation, close.id, true)
+            .unwrap();
+        while trial.now < 5000 {
+            trial.service_frame();
+            assert_eq!(trial.plays(), 0, "replay cannot start behind {panel:?}");
+            assert!(trial.panel_visible(panel));
+        }
+        assert_eq!(trial.login.state.view(true).phase, MenuPhase::Login);
+        trial.close_panel(panel);
+        while trial.panel_visible(panel) {
+            trial.service_frame();
+            assert_eq!(trial.plays(), 0, "replay must wait for the exit fade");
+        }
+        // The close completes during step; the next service seam admits replay.
+        trial.service_frame();
+        assert_eq!(trial.plays(), 1);
+        trial.service_frame();
+        assert_eq!(trial.plays(), 1, "the buffered request is consumed once");
+    }
 }
 
 #[test]

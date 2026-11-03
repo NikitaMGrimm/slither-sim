@@ -40,6 +40,10 @@ while the session continues the login/world crossfade underneath. Closing before
 return completion defers nickname focus to the existing completion intent; a
 panel retained into Login keeps focus until its ordinary close handoff. The
 hold, return clock, queued Play and receipt-derived final length are unchanged.
+An Enter deliberately buffered on the login during explicit Close is retained
+while Servers or Settings is open, including its exit fade, and dispatches once
+after the panel releases input and Play becomes available. Enter inside either
+panel belongs to its controls and never buffers another Play.
 Authored regressions are in `tests/return_panels.rs`.
 
 After the death return completes, the menu keeps presenting while the old

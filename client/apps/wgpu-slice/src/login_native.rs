@@ -280,7 +280,13 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
-        if self.replay_after_close && game.can_play() && !self.state.view(true).play_disabled {
+        // Retain Close replay until the panel, including its exit fade, releases
+        // input. Otherwise a picker can survive invisibly into the next world.
+        if self.replay_after_close
+            && self.login_owns_input()
+            && game.can_play()
+            && !self.state.view(true).play_disabled
+        {
             self.replay_after_close = false;
             self.state.action(MenuAction::Play, true);
         }
@@ -713,8 +719,10 @@ impl NativeLogin {
             self.pixel_scale,
             &order,
             |ctx, reveal| {
-                // While open, the picker and studio own Enter and Escape.
+                // Panels own Enter throughout their visible lifetime, including
+                // exit fades; editing a control must not also queue Close replay.
                 if self.closing
+                    && !settings
                     && !picker
                     && !studio
                     && !self.login_ui.composing
