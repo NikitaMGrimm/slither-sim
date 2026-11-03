@@ -421,7 +421,10 @@ measurements, not additive whole-frame claims. They motivated specialization
 before a data-layout or threading rewrite.
 
 The primary comparison is RTX 5070 Ti / Vulkan at physical 3840x2160, Original
-and Native, DPR 1. The same retained offline join drives 600 virtual 60 Hz
+and Native, DPR 1. The restricted input has neutral local identifier
+`retained-join-A`, SHA-256
+`a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43`; the recording remains outside Git.
+The same retained offline join drives 600 virtual 60 Hz
 callbacks over 10 seconds, 29,044 messages and zero skips. Art quantiles select
 callbacks 120–419 ([2,7) seconds). This is about 18,475 visible foods and 30,522
 retained foods at the window median. Every timing run includes the native login
