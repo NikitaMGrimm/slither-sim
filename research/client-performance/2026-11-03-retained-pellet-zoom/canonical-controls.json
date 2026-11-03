@@ -1,0 +1,38 @@
+{
+  "1920x1080": {
+    "base": {
+      "binary_sha256": "f8d11472188dbfa4fb2308c90b3616a8bd6adbb238442441e3ae77303f2bbf33",
+      "callbacks": 600,
+      "skips": 0,
+      "canonical_quads": 48556857,
+      "quad_digest": "68ed045956b35a71",
+      "canonical_and_send_digest": "a462e133265488fa"
+    },
+    "candidate": {
+      "binary_sha256": "eadbd6043c8a393922c89043a4536e2704d100fc32b9c8b60259bee45a3705b0",
+      "callbacks": 600,
+      "skips": 0,
+      "canonical_quads": 48556857,
+      "quad_digest": "68ed045956b35a71",
+      "canonical_and_send_digest": "a462e133265488fa"
+    }
+  },
+  "3840x2160": {
+    "base": {
+      "binary_sha256": "f8d11472188dbfa4fb2308c90b3616a8bd6adbb238442441e3ae77303f2bbf33",
+      "callbacks": 600,
+      "skips": 0,
+      "canonical_quads": 48556857,
+      "quad_digest": "1448fb215738ce28",
+      "canonical_and_send_digest": "895bdb15bcfb56f7"
+    },
+    "candidate": {
+      "binary_sha256": "eadbd6043c8a393922c89043a4536e2704d100fc32b9c8b60259bee45a3705b0",
+      "callbacks": 600,
+      "skips": 0,
+      "canonical_quads": 48556857,
+      "quad_digest": "1448fb215738ce28",
+      "canonical_and_send_digest": "895bdb15bcfb56f7"
+    }
+  }
+}
