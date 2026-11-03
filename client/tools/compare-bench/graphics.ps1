@@ -73,4 +73,27 @@ public static class BenchGraphics {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern bool EnumDisplaySettings(string device,int mode,ref Mode data);
   public static uint Refresh(string device) { Mode m=new Mode(); m.Size=(ushort)Marshal.SizeOf(typeof(Mode)); if(!EnumDisplaySettings(device,-1,ref m))return 0; return m.Frequency; }
 }
+public sealed class BenchGpu : IDisposable {
+  [StructLayout(LayoutKind.Sequential)] struct Value { public uint Status; public double Number; }
+  public class Reading { public string instance; public double utilization; }
+  [DllImport("pdh.dll",CharSet=CharSet.Unicode)] static extern uint PdhOpenQuery(string source,UIntPtr user,out IntPtr query);
+  [DllImport("pdh.dll",CharSet=CharSet.Unicode,EntryPoint="PdhAddEnglishCounterW")] static extern uint Add(IntPtr query,string path,UIntPtr user,out IntPtr counter);
+  [DllImport("pdh.dll")] static extern uint PdhCollectQueryData(IntPtr query);
+  [DllImport("pdh.dll")] static extern uint PdhGetFormattedCounterValue(IntPtr counter,uint format,out uint type,out Value value);
+  [DllImport("pdh.dll")] static extern uint PdhCloseQuery(IntPtr query);
+  IntPtr query; readonly List<IntPtr> counters=new List<IntPtr>(); readonly List<string> names=new List<string>();
+  static void Check(uint code) {if(code!=0)throw new Exception("GPU PDH error 0x"+code.ToString("x8"));}
+  public BenchGpu(string[] instances) {
+    Check(PdhOpenQuery(null,UIntPtr.Zero,out query));
+    foreach(var name in instances) {IntPtr counter;Check(Add(query,"\\GPU Engine("+name+")\\Utilization Percentage",UIntPtr.Zero,out counter));counters.Add(counter);names.Add(name);}
+    Check(PdhCollectQueryData(query));
+  }
+  public Reading[] Sample() {
+    Check(PdhCollectQueryData(query));var result=new List<Reading>();
+    for(int i=0;i<counters.Count;i++){uint type;Value v;Check(PdhGetFormattedCounterValue(counters[i],0x200,out type,out v));
+      if(v.Status==0||v.Status==1)result.Add(new Reading{instance=names[i],utilization=v.Number});
+    }return result.ToArray();
+  }
+  public void Dispose(){if(query!=IntPtr.Zero){PdhCloseQuery(query);query=IntPtr.Zero;}}
+}
 '@

@@ -92,21 +92,18 @@ $prevCpu = [BenchWindow]::Cpu()
 $hostProcess = Get-Process -Id $c.hostPid
 $prevHost = $hostProcess.TotalProcessorTime.TotalSeconds
 $prevAt = [Diagnostics.Stopwatch]::GetTimestamp()
-$end = [DateTime]::UtcNow.AddSeconds($c.seconds)
 $buildCommands = $false
 $nextBuildCheck = [DateTime]::MinValue
 $gpuEngines = @()
 $gpuError = $null
-$gpuCounters = @()
+$gpuQuery = $null
 try {
   $category = New-Object Diagnostics.PerformanceCounterCategory('GPU Engine')
-  $gpuCounters = @($category.GetInstanceNames() | Where-Object { $_ -match ('^pid_' + $c.gpuPid + '_') } | ForEach-Object {
-    $counter = New-Object Diagnostics.PerformanceCounter('GPU Engine','Utilization Percentage',$_)
-    $null = $counter.NextValue()
-    $counter
-  })
+  $instances = [string[]]@($category.GetInstanceNames() | Where-Object { $_ -match ('^pid_' + $c.gpuPid + '_') })
+  $gpuQuery = New-Object BenchGpu(,$instances)
 } catch { $gpuError = $_.Exception.Message }
 $displayBindings = @([BenchGraphics]::DisplayBindings())
+$end = [DateTime]::UtcNow.AddSeconds($c.seconds)
 while ([DateTime]::UtcNow -lt $end) {
   $r = New-Object BenchWindow+Rect
   [BenchWindow]::GetClientRect($hwnd,[ref]$r) | Out-Null
@@ -123,7 +120,7 @@ while ([DateTime]::UtcNow -lt $end) {
     $nextBuildCheck = [DateTime]::UtcNow.AddSeconds(1)
   }
   $build = $build -or $buildCommands
-  try { $gpuEngines = @($gpuCounters | ForEach-Object { @{instance=$_.InstanceName; utilization=$_.NextValue()} }) }
+  try { if ($gpuQuery) { $gpuEngines = @($gpuQuery.Sample()) } }
   catch { $gpuError = $_.Exception.Message }
   @{ qpcMs=[BenchWindow]::QpcMs(); foreground=([BenchWindow]::GetForegroundWindow() -eq $hwnd);
      occluded=[BenchWindow]::Occluded($hwnd); minimized=[BenchWindow]::IsIconic($hwnd); visible=[BenchWindow]::IsWindowVisible($hwnd);
@@ -134,4 +131,4 @@ while ([DateTime]::UtcNow -lt $end) {
   $prevCpu=$cpu; $prevHost=$hostCpu; $prevAt=$now
   Start-Sleep -Milliseconds 250
 }
-foreach ($counter in $gpuCounters) { $counter.Dispose() }
+if ($gpuQuery) { $gpuQuery.Dispose() }

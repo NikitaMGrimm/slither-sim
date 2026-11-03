@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { presentation, csv, hostStats, wholeMap, validity, schedule, netlogProof, comparison } from './analysis.mjs';
+import { presentation, csv, hostStats, wholeMap, validity, schedule, netlogProof, comparison, presentMonFailure } from './analysis.mjs';
 import { ntl } from './browser.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +14,9 @@ let interrupted = false;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sha = async file => hash(await fs.readFile(file));
 const save = (file, value) => fs.writeFile(file, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' });
+export function completeJsonLines(text, prefix) {
+  return text.split(/\r?\n/).slice(0,-1).filter(l => l.startsWith(prefix)).map(l => JSON.parse(l.slice(prefix.length)));
+}
 async function treeHash(directory) {
   const rows = [];
   async function walk(dir, prefix = '') {
@@ -98,6 +101,7 @@ async function runAttempt(config, root, item, provenance, machine) {
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, monitor, pm, host, native;
   let startHost = 0, startClient = 0, hostEnd = 0;
+  let pmLog = '';
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
@@ -123,6 +127,8 @@ async function runAttempt(config, root, item, provenance, machine) {
     if (item.client === 'ntl') {
       browser = await ntl({ ...config, directory, endpoint, register });
       native = browser.child;
+      r.adapter = browser.adapter; r.chromeVersion = browser.chromeVersion;
+      r.adapterRequest = config.adapter; r.vsync = 'Chrome default compositor pacing; actual SyncInterval unmeasured until ETW';
       await windows({ mode: 'setup', clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       if (item.scenario === 'battledome') await browser.zoomOut();
       const view = await browser.view(); r.preflightView = view;
@@ -148,20 +154,19 @@ async function runAttempt(config, root, item, provenance, machine) {
         { cwd: directory, env: { ...process.env, LOCALAPPDATA: data, SLITHER_FRAME_PACING: '1' }, windowsHide: false });
       register(native); native.stdout.on('data', b => clientLog += b); native.stderr.on('data', b => clientLog += b);
       await windows({ mode: 'setup', clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
-      await waitFor(() => hostLog.split(/\r?\n/).some(l => l.startsWith('frame-bench: ') && JSON.parse(l.slice(13)).players?.[0]?.setup)
+      await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
         || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
       r.vsync = 'Fifo (source); PresentMon records actual mode and SyncInterval';
       r.networkVerified = true; // Direct explicit --server bypasses discovery; verify socket census below.
     }
     r.worldReady = await waitFor(() => {
-      const line = hostLog.split(/\r?\n/).filter(l => l.startsWith('frame-bench: ')).at(-1);
-      if (!line) return null;
-      const census = JSON.parse(line.slice(13));
+      const census = completeJsonLines(hostLog, 'frame-bench: ').at(-1);
+      if (!census) return null;
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
     await delay(config.warmupSeconds * 1000);
     // Start ETW before the fixed window; retain the guards before/after it too.
-    const csvPath = path.join(directory, 'presentmon.csv'); let pmLog = '';
+    const csvPath = path.join(directory, 'presentmon.csv');
     pm = spawn(config.presentMon, ['--session_name', `SlitherBench-${randomUUID()}`, '--output_file', csvPath,
       '--v2_metrics', '--qpc_time_ms', '--timed', String(config.seconds + 12), '--terminate_after_timed', '--no_console_stats'], { windowsHide: true }); register(pm);
     pm.stdout.on('data', b => pmLog += b); pm.stderr.on('data', b => pmLog += b);
@@ -200,8 +205,7 @@ async function runAttempt(config, root, item, provenance, machine) {
       machineMaxCpuPercent: Math.max(...r.windowSamples.map(s => s.machineCpuPercent)),
       logicalProcessors: machine.logicalProcessors };
     if (!browser) {
-      r.views = clientLog.slice(startClient).split(/\r?\n/).filter(l => l.startsWith('frame-bench-client: ')).map(l => {
-        const v = JSON.parse(l.slice('frame-bench-client: '.length));
+      r.views = completeJsonLines(clientLog.slice(startClient), 'frame-bench-client: ').map(v => {
         // Camera works in logical client backing coordinates, not attachment pixels.
         const viewport = v.viewport ?? [config.width * 96 / r.dpi, config.height * 96 / r.dpi];
         return { ...v, viewport, wholeMap: wholeMap({ ...v, viewport }) };
@@ -212,10 +216,11 @@ async function runAttempt(config, root, item, provenance, machine) {
       r.networkVerified = peers.length > 0 && peers.every(p => p.RemoteAddress === '127.0.0.1' && p.RemotePort === +new URL(endpoint).port);
     }
     r.stats = hostStats(hostLog.slice(startHost, hostEnd));
-    r.census = hostLog.slice(startHost, hostEnd).split(/\r?\n/).filter(l => l.startsWith('frame-bench: ')).map(l => JSON.parse(l.slice('frame-bench: '.length)));
+    r.census = completeJsonLines(hostLog.slice(startHost, hostEnd), 'frame-bench: ');
     await new Promise(resolve => pm.exitCode !== null ? resolve() : pm.once('close', resolve));
     await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
     if (pm.exitCode !== 0) throw Error(`PresentMon exit ${pm.exitCode}; ETW access/collection failed. No self-elevation attempted.`);
+    if (presentMonFailure(pmLog)) throw Error(presentMonFailure(pmLog));
     const text = await fs.readFile(csvPath, 'utf8');
     const surfaces = new Map();
     const ownedPids = new Set([browser ? browser.gpuPid : native.pid]);
@@ -242,8 +247,9 @@ async function runAttempt(config, root, item, provenance, machine) {
     for (const child of [...children].reverse()) await stop(child);
     await fs.writeFile(path.join(directory, 'host.txt'), hostLog);
     await fs.writeFile(path.join(directory, 'client.txt'), clientLog);
-    if (browser) {
-      try { r.networkProof = netlogProof(JSON.parse(await fs.readFile(browser.log, 'utf8')), r.endpoint.replace('ws://', '').replace('/slither', '')); r.networkVerified = r.networkProof.verified; }
+    await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
+    if (item.client === 'ntl' && r.endpoint) {
+      try { r.networkProof = netlogProof(JSON.parse(await fs.readFile(path.join(directory,'netlog.json'), 'utf8')), r.endpoint.replace('ws://', '').replace('/slither', '')); r.networkVerified = r.networkProof.verified; }
       catch (e) { r.networkError = e.message; }
     }
     r.validity = validity(r); await save(path.join(directory, 'result.json'), r);
@@ -292,6 +298,11 @@ export async function main(args = process.argv.slice(2)) {
   catch (error) { provenance.vlither = { error: error.message }; }
   await save(path.join(session, 'inputs.json'), provenance);
   const machine = (await windows({ mode: 'machine' }, session, 'machine', []))[0];
+  if (config.experiment === 'primary') {
+    const adapter = machine.dxgiAdapters.find(a => a.luid === config.targetAdapterLuid);
+    const display = machine.screens.find(s => s.display === config.targetDisplay);
+    if (adapter?.vendorId !== 0x1002 || !display || display.bounds[2] !== 3840 || display.bounds[3] !== 2160 || config.targetRefreshHz !== 240) throw Error('Primary matrix requires the AMD adapter and the physical 3840x2160 / 240 Hz display; inspect and correct the external config. No run was started.');
+  }
   const rounds = args[0] === 'smoke' ? 1 : config.rounds ?? 3;
   if (args[0] === 'run' && rounds < 3) throw Error('Real runs require at least three rounds');
   const results = [];

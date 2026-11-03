@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation, hostStats, validity, wholeMap, schedule, netlogProof, comparison } from './compare-bench/analysis.mjs';
-import { endpointFrom } from './compare-bench/run.mjs';
+import { csv, presentation, hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure } from './compare-bench/analysis.mjs';
+import { endpointFrom, completeJsonLines } from './compare-bench/run.mjs';
 import { adapterFlags } from './compare-bench/browser.mjs';
 
 test('CSV quoting, BOM and malformed rows', () => {
@@ -58,7 +58,7 @@ test('round order reverses and keeps every variant', () => {
   assert.deepEqual(schedule(3, ['a', 'b']).map(x => x.client), ['a', 'b', 'b', 'a', 'a', 'b']);
 });
 test('network evidence rejects remote peers and missing game connection', () => {
-  const make = addresses => ({ constants: { logEventTypes: { TCP_CONNECT_ATTEMPT: 5 } }, events: addresses.map(remote_address => ({ type: 5, params: { remote_address } })) });
+  const make = addresses => ({ constants: { logEventTypes: { TCP_CONNECT_ATTEMPT: 5 } }, events: addresses.flatMap((address,id) => [{ type: 5, phase: 1, source:{id}, params: { address } },{type:5,phase:2,source:{id}}]) });
   assert.equal(netlogProof(make(['127.0.0.1:12']), '127.0.0.1:12').verified, true);
   assert.equal(netlogProof(make(['127.0.0.1:12', '203.0.113.1:80']), '127.0.0.1:12').verified, false);
   assert.equal(netlogProof(make(['127.0.0.1:13']), '127.0.0.1:12').verified, false);
@@ -68,4 +68,12 @@ test('readiness admits only complete allowed literal-loopback announcements', ()
   assert.equal(endpointFrom('Listening on ws://127.0.0.1:49'), null);
   assert.equal(endpointFrom('Listening on ws://203.0.113.1:49152/slither\n'), null);
   for (const port of [0, 8766, 18884, 18885, 65536]) assert.throws(() => endpointFrom(`Listening on ws://127.0.0.1:${port}/slither\n`));
+});
+test('streamed telemetry ignores a partial final line without accepting defaults', () => {
+  assert.deepEqual(completeJsonLines('other\nframe-bench: {"tick":1}\nframe-bench: {"ti', 'frame-bench: '), [{tick:1}]);
+  assert.throws(() => completeJsonLines('frame-bench: malformed\n','frame-bench: '));
+});
+test('ETW loss is a collection failure even with successful process exit', () => {
+  assert.match(presentMonFailure('warning: 12345 ETW events were lost.'), /lost ETW/);
+  assert.equal(presentMonFailure('Started recording.\nStopped recording.'), null);
 });

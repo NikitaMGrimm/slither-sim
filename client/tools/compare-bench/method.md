@@ -186,7 +186,9 @@ Both committed scenarios start a fresh host at `127.0.0.1:0 --stats 0.5
   and `vision:13000` (larger than that diameter from any in-arena player position).
   Census records actual radius, admitted bot seats and alive bots. The feature-gated host hook
   gives **only the socket player** every food sector intersecting the arena
-  bounds; internal bots retain ordinary 45-sector interest and normal visibility.
+  bounds; internal bots retain ordinary 45-sector food interest. The configured
+  snake/prey vision is world-wide and therefore also applies to internal bots;
+  its additional host cost is part of the measured workload.
   Raising `vision` alone would not expand food interest. A camera fit test includes
   offset from the arena centre; a zoom slider endpoint alone is not acceptance.
 * Normal uses 500 bots, normal client zoom, `sizeToPopulation:true` and

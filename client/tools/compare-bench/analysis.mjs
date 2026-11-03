@@ -51,6 +51,11 @@ export function hostStats(text) {
   return [...text.matchAll(/stats: ticks\/s=([\d.]+) deferred_ticks=(\d+) lost_seconds=([\d.]+) simulation_load=([\d.]+)% players=(\d+) bot_slots=(\d+)/g)]
     .map(m => ({ ticksPerSecond: +m[1], deferredTicks: +m[2], lostSeconds: +m[3], simulationLoad: +m[4], players: +m[5], bots: +m[6] }));
 }
+export function presentMonFailure(text) {
+  if (/[1-9]\d*\s+ETW events were lost/i.test(text)) return 'PresentMon lost ETW events; presentation coverage is incomplete';
+  if (/access.*denied|error.*(?:trace|session)|failed to start/i.test(text)) return 'PresentMon ETW capture failed; inspect retained console output';
+  return null;
+}
 export function wholeMap({ camera, center, radius, zoom, viewport }) {
   if (![...camera, center, radius, zoom, ...viewport].every(Number.isFinite) || radius <= 0 || zoom <= 0) return false;
   return (radius + Math.abs(camera[0] - center)) * zoom <= viewport[0] / 2 + .01
@@ -116,8 +121,11 @@ export function schedule(rounds = 3, clients = ['original', 'native', 'ntl', 'vl
 export function netlogProof(log, endpoint) {
   // TCP connect completion is network evidence; JS WebSocket hooks alone are not.
   const names = Object.fromEntries(Object.entries(log.constants?.logEventTypes ?? {}).map(([k, v]) => [v, k]));
-  const connected = log.events?.filter(e => /TCP_CONNECT_ATTEMPT/.test(names[e.type]) && e.params?.remote_address && e.params?.net_error === undefined) ?? [];
-  const addresses = connected.map(e => e.params.remote_address);
+  const attempts = log.events?.filter(e => /TCP_CONNECT_ATTEMPT/.test(names[e.type])) ?? [];
+  const starts = attempts.filter(e => e.params?.address || e.params?.remote_address);
+  const addresses = starts.map(e => e.params.address ?? e.params.remote_address);
+  const successful = starts.filter(e => attempts.some(end => end.source?.id === e.source?.id && end.phase === 2 && !end.params?.net_error));
   const loopback = a => /^127\.\d+\.\d+\.\d+:\d+$/.test(a) || /^\[::1\]:\d+$/.test(a);
-  return { verified: addresses.length > 0 && addresses.every(loopback) && addresses.includes(endpoint), addresses };
+  return { verified: addresses.length > 0 && addresses.every(loopback)
+    && successful.some(e => (e.params.address ?? e.params.remote_address) === endpoint), addresses: [...new Set(addresses)] };
 }

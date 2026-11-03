@@ -49,7 +49,11 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
   const blocked = [];
   const proxy = http.createServer((req, res) => { blocked.push(req.url); res.writeHead(403); res.end('External network denied'); });
   proxy.on('connect', (req, socket) => { blocked.push(req.url); socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); });
+  proxy.on('connection', socket => socket.on('error', error => blocked.push(`socket-error:${error.code}`)));
+  proxy.on('clientError', (error, socket) => { blocked.push(`client-error:${error.code}`); socket.destroy(); });
   const pageServer = http.createServer((req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(shell); });
+  pageServer.on('connection', socket => socket.on('error', () => {}));
+  pageServer.on('clientError', (_error, socket) => socket.destroy());
   await new Promise(resolve => proxy.listen(0, '127.0.0.1', resolve));
   await new Promise(resolve => pageServer.listen(0, '127.0.0.1', resolve));
   const profile = path.join(directory, 'chrome-profile'); await fs.mkdir(path.join(profile, 'Default'), { recursive: true });
@@ -134,7 +138,10 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
       },
       async view() {
         const v = await page.evaluate(`(()=>{
-          if(!window.playing||!window.snake||!Number.isFinite(window.gsc)||!Number.isFinite(window.view_xx)||!Number.isFinite(window.view_yy)||!Number.isFinite(window.grd)||!Number.isFinite(window.real_flux_grd)||!Array.isArray(window.foods)) throw Error('NTL view contract changed');
+          const missing=['gsc','view_xx','view_yy','grd','real_flux_grd','flux_grd','mww','mhh','foods_c'].filter(k=>!Number.isFinite(window[k]));
+          if(!Array.isArray(window.foods))missing.push('foods[]');
+          if(missing.length)throw Error('NTL read-only view preflight missing: '+missing.join(', ')+'. Mod must have a verified local adapter before timing; no inferred counts.');
+          if(!window.playing||!window.snake) throw Error('NTL stopped playing before view preflight');
           const z=window.gsc, w=window.mww, h=window.mhh;
           if(!Number.isFinite(w)||!Number.isFinite(h)||!Number.isFinite(window.foods_c))throw Error('NTL viewport/food contract changed');
           let visible=0,retained=0;
