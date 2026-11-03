@@ -204,10 +204,12 @@ impl SettingsState {
     }
 }
 /// Settings needs no connection admission, including while a returned socket closes.
-/// Pending Play, return and champion phases still own the menu.
+/// Visible return permits local edits; pending Play and champion phases still own the menu.
 pub fn available(view: &crate::start_page::StartMenuView) -> bool {
-    view.phase == crate::start_page::MenuPhase::Login
-        && view.visible
+    matches!(
+        view.phase,
+        crate::start_page::MenuPhase::Login | crate::start_page::MenuPhase::Returning
+    ) && view.visible
         && view.ordinary_controls_visible
         && !view.champion_pending
 }

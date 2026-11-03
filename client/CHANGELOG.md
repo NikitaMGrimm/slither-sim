@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Allow Servers and Settings during the visible death-return fade, retaining
+  modal input and one settled-login focus handoff; keep Change Skin unavailable.
+
 - Keep the returned death menu drawing while a slow server closes the old
   connection, and let local Settings open without connection admission.
 

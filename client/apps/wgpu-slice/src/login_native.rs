@@ -215,7 +215,9 @@ impl NativeLogin {
         effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         if settings_visible && !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
-            effects.extend(self.focus(SETTINGS));
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(SETTINGS));
+            }
         }
         self.picker.step(now)?;
         if studio_closed {
@@ -225,7 +227,11 @@ impl NativeLogin {
         }
         if self.picker.take_closed() {
             effects.extend(self.modal_effects(false));
-            effects.extend(self.focus(NICKNAME));
+            // During return the nickname is still disabled; its existing
+            // completion intent restores focus once the login has settled.
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(NICKNAME));
+            }
         }
         if self.champion.policy.visible() || self.champion.policy.finished() {
             self.champion.step(
@@ -247,6 +253,8 @@ impl NativeLogin {
     }
     pub fn begin_play_attempt(&mut self, game: &mut crate::game::LocalGame) -> Result<()> {
         game.begin_play_attempt()?;
+        // Accepted Play subsumes any held Close replay, including on later failure.
+        self.replay_after_close = false;
         self.connection_error = None;
         Ok(())
     }
@@ -274,7 +282,13 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
-        if self.replay_after_close && game.can_play() && !self.state.view(true).play_disabled {
+        // Unlike the reference picker, native panels stay modal through exit
+        // fades. Hold replay so a picker cannot survive invisibly into the world.
+        if self.replay_after_close
+            && self.login_owns_input()
+            && game.can_play()
+            && !self.state.view(true).play_disabled
+        {
             self.replay_after_close = false;
             self.state.action(MenuAction::Play, true);
         }
@@ -552,7 +566,9 @@ impl NativeLogin {
         if !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
             effects.extend(self.input.state.apply(EditIntent::Focus(None)));
-            effects.extend(self.focus(SETTINGS));
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(SETTINGS));
+            }
         }
         effects
     }
@@ -705,8 +721,10 @@ impl NativeLogin {
             self.pixel_scale,
             &order,
             |ctx, reveal| {
-                // While open, the picker and studio own Enter and Escape.
+                // Panels own Enter throughout their visible lifetime, including
+                // exit fades; editing a control must not also queue Close replay.
                 if self.closing
+                    && !settings
                     && !picker
                     && !studio
                     && !self.login_ui.composing

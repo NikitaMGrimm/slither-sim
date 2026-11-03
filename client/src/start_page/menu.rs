@@ -297,7 +297,11 @@ impl StartMenuState {
             self.spinner_visible = true;
             return None;
         }
-        if self.phase != MenuPhase::Login || self.champion || self.settings.visible() {
+        if (self.phase != MenuPhase::Login
+            && !(self.phase == MenuPhase::Returning && action == MenuAction::Server))
+            || self.champion
+            || self.settings.visible()
+        {
             return None;
         }
         match action {

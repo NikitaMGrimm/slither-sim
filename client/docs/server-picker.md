@@ -1,6 +1,6 @@
 # Native server picker
 
-The login's Servers icon opens a shared modal with a `host:port` field, Add,
+The Servers icon opens during the visible return fade and in Login, with a shared modal containing a `host:port` field, Add,
 saved Custom entries and official rows. A no-flag native launch starts official
 directory discovery and latency measurement in the background. Choose a custom row
 to enable direct Play with the fixed login. Removing the selected custom entry

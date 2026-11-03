@@ -19,11 +19,14 @@ pub enum CustomServerOperation {
     Remove(String),
 }
 const REMOVE_BASE: u16 = 8192;
-/// The directory UI is available on ordinary login even without Play admission.
+/// The directory UI is available on visible return and login, without Play admission.
 pub fn available(view: &crate::start_page::StartMenuView) -> bool {
     view.visible
         && view.ordinary_controls_visible
-        && view.phase == crate::start_page::MenuPhase::Login
+        && matches!(
+            view.phase,
+            crate::start_page::MenuPhase::Login | crate::start_page::MenuPhase::Returning
+        )
 }
 const ROW_BASE: u16 = 16;
 const VISIBLE_ROWS: usize = 6;

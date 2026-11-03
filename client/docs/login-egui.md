@@ -34,6 +34,22 @@ steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.
 
+During the visible death-return fade, Servers and Settings already accept input;
+Change Skin waits for Login. The panel keeps its own opacity and modal input
+while the session continues the login/world crossfade underneath. Closing before
+return completion defers nickname focus to the existing completion intent; a
+panel retained into Login keeps focus until its ordinary close handoff. The
+hold, return clock, queued Play and receipt-derived final length are unchanged.
+An Enter deliberately buffered on the login during explicit Close is retained
+while Servers or Settings is open, including its exit fade, and dispatches once
+after the panel releases input and Play becomes available. Enter inside either
+panel belongs to its controls and never buffers another Play.
+An accepted native Play attempt consumes any older buffered request, so a failed
+replacement connection cannot trigger another Play without input. Rejected
+admission retains the buffer. Waiting through the panel exit is an intentional
+deviation from the reference picker, because native panels retain modal input.
+Authored regressions are in `tests/return_panels.rs`.
+
 After the death return completes, the menu keeps presenting while the old
 socket's Close handshake finishes (up to five seconds). Servers, Change Skin and
 Settings remain usable; Play still waits for Close acknowledgement and committed
