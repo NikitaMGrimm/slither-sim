@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,collectRounds,requireNtlDisplayGate,sessionReport} from './compare-bench/matrix.mjs';
+import {roundPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
@@ -37,16 +37,22 @@ test('navigation waits for the matching document, including load before command 
 
 test('first-round controls and limited-view pairs retain reversed client ordering',()=>{
   const plan=roundPlan(3,['original','native','ntl','vlither'],{limitedNtlView:true});
-  assert.equal(plan.length,38);assert.equal(plan.filter(r=>r.telemetry==='off').length,8);
+  assert.equal(plan.length,30);assert.equal(plan.filter(r=>r.telemetry==='off').length,6);
   assert.ok(plan.filter(r=>r.telemetry==='off').every(r=>r.round===1&&r.client!=='vlither'));
   assert.deepEqual([...new Set(plan.filter(r=>r.round===2).map(r=>r.client))],['vlither','ntl','native','original']);
-  for(const round of [1,2,3])for(const client of ['original','native'])assert.ok(plan.some(r=>r.round===round&&r.client===client&&r.scenario==='battledome'&&r.viewCondition==='ntl-farthest'&&r.telemetry==='on'));
+  assert.ok(plan.filter(r=>r.scenario==='battledome').every(r=>r.viewCondition==='ntl-farthest'));
+  assert.ok(plan.filter(r=>r.scenario==='normal').every(r=>r.viewCondition==='stock'));
   for(const client of ['original','native']){
     const matched=plan.filter(r=>r.round===1&&r.client===client&&r.viewCondition==='ntl-farthest');
     assert.deepEqual(matched.map(r=>r.telemetry),client==='original'?['on','off']:['off','on']);
     assert.ok(matched.every(r=>r.scenario==='battledome'));
   }
   assert.equal(roundPlan(3,['original','native','ntl','vlither'],{telemetryControls:false}).length,24);
+  for(const [clients,limited] of [[['original','native','vlither'],true],[['original','native','ntl','vlither'],false]]){
+    const fallback=roundPlan(3,clients,{limitedNtlView:limited});
+    assert.ok(fallback.filter(r=>r.scenario==='battledome').every(r=>r.viewCondition==='whole-map'));
+    assert.ok(fallback.filter(r=>r.scenario==='normal').every(r=>r.viewCondition==='stock'));
+  }
 });
 test('run/smoke require a passing NTL display gate before planning',()=>{
   for(const calibration of [undefined,{}, {displayGate:null},{displayGate:{}},{displayGate:{passed:false,reasons:[]}},{displayGate:{passed:'true'}}]){
@@ -54,6 +60,14 @@ test('run/smoke require a passing NTL display gate before planning',()=>{
   }
   assert.throws(()=>requireNtlDisplayGate({displayGate:{passed:false,reasons:['Window occluded','Wrong display']}}),/NTL display preflight rejected.*Window occluded; Wrong display/);
   assert.doesNotThrow(()=>requireNtlDisplayGate({displayGate:{passed:true,reasons:[]}}));
+});
+test('moving foreground before picture setup never permits input or focus loss to be hidden by warmup',()=>{
+  const focus={lastInputTick:50},current={lastInputTick:50,idleMs:5000,foreground:true,visible:true,minimized:false,occluded:false};
+  assert.doesNotThrow(()=>requireSetupAvailability(focus,current));
+  for(const change of [s=>s.lastInputTick=51,s=>s.idleMs=4999,s=>s.foreground=false,s=>s.visible=false,s=>s.minimized=true,s=>s.occluded=true,s=>delete s.idleMs]){
+    const bad={...current};change(bad);assert.throws(()=>requireSetupAvailability(focus,bad),/Owner input or window obscured/);
+  }
+  assert.throws(()=>requireSetupAvailability({},current),/Owner input/);
 });
 
 test('outer-circle anchoring rejects a pit circle and measures a zoom plateau',()=>{
@@ -70,7 +84,8 @@ test('NTL rows reproduce calibration wheel/settings and settle before warmup',as
   const calibration={physicalPixelsPerWorldUnit:.6,wholeMap:false,totalWheelNotches:1040,settings};
   const calls=[],browser={ntlSettings:settings,zoomOut:async n=>calls.push(['wheel',n])};
   const settled=await settleNtlView(browser,calibration,'ntl-farthest',async i=>{calls.push(['picture',i]);return {picture,census};},async ms=>calls.push(['settle',ms]));
-  calls.push(['warmup']);assert.deepEqual(calls,[['wheel',1040],['picture',0],['settle',500],['picture',1],['warmup']]);
+  calls.push(['warmup']);assert.deepEqual(calls,[['wheel',80],['picture',0],['settle',500],['picture',1],['warmup']]);
+  assert.equal(settled.referenceWheelNotches,1040);
   assert.equal(settled.samples.length,2);assert.equal(settled.samples[1].anchor.wholeMap,false);
   const changed={...browser,ntlSettings:{...settings,slowReturnEnabled:true},zoomOut:()=>assert.fail('Wrong settings must fail before wheel input')};
   await assert.rejects(settleNtlView(changed,calibration,'ntl-farthest',()=>{},()=>{}),/zoom UI settings differ/);
@@ -144,6 +159,55 @@ test('matched native off control measures scale then acknowledges telemetry sile
   await assert.rejects(settleNativeView({...options,stopTelemetry:async()=>{throw Error('Missing stop acknowledgement');}}),/Missing stop acknowledgement/);
   const on=await settleNativeView({...options,stopTelemetry:undefined});assert.match(on.method,/continuous/);assert.equal(on.stoppedAtMs,undefined);
   await assert.rejects(settleNativeView({...options,readView:async()=>({}),stopTelemetry:()=>assert.fail('Unmeasured scale must not stop setup')}),/physical zoom unavailable/);
+});
+
+// Authored physical-pixel image; no third-party screenshot or game connection.
+function vlitherPicture(zoom=.14,atMs=-10000) {
+  const width=480,height=360,channels=3,pixels=Buffer.alloc(width*height*channels);
+  const radius=1000*zoom,cx=width/2,cy=height/2-750*zoom;
+  // A filled red exterior models a stock shader's boundary tint, not its code.
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(Math.hypot(x-cx,y-cy)>=radius)pixels[(y*width+x)*3]=120;
+  for(let i=0;i<8;i++)for(let y=0;y<3;y++)for(let x=0;x<3;x++)pixels[((150+y)*width+160+i*15+x)*3+1]=200;
+  const picture={...pictureEvidence({width,height,channels,pixels}),imageSha256:'a'.repeat(64)};
+  const view={zoom,atMs,viewport:[width,height],framebuffer:[width,height],rendererViewport:[width,height],
+    zoomUnits:'framebuffer-pixels-per-world-unit',camera:[1000,1750],center:1000,radius:1000,
+    wheelZoom:zoom,wheelStep:.1,stockZoomMinimum:.025,stockZoomMaximum:10};
+  const census={atMs,radius:1000,players:[{alive:true,setup:true,x:0,y:750}]};
+  return {picture,census,view,atMs};
+}
+test('Vlither scale uses framebuffer pixels and requires independent anchored picture agreement',()=>{
+  const sample=vlitherPicture(),calibration={wholeMap:false,physicalPixelsPerWorldUnit:.14};
+  assert.equal(vlitherPhysicalScale(sample.view,480,360),.14);
+  assert.equal(checkVlitherPicture(sample,calibration,480,360).wholeMap,false);
+  for(const change of [s=>s.view.zoom=.2,s=>s.view.framebuffer=[384,288],s=>s.view.rendererViewport=[384,288],
+    s=>delete s.view.zoomUnits,s=>s.picture.boundary.radius*=1.2,s=>s.census.players[0].y=0,
+    s=>s.view.atMs-=1201,s=>s.census.atMs-=1201,s=>s.picture.pelletCandidates=0,
+    s=>s.picture.boundary.radius=NaN,s=>delete s.picture.imageSha256]){
+    const bad=structuredClone(sample);change(bad);assert.throws(()=>checkVlitherPicture(bad,calibration,480,360),/Vlither zoom picture preflight/);
+  }
+});
+test('Vlither prefers whole stock notches and uses bounded fractional callback offsets only when needed',async()=>{
+  const initial={...vlitherPicture().view,zoom:1.5,wheelZoom:1.5};
+  const whole=vlitherWheel(initial,.1803,480,360);assert.equal(whole.notches,-21);assert.match(whole.method,/whole/);
+  const lower=vlitherWheel(initial,1.5*Math.exp(-2.15),480,360);
+  assert.equal(lower.notches,-22);assert.match(lower.method,/whole/,'the lower adjacent notch fits 5% even though the upper one misses');
+  const target=1.5*Math.exp(-3.5),fraction=vlitherWheel({...initial,wheelStep:.2},target,480,360);
+  assert.equal(fraction.notches,-17.5);assert.match(fraction.method,/1\/120/);
+  assert.throws(()=>vlitherWheel(initial,.01,480,360),/unchanged stock zoom range/);
+  assert.throws(()=>vlitherWheel({...initial,wheelStep:100},.14,480,360),/quantum cannot reach/);
+  assert.throws(()=>vlitherWheel({...initial,wheelZoom:1.6},.14,480,360),/not settled/);
+  let zoom=1.5;const calls=[];
+  const setup=await settleVlitherView({calibration:{wholeMap:false,physicalPixelsPerWorldUnit:.14},width:480,height:360,
+    readView:async()=>({...initial,zoom,wheelZoom:zoom}),wheel:async n=>{calls.push('wheel');zoom*=Math.exp(n*.1);},
+    capture:async i=>{calls.push('picture');return vlitherPicture(zoom,-10000+i*500);},pause:async()=>calls.push('settle')});
+  calls.push('warmup');assert.deepEqual(calls,['wheel','picture','settle','picture','warmup']);
+  assert.equal(setup.pictureSamples.length,2);
+  await assert.rejects(settleVlitherView({calibration:{wholeMap:true}}),/limited-view calibration/);
+  const stepped=reachedAt=>{let wheels=0,current=1.5;return {calibration:{wholeMap:false,physicalPixelsPerWorldUnit:.14},width:480,height:360,
+    readView:async()=>({...initial,zoom:current,wheelZoom:current}),wheel:async()=>{if(++wheels===reachedAt)current=.14;},
+    capture:async i=>vlitherPicture(current,-10000+i*500),pause:async()=>{}};};
+  assert.equal((await settleVlitherView(stepped(8))).adjustments.length,8,'the eighth wheel may be the one that lands');
+  await assert.rejects(settleVlitherView(stepped(9)),/stock wheel did not reach target/);
 });
 
 test('collector exposes split live ETW loss before capture completion',async()=>{
@@ -247,6 +311,29 @@ test('a labelled limited view must match its calibrated physical scale',()=>{
   run.views[10].zoom=.25;
   assert.ok(validity(run).reasons.includes('Farthest NTL view scale not matched within 5%'));
   delete run.ntlViewCalibration;assert.equal(validity(run).valid,false);
+});
+test('matched Vlither timed acceptance keeps scene, whole-map delivery and 5% scale gates',()=>{
+  const run=completeBattledome(),sample=vlitherPicture();
+  Object.assign(run,{client:'vlither',viewCondition:'ntl-farthest',width:480,height:360,
+    ntlViewCalibration:{wholeMap:false,physicalPixelsPerWorldUnit:.14},viewSetup:{pictureSamples:[sample,vlitherPicture(.14,-9500)]}});
+  run.windowSamples.forEach(s=>Object.assign(s,{width:480,height:360,clientRect:[0,0,480,360]}));
+  run.views.forEach(v=>Object.assign(v,{...sample.view,atMs:v.atMs,wholeMap:false,protocol:19,drawnLiveSnakes:20,receivedUneatenPellets:1000,visiblePellets:100}));
+  assert.equal(validity(run).valid,true);
+  for(const change of [r=>r.views[0].zoom=.15,r=>r.views[0].wholeMap=true,r=>r.views[0].framebuffer=[384,288],
+    r=>delete r.viewSetup,r=>r.viewSetup.pictureSamples[0].atMs=500,
+    r=>r.views[0].drawnLiveSnakes=0,r=>r.views[0].receivedUneatenPellets=0,r=>r.census[0].wholeMapFood=false,
+    r=>r.census[0].players[0].wireLivingSnakes=50]){
+    const bad=structuredClone(run);change(bad);assert.equal(validity(bad).valid,false);
+  }
+  const other=structuredClone(run);run.validity=validity(run);other.validity=validity(other);
+  assert.equal(comparison(run,other).classification,'direct comparison','authored complete evidence can qualify at the same view');
+  other.contentDisplayCorrelation='unestablished';assert.equal(comparison(run,other).classification,'labelled comparison only');
+  other.contentDisplayCorrelation='established';delete other.views[0].drawnLiveSnakes;
+  assert.equal(comparison(run,other).classification,'labelled comparison only');
+  const fallback=completeBattledome();fallback.client='vlither';fallback.viewCondition='whole-map';
+  fallback.views.forEach(v=>Object.assign(v,{zoom:.025,zoomUnits:'framebuffer-pixels-per-world-unit',viewport:[960,540],
+    framebuffer:[960,540],rendererViewport:[960,540],protocol:19}));
+  assert.equal(validity(fallback).valid,true,'whole-map fallback needs no NTL calibration or matched-view picture receipt');
 });
 test('native network observations retain early TCP and UDP violations without claiming complete proof',()=>{
   const sample={atUnixMs:0,pids:[7],tcpCollected:true,udpCollected:true,tcp:[{pid:7,localAddress:'127.0.0.1',remoteAddress:'127.0.0.1',state:'Established'}],udp:[{pid:7,localAddress:'::1',remoteAddress:null}]};

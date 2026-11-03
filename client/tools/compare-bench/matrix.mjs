@@ -1,30 +1,13 @@
-import {schedule,transientFailure,comparison} from './analysis.mjs';
+import {schedule,transientFailure,comparison,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture} from './analysis.mjs';
 
 export function roundPlan(rounds,clients,{telemetryControls=true,limitedNtlView=false}={}) {
+  const matched=limitedNtlView&&clients.includes('ntl');
   return schedule(rounds,clients).flatMap(({round,client},index)=>['battledome','normal'].flatMap(scenario=>{
-    const base={round,client,scenario,viewCondition:scenario==='normal'?'stock':client==='ntl'&&limitedNtlView?'ntl-farthest':'whole-map'};
+    const base={round,client,scenario,viewCondition:scenario==='normal'?'stock':matched?'ntl-farthest':'whole-map'};
     const on={...base,telemetry:'on'},off={...base,telemetry:'off'};
     const rows=round===1&&telemetryControls&&client!=='vlither'?(index%2?[off,on]:[on,off]):[on];
-    if(scenario==='battledome'&&limitedNtlView&&['original','native'].includes(client)){
-      const matched={...on,viewCondition:'ntl-farthest'};
-      rows.push(...(round===1&&telemetryControls?(index%2?[{...matched,telemetry:'off'},matched]:[matched,{...matched,telemetry:'off'}]):[matched]));
-    }
     return rows;
   }));
-}
-
-export function anchoredBoundary(view,census) {
-  const b=view.boundary,p=census?.players?.[0],radius=census?.radius;
-  if(!b||!p?.alive||!p.setup||!Number.isFinite(radius)||radius<=0)return null;
-  const scale=b.radius/radius,[width,height]=view.viewport;
-  const predicted=[width/2-p.x*scale,height/2-p.y*scale];
-  // Camera smoothing and receipt lag are allowed; a pit circle at a different
-  // radius cannot also explain the projected outer-map origin at the orbit.
-  const error=Math.hypot(b.x-predicted[0],b.y-predicted[1]);
-  if(error>Math.max(30,b.radius*.04))return null;
-  return {physicalPixelsPerWorldUnit:scale,centerErrorPixels:error,
-    wholeMap:b.x-b.radius>=0&&b.y-b.radius>=0&&b.x+b.radius<=width&&b.y+b.radius<=height,
-    confidence:'outer-circle candidate anchored to host radius and projected player offset; camera smoothing tolerance 4% or 30 pixels'};
 }
 
 export function zoomPlateau(samples) {
@@ -37,6 +20,11 @@ export function requireNtlDisplayGate(calibration) {
   const reasons=Array.isArray(calibration?.displayGate?.reasons)&&calibration.displayGate.reasons.length
     ?calibration.displayGate.reasons:['missing or non-passing displayGate evidence'];
   throw Error(`NTL display preflight rejected; no run plan or timed rounds: ${reasons.join('; ')}`);
+}
+export function requireSetupAvailability(focus,current) {
+  if(!Number.isFinite(focus?.lastInputTick)||!Number.isFinite(current?.idleMs)||current.idleMs<5000
+    ||focus.lastInputTick!==current.lastInputTick||current.foreground!==true||current.visible!==true
+    ||current.minimized!==false||current.occluded!==false)throw Error('Owner input or window obscured during setup/warmup; no timed capture');
 }
 
 export function checkNtlCalibratedView(picture,census,calibration,viewCondition,settings) {
@@ -57,14 +45,53 @@ export async function settleNtlView(browser,calibration,viewCondition,capture,pa
   if(!Number.isInteger(calibration?.totalWheelNotches)||calibration.totalWheelNotches<1)throw Error('NTL calibrated view preflight: missing wheel reference');
   if(!calibration.settings||JSON.stringify(browser.ntlSettings)!==JSON.stringify(calibration.settings))throw Error('NTL calibrated view preflight: zoom UI settings differ from calibration');
   if(viewCondition!==(calibration.wholeMap?'whole-map':'ntl-farthest'))throw Error('NTL calibrated view preflight: row label differs from calibrated extent');
-  await browser.zoomOut(calibration.totalWheelNotches);
+  // Calibration's first 80-notch picture must already share the plateau. A new
+  // package that does not reproduce it fails the unchanged picture checks.
+  const wheelNotches=80;
+  await browser.zoomOut(wheelNotches);
   const samples=[];
   for(let i=0;i<2;i++){
     const sample=await capture(i);sample.anchor=checkNtlCalibratedView(sample.picture,sample.census,calibration,viewCondition,browser.ntlSettings);samples.push(sample);
     if(i===0)await pause(500);
   }
   if(Math.max(...samples.map(s=>s.anchor.physicalPixelsPerWorldUnit))/Math.min(...samples.map(s=>s.anchor.physicalPixelsPerWorldUnit))>1.03)throw Error('NTL calibrated view preflight: view has not settled');
-  return {wheelNotches:calibration.totalWheelNotches,viewCondition,settings:browser.ntlSettings,samples};
+  return {wheelNotches,referenceWheelNotches:calibration.totalWheelNotches,viewCondition,settings:browser.ntlSettings,samples};
+}
+
+export function vlitherWheel(view,target,width,height) {
+  const scale=vlitherPhysicalScale(view,width,height),step=view.wheelStep;
+  if(!Number.isFinite(scale)||!Number.isFinite(step)||step<=0||!Number.isFinite(target)||target<=0)throw Error('Vlither zoom preflight: physical scale or stock wheel step unavailable');
+  if(!Number.isFinite(view.stockZoomMinimum)||!Number.isFinite(view.stockZoomMaximum)||target<view.stockZoomMinimum||target>view.stockZoomMaximum)throw Error('Vlither zoom preflight: target outside unchanged stock zoom range');
+  if(!Number.isFinite(view.wheelZoom)||Math.abs(view.wheelZoom/scale-1)>.005)throw Error('Vlither zoom preflight: stock zoom has not settled');
+  const exact=Math.log(target/scale)/step;
+  const error=n=>Math.abs(scale*Math.exp(n*step)/target-1);
+  const whole=[Math.floor(exact),Math.ceil(exact)].sort((a,b)=>error(a)-error(b))[0];
+  const wholeFits=error(whole)<=.05;
+  const notches=wholeFits?whole:Math.round(exact*120)/120;
+  if(!Number.isFinite(notches)||Math.abs(notches)>200||error(notches)>.05)throw Error('Vlither zoom preflight: stock wheel quantum cannot reach target tolerance');
+  return {notches,method:wholeFits?'whole stock wheel notches':'fractional stock wheel offset (1/120 notch)',wheelStep:step};
+}
+
+export async function settleVlitherView({calibration,width,height,readView,wheel,capture,pause}) {
+  const target=calibration?.physicalPixelsPerWorldUnit,adjustments=[];
+  if(calibration?.wholeMap!==false)throw Error('Vlither zoom preflight: missing limited-view calibration');
+  let matched=false;
+  // One read beyond the last wheel, so the final adjustment's result is judged.
+  for(let i=0;i<=8;i++){
+    const view=await readView(),adjustment=vlitherWheel(view,target,width,height);
+    if(Math.abs(vlitherPhysicalScale(view,width,height)/target-1)<=.05){matched=true;break;}
+    if(i===8)break;
+    adjustments.push(adjustment);await wheel(adjustment.notches,i);
+  }
+  if(!matched)throw Error('Vlither zoom preflight: stock wheel did not reach target');
+  const pictureSamples=[];
+  for(let i=0;i<2;i++){
+    const sample=await capture(i);
+    sample.anchor=checkVlitherPicture(sample,calibration,width,height);pictureSamples.push(sample);
+    if(i===0)await pause(500);
+  }
+  if(Math.max(...pictureSamples.map(s=>s.anchor.physicalPixelsPerWorldUnit))/Math.min(...pictureSamples.map(s=>s.anchor.physicalPixelsPerWorldUnit))>1.03)throw Error('Vlither zoom preflight: anchored pictures have not settled');
+  return {method:'stock GLFW wheel callback; framebuffer scale checked by host-anchored pictures',adjustments,pictureSamples};
 }
 
 export async function settleNativeView({target,width,readView,wheel,stopTelemetry}) {

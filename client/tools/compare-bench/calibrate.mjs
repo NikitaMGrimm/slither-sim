@@ -5,9 +5,9 @@ import {spawn,execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {ntl} from './browser.mjs';
 import {pngEvidence} from './picture.mjs';
-import {anchoredBoundary,zoomPlateau} from './matrix.mjs';
+import {zoomPlateau} from './matrix.mjs';
 import {endpointFrom,completeJsonLines,windows} from './run.mjs';
-import {netlogProof,windowReasons} from './analysis.mjs';
+import {netlogProof,windowReasons,anchoredBoundary} from './analysis.mjs';
 
 // Per-session preflight, before any timed round. Updated packages never reuse
 // another package's zoom estimate or network receipt.

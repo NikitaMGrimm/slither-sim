@@ -74,9 +74,22 @@ Apply local Cargo target/jobs limits per command. No build/test runs during timi
   they measure scale before warmup, then disable all client telemetry.
   Each session first calibrates NTL zoom and verifies its closed netlog under the
   documented named no-packet reachability-probe allowance; all other non-loopback
-  transport evidence stops before timed rounds. If its farthest
-  view is limited, additional Original/Native Battledome runs match that scale.
-  These remain labelled comparisons alongside separate whole-map runs.
+  transport evidence stops before timed rounds. If NTL participates and its
+  farthest view is limited, every Battledome row uses that physical scale,
+  including Vlither and telemetry controls; separate whole-map rows are dropped.
+  Without NTL, or if an updated package fits the map, whole-map behavior remains.
+  Normal stays at stock zoom. The full first session has 30 rows; budget about
+  50-65 minutes before retries (estimate, not a measured duration).
+
+NTL row setup uses 80 wheel notches, with fresh scale/settling pictures before
+warmup; calibration keeps 80 + 320 + 640. Vlither uses its stock wheel callback,
+preferring whole notches and using fractional 1/120-notch offsets only when
+needed for the 5% reference tolerance. Its physical framebuffer scale must match two
+host-anchored pictures; timed acceptance keeps the same 5% reference tolerance.
+No zoom range or renderer is changed. A wrapper change requires a fresh external
+Vlither build/receipt before acquisition; an old binary fails provenance checks.
+Matching the view does not establish content/display correlation, exact NTL scene
+counts or identical presentation modes. Those qualifications still apply.
 
 Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
 500 internal bots; stress triples ambient attempts and initial/refill target.

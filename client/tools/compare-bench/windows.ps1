@@ -149,6 +149,43 @@ if($c.mode -eq 'close') {
   [BenchWindow]::PostMessage($hwnd,0x10,[IntPtr]0,[IntPtr]0)|Out-Null
   exit
 }
+if($c.mode -eq 'visibility') {
+  @{foreground=([BenchWindow]::GetForegroundWindow() -eq $hwnd);visible=[BenchWindow]::IsWindowVisible($hwnd);
+    minimized=[BenchWindow]::IsIconic($hwnd);occluded=(@([BenchWindow]::Occluders($hwnd)).Count -gt 0);
+    lastInputTick=[BenchWindow]::LastInputTick();idleMs=[BenchWindow]::IdleMs()}|ConvertTo-Json -Compress
+  exit
+}
+if($c.mode -eq 'capture') {
+  # Capture actual client pixels only when visible and unobstructed. A picture
+  # of an occluder must never qualify the game's physical scale.
+  if([BenchWindow]::IdleMs() -lt 5000 -or [BenchWindow]::GetForegroundWindow() -ne $hwnd -or
+     -not [BenchWindow]::IsWindowVisible($hwnd) -or [BenchWindow]::IsIconic($hwnd) -or
+     @([BenchWindow]::Occluders($hwnd)).Count -gt 0){throw 'Window obscured or owner input; no client picture captured'}
+  Add-Type -AssemblyName System.Drawing
+  $r=New-Object BenchWindow+Rect
+  [BenchWindow]::GetClientRect($hwnd,[ref]$r)|Out-Null
+  $origin=New-Object BenchWindow+Point
+  [BenchWindow]::ClientToScreen($hwnd,[ref]$origin)|Out-Null
+  $screen=[Windows.Forms.Screen]::FromHandle($hwnd)
+  if($r.R -ne $c.width -or $r.B -ne $c.height -or $origin.X -lt $screen.Bounds.Left -or $origin.Y -lt $screen.Bounds.Top -or
+     $origin.X+$r.R -gt $screen.Bounds.Right -or $origin.Y+$r.B -gt $screen.Bounds.Bottom){throw 'Client picture area is clipped or has wrong physical size'}
+  $bitmap=New-Object Drawing.Bitmap($r.R,$r.B,[Drawing.Imaging.PixelFormat]::Format24bppRgb)
+  $graphics=[Drawing.Graphics]::FromImage($bitmap)
+  try{
+    $at=[BenchWindow]::QpcMs()
+    $graphics.CopyFromScreen($origin.X,$origin.Y,0,0,$bitmap.Size)
+    $after=New-Object BenchWindow+Point
+    [BenchWindow]::ClientToScreen($hwnd,[ref]$after)|Out-Null
+    $afterRect=New-Object BenchWindow+Rect
+    [BenchWindow]::GetClientRect($hwnd,[ref]$afterRect)|Out-Null
+    if([BenchWindow]::IdleMs() -lt 5000 -or [BenchWindow]::GetForegroundWindow() -ne $hwnd -or
+       $after.X -ne $origin.X -or $after.Y -ne $origin.Y -or $afterRect.R -ne $r.R -or $afterRect.B -ne $r.B -or
+       @([BenchWindow]::Occluders($hwnd)).Count -gt 0){throw 'Window obscured or owner input during client picture'}
+    $bitmap.Save($c.file,[Drawing.Imaging.ImageFormat]::Png)
+    @{file=$c.file;atMs=$at;clientRect=@($origin.X,$origin.Y,$r.R,$r.B)}|ConvertTo-Json -Compress
+  }finally{$graphics.Dispose();$bitmap.Dispose()}
+  exit
+}
 $prevCpu = [BenchWindow]::Cpu()
 $hostProcess = if($c.hostPid){Get-Process -Id $c.hostPid}else{$null}
 $prevHost = if($hostProcess){$hostProcess.TotalProcessorTime.TotalSeconds}else{0}
@@ -166,7 +203,7 @@ try {
   $instances = [string[]]@($category.GetInstanceNames() | Where-Object { $_ -match ('^pid_' + $c.gpuPid + '_') })
   $gpuQuery = New-Object BenchGpu(,$instances)
 } catch { $gpuError = $_.Exception.Message }
-$inputAtStart=[BenchWindow]::LastInputTick()
+$inputAtStart=if($null -ne $c.initialInputTick){[uint32]$c.initialInputTick}else{[BenchWindow]::LastInputTick()}
 $end = [DateTime]::UtcNow.AddSeconds($c.seconds)
 while ([DateTime]::UtcNow -lt $end) {
   $r = New-Object BenchWindow+Rect

@@ -48,21 +48,39 @@ void trender(tenv* env) {
   double now = glfwGetTime();
   if (now >= next && g->conn == CONNECTED) {
     next = now + .5;
-    int count = (int)tdarray_length(g->data.foods), visible = 0;
+    int count = (int)tdarray_length(g->data.foods), visible = 0, uneaten = 0, drawn = 0;
+    int fbw = 0, fbh = 0;
+    glfwGetFramebufferSize(env->wnd->handle, &fbw, &fbh);
     for (int i = 0; i < count; i++) {
       food* f = &g->data.foods[i];
+      if (!f->eaten) uneaten++;
       if (fabsf(f->rx - g->data.view_xx) * g->data.gsc <= env->ctx->size[0] / 2.f &&
           fabsf(f->ry - g->data.view_yy) * g->data.gsc <= env->ctx->size[1] / 2.f)
         visible++;
     }
+    for (int i = 0; i < (int)tdarray_length(g->data.snakes); i++) {
+      snake* s = &g->data.snakes[i];
+      if (!s->dead && s->iiv && s->alive_amt > 0 && s->dead_amt < 1) drawn++;
+    }
+    /* gsc maps world offsets to ctx framebuffer pixels in stock redraw.c.
+     * The runner also checks the actual framebuffer and renderer dimensions,
+     * then an independent host-anchored picture before matching is accepted.
+     * Stock wheel: app/src/game/input.c and thermite/src/framework/tmouse.c
+     * at https://github.com/for-loop9/vlither/tree/8612bc12186547fc385ea38a399b144973338384 */
     printf("frame-bench-client: {\"schema\":1,\"instrumented\":true,\"connected\":true,"
       "\"alive\":%s,\"camera\":[%.9g,%.9g],\"center\":%.9g,\"radius\":%.9g,"
       "\"zoom\":%.9g,\"viewport\":[%d,%d],\"retainedPellets\":%d,\"visiblePellets\":%d,"
-      "\"protocol\":%d,\"stockZoomMinimum\":%.9g,\"presentMode\":\"FIFO\"}\n",
+      "\"receivedUneatenPellets\":%d,\"drawnLiveSnakes\":%d,"
+      "\"drawnSnakeScope\":\"stock redraw visibility flag and live opacity\","
+      "\"zoomUnits\":\"framebuffer-pixels-per-world-unit\",\"framebuffer\":[%d,%d],\"rendererViewport\":[%d,%d],"
+      "\"wheelZoom\":%.9g,\"wheelStep\":%.9g,"
+      "\"protocol\":%d,\"stockZoomMinimum\":%.9g,\"stockZoomMaximum\":%.9g,\"presentMode\":\"FIFO\"}\n",
       g->data.dead ? "false" : "true", g->data.view_xx, g->data.view_yy,
       g->data.grd, fmaxf(g->data.flux_grd, g->data.real_flux_grd), g->data.gsc,
       env->ctx->size[0], env->ctx->size[1], count, visible,
-      g->data.protocol_version, (double)MAX_ZOOM_OUT);
+      uneaten, drawn, fbw, fbh, env->usr->r->size[0], env->usr->r->size[1],
+      g->data.ms_zoom, env->usr->usrs.zoom_step,
+      g->data.protocol_version, (double)MAX_ZOOM_OUT, (double)MAX_ZOOM_IN);
     fflush(stdout);
   }
 }
