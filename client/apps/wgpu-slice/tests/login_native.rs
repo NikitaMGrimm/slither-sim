@@ -949,6 +949,93 @@ fn acquisition_cancel_and_pre_game_socket_outcomes_release_native_admission() {
 mod endpoint_tape;
 
 #[test]
+fn returned_menu_keeps_presenting_buttons_while_death_close_is_pending() {
+    use endpoint_tape::{bundle, pump};
+    use slither_wgpu_slice::game::EffectKind;
+    for button in [E::Server, E::Skin, E::Settings] {
+        let mut game = endpoint_tape::playing();
+        let mut login = NativeLogin::new("Stored").unwrap();
+        login.step(0., true, false).unwrap();
+        login.activate(true);
+        login.step(16., true, false).unwrap();
+        pump(&mut game, 600.);
+        login.observe_game(&game).unwrap();
+        login.step(600., false, false).unwrap();
+        game.receive(game.generation(), &bundle(&[vec![b'v', 0]]), 700.)
+            .unwrap();
+        let mut returned = None;
+        for now in (716..=5000).step_by(16) {
+            let now = f64::from(now);
+            game.receive(game.generation(), &bundle(&[vec![b'p']]), now)
+                .unwrap();
+            game.begin_frame(now, [960, 540], 1.).unwrap();
+            while let Some(effect) = game.effect() {
+                if effect.kind == EffectKind::Close {
+                    returned = Some((now, effect));
+                    break;
+                }
+                game.acknowledge(effect.generation, effect.id, true)
+                    .unwrap();
+            }
+            endpoint_tape::pictures(&mut game);
+            login.observe_game(&game).unwrap();
+            login.step(now, game.can_play(), false).unwrap();
+            if returned.is_some() {
+                break;
+            }
+        }
+        let (returned, close) = returned.expect("death return must queue Close");
+        assert_eq!(login.state.view(false).phase, MenuPhase::Login);
+        for _ in 0..2 {
+            login.prepare_host([960, 540], 1., false, None).unwrap();
+        }
+        let generation = game.generation();
+        // Withhold the peer's Close acknowledgement beyond the native timeout.
+        // Menu presentation must not consume Close or permit another connection.
+        for elapsed in (16..=5200).step_by(16) {
+            let now = returned + f64::from(elapsed);
+            assert!(!game.can_play());
+            assert!(
+                game.play("ws://127.0.0.1:19491/slither", "Again", 0)
+                    .is_err()
+            );
+            game.begin_frame(now, [960, 540], 1.).unwrap();
+            let picture = game
+                .take_frame()
+                .expect("menu picture while Close is pending");
+            login.observe_game(&game).unwrap();
+            assert!(login.step(now, false, false).unwrap().0.is_empty());
+            login.prepare_host([960, 540], 1., false, None).unwrap();
+            if elapsed == 16 {
+                let rect = login.layout.viewport_rect(button);
+                let point = [rect.x + rect.width / 2., rect.y + rect.height / 2.];
+                login.pointer(point, Some(true), false);
+                login.pointer(point, Some(false), false);
+                assert!(
+                    match button {
+                        E::Server => login.picker.policy.visible(),
+                        E::Skin => login.studio.state.visible(),
+                        E::Settings => login.state.settings.visible(),
+                        _ => unreachable!(),
+                    },
+                    "{button:?} must open during Close"
+                );
+            }
+            game.presented(true).unwrap();
+            game.bank.recycle_frame(picture);
+            let pending = game.effect().expect("Close remains owned by transport");
+            assert_eq!(
+                (pending.generation, pending.id, pending.kind),
+                (close.generation, close.id, EffectKind::Close)
+            );
+            assert_eq!(game.generation(), generation);
+        }
+        game.acknowledge(close.generation, close.id, true).unwrap();
+        assert!(game.can_play());
+    }
+}
+
+#[test]
 fn early_return_click_uses_animated_hit_rect_and_waits_for_close_ack() {
     use endpoint_tape::{bundle, pump};
     use slither_wgpu_slice::{endpoint_login, game::EffectKind};

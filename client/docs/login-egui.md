@@ -34,6 +34,13 @@ steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.
 
+After the death return completes, the menu keeps presenting while the old
+socket's Close handshake finishes (up to five seconds). Servers, Change Skin and
+Settings remain usable; Play still waits for Close acknowledgement and committed
+presentation. The synthetic
+`returned_menu_keeps_presenting_buttons_while_death_close_is_pending` regression
+withholds Close while opening each panel and preserving the connection generation.
+
 After a committed own-death removal or game-over, socket resets and abnormal
 closes end the native session quietly. Death observations belong to one connection;
 rival deaths and removals without the death flag do not hide failures. Received

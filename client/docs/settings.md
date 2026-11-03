@@ -1,8 +1,9 @@
 # Settings
 
 The native login's secondary row is Change Skin, Choose Server, Settings, after
-Nickname and Play in keyboard order. Settings opens only in admitted, settled
-Login, with no pending Play, champion editor, skin studio or picker. Its shared
+Nickname and Play in keyboard order. Settings opens in settled Login even while
+connection admission is unavailable, with no pending Play, champion editor, skin
+studio or picker. Its shared
 modal backdrop replaces login content and the wordmark. Tab wraps Quality →
 World resolution → Done;
 Enter/Space activates the focused control. Done and Escape close and restore
