@@ -17,11 +17,9 @@ class StudyTests(unittest.TestCase):
                          study.results())
 
     def test_report_names_recorded_replay_input(self):
-        report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
+        report = ' '.join((ROOT / 'REPORT.md').read_text(encoding='utf-8').split())
         replay = json.loads((ROOT / 'identities.json').read_text(encoding='utf-8'))['replay_input']
-        self.assertIn(f"neutral local identifier `{replay['local_identifier']}`", report)
-        self.assertIn(f"SHA-256
-  `{replay['sha256']}`", report)
+        self.assertIn(f"neutral local identifier `{replay['local_identifier']}`, SHA-256 `{replay['sha256']}`", report)
 
 
 if __name__ == '__main__':
