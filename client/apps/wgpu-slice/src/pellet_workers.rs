@@ -534,7 +534,7 @@ mod tests {
     fn all_participant_counts_preserve_ordered_bytes_flags_and_coverage() {
         let (frame, b) = scene();
         let expected = expected(&job(&frame, &b));
-        for n in [2, 4] {
+        for n in [2, 3, 4] {
             let pool = Pool::new(n, Behavior::default()).unwrap();
             ready(&pool);
             for _ in 0..5 {
