@@ -149,9 +149,9 @@ impl Cache {
                 let start = grouped;
                 for i in indices {
                     slots[i] = grouped;
-                    slot_groups.push(groups.len());
                     grouped += 1;
                 }
+                slot_groups.resize(grouped, groups.len());
                 groups.push(Group {
                     sources,
                     range: start..grouped,
@@ -608,6 +608,14 @@ pub(crate) mod tests {
                 ..view()
             };
             let b = batch(&mut cache, &mut bank, &world, view);
+            for (i, food) in world.foods().iter().enumerate() {
+                let slot = b.sources.slots[i];
+                let group = &b.sources.groups[b.sources.slot_groups[slot]];
+                assert!(group.range.contains(&slot));
+                let expected = food.snapshot().sources;
+                assert_eq!(group.sources, expected);
+                assert!(same_source_bits(&group.sources, &expected));
+            }
             assert!(Arc::ptr_eq(&sources, &b.sources));
             assert_eq!(sources.source_identity, world.source_identity());
             let plan = plan_food_with_index(
