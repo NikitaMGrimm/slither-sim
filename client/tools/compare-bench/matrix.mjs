@@ -29,6 +29,12 @@ export function zoomPlateau(samples) {
   return scales.length>=3&&scales.every(v=>Number.isFinite(v)&&v>0)
     &&Math.max(...scales)/Math.min(...scales)<=1.03;
 }
+export function requireNtlDisplayGate(calibration) {
+  if(calibration?.displayGate?.passed===true)return;
+  const reasons=Array.isArray(calibration?.displayGate?.reasons)&&calibration.displayGate.reasons.length
+    ?calibration.displayGate.reasons:['missing or non-passing displayGate evidence'];
+  throw Error(`NTL display preflight rejected; no run plan or timed rounds: ${reasons.join('; ')}`);
+}
 
 export function checkNtlCalibratedView(picture,census,calibration,viewCondition,settings) {
   const fail=reason=>{throw Error(`NTL calibrated view preflight: ${reason}`);};

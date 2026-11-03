@@ -202,6 +202,9 @@ and `externalSocketAttemptsObserved`. All other non-loopback traffic fails.
 it never starts PresentMon or timed rounds. Its single display snapshot is not
 continuous run acceptance. A display-only failure returns exit 2 with the network
 and zoom results retained, without touching an occluding owner window.
+For `run` and `smoke`, any missing or non-passing NTL display gate raises the
+named `NTL display preflight rejected` error with its reasons before a run plan
+is written or any round begins.
 
 Native clients have a separate, explicitly incomplete safety record. An
 unprivileged helper starts just after client launch and periodically samples

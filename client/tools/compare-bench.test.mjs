@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,collectRounds} from './compare-bench/matrix.mjs';
+import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,collectRounds,requireNtlDisplayGate} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
@@ -42,6 +42,13 @@ test('first-round controls and limited-view pairs retain reversed client orderin
   assert.deepEqual([...new Set(plan.filter(r=>r.round===2).map(r=>r.client))],['vlither','ntl','native','original']);
   for(const round of [1,2,3])for(const client of ['original','native'])assert.ok(plan.some(r=>r.round===round&&r.client===client&&r.scenario==='battledome'&&r.viewCondition==='ntl-farthest'&&r.telemetry==='on'));
   assert.equal(roundPlan(3,['original','native','ntl','vlither'],{telemetryControls:false}).length,24);
+});
+test('run/smoke require a passing NTL display gate before planning',()=>{
+  for(const calibration of [undefined,{}, {displayGate:null},{displayGate:{}},{displayGate:{passed:false,reasons:[]}},{displayGate:{passed:'true'}}]){
+    assert.throws(()=>requireNtlDisplayGate(calibration),/NTL display preflight rejected; no run plan or timed rounds: missing or non-passing displayGate evidence/);
+  }
+  assert.throws(()=>requireNtlDisplayGate({displayGate:{passed:false,reasons:['Window occluded','Wrong display']}}),/NTL display preflight rejected.*Window occluded; Wrong display/);
+  assert.doesNotThrow(()=>requireNtlDisplayGate({displayGate:{passed:true,reasons:[]}}));
 });
 
 test('outer-circle anchoring rejects a pit circle and measures a zoom plateau',()=>{

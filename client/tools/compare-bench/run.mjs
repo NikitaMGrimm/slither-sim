@@ -10,7 +10,7 @@ import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
-import {roundPlan,anchoredBoundary,settleNtlView,collectRounds} from './matrix.mjs';
+import {roundPlan,anchoredBoundary,settleNtlView,collectRounds,requireNtlDisplayGate} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -427,9 +427,10 @@ export async function main(args = process.argv.slice(2)) {
     console.log(JSON.stringify({session,timedRoundsStarted:false,networkVerified:report.network.verified,
       noPacketReachabilityProbeCount:report.network.noPacketReachabilityProbeCount,zoomPlateau:report.plateau,
       displayGate:report.displayGate,readyForTimedRound:report.displayGate?.passed===true}));
-    if(!report.displayGate?.passed)process.exitCode=2;
+    if(report.displayGate?.passed!==true)process.exitCode=2;
     return;
   }
+  if(clients.includes('ntl'))requireNtlDisplayGate(config.ntlViewCalibration);
   const plan=roundPlan(rounds,clients,{telemetryControls:args[0]==='run'&&config.telemetryControls!==false&&!config.telemetry,
     limitedNtlView:config.ntlViewCalibration?.wholeMap===false}).map(item=>({...item,telemetry:config.telemetry??item.telemetry}));
   await save(path.join(session,'run-plan.json'),plan);
