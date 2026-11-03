@@ -4,13 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
-import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
+import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
-import {roundPlan,anchoredBoundary} from './matrix.mjs';
+import {roundPlan,anchoredBoundary,settleNtlView,collectRounds} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -167,7 +167,6 @@ async function runAttempt(config, root, item, provenance, machine) {
         await windows({ mode: 'setup', borderless:true,clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
         r.windowMode='Chrome app window, borderless task-owned HWND';
       }
-      if (item.scenario === 'battledome') await browser.zoomOut();
       r.vsync = 'Chrome default compositor pacing; verify PresentMon SyncInterval/mode'; r.chromeVersion = browser.chromeVersion;
     } else if (item.client === 'vlither') {
       const receipt = JSON.parse(await fs.readFile(path.join(config.output, 'vlither/build/compare-build.json'), 'utf8'));
@@ -208,6 +207,12 @@ async function runAttempt(config, root, item, provenance, machine) {
       if (!census) return null;
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
+    if(browser&&item.scenario==='battledome'){
+      r.viewSetup=await settleNtlView(browser,config.ntlViewCalibration,item.viewCondition,async index=>{
+        const file=await browser.capture(`before-warmup-${index}`),picture=pngEvidence(await fs.readFile(file));
+        return {file:path.basename(file),picture,census:r.census.at(-1),atMs:now()};
+      },delay);
+    }
     if(item.viewCondition==='ntl-farthest'&&!browser){
       const target=config.ntlViewCalibration?.physicalPixelsPerWorldUnit;
       if(!Number.isFinite(target)||target<=0)throw Error('Matched NTL view calibration unavailable');
@@ -335,10 +340,10 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.telemetryErrors=telemetryErrors;
     if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
-    if(pm?.exitCode===null&&r.presentMonSession){
+    if(pm&&pm.exitCode!==0&&r.presentMonSession){
       // A force-killed ETW consumer leaves a live session. Stop only the exact
       // unique session this attempt started before terminating owned children.
-      try{r.traceCleanup=execute(config.presentMon,['--session_name',r.presentMonSession,'--terminate_existing_session'],{timeout:5000});}
+      try{r.traceCleanup=cleanupPresentMon(pm,r.presentMonSession,session=>execute(config.presentMon,['--session_name',session,'--terminate_existing_session'],{timeout:5000}));}
       catch(error){r.cleanupError??=`Owned ETW session cleanup failed: ${error.message}`;}
     }
     for (const child of [...children].reverse()) await stop(child);
@@ -361,7 +366,7 @@ async function runAttempt(config, root, item, provenance, machine) {
   return { directory, valid: r.validity.valid, run: r };
 }
 export async function main(args = process.argv.slice(2)) {
-  if (args.length !== 2 || !['inspect', 'prepare', 'smoke', 'run'].includes(args[0])) throw Error('Usage: node tools/compare-bench/run.mjs inspect|prepare|smoke|run EXTERNAL_CONFIG.json');
+  if (args.length !== 2 || !['inspect', 'prepare', 'preflight', 'smoke', 'run'].includes(args[0])) throw Error('Usage: node tools/compare-bench/run.mjs inspect|prepare|preflight|smoke|run EXTERNAL_CONFIG.json');
   if (process.platform !== 'win32') throw Error('Windows only; analysis/tests are portable');
   const config = JSON.parse(await fs.readFile(args[1], 'utf8'));
   const root = path.resolve(config.output);
@@ -380,6 +385,7 @@ export async function main(args = process.argv.slice(2)) {
   if(config.telemetry&&!['on','off'].includes(config.telemetry))throw Error('telemetry must be on or off (diagnostic only)');
   const clients = config.clients ?? ['original', 'native', 'ntl', 'vlither'];
   if (!Array.isArray(clients) || !clients.length || new Set(clients).size !== clients.length || clients.some(c => !['original','native','ntl','vlither'].includes(c))) throw Error('clients must be a unique nonempty subset of original, native, ntl, vlither');
+  if(args[0]==='preflight'&&!clients.includes('ntl'))throw Error('preflight requires NTL among the configured clients');
   for (const key of ['width', 'height']) if (!Number.isInteger(config[key]) || config[key] < 320 || config[key] > 3840) throw Error(`${key} must be 320..3840 physical pixels`);
   config.experiment ??= 'primary';
   if (!['primary', 'secondary', 'pixels-optional','igpu-future'].includes(config.experiment)) throw Error('Unknown experiment');
@@ -408,7 +414,6 @@ export async function main(args = process.argv.slice(2)) {
   }
   const rounds = args[0] === 'smoke' ? 1 : config.rounds ?? 3;
   if (args[0] === 'run' && rounds < 3) throw Error('Real runs require at least three rounds');
-  const results = [],roundAttempts=[];let pending=Array.from({length:rounds},(_,i)=>i+1);
   const maxAttempts=config.maxRoundAttempts??3;
   if(!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>3)throw Error('maxRoundAttempts must be 1..3');
   if(config.telemetryControls!==undefined&&typeof config.telemetryControls!=='boolean')throw Error('telemetryControls must be boolean');
@@ -417,30 +422,28 @@ export async function main(args = process.argv.slice(2)) {
     const {calibrateNtl}=await import('./calibrate.mjs');
     config.ntlViewCalibration=await calibrateNtl(config,session,provenance.ntl);
   }
+  if(args[0]==='preflight'){
+    const report=config.ntlViewCalibration;
+    console.log(JSON.stringify({session,timedRoundsStarted:false,networkVerified:report.network.verified,
+      noPacketReachabilityProbeCount:report.network.noPacketReachabilityProbeCount,zoomPlateau:report.plateau,
+      displayGate:report.displayGate,readyForTimedRound:report.displayGate?.passed===true}));
+    if(!report.displayGate?.passed)process.exitCode=2;
+    return;
+  }
   const plan=roundPlan(rounds,clients,{telemetryControls:args[0]==='run'&&config.telemetryControls!==false&&!config.telemetry,
     limitedNtlView:config.ntlViewCalibration?.wholeMap===false}).map(item=>({...item,telemetry:config.telemetry??item.telemetry}));
   await save(path.join(session,'run-plan.json'),plan);
-  for(let attempt=1;attempt<=maxAttempts&&pending.length&&!interrupted;attempt++){
-    const retry=[];
-    for(const round of pending){
-      const preflight=(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0];
-      const record={round,attempt,preflight,results:[]};roundAttempts.push(record);
-      if(preflight.competingWork.length||preflight.idleMs<5000){record.blocked='competing work or recent owner input';retry.push(round);continue;}
-      const order=plan.filter(item=>item.round===round);
-      let transient=false;
-      for(const item of order){
-        if(interrupted)break;
-        const result=await runAttempt({...config,telemetry:item.telemetry},session,{...item,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
-        transient=transientFailure(result.run);
-        if(transient)break;
-      }
-      if(transient){record.blocked='transient validity failure; retained partial round';retry.push(round);}
-      await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(roundAttempts,null,2));
-    }
-    pending=retry;
-    if(pending.length&&attempt<maxAttempts)await delay(5000);
-  }
-  await save(path.join(session,'round-summary.json'),{roundAttempts,uncollectedRounds:pending,maxAttempts});
+  const markInterrupted=()=>{interrupted=true;};let collection;
+  process.on('SIGINT',markInterrupted);process.on('SIGTERM',markInterrupted);
+  try{
+    collection=await collectRounds({rounds,maxAttempts,plan,isInterrupted:()=>interrupted,
+      preflight:async(round,attempt)=>(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0],
+      acquire:item=>runAttempt({...config,telemetry:item.telemetry},session,item,provenance,machine),
+      persist:records=>fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(records,null,2)),
+      betweenAttempts:()=>delay(5000)});
+  }finally{process.removeListener('SIGINT',markInterrupted);process.removeListener('SIGTERM',markInterrupted);}
+  const {results,...summary}=collection;
+  await save(path.join(session,'round-summary.json'),summary);
   const comparisons = [];
   for (let i = 0; i < results.length; i++) for (let j = i + 1; j < results.length; j++) {
     const a = results[i], b = results[j];

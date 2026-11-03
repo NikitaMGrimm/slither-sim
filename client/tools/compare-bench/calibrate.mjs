@@ -7,7 +7,7 @@ import {ntl} from './browser.mjs';
 import {pngEvidence} from './picture.mjs';
 import {anchoredBoundary,zoomPlateau} from './matrix.mjs';
 import {endpointFrom,completeJsonLines,windows} from './run.mjs';
-import {netlogProof} from './analysis.mjs';
+import {netlogProof,windowReasons} from './analysis.mjs';
 
 // Per-session preflight, before any timed round. Updated packages never reuse
 // another package's zoom estimate or network receipt.
@@ -30,6 +30,7 @@ export async function calibrateNtl(config,session,provenance) {
     for(let i=0;i<600&&!aborted;i++){endpoint=endpointFrom(hostLog);if(endpoint)break;if(host.exitCode!==null)throw Error('Calibration host exited');await delay(100);}
     if(!endpoint||aborted)throw Error('Calibration interrupted or host readiness timed out');
     browser=await ntl({...config,directory,endpoint,scenario:'battledome',productionProbe:false,register});
+    report.settings=browser.ntlSettings;
     await checkOwner('before-fullscreen');
     if(config.width===3840&&config.height===2160)await browser.fullscreen();
     else await windows({mode:'setup',clientPid:browser.child.pid,client:'browser',borderless:true,...Object.fromEntries(['width','height','x','y'].map(k=>[k,config[k]]))},directory,'setup',children);
@@ -49,7 +50,16 @@ export async function calibrateNtl(config,session,provenance) {
     const anchors=report.samples.map(s=>s.anchor);
     report.plateau=anchors.every(Boolean)&&zoomPlateau(anchors);
     if(!report.plateau)throw Error('NTL farthest view is not established by three anchored wheel-range pictures');
+    if(anchors.some(a=>a.wholeMap!==anchors[0].wholeMap))throw Error('NTL calibrated extent changes between whole-map and limited view; row label is unestablished');
     Object.assign(report,anchors.at(-1),{width:config.width,height:config.height,totalWheelNotches:1040});
+    const processes=await browser.browser.send('SystemInfo.getProcessInfo'),gpuPid=processes.processInfo.find(p=>p.type==='GPU')?.id;
+    const snapshots=await windows({mode:'sample',clientPid:browser.child.pid,clientPids:processes.processInfo.map(p=>p.id),gpuPid,seconds:.3},directory,'display-snapshot',children);
+    const first=snapshots[0],last=snapshots.at(-1);
+    const reasons=windowReasons({windowSamples:snapshots,startMs:first?.qpcMs,endMs:(last?.qpcMs??NaN)+1,
+      width:config.width,height:config.height,display:config.targetDisplay??first?.display,dpi:first?.dpi,refreshHz:config.targetRefreshHz??first?.refreshHz});
+    const luids=[...new Set(snapshots.flatMap(s=>s.gpuEngines??[]).filter(e=>/engtype_3d/i.test(e.instance)&&e.utilization>.01).map(e=>e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
+    if(config.experiment==='primary'&&(luids.length!==1||luids[0]!==config.targetAdapterLuid))reasons.push('Preflight actual render LUID does not match the requested adapter');
+    report.displayGate={scope:'untimed display snapshot only; timed runs require continuous evidence',passed:reasons.length===0,reasons,renderLuids:luids,snapshots};
   }catch(error){report.error=error.message;}
   finally{
     try{await browser?.close();}catch(error){report.cleanupError=error.message;}
@@ -59,6 +69,6 @@ export async function calibrateNtl(config,session,provenance) {
     if(endpoint)try{report.network=netlogProof(JSON.parse(await fs.readFile(path.join(directory,'netlog.json'),'utf8')),new URL(endpoint).host);}catch(error){report.networkError=error.message;}
     await fs.writeFile(path.join(directory,'calibration.json'),JSON.stringify(report,null,2));
   }
-  if(report.error||report.cleanupError||!report.network?.verified)throw Error(`NTL preflight failed; no timed rounds: ${report.error??report.cleanupError??'non-loopback transport evidence (including resolver probes), or missing successful loopback game socket'}. Inspect ${directory}`);
+  if(report.error||report.cleanupError||!report.network?.verified)throw Error(`NTL preflight failed; no timed rounds: ${report.error??report.cleanupError??report.network?.failure??'missing successful loopback game socket'}. Inspect ${directory}`);
   return report;
 }

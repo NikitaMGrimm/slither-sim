@@ -142,7 +142,8 @@ export async function ntl(options){
     session=await chromeSession(options);const{page}=session;
     let ready=false;for(let i=0;i<150;i++){ready=await page.evaluate(`Boolean(document.querySelector('#ip-server')&&document.querySelector('#connect-btn')&&document.querySelector('#nick'))`);if(ready)break;await delay(100);}
     if(!ready)throw Error('NTL local UI bootstrap changed: #nick, #ip-server and #connect-btn required');
-    const settings=await configureNTL(page,{wholeMap:options.scenario==='battledome'});await fs.writeFile(path.join(options.directory,'ntl-settings.json'),JSON.stringify(settings,null,2));
+    const settings=await configureNTL(page,{enableZoom:options.scenario==='battledome'});session.ntlSettings=settings.zoomSettings;
+    await fs.writeFile(path.join(options.directory,'ntl-settings.json'),JSON.stringify(settings,null,2));
     let setup=false;page.onEvent=((previous)=>m=>{previous?.(m);if(m.method==='Network.webSocketFrameReceived'&&m.params.response.opcode===2&&Buffer.from(m.params.response.payloadData,'base64')[2]===97)setup=true;})(page.onEvent);
     await page.send('Network.enable');
     // Structured arguments keep endpoint/package data out of JavaScript source.

@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,anchoredBoundary,zoomPlateau} from './compare-bench/matrix.mjs';
+import {roundPlan,anchoredBoundary,zoomPlateau,checkNtlCalibratedView,settleNtlView,collectRounds} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
-import {resourceScope,collectorCompletion,recoverCollectorLog} from './compare-bench/resources.mjs';
+import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
 import {nativeNetworkEvidence,startNativeNetwork,nativeNetworkMaxSeconds} from './compare-bench/native-network.mjs';
 import {spawn,execFileSync} from 'node:child_process';
 import vm from 'node:vm';
@@ -51,6 +51,45 @@ test('outer-circle anchoring rejects a pit circle and measures a zoom plateau',(
   assert.equal(anchoredBoundary({...view,boundary:{x:350,y:400,radius:100}},census),null);
   assert.equal(zoomPlateau([anchor,{...anchor,physicalPixelsPerWorldUnit:.201},anchor]),true);
   assert.equal(zoomPlateau([anchor,{...anchor,physicalPixelsPerWorldUnit:.25},anchor]),false);
+});
+test('NTL rows reproduce calibration wheel/settings and settle before warmup',async()=>{
+  const census={radius:1000,players:[{alive:true,setup:true,x:750,y:0}]},settings={zoomEnabled:true,slowReturnEnabled:false,controls:[]};
+  const picture={viewport:[1000,800],boundary:{x:50,y:400,radius:600}};
+  const calibration={physicalPixelsPerWorldUnit:.6,wholeMap:false,totalWheelNotches:1040,settings};
+  const calls=[],browser={ntlSettings:settings,zoomOut:async n=>calls.push(['wheel',n])};
+  const settled=await settleNtlView(browser,calibration,'ntl-farthest',async i=>{calls.push(['picture',i]);return {picture,census};},async ms=>calls.push(['settle',ms]));
+  calls.push(['warmup']);assert.deepEqual(calls,[['wheel',1040],['picture',0],['settle',500],['picture',1],['warmup']]);
+  assert.equal(settled.samples.length,2);assert.equal(settled.samples[1].anchor.wholeMap,false);
+  const changed={...browser,ntlSettings:{...settings,slowReturnEnabled:true},zoomOut:()=>assert.fail('Wrong settings must fail before wheel input')};
+  await assert.rejects(settleNtlView(changed,calibration,'ntl-farthest',()=>{},()=>{}),/zoom UI settings differ/);
+  const drift=scale=>({viewport:[1000,800],boundary:{x:500-750*scale,y:400,radius:1000*scale}});
+  await assert.rejects(settleNtlView(browser,calibration,'ntl-farthest',async i=>({picture:drift(i ? .624 : .6),census}),async()=>{}),/has not settled/);
+  assert.throws(()=>checkNtlCalibratedView(drift(.8),census,calibration,'ntl-farthest',settings),/physical scale differs/);
+  const whole={...calibration,physicalPixelsPerWorldUnit:.2,wholeMap:true},wholePicture=drift(.2);
+  assert.equal(checkNtlCalibratedView(wholePicture,census,whole,'whole-map',settings).wholeMap,true);
+  assert.throws(()=>checkNtlCalibratedView(wholePicture,census,whole,'ntl-farthest',settings),/row label differs/);
+  assert.equal(roundPlan(1,['ntl'],{limitedNtlView:false}).find(r=>r.scenario==='battledome').viewCondition,'whole-map');
+});
+test('round interruption preserves current/remaining rounds and starts no later preflight',async()=>{
+  for(const stopAt of ['before','preflight','acquire']){
+    let interrupted=stopAt==='before';const preflights=[],acquired=[],writes=[];
+    const result=await collectRounds({rounds:3,maxAttempts:3,plan:[1,2,3].map(round=>({round,client:'original'})),isInterrupted:()=>interrupted,
+      preflight:async round=>{assert.equal(interrupted,false);preflights.push(round);if(stopAt==='preflight'){interrupted=true;throw Error('Interrupted preflight');}return {competingWork:[],idleMs:10000};},
+      acquire:async item=>{acquired.push(item.round);if(item.round===2)interrupted=true;return {directory:`round-${item.round}`,run:{}};},
+      persist:async rows=>writes.push(structuredClone(rows)),betweenAttempts:()=>assert.fail('No retry wait after interruption')});
+    writes.push('summary');assert.ok(Array.isArray(writes.at(-2)),'attempts must be persisted before summary');
+    assert.deepEqual(result.uncollectedRounds,stopAt==='acquire'?[2,3]:[1,2,3]);
+    assert.deepEqual(preflights,stopAt==='before'?[]:stopAt==='preflight'?[1]:[1,2]);
+    assert.deepEqual(acquired,stopAt==='acquire'?[1,2]:[]);
+    assert.equal(result.roundAttempts.some(r=>r.round===3),false);
+  }
+});
+test('a transient capture retries only its affected round and keeps prior failures',async()=>{
+  const calls=[],result=await collectRounds({rounds:3,maxAttempts:3,plan:[1,2,3].map(round=>({round})),isInterrupted:()=>false,
+    preflight:async(round,attempt)=>{calls.push([round,attempt]);return {competingWork:[],idleMs:10000};},
+    acquire:async item=>({directory:`round-${item.round}-${item.attempt}`,run:item.round===1&&item.attempt===1?{error:'PresentMon lost ETW events'}:{}}),
+    persist:async()=>{},betweenAttempts:async()=>{}});
+  assert.deepEqual(calls,[[1,1],[2,1],[3,1],[1,2]]);assert.deepEqual(result.uncollectedRounds,[]);assert.equal(result.results.length,4);
 });
 
 test('collector exposes split live ETW loss before capture completion',async()=>{
@@ -222,6 +261,57 @@ test('network evidence rejects remote peers and missing game connection', () => 
   assert.equal(netlogProof(make(['127.0.0.1:12']), '127.0.0.1:12').verified, true);
   assert.equal(netlogProof(make(['127.0.0.1:12', '203.0.113.1:80']), '127.0.0.1:12').verified, false);
   assert.equal(netlogProof(make(['127.0.0.1:13']), '127.0.0.1:12').verified, false);
+});
+function reachabilityFixture(endpoint='[2001:4860:4860::8888]:443') {
+  const types={TCP_CONNECT_ATTEMPT:1,SOCKET_ALIVE:2,SOCKET_OPEN:3,UDP_CONNECT:4,SOCKET_CONNECT:5,HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK:6,UDP_BYTES_SENT:7,UDP_BYTES_RECEIVED:8,UDP_READ_ERROR:9};
+  const udp={id:20,type:24},wrapper={id:21,type:49},parent={id:22,type:3};
+  const event=(name,source,phase,time,params)=>({type:types[name],source,phase,time:String(time),params});
+  return {constants:{logEventTypes:types,logSourceType:{UDP_SOCKET:24,UDP_CLIENT_SOCKET:49,HOST_RESOLVER_MANAGER_REQUEST:3}},events:[
+    event('TCP_CONNECT_ATTEMPT',{id:1,type:10},1,0,{address:'127.0.0.1:12345'}),event('TCP_CONNECT_ATTEMPT',{id:1,type:10},2,1),
+    event('SOCKET_ALIVE',udp,1,10,{source_dependency:wrapper}),event('SOCKET_ALIVE',wrapper,1,10,{source_dependency:parent}),
+    event('SOCKET_OPEN',wrapper,0,11),event('UDP_CONNECT',udp,1,11,{address:endpoint}),event('UDP_CONNECT',udp,2,12,{net_error:-109}),
+    event('SOCKET_CONNECT',wrapper,0,12,{address:endpoint,net_error:-109}),event('SOCKET_ALIVE',wrapper,2,14),event('SOCKET_ALIVE',udp,2,14),
+    event('HOST_RESOLVER_MANAGER_IPV6_REACHABILITY_CHECK',parent,0,14,{cached:false,ipv6_available:false})]};
+}
+test('the named no-packet probe allowance discloses exact closed attributed UDP sockets',()=>{
+  const proof=netlogProof(reachabilityFixture(),'127.0.0.1:12345');
+  assert.equal(proof.verified,true);assert.equal(proof.externalSocketAttemptsObserved,true);
+  assert.equal(proof.noPacketReachabilityProbeCount,1);assert.equal(proof.allowances[0].name,'no-packet reachability probe');
+  assert.equal(proof.allowances[0].probes[0].socketIoEvents,0);
+  const noGame=reachabilityFixture();noGame.events=noGame.events.filter(e=>e.source.id!==1);
+  assert.equal(netlogProof(noGame,'127.0.0.1:12345').verified,false);
+});
+test('probe bytes, I/O events, changed endpoints, TCP and incomplete attribution fail closed',()=>{
+  const rejected=[];
+  for(const name of ['UDP_BYTES_SENT','UDP_BYTES_RECEIVED','UDP_READ_ERROR']){
+    const log=reachabilityFixture();log.events.push({type:log.constants.logEventTypes[name],phase:0,time:'13',source:{id:20,type:24},params:name==='UDP_READ_ERROR'?{net_error:-3}:{byte_count:name==='UDP_BYTES_RECEIVED'?0:1}});rejected.push(log);
+  }
+  const wrapperIo=reachabilityFixture();wrapperIo.events.push({type:wrapperIo.constants.logEventTypes.UDP_BYTES_SENT,phase:0,time:'13',source:{id:21,type:49},params:{byte_count:1}});rejected.push(wrapperIo);
+  for(const endpoint of ['[2001:4860:4860::8889]:443','[2001:4860:4860::8888]:53'])rejected.push(reachabilityFixture(endpoint));
+  const tcp=reachabilityFixture();tcp.events.push({type:1,source:{id:99,type:10},phase:1,time:'15',params:{address:'[2001:4860:4860::8888]:443'}});rejected.push(tcp);
+  const unattributed=reachabilityFixture();delete unattributed.events.find(e=>e.source.id===21&&e.type===2&&e.phase===1).params.source_dependency;rejected.push(unattributed);
+  const cached=reachabilityFixture();cached.events.at(-1).params.cached=true;rejected.push(cached);
+  for(const id of [20,21]){const open=reachabilityFixture();open.events=open.events.filter(e=>!(e.source.id===id&&e.type===2&&e.phase===2));rejected.push(open);}
+  const hiddenBytes=reachabilityFixture();hiddenBytes.events.find(e=>e.type===4&&e.phase===2).params.byte_count=1;rejected.push(hiddenBytes);
+  for(const log of rejected){const proof=netlogProof(log,'127.0.0.1:12345');assert.equal(proof.verified,false);assert.match(proof.failure,/no-packet reachability probe/);}
+  assert.match(netlogProof(reachabilityFixture('[2001:4860:4860::8888]:53'),'127.0.0.1:12345').failure,/:53/);
+});
+test('interrupted or failed collectors clean their owned session; a clean exit skips cleanup',async()=>{
+  for(const exitCode of [null,1,7]){
+    const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.exitCode=null;
+    const completed=collectorCompletion(child);child.kill=()=>{child.exitCode=exitCode;child.emit('close',exitCode);};
+    const interrupt=new EventEmitter();interrupt.once('SIGINT',()=>child.kill());interrupt.emit('SIGINT');await completed;
+    const calls=[];assert.equal(cleanupPresentMon(child,'SlitherOwned-offline',name=>{calls.push(name);return 'stopped';}).status,'stopped');
+    assert.deepEqual(calls,['SlitherOwned-offline']);
+  }
+  assert.equal(cleanupPresentMon({exitCode:0},'SlitherOwned-offline',()=>assert.fail('Clean collector must not terminate a session')),null);
+});
+test('only PresentMon exit 7 with the exact owned missing-session message is harmless',()=>{
+  const session='SlitherOwned-offline',gone=Object.assign(Error('exit 7'),{status:7,stdout:'',stderr:`warning: option\nerror: no existing sessions found: ${session}\n`});
+  assert.equal(cleanupPresentMon({exitCode:1},session,()=>{throw gone;}).status,'already-gone');
+  for(const error of [Object.assign(Error('denied'),{status:7,stderr:'error: access denied'}),Object.assign(Error('wrong session'),{status:7,stderr:'error: no existing sessions found: another-session'}),Object.assign(Error('wrong status'),{status:1,stderr:gone.stderr})]){
+    assert.throws(()=>cleanupPresentMon({exitCode:null},session,()=>{throw error;}),e=>e===error);
+  }
 });
 test('readiness admits only complete allowed literal-loopback announcements', () => {
   assert.equal(endpointFrom('Listening on ws://127.0.0.1:49152/slither\n'), 'ws://127.0.0.1:49152/slither');

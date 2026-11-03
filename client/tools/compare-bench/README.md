@@ -46,6 +46,7 @@ Use Node 24 and existing locked dependencies (`npm ci --ignore-scripts --no-audi
 node tools/compare-bench/run.mjs inspect <external-config.json>
 node tools/compare-bench/run.mjs prepare <external-config.json>
 node tools/compare-bench/build-vlither.mjs <external-config.json>
+node tools/compare-bench/run.mjs preflight <external-config.json>
 node tools/compare-bench/run.mjs smoke <external-config.json>
 node tools/compare-bench/run.mjs run <external-config.json>
 ```
@@ -68,8 +69,9 @@ Apply local Cargo target/jobs limits per command. No build/test runs during timi
   primary with five-second windows. Foreground/input/occlusion, host tick health,
   stream coverage, scene evidence, GPU and refresh changes are validity gates.
   The first real round also pairs telemetry on/off for Original, Native and NTL.
-  Each session first calibrates NTL zoom and verifies its closed netlog; any
-  non-loopback transport evidence stops before timed rounds. If its farthest
+  Each session first calibrates NTL zoom and verifies its closed netlog under the
+  documented named no-packet reachability-probe allowance; all other non-loopback
+  transport evidence stops before timed rounds. If its farthest
   view is limited, additional Original/Native Battledome runs match that scale.
   These remain labelled comparisons alongside separate whole-map runs.
 
@@ -93,6 +95,9 @@ See [method.md](method.md) for tool paths, PresentMon rights, isolation, adapter
 controls, coverage limits and telemetry on/off perturbation controls. Unknown
 overhead or content equivalence blocks a verdict. The harness never elevates,
 changes group membership, kills competing work or fights for foreground.
+Use `preflight` to check NTL without starting timed rounds. It discloses the exact
+closed, attributed, zero-I/O UDP reachability probes; runs are not described as
+having no external socket attempts. A display-only failure returns exit 2.
 
 Offline checks: `node --test tools/compare-bench.test.mjs`. The authored 60 Hz
 canvas/fast compositor control has a separate manual `synthetic-check.mjs` runner;
