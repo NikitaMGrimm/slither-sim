@@ -679,6 +679,8 @@ mod desktop {
                 top.as_ref(),
             ) {
                 Ok(true) => {
+                    #[cfg(feature = "frame-bench")]
+                    let food_submission = p.food_submission;
                     if let Some(journal) = &mut self.pacing_journal {
                         journal.presented(p.frame.identity);
                     }
@@ -693,7 +695,10 @@ mod desktop {
                     let effects = self.login.sync_return_focus(self.game.can_play());
                     self.edit_effects(effects);
                     self.schedule.presented();
-                    self.log_present();
+                    self.log_present(
+                        #[cfg(feature = "frame-bench")]
+                        food_submission,
+                    );
                 }
                 Ok(false) => {
                     self.game.retry_frame(p)?;
@@ -720,7 +725,12 @@ mod desktop {
             self.schedule.retry(Instant::now());
             self.effects()
         }
-        fn log_present(&mut self) {
+        fn log_present(
+            &mut self,
+            #[cfg(feature = "frame-bench")] food_submission: Option<
+                slither_wgpu_slice::render::FoodSubmission,
+            >,
+        ) {
             // Setup-only view telemetry must stop before the off control warms
             // up. Drop the path as well, so measured frames do no file polling.
             if take_setup_stop(&mut self.pacing_setup_stop) {
@@ -773,9 +783,7 @@ mod desktop {
                                 && (p.y - position.y).abs() * camera.zoom() <= f64::from(h) / 2.
                         }));
                     }
-                    eprintln!(
-                        "frame-bench-client: {}",
-                        serde_json::json!({
+                    let view = serde_json::json!({
                         "schema": 1, "connected": client.connected(),
                         "alive": client.own_snake().is_some_and(|s| s.metrics().alive),
                         "drawnLiveSnakes": client.snake_objects().filter(|(_,_,drawn,s)| *drawn && s.metrics().alive).count(),
@@ -786,8 +794,18 @@ mod desktop {
                         "retainedPellets": client.foods().foods().len(), "visiblePellets": visible,
                         "receivedUneatenPellets": uneaten,
                         "quality": format!("{:?}", self.game.quality()),
-                        "presentMode": "Fifo"})
-                    );
+                        "presentMode": "Fifo"});
+                    #[cfg(feature = "frame-bench")]
+                    let view = {
+                        let mut view = view;
+                        if let Some(food) = food_submission {
+                            view["submittedPellets"] = food.counts.visible_foods.into();
+                            view["pelletsBeforeOmission"] = food.counts.before_zoom_foods.into();
+                            view["foodBudgetApplied"] = food.budget_applied.into();
+                        }
+                        view
+                    };
+                    eprintln!("frame-bench-client: {}", view);
                     eprintln!(
                         "native pacing: {:.1} presents/s, max gap {:.2}ms; monitor {:.1}Hz (submission, not scanout)",
                         f64::from(*count) / seconds,

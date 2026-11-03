@@ -1298,6 +1298,8 @@ pub(crate) mod tests {
             snakes: Vec::new(),
         };
         let original = PreparedFrame {
+            #[cfg(feature = "frame-bench")]
+            food_submission: None,
             resources: bank.resources(&frame).unwrap(),
             frame,
             overlay: None,

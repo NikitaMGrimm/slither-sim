@@ -152,6 +152,25 @@ export function sceneChecks(run) {
       && Number.isInteger(v.visiblePellets)&&v.visiblePellets>0;
   });
 }
+// A reporting threshold, not a rendering tolerance: qualify a >=5 percentage
+// point difference at any sampled view. Always retain the exact shares below it.
+// See method.md, Worlds and validity; matching zoom alone does not match the work.
+export const materialFoodOmission = .05;
+export function foodSubmission(view) {
+  const before=view.pelletsBeforeOmission,submitted=view.submittedPellets;
+  const countsValid=Number.isSafeInteger(before)&&before>=0&&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
+  const omissionShare=countsValid&&before>0?(before-submitted)/before:null;
+  const reason=!countsValid?'missing or contradictory planner counts':before===0?'empty culling bounds':
+    view.foodBudgetApplied!==false?'upstream food selection is applied or unestablished':null;
+  return {status:reason?'unestablished':'established',reason,omissionShare};
+}
+export function foodSubmissionEvidence(run) {
+  const samples=(run.views??[]).map(v=>({atMs:v.atMs,...foodSubmission(v)}));
+  const shares=samples.map(s=>s.omissionShare).filter(Number.isFinite);
+  return {status:samples.length&&samples.every(s=>s.status==='established')?'established':'unestablished',
+    minimumOmissionShare:shares.length?Math.min(...shares):null,
+    maximumOmissionShare:shares.length?Math.max(...shares):null,samples};
+}
 export function drawnSnakeEvidence(run) {
   const reasons=[];let missing=!run.views?.length;
   for(const view of run.views??[]){
@@ -228,6 +247,7 @@ export function validity(run) {
   if (!run.views?.length) reasons.push('Camera/drawn-pellet evidence unavailable');
   if(run.views?.some(v=>v.sceneEvidence==='image'&&(v.viewport?.[0]!==run.width||v.viewport?.[1]!==run.height)))reasons.push('Browser content viewport does not match requested client area');
   if(!sceneChecks(run))reasons.push('Client scene does not match authoritative delivered food / image evidence');
+  if(['original','native'].includes(run.client)&&foodSubmissionEvidence(run).status!=='established')reasons.push('Native food submission evidence missing or incomplete (requires frame-bench planner census)');
   reasons.push(...drawnSnakeEvidence(run).reasons);
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
@@ -268,6 +288,15 @@ export function validity(run) {
 }
 export function comparison(a, b) {
   const reasons = [];
+  const foodA=foodSubmissionEvidence(a),foodB=foodSubmissionEvidence(b);
+  const completeFood=foodA.status==='established'&&foodB.status==='established';
+  const shares=[foodA.minimumOmissionShare,foodA.maximumOmissionShare,foodB.minimumOmissionShare,foodB.maximumOmissionShare].filter(Number.isFinite);
+  if(!completeFood)reasons.push('food submission evidence missing or incomplete; equal submission unestablished');
+  // Absorb only subtraction roundoff at the exact threshold (e.g. .30-.25).
+  if(completeFood&&Math.max(...shares)-Math.min(...shares)+Number.EPSILON>=materialFoodOmission)
+    reasons.push('different food submission: omission shares differ by at least 5 percentage points');
+  else if(!completeFood&&shares.some(s=>s>=materialFoodOmission))
+    reasons.push('different food submission cannot be excluded: material omission with incomplete peer evidence');
   const gpu = r => (r.renderAdapters ?? []).map(a => a.luid).sort().join(',');
   if((a.viewCondition??'whole-map')!==(b.viewCondition??'whole-map'))reasons.push('different view conditions');
   if (!a.validity?.valid || !b.validity?.valid) reasons.push('invalid run');
@@ -281,7 +310,8 @@ export function comparison(a, b) {
   if(a.contentDisplayCorrelation!=='established'||b.contentDisplayCorrelation!=='established')reasons.push('new game content is not correlated to displayed frames');
   if(a.views?.some(v=>v.sceneEvidence==='image')||b.views?.some(v=>v.sceneEvidence==='image'))reasons.push('picture presence evidence does not establish exact scene counts');
   if(drawnSnakeEvidence(a).status!=='consistent'||drawnSnakeEvidence(b).status!=='consistent')reasons.push('drawn-snake scene acceptance is unestablished or contradicted');
-  return { classification: reasons.length ? 'labelled comparison only' : 'direct comparison', reasons };
+  return { classification: reasons.length ? 'labelled comparison only' : 'direct comparison', reasons,
+    foodSubmission:{materialThreshold:materialFoodOmission,a:foodA,b:foodB} };
 }
 export function schedule(rounds = 3, clients = ['original', 'native', 'ntl', 'vlither']) {
   if (!Number.isInteger(rounds) || rounds < 1) throw Error('rounds must be a positive integer');

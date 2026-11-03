@@ -40,6 +40,32 @@ fn crowded_wheel_views_keep_retained_food_and_frozen_retry_inputs() {
     }
 }
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn benchmark_food_counts_follow_retained_batch_and_picture_retry() {
+    let mut game = tape::playing();
+    let mut packet = vec![b'F', 11, 10];
+    for i in 0..1024_u16 {
+        packet.extend([0, (i % 32) as u8, (i / 32) as u8, 20]);
+    }
+    game.receive(game.generation(), &tape::bundle(&[packet]), 40.)
+        .unwrap();
+    game.begin_frame(110., [960, 540], 1.).unwrap();
+    tape::effects(&mut game);
+    let picture = game.take_frame().unwrap();
+    assert!(picture.frame.food_batch.is_some());
+    let food = picture.food_submission.unwrap();
+    assert!(!food.budget_applied);
+    assert_eq!(food.counts.visible_foods, 1024);
+    assert_eq!(food.counts.before_zoom_foods, 1024);
+    let identity = picture.frame.identity;
+    game.retry_frame(picture).unwrap();
+    let retry = game.take_frame().unwrap();
+    assert_eq!(retry.frame.identity, identity);
+    assert_eq!(retry.food_submission, Some(food));
+    game.presented(true).unwrap();
+}
+
 // Native trig/Debug float text is platform-specific. This independent golden was
 // captured on Windows and paired with a pristine-main projection excluding only
 // the removed background draws. The original full-frame fixture remains unchanged.
@@ -426,6 +452,12 @@ fn maximum_zoom_out_fits_current_radius_and_preserves_draw_budgets() {
         if index == 109 {
             assert_eq!(p.frame.snakes.len(), 65, "LOD retains every snake");
             assert!(p.frame.snakes.iter().all(|s| s.body_commands > 0));
+            #[cfg(feature = "frame-bench")]
+            {
+                assert!(p.frame.food_batch.is_none());
+                let food = p.food_submission.unwrap();
+                assert!(food.counts.before_zoom_foods > food.counts.visible_foods);
+            }
         }
         assert!(p.frame.draws.capacity() <= MAX_DRAWS);
         assert!(p.pixel_bytes() <= 64 * 1024 * 1024);

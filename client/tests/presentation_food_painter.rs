@@ -187,6 +187,40 @@ fn reciprocal_zoom_preserves_a_growing_foods_declared_crop() {
     panic!("no near-mature scale witness");
 }
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn benchmark_counts_share_culling_bounds_before_omission_and_count_food_not_calls() {
+    let palette = Palette::new();
+    let assets = palette.assets();
+    let mut world = FoodWorld::new();
+    palette.spawn(&mut world, 1, Point { x: 12., y: 13. });
+    palette.spawn(&mut world, 2, Point { x: 100_000., y: 0. });
+    mature(&mut world);
+    palette.spawn(&mut world, 3, Point { x: 12., y: 13. });
+    let before = world.clone();
+    let plan = plan_food_with_zoom(input(&world, &assets), vec![], vec![], 0.05).unwrap();
+    assert_eq!(plan.counts.before_zoom_foods, 2);
+    assert_eq!(plan.counts.visible_foods, 1);
+    assert_eq!(plan.counts.total(), 7);
+    assert_eq!(
+        calls(&plan)
+            .map(|c| c.instance)
+            .collect::<std::collections::HashSet<_>>()
+            .len(),
+        1
+    );
+    let stock = plan_food(input(&world, &assets)).unwrap();
+    assert_eq!(stock.counts.before_zoom_foods, 2);
+    assert_eq!(stock.counts.visible_foods, 2);
+    assert_eq!(stock.counts.total(), 14);
+    let mut empty = input(&world, &assets);
+    empty.bounds = None;
+    let empty = plan_food_with_zoom(empty, vec![], vec![], 0.05).unwrap();
+    assert_eq!(empty.counts.before_zoom_foods, 0);
+    assert_eq!(empty.counts.visible_foods, 0);
+    assert_eq!(world, before);
+}
+
 #[test]
 fn retired_food_storage_preserves_barriers_and_reuses_both_lanes() {
     let palette = Palette::new();
@@ -244,6 +278,8 @@ fn all_outline_all_body_and_per_food_late_glows_are_separate_reverse_passes() {
         plan.counts,
         FoodPaintCounts {
             visible_foods: 2,
+            #[cfg(feature = "frame-bench")]
+            before_zoom_foods: 2,
             early: 6,
             late: 8
         }

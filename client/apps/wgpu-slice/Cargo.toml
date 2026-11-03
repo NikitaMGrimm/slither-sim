@@ -56,6 +56,7 @@ feel-trace = ["slither-client/feel-trace"]
 frame-profile = ["wgpu/trace", "dep:wgpu-core", "dep:ron", "dep:serde"]
 frame-profile-no-shadow-cut = ["frame-profile"]
 latency-rig = ["slither-client/latency-rig"]
+frame-bench = ["slither-client/frame-bench"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 slither-protocol = { path = "../../../crates/slither-protocol" }

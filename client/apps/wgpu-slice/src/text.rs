@@ -1331,6 +1331,8 @@ mod hud_budget_tests {
             for _ in 0..2 {
                 let out = render::finish_hud(
                     render::PreparedFrame {
+                        #[cfg(feature = "frame-bench")]
+                        food_submission: None,
                         overlay: None,
                         frame: Frame {
                             identity: 1,

@@ -157,6 +157,8 @@ impl MenuFrame {
             })
         };
         let mut composed = PreparedFrame {
+            #[cfg(feature = "frame-bench")]
+            food_submission: picture.food_submission,
             frame: copy(
                 &picture.frame,
                 world_extra

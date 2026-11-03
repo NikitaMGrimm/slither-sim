@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary,foodSubmission,foodSubmissionEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
@@ -383,7 +383,8 @@ async function runAttempt(config, root, item, provenance, machine) {
       try { r.networkProof = netlogProof(JSON.parse(await fs.readFile(path.join(directory,'netlog.json'), 'utf8')), r.endpoint.replace('ws://', '').replace('/slither', '')); r.networkVerified = r.networkProof.verified; }
       catch (e) { r.networkError = e.message; }
     }
-    r.sceneAcceptance={drawnSnakes:drawnSnakeEvidence(r)};
+    r.views=r.views.map(v=>({...v,foodOmissionShare:foodSubmission(v).omissionShare}));
+    r.sceneAcceptance={drawnSnakes:drawnSnakeEvidence(r),foodSubmission:foodSubmissionEvidence(r)};
     r.validity = validity(r); await save(path.join(directory, 'result.json'), r);
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
   }

@@ -299,6 +299,30 @@ local host checks remain possible without it.
 
 ## Worlds and validity
 
+Food submission is separate from reception and viewport membership. Build the
+native input with `--features frame-bench`: each successful picture carries
+`submittedPellets` (distinct planner foods, not draw calls) and
+`pelletsBeforeOmission` from the same inclusive culling bounds, counted during
+the existing outline traversal. These counters are absent in ordinary builds.
+Results retain `foodOmissionShare` per view, including zero, and the full
+submission evidence in `sceneAcceptance` and comparisons. Missing/contradictory
+counts, an empty denominator, or upstream capacity-pressure selection leave
+submission unestablished; native acquisition acceptance requires established
+evidence. Missing peer evidence always qualifies a comparison. A difference of
+at least five percentage points across sampled omission shares adds **different
+food submission**: one in twenty candidates is enough to reject an equal-work
+interpretation. This reporting threshold never hides smaller values or changes
+rendering acceptance.
+Material omission with unknown peer counts is explicitly qualified as a possible
+difference, not asserted as equal work. The current zoom policy can omit a whole
+pellet with its outline/glows; the under-two-pixel quality switch is for snake
+bodies. Sprite-width bins make omission sensitive even inside the allowed
+plus/minus 5% physical-scale band. Matched scale alone establishes neither equal
+food submission nor equal pixel contribution; continuous fading would still
+need that distinction. Telemetry-off controls remain outside scene acceptance.
+The feature's counter increments and picture metadata remain common to on/off
+rows; this residual cost is not isolated by the telemetry control.
+
 Fresh hosts bind `127.0.0.1:0 --stats 0.5 --frame-bench`; readiness reads the bound
 port and rejects 8766, 18884 and 18885. Existing `bots.count`/`bots.threads` run
 in-process A4 workers, not socket bots. One socket player is reserved.

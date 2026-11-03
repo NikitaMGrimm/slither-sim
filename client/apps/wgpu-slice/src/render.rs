@@ -52,6 +52,16 @@ pub struct PreparedFrame {
     pub frame: Frame,
     pub overlay: Option<Frame>,
     pub resources: Vec<Resource>,
+    #[cfg(feature = "frame-bench")]
+    pub food_submission: Option<FoodSubmission>,
+}
+/// Successful planner output, carried with the picture through worker/retry paths.
+#[cfg(feature = "frame-bench")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FoodSubmission {
+    pub counts: FoodPaintCounts,
+    /// Pressure selection precedes the planner and can itself omit food.
+    pub budget_applied: bool,
 }
 /// Producer limits bound text resources; they no longer reserve world capacity.
 pub const PANEL_PRODUCER_DRAWS: usize = 96;
@@ -1010,6 +1020,8 @@ fn prepare_composed(
             outline_barrier: batch.visible_count,
             counts: FoodPaintCounts {
                 visible_foods: batch.visible_count,
+                #[cfg(feature = "frame-bench")]
+                before_zoom_foods: batch.visible_count,
                 early: 0,
                 late: 0,
             },
@@ -1504,6 +1516,11 @@ fn prepare_composed(
         frame,
         overlay,
         resources,
+        #[cfg(feature = "frame-bench")]
+        food_submission: Some(FoodSubmission {
+            counts: food.counts,
+            budget_applied: pressure,
+        }),
     })
 }
 // Clip on the same physical grid as the raster. Fractional source crops would
@@ -1661,6 +1678,8 @@ pub fn finish(frame: Frame, bank: &mut Bank, hud: &str) -> Result<PreparedFrame>
         let resources = bank.resources(&frame)?;
         finish_plan(
             PreparedFrame {
+                #[cfg(feature = "frame-bench")]
+                food_submission: None,
                 frame,
                 overlay: None,
                 resources,
@@ -1807,6 +1826,8 @@ mod text_staging_tests {
                     frame.draws[0].destination.width = f64::NAN;
                     finish_plan(
                         PreparedFrame {
+                            #[cfg(feature = "frame-bench")]
+                            food_submission: None,
                             overlay: None,
                             frame,
                             resources: Vec::new(),
@@ -1822,6 +1843,8 @@ mod text_staging_tests {
                 3 => {
                     frame.draws[0].asset.handle += 1000;
                     bank.resources(&frame).map(|resources| PreparedFrame {
+                        #[cfg(feature = "frame-bench")]
+                        food_submission: None,
                         frame,
                         overlay: None,
                         resources,
@@ -1831,6 +1854,8 @@ mod text_staging_tests {
                     frame.viewport_scale = f64::NAN;
                     finish_hud(
                         PreparedFrame {
+                            #[cfg(feature = "frame-bench")]
+                            food_submission: None,
                             overlay: None,
                             frame,
                             resources: Vec::new(),
