@@ -109,12 +109,18 @@ impl Cache {
                     s.outer.asset().into(),
                 ];
                 let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
-                // Grouped paint inputs reuse this metadata. Numeric equality
-                // alone collapses signed zero; keep exact source bits too.
-                if !same_source_bits(&family.0, &s) {
+                if family.0 != s {
                     return Ok(None);
                 }
                 family.1.push(i);
+            }
+            // Compact projections substitute family metadata. Finite, nonzero
+            // dimensions compare bit-exactly with numeric equality. Zero halves
+            // may differ only in sign, so use the canonical path for that rare
+            // family instead of rechecking every pellet's source bits.
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
+            if families.values().any(|(s, _)| source_has_zero_half(s)) {
+                return Ok(None);
             }
             // Source readiness still covers all retained sources, including culled food.
             let representatives: Vec<_> = families
@@ -190,9 +196,14 @@ impl Cache {
     }
 }
 
-// Grouped inputs substitute the family's metadata for each pellet. Compare the
-// exact bits once, rather than numeric equality followed by a signed-zero pass.
-// This preserves signed-zero fallback and avoids a second walk of the sources.
+#[inline]
+fn source_has_zero_half(s: &FoodSources) -> bool {
+    [&s.body, &s.outline, &s.inner, &s.outer]
+        .into_iter()
+        .any(|source| source.half_width() == 0. || source.half_height() == 0.)
+}
+
+#[cfg(test)]
 #[inline(always)]
 fn same_source_bits(a: &FoodSources, b: &FoodSources) -> bool {
     a.indices == b.indices
@@ -499,6 +510,7 @@ pub(crate) mod tests {
         let world = rectangle_count(&bank, 1024);
         let original = world.foods()[0].snapshot().sources;
         assert!(same_source_bits(&original, &original));
+        assert!(!source_has_zero_half(&original));
         for part in 0..4 {
             for axis in 0..2 {
                 let mut positive = original;
@@ -523,6 +535,8 @@ pub(crate) mod tests {
                     )
                     .unwrap();
                 }
+                assert!(source_has_zero_half(&positive));
+                assert!(source_has_zero_half(&negative));
                 assert_eq!(positive, negative);
                 assert!(!same_source_bits(&positive, &negative));
             }
