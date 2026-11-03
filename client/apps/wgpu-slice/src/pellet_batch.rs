@@ -111,7 +111,7 @@ impl Cache {
                 let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
                 // Grouped paint inputs reuse this metadata. Numeric equality
                 // alone collapses signed zero; keep exact source bits too.
-                if family.0 != s || !same_source_bits(family.0, s) {
+                if family.0 != s || !same_source_bits(&family.0, &s) {
                     return Ok(None);
                 }
                 family.1.push(i);
@@ -190,10 +190,13 @@ impl Cache {
     }
 }
 
-fn same_source_bits(a: FoodSources, b: FoodSources) -> bool {
-    [a.body, a.outline, a.inner, a.outer]
+// Rebuild bursts must not copy two full source records into each comparison.
+// Keep exact signed-zero admission, but borrow and inline the numeric check.
+#[inline(always)]
+fn same_source_bits(a: &FoodSources, b: &FoodSources) -> bool {
+    [&a.body, &a.outline, &a.inner, &a.outer]
         .into_iter()
-        .zip([b.body, b.outline, b.inner, b.outer])
+        .zip([&b.body, &b.outline, &b.inner, &b.outer])
         .all(|(a, b)| {
             [a.width(), a.height(), a.half_width(), a.half_height()].map(f64::to_bits)
                 == [b.width(), b.height(), b.half_width(), b.half_height()].map(f64::to_bits)
