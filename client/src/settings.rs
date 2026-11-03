@@ -114,7 +114,7 @@ impl SettingsState {
         crate::menu_transition::step(&mut self.alpha, &mut self.previous, self.open, now)
             .map_err(|_| "Invalid settings clock")
     }
-    /// Mount only after the login's existing admission gates settle.
+    /// Mount only after the login's existing phase gates settle.
     pub fn open(&mut self, view: &crate::start_page::StartMenuView) -> bool {
         if !available(view) || self.visible() {
             return false;
@@ -203,11 +203,11 @@ impl SettingsState {
         self.preferences.resolution == WorldResolution::Native && !self.native_available
     }
 }
-/// Shared entry gate; no pending Play, return, champion, or missing route admission.
+/// Settings needs no connection admission, including while a returned socket closes.
+/// Pending Play, return and champion phases still own the menu.
 pub fn available(view: &crate::start_page::StartMenuView) -> bool {
     view.phase == crate::start_page::MenuPhase::Login
         && view.visible
-        && !view.disabled
         && view.ordinary_controls_visible
         && !view.champion_pending
 }

@@ -197,9 +197,8 @@ fn offline_tab_finds_shared_server_link_and_paints_its_focus_without_enabling_pl
     assert!(login.login_ui.keyboard_focus);
     assert!(login.egui.prepared_shapes().len() > unfocused);
     let order = slither_wgpu_slice::login_egui::focus_order(&login.state.view(false));
-    for id in [PLAY, SETTINGS] {
-        assert!(!order.contains(&slither_wgpu_slice::login_egui::widget_id(id)));
-    }
+    assert!(!order.contains(&slither_wgpu_slice::login_egui::widget_id(PLAY)));
+    assert!(order.contains(&slither_wgpu_slice::login_egui::widget_id(SETTINGS)));
     assert!(login.state.view(false).play_disabled);
 }
 

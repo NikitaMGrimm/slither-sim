@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep the returned death menu drawing while a slow server closes the old
+  connection, and let local Settings open without connection admission.
+
 - Reduce community join/refresh hitches by staging only new food in sector
   listings and applying sector clears/notices without whole-world copies.
 

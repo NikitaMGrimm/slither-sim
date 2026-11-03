@@ -127,9 +127,9 @@ fn v2_roundtrips_strictly_and_resolution_is_independent_of_quality_and_capabilit
 fn storage_failure_and_done_preserve_quality_next_play_and_generation() {
     let mut m = menu(Q::High);
     m.edit_nickname(&"Player".encode_utf16().collect::<Vec<_>>());
-    let view = m.view(true);
-    assert!(!m.settings.open(&m.view(false)));
-    assert!(m.settings.open(&view));
+    // Settings edits local preferences even while a route or old socket owns Play.
+    assert!(m.view(false).disabled);
+    assert!(m.settings.open(&m.view(false)));
     let toggle = m.settings.intent(QUALITY, Some(false), Activation::Space);
     m.settings.activate(toggle);
     m.action(MenuAction::Play, true);

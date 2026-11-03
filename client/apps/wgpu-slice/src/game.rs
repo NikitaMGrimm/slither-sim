@@ -1297,9 +1297,18 @@ impl LocalGame {
         if !now.is_finite() {
             return Err("Invalid frame timestamp".into());
         }
+        // The returned menu still needs pictures while transport owns Close.
+        // No gameplay sends remain; can_play keeps the old socket's admission.
+        // See returned_menu_keeps_presenting_buttons_while_death_close_is_pending.
+        let returning_close = self.phase() == Phase::Disconnected
+            && self.session.view().outcome.is_some()
+            && self
+                .effects
+                .iter()
+                .all(|p| p.effect.kind == EffectKind::Close);
         if self.work.is_some()
             || self.inflight != 0
-            || (!self.effects.is_empty() && !self.stopping())
+            || (!self.effects.is_empty() && !self.stopping() && !returning_close)
             || !self.packet_frames.is_empty()
         {
             return Ok(());
