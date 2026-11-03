@@ -1,0 +1,14 @@
+[
+  {
+    "mutation": "creation-identity",
+    "regression": "static_identity_is_weak_and_distinguishes_equal_serial_creations",
+    "result": "assertion failure as expected; not a compile failure",
+    "restored_sha256": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945"
+  },
+  {
+    "mutation": "cached-metadata-guard",
+    "regression": "new_metadata_cannot_replace_a_family_while_cached_members_still_use_it",
+    "result": "assertion failure as expected; not a compile failure",
+    "restored_sha256": "68f04789163ae289588f2d36cec40f11d5370f7ab4f158947cae443299dce8d2"
+  }
+]

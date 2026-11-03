@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Reuse food source classifications](client-performance/2026-11-03-food-source-groups/REPORT.md) | Weak creation identities preserve ordered grouping while reclassifying only new or moved records; current-main RTX/Vulkan 4K pairs, AMD guardrails and exact images; art p95 remains above the high-refresh budget. |
 | Client performance | [Exact native pellet workers](client-performance/2026-11-03-pellet-workers/REPORT.md) | Bounded sleeping workers; interleaved RTX/Vulkan 4K and AMD/DX12 guards, exact world-image controls and retained idle/stress costs; high-refresh p95 remains over budget. |
 | Client performance | [Canonical-parity evidence clarification](client-performance/2026-11-03-canonical-parity-audit/REPORT.md) | Distinguish explicitly enabled original vertex controls from inactive later timing accumulators; preserve historical data and separate actual-image evidence. |
 | Client performance | [Smaller food frame copies](client-performance/2026-11-03-food-cpu/REPORT.md) | Separate frozen food metadata from numeric frame state; matched current-main RTX/Vulkan 4K pairs, AMD guardrails and exact image controls, with native worker adoption kept separate. |
