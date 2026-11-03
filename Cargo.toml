@@ -55,7 +55,7 @@ default-members = ["."]
 # One version for the simulator, the C ABI crate and the Python package;
 # release-plz bumps it here.
 [workspace.package]
-version = "0.9.0"
+version = "0.10.0"
 
 [features]
 default = ["networking", "parallel"]
