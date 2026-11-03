@@ -149,6 +149,20 @@ of the successful loopback game connection fails proof. Keep logs private.
 NTL negotiates protocol 13; host census checks the negotiated protocol and life.
 Untrusted endpoint values use structured CDP arguments, not constructed source.
 
+Native clients have a separate, explicitly incomplete safety record. An
+unprivileged helper starts just after client launch and periodically samples
+TCP connections (including non-established states) and UDP local bindings for
+the observed owned process tree, with process creation times guarding PID reuse.
+It continues through client shutdown; actual sample timestamps, startup delay,
+errors and observed process IDs are retained. The requested interval is one
+second plus collection time. Any observed non-loopback or wildcard endpoint
+invalidates, including a connection present only in an early sample.
+The record is labelled sampled and complete:false, never networkVerified.
+Windows UDP tables do not expose per-datagram destinations; short connections or
+children between polls can be missed. Incompleteness alone does not invalidate a
+native run; unavailable collection is a tooling failure. This helper adds host
+CPU load during measurement and remains enabled in both telemetry controls.
+
 CDP Network is enabled only for join confirmation and disabled immediately on
 Setup. Events have a fixed bound; no WebSocket frame serialization or game-state
 polling continues during the window. Screenshots run before/after the timed
@@ -206,6 +220,15 @@ Battledome adds synthetic pit-marker food. Native received-uneaten counts are
 checked against nearby decorated wire counts with an explicit 32 + 5% allowance
 for delivery/sampling lag; retained eaten flights are excluded where exposed.
 Visible/retained counts are instances, not opaque pixels or GPU quads.
+Available drawn-live-snake counts are checked against host delivery receipts
+within 1200 ms. Whole-map views must fall inside that nearby count range with a
+two-snake allowance for appearance/death delivery and presentation lag. A living
+local player must still be drawn; the allowance never excuses a zero count.
+Normal/limited views check the delivered upper bound and living local player,
+because the host does not know the precise visible subset. Contradictions
+invalidate. Missing counts (including NTL without game internals) explicitly
+leave drawn-snake scene acceptance unestablished and prevent direct comparison.
+
 NTL screenshots report colored small-component **pellet candidates**, not exact
 pellet counts; a fitted red/gold circle is a candidate visible boundary. Presence-only
 image evidence cannot establish complete scene delivery or identify an inner

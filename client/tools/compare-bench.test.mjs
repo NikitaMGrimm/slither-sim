@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP } from './compare-bench/browser.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog} from './compare-bench/resources.mjs';
+import {nativeNetworkEvidence,startNativeNetwork} from './compare-bench/native-network.mjs';
 import {spawn,execFileSync} from 'node:child_process';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -31,7 +32,7 @@ test('display timestamps include latency and select exactly one PID/surface', ()
 test('invalid/unknown validity cannot silently pass', () => {
   assert.equal(validity({}).valid, false);
   const run = { metrics: { coveredMs: 1000, boundaryGapMs: [0, 0] },startMs:0,endMs:1000, seconds: 1, dt: .007, bots: 100,
-    scenario: 'battledome', networkVerified: true, width: 960, height: 540, display: 'D', dpi: 96,
+    scenario: 'battledome', nativeNetwork:{status:'sampled-loopback-only',complete:false,rejectedEndpoints:[]},width: 960, height: 540, display: 'D', dpi: 96,
     adapter: 'synthetic', renderAdapters: [{ name: 'Synthetic GPU', luid: 'luid1' }], refreshHz: 60, vsync: 'Fifo',
     windowSamples: [0,500,1000].map(atMs=>({atMs,qpcMs:atMs,foreground: true, occluded: false, minimized: false, visible: true, width: 960, height: 540, display: 'D', dpi: 96,refreshHz:60,nominalRefreshHz:60,clientRect:[0,0,960,540],displayBounds:[0,0,1920,1080],gpuEngines:[{instance:'gpu',utilization:2}]})),
     stats: [{atMs:0, ticksPerSecond: 142.85, deferredTicks: 0, lostSeconds: 0, bots: 100, players: 1 }],
@@ -43,6 +44,7 @@ test('invalid/unknown validity cannot silently pass', () => {
   assert.equal(validity(refreshed).valid,false);
   refreshed.clock={qpcMs:0,unixMs:1000000};assert.equal(validity(refreshed).valid,true);
   const ntl=structuredClone(run);ntl.client='ntl';ntl.census[0].players[0].protocol=13;
+  ntl.networkVerified=true;
   ntl.contentMetrics={frames:60,achievedFps:60};
   assert.ok(validity(ntl).reasons.includes('NTL input provenance unavailable'));
   ntl.provenance={ntl:{tree:{sha256:'a'.repeat(64)}}};assert.equal(validity(ntl).valid,true);
@@ -53,7 +55,7 @@ test('invalid/unknown validity cannot silently pass', () => {
   for (const mutation of [r => r.windowSamples[0].foreground = false, r => r.windowSamples[0].occluded = true,
     r => r.windowSamples[0].buildRunning = true, r => r.stats[0].deferredTicks = 1,
     r => r.census[0].players[0].alive = false, r => r.views[0].wholeMap = false,
-    r => r.census[0].wholeMapFood = false, r => r.networkVerified = false,
+    r => r.census[0].wholeMapFood = false, r => r.nativeNetwork.rejectedEndpoints=[{remoteAddress:'203.0.113.1'}],
     r => r.metrics.boundaryGapMs = [1000, 0],r=>r.views[0].retainedPellets=0,
     r=>r.windowSamples[1].refreshHz=30,r=>r.windowSamples[0].nominalRefreshHz=30,
     r=>r.windowSamples[0].clientRect=[-20,0,960,540],r=>r.windowSamples[0].gpuCounterError='query failed',
@@ -64,10 +66,64 @@ test('invalid/unknown validity cannot silently pass', () => {
 });
 test('adapter and refresh mismatches are labelled, never direct comparisons', () => {
   const run = { validity: { valid: true }, renderAdapters: [{ luid: 'A' }], display: 'D', refreshHz: 240, width: 1280, height: 720, dpi: 120, scenario: 'normal', experiment: 'primary', vsyncCondition: 'display-paced',metrics:{presentModes:['Composed: Flip']},contentDisplayCorrelation:'established' };
+  run.views=[{atMs:0,drawnLiveSnakes:1}];run.census=[{atMs:0,players:[{wireLivingSnakes:1,alive:true,setup:true}]}];
   assert.equal(comparison(run, structuredClone(run)).classification, 'direct comparison');
   for (const change of [r => r.renderAdapters = [{ luid: 'B' }], r => r.refreshHz = 60, r => r.validity.valid = false,r=>r.metrics.presentModes=['Hardware: Independent Flip'],r=>r.metrics.presentModes=[],r=>r.metrics.presentModes=['Unknown'],r=>r.contentDisplayCorrelation='unestablished']) {
     const other = structuredClone(run); change(other); assert.equal(comparison(run, other).classification, 'labelled comparison only');
   }
+});
+
+function completeBattledome() {
+  const times=Array.from({length:121},(_,i)=>i*500);
+  const run={client:'original',scenario:'battledome',experiment:'primary',seconds:60,startMs:0,endMs:60000,dt:.007,bots:100,
+    width:960,height:540,display:'D',dpi:96,refreshHz:240,adapter:'authored',renderAdapters:[{luid:'A',name:'Authored GPU'}],
+    vsync:'Fifo',vsyncCondition:'sync-interval-1',contentDisplayCorrelation:'established',
+    nativeNetwork:{status:'sampled-loopback-only',complete:false,rejectedEndpoints:[]},
+    metrics:{coveredMs:60000,boundaryGapMs:[0,0],presentModes:['Composed: Flip']}};
+  run.windowSamples=times.map(atMs=>({atMs,qpcMs:atMs,width:960,height:540,display:'D',dpi:96,refreshHz:240,nominalRefreshHz:240,
+    foreground:true,visible:true,occluded:false,minimized:false,clientRect:[0,0,960,540],displayBounds:[0,0,1920,1080],gpuEngines:[{instance:'authored',utilization:1}]}));
+  run.stats=times.map(atMs=>({atMs,ticksPerSecond:142.85,deferredTicks:0,lostSeconds:0,bots:100,players:1}));
+  run.census=times.map(atMs=>({atMs,wholeMapFood:true,admittedBotSlots:100,totalAliveSnakes:101,players:[{alive:true,setup:true,protocol:19,wireLivingSnakes:101,decoratedWireFood:1000}]}));
+  run.views=times.filter(t=>t%2000===0).map(atMs=>({atMs,wholeMap:true,retainedPellets:1000,visiblePellets:1000,drawnLiveSnakes:101}));
+  return run;
+}
+test('complete 60-second delivery cannot pass a blank drawn-snake scene',()=>{
+  const run=completeBattledome();assert.equal(validity(run).valid,true);
+  run.views.forEach(v=>v.drawnLiveSnakes=0);
+  assert.equal(validity(run).valid,false);assert.equal(drawnSnakeEvidence(run).status,'contradicted');
+  run.views.forEach(v=>v.drawnLiveSnakes=99);assert.equal(validity(run).valid,true);
+  run.views.forEach(v=>v.drawnLiveSnakes=98);assert.equal(validity(run).valid,false);
+  run.views.forEach(v=>delete v.drawnLiveSnakes);assert.equal(drawnSnakeEvidence(run).status,'unestablished');
+  const other=completeBattledome();run.validity=validity(run);other.validity=validity(other);
+  assert.equal(comparison(run,other).classification,'labelled comparison only');
+  assert.ok(comparison(run,other).reasons.some(reason=>reason.includes('drawn-snake')));
+});
+test('native network observations retain early TCP and UDP violations without claiming complete proof',()=>{
+  const sample={atUnixMs:0,pids:[7],tcpCollected:true,udpCollected:true,tcp:[{pid:7,localAddress:'127.0.0.1',remoteAddress:'127.0.0.1',state:'Established'}],udp:[{pid:7,localAddress:'::1',remoteAddress:null}]};
+  const clean=nativeNetworkEvidence([sample]);assert.equal(clean.complete,false);assert.equal(Object.hasOwn(clean,'verified'),false);
+  const run=completeBattledome();run.nativeNetwork=clean;assert.equal(validity(run).valid,true);
+  const closed={...sample,atUnixMs:1000,tcp:[],udp:[]};
+  const remote=structuredClone(sample);remote.tcp[0].remoteAddress='203.0.113.1';
+  run.nativeNetwork=nativeNetworkEvidence([remote,closed]);assert.equal(validity(run).valid,false);
+  const udp=structuredClone(sample);udp.udp[0].localAddress='0.0.0.0';
+  run.nativeNetwork=nativeNetworkEvidence([udp,closed]);assert.equal(validity(run).valid,false);
+  udp.udp[0]={pid:7,localAddress:'127.0.0.1',remoteAddress:'203.0.113.1'};
+  assert.equal(nativeNetworkEvidence([udp]).rejectedEndpoints.length,1);
+});
+test('unprivileged native collector samples authored loopback TCP and UDP over process lifetime',{skip:process.platform!=='win32',timeout:30000},async()=>{
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'native-network-'));
+  const script=`const net=require('net'),udp=require('dgram').createSocket('udp4');const tcp=net.createServer();tcp.listen(0,'127.0.0.1',()=>udp.bind(0,'127.0.0.1',()=>console.log(JSON.stringify({tcp:tcp.address().port,udp:udp.address().port}))));`;
+  const child=spawn(process.execPath,['-e',script],{windowsHide:true});let monitor;
+  try{
+    const ports=await new Promise((resolve,reject)=>{child.once('error',reject);child.stdout.once('data',b=>resolve(JSON.parse(String(b))));});
+    monitor=await startNativeNetwork({pid:child.pid,executable:process.execPath,directory,maxSeconds:15,startedUnixMs:Date.now()});
+    await new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(Error('No network sample')),18000);monitor.child.stdout.on('data',b=>{text+=b;if(text.includes('\n')){clearTimeout(timer);resolve();}});monitor.child.once('error',reject);});
+    child.kill();const evidence=await monitor.finish();monitor=null;
+    assert.equal(evidence.complete,false);assert.notEqual(evidence.status,'unavailable',JSON.stringify(evidence.errors));
+    assert.ok(evidence.samples.some(s=>s.tcp.some(p=>p.localPort===ports.tcp)));
+    assert.ok(evidence.samples.some(s=>s.udp.some(p=>p.localPort===ports.udp)));
+    assert.equal(evidence.rejectedEndpoints.length,0);
+  }finally{if(child.exitCode===null)child.kill();if(monitor)await monitor.finish();await fs.rm(directory,{recursive:true,force:true});}
 });
 test('Chrome adapter selection is explicit, with no silent malformed fallback', () => {
   assert.deepEqual(adapterFlags('default'), []);

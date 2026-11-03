@@ -117,6 +117,26 @@ export function sceneChecks(run) {
       && Number.isInteger(v.visiblePellets)&&v.visiblePellets>0;
   });
 }
+export function drawnSnakeEvidence(run) {
+  const reasons=[];let missing=!run.views?.length;
+  for(const view of run.views??[]){
+    if(!Object.hasOwn(view,'drawnLiveSnakes')){missing=true;continue;}
+    const drawn=view.drawnLiveSnakes;
+    if(!Number.isInteger(drawn)||drawn<0){reasons.push('Invalid drawn-live-snake count');continue;}
+    const near=(run.census??[]).filter(c=>Number.isFinite(c.atMs)&&Number.isFinite(view.atMs)&&Math.abs(c.atMs-view.atMs)<=1200);
+    const delivered=near.map(c=>c.players?.[0]?.wireLivingSnakes).filter(Number.isFinite);
+    if(!delivered.length){missing=true;continue;}
+    // Bracket with census receipts within 1.2 s, then allow two additional
+    // snakes for in-flight appearance/death and presentation timing. A living
+    // local player must still be drawn: the allowance never excuses zero.
+    const ownAlive=near.some(c=>c.players?.[0]?.alive&&c.players[0].setup);
+    const minimum=run.scenario==='battledome'&&view.wholeMap===true?Math.max(ownAlive?1:0,Math.min(...delivered)-2):ownAlive?1:0;
+    if(drawn<minimum||drawn>Math.max(...delivered)+2)reasons.push('Drawn living snakes contradict nearby authoritative delivery');
+  }
+  return {status:reasons.length?'contradicted':missing?'unestablished':'consistent',reasons:[...new Set(reasons)],
+    censusDistanceMs:1200,deliveryTimingAllowanceSnakes:2,
+    scope:'whole-map count range; normal/limited views check the delivered upper bound and living local player'};
+}
 export function nativeProduction(journal,{startMs,endMs,qpcUnixOffset}){
   if(journal.overflow)throw Error('Native present-identity journal overflow');
   const rows=journal.rows.map(([ns,identity])=>({at:journal.unixStartMs+ns/1e6+qpcUnixOffset,identity})).filter(r=>r.at>=startMs&&r.at<=endMs);
@@ -149,7 +169,12 @@ export function validity(run) {
   if (run.error) reasons.push(run.error);
   if (run.cleanupError) reasons.push('Acquisition cleanup failed');
   if (!run.metrics) reasons.push('No comparable displayed-frame measurement');
-  if (!run.networkVerified) reasons.push('Loopback-only game traffic not verified');
+  if(run.client==='ntl'){
+    if(!run.networkVerified)reasons.push('Loopback-only game traffic not verified');
+  }else{
+    if(!run.nativeNetwork||run.nativeNetwork.status==='unavailable')reasons.push('Native endpoint sampling unavailable');
+    if(run.nativeNetwork?.rejectedEndpoints?.length)reasons.push('Non-loopback native endpoint observed');
+  }
   for(const [name,rows,gap] of [['window',run.windowSamples,750],['host stats',run.stats,1200],['host census',run.census,1200],['view',run.views,3000]]) {
     if(!streamCoverage(rows,run.startMs,run.endMs,gap))reasons.push(`${name} telemetry does not cover the measured window`);
   }
@@ -168,6 +193,7 @@ export function validity(run) {
   if (!run.views?.length) reasons.push('Camera/drawn-pellet evidence unavailable');
   if(run.views?.some(v=>v.sceneEvidence==='image'&&(v.viewport?.[0]!==run.width||v.viewport?.[1]!==run.height)))reasons.push('Browser content viewport does not match requested client area');
   if(!sceneChecks(run))reasons.push('Client scene does not match authoritative delivered food / image evidence');
+  reasons.push(...drawnSnakeEvidence(run).reasons);
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
   if (run.scenario === 'normal' && ['original','native'].includes(run.client)
@@ -200,6 +226,7 @@ export function comparison(a, b) {
   if(!modes(a)||modes(a)!==modes(b))reasons.push('different or unknown presentation modes');
   if(a.contentDisplayCorrelation!=='established'||b.contentDisplayCorrelation!=='established')reasons.push('new game content is not correlated to displayed frames');
   if(a.views?.some(v=>v.sceneEvidence==='image')||b.views?.some(v=>v.sceneEvidence==='image'))reasons.push('picture presence evidence does not establish exact scene counts');
+  if(drawnSnakeEvidence(a).status!=='consistent'||drawnSnakeEvidence(b).status!=='consistent')reasons.push('drawn-snake scene acceptance is unestablished or contradicted');
   return { classification: reasons.length ? 'labelled comparison only' : 'direct comparison', reasons };
 }
 export function schedule(rounds = 3, clients = ['original', 'native', 'ntl', 'vlither']) {

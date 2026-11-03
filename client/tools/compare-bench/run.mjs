@@ -4,11 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
+import {startNativeNetwork} from './native-network.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -111,13 +112,13 @@ async function modInput(input, session) {
 async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
-  const children = []; let hostLog = '', clientLog = '', browser, pm, host, native;
+  const children = []; let hostLog = '', clientLog = '', browser, pm, host, native,networkMonitor;
   let pmLog = '',pmCompleted;
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
-    provenance, machine, telemetry:config.telemetry??'on', networkVerified: false, windowSamples: [], views: [], census: [], stats: [],
+    provenance, machine, telemetry:config.telemetry??'on', windowSamples: [], views: [], census: [], stats: [],
     acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
@@ -173,10 +174,12 @@ async function runAttempt(config, root, item, provenance, machine) {
       r.vlitherBuild = receipt; r.vsync = 'FIFO, enabled by labelled benchmark wrapper';
       // Fresh user.dat per attempt; assets remain in external upstream checkout.
       for (const resource of ['app', 'thermite']) await fs.symlink(path.join(config.output, 'vlither', resource), path.join(directory, resource), 'junction');
+      r.nativeStartedUnixMs=Date.now();
       native = spawn(config.vlitherBinary, [], { cwd: directory, env: { ...process.env,
         SLITHER_BENCH_SERVER: endpoint.replace('ws://', '').replace('/slither', ''),
         ...(item.scenario === 'battledome' ? { SLITHER_BENCH_WHOLE_MAP: '1' } : {}) }, windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
+      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.vlitherBinary,directory,maxSeconds:config.seconds+240,startedUnixMs:r.nativeStartedUnixMs});
       await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'vlither', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Vlither GLFW window, borderless task-owned HWND';
       await waitFor(() => clientLog.includes('frame-bench-client: ') || (native.exitCode !== null ? Promise.reject(Error(`Vlither exited ${native.exitCode}: ${clientLog}`)) : null), 20000, 'Vlither local join');
@@ -186,15 +189,16 @@ async function runAttempt(config, root, item, provenance, machine) {
       const clientEnv={...process.env,LOCALAPPDATA:data};
       delete clientEnv.SLITHER_FRAME_PACING;delete clientEnv.SLITHER_FRAME_PACING_JOURNAL;
       if(config.telemetry!=='off')Object.assign(clientEnv,{SLITHER_FRAME_PACING:'1',SLITHER_FRAME_PACING_JOURNAL:path.join(directory,'native-production.json')});
+      r.nativeStartedUnixMs=Date.now();
       native = spawn(config.binary, ['--server', endpoint.replace('ws://', '').replace('/slither', ''), '--nickname', 'FrameBench', '--skin', '0'],
         { cwd: directory, env:clientEnv,windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
+      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.binary,directory,maxSeconds:config.seconds+240,startedUnixMs:r.nativeStartedUnixMs});
       await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Native winit window, borderless task-owned HWND';
       await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
         || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
       r.vsync = 'Fifo (source); PresentMon records actual mode and SyncInterval';
-      r.networkVerified = true; // Direct explicit --server bypasses discovery; verify socket census below.
     }
     r.worldReady = await waitFor(() => {
       const census = completeJsonLines(hostLog, 'frame-bench: ').at(-1);
@@ -266,12 +270,6 @@ async function runAttempt(config, root, item, provenance, machine) {
       machineMeanCpuPercent: r.windowSamples.reduce((sum, s) => sum + s.machineCpuPercent, 0) / r.windowSamples.length,
       machineMaxCpuPercent: Math.max(...r.windowSamples.map(s => s.machineCpuPercent)),
       logicalProcessors: machine.logicalProcessors };
-    if (!browser) {
-      const network = execute('powershell.exe', ['-NoProfile', '-Command', `@(Get-NetTCPConnection -OwningProcess ${native.pid} -ErrorAction SilentlyContinue | Where-Object State -eq Established | Select-Object RemoteAddress,RemotePort) | ConvertTo-Json -Compress`]);
-      await fs.writeFile(path.join(directory, 'native-sockets.json'), network);
-      const peers = network ? [JSON.parse(network)].flat() : [];
-      r.networkVerified = peers.length > 0 && peers.every(p => p.RemoteAddress === '127.0.0.1' && p.RemotePort === +new URL(endpoint).port);
-    }
     const covered=rows=>rows.filter(row=>row.atMs>=r.startMs-3000&&row.atMs<=r.endMs+3000);
     r.stats=covered(r.stats);r.census=covered(r.census);r.views=covered(r.views);
     if(r.windowSamples.some(s=>s.ownerInput||!s.foreground))throw Error('Owner input or foreground loss: stopped without reclaiming focus');
@@ -301,6 +299,9 @@ async function runAttempt(config, root, item, provenance, machine) {
     if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
     for (const child of [...children].reverse()) await stop(child);
+    if(networkMonitor){
+      try{r.nativeNetwork=await networkMonitor.finish();}catch(error){r.networkError=error.message;}
+    }
     pmLog=await recoverCollectorLog(pmCompleted,pmLog);
     await fs.writeFile(path.join(directory, 'host.txt'), hostLog);
     await fs.writeFile(path.join(directory, 'client.txt'), clientLog);
@@ -309,6 +310,7 @@ async function runAttempt(config, root, item, provenance, machine) {
       try { r.networkProof = netlogProof(JSON.parse(await fs.readFile(path.join(directory,'netlog.json'), 'utf8')), r.endpoint.replace('ws://', '').replace('/slither', '')); r.networkVerified = r.networkProof.verified; }
       catch (e) { r.networkError = e.message; }
     }
+    r.sceneAcceptance={drawnSnakes:drawnSnakeEvidence(r)};
     r.validity = validity(r); await save(path.join(directory, 'result.json'), r);
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
   }
