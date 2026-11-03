@@ -111,6 +111,53 @@ fn wire_score(snake: &Snake) -> f64 {
 }
 
 impl SimulatorBackend {
+    #[cfg(feature = "frame-bench")]
+    fn frame_bench_actions(
+        &self,
+        mut actions: Vec<Option<crate::Action>>,
+    ) -> Vec<Option<crate::Action>> {
+        if self.frame_bench {
+            for (action, snake) in actions
+                .iter_mut()
+                .zip(self.world.snakes())
+                .take(self.player_latency.slots)
+            {
+                // Same measurement-only orbit for every socket client. Socket
+                // heads skip body tests, but rim/pit deaths remain possible and
+                // bots still collide with (and can die on) the player's body.
+                let radius = self.world.radius() * 0.75;
+                let distance = snake.head.x.hypot(snake.head.y);
+                *action = snake.alive.then_some(crate::Action {
+                    heading: snake.head.y.atan2(snake.head.x)
+                        + std::f64::consts::FRAC_PI_2
+                        + ((distance - radius) / 200.).atan(),
+                    boost: false,
+                });
+            }
+        }
+        actions
+    }
+
+    fn advance_food_interest(&mut self, now: f64) {
+        let slots = self.slots.iter_mut().zip(self.world.snakes());
+        #[cfg(feature = "frame-bench")]
+        let mut slots = slots;
+        #[cfg(feature = "frame-bench")]
+        if self.frame_bench && self.world.config().pit.is_some() {
+            for (slot, _) in slots.by_ref().take(self.player_latency.slots) {
+                if slot.connection.setup {
+                    slot.connection.food_interest.all(self.world.radius());
+                }
+            }
+        }
+        for (slot, snake) in slots {
+            if slot.connection.setup {
+                slot.connection
+                    .food_interest
+                    .advance(snake.head, snake.heading, now);
+            }
+        }
+    }
     /// Text from the client whose dead life holds the record, accepted once.
     /// Anything else is ignored: this is a local session rule, not an official
     /// qualification check.
@@ -223,28 +270,10 @@ impl SimulatorBackend {
             .snakes()
             .iter()
             .zip(&self.slots)
-            .enumerate()
-            .map(|(index, (snake, slot))| {
-                let control = slot.control;
-                // Same measurement-only orbit for every socket client. Normal
-                // collisions remain enabled; deaths invalidate, never disappear.
-                #[cfg(feature = "frame-bench")]
-                let control = if self.frame_bench && index < self.player_latency.slots {
-                    let radius = self.world.radius() * 0.75;
-                    let distance = snake.head.x.hypot(snake.head.y);
-                    crate::Action {
-                        heading: snake.head.y.atan2(snake.head.x)
-                            + std::f64::consts::FRAC_PI_2
-                            + ((distance - radius) / 200.).atan(),
-                        boost: false,
-                    }
-                } else {
-                    control
-                };
-                let _ = index;
-                snake.alive.then_some(control)
-            })
+            .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
+        #[cfg(feature = "frame-bench")]
+        let actions = self.frame_bench_actions(actions);
         let radius = self.world.radius();
         #[cfg(feature = "latency-rig")]
         let truth_before = self.latency_truth.as_mut().map(|r| r.stamp()).transpose()?;
@@ -306,22 +335,7 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
-        for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate() {
-            if slot.connection.setup {
-                #[cfg(feature = "frame-bench")]
-                if self.frame_bench
-                    && index < self.player_latency.slots
-                    && self.world.config().pit.is_some()
-                {
-                    slot.connection.food_interest.all(self.world.radius());
-                    continue;
-                }
-                let _ = index;
-                slot.connection
-                    .food_interest
-                    .advance(snake.head, snake.heading, now);
-            }
-        }
+        self.advance_food_interest(now);
         for slot in &mut self.slots {
             // A decision that sent nothing is complete once its duration elapses.
             if slot
@@ -403,23 +417,7 @@ impl SimulatorBackend {
         // still need the refresh after an edited pose, even at the same time.
         // Dead clients keep their subscriptions for the rendered death fade.
         if advance_interest {
-            for (index, (slot, snake)) in self.slots.iter_mut().zip(self.world.snakes()).enumerate()
-            {
-                if slot.connection.setup {
-                    #[cfg(feature = "frame-bench")]
-                    if self.frame_bench
-                        && index < self.player_latency.slots
-                        && self.world.config().pit.is_some()
-                    {
-                        slot.connection.food_interest.all(self.world.radius());
-                        continue;
-                    }
-                    let _ = index;
-                    slot.connection
-                        .food_interest
-                        .advance(snake.head, snake.heading, now);
-                }
-            }
+            self.advance_food_interest(now);
         }
         let food_changes = self.sync_food_sectors()?;
         self.assign_prey_wire()?;

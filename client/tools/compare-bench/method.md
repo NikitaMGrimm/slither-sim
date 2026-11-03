@@ -208,6 +208,11 @@ orbit, with boost off, identically across clients. The socket player is exempt
 from body-collision deaths for this measurement; bots still collide, including
 against its body, and boundary/pit deaths remain enabled. This is an altered
 benchmark workload, absent from ordinary builds and not mechanics evidence.
+The protected player's body therefore still affects bot deaths and the resulting
+food/population; that influence is identical in policy for every client.
+Whole-map socket seats never call ordinary food-interest `advance` while the
+benchmark is enabled: `all` updates `subscribed` but deliberately leaves retention
+`last_seen` alone. Connection reset discards this transient membership.
 Any dead or unadmitted sample still invalidates the run. No client invulnerability
 setting is shipped, and no third-party gameplay code is patched for survival.
 The same hook reports authoritative total physical pellets and socket wire-cell

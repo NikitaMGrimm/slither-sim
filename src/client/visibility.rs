@@ -37,6 +37,9 @@ pub(super) struct SectorInterest {
 impl SectorInterest {
     /// Measurement-only: subscribe every sector in the arena bounds. Only the
     /// actual socket seat uses this, never the internal bot seats.
+    /// `last_seen` intentionally remains untouched: these seats must never call
+    /// `advance` while whole-map measurement is enabled. Connections reset on
+    /// reuse, so ordinary retention never resumes with this membership.
     #[cfg(feature = "frame-bench")]
     pub(super) fn all(&mut self, radius: f64) {
         let center = f64::from(encode::GRID_CENTER);
