@@ -34,7 +34,8 @@ export function presentation(text, { pid, swapchain, seconds, startMs, endMs }) 
     .filter(r => Number.isFinite(r.at)).sort((a, b) => a.at - b.at);
   // Timestamp differences, rather than duration fields, include a long frame
   // with no intervening presentation. Do not merge unrelated browser surfaces.
-  const times = displayed.filter(r => r.at >= startMs && r.at <= endMs).map(r => r.at);
+  const windowRows = displayed.filter(r => r.at >= startMs && r.at <= endMs);
+  const times = windowRows.map(r => r.at);
   if (times.length < 3) throw Error('Fewer than three displayed frames on selected PID/swapchain');
   const gaps = times.slice(1).map((t, i) => t - times[i]);
   if (gaps.some(v => v <= 0)) throw Error('Duplicate display timestamps / multiple display layers: select an unambiguous surface');
@@ -45,7 +46,7 @@ export function presentation(text, { pid, swapchain, seconds, startMs, endMs }) 
     stallsOver100Ms: gaps.filter(x => x > 100).length, stallsOver250Ms: gaps.filter(x => x > 250).length,
     achievedFps: times.length / seconds, coveredMs: times.at(-1) - times[0],
     boundaryGapMs: [times[0] - startMs, endMs - times.at(-1)],
-    presentModes: [...new Set(selected.map(r => r.PresentMode))], syncIntervals: [...new Set(selected.map(r => r.SyncInterval))] };
+    presentModes: [...new Set(windowRows.map(r => r.PresentMode))], syncIntervals: [...new Set(windowRows.map(r => r.SyncInterval))] };
 }
 export function hostStats(text) {
   return [...text.matchAll(/stats: ticks\/s=([\d.]+) deferred_ticks=(\d+) lost_seconds=([\d.]+) simulation_load=([\d.]+)% players=(\d+) bot_slots=(\d+)/g)]
@@ -61,6 +62,42 @@ export function wholeMap({ camera, center, radius, zoom, viewport }) {
   return (radius + Math.abs(camera[0] - center)) * zoom <= viewport[0] / 2 + .01
     && (radius + Math.abs(camera[1] - center)) * zoom <= viewport[1] / 2 + .01;
 }
+export function streamCoverage(rows,startMs,endMs,maxGapMs) {
+  if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs||!rows?.length)return false;
+  if(rows.some(r=>!Number.isFinite(r.atMs)))return false;
+  const at=rows.map(r=>r.atMs).sort((a,b)=>a-b).filter(t=>t>=startMs-maxGapMs&&t<=endMs+maxGapMs);
+  if(!at.length||at[0]>startMs+maxGapMs||at.at(-1)<endMs-maxGapMs)return false;
+  return at.every((t,i)=>i===0||t-at[i-1]<=maxGapMs);
+}
+export function contained(rect,bounds) {
+  if(!rect||!bounds||![...rect,...bounds].every(Number.isFinite))return false;
+  const [x,y,w,h]=rect,[left,top,width,height]=bounds;
+  return w>0&&h>0&&x>=left&&y>=top&&x+w<=left+width&&y+h<=top+height;
+}
+export function sceneChecks(run) {
+  if(!run.views?.length||!run.census?.length)return false;
+  return run.views.every(v=>{
+    const near=run.census.filter(c=>Math.abs(c.atMs-v.atMs)<=1200);
+    if(!near.length)return false;
+    const expected=near.map(c=>c.players?.[0]?.decoratedWireFood).filter(Number.isFinite);
+    if(!expected.length)return false;
+    if(v.sceneEvidence==='image')return v.imageSha256?.length===64&&v.pelletCandidates>0&&v.gameCanvasVisible===true&&v.sceneConfidence==='presence-only; exact count unverified';
+    const live=v.receivedUneatenPellets??v.retainedPellets;
+    // Wire cells collapse physical duplicates; decorations are included in this
+    // baseline. Only retained eaten flights are excluded from the client count.
+    const slack=32+Math.ceil(Math.max(...expected)*.05);
+    return Number.isInteger(live)&&live>=Math.min(...expected)-slack&&live<=Math.max(...expected)+slack
+      && Number.isInteger(v.visiblePellets)&&v.visiblePellets>0;
+  });
+}
+export function nativeProduction(journal,{startMs,endMs,qpcUnixOffset}){
+  if(journal.overflow)throw Error('Native present-identity journal overflow');
+  const rows=journal.rows.map(([ns,identity])=>({at:journal.unixStartMs+ns/1e6+qpcUnixOffset,identity})).filter(r=>r.at>=startMs&&r.at<=endMs);
+  const fresh=rows.filter((r,i)=>i===0||r.identity!==rows[i-1].identity);
+  return {successfulPresentReceipts:rows.length,freshPreparedPictures:fresh.length,duplicatePicturePresents:rows.length-fresh.length,
+    scope:'prepared-picture identity, not pixel uniqueness; no per-frame scene scan',
+    contentDisplayCorrelation:rows.length===fresh.length?'all successful receipts used a new prepared picture; ETW identity mapping unestablished':'duplicate native pictures; displayed-content mapping unestablished'};
+}
 export function validity(run) {
   const reasons = [];
   if (run.error) reasons.push(run.error);
@@ -72,7 +109,16 @@ export function validity(run) {
     if (!s.foreground || s.occluded || s.minimized || !s.visible) reasons.push('Window not foreground and fully unoccluded');
     if (s.buildRunning) reasons.push('Build/test process running');
     if (s.width !== run.width || s.height !== run.height || s.display !== run.display || s.dpi !== run.dpi) reasons.push('Window size/display/DPI changed');
-    if (s.refreshHz !== undefined && s.refreshHz !== run.refreshHz) reasons.push('Monitor refresh changed');
+    if (!Number.isFinite(s.refreshHz) || s.refreshHz <= 0 || s.refreshHz !== run.refreshHz) reasons.push('Monitor refresh changed or unavailable');
+    if(!Number.isFinite(s.nominalRefreshHz)||s.nominalRefreshHz<=0||Math.abs(s.nominalRefreshHz-s.refreshHz)>.5)reasons.push('Current DisplayConfig and mode refresh disagree or unavailable');
+    if(!contained(s.clientRect,s.displayBounds))reasons.push('Client area is clipped or spans displays');
+    if(s.ownerInput)reasons.push('Owner input during acquisition');
+    if(s.gpuCounterError||!s.gpuEngines?.length)reasons.push('Missing current GPU counter evidence');
+    const clock=run.machine?.clock;
+    if(clock&&(!Number.isFinite(s.unixMs)||Math.abs((s.qpcMs-s.unixMs)-(clock.qpcMs-clock.unixMs))>10))reasons.push('QPC/UNIX clock mapping changed or unavailable');
+  }
+  for(const [name,rows,gap] of [['window',run.windowSamples,750],['host stats',run.stats,1200],['host census',run.census,1200],['view',run.views,3000]]) {
+    if(!streamCoverage(rows,run.startMs,run.endMs,gap))reasons.push(`${name} telemetry does not cover the measured window`);
   }
   if ((run.windowSamples ?? []).some((s, i, a) => i > 0 && s.qpcMs - a[i-1].qpcMs > 750)) reasons.push('Window/load sampler gap exceeded 750 ms');
   if (run.windowSamples?.length && Number.isFinite(run.endMs) && run.endMs - run.windowSamples.at(-1).qpcMs > 750) reasons.push('Window monitor ended before measurement');
@@ -87,12 +133,13 @@ export function validity(run) {
   if (run.census?.some(s => s.players?.[0]?.protocol !== (run.client === 'ntl' ? 13 : 19))) reasons.push('Unexpected negotiated protocol');
   if (run.scenario === 'battledome' && run.census?.some(s => s.players?.[0]?.wireLivingSnakes !== s.totalAliveSnakes)) reasons.push('Host did not deliver every living snake');
   if (!run.views?.length) reasons.push('Camera/drawn-pellet evidence unavailable');
-  if (run.views?.some(v => !Number.isInteger(v.visiblePellets) || !Number.isInteger(v.retainedPellets))) reasons.push('Pellet census unavailable');
+  if(!sceneChecks(run))reasons.push('Client scene does not match authoritative delivered food / image evidence');
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
   if (run.scenario === 'normal' && ['original','native'].includes(run.client)
       && run.views?.some(v => v.userZoom !== 1)) reasons.push('Normal scenario left stock zoom');
   if (run.scenario === 'battledome' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
+  if(run.scenario==='battledome'&&run.views?.some(v=>v.sceneEvidence==='image'))reasons.push('Image boundary is unanchored to outer map extent; whole-map acceptance unavailable');
   if (run.scenario === 'battledome' && (!run.census?.length || run.census.some(v => !v.wholeMapFood))) reasons.push('Whole-map food delivery not enabled');
   if (run.metrics && (run.metrics.coveredMs < run.seconds * 1000 * .9 || run.metrics.boundaryGapMs.some(g => g > 250))) reasons.push('Incomplete display coverage at window boundaries');
   if (!run.vsync) reasons.push('Vsync state unknown');
@@ -100,6 +147,9 @@ export function validity(run) {
   if (!run.renderAdapters?.length || run.renderAdapters.some(a => !a.name || a.name === 'unmapped')) reasons.push('Actual render GPU not established by per-process GPU engines');
   if (run.expectedRenderLuid && (run.renderAdapters?.length !== 1 || run.renderAdapters[0].luid !== run.expectedRenderLuid)) reasons.push('Requested adapter not established as the actual render adapter');
   if (run.targetDisplay && (run.display !== run.targetDisplay || run.refreshHz !== run.targetRefreshHz)) reasons.push('Window is not on the requested display/refresh experiment');
+  if(run.client==='ntl'&&!run.contentMetrics)reasons.push('No game-canvas production measure; compositor FPS is not game FPS');
+  if(run.client==='ntl'&&(run.provenance?.ntl?.error||!run.provenance?.ntl?.tree?.sha256))reasons.push('NTL input provenance unavailable');
+  if(run.telemetry==='off')reasons.push('Instrumentation-off diagnostic; scene/content acceptance unavailable');
   return { valid: reasons.length === 0, reasons: [...new Set(reasons)] };
 }
 export function comparison(a, b) {
@@ -111,6 +161,10 @@ export function comparison(a, b) {
     if (a[field] === undefined || a[field] !== b[field]) reasons.push(`different or unknown ${field}`);
   }
   if (a.vsyncCondition === 'recorded-modes-require-qualified-comparison' || b.vsyncCondition === 'recorded-modes-require-qualified-comparison') reasons.push('vsync/presentation conditions require qualification');
+  const modes=r=>r.metrics?.presentModes?.length===1&&!/^(unknown|na|other|)$/i.test(r.metrics.presentModes[0])?r.metrics.presentModes[0]:null;
+  if(!modes(a)||modes(a)!==modes(b))reasons.push('different or unknown presentation modes');
+  if(a.contentDisplayCorrelation!=='established'||b.contentDisplayCorrelation!=='established')reasons.push('new game content is not correlated to displayed frames');
+  if(a.views?.some(v=>v.sceneEvidence==='image')||b.views?.some(v=>v.sceneEvidence==='image'))reasons.push('picture presence evidence does not establish exact scene counts');
   return { classification: reasons.length ? 'labelled comparison only' : 'direct comparison', reasons };
 }
 export function schedule(rounds = 3, clients = ['original', 'native', 'ntl', 'vlither']) {
@@ -126,6 +180,12 @@ export function netlogProof(log, endpoint) {
   const addresses = starts.map(e => e.params.address ?? e.params.remote_address);
   const successful = starts.filter(e => attempts.some(end => end.source?.id === e.source?.id && end.phase === 2 && !end.params?.net_error));
   const loopback = a => /^127\.\d+\.\d+\.\d+:\d+$/.test(a) || /^\[::1\]:\d+$/.test(a);
-  return { verified: addresses.length > 0 && addresses.every(loopback)
+  const transportPeers=[];
+  for(const event of log.events??[]){if(!/TCP|UDP|QUIC|SOCKET|WEBTRANSPORT/i.test(names[event.type]??''))continue;
+    for(const key of ['address','remote_address','peer_address','destination','server_address']) {
+      const peer=event.params?.[key];if(typeof peer==='string')transportPeers.push({protocol:names[event.type],peer});
+    }
+  }
+  return { verified: addresses.length > 0 && addresses.every(loopback)&&transportPeers.every(p=>loopback(p.peer))
     && successful.some(e => (e.params.address ?? e.params.remote_address) === endpoint), addresses: [...new Set(addresses)] };
 }

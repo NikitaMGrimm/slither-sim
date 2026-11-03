@@ -85,12 +85,14 @@ public sealed class BenchGpu : IDisposable {
   static void Check(uint code) {if(code!=0)throw new Exception("GPU PDH error 0x"+code.ToString("x8"));}
   public BenchGpu(string[] instances) {
     Check(PdhOpenQuery(null,UIntPtr.Zero,out query));
-    foreach(var name in instances) {IntPtr counter;Check(Add(query,"\\GPU Engine("+name+")\\Utilization Percentage",UIntPtr.Zero,out counter));counters.Add(counter);names.Add(name);}
-    Check(PdhCollectQueryData(query));
+    try {
+      foreach(var name in instances) {IntPtr counter;if(Add(query,"\\GPU Engine("+name+")\\Utilization Percentage",UIntPtr.Zero,out counter)!=0)continue;counters.Add(counter);names.Add(name);}
+      Check(PdhCollectQueryData(query));
+    } catch { Dispose(); throw; }
   }
   public Reading[] Sample() {
     Check(PdhCollectQueryData(query));var result=new List<Reading>();
-    for(int i=0;i<counters.Count;i++){uint type;Value v;Check(PdhGetFormattedCounterValue(counters[i],0x200,out type,out v));
+    for(int i=0;i<counters.Count;i++){uint type;Value v;if(PdhGetFormattedCounterValue(counters[i],0x200,out type,out v)!=0)continue;
       if(v.Status==0||v.Status==1)result.Add(new Reading{instance=names[i],utilization=v.Number});
     }return result.ToArray();
   }

@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><title>Authored production-versus-compositor control</title>
+<style>body{margin:0;background:#111;color:white;font:16px sans-serif}canvas{display:block;width:80vw;height:80vh}#compositor{position:fixed;right:5px;top:0;width:20px;height:20px;background:#0ff;will-change:transform;animation:move 1s linear infinite alternate}@keyframes move{to{transform:translateY(500px)}}</style>
+<canvas width="960" height="540"></canvas><div id="compositor"></div>
+<p>Authored control: canvas capped at 60 productions/s; independent compositor animation.</p>
+<script>
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');let next=0,count=0;
+function frame(at){if(at>=next){next+=1000/60;if(next<at-1000/60)next=at+1000/60;ctx.fillStyle=count++%2?'#f80':'#08f';ctx.fillRect(0,0,960,540);}requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script>

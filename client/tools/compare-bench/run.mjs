@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { presentation, csv, hostStats, wholeMap, validity, schedule, netlogProof, comparison, presentMonFailure } from './analysis.mjs';
+import { presentation, csv, hostStats, wholeMap, validity, schedule, netlogProof, comparison, presentMonFailure,nativeProduction } from './analysis.mjs';
+import { contentIntervals } from './content-probe.mjs';
+import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +16,14 @@ let interrupted = false;
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sha = async file => hash(await fs.readFile(file));
 const save = (file, value) => fs.writeFile(file, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' });
+export function outsideRepository(root,repo,paths=path) {
+  const relative=paths.relative(repo,root);
+  return relative!==''&&(relative==='..'||relative.startsWith(`..${paths.sep}`)||paths.isAbsolute(relative));
+}
+export function lineJournal(accept,now) {
+  let pending='';
+  return bytes=>{pending+=bytes;let split;while((split=pending.indexOf('\n'))>=0){const line=pending.slice(0,split).replace(/\r$/,'');pending=pending.slice(split+1);accept(line,now());}};
+}
 export function completeJsonLines(text, prefix) {
   return text.split(/\r?\n/).slice(0,-1).filter(l => l.startsWith(prefix)).map(l => JSON.parse(l.slice(prefix.length)));
 }
@@ -50,7 +60,7 @@ async function stop(child) {
   try { execute('taskkill', ['/PID', String(child.pid), '/T', '/F']); } catch {}
   await Promise.race([new Promise(resolve => child.once('close', resolve)), delay(2000)]);
 }
-async function windows(config, directory, label, children) {
+export async function windows(config, directory, label, children) {
   const file = path.join(directory, `${label}-config.json`); await save(file, config);
   const child = spawn('powershell.exe', ['-NoProfile', '-File', path.join(here, 'windows.ps1'), '-Config', file], { windowsHide: true });
   children.push(child); let out = '', err = '';
@@ -77,6 +87,7 @@ async function inputs(config, directory) {
     repositoryHead: execute('git', ['rev-parse', 'HEAD'], { cwd: repository }),
     sourceDirty: Boolean(execute('git', ['status', '--porcelain'], { cwd: repository })),
     presentMon: { sha256: await sha(config.presentMon) } };
+  if(config.binaryReceipt){result.binary.receipt=JSON.parse(await fs.readFile(config.binaryReceipt,'utf8'));if(result.binary.receipt.binarySha256!==result.binary.sha256)throw Error('Binary build receipt hash mismatch');}
   return result;
 }
 async function modInput(input, session) {
@@ -99,17 +110,28 @@ async function modInput(input, session) {
 async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
-  const children = []; let hostLog = '', clientLog = '', browser, monitor, pm, host, native;
-  let startHost = 0, startClient = 0, hostEnd = 0;
+  const children = []; let hostLog = '', clientLog = '', browser, pm, host, native;
   let pmLog = '';
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
-    provenance, machine, networkVerified: false, windowSamples: [], views: [], census: [], stats: [],
-    acceptance: 'harness smoke only; not comparative client acceptance',
+    provenance, machine, telemetry:config.telemetry??'on', networkVerified: false, windowSamples: [], views: [], census: [], stats: [],
+    acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
+  const offset=machine.clock.qpcMs-machine.clock.unixMs;
+  const now=()=>Date.now()+offset;
+  const telemetryErrors=[];
+  const hostJournal=lineJournal((line,atMs)=>{try{
+    if(line.startsWith('frame-bench: '))r.census.push({...JSON.parse(line.slice(13)),atMs});
+    else for(const stats of hostStats(line))r.stats.push({...stats,atMs});
+  }catch(error){telemetryErrors.push(error.message);}},now);
+  const clientJournal=lineJournal((line,atMs)=>{try{
+    if(line.startsWith('frame-bench-client: ')){
+      const v=JSON.parse(line.slice(20));r.views.push({...v,atMs,wholeMap:wholeMap(v)});
+    }
+  }catch(error){telemetryErrors.push(error.message);}},now);
   const cancel = () => {
     interrupted = true;
     browser?.close().catch(() => {});
@@ -121,17 +143,18 @@ async function runAttempt(config, root, item, provenance, machine) {
     const scenarioPath = path.join(directory, 'host.json'); await save(scenarioPath, scenario);
     r.scenarioSha256 = await sha(scenarioPath);
     host = spawn(config.host, ['host', '--bind', '127.0.0.1:0', '--config', scenarioPath, '--stats', '0.5', '--frame-bench'], { windowsHide: true }); register(host);
-    host.stdout.on('data', b => hostLog += b); host.stderr.on('data', b => hostLog += b);
+    host.stdout.on('data', b => {hostLog+=b;hostJournal(b);}); host.stderr.on('data', b => {hostLog+=b;hostJournal(b);});
     const endpoint = await waitFor(() => endpointFrom(hostLog) || (host.exitCode !== null ? Promise.reject(Error(`Host exited ${host.exitCode}: ${hostLog}`)) : null), 30000, 'Host readiness');
     r.endpoint = endpoint;
     if (item.client === 'ntl') {
-      browser = await ntl({ ...config, directory, endpoint, register });
+      if(provenance.ntl?.error||!provenance.ntl?.tree?.sha256)throw Error('NTL mod provenance unavailable; package will not be loaded');
+      browser = await ntl({ ...config, directory, endpoint, register, scenario:item.scenario,productionProbe:config.telemetry!=='off' });
       native = browser.child;
       r.adapter = browser.adapter; r.chromeVersion = browser.chromeVersion;
       r.adapterRequest = config.adapter; r.vsync = 'Chrome default compositor pacing; actual SyncInterval unmeasured until ETW';
-      await windows({ mode: 'setup', clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      await windows({ mode: 'setup', borderless:true,clientPid: native.pid, client: 'browser', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      r.windowMode='Chrome app window, borderless task-owned HWND';
       if (item.scenario === 'battledome') await browser.zoomOut();
-      const view = await browser.view(); r.preflightView = view;
       r.vsync = 'Chrome default compositor pacing; verify PresentMon SyncInterval/mode'; r.chromeVersion = browser.chromeVersion;
     } else if (item.client === 'vlither') {
       const receipt = JSON.parse(await fs.readFile(path.join(config.output, 'vlither/build/compare-build.json'), 'utf8'));
@@ -144,16 +167,21 @@ async function runAttempt(config, root, item, provenance, machine) {
       native = spawn(config.vlitherBinary, [], { cwd: directory, env: { ...process.env,
         SLITHER_BENCH_SERVER: endpoint.replace('ws://', '').replace('/slither', ''),
         ...(item.scenario === 'battledome' ? { SLITHER_BENCH_WHOLE_MAP: '1' } : {}) }, windowsHide: false });
-      register(native); native.stdout.on('data', b => clientLog += b); native.stderr.on('data', b => clientLog += b);
-      await windows({ mode: 'setup', clientPid: native.pid, client: 'vlither', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
+      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'vlither', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      r.windowMode='Vlither GLFW window, borderless task-owned HWND';
       await waitFor(() => clientLog.includes('frame-bench-client: ') || (native.exitCode !== null ? Promise.reject(Error(`Vlither exited ${native.exitCode}: ${clientLog}`)) : null), 20000, 'Vlither local join');
     } else {
       const data = path.join(directory, 'preferences'); await fs.mkdir(path.join(data, 'SlitherClient'), { recursive: true });
       await fs.writeFile(path.join(data, 'SlitherClient', 'settings.txt'), `2:1:${item.client === 'native' ? 'native' : 'original'}`);
+      const clientEnv={...process.env,LOCALAPPDATA:data};
+      delete clientEnv.SLITHER_FRAME_PACING;delete clientEnv.SLITHER_FRAME_PACING_JOURNAL;
+      if(config.telemetry!=='off')Object.assign(clientEnv,{SLITHER_FRAME_PACING:'1',SLITHER_FRAME_PACING_JOURNAL:path.join(directory,'native-production.json')});
       native = spawn(config.binary, ['--server', endpoint.replace('ws://', '').replace('/slither', ''), '--nickname', 'FrameBench', '--skin', '0'],
-        { cwd: directory, env: { ...process.env, LOCALAPPDATA: data, SLITHER_FRAME_PACING: '1' }, windowsHide: false });
-      register(native); native.stdout.on('data', b => clientLog += b); native.stderr.on('data', b => clientLog += b);
-      await windows({ mode: 'setup', clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+        { cwd: directory, env:clientEnv,windowsHide: false });
+      register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
+      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      r.windowMode='Native winit window, borderless task-owned HWND';
       await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
         || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
       r.vsync = 'Fifo (source); PresentMon records actual mode and SyncInterval';
@@ -165,6 +193,15 @@ async function runAttempt(config, root, item, provenance, machine) {
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
     await delay(config.warmupSeconds * 1000);
+    await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
+    if(browser){
+      const before=await browser.capture('before-window');const evidence=pngEvidence(await fs.readFile(before));
+      r.preflightView={...evidence,atMs:now()};r.views.push(r.preflightView);
+      const processes=await browser.browser.send('SystemInfo.getProcessInfo');
+      browser.processIds=processes.processInfo.map(p=>p.id);
+      browser.gpuPid=processes.processInfo.find(p=>p.type==='GPU')?.id;
+      r.clientProcessSnapshot=processes;
+    }
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
     pm = spawn(config.presentMon, ['--session_name', `SlitherBench-${randomUUID()}`, '--output_file', csvPath,
@@ -172,16 +209,24 @@ async function runAttempt(config, root, item, provenance, machine) {
     pm.stdout.on('data', b => pmLog += b); pm.stderr.on('data', b => pmLog += b);
     await delay(1000);
     if (pm.exitCode !== null) throw Error(`PresentMon failed without elevation: ${pmLog}. Owner must grant ETW permission or run collector separately; no security settings changed.`);
-    startHost = hostLog.length; startClient = clientLog.length;
-    const samplesPromise = windows({ mode: 'sample', clientPid: native.pid, gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
+    if(browser&&config.telemetry!=='off')r.productionStarted=await browser.productionStart();
+    const samplesPromise = windows({ mode: 'sample', clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
     let monitoring = true;
     samplesPromise.finally(() => { monitoring = false; }).catch(() => {});
     while (monitoring) {
-      if (browser) { const v = await browser.view(); r.views.push({ ...v, wholeMap: wholeMap(v) }); }
       await delay(250);
     }
     r.windowSamples = await samplesPromise;
-    hostEnd = hostLog.length;
+    if(browser&&config.telemetry!=='off'){
+      r.production=await browser.productionStop();
+      await save(path.join(directory,'canvas-production.json'),r.production);
+      const canvases=r.production.canvases.filter(c=>c.rect[2]>=config.width*.8&&c.rect[3]>=config.height*.8);
+      if(canvases.length!==1)throw Error('Game canvas not uniquely identified by visible viewport coverage');
+      const browserToQpc=r.production.timeOrigin+offset;
+      r.contentMetrics=contentIntervals(r.production,{canvas:canvases[0].canvas,seconds:config.seconds,startMs:r.windowSamples[0].atMs-browserToQpc,endMs:r.windowSamples[0].atMs+config.seconds*1000-browserToQpc});
+      const after=await browser.capture('after-window');r.postflightView={...pngEvidence(await fs.readFile(after)),atMs:now()};r.views.push(r.postflightView);
+      r.contentDisplayCorrelation='unestablished';
+    }
     if (!r.windowSamples.length) throw Error('Window monitoring returned no samples');
     const first = r.windowSamples[0]; r.display = first.display; r.dpi = first.dpi;
     r.startMs = first.qpcMs; r.endMs = r.startMs + config.seconds * 1000;
@@ -201,22 +246,20 @@ async function runAttempt(config, root, item, provenance, machine) {
       : item.client === 'ntl' && config.adapter?.chromeLuid !== 'default' ? config.adapter?.chromeLuid : null;
     r.adapter = item.client === 'ntl' ? browser.adapter : clientLog.match(/Actual adapter (.+); MSAA/)?.[1] ?? clientLog.match(/GPU: (.+)/)?.[1];
     r.load = { hostMeanCpuCores: r.windowSamples.reduce((sum, s) => sum + s.hostCpuCores, 0) / r.windowSamples.length,
+      clientMeanCpuCores:r.windowSamples.slice(1).reduce((sum,s)=>sum+s.clientCpuCores,0)/Math.max(1,r.windowSamples.length-1),
+      clientCpuSeconds:r.windowSamples.slice(1).reduce((sum,s)=>sum+s.clientCpuDeltaSeconds,0),
       machineMeanCpuPercent: r.windowSamples.reduce((sum, s) => sum + s.machineCpuPercent, 0) / r.windowSamples.length,
       machineMaxCpuPercent: Math.max(...r.windowSamples.map(s => s.machineCpuPercent)),
       logicalProcessors: machine.logicalProcessors };
     if (!browser) {
-      r.views = completeJsonLines(clientLog.slice(startClient), 'frame-bench-client: ').map(v => {
-        // Camera works in logical client backing coordinates, not attachment pixels.
-        const viewport = v.viewport ?? [config.width * 96 / r.dpi, config.height * 96 / r.dpi];
-        return { ...v, viewport, wholeMap: wholeMap({ ...v, viewport }) };
-      });
       const network = execute('powershell.exe', ['-NoProfile', '-Command', `@(Get-NetTCPConnection -OwningProcess ${native.pid} -ErrorAction SilentlyContinue | Where-Object State -eq Established | Select-Object RemoteAddress,RemotePort) | ConvertTo-Json -Compress`]);
       await fs.writeFile(path.join(directory, 'native-sockets.json'), network);
       const peers = network ? [JSON.parse(network)].flat() : [];
       r.networkVerified = peers.length > 0 && peers.every(p => p.RemoteAddress === '127.0.0.1' && p.RemotePort === +new URL(endpoint).port);
     }
-    r.stats = hostStats(hostLog.slice(startHost, hostEnd));
-    r.census = completeJsonLines(hostLog.slice(startHost, hostEnd), 'frame-bench: ');
+    const covered=rows=>rows.filter(row=>row.atMs>=r.startMs-3000&&row.atMs<=r.endMs+3000);
+    r.stats=covered(r.stats);r.census=covered(r.census);r.views=covered(r.views);
+    if(r.windowSamples.some(s=>s.ownerInput||!s.foreground))throw Error('Owner input or foreground loss: stopped without reclaiming focus');
     await new Promise(resolve => pm.exitCode !== null ? resolve() : pm.once('close', resolve));
     await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
     if (pm.exitCode !== 0) throw Error(`PresentMon exit ${pm.exitCode}; ETW access/collection failed. No self-elevation attempted.`);
@@ -241,8 +284,16 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.metrics.longestRefreshPeriods = r.metrics.longestStallMs / r.metrics.refreshPeriodMs;
     r.metrics.medianRefreshPeriods = r.metrics.medianMs / r.metrics.refreshPeriodMs;
     r.vsyncCondition = r.metrics.syncIntervals.length === 1 && r.metrics.syncIntervals[0] === '1' ? 'sync-interval-1' : 'recorded-modes-require-qualified-comparison';
+    if(!browser&&item.client!=='vlither'&&config.telemetry!=='off'){
+      await windows({mode:'close',clientPid:native.pid},directory,'close',children);
+      await waitFor(()=>native.exitCode!==null,5000,'Native graceful journal export');
+      r.nativeProduction=nativeProduction(JSON.parse(await fs.readFile(path.join(directory,'native-production.json'),'utf8')),{startMs:r.startMs,endMs:r.endMs,qpcUnixOffset:offset});
+      r.contentDisplayCorrelation='unestablished';
+    }
   } catch (error) { r.error = error.message; }
   finally {
+    r.telemetryErrors=telemetryErrors;
+    if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
     for (const child of [...children].reverse()) await stop(child);
     await fs.writeFile(path.join(directory, 'host.txt'), hostLog);
@@ -264,24 +315,24 @@ export async function main(args = process.argv.slice(2)) {
   const config = JSON.parse(await fs.readFile(args[1], 'utf8'));
   const root = path.resolve(config.output);
   config.output = root;
-  if (root === repository || root.startsWith(repository + path.sep)) throw Error('Results and inputs must stay outside Git');
+  if(!outsideRepository(root,repository))throw Error('Results and inputs must stay outside Git');
   await fs.mkdir(root, { recursive: true });
   if (args[0] === 'inspect') {
     const directory = path.join(root, `machine-${randomUUID()}`); await fs.mkdir(directory);
     console.log(JSON.stringify((await windows({ mode: 'machine' }, directory, 'machine', []))[0])); return;
   }
   if (args[0] === 'prepare') { console.log(JSON.stringify(await prepare(config, root))); return; }
-  Object.assign(config, { width: config.width ?? 1280, height: config.height ?? 720, x: config.x ?? 0, y: config.y ?? 0,
+  Object.assign(config, { width: config.width ?? 3840, height: config.height ?? 2160, x: config.x ?? 0, y: config.y ?? 0,
     seconds: args[0] === 'smoke' ? 5 : config.seconds ?? 60, warmupSeconds: config.warmupSeconds ?? 5 });
   if (!Number.isInteger(config.seconds) || config.seconds < 3 || config.seconds > 180) throw Error('seconds must be 3..180');
+  if(config.telemetry&&!['on','off'].includes(config.telemetry))throw Error('telemetry must be on or off (diagnostic only)');
   const clients = config.clients ?? ['original', 'native', 'ntl', 'vlither'];
   if (!Array.isArray(clients) || !clients.length || new Set(clients).size !== clients.length || clients.some(c => !['original','native','ntl','vlither'].includes(c))) throw Error('clients must be a unique nonempty subset of original, native, ntl, vlither');
   for (const key of ['width', 'height']) if (!Number.isInteger(config[key]) || config[key] < 320 || config[key] > 3840) throw Error(`${key} must be 320..3840 physical pixels`);
   config.experiment ??= 'primary';
-  if (!['primary', 'secondary', 'rtx-optional'].includes(config.experiment)) throw Error('experiment must be primary, secondary or rtx-optional');
-  if (args[0] === 'smoke' && config.experiment !== 'primary') throw Error('Smoke is restricted to the primary iGPU experiment');
+  if (!['primary', 'secondary', 'pixels-optional','igpu-future'].includes(config.experiment)) throw Error('Unknown experiment');
   if (config.experiment === 'primary') {
-    if (!/^luid_0x[0-9a-f]{8}_0x[0-9a-f]{8}$/i.test(config.targetAdapterLuid ?? '') || !config.targetDisplay || !config.targetRefreshHz) throw Error('Primary requires explicit targetAdapterLuid, targetDisplay and targetRefreshHz from inspect (AMD iGPU / 4K display)');
+    if (!/^luid_0x[0-9a-f]{8}_0x[0-9a-f]{8}$/i.test(config.targetAdapterLuid ?? '') || !config.targetDisplay || !config.targetRefreshHz) throw Error('Primary requires the RTX render LUID and DISPLAY2 / 4K / 240 Hz target');
     config.adapter = { ...config.adapter, chromeLuid: config.targetAdapterLuid };
   }
   if (config.experiment === 'secondary' && config.adapter?.chromeLuid && config.adapter.chromeLuid !== 'default') throw Error('Secondary must use default adapter selection for every client');
@@ -301,17 +352,35 @@ export async function main(args = process.argv.slice(2)) {
   if (config.experiment === 'primary') {
     const adapter = machine.dxgiAdapters.find(a => a.luid === config.targetAdapterLuid);
     const display = machine.screens.find(s => s.display === config.targetDisplay);
-    if (adapter?.vendorId !== 0x1002 || !display || display.bounds[2] !== 3840 || display.bounds[3] !== 2160 || config.targetRefreshHz !== 240) throw Error('Primary matrix requires the AMD adapter and the physical 3840x2160 / 240 Hz display; inspect and correct the external config. No run was started.');
+    if (adapter?.vendorId !== 0x10de || !display || display.bounds[2] !== 3840 || display.bounds[3] !== 2160 || config.targetRefreshHz !== 240||config.width!==3840||config.height!==2160) throw Error('Primary matrix requires RTX rendering and a 3840x2160 client area on the 4K / 240 Hz display');
   }
   const rounds = args[0] === 'smoke' ? 1 : config.rounds ?? 3;
   if (args[0] === 'run' && rounds < 3) throw Error('Real runs require at least three rounds');
-  const results = [];
-  for (const item of schedule(rounds, config.clients ?? ['original', 'native', 'ntl', 'vlither'])) {
-    for (const scenario of ['battledome', 'normal']) {
-      if (interrupted) break;
-      results.push(await runAttempt(config, session, { ...item, scenario }, provenance, machine));
+  const results = [],roundAttempts=[];let pending=Array.from({length:rounds},(_,i)=>i+1);
+  const maxAttempts=config.maxRoundAttempts??3;
+  if(!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>3)throw Error('maxRoundAttempts must be 1..3');
+  for(let attempt=1;attempt<=maxAttempts&&pending.length&&!interrupted;attempt++){
+    const retry=[];
+    for(const round of pending){
+      const preflight=(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0];
+      const record={round,attempt,preflight,results:[]};roundAttempts.push(record);
+      if(preflight.competingWork.length||preflight.idleMs<5000){record.blocked='competing work or recent owner input';retry.push(round);continue;}
+      const order=schedule(rounds,clients).filter(item=>item.round===round);
+      let transient=false;
+      for(const item of order){for(const scenario of ['battledome','normal']){
+        if(interrupted)break;
+        const result=await runAttempt(config,session,{...item,scenario,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
+        transient=result.run.windowSamples.some(s=>s.buildRunning||s.ownerInput||!s.foreground)
+          || /ETW events|Foreground acquisition|Owner input/.test(result.run.error??'');
+        if(transient)break;
+      }if(transient||interrupted)break;}
+      if(transient){record.blocked='transient validity failure; retained partial round';retry.push(round);}
+      await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(roundAttempts,null,2));
     }
+    pending=retry;
+    if(pending.length&&attempt<maxAttempts)await delay(5000);
   }
+  await save(path.join(session,'round-summary.json'),{roundAttempts,uncollectedRounds:pending,maxAttempts});
   const comparisons = [];
   for (let i = 0; i < results.length; i++) for (let j = i + 1; j < results.length; j++) {
     const a = results[i], b = results[j];

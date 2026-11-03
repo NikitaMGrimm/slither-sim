@@ -1,20 +1,20 @@
 # Local visible-frame pacing benchmark
 
 Opt-in Windows acquisition for a supplied release slither-client binary, an
-owner-supplied NTL mod, and a GitHub Vlither ref. Nothing is downloaded from or
-connected to a public game server. Acquisition is never run in CI.
+updated owner-supplied NTL mod and a GitHub Vlither ref. All game traffic stays
+loopback; third-party files, raw evidence and failed attempts stay outside Git.
+Acquisition never runs in CI.
 
-The primary measure is the interval between **actually displayed frames** from
-PresentMon 2.x ETW timestamps, identically for every client: median, p95, p99,
-longest gap, stalls over 50/100/250 ms and achieved FPS over a fixed post-join
-window. Raw CSV, presentation mode/vsync, refresh periods and every failed attempt
-are retained. This does not measure physical scanout, input latency or offscreen
-rendering; browser rAF and submission timings are never substitutes.
+PresentMon 2.x measures displayed-present intervals: median/p95/p99, longest
+stall, counts over 50/100/250 ms and achieved FPS, with actual refresh, mode and
+SyncInterval. **A compositor present is not necessarily a new game frame.** NTL
+also reports canvas draw production grouped by rAF timestamp as a separate primary
+content measure. Native journals expose duplicate prepared-picture presents.
+Exact content/display correlation remains unestablished, so cross-client results
+remain labelled comparisons. This does not measure physical scanout or input
+latency, and browser rAF never substitutes for ETW.
 
-## Run
-
-Use Node 24 and the client's existing locked dependencies (`npm ci --ignore-scripts
---no-audit --no-fund`). Put this config, all inputs and results outside Git:
+Put this config and all inputs/results outside Git:
 
 ```json
 {
@@ -26,11 +26,11 @@ Use Node 24 and the client's existing locked dependencies (`npm ci --ignore-scri
   "presentMon": "<PresentMon 2.6 console executable>",
   "vlitherBinary": "<output>/vlither/build/bin/windows_x86_64_release/app.exe",
   "experiment": "primary",
-  "targetAdapterLuid": "<AMD LUID from inspect>",
-  "targetDisplay": "<4K monitor device name from inspect>",
+  "targetAdapterLuid": "<RTX LUID from inspect>",
+  "targetDisplay": "<4K display device name from inspect>",
   "targetRefreshHz": 240,
-  "width": 1280,
-  "height": 720,
+  "width": 3840,
+  "height": 2160,
   "x": 0,
   "y": 0,
   "seconds": 60,
@@ -38,9 +38,10 @@ Use Node 24 and the client's existing locked dependencies (`npm ci --ignore-scri
 }
 ```
 
-Run from `client/`:
+Use Node 24 and existing locked dependencies (`npm ci --ignore-scripts --no-audit
+--no-fund`). Run from `client/`:
 
-```text
+```
 node tools/compare-bench/run.mjs inspect <external-config.json>
 node tools/compare-bench/run.mjs prepare <external-config.json>
 node tools/compare-bench/build-vlither.mjs <external-config.json>
@@ -48,40 +49,43 @@ node tools/compare-bench/run.mjs smoke <external-config.json>
 node tools/compare-bench/run.mjs run <external-config.json>
 ```
 
-Build the host separately with `cargo build --release --locked --features
-frame-bench --bin slither-sim`. Pass a release desktop binary by path; its hash
-identifies the code tested. Older binaries without passive view telemetry fail
-acceptance clearly. No build or test is started during acquisition.
+Build the host separately: `cargo build --release --locked -p slither-sim
+--features frame-bench --bin slither-sim`. Pass a release desktop binary by path;
+its hash identifies it. View telemetry/journal support is required for acceptance.
+Apply local Cargo target/jobs limits per command. No build/test runs during timing.
 
-* **Primary:** AMD rendering on the 4K/240 Hz monitor. Actual per-process GPU-engine
-  counters must resolve to the requested adapter LUID. Chrome gets a throwaway
-  profile with an explicit ANGLE LUID flag. Native and current Vlither expose no
-  selector; mismatches remain blocked. No Windows graphics setting is changed.
-* **Secondary:** every client selects its default adapter, same window/display.
-  Use `experiment:"secondary"` and omit the Chrome override. Mixed adapters are
-  labelled comparisons. Optional RTX runs are a separate experiment.
-* Real runs reverse client order over at least three rounds, with separate full
-  High-requested Original and Native runs. Smoke uses primary only and five-second
-  windows. All runs record actual monitor refresh/DPI, render/output LUIDs, machine
-  and host CPU load, host tick health, pellet census and camera fit. Occlusion,
-  loss of foreground, death, overload or missing evidence invalidates a result.
+* Primary: same RTX adapter, 3840x2160 borderless client area on the selected
+  4K/240 Hz display. Chrome gets an ANGLE LUID flag in a throwaway profile. Actual
+  per-process GPU engine counters must resolve to that LUID. Native/Vlither have
+  no adapter selector; no Windows graphics preference or client default changes.
+* Secondary: Chrome unforced (`clients:["ntl"]`, `experiment:"secondary"`), same
+  size/display. Optional 1280x720 uses `pixels-optional`; future iGPU comparisons
+  are documented separately. Actual default selection is recorded, never assumed.
+* Real runs reverse order over at least three rounds; bounded retries preserve
+  failures. Full High-effects Original/Native are separate variants. Smoke uses
+  primary with five-second windows. Foreground/input/occlusion, host tick health,
+  stream coverage, scene evidence, GPU and refresh changes are validity gates.
 
-The scenarios are Battledome with 100 internal bots and whole-map interest, and
-a normal map with 500 internal bots. Normal stress triples both ambient attempt
-rate and food target: after population scaling, target **163500**, refill
-**2406.845341348622 attempts/s**. Actual physical, received and visible counts
-are separate. The feature-gated host supplies identical circular steering and
-socket-player body-collision protection; bots and boundary/pit rules remain real.
-This altered local workload is disclosed in every result.
+Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
+500 internal bots; stress triples ambient attempts and initial/refill target.
+After population scaling: target **163500**, **2406.845341348622 attempts/s**.
+Actual physical, received, visible and image-candidate pellet counts remain
+separate. A nondefault loopback-only host feature supplies identical orbit
+steering and socket-player collision protection; bots still die on its body.
 
-Replace `mod` to use updated NTL; package/tree hashes and manifest version are
-recorded, and changed bootstrap/view contracts fail preflight. Set `vlitherRef`
-to pin a revision; omission fetches the latest default branch and records its
-exact commit. The Vlither build requires explicit user-space tool paths and a
-**labelled authored launch/telemetry wrapper**, without changing stock rendering
-or zoom limits. See [method and setup details](method.md) for build inputs,
-PresentMon rights, network isolation, adapter controls, survival and evidence
-limits. It never elevates or changes group membership.
+Replace `mod` to use updated NTL. Manifest/package/tree hashes are recorded;
+changed visible UI contracts fail preflight in one small adapter. No minified game
+globals are read. The local shell needs no official page/assets. Screenshots
+provide presence/extent candidates, not exact counts or continuous camera proof.
+Set `vlitherRef` to pin upstream; omission fetches the default tip and records its
+commit. The user-space build uses a labelled authored launch/telemetry wrapper
+without changing stock render or zoom limits.
 
-Offline tests: `node --test tools/compare-bench.test.mjs`. These use authored
-synthetic inputs and need no client, GPU, ETW session or game server.
+See [method.md](method.md) for tool paths, PresentMon rights, isolation, adapter
+controls, coverage limits and telemetry on/off perturbation controls. Unknown
+overhead or content equivalence blocks a verdict. The harness never elevates,
+changes group membership, kills competing work or fights for foreground.
+
+Offline checks: `node --test tools/compare-bench.test.mjs`. The authored 60 Hz
+canvas/fast compositor control has a separate manual `synthetic-check.mjs` runner;
+only its offline parsing/probe regression runs in CI.
