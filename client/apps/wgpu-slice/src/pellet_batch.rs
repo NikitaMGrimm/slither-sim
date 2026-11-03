@@ -80,6 +80,21 @@ impl Cache {
             return Ok(None);
         }
         let limits = bounds.expect("checked bounds").limits();
+        // A whole-map view can omit every pellet under the existing subpixel
+        // rule. Do not rebuild/upload source groups for that empty picture.
+        // Keep generic validation (including eligible offscreen sources) intact.
+        if user_zoom < 1.
+            && !world.foods().iter().any(|food| {
+                let f = food.snapshot();
+                f.render_position.x >= limits[0]
+                    && f.render_position.x <= limits[1]
+                    && f.render_position.y >= limits[2]
+                    && f.render_position.y <= limits[3]
+                    && food_zoom_eligible(f, user_zoom)
+            })
+        {
+            return Ok(None);
+        }
         let current = self
             .sources
             .as_ref()
@@ -650,7 +665,6 @@ pub(crate) mod tests {
                         user_zoom,
                         MAX_FOOD_PAINT_COMMANDS,
                     )
-                    .unwrap()
                     .unwrap();
                 let input = FoodPaintInput {
                     foods: world.foods(),
@@ -666,6 +680,11 @@ pub(crate) mod tests {
                     command_limit: MAX_FOOD_PAINT_COMMANDS,
                 };
                 let plan = plan_food_with_zoom(input, Vec::new(), Vec::new(), user_zoom).unwrap();
+                if user_zoom < 1. && plan.counts.total() == 0 {
+                    assert!(b.is_none(), "empty LOD must not rebuild retained groups");
+                    continue;
+                }
+                let b = b.unwrap();
                 assert_eq!(b.visible_count, plan.counts.visible_foods);
                 assert_eq!(b.draw_count(), plan.counts.total());
                 assert_eq!(
@@ -706,6 +725,32 @@ pub(crate) mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn empty_zoom_does_not_rebuild_groups_after_membership_changes() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        let mut cache = Cache::default();
+        let previous = batch(&mut cache, &mut bank, &world, view()).sources;
+        world.consume(1, FoodConsume::Immediate);
+        assert_ne!(previous.source_identity, world.source_identity());
+        assert!(
+            cache
+                .prepare(
+                    &world,
+                    view(),
+                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    0.001,
+                    MAX_FOOD_PAINT_COMMANDS
+                )
+                .unwrap()
+                .is_none()
+        );
+        assert!(Arc::ptr_eq(cache.sources.as_ref().unwrap(), &previous));
     }
 
     #[test]
