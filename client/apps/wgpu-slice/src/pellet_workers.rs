@@ -38,7 +38,8 @@ struct Job {
     attachment: [u32; 2],
     next: AtomicUsize,
     cancelled: AtomicBool,
-    results: Vec<OnceLock<Vec<Result<Projected>>>>,
+    // One fallibly allocated slab; workers never allocate chunk result vectors.
+    results: Vec<OnceLock<[Result<Projected>; CHUNK]>>,
     worker_chunks: AtomicUsize,
     #[cfg(feature = "frame-profile")]
     dispatched: std::time::Instant,
@@ -52,12 +53,14 @@ impl Job {
         &self.inputs[begin..(begin + CHUNK).min(self.inputs.len())]
     }
 
-    fn compute(&self, chunk: usize) -> Option<Vec<Result<Projected>>> {
+    fn compute(&self, chunk: usize) -> [Result<Projected>; CHUNK] {
         let inputs = self.range(chunk);
-        let mut values = Vec::new();
-        values.try_reserve_exact(inputs.len()).ok()?;
-        values.extend(inputs.iter().map(|input| self.one(*input)));
-        Some(values)
+        std::array::from_fn(|i| {
+            // Unused tail slots are never read. An empty error owns no allocation.
+            inputs
+                .get(i)
+                .map_or_else(|| Err(String::new()), |input| self.one(*input))
+        })
     }
 
     fn one(&self, input: Input) -> Result<Projected> {
@@ -82,13 +85,12 @@ impl Job {
             if stop.load(Ordering::Acquire) || self.cancelled.load(Ordering::Acquire) {
                 break;
             }
-            if let Some(values) = self.compute(chunk) {
-                // Each cell has one claimant. Main never initializes a worker's
-                // missing cell, so set() cannot wait on another initializer.
-                let _ = self.results[chunk].set(values);
-                if worker {
-                    self.worker_chunks.fetch_add(1, Ordering::Relaxed);
-                }
+            let values = self.compute(chunk);
+            // Each cell has one claimant. Main never initializes a worker's
+            // missing cell, so set() cannot wait on another initializer.
+            let _ = self.results[chunk].set(values);
+            if worker {
+                self.worker_chunks.fetch_add(1, Ordering::Relaxed);
             }
         }
     }
@@ -102,7 +104,7 @@ impl Job {
         let mut late = 0;
         for (chunk, cell) in self.results.iter().enumerate() {
             if let Some(values) = cell.get() {
-                for value in values {
+                for value in &values[..self.range(chunk).len()] {
                     value
                         .as_ref()
                         .map_err(Clone::clone)?
