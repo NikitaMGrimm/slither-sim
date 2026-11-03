@@ -34,6 +34,14 @@ steering, zoom and Esc. No egui pass, input translation or drain runs when all
 egui menus and their fades are inactive. Browser DOM menus are unchanged.
 The disabled outgoing controls allow pointer input through to gameplay.
 
+During the visible death-return fade, Servers and Settings already accept input;
+Change Skin waits for Login. The panel keeps its own opacity and modal input
+while the session continues the login/world crossfade underneath. Closing before
+return completion defers nickname focus to the existing completion intent; a
+panel retained into Login keeps focus until its ordinary close handoff. The
+hold, return clock, queued Play and receipt-derived final length are unchanged.
+Authored regressions are in `tests/return_panels.rs`.
+
 After the death return completes, the menu keeps presenting while the old
 socket's Close handshake finishes (up to five seconds). Servers, Change Skin and
 Settings remain usable; Play still waits for Close acknowledgement and committed

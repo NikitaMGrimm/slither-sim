@@ -215,7 +215,9 @@ impl NativeLogin {
         effects.extend(self.input.state.apply(EditIntent::Focus(None)));
         if settings_visible && !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
-            effects.extend(self.focus(SETTINGS));
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(SETTINGS));
+            }
         }
         self.picker.step(now)?;
         if studio_closed {
@@ -225,7 +227,11 @@ impl NativeLogin {
         }
         if self.picker.take_closed() {
             effects.extend(self.modal_effects(false));
-            effects.extend(self.focus(NICKNAME));
+            // During return the nickname is still disabled; its existing
+            // completion intent restores focus once the login has settled.
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(NICKNAME));
+            }
         }
         if self.champion.policy.visible() || self.champion.policy.finished() {
             self.champion.step(
@@ -552,7 +558,9 @@ impl NativeLogin {
         if !self.state.settings.visible() {
             effects.extend(self.input.state.apply(EditIntent::Modal(false)));
             effects.extend(self.input.state.apply(EditIntent::Focus(None)));
-            effects.extend(self.focus(SETTINGS));
+            if self.state.view(true).phase == slither_client::start_page::MenuPhase::Login {
+                effects.extend(self.focus(SETTINGS));
+            }
         }
         effects
     }

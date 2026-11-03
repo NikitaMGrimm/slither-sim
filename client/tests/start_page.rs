@@ -609,6 +609,41 @@ fn early_return_play_locks_but_waits_for_return_and_admission() {
 }
 
 #[test]
+fn returning_allows_server_and_settings_but_not_skin_or_death_hold_entry() {
+    let mut state = menu();
+    world(&mut state, 0.);
+    state
+        .accepted_game_over(Phase::Dead, Some(capture(1001.)))
+        .unwrap();
+    let mut clock = ReturnClock::new(500., 500.);
+    clock.step(&mut state, 2100., false).unwrap();
+    assert_eq!(state.view(false).phase, P::DeathHold);
+    assert!(!slither_client::server_picker::available(
+        &state.view(false)
+    ));
+    assert!(!slither_client::settings::available(&state.view(false)));
+    assert_eq!(state.action(A::Server, false), None);
+    clock.step(&mut state, 2101., false).unwrap();
+    let view = state.view(false);
+    assert_eq!(view.phase, P::Returning);
+    assert!(slither_client::server_picker::available(&view));
+    assert!(slither_client::settings::available(&view));
+    assert_eq!(state.action(A::Server, false), Some(I::OpenServerPicker));
+    assert_eq!(state.action(A::Skin, false), None);
+    assert!(state.settings.open(&view));
+    state.action(A::Play, false);
+    assert_eq!(state.view(false).phase, P::Returning);
+    state.settings.close();
+    state.action(A::Play, false);
+    let queued = state.view(false);
+    assert_eq!(queued.phase, P::Connecting);
+    assert!(!slither_client::server_picker::available(&queued));
+    assert!(!slither_client::settings::available(&queued));
+    assert_eq!(state.action(A::Server, false), None);
+    assert_eq!(queued.last_life, view.last_life);
+}
+
+#[test]
 fn terminal_return_enter_can_queue_and_cancel_preserves_the_fade() {
     let mut state = menu();
     world(&mut state, 0.);

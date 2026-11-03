@@ -1,13 +1,14 @@
 # Settings
 
 The native login's secondary row is Change Skin, Choose Server, Settings, after
-Nickname and Play in keyboard order. Settings opens in settled Login even while
-connection admission is unavailable, with no pending Play, champion editor, skin
+Nickname and Play in keyboard order. Settings opens during the visible return
+fade and in Login even while connection admission is unavailable, with no pending Play, champion editor, skin
 studio or picker. Its shared
 modal backdrop replaces login content and the wordmark. Tab wraps Quality →
 World resolution → Done;
 Enter/Space activates the focused control. Done and Escape close and restore
-Settings focus. Outside clicks close on matching release. During play, Escape
+Settings focus after Login has settled. Closing during return leaves nickname
+focus to the existing return-completion intent. Outside clicks close on matching release. During play, Escape
 opens the single-action Leave game overlay; it still cancels a pending connection.
 Settings shares the native egui 0.37 host with that overlay. Other native
 menus retain their adapters until ported, and browser hosts retain DOM controls. Settings uses the
