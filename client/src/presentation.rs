@@ -101,8 +101,8 @@ pub use follow_camera::{FollowCamera, INITIAL_ZOOM};
 pub use food::{
     FoodConsume, FoodEaterPose, FoodError, FoodFactory, FoodFactoryInput, FoodInstance,
     FoodPaintSnapshot, FoodPaintState, FoodPalette, FoodPresentation, FoodSnapshot, FoodSource,
-    FoodSourceIdentity, FoodSources, FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken,
-    food_palette,
+    FoodSourceIdentity, FoodSources, FoodSpawn, FoodStaticIdentity, FoodWorld, MAX_RETAINED_FOODS,
+    SnakeObjectToken, food_palette,
 };
 pub use food_painter::{
     FoodAssetIndex, FoodCullBounds, FoodGlowPaint, FoodImageCommand, FoodImageDraw,

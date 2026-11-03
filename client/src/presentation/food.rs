@@ -1,6 +1,12 @@
 //! Owned desktop food instances and fractional animation, without packet or asset loading.
 
-use std::{error::Error, f64::consts::PI, fmt, num::NonZeroU64, sync::Arc};
+use std::{
+    error::Error,
+    f64::consts::PI,
+    fmt,
+    num::NonZeroU64,
+    sync::{Arc, Weak},
+};
 
 use crate::state::Point;
 
@@ -354,12 +360,26 @@ struct FoodState {
     creation_zoom: f64,
 }
 
+/// Opaque identity of one food's immutable creation inputs.
+/// Weak ownership retains no animation, source payload or mutable world array.
+/// It distinguishes sibling rollback spawns even when numeric instances match.
+#[derive(Clone)]
+pub struct FoodStaticIdentity(Weak<Vec<FoodSources>>);
+impl fmt::Debug for FoodStaticIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("FoodStaticIdentity").finish_non_exhaustive()
+    }
+}
+
 /// One owned instance. All transitions occur through its FoodWorld.
 #[derive(Clone, PartialEq)]
 pub struct FoodPresentation {
     state: FoodState,
     // The one-element vector makes the payload allocation fallible on stable
     // Rust; Arc itself allocates only its fixed-size ownership header.
+    // Each creation needs a distinct ownership header: weak renderer identities
+    // use it to distinguish sibling rollback spawns. Snapshot clones share it.
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-food-source-groups/REPORT.md.
     sources: Arc<Vec<FoodSources>>,
 }
 
@@ -372,6 +392,21 @@ impl fmt::Debug for FoodPresentation {
 }
 
 impl FoodPresentation {
+    /// Identify this creation without sharing the live world or retaining source pixels.
+    #[inline]
+    pub fn static_identity(&self) -> FoodStaticIdentity {
+        FoodStaticIdentity(Arc::downgrade(&self.sources))
+    }
+
+    /// Test immutable creation identity without upgrading or cloning its ownership.
+    #[inline]
+    pub fn matches_static_identity(&self, identity: &FoodStaticIdentity) -> bool {
+        // The weak token keeps the Arc header allocated, preventing address reuse.
+        // Sources and original position are frozen for this creation; numeric IDs
+        // alone cannot distinguish newly created records on rollback forks.
+        std::ptr::eq(Arc::as_ptr(&self.sources), identity.0.as_ptr())
+    }
+
     /// Copy changing paint inputs without copying source metadata or sharing the world.
     #[inline]
     pub fn paint_state(&self) -> FoodPaintState {
@@ -864,6 +899,59 @@ impl FoodWorld {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn static_identity_is_weak_and_distinguishes_equal_serial_creations() {
+        let source = FoodSource::new(
+            BodyAsset {
+                handle: 1,
+                revision: 1,
+                width: 4,
+                height: 4,
+                status: BodyAssetStatus::Ready,
+            },
+            4.,
+            4.,
+            2.,
+            2.,
+        )
+        .unwrap();
+        let sources = [source];
+        let spawn = FoodSpawn {
+            key: 1,
+            sector: (0, 0),
+            position: Point::default(),
+            base_size: 1.,
+            raw_color: 0,
+            rapid: false,
+        };
+        let input = FoodFactoryInput {
+            random_phase_unit: 0.,
+            random_wobble_unit: 0.,
+            creation_zoom: 1.,
+            palette: FoodPalette {
+                palette: 0,
+                image_count: 1,
+                bodies: &sources,
+                outlines: &sources,
+                glows: &sources,
+            },
+        };
+        let food = create(FoodInstance(1), spawn, input).unwrap();
+        let token = food.static_identity();
+        let clone = food.clone();
+        assert!(clone.matches_static_identity(&token));
+        let sibling = create(FoodInstance(1), spawn, input).unwrap();
+        assert_eq!(food.snapshot(), sibling.snapshot());
+        assert!(!sibling.matches_static_identity(&token));
+        drop(clone);
+        drop(food);
+        assert!(
+            token.0.upgrade().is_none(),
+            "cache identity must not retain the source payload"
+        );
+        assert!(!sibling.matches_static_identity(&token));
+    }
 
     #[test]
     fn checked_serial_never_wraps_even_after_clear() {
