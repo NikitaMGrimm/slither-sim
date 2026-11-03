@@ -1,0 +1,43 @@
+{
+  "baseline_revision": "dd756cdffd7d3fb8b1ec48e9e15fe5a4df111379",
+  "candidate_runtime_revision": "db89a621cc0b284dc66fec46b8ef14523d818d1a",
+  "replay_input": {
+    "local_id": "retained-join-A",
+    "sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43"
+  },
+  "note": "Instrumented food.rs and presentation.rs add passive advance/copy counters and exports. Runtime hashes record the uninstrumented Git source, separately from measured source. Frozen source trees and raw outputs remain local. No current-file hash gate.",
+  "baseline": {
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+      "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499",
+      "client/src/presentation.rs": "f8a08f288b795f38e8d1e443b7ed6cd996f28da5636e9a4cd490e603131f4cfe",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "9c37aedc22c5a31897858d2aa8252284b6435393225a028ef2214ad99b35d893"
+    },
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "cdb4ef0e444fe214588bbba30058bf1c96dd7f15961b969ae19dba4da84cea09",
+      "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499",
+      "client/src/presentation.rs": "105dcd3d58ebd44832485e7a0652154dd24b955d8f4a11083cf61d057f1b28dd",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "9c37aedc22c5a31897858d2aa8252284b6435393225a028ef2214ad99b35d893"
+    },
+    "binary_sha256": "135ebed27fec4490f4c5290eee756fcb3f71eb8e4142308d24cce564d1d91dd5",
+    "driver_sha256": "ee94d1b6cc997fad57c3223341547c4acfa15586a6a8ff68267c330103f99764"
+  },
+  "candidate": {
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0ab45c722ec2899af0fb60fee8bba25cc6408d1cb8b7befb2875366af6b98e61"
+    },
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "694c0008851a2612bb5ec01c38e72a98515b337fd40a770d9c76ba7e34164f23",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "9b288f11b1be458030742f0b844a97cf14026445b5dacfb962dc1948394c3936",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0ab45c722ec2899af0fb60fee8bba25cc6408d1cb8b7befb2875366af6b98e61"
+    },
+    "binary_sha256": "29f9795f07017de6473bde7e20731fd9a7991548fdd67c1f11f16a4989bb9d97",
+    "driver_sha256": "ee94d1b6cc997fad57c3223341547c4acfa15586a6a8ff68267c330103f99764"
+  },
+  "candidate_image_binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+  "candidate_image_driver_sha256": "5d132698641b3fe8c5c98d6eb3179ffd7eb46e1c4891619a12ecfb606293b4b4"
+}
