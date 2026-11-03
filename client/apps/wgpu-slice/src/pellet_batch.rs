@@ -25,6 +25,8 @@ pub(crate) struct Group {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Instance(pub [[f32; 4]; 6]);
 impl Instance {
+    // Fold the fixed-layout byte stores into each rewritten mirror slot.
+    #[inline(always)]
     pub fn bytes(self) -> [u8; 96] {
         let mut b = [0; 96];
         for (i, v) in self.0.into_iter().flatten().enumerate() {
@@ -861,7 +863,11 @@ mod tests {
         let target = offscreen::target(&renderer, extent);
         let reference = offscreen::target(&renderer, extent);
         let eater = SnakeObjectToken::new(1).unwrap();
-        for tick in 0..24 {
+        for tick in 0..30 {
+            if tick == 26 {
+                // Same-length replacement must invalidate serialized slots too.
+                world = rectangle(&bank);
+            }
             if tick == 18 {
                 for key in (0..25_000).step_by(97) {
                     world.consume(key, FoodConsume::Eaten(Some(eater)));
@@ -880,11 +886,23 @@ mod tests {
                     })
                 })
                 .unwrap();
+            let view = if matches!(tick, 12 | 26) {
+                // Hide part of the mirror, then bring those slots back next frame.
+                BodyPaintView {
+                    camera: Point {
+                        x: 17_350.,
+                        ..view().camera
+                    },
+                    ..view()
+                }
+            } else {
+                view()
+            };
             let batch = cache
                 .prepare(
                     &world,
-                    view(),
-                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    view,
+                    Some(FoodCullBounds::from_view(view).unwrap()),
                     &bank.assets,
                     &bank.food_outline,
                     &mut bank.food_asset_index,
@@ -930,7 +948,7 @@ mod tests {
             active.sort_unstable();
             let maximum = active.last().copied().unwrap();
             let p95 = active[(active.len() - 1) * 95 / 100];
-            let state = if tick >= 18 {
+            let state = if world.foods().iter().any(|f| f.snapshot().eaten) {
                 "consumed"
             } else if world.foods().iter().all(|f| f.snapshot().fade == 1.) {
                 "settled"

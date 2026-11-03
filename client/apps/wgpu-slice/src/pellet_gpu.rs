@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
-    pellet_batch::{Batch, Instance, Sources, exact_instance, glow_pair},
+    pellet_batch::{Batch, Sources, exact_instance, glow_pair},
 };
 use slither_client::presentation::{FoodSource, food_body_alpha, food_pulse};
 use std::{ops::Range, sync::Arc};
@@ -70,7 +70,11 @@ pub(super) struct Pellets {
     flags: Option<wgpu::Buffer>,
     dynamic: Option<wgpu::Buffer>,
     sources: Option<Arc<Sources>>,
-    mirror: Vec<Instance>,
+    // Retain little-endian upload bytes, including unchanged culled slots.
+    // Serialize rewritten slots once instead of repacking and allocating the
+    // entire mirror each frame. See
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-upload-mirror/REPORT.md.
+    mirror: Vec<[u8; 96]>,
     bindings: Vec<[Option<SourceDraw>; 3]>,
 }
 fn uniform(
@@ -272,7 +276,7 @@ impl Pellets {
         }
         if changed {
             self.sources = Some(b.sources.clone());
-            self.mirror = vec![Instance([[0.; 4]; 6]); length];
+            self.mirror = vec![[0; 96]; length];
         }
         if self.bindings.len() != b.sources.groups.len() {
             self.bindings = (0..b.sources.groups.len())
@@ -339,12 +343,14 @@ impl Pellets {
                 }
             }
             let exact = exact_instance(frame, f, b.view, &glows, pulse)?;
-            self.mirror[slot] = exact;
+            self.mirror[slot] = exact.bytes();
             flags[slot] = bits;
         }
-        let bytes: Vec<_> = self.mirror.iter().flat_map(|i| i.bytes()).collect();
-        r.queue
-            .write_buffer(self.dynamic.as_ref().expect("dynamic instances"), 0, &bytes);
+        r.queue.write_buffer(
+            self.dynamic.as_ref().expect("dynamic instances"),
+            0,
+            self.mirror.as_flattened(),
+        );
         let previous = if r.layer_history.extent == attachment && r.layer_history.samples == samples
         {
             r.layer_history

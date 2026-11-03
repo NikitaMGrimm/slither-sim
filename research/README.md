@@ -7,6 +7,7 @@ archive integrity establishes neither scientific rules nor product adoption.
 
 | Topic | Study | Scope and decision |
 | --- | --- | --- |
+| Client performance | [Serialized pellet upload mirror](client-performance/2026-11-03-pellet-upload-mirror/REPORT.md) | Retain exact little-endian instance bytes; alternating RTX/Vulkan 4K and AMD/DX12 guardrails, complete-image controls and remaining CPU/refresh-budget limits. |
 | Client performance | [Pellet-art join and sector refresh](client-performance/2026-11-02-join-sectors/REPORT.md) | Restricted ten-second join timeline; stage only new food in sector listings and avoid world copies on clear/visibility notices, with exact output and authored packed-pellet controls. |
 | Client performance | [Retained dense pellet batches](client-performance/2026-11-02-retained-pellets/REPORT.md) | Retained batches and exact CPU projection specialization; RTX/Vulkan 4K and AMD/DX12 1080p/4K release pairs, canonical controls and full-frame image hashes, with remaining high-refresh and cold-spike limits. |
 | Client performance | [Overlapping sprites](client-performance/2026-11-02-overlapping-sprites/REPORT.md) | Current-main per-pass diagnostics, exact invisible-draw removal and one-pass world composition; authored crowded iGPU comparison and remaining target miss. |
