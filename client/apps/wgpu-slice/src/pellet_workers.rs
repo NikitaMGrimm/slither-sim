@@ -16,12 +16,12 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-// Main participates. The earlier 4->8 pilot saved only 0.2-0.25 ms for
-// twice the participants; cap portable available_parallelism at four.
+// Resource cap including main: leave CPU capacity for other applications.
+// available_parallelism limits this further; Wasm does not instantiate a pool.
 const MAX_PARTICIPANTS: usize = 4;
-// With 4 ms gaps, two participants at 1,024 settled pellets were effectively
-// tied with serial (0.0954/0.0959 ms). At 2,048, two/four took 0.124/0.094 ms
-// versus 0.190 ms serial. Below that, neither copy inputs nor start workers.
+// Paced density controls show only tens of microseconds saved at 1,024 visible
+// pellets, versus a repeatable reduction with two/four participants at 2,048.
+// Below that, neither copy inputs nor start workers.
 // Measured cutoff, not a gameplay or visual limit:
 // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
 const MIN_VISIBLE: usize = 2048;
@@ -612,6 +612,10 @@ mod tests {
     #[ignore]
     fn measure_pool_density() {
         let mut bank = Bank::new().unwrap();
+        println!(
+            "available_parallelism={:?}",
+            thread::available_parallelism()
+        );
         let paced = std::env::var_os("PELLET_DENSITY_PACED").is_some();
         println!("density,settled,participants,repeat,p50_ns,p95_ns");
         for settled in [false, true] {
