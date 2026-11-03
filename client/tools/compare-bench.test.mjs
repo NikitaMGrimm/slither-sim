@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation, hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP } from './compare-bench/browser.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
-import {resourceScope,listen,closeServer} from './compare-bench/resources.mjs';
+import {resourceScope,collectorCompletion} from './compare-bench/resources.mjs';
+import {spawn} from 'node:child_process';
 import vm from 'node:vm';
 import path from 'node:path';
 import http from 'node:http';
@@ -37,6 +38,18 @@ test('invalid/unknown validity cannot silently pass', () => {
     census: [{atMs:0, wholeMapFood: true, admittedBotSlots: 100, totalAliveSnakes: 100, players: [{ alive: true, setup: true, protocol: 19, wireLivingSnakes: 100,decoratedWireFood:40 }] }],
     views: [{atMs:0, wholeMap: true, visiblePellets: 40, retainedPellets: 40 }] };
   assert.equal(validity(run).valid, true);
+  const refreshed=structuredClone(run);refreshed.machine={clock:{qpcMs:0,unixMs:0}};
+  refreshed.windowSamples.forEach(s=>s.unixMs=s.qpcMs+1000000);
+  assert.equal(validity(refreshed).valid,false);
+  refreshed.clock={qpcMs:0,unixMs:1000000};assert.equal(validity(refreshed).valid,true);
+  const ntl=structuredClone(run);ntl.client='ntl';ntl.census[0].players[0].protocol=13;
+  ntl.contentMetrics={frames:60,achievedFps:60};
+  assert.ok(validity(ntl).reasons.includes('NTL input provenance unavailable'));
+  ntl.provenance={ntl:{tree:{sha256:'a'.repeat(64)}}};assert.equal(validity(ntl).valid,true);
+  ntl.contentMetrics={};assert.equal(validity(ntl).valid,false);
+  const clippedImage=structuredClone(run);clippedImage.scenario='normal';
+  clippedImage.views[0]={...clippedImage.views[0],sceneEvidence:'image',viewport:[960,500]};
+  assert.ok(validity(clippedImage).reasons.includes('Browser content viewport does not match requested client area'));
   for (const mutation of [r => r.windowSamples[0].foreground = false, r => r.windowSamples[0].occluded = true,
     r => r.windowSamples[0].buildRunning = true, r => r.stats[0].deferredTicks = 1,
     r => r.census[0].players[0].alive = false, r => r.views[0].wholeMap = false,
@@ -89,6 +102,26 @@ test('ETW loss is a collection failure even with successful process exit', () =>
   assert.match(presentMonFailure('warning: 12345 ETW events were lost.'), /lost ETW/);
   assert.equal(presentMonFailure('Started recording.\nStopped recording.'), null);
 });
+
+test('synthetic acceptance needs successful ETW and one complete owned display surface',()=>{
+  const header='ProcessID,SwapChainAddress,CPUStartQPCTime,DisplayLatency,DisplayedTime,PresentMode,SyncInterval\n';
+  const text=header+Array.from({length:240},(_,i)=>`7,A,${i*1000/240},0,4.1667,Composed: Flip,1`).join('\n');
+  const options={pids:[7],seconds:1,startMs:0,endMs:1000};
+  const collector={exitCode:0,log:'',text};
+  assert.equal(checkedPresentation(collector,options).metrics.achievedFps,240);
+  for(const failed of [{...collector,exitCode:1,log:'Access denied'},{...collector,error:'ENOENT'},
+    {...collector,log:'123 ETW events were lost'},{...collector,text:header},
+    {...collector,text:text.replaceAll('7,A,','8,A,')},
+    {...collector,text:text+ '\n7,B,500,0,4,Composed: Flip,1'}])assert.throws(()=>checkedPresentation(failed,options));
+});
+
+test('a missing collector returns a handled launch failure through the cleanup path',async()=>{
+  const scope=resourceScope();let closed=false;scope.add(()=>{closed=true;});
+  let result;
+  try{result=await collectorCompletion(spawn(path.join(os.tmpdir(),`missing-collector-${process.pid}-${Date.now()}`),[],{windowsHide:true}));}
+  finally{await scope.close();}
+  assert.match(result.error,/ENOENT/);assert.equal(result.exitCode,null);assert.equal(closed,true);
+});
 test('60 Hz canvas activity beside 240 Hz callbacks/compositor is counted as 60, not 240',()=>{
   class Context { constructor(canvas){this.canvas=canvas;} fillRect(){} }
   const canvas={width:960,height:540,getBoundingClientRect:()=>({x:0,y:0,width:960,height:540})};
@@ -104,6 +137,7 @@ test('60 Hz canvas activity beside 240 Hz callbacks/compositor is counted as 60,
 test('duplicate native picture presents cannot masquerade as new content',()=>{
   const result=nativeProduction({unixStartMs:0,rows:[[0,1],[1000000,1],[2000000,2],[3000000,2]]},{startMs:0,endMs:5,qpcUnixOffset:0});
   assert.equal(result.freshPreparedPictures,2);assert.equal(result.duplicatePicturePresents,2);
+  assert.throws(()=>nativeProduction({unixStartMs:0,rows:[]},{startMs:0,endMs:5,qpcUnixOffset:0}),/No native present identities/);
 });
 test('all streams require timestamps, bounded gaps and both measurement boundaries',()=>{
   assert.equal(streamCoverage([{atMs:0}],0,60000,1200),false);
@@ -141,4 +175,7 @@ test('empty scene is rejected; authored image can show boundary and pellet prese
   for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(Math.abs(Math.hypot(x-240,y-180)-140)<2)set(x,y,100,0,0);
   for(let i=0;i<10;i++)for(let x=0;x<3;x++)for(let y=0;y<3;y++)set(130+i*15+x,160+y,0,200,60);
   const evidence=pictureEvidence({width,height,channels,pixels});assert.equal(evidence.wholeMap,true);assert.ok(evidence.pelletCandidates>=10);assert.match(evidence.sceneConfidence,/exact count unverified/);
+  pixels.fill(0);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++)if(Math.abs(Math.hypot(x-240,y-30)-140)<2)set(x,y,100,70,0);
+  const limited=pictureEvidence({width,height,channels,pixels});assert.ok(limited.boundary);assert.equal(limited.wholeMap,false);
 });

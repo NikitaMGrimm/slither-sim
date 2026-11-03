@@ -57,6 +57,21 @@ export function presentMonFailure(text) {
   if (/access.*denied|error.*(?:trace|session)|failed to start/i.test(text)) return 'PresentMon ETW capture failed; inspect retained console output';
   return null;
 }
+export function checkedPresentation(collector,{pids,seconds,startMs,endMs}) {
+  if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??`exit ${collector.exitCode}`}`);
+  const failure=presentMonFailure(collector.log??'');if(failure)throw Error(failure);
+  const surfaces=new Map();
+  for(const row of csv(collector.text)){
+    if(!pids.includes(+row.ProcessID)||!(+row.DisplayedTime>0)||row.DisplayedTime==='NA')continue;
+    if(!(+row.CPUStartQPCTime>=startMs&&+row.CPUStartQPCTime<=endMs))continue;
+    const key=`${row.ProcessID}/${row.SwapChainAddress}`;surfaces.set(key,(surfaces.get(key)??0)+1);
+  }
+  if(surfaces.size!==1)throw Error(`Ambiguous/missing presentation surface (${surfaces.size}); no fastest-surface selection`);
+  const [pid,swapchain]=[...surfaces.keys()][0].split('/');
+  const metrics=presentation(collector.text,{pid:+pid,swapchain,seconds,startMs,endMs});
+  if(metrics.coveredMs<seconds*1000*.9||metrics.boundaryGapMs.some(g=>g>250))throw Error('Incomplete display coverage at window boundaries');
+  return {surfaces:[...surfaces],metrics};
+}
 export function wholeMap({ camera, center, radius, zoom, viewport }) {
   if (![...camera, center, radius, zoom, ...viewport].every(Number.isFinite) || radius <= 0 || zoom <= 0) return false;
   return (radius + Math.abs(camera[0] - center)) * zoom <= viewport[0] / 2 + .01
@@ -93,17 +108,14 @@ export function sceneChecks(run) {
 export function nativeProduction(journal,{startMs,endMs,qpcUnixOffset}){
   if(journal.overflow)throw Error('Native present-identity journal overflow');
   const rows=journal.rows.map(([ns,identity])=>({at:journal.unixStartMs+ns/1e6+qpcUnixOffset,identity})).filter(r=>r.at>=startMs&&r.at<=endMs);
+  if(!rows.length)throw Error('No native present identities in measured window');
   const fresh=rows.filter((r,i)=>i===0||r.identity!==rows[i-1].identity);
   return {successfulPresentReceipts:rows.length,freshPreparedPictures:fresh.length,duplicatePicturePresents:rows.length-fresh.length,
     scope:'prepared-picture identity, not pixel uniqueness; no per-frame scene scan',
     contentDisplayCorrelation:rows.length===fresh.length?'all successful receipts used a new prepared picture; ETW identity mapping unestablished':'duplicate native pictures; displayed-content mapping unestablished'};
 }
-export function validity(run) {
+export function windowReasons(run) {
   const reasons = [];
-  if (run.error) reasons.push(run.error);
-  if (run.cleanupError) reasons.push('Acquisition cleanup failed');
-  if (!run.metrics) reasons.push('No comparable displayed-frame measurement');
-  if (!run.networkVerified) reasons.push('Loopback-only game traffic not verified');
   if (!run.windowSamples?.length) reasons.push('No window/load evidence');
   for (const s of run.windowSamples ?? []) {
     if (!s.foreground || s.occluded || s.minimized || !s.visible) reasons.push('Window not foreground and fully unoccluded');
@@ -114,9 +126,18 @@ export function validity(run) {
     if(!contained(s.clientRect,s.displayBounds))reasons.push('Client area is clipped or spans displays');
     if(s.ownerInput)reasons.push('Owner input during acquisition');
     if(s.gpuCounterError||!s.gpuEngines?.length)reasons.push('Missing current GPU counter evidence');
-    const clock=run.machine?.clock;
+    const clock=run.clock??run.machine?.clock;
     if(clock&&(!Number.isFinite(s.unixMs)||Math.abs((s.qpcMs-s.unixMs)-(clock.qpcMs-clock.unixMs))>10))reasons.push('QPC/UNIX clock mapping changed or unavailable');
   }
+  if(!streamCoverage(run.windowSamples,run.startMs,run.endMs,750))reasons.push('window telemetry does not cover the measured window');
+  return [...new Set(reasons)];
+}
+export function validity(run) {
+  const reasons = windowReasons(run);
+  if (run.error) reasons.push(run.error);
+  if (run.cleanupError) reasons.push('Acquisition cleanup failed');
+  if (!run.metrics) reasons.push('No comparable displayed-frame measurement');
+  if (!run.networkVerified) reasons.push('Loopback-only game traffic not verified');
   for(const [name,rows,gap] of [['window',run.windowSamples,750],['host stats',run.stats,1200],['host census',run.census,1200],['view',run.views,3000]]) {
     if(!streamCoverage(rows,run.startMs,run.endMs,gap))reasons.push(`${name} telemetry does not cover the measured window`);
   }
@@ -133,6 +154,7 @@ export function validity(run) {
   if (run.census?.some(s => s.players?.[0]?.protocol !== (run.client === 'ntl' ? 13 : 19))) reasons.push('Unexpected negotiated protocol');
   if (run.scenario === 'battledome' && run.census?.some(s => s.players?.[0]?.wireLivingSnakes !== s.totalAliveSnakes)) reasons.push('Host did not deliver every living snake');
   if (!run.views?.length) reasons.push('Camera/drawn-pellet evidence unavailable');
+  if(run.views?.some(v=>v.sceneEvidence==='image'&&(v.viewport?.[0]!==run.width||v.viewport?.[1]!==run.height)))reasons.push('Browser content viewport does not match requested client area');
   if(!sceneChecks(run))reasons.push('Client scene does not match authoritative delivered food / image evidence');
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
@@ -147,7 +169,8 @@ export function validity(run) {
   if (!run.renderAdapters?.length || run.renderAdapters.some(a => !a.name || a.name === 'unmapped')) reasons.push('Actual render GPU not established by per-process GPU engines');
   if (run.expectedRenderLuid && (run.renderAdapters?.length !== 1 || run.renderAdapters[0].luid !== run.expectedRenderLuid)) reasons.push('Requested adapter not established as the actual render adapter');
   if (run.targetDisplay && (run.display !== run.targetDisplay || run.refreshHz !== run.targetRefreshHz)) reasons.push('Window is not on the requested display/refresh experiment');
-  if(run.client==='ntl'&&!run.contentMetrics)reasons.push('No game-canvas production measure; compositor FPS is not game FPS');
+  if(run.client==='ntl'&&(!run.contentMetrics||!Number.isInteger(run.contentMetrics.frames)||run.contentMetrics.frames<3
+    ||!Number.isFinite(run.contentMetrics.achievedFps)||run.contentMetrics.achievedFps<=0))reasons.push('No game-canvas production measure; compositor FPS is not game FPS');
   if(run.client==='ntl'&&(run.provenance?.ntl?.error||!run.provenance?.ntl?.tree?.sha256))reasons.push('NTL input provenance unavailable');
   if(run.telemetry==='off')reasons.push('Instrumentation-off diagnostic; scene/content acceptance unavailable');
   return { valid: reasons.length === 0, reasons: [...new Set(reasons)] };
@@ -186,6 +209,8 @@ export function netlogProof(log, endpoint) {
       const peer=event.params?.[key];if(typeof peer==='string')transportPeers.push({protocol:names[event.type],peer});
     }
   }
-  return { verified: addresses.length > 0 && addresses.every(loopback)&&transportPeers.every(p=>loopback(p.peer))
-    && successful.some(e => (e.params.address ?? e.params.remote_address) === endpoint), addresses: [...new Set(addresses)] };
+  const rejectedPeers=transportPeers.filter(p=>!loopback(p.peer));
+  const gameSocketVerified=successful.some(e => (e.params.address ?? e.params.remote_address) === endpoint);
+  return { verified: addresses.length > 0 && addresses.every(loopback)&&rejectedPeers.length===0&&gameSocketVerified,
+    gameSocketVerified,addresses:[...new Set(addresses)],rejectedPeers };
 }

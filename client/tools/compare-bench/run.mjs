@@ -4,10 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { presentation, csv, hostStats, wholeMap, validity, schedule, netlogProof, comparison, presentMonFailure,nativeProduction } from './analysis.mjs';
+import { checkedPresentation,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
+import {collectorCompletion} from './resources.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -111,7 +112,7 @@ async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, pm, host, native;
-  let pmLog = '';
+  let pmLog = '',pmCompleted;
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
@@ -120,7 +121,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
-  const offset=machine.clock.qpcMs-machine.clock.unixMs;
+  let offset=machine.clock.qpcMs-machine.clock.unixMs;
   const now=()=>Date.now()+offset;
   const telemetryErrors=[];
   const hostJournal=lineJournal((line,atMs)=>{try{
@@ -139,6 +140,8 @@ async function runAttempt(config, root, item, provenance, machine) {
   };
   process.once('SIGINT', cancel); process.once('SIGTERM', cancel);
   try {
+    r.clock=(await windows({mode:'clock'},directory,'clock',children))[0];
+    offset=r.clock.qpcMs-r.clock.unixMs;
     const scenario = JSON.parse(await fs.readFile(path.join(here, 'scenarios', `${item.scenario}.json`), 'utf8'));
     const scenarioPath = path.join(directory, 'host.json'); await save(scenarioPath, scenario);
     r.scenarioSha256 = await sha(scenarioPath);
@@ -197,6 +200,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     if(browser){
       const before=await browser.capture('before-window');const evidence=pngEvidence(await fs.readFile(before));
       r.preflightView={...evidence,atMs:now()};r.views.push(r.preflightView);
+      if(evidence.viewport[0]!==config.width||evidence.viewport[1]!==config.height)throw Error(`Browser content viewport ${evidence.viewport.join('x')} does not match requested ${config.width}x${config.height}; no timed capture`);
       const processes=await browser.browser.send('SystemInfo.getProcessInfo');
       browser.processIds=processes.processInfo.map(p=>p.id);
       browser.gpuPid=processes.processInfo.find(p=>p.type==='GPU')?.id;
@@ -206,9 +210,9 @@ async function runAttempt(config, root, item, provenance, machine) {
     const csvPath = path.join(directory, 'presentmon.csv');
     pm = spawn(config.presentMon, ['--session_name', `SlitherBench-${randomUUID()}`, '--output_file', csvPath,
       '--v2_metrics', '--qpc_time_ms', '--timed', String(config.seconds + 12), '--terminate_after_timed', '--no_console_stats'], { windowsHide: true }); register(pm);
-    pm.stdout.on('data', b => pmLog += b); pm.stderr.on('data', b => pmLog += b);
-    await delay(1000);
-    if (pm.exitCode !== null) throw Error(`PresentMon failed without elevation: ${pmLog}. Owner must grant ETW permission or run collector separately; no security settings changed.`);
+    pmCompleted=collectorCompletion(pm);
+    const early=await Promise.race([pmCompleted,delay(1000).then(()=>null)]);
+    if (early) {pmLog=early.log;throw Error(`PresentMon preflight failed: ${early.error??early.exitCode}; ${pmLog}. No elevation or security changes attempted.`);}
     if(browser&&config.telemetry!=='off')r.productionStarted=await browser.productionStart();
     const samplesPromise = windows({ mode: 'sample', clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
     let monitoring = true;
@@ -233,7 +237,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.windowSamples = r.windowSamples.filter(s => s.qpcMs <= r.endMs);
     r.refreshHz = first.refreshHz;
     r.displayAdapters = machine.dxgiAdapters.filter(a => a.outputs?.includes(r.display));
-    r.displayBindings = machine.displayBindings.filter(b => b.display === r.display);
+    r.displayBindings = first.displayBinding?[first.displayBinding]:[];
     const engines = r.windowSamples.flatMap(s => s.gpuEngines ?? []);
     const renderLuids = [...new Set(engines.filter(e => /engtype_3d/i.test(e.instance) && e.utilization > .01)
       .map(e => e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
@@ -260,25 +264,14 @@ async function runAttempt(config, root, item, provenance, machine) {
     const covered=rows=>rows.filter(row=>row.atMs>=r.startMs-3000&&row.atMs<=r.endMs+3000);
     r.stats=covered(r.stats);r.census=covered(r.census);r.views=covered(r.views);
     if(r.windowSamples.some(s=>s.ownerInput||!s.foreground))throw Error('Owner input or foreground loss: stopped without reclaiming focus');
-    await new Promise(resolve => pm.exitCode !== null ? resolve() : pm.once('close', resolve));
+    const collector=await pmCompleted;pmLog=collector.log;
     await fs.writeFile(path.join(directory, 'presentmon-console.txt'), pmLog);
-    if (pm.exitCode !== 0) throw Error(`PresentMon exit ${pm.exitCode}; ETW access/collection failed. No self-elevation attempted.`);
-    if (presentMonFailure(pmLog)) throw Error(presentMonFailure(pmLog));
+    if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??collector.exitCode}; ${pmLog}`);
     const text = await fs.readFile(csvPath, 'utf8');
-    const surfaces = new Map();
-    const ownedPids = new Set([browser ? browser.gpuPid : native.pid]);
     // Chrome GPU process owns presents. Require an explicit single active
     // surface in this dedicated process tree; never pick the fastest surface.
-    for (const row of csv(text)) {
-      if (!ownedPids.has(+row.ProcessID)) continue;
-      if (row.DisplayedTime === 'NA' || !(+row.DisplayedTime > 0)) continue;
-      if (!(+row.CPUStartQPCTime >= r.startMs && +row.CPUStartQPCTime <= r.endMs)) continue;
-      const key = `${row.ProcessID}/${row.SwapChainAddress}`; surfaces.set(key, (surfaces.get(key) ?? 0) + 1);
-    }
-    r.surfaces = [...surfaces];
-    if (surfaces.size !== 1) throw Error(`Ambiguous/missing presentation surface (${surfaces.size}); no aggregate or automatic fastest selection`);
-    const [pid, swapchain] = [...surfaces.keys()][0].split('/');
-    r.metrics = presentation(text, { pid: +pid, swapchain, seconds: config.seconds, startMs: r.startMs, endMs: r.endMs });
+    const displayed=checkedPresentation({exitCode:pm.exitCode,log:pmLog,text},{pids:[browser?browser.gpuPid:native.pid],seconds:config.seconds,startMs:r.startMs,endMs:r.endMs});
+    r.surfaces=displayed.surfaces;r.metrics=displayed.metrics;
     r.metrics.refreshPeriodMs = 1000 / r.refreshHz;
     r.metrics.p95RefreshPeriods = r.metrics.p95Ms / r.metrics.refreshPeriodMs;
     r.metrics.longestRefreshPeriods = r.metrics.longestStallMs / r.metrics.refreshPeriodMs;

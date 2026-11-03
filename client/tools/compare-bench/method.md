@@ -23,8 +23,8 @@ The probe wraps standard draw APIs; it does not inspect mod game state. WebGPU,
 worker/OffscreenCanvas production and an ambiguous full-viewport canvas fail
 acceptance rather than silently falling back to compositor FPS.
 
-Our optional bounded in-memory journal records successful present receipts and
-prepared-picture identity, then exports on graceful exit. Repeated identities
+Our optional bounded in-memory journal holds 262144 successful present receipts
+and prepared-picture identities (4 MiB), then exports on graceful exit. Repeated identities
 are reported separately. A new prepared identity is not proof of changed pixels.
 Vlither has no equivalent content/display correlation. Until exact correlation is
 established, browser/native pairings remain **labelled comparisons only**, even
@@ -198,13 +198,13 @@ checked against nearby decorated wire counts with an explicit 32 + 5% allowance
 for delivery/sampling lag; retained eaten flights are excluded where exposed.
 Visible/retained counts are instances, not opaque pixels or GPU quads.
 NTL screenshots report colored small-component **pellet candidates**, not exact
-pellet counts; a fitted red circle is a candidate visible boundary. Presence-only
+pellet counts; a fitted red/gold circle is a candidate visible boundary. Presence-only
 image evidence cannot establish complete scene delivery or identify an inner
 pit circle as the outer map. Exact NTL counts and whole-map extent remain
 qualified until independently anchored. No image-derived count is invented.
 
 Every stream carries a QPC-domain receipt timestamp: host stats/census and native
-logs are mapped from UNIX receipt time using a machine QPC/UNIX pair, while
+logs are mapped from UNIX receipt time using a fresh per-attempt QPC/UNIX pair, while
 window samples use QPC directly and browser rAF uses timeOrigin. This mapping
 includes IPC/scheduling delay and is not hardware synchronization. Current clock
 mapping disagreement fails acceptance. Stream coverage needs both boundaries and

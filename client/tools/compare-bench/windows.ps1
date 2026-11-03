@@ -75,6 +75,10 @@ if ($c.mode -eq 'preflight') {
   @{competingWork=@(Competing-Work); idleMs=[BenchWindow]::IdleMs(); lastInputTick=[BenchWindow]::LastInputTick()} | ConvertTo-Json -Depth 4 -Compress
   exit
 }
+if ($c.mode -eq 'clock') {
+  @{qpcMs=[BenchWindow]::QpcMs();unixMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()} | ConvertTo-Json -Compress
+  exit
+}
 if ($c.mode -eq 'machine') {
   $adapters = @(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate)
   $screens = @([Windows.Forms.Screen]::AllScreens | ForEach-Object { @{ display=$_.DeviceName; bounds=@($_.Bounds.X,$_.Bounds.Y,$_.Bounds.Width,$_.Bounds.Height); refreshHz=[BenchGraphics]::Refresh($_.DeviceName) } })
@@ -127,8 +131,8 @@ if($c.mode -eq 'close') {
   exit
 }
 $prevCpu = [BenchWindow]::Cpu()
-$hostProcess = Get-Process -Id $c.hostPid
-$prevHost = $hostProcess.TotalProcessorTime.TotalSeconds
+$hostProcess = if($c.hostPid){Get-Process -Id $c.hostPid}else{$null}
+$prevHost = if($hostProcess){$hostProcess.TotalProcessorTime.TotalSeconds}else{0}
 $clientCpu = @{}
 $clientIds = @($c.clientPids)
 foreach($id in $clientIds) { $p=Get-Process -Id $id -ErrorAction SilentlyContinue; if($p){$clientCpu[[string]$id]=$p.TotalProcessorTime.TotalSeconds} }
@@ -148,8 +152,8 @@ $end = [DateTime]::UtcNow.AddSeconds($c.seconds)
 while ([DateTime]::UtcNow -lt $end) {
   $r = New-Object BenchWindow+Rect
   [BenchWindow]::GetClientRect($hwnd,[ref]$r) | Out-Null
-  $hostProcess.Refresh()
-  $now = [Diagnostics.Stopwatch]::GetTimestamp(); $hostCpu = $hostProcess.TotalProcessorTime.TotalSeconds
+  if($hostProcess){$hostProcess.Refresh()}
+  $now = [Diagnostics.Stopwatch]::GetTimestamp(); $hostCpu = if($hostProcess){$hostProcess.TotalProcessorTime.TotalSeconds}else{0}
   $elapsed = ($now-$prevAt)/[Diagnostics.Stopwatch]::Frequency
   $clientDelta=0.0; $processCpu=@()
   foreach($id in $clientIds){$p=Get-Process -Id $id -ErrorAction SilentlyContinue;if($p){$current=$p.TotalProcessorTime.TotalSeconds;$previous=$clientCpu[[string]$id];$delta=$current-$previous;$clientDelta+=$delta;$clientCpu[[string]$id]=$current;$processCpu+=@{pid=$id;cpuSeconds=$current;deltaSeconds=$delta}}}
@@ -173,6 +177,7 @@ while ([DateTime]::UtcNow -lt $end) {
      occluded=[BenchWindow]::Occluded($hwnd); minimized=[BenchWindow]::IsIconic($hwnd); visible=[BenchWindow]::IsWindowVisible($hwnd);
      width=$r.R; height=$r.B; dpi=[BenchWindow]::GetDpiForWindow($hwnd); display=$screen.DeviceName;
      refreshHz=$binding.refreshHz; nominalRefreshHz=[BenchGraphics]::Refresh($screen.DeviceName); gpuEngines=$gpuEngines; gpuCounterError=$gpuError;
+     displayBinding=$binding;
      displayBounds=@($screen.Bounds.X,$screen.Bounds.Y,$screen.Bounds.Width,$screen.Bounds.Height);
      clientRect=@($clientOrigin.X,$clientOrigin.Y,$r.R,$r.B);
      ownerInput=([BenchWindow]::LastInputTick() -ne $inputAtStart); processCpu=$processCpu; clientCpuDeltaSeconds=$clientDelta;

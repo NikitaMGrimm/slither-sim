@@ -17,3 +17,13 @@ export async function closeServer(server) {
   server.closeAllConnections?.();
   if(server.listening)await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
 }
+// Resolves failures as data so an early spawn error cannot become an unhandled
+// rejection while a caller is still preparing browser observations.
+export function collectorCompletion(child) {
+  let log='';
+  child.stdout?.on('data',bytes=>log+=bytes);child.stderr?.on('data',bytes=>log+=bytes);
+  return new Promise(resolve=>{
+    child.once('error',error=>resolve({exitCode:null,error:error.message,log}));
+    child.once('close',exitCode=>resolve({exitCode,log}));
+  });
+}
