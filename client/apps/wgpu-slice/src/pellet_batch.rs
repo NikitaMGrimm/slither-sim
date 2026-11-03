@@ -944,6 +944,7 @@ pub(crate) mod tests {
                     &bank.assets,
                     &bank.food_outline,
                     &mut bank.food_asset_index,
+                    1.,
                     MAX_FOOD_PAINT_COMMANDS
                 )
                 .unwrap()
@@ -979,6 +980,7 @@ pub(crate) mod tests {
                     &invalid,
                     &bank.food_outline,
                     &mut bank.food_asset_index,
+                    1.,
                     MAX_FOOD_PAINT_COMMANDS
                 )
                 .is_err()
@@ -1086,6 +1088,7 @@ pub(crate) mod tests {
                         &bank.assets,
                         &bank.food_outline,
                         &mut bank.food_asset_index,
+                        1.,
                         MAX_FOOD_PAINT_COMMANDS
                     )
                     .unwrap()
@@ -1141,6 +1144,7 @@ pub(crate) mod tests {
                         &bank.assets,
                         &bank.food_outline,
                         &mut bank.food_asset_index,
+                        1.,
                         MAX_FOOD_PAINT_COMMANDS
                     )
                     .unwrap()
