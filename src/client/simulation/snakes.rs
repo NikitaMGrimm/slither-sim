@@ -340,6 +340,10 @@ pub(super) struct KnownSnakes {
     entries: Vec<(usize, KnownSnake)>,
 }
 impl KnownSnakes {
+    #[cfg(feature = "frame-bench")]
+    pub(super) fn frame_bench_len(&self) -> usize {
+        self.entries.len()
+    }
     fn index(&self, slot: usize) -> Option<usize> {
         // Bound linear work for crowded views without reserving sparse slots.
         if self.entries.len() <= 8 {

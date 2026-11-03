@@ -48,6 +48,7 @@ def commands(group):
             clippy("--no-default-features", "--features", "perf-internals"),
             clippy("--no-default-features", "--features", "latency-rig"),
             clippy("--features", "latency-rig"),
+            clippy("--features", "frame-bench"),
         ]
     if group == "test":
         return [
@@ -67,6 +68,7 @@ def commands(group):
             ["cargo", "test", "--locked", "--features", "perf-internals", "--example", "perf_baseline"],
             ["cargo", "test", "--all-targets", "--locked", "--no-default-features", "--features", "latency-rig"],
             ["cargo", "test", "--all-targets", "--locked", "--features", "latency-rig"],
+            ["cargo", "test", "--locked", "--lib", "--features", "frame-bench", "frame_bench"],
         ]
     if group == "tools":
         target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))

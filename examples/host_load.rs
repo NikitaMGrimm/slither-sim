@@ -407,6 +407,8 @@ pub fn benchmark(
         thread,
     };
     let host = Host::bind(HostConfig {
+        #[cfg(feature = "frame-bench")]
+        frame_bench: false,
         bind: "127.0.0.1:0".parse().map_err(|_| "bad address")?,
         seed: 7,
         max_tick: None,

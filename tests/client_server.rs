@@ -52,6 +52,8 @@ fn config(max_clients: usize, bots: usize) -> HostConfig {
     // Every snake is covered, so all players receive each other.
     simulation.world.vision = 3000.;
     HostConfig {
+        #[cfg(feature = "frame-bench")]
+        frame_bench: false,
         bind: "127.0.0.1:0".parse().unwrap(),
         seed: 7,
         max_tick: None,

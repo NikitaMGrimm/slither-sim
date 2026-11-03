@@ -111,6 +111,65 @@ fn wire_score(snake: &Snake) -> f64 {
 }
 
 impl SimulatorBackend {
+    #[cfg(feature = "frame-bench")]
+    pub(super) fn frame_bench_admitted_bots(&self) -> usize {
+        self.slots
+            .iter()
+            .skip(self.player_latency.slots)
+            .filter(|s| s.connection.open && s.connection.setup)
+            .count()
+    }
+    #[cfg(feature = "frame-bench")]
+    fn frame_bench_actions(
+        &mut self,
+        mut actions: Vec<Option<crate::Action>>,
+    ) -> Vec<Option<crate::Action>> {
+        if self.frame_bench {
+            for ((action, snake), slot) in actions
+                .iter_mut()
+                .zip(self.world.snakes())
+                .zip(&mut self.slots)
+                .take(self.player_latency.slots)
+            {
+                // Same measurement-only orbit for every socket client. Socket
+                // heads skip body tests, but rim/pit deaths remain possible and
+                // bots still collide with (and can die on) the player's body.
+                let radius = self.world.radius() * 0.75;
+                let distance = snake.head.x.hypot(snake.head.y);
+                *action = snake.alive.then_some(crate::Action {
+                    heading: snake.head.y.atan2(snake.head.x)
+                        + std::f64::consts::FRAC_PI_2
+                        + ((distance - radius) / 200.).atan(),
+                    boost: false,
+                });
+                if let Some(applied) = *action {
+                    slot.control = applied;
+                }
+            }
+        }
+        actions
+    }
+
+    fn advance_food_interest(&mut self, now: f64) {
+        let slots = self.slots.iter_mut().zip(self.world.snakes());
+        #[cfg(feature = "frame-bench")]
+        let mut slots = slots;
+        #[cfg(feature = "frame-bench")]
+        if self.frame_bench && self.world.config().pit.is_some() {
+            for (slot, _) in slots.by_ref().take(self.player_latency.slots) {
+                if slot.connection.setup {
+                    slot.connection.food_interest.all(self.world.radius());
+                }
+            }
+        }
+        for (slot, snake) in slots {
+            if slot.connection.setup {
+                slot.connection
+                    .food_interest
+                    .advance(snake.head, snake.heading, now);
+            }
+        }
+    }
     /// Text from the client whose dead life holds the record, accepted once.
     /// Anything else is ignored: this is a local session rule, not an official
     /// qualification check.
@@ -225,6 +284,8 @@ impl SimulatorBackend {
             .zip(&self.slots)
             .map(|(snake, slot)| snake.alive.then_some(slot.control))
             .collect();
+        #[cfg(feature = "frame-bench")]
+        let actions = self.frame_bench_actions(actions);
         let radius = self.world.radius();
         #[cfg(feature = "latency-rig")]
         let truth_before = self.latency_truth.as_mut().map(|r| r.stamp()).transpose()?;
@@ -286,13 +347,7 @@ impl SimulatorBackend {
         self.settle_lives();
         self.tick += 1;
         let now = self.time();
-        for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
-            if slot.connection.setup {
-                slot.connection
-                    .food_interest
-                    .advance(snake.head, snake.heading, now);
-            }
-        }
+        self.advance_food_interest(now);
         for slot in &mut self.slots {
             // A decision that sent nothing is complete once its duration elapses.
             if slot
@@ -374,13 +429,7 @@ impl SimulatorBackend {
         // still need the refresh after an edited pose, even at the same time.
         // Dead clients keep their subscriptions for the rendered death fade.
         if advance_interest {
-            for (slot, snake) in self.slots.iter_mut().zip(self.world.snakes()) {
-                if slot.connection.setup {
-                    slot.connection
-                        .food_interest
-                        .advance(snake.head, snake.heading, now);
-                }
-            }
+            self.advance_food_interest(now);
         }
         let food_changes = self.sync_food_sectors()?;
         self.assign_prey_wire()?;
@@ -477,6 +526,39 @@ impl SimulatorBackend {
         }
         if early >= self.slots.len() {
             self.hand_over_early(early, hand_over)?;
+        }
+        #[cfg(feature = "frame-bench")]
+        if self.frame_bench && self.tick.is_multiple_of(72) {
+            // Wire cells and physical pellets deliberately remain separate.
+            // This low-rate census contributes to measured host load.
+            let players: Vec<_> = self
+                .slots
+                .iter()
+                .zip(self.world.snakes())
+                .take(self.player_latency.slots)
+                .enumerate()
+                .map(|(id, (slot, snake))| {
+                    serde_json::json!({"slot": id, "setup": slot.connection.setup,
+                        "alive": snake.alive, "x": snake.head.x, "y": snake.head.y,
+                        "protocol": if slot.connection.legacy.is_some() { 13 } else { 19 },
+                        "wireLivingSnakes": slot.connection.snakes.frame_bench_len(),
+                        "wireFood": slot.connection.food.perf_len(),
+                        "decoratedWireFood": slot.connection.decorated_food.perf_len()})
+                })
+                .collect();
+            eprintln!(
+                "frame-bench: {}",
+                serde_json::json!({"schema": 1,
+                "tick": self.tick, "radius": self.world.radius(),
+                "totalPellets": self.world.food().len(), "players": players,
+                "totalAliveSnakes": self.world.snakes().iter().filter(|s| s.alive).count(),
+                "foodTarget": self.world.config().food_count,
+                "ambientAttemptsPerSecond": self.world.config().ambient_replenish_per_second,
+                "sizeToPopulation": self.world.config().size_to_population,
+                "admittedBotSlots": self.frame_bench_admitted_bots(),
+                "aliveBots": self.world.snakes().iter().skip(self.player_latency.slots).filter(|s| s.alive).count(),
+                "wholeMapFood": self.world.config().pit.is_some()})
+            );
         }
         self.coverage_grid = Some(grid);
         self.coverage_bounds = snakes.body_bounds;

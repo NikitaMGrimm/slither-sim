@@ -9,6 +9,128 @@ use crate::{
 };
 use std::collections::BTreeSet;
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_reports_the_applied_orbit_target_and_current_admission() {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::sandbox();
+    config.world.food_count = 0;
+    let mut host = RawSimulator::new(7, config, 2).unwrap();
+    host.set_player_latency(1, LatencyConfig::default());
+    host.set_frame_bench(true);
+    for slot in 0..2 {
+        assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+    }
+    host.backend.slots[0].control.heading = 0.123;
+    host.advance_ticks(2).unwrap();
+    let control = host.backend.slots[0].control;
+    assert_ne!(control.heading, 0.123);
+    assert_eq!(
+        host.backend.slots[0]
+            .connection
+            .snakes
+            .get_mut(0)
+            .unwrap()
+            .wanted,
+        encode::angle_byte(physics::quantize_heading(control.heading))
+    );
+    assert_eq!(host.backend.frame_bench_admitted_bots(), 1);
+    assert!(host.backend.slots[1].life > 0);
+    host.disconnect(1).unwrap();
+    assert!(host.backend.slots[1].life > 0);
+    assert_eq!(host.backend.frame_bench_admitted_bots(), 0);
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_full_food_interest_is_only_for_socket_seats() {
+    let mut config = SimulationConfig {
+        agents: 2,
+        ..Default::default()
+    };
+    config.world = Config::battledome();
+    config.world.dynamic_radius = false;
+    config.world.food_count = 0;
+    config.world.ambient_replenish_per_second = 0.;
+    let mut host = RawSimulator::new(7, config, 2).unwrap();
+    host.set_player_latency(1, LatencyConfig::default());
+    host.set_frame_bench(true);
+    for slot in 0..2 {
+        assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+    }
+    host.advance_ticks(2).unwrap();
+    let player = &host.backend.slots[0].connection.food_interest;
+    let bot = &host.backend.slots[1].connection.food_interest;
+    assert!(player.subscribed().len() > 45);
+    assert_eq!(bot.subscribed().len(), 45);
+    let center = encode::GRID_CENTER as f64;
+    let size = encode::SECTOR_SIZE as f64;
+    for x in [-3584., 3584.] {
+        for y in [-3584., 3584.] {
+            assert!(player.subscribed().contains(&[
+                ((center + x) / size).floor() as u8,
+                ((center + y) / size).floor() as u8
+            ]));
+        }
+    }
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_public_bind_and_json_activation_are_rejected() {
+    let mut config = crate::client::HostConfig {
+        frame_bench: true,
+        ..Default::default()
+    };
+    config.bind = "0.0.0.0:0".parse().unwrap();
+    assert!(config.validate().unwrap_err().contains("loopback"));
+    assert!(serde_json::from_str::<crate::client::HostConfig>(r#"{"frameBench":true}"#).is_err());
+}
+
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_body_protection_is_explicit_and_does_not_protect_bots() {
+    fn fixture(protect: bool) -> RawSimulator {
+        let mut config = SimulationConfig {
+            agents: 2,
+            ..Default::default()
+        };
+        config.world = Config::sandbox();
+        config.world.food_count = 0;
+        let mut host = RawSimulator::new(7, config, 2).unwrap();
+        for slot in 0..2 {
+            assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+            let heading = if slot == 0 { 0. } else { std::f64::consts::PI };
+            let point = Point {
+                x: slot as f64 * 2. * physics::BODY_RADIUS * physics::scale(2),
+                y: 0.,
+            };
+            host.backend
+                .world
+                .correct_pose(slot, point, vec![point; 2], heading)
+                .unwrap();
+            host.backend.slots[slot].control = Action {
+                heading,
+                boost: false,
+            };
+        }
+        if protect {
+            host.backend.world.frame_bench_protect(1);
+        }
+        host
+    }
+    let mut plain = fixture(false);
+    let mut protected = fixture(true);
+    plain.advance_ticks(1).unwrap();
+    protected.advance_ticks(1).unwrap();
+    assert!(!plain.backend.world.snakes()[0].alive);
+    assert!(protected.backend.world.snakes()[0].alive);
+    assert!(!protected.backend.world.snakes()[1].alive);
+}
+
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},

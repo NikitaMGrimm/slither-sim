@@ -4,6 +4,8 @@ fn main() {}
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod headless;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
+mod pacing_journal;
+#[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod scheduling;
 #[cfg(not(any(target_arch = "wasm32", target_os = "linux")))]
 mod desktop {
@@ -171,6 +173,7 @@ mod desktop {
         discovery_poll: Option<Instant>,
         handshake_wake: Option<Instant>,
         pacing_log: Option<(Instant, u32, Instant, f64)>,
+        pacing_journal: Option<crate::pacing_journal::Journal>,
     }
     impl Running {
         fn can_play(&self) -> bool {
@@ -667,6 +670,9 @@ mod desktop {
                 top.as_ref(),
             ) {
                 Ok(true) => {
+                    if let Some(journal) = &mut self.pacing_journal {
+                        journal.presented(p.frame.identity);
+                    }
                     if composed.is_some() && self.login.studio.state.visible() {
                         self.login.studio.presented();
                     }
@@ -717,6 +723,45 @@ mod desktop {
                 *count += 1;
                 let seconds = now.duration_since(*since).as_secs_f64();
                 if seconds >= 2. {
+                    let client = self.game.client();
+                    let camera = client.camera();
+                    let position = camera.position();
+                    let radius = client.boundary().map(|b| b.target().max(b.displayed()));
+                    let center = client.arena_edge_view().center();
+                    let size = self.window.inner_size();
+                    let dpr = self.window.scale_factor();
+                    let viewport = slither_wgpu_slice::render::backing_size([
+                        f64::from(size.width) / dpr,
+                        f64::from(size.height) / dpr,
+                    ])
+                    .ok();
+                    let bounds = client.food_bounds().map(|b| b.limits());
+                    let mut visible = 0;
+                    let mut uneaten = 0;
+                    for food in client.foods().foods() {
+                        let snapshot = food.snapshot();
+                        uneaten += usize::from(!snapshot.eaten);
+                        let p = snapshot.render_position;
+                        visible += usize::from(viewport.is_some_and(|[w, h]| {
+                            (p.x - position.x).abs() * camera.zoom() <= f64::from(w) / 2.
+                                && (p.y - position.y).abs() * camera.zoom() <= f64::from(h) / 2.
+                        }));
+                    }
+                    eprintln!(
+                        "frame-bench-client: {}",
+                        serde_json::json!({
+                        "schema": 1, "connected": client.connected(),
+                        "alive": client.own_snake().is_some_and(|s| s.metrics().alive),
+                        "drawnLiveSnakes": client.snake_objects().filter(|(_,_,drawn,s)| *drawn && s.metrics().alive).count(),
+                        "camera": [position.x, position.y], "zoom": camera.zoom(),
+                        "viewport": viewport,
+                        "userZoom": camera.user_zoom_factor(), "radius": radius,
+                        "center": center, "foodBounds": bounds,
+                        "retainedPellets": client.foods().foods().len(), "visiblePellets": visible,
+                        "receivedUneatenPellets": uneaten,
+                        "quality": format!("{:?}", self.game.quality()),
+                        "presentMode": "Fifo"})
+                    );
                     eprintln!(
                         "native pacing: {:.1} presents/s, max gap {:.2}ms; monitor {:.1}Hz (submission, not scanout)",
                         f64::from(*count) / seconds,
@@ -846,6 +891,7 @@ mod desktop {
                 title: String::new(),
                 discovery_poll: None,
                 handshake_wake: None,
+                pacing_journal: crate::pacing_journal::Journal::from_env(),
                 pacing_log: std::env::var_os("SLITHER_FRAME_PACING")
                     .map(|_| (Instant::now(), 0, Instant::now(), 0.)),
             })

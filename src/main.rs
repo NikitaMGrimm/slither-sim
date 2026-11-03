@@ -45,6 +45,8 @@ fn host_usage() -> String {
 }
 
 fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
+    #[cfg(feature = "frame-bench")]
+    let mut frame_bench = false;
     let mut bind = None;
     let mut file = None;
     let mut stats_interval = None;
@@ -55,6 +57,8 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     let mut args = args.iter().copied();
     while let Some(arg) = args.next() {
         match arg {
+            #[cfg(feature = "frame-bench")]
+            "--frame-bench" => frame_bench = true,
             "--help" | "-h" => return Ok(None),
             "--bind" => {
                 if bind.is_some() {
@@ -115,6 +119,10 @@ fn parse_host_args(args: &[&str]) -> Result<Option<HostOptions>, String> {
     };
     if let Some(bind) = bind {
         config.bind = bind.parse().map_err(|_| "--bind needs a literal IP:PORT")?;
+    }
+    #[cfg(feature = "frame-bench")]
+    {
+        config.frame_bench = frame_bench;
     }
     config.validate()?;
     #[cfg(feature = "latency-rig")]

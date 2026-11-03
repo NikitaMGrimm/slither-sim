@@ -118,6 +118,10 @@ const CHALLENGE_LITERAL: (&[u8; 5], &[u8; 22]) = (b"Slith", b"erSimLocalHostChal
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
 pub struct HostConfig {
+    /// Unstable local measurement hook; not a serialized host setting.
+    #[cfg(feature = "frame-bench")]
+    #[serde(skip)]
+    pub frame_bench: bool,
     pub bind: SocketAddr,
     pub seed: u32,
     pub players: PlayerConfig,
@@ -131,6 +135,8 @@ pub struct HostConfig {
 impl Default for HostConfig {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "frame-bench")]
+            frame_bench: false,
             bind: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_PORT)),
             seed: 1,
             players: PlayerConfig::default(),
@@ -194,6 +200,10 @@ impl HostConfig {
     }
 
     fn world_config(&self) -> Result<SimulationConfig, String> {
+        #[cfg(feature = "frame-bench")]
+        if self.frame_bench && !self.bind.ip().is_loopback() {
+            return Err("--frame-bench requires a loopback bind".into());
+        }
         let agents = self
             .players
             .max
@@ -439,6 +449,8 @@ impl Host {
             config.players.max + config.bots.count,
         )?;
         world.set_player_latency(config.players.max, config.players.latency);
+        #[cfg(feature = "frame-bench")]
+        world.set_frame_bench(config.frame_bench);
         let listener = TcpListener::bind(config.bind).map_err(|e| e.to_string())?;
         listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         Ok(Self {

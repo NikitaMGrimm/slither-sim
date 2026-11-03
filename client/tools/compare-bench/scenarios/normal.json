@@ -1,0 +1,19 @@
+{
+  "bind": "127.0.0.1:0",
+  "seed": 7,
+  "players": {
+    "max": 1
+  },
+  "bots": {
+    "count": 500,
+    "threads": 2
+  },
+  "simulation": {
+    "world": {
+      "sizeToPopulation": true,
+      "dynamicRadius": false,
+      "foodCount": 327,
+      "ambientReplenishPerSecond": 4.813690682697244
+    }
+  }
+}
