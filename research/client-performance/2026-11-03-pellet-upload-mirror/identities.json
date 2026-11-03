@@ -171,5 +171,9 @@
       "baseline_binary_sha256": "4b662494462dca2c5cfabeca26987ae586c1cef7ebc5f7ea069a14549089570a",
       "messages": 8
     }
+  },
+  "replay_input": {
+    "local_identifier": "retained-join-A",
+    "sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43"
   }
 }

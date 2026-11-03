@@ -18,6 +18,8 @@ the 4.167 ms refresh budget. The AMD integrated GPU / DX12 cases are guardrails.
 - Release builds, same retained local input and passive instrumentation, Rust
   1.99.0, jobs 2, target on D:. No live server connections, visible windows,
   adapter-default changes, CPU-specific instructions or thread pinning.
+- Replay input: neutral local identifier `retained-join-A`, SHA-256
+  `a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43`. The restricted recording remains outside Git.
 - Replay: 600 virtual 60 Hz callbacks / ten model seconds, 29,044 envelopes;
   art summaries use callbacks 120-419 ([2,7) model seconds). Replay runs as fast
   as possible and does not reproduce the display's Fifo wait or presented cadence.
