@@ -525,3 +525,8 @@ Actual browser GPU/WebGL runtime, other hardware/OSes, four-core hardware,
 owner play, physical input latency and displayed intervals were not measured
 by this follow-up. The separate visible benchmark owns pacing evidence.
 No adapter default, motion smoothing, limiter, quality or visible effect changed.
+
+
+## Evidence clarification, 2026-11-03
+
+The [canonical-parity audit](../2026-11-03-canonical-parity-audit/REPORT.md) distinguishes the original explicit controls from later inactive timing accumulators. Historical data is preserved; actual-image and timing evidence is unchanged.

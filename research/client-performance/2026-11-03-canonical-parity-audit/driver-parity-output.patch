@@ -1,0 +1,44 @@
+--- a/client/apps/wgpu-slice/examples/join_profile.rs
++++ b/client/apps/wgpu-slice/examples/join_profile.rs
+@@ -325,4 +325,5 @@
+     let mut menu_csv = String::from("frame,model_ms,world_alpha,visible,spinner,needs_menu,batch_before,batch_after,menu_step_ns,compose_ns,egui_cpu_ns\n");
+     let mut quad_digest = std::collections::hash_map::DefaultHasher::new();
++    let mut canonical_quads=0u64;
+     let mut digest = std::collections::hash_map::DefaultHasher::new();
+     phase("connect_begin", 0);
+@@ -572,4 +573,5 @@
+                         for q in frame.quad_iter(&resident)? {
+                             let q = q?;
++                            canonical_quads+=1;
+                             q.key.handle.hash(&mut quad_digest);
+                             q.key.revision.hash(&mut quad_digest);
+@@ -710,7 +712,7 @@
+     if let Some((wall,cpu))=idle_totals {std::fs::write(output.join("process-cpu.json"),format!("{{\"wall_s\":{wall},\"cpu_s\":{cpu},\"one_core_percent\":{}}}\n",100.*cpu/wall)).unwrap();}
+     println!(
+-        "terminal_phase={:?},quad_digest={:016x}",
++        "terminal_phase={:?},quad_digest={},canonical_active={parity},canonical_quads={canonical_quads}",
+         g.phase(),
+-        quad_digest.finish()
++        quad_digest_status(parity,canonical_quads,quad_digest.finish())
+     );
+     println!(
+@@ -739,2 +741,19 @@
+ unsafe extern "system" {fn GetProcessTimes(h:*mut std::ffi::c_void,c:*mut u64,e:*mut u64,k:*mut u64,u:*mut u64)->i32;}
+ fn process_cpu_ns()->u64 {let(mut c,mut e,mut k,mut u)=(0u64,0u64,0u64,0u64);assert_ne!(unsafe{GetProcessTimes(-1isize as *mut _,&mut c,&mut e,&mut k,&mut u)},0);(k+u)*100}
++
++fn quad_digest_status(active:bool,quads:u64,digest:u64)->String {
++    if !active { "absent".into() }
++    else if quads==0 { "empty".into() }
++    else { format!("{digest:016x}") }
++}
++
++#[cfg(test)]
++mod parity_output_tests {
++    use super::quad_digest_status;
++    #[test] fn inactive_and_empty_gates_cannot_look_like_matches() {
++        assert_eq!(quad_digest_status(false,0,0xd1fba762150c532c),"absent");
++        assert_eq!(quad_digest_status(false,17,42),"absent");
++        assert_eq!(quad_digest_status(true,0,0xd1fba762150c532c),"empty");
++        assert_eq!(quad_digest_status(true,17,42),"000000000000002a");
++    }
++}
