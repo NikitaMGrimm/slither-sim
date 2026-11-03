@@ -16,10 +16,18 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+// Main participates. The earlier 4->8 pilot saved only 0.2-0.25 ms for
+// twice the participants; cap portable available_parallelism at four.
 const MAX_PARTICIPANTS: usize = 4;
-// Provisional until the adopted density/cutoff comparison is complete.
+// With 4 ms gaps, two participants at 1,024 settled pellets were effectively
+// tied with serial (0.0954/0.0959 ms). At 2,048, two/four took 0.124/0.094 ms
+// versus 0.190 ms serial. Below that, neither copy inputs nor start workers.
+// Measured cutoff, not a gameplay or visual limit:
+// https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
 const MIN_VISIBLE: usize = 2048;
+// Claim bounded independent work, then merge in the original numeric order.
 const CHUNK: usize = 128;
+// A missed wakeup must not incur a fresh input copy on every busy callback.
 const MISS_BACKOFF: usize = 32;
 
 struct Job {
@@ -32,6 +40,10 @@ struct Job {
     cancelled: AtomicBool,
     results: Vec<OnceLock<Vec<Result<Projected>>>>,
     worker_chunks: AtomicUsize,
+    #[cfg(feature = "frame-profile")]
+    dispatched: std::time::Instant,
+    #[cfg(feature = "frame-profile")]
+    wakes: [std::sync::atomic::AtomicU64; 3],
 }
 
 impl Job {
@@ -202,6 +214,11 @@ impl Pool {
                                 break;
                             };
                             flag.store(false, Ordering::Release);
+                            #[cfg(feature = "frame-profile")]
+                            job.wakes[i - 1].store(
+                                job.dispatched.elapsed().as_nanos() as u64,
+                                Ordering::Release,
+                            );
                             job.drain(&stop, &behavior, true);
                         }
                     }));
@@ -367,6 +384,10 @@ impl Workers {
             cancelled: AtomicBool::new(false),
             results,
             worker_chunks: AtomicUsize::new(0),
+            #[cfg(feature = "frame-profile")]
+            dispatched: std::time::Instant::now(),
+            #[cfg(feature = "frame-profile")]
+            wakes: std::array::from_fn(|_| std::sync::atomic::AtomicU64::new(0)),
         });
         let _cancel = Cancel(&job);
         pool.dispatch(&job);
@@ -376,7 +397,20 @@ impl Workers {
             self.backoff = MISS_BACKOFF;
         }
         #[cfg(feature = "frame-profile")]
-        crate::render::observe_preparation("pellet_late_chunks", late as u64);
+        {
+            crate::render::observe_preparation("pellet_late_chunks", late as u64);
+            crate::render::observe_preparation(
+                "pellet_worker_chunks",
+                job.worker_chunks.load(Ordering::Relaxed) as u64,
+            );
+            for wake in &job.wakes[..self.participants - 1] {
+                // Zero means unobserved at this nonblocking read, not instant wakeup.
+                crate::render::observe_preparation(
+                    "pellet_worker_wakeup_ns",
+                    wake.load(Ordering::Acquire),
+                );
+            }
+        }
         #[cfg(not(feature = "frame-profile"))]
         let _ = late;
         Ok(true)
@@ -463,6 +497,10 @@ mod tests {
             cancelled: AtomicBool::new(false),
             results,
             worker_chunks: AtomicUsize::new(0),
+            #[cfg(feature = "frame-profile")]
+            dispatched: std::time::Instant::now(),
+            #[cfg(feature = "frame-profile")]
+            wakes: std::array::from_fn(|_| std::sync::atomic::AtomicU64::new(0)),
         })
     }
     fn ready(pool: &Pool) {
@@ -574,76 +612,58 @@ mod tests {
     #[ignore]
     fn measure_pool_density() {
         let mut bank = Bank::new().unwrap();
-        println!("density,participants,repeat,p50_ns,p95_ns");
-        for count in [1024, 2048, 4096, 8192, 16384, 25000] {
-            let world = crate::pellet_batch::tests::rectangle_count(&bank, count);
-            let b = batch(
-                &mut crate::pellet_batch::Cache::default(),
-                &mut bank,
-                &world,
-                view(),
-            );
-            let frame = Frame {
-                identity: 1,
-                extent: [1500, 844],
-                viewport_scale: 1.,
-                tick: 0,
-                draws: Vec::new(),
-                food_batch: None,
-                snakes: Vec::new(),
-            };
-            let mut mirror = vec![[0; 96]; count];
-            let mut flags = vec![0; count];
-            let mut pools = [Workers::with_participants(2), Workers::with_participants(4)];
-            for pool in &mut pools {
-                pool.attempted = true;
-                pool.pool = Pool::new(pool.participants, Behavior::default());
-                ready(pool.pool.as_ref().unwrap());
-            }
-            for repeat in 0..5 {
-                for n in if repeat % 2 == 0 {
-                    [1, 2, 4]
-                } else {
-                    [4, 2, 1]
-                } {
-                    let mut values = Vec::new();
-                    for _ in 0..105 {
-                        let mut cover = [0.; 4];
-                        let begin = Instant::now();
-                        if n == 1 {
-                            for (i, f) in b.world.foods().iter().enumerate().rev() {
-                                let slot = b.sources.slots[i];
-                                project(
-                                    &frame,
-                                    Input {
-                                        slot,
-                                        animation: f.paint_state(),
-                                    },
-                                    &b.sources,
-                                    b.view,
-                                    frame.extent,
-                                )
-                                .unwrap()
-                                .apply(
-                                    &mut mirror,
-                                    &mut flags,
-                                    &mut cover,
-                                );
+        let paced = std::env::var_os("PELLET_DENSITY_PACED").is_some();
+        println!("density,settled,participants,repeat,p50_ns,p95_ns");
+        for settled in [false, true] {
+            for count in [1024, 2048, 4096, 8192, 16384, 25000] {
+                if paced && count > 8192 {
+                    continue;
+                }
+                let mut world = crate::pellet_batch::tests::rectangle_count(&bank, count);
+                if settled {
+                    for _ in 0..12 {
+                        world
+                            .advance(crate::pellet_batch::tests::step(5.), |_| unreachable!())
+                            .unwrap();
+                    }
+                }
+                let b = batch(
+                    &mut crate::pellet_batch::Cache::default(),
+                    &mut bank,
+                    &world,
+                    view(),
+                );
+                let frame = Frame {
+                    identity: 1,
+                    extent: [1500, 844],
+                    viewport_scale: 1.,
+                    tick: 0,
+                    draws: Vec::new(),
+                    food_batch: None,
+                    snakes: Vec::new(),
+                };
+                let mut mirror = vec![[0; 96]; count];
+                let mut flags = vec![0; count];
+                let mut pools = [Workers::with_participants(2), Workers::with_participants(4)];
+                for pool in &mut pools {
+                    pool.attempted = true;
+                    pool.pool = Pool::new(pool.participants, Behavior::default());
+                    ready(pool.pool.as_ref().unwrap());
+                }
+                for repeat in 0..5 {
+                    for n in if repeat % 2 == 0 {
+                        [1, 2, 4]
+                    } else {
+                        [4, 2, 1]
+                    } {
+                        let mut values = Vec::new();
+                        for _ in 0..105 {
+                            if paced {
+                                thread::sleep(Duration::from_millis(4));
                             }
-                        } else {
-                            let pool = &mut pools[usize::from(n == 4)];
-                            if !pool
-                                .prepare_with_cutoff(
-                                    &frame,
-                                    &b,
-                                    frame.extent,
-                                    &mut mirror,
-                                    &mut flags,
-                                    &mut cover,
-                                    0,
-                                )
-                                .unwrap()
-                            {
+                            let mut cover = [0.; 4];
+                            let begin = Instant::now();
+                            if n == 1 {
                                 for (i, f) in b.world.foods().iter().enumerate().rev() {
                                     let slot = b.sources.slots[i];
                                     project(
@@ -663,14 +683,51 @@ mod tests {
                                         &mut cover,
                                     );
                                 }
+                            } else {
+                                let pool = &mut pools[usize::from(n == 4)];
+                                if !pool
+                                    .prepare_with_cutoff(
+                                        &frame,
+                                        &b,
+                                        frame.extent,
+                                        &mut mirror,
+                                        &mut flags,
+                                        &mut cover,
+                                        0,
+                                    )
+                                    .unwrap()
+                                {
+                                    for (i, f) in b.world.foods().iter().enumerate().rev() {
+                                        let slot = b.sources.slots[i];
+                                        project(
+                                            &frame,
+                                            Input {
+                                                slot,
+                                                animation: f.paint_state(),
+                                            },
+                                            &b.sources,
+                                            b.view,
+                                            frame.extent,
+                                        )
+                                        .unwrap()
+                                        .apply(
+                                            &mut mirror,
+                                            &mut flags,
+                                            &mut cover,
+                                        );
+                                    }
+                                }
                             }
+                            values.push(begin.elapsed().as_nanos());
+                            std::hint::black_box(&mirror);
                         }
-                        values.push(begin.elapsed().as_nanos());
-                        std::hint::black_box(&mirror);
+                        let mut values = values.split_off(5);
+                        values.sort_unstable();
+                        println!(
+                            "{count},{settled},{n},{repeat},{},{}",
+                            values[50], values[94]
+                        );
                     }
-                    let mut values = values.split_off(5);
-                    values.sort_unstable();
-                    println!("{count},{n},{repeat},{},{}", values[50], values[94]);
                 }
             }
         }
@@ -768,13 +825,13 @@ mod tests {
                 food_batch: None,
                 snakes: Vec::new(),
             });
+            let mut resources = bank.resources(&frame).unwrap();
             if tick % 3 == 2 {
                 frame.draws.push(page.backdrop.clone().unwrap());
                 let b = frame.food_batch.as_mut().unwrap();
                 b.early_at += 1;
                 b.late_at += 1;
             }
-            let mut resources = bank.resources(&frame).unwrap();
             resources.extend(page.resources);
             serial.sync_resources(&resources).unwrap();
             parallel.sync_resources(&resources).unwrap();
