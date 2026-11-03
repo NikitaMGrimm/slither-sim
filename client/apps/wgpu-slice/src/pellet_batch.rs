@@ -42,6 +42,8 @@ pub(crate) struct Sources {
     pub groups: Vec<Group>,
     /// Dense world index -> grouped instance slot.
     pub slots: Vec<usize>,
+    /// Group of each already grouped slot, independent of animation.
+    pub slot_groups: Vec<usize>,
     pub assets: Vec<BodyAsset>,
 }
 
@@ -107,7 +109,9 @@ impl Cache {
                     s.outer.asset().into(),
                 ];
                 let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
-                if family.0 != s {
+                // Grouped paint inputs reuse this metadata. Numeric equality
+                // alone collapses signed zero; keep exact source bits too.
+                if family.0 != s || !same_source_bits(family.0, s) {
                     return Ok(None);
                 }
                 family.1.push(i);
@@ -138,10 +142,12 @@ impl Cache {
             let mut groups = Vec::new();
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
+            let mut slot_groups = Vec::with_capacity(world.foods().len());
             for (_, (sources, indices)) in families {
                 let start = grouped;
                 for i in indices {
                     slots[i] = grouped;
+                    slot_groups.push(groups.len());
                     grouped += 1;
                 }
                 groups.push(Group {
@@ -153,6 +159,7 @@ impl Cache {
                 source_identity: world.source_identity(),
                 groups,
                 slots,
+                slot_groups,
                 assets: assets.to_vec(),
             }));
         }
@@ -181,6 +188,16 @@ impl Cache {
             late_at: 0,
         }))
     }
+}
+
+fn same_source_bits(a: FoodSources, b: FoodSources) -> bool {
+    [a.body, a.outline, a.inner, a.outer]
+        .into_iter()
+        .zip([b.body, b.outline, b.inner, b.outer])
+        .all(|(a, b)| {
+            [a.width(), a.height(), a.half_width(), a.half_height()].map(f64::to_bits)
+                == [b.width(), b.height(), b.half_width(), b.half_height()].map(f64::to_bits)
+        })
 }
 
 /// Opaque retained inputs. The ordinary image stream remains available as an oracle.

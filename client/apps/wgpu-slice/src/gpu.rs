@@ -19,6 +19,8 @@ use draw_runs::{DrawState, Pipeline, draw_runs};
 #[path = "texture_arrays.rs"]
 mod texture_arrays;
 use texture_arrays::{Group, TextureArray};
+#[path = "pellet_cpu.rs"]
+mod pellet_cpu;
 #[path = "pellet_gpu.rs"]
 mod pellet_gpu;
 #[path = "soft_layers.rs"]
