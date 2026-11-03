@@ -44,6 +44,10 @@ An Enter deliberately buffered on the login during explicit Close is retained
 while Servers or Settings is open, including its exit fade, and dispatches once
 after the panel releases input and Play becomes available. Enter inside either
 panel belongs to its controls and never buffers another Play.
+An accepted native Play attempt consumes any older buffered request, so a failed
+replacement connection cannot trigger another Play without input. Rejected
+admission retains the buffer. Waiting through the panel exit is an intentional
+deviation from the reference picker, because native panels retain modal input.
 Authored regressions are in `tests/return_panels.rs`.
 
 After the death return completes, the menu keeps presenting while the old

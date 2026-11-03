@@ -253,6 +253,8 @@ impl NativeLogin {
     }
     pub fn begin_play_attempt(&mut self, game: &mut crate::game::LocalGame) -> Result<()> {
         game.begin_play_attempt()?;
+        // Accepted Play subsumes any held Close replay, including on later failure.
+        self.replay_after_close = false;
         self.connection_error = None;
         Ok(())
     }
@@ -280,8 +282,8 @@ impl NativeLogin {
         self.state
             .observe_session(game.login_session(), game.login_final())
             .map_err(str::to_owned)?;
-        // Retain Close replay until the panel, including its exit fade, releases
-        // input. Otherwise a picker can survive invisibly into the next world.
+        // Unlike the reference picker, native panels stay modal through exit
+        // fades. Hold replay so a picker cannot survive invisibly into the world.
         if self.replay_after_close
             && self.login_owns_input()
             && game.can_play()

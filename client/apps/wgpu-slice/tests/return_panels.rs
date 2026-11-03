@@ -134,6 +134,122 @@ impl Trial {
         self.login.observe_game(&self.game).unwrap();
         self.frame();
     }
+    fn wait_for_play(&mut self) {
+        let deadline = self.now + 10_000;
+        loop {
+            self.now += 16;
+            let now = f64::from(self.now);
+            self.login.observe_game(&self.game).unwrap();
+            let admission = self.game.can_play();
+            let intents = self.login.step(now, admission, false).unwrap().0;
+            let play = intents
+                .iter()
+                .any(|i| matches!(i, StartMenuIntent::Play { .. }));
+            self.intents.extend(intents);
+            if play {
+                // Running executes Play here, before observing the old game again.
+                return;
+            }
+            assert!(self.now < deadline, "buffered Play must not be lost");
+            self.game.begin_redraw(now, [960, 720], 1.).unwrap();
+            tape::effects(&mut self.game);
+            self.login.observe_game(&self.game).unwrap();
+            let picture = self.game.take_frame().unwrap();
+            self.login
+                .prepare_host([960, 720], 1., admission, None)
+                .unwrap();
+            self.game.presented(true).unwrap();
+            self.game.bank.recycle_frame(picture);
+            self.login.sync_return_focus(self.game.can_play());
+        }
+    }
+}
+
+#[test]
+fn accepted_play_consumes_close_replay_across_failed_generations() {
+    use slither_wgpu_slice::game::EffectKind;
+    let mut results = Vec::new();
+    for panel in [E::Settings, E::Server] {
+        for replacement in [false, true] {
+            let mut trial = Trial::new();
+            trial.until(3308);
+            let close = trial.request_close();
+            trial.key(egui::Key::Enter);
+            // Rejected admission must leave the deliberate buffered request intact.
+            assert!(trial.login.begin_play_attempt(&mut trial.game).is_err());
+            trial.click(panel);
+            assert!(trial.panel_visible(panel));
+            for _ in 0..26 {
+                trial.pending_close_frame(&close);
+            }
+            trial.close_panel(panel);
+            while trial.panel_visible(panel) {
+                trial.pending_close_frame(&close);
+            }
+            if replacement {
+                trial.click(E::Play);
+                assert_eq!(trial.login.state.view(false).phase, MenuPhase::Connecting);
+            }
+            trial
+                .game
+                .acknowledge(close.generation, close.id, true)
+                .unwrap();
+            trial.wait_for_play();
+            assert_eq!(trial.plays(), 1);
+            let old_generation = trial.game.generation();
+            trial.login.begin_play_attempt(&mut trial.game).unwrap();
+            trial
+                .game
+                .play("ws://127.0.0.1:19491/slither", "Replay", 0)
+                .unwrap();
+            let now = f64::from(trial.now);
+            trial.game.begin_redraw(now + 1., [960, 720], 1.).unwrap();
+            tape::pictures(&mut trial.game);
+            let connect = trial.game.effect().unwrap();
+            assert!(matches!(connect.kind, EffectKind::Connect(_)));
+            assert_eq!(connect.generation, old_generation + 1);
+            trial
+                .game
+                .construct(connect.generation, connect.id, now + 1.)
+                .unwrap();
+            trial
+                .game
+                .acknowledge(connect.generation, connect.id, true)
+                .unwrap();
+            // Exercise the real failure/Close owners with in-memory receipts.
+            trial
+                .game
+                .transport_failed(connect.generation, "Authored refusal")
+                .unwrap();
+            let failed_close = trial.game.effect().unwrap();
+            assert_eq!(failed_close.kind, EffectKind::Close);
+            trial
+                .game
+                .acknowledge(failed_close.generation, failed_close.id, true)
+                .unwrap();
+            for offset in 2..=4 {
+                trial.login.observe_game(&trial.game).unwrap();
+                trial.intents.extend(
+                    trial
+                        .login
+                        .step(now + f64::from(offset), trial.game.can_play(), false)
+                        .unwrap()
+                        .0,
+                );
+            }
+            assert!(trial.game.can_play());
+            println!(
+                "{panel:?}, replacement={replacement}: total Play intents={}",
+                trial.plays()
+            );
+            results.push(trial.plays());
+        }
+    }
+    assert_eq!(
+        results,
+        [1, 1, 1, 1],
+        "accepted Play must consume any older Close replay"
+    );
 }
 
 #[test]
