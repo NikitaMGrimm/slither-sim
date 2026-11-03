@@ -401,3 +401,122 @@ isolated study-only copy pass; the explicit authored offscreen GPU check passes.
 Actual browser GPU/WebGL runtime, Vulkan/other hardware, owner play, physical input/
 display latency and gameplay FPS remain unverified. Exact CPU/source parity and
 the DX12 picture gate do not establish those acceptance axes.
+
+
+## 2026-11-03: exact CPU projection specialization
+
+This follow-up starts at merged main c58fc66b, including #445's review fixes.
+`Frame::project` is shared by the retained and ordinary submission paths. Food
+supplies a constant axis-aligned `Draw`, but a plain inline hint did not force
+specialization. The adopted `inline(always)` attribute lets LLVM specialize
+those calls. The checked f64 operations, f32 boundary, source selection, draw
+order, animation and protocol code are unchanged. No intrinsics, target-feature
+flags or per-CPU paths are added.
+
+The isolated substage probe found about 70 ns per visible food for both glow
+projections and 48 ns for body projection/packing, versus 29 ns for the two
+shared glow-policy calls, 9 ns for pulse, and 4 ns for a snapshot copy. Stages
+partly overlap (body and policy include pulse); these are diagnostic loop
+measurements, not additive whole-frame claims. They motivated specialization
+before a data-layout or threading rewrite.
+
+The primary comparison is RTX 5070 Ti / Vulkan at physical 3840x2160, Original
+and Native, DPR 1. The same retained offline join drives 600 virtual 60 Hz
+callbacks over 10 seconds, 29,044 messages and zero skips. Art quantiles select
+callbacks 120–419 ([2,7) seconds). This is about 18,475 visible foods and 30,522
+retained foods at the window median. Every timing run includes the native login
+step/observe/prepare/composition and egui paint path, with per-pass GPU queries.
+Original uses 1500x845/MSAA4 plus blit; Native 4K uses the existing single-sample
+memory-cap fallback. The AMD iGPU/DX12 guardrails also cover 4K and 1080p, both
+qualities. This is the same 8-core/16-logical-processor desktop, not a four-core
+hardware result.
+
+Release builds use CARGO_BUILD_JOBS=2 and a lane-owned CARGO_TARGET_DIR on D:.
+Runs alternate arms and reverse mode/configuration order. CPU/process and GPU
+engine load are retained outside Git around every sample. Only observed
+compiler/linker overlap excludes a run; a pair is used only if both arms are
+accepted. After the first six primary pairs, collection continued until each
+configuration had at least five complete accepted pairs, with a declared
+maximum of twelve extra rounds. No quiet window, CPU pinning or worker pause
+was used. Absolute times differ from the preceding busy-machine profile;
+compare matched arms here rather than subtracting across studies.
+
+`serial-runs.csv` retains every run of the adopted and rejected serial probes,
+including excluded rows, binary/source labels, allocation requests, elapsed
+and per-run quantiles. Recorded numeric state/control digests match across each
+pair, including excluded samples. `serial-identities.json` records the measured runtime
+and passive-instrumentation hashes, timing/image binaries and image parity.
+The measured candidate frame file is byte-identical to this follow-up's
+production frame file. Historical revisions are labels, not `git show` test
+dependencies; no historical check compares a current working-tree source hash.
+Full captures, source trees, binaries, load and raw frame journals remain
+local-only outside Git. Nothing identifying is included here.
+
+<!-- BEGIN SERIAL RESULTS -->
+| Adapter / physical / quality | Complete pairs | Art p50 before -> after ms | Art p95 before -> after ms | CPU stages before -> after ms | Pellet math before -> after ms | GPU before -> after ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| rtx / 3840x2160 / original | 7 | 8.636 -> 7.185 | 11.847 -> 10.394 | 8.123 -> 6.751 | 3.762 -> 2.554 | 0.224 -> 0.224 |
+| rtx / 3840x2160 / native | 5 | 8.560 -> 7.201 | 12.238 -> 10.516 | 8.005 -> 6.662 | 3.722 -> 2.515 | 0.243 -> 0.243 |
+| igpu / 3840x2160 / original | 5 | 15.177 -> 13.954 | 18.005 -> 16.373 | 8.191 -> 6.742 | 3.784 -> 2.524 | 5.474 -> 5.427 |
+| igpu / 3840x2160 / native | 5 | 18.206 -> 17.081 | 20.514 -> 19.288 | 7.830 -> 6.547 | 3.684 -> 2.533 | 8.318 -> 8.248 |
+| igpu / 1920x1080 / original | 5 | 14.779 -> 13.306 | 17.559 -> 15.833 | 8.155 -> 6.906 | 3.782 -> 2.522 | 4.888 -> 4.985 |
+| igpu / 1920x1080 / native | 5 | 14.775 -> 13.589 | 17.576 -> 16.351 | 7.828 -> 6.743 | 3.720 -> 2.509 | 5.081 -> 5.082 |
+
+rtx / 3840x2160 / original: paired p50 difference median -1.451 ms, range -3.852 to -1.150 ms; baseline p50 range 8.310 to 10.929 ms; always p50 range 7.020 to 7.366 ms; load 8.2 to 82.3%; observed cargo/test samples 360/360.
+
+rtx / 3840x2160 / native: paired p50 difference median -1.629 ms, range -2.680 to -0.994 ms; baseline p50 range 8.107 to 9.881 ms; always p50 range 6.860 to 7.424 ms; load 14.7 to 98.6%; observed cargo/test samples 258/258.
+
+igpu / 3840x2160 / original: paired p50 difference median -1.202 ms, range -1.334 to -1.137 ms; baseline p50 range 15.099 to 15.281 ms; always p50 range 13.897 to 14.040 ms; load 7.0 to 54.3%; observed cargo/test samples 351/344.
+
+igpu / 3840x2160 / native: paired p50 difference median -1.040 ms, range -1.176 to -0.916 ms; baseline p50 range 18.079 to 18.289 ms; always p50 range 17.061 to 17.291 ms; load 3.1 to 65.8%; observed cargo/test samples 319/318.
+
+igpu / 1920x1080 / original: paired p50 difference median -1.316 ms, range -1.742 to -0.763 ms; baseline p50 range 14.329 to 15.048 ms; always p50 range 13.175 to 14.016 ms; load 0.8 to 95.2%; observed cargo/test samples 271/271.
+
+igpu / 1920x1080 / native: paired p50 difference median -1.048 ms, range -1.682 to -0.788 ms; baseline p50 range 14.359 to 15.000 ms; always p50 range 13.311 to 13.987 ms; load 0.7 to 60.5%; observed cargo/test samples 144/138.
+
+All serial-probe runs retained: 92; compile-overlap exclusions: 22. Incomplete accepted pairs are retained but excluded from aggregates.
+<!-- END SERIAL RESULTS -->
+
+The table gives medians of per-run quantiles, not pooled quantiles. CPU stages
+include redraw, ingress, synchronization, submit and poll. CPU submit includes
+projection/packing plus wgpu/driver calls; component medians need not sum.
+Callbacks include synchronous diagnostic query resolution/completion and are
+not presented intervals or gameplay FPS. GPU work is essentially unchanged;
+the reduction is CPU work. The art frame remains over the 4.167 ms budget for
+240 Hz, and this does not establish stable high-refresh delivery. Cold redraw,
+ingress bursts, zoom's retained-path gap and menu-backdrop fallback remain.
+
+Two earlier probes are retained rather than presented as wins. The plain
+inline hint has four compiler-overlap pilot runs, so its timing is inconclusive.
+A fixed-block byte-copy loop has two accepted pairs against the specialized
+projection parent: packing is 0.577→0.627 and 0.580→0.613 ms. It was rejected;
+the optimized iterator remains. Their source deltas are retained in the two
+`serial-rejected-*.patch` files. Neither rejected probe is part of the final
+runtime change.
+
+### Validation and limits of this follow-up
+
+All 600 individual output-image SHA-256 hashes match baseline in each of ten
+cases (6,000 image pairs): the community replay on RTX/Vulkan 4K and AMD/DX12
+4K and 1080p, both qualities, plus the authored 25,000-food rectangle on both
+adapters at 4K in both qualities. Image drivers rasterize the actual old/new
+world/menu stream, not just `Batch::canonical` text. They share the existing
+materials and shader fragments; unchanged egui paint is omitted identically
+from these image controls. No rounding allowance was needed for old/new images.
+This does not assert cross-adapter image equality. Raw pixels were not retained
+or published by this hash-only driver.
+
+The authored compact-instance f32-bit oracle and explicit offscreen rectangle
+GPU regression pass. `npm run check` passes on Windows, including native tests,
+strict Clippy, Canvas/Wasm ABI checks, desktop and Wasm builds. Recompute all
+new and historical tables and check the bounded parity counts with:
+
+```sh
+python -B research/client-performance/2026-11-02-retained-pellets/recompute.py --check
+python -B -m unittest discover -s research/client-performance/2026-11-02-retained-pellets -p test_study.py
+```
+
+Actual browser GPU/WebGL runtime, other hardware/OSes, four-core hardware,
+owner play, physical input latency and displayed intervals were not measured
+by this follow-up. The separate visible benchmark owns pacing evidence.
+No adapter default, motion smoothing, limiter, quality or visible effect changed.
