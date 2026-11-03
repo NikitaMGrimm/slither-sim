@@ -78,7 +78,7 @@ impl Cache {
             .as_ref()
             .filter(|s| s.source_identity == world.source_identity() && s.assets == assets);
         if current.is_none() {
-            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, bool, Vec<usize>)> =
+            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> =
                 BTreeMap::new();
             for (i, f) in world.foods().iter().enumerate().rev() {
                 let f = f.snapshot();
@@ -108,20 +108,18 @@ impl Cache {
                     s.inner.asset().into(),
                     s.outer.asset().into(),
                 ];
-                let family = families
-                    .entry(key)
-                    .or_insert_with(|| (s, source_has_zero_half(&s), Vec::new()));
+                let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
                 // Grouped paint inputs reuse this metadata. Numeric equality
                 // alone collapses signed zero; keep exact source bits too.
-                if family.0 != s || (family.1 && !same_source_bits(&family.0, &s)) {
+                if !same_source_bits(&family.0, &s) {
                     return Ok(None);
                 }
-                family.2.push(i);
+                family.1.push(i);
             }
             // Source readiness still covers all retained sources, including culled food.
             let representatives: Vec<_> = families
                 .values()
-                .map(|(_, _, indices)| world.foods()[indices[0]].clone())
+                .map(|(_, indices)| world.foods()[indices[0]].clone())
                 .collect();
             validate_food_with_index(
                 FoodPaintInput {
@@ -145,7 +143,7 @@ impl Cache {
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
             let mut slot_groups = Vec::with_capacity(world.foods().len());
-            for (_, (sources, _, indices)) in families {
+            for (_, (sources, indices)) in families {
                 let start = grouped;
                 for i in indices {
                     slots[i] = grouped;
@@ -192,26 +190,21 @@ impl Cache {
     }
 }
 
-// FoodSource validates finite metadata and strictly positive full sizes. After
-// numeric equality, only a signed-zero half can have different bits. Test for
-// that possibility once per family, preserving the authored signed-zero
-// fallback without repeating a full bit comparison per ordinary pellet.
-#[inline(always)]
-fn source_has_zero_half(s: &FoodSources) -> bool {
-    [&s.body, &s.outline, &s.inner, &s.outer]
-        .into_iter()
-        .any(|source| source.half_width() == 0. || source.half_height() == 0.)
-}
-
+// Grouped inputs substitute the family's metadata for each pellet. Compare the
+// exact bits once, rather than numeric equality followed by a signed-zero pass.
+// This preserves signed-zero fallback and avoids a second walk of the sources.
 #[inline(always)]
 fn same_source_bits(a: &FoodSources, b: &FoodSources) -> bool {
-    [&a.body, &a.outline, &a.inner, &a.outer]
-        .into_iter()
-        .zip([&b.body, &b.outline, &b.inner, &b.outer])
-        .all(|(a, b)| {
-            [a.width(), a.height(), a.half_width(), a.half_height()].map(f64::to_bits)
-                == [b.width(), b.height(), b.half_width(), b.half_height()].map(f64::to_bits)
-        })
+    a.indices == b.indices
+        && [&a.body, &a.outline, &a.inner, &a.outer]
+            .into_iter()
+            .zip([&b.body, &b.outline, &b.inner, &b.outer])
+            .all(|(a, b)| {
+                a.asset() == b.asset()
+                    && [a.width(), a.height(), a.half_width(), a.half_height()].map(f64::to_bits)
+                        == [b.width(), b.height(), b.half_width(), b.half_height()]
+                            .map(f64::to_bits)
+            })
 }
 
 /// Opaque retained inputs. The ordinary image stream remains available as an oracle.
@@ -501,11 +494,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn zero_half_classification_covers_every_source_and_axis() {
+    fn exact_metadata_comparison_covers_every_source_and_axis() {
         let bank = Bank::new().unwrap();
         let world = rectangle_count(&bank, 1024);
         let original = world.foods()[0].snapshot().sources;
-        assert!(!source_has_zero_half(&original));
+        assert!(same_source_bits(&original, &original));
         for part in 0..4 {
             for axis in 0..2 {
                 let mut positive = original;
@@ -531,8 +524,6 @@ pub(crate) mod tests {
                     .unwrap();
                 }
                 assert_eq!(positive, negative);
-                assert!(source_has_zero_half(&positive));
-                assert!(source_has_zero_half(&negative));
                 assert!(!same_source_bits(&positive, &negative));
             }
         }
