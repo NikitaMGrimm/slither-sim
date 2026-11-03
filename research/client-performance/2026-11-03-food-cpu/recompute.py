@@ -1,6 +1,6 @@
 """Recompute retained per-run aggregates with Python's standard library."""
 from pathlib import Path
-import csv,json,statistics,sys
+import csv,json,re,statistics,sys
 ROOT=Path(__file__).resolve().parent
 EMPTY_QUAD_DIGEST='d1fba762150c532c'
 EXPECTED_PARITY_KEYS={
@@ -12,6 +12,9 @@ EXPECTED_PARITY_KEYS={
     for adapter in ['rtx','igpu']
     for quality in ['original','native']
 }
+
+def check_hex_digest(value,width,field):
+    assert isinstance(value,str) and re.fullmatch(f'[0-9a-f]{{{width}}}',value),f'malformed {field}'
 
 def validate(rows,parity,identities,canonical):
     grouped={}
@@ -42,6 +45,8 @@ def validate(rows,parity,identities,canonical):
         assert record['active'] is True,'canonical gate inactive'
         assert (record['callbacks'],record['messages'],record['skips'])==(600,29044,0)
         assert record['binary_sha256']==identities[arm+'_image_binary_sha256']
+        for field,width in [('quad_digest',16),('canonical_and_send_digest',16),('selected_numeric_sha256',64)]:
+            check_hex_digest(record[field],width,field)
         assert record['quad_digest'] not in (EMPTY_QUAD_DIGEST,'absent','empty',''),'canonical gate has no active digest'
     for field in ['quad_digest','canonical_and_send_digest','selected_numeric_sha256']:
         assert canonical['baseline'][field]==canonical['candidate'][field]

@@ -65,4 +65,11 @@ class Study(unittest.TestCase):
         for arm in changed:changed[arm]['quad_digest']=recompute.EMPTY_QUAD_DIGEST
         with self.assertRaisesRegex(AssertionError,'no active digest'):
             recompute.validate(self.rows,self.parity,self.identities,changed)
+    def test_equal_empty_or_malformed_canonical_hashes_are_rejected(self):
+        for field,width in [('quad_digest',16),('canonical_and_send_digest',16),('selected_numeric_sha256',64)]:
+            for value in ['',None,'g'*width,'a'*(width-1),'a'*(width+1)]:
+                changed=copy.deepcopy(self.canonical)
+                for arm in changed:changed[arm][field]=value
+                with self.subTest(field=field,value=value), self.assertRaisesRegex(AssertionError,'malformed '+field):
+                    recompute.validate(self.rows,self.parity,self.identities,changed)
 if __name__=='__main__':unittest.main()
