@@ -830,6 +830,8 @@ mod tests {
         assert_ne!(fresh.handle, old.asset.handle);
         assert_ne!(fresh.revision, old.asset.revision);
         let mut picture = PreparedFrame {
+            #[cfg(feature = "frame-bench")]
+            food_submission: None,
             frame: crate::frame::Frame {
                 identity: 0,
                 extent: [960, 540],

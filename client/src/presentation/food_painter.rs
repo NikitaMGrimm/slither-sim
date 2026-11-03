@@ -120,8 +120,11 @@ pub struct FoodImageCommand {
 /// Exact command and visibility counts, available only on complete validation.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FoodPaintCounts {
-    /// Retained food centers inside the inclusive cull rectangle.
+    /// Distinct foods inside the cull rectangle that emit image commands.
     pub visible_foods: usize,
+    /// Same inclusive cull rectangle, before zoom omission; not image calls.
+    #[cfg(feature = "frame-bench")]
+    pub before_zoom_foods: usize,
     /// Outline and body calls before all snake work.
     pub early: usize,
     /// Inner and outer glow calls after all snake eyes.
@@ -552,7 +555,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
     let q = input.quality;
     let v = input.view;
     let detailed = q.high_quality || q.blend > 0.;
-    let visible = || {
+    let in_bounds = || {
         input
             .foods
             .iter()
@@ -560,11 +563,18 @@ fn generate<F: FnMut(FoodImageCommand)>(
             .rev()
             .map(|(i, food)| (i, food.snapshot()))
             .filter(|(_, f)| bounds.contains(f.render_position))
-            // Opt-in wheel LOD: omit food whose body is smaller than one
-            // logical pixel. Default traversal stays exact (docs/zoom.md).
-            .filter(|(_, f)| food_zoom_eligible(*f, zoom_factor))
     };
-    for (index, food) in visible() {
+    let visible = || in_bounds().filter(|(_, f)| food_zoom_eligible(*f, zoom_factor));
+    for (index, food) in in_bounds() {
+        #[cfg(feature = "frame-bench")]
+        {
+            recorder.counts.before_zoom_foods += 1;
+        }
+        // Opt-in wheel LOD; count before it during the existing outline walk,
+        // never with a separate census scan. See docs/zoom.md.
+        if !food_zoom_eligible(food, zoom_factor) {
+            continue;
+        }
         let center = food_body_center(food, v);
         recorder.image(
             food,

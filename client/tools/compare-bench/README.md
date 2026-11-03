@@ -53,7 +53,11 @@ node tools/compare-bench/run.mjs run <external-config.json>
 
 Build the host separately: `cargo build --release --locked -p slither-sim
 --features frame-bench --bin slither-sim`. Pass a release desktop binary by path;
-its hash identifies it. View telemetry/journal support is required for acceptance.
+its hash identifies it. Build the desktop input with `--features frame-bench`
+for the planner food census; view telemetry/journal support is also required.
+Results distinguish received/viewport counts from distinct submitted pellets and
+record omission share per view. Missing submission evidence and material food
+submission differences qualify comparisons; see [method](method.md#worlds-and-validity).
 Apply local Cargo target/jobs limits per command. No build/test runs during timing.
 
 * Primary: same RTX adapter, 3840x2160 physical client area on the selected

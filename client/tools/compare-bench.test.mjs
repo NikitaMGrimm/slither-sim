@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
 import {roundPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
@@ -242,7 +242,7 @@ test('invalid/unknown validity cannot silently pass', () => {
     windowSamples: [0,500,1000].map(atMs=>({atMs,qpcMs:atMs,foreground: true, occluded: false, minimized: false, visible: true, width: 960, height: 540, display: 'D', dpi: 96,refreshHz:60,nominalRefreshHz:60,clientRect:[0,0,960,540],displayBounds:[0,0,1920,1080],gpuEngines:[{instance:'gpu',utilization:2}]})),
     stats: [{atMs:0, ticksPerSecond: 142.85, deferredTicks: 0, lostSeconds: 0, bots: 100, players: 1 }],
     census: [{atMs:0, wholeMapFood: true, admittedBotSlots: 100, totalAliveSnakes: 100, players: [{ alive: true, setup: true, protocol: 19, wireLivingSnakes: 100,decoratedWireFood:40 }] }],
-    views: [{atMs:0, wholeMap: true, visiblePellets: 40, retainedPellets: 40 }] };
+    views: [{atMs:0, wholeMap: true, visiblePellets: 40, retainedPellets: 40,submittedPellets:40,pelletsBeforeOmission:40,pictureRetainedPellets:40,foodBudgetApplied:false }] };
   assert.equal(validity(run).valid, true);
   const refreshed=structuredClone(run);refreshed.machine={clock:{qpcMs:0,unixMs:0}};
   refreshed.windowSamples.forEach(s=>s.unixMs=s.qpcMs+1000000);
@@ -271,7 +271,7 @@ test('invalid/unknown validity cannot silently pass', () => {
 });
 test('adapter and refresh mismatches are labelled, never direct comparisons', () => {
   const run = { validity: { valid: true }, renderAdapters: [{ luid: 'A' }], display: 'D', refreshHz: 240, width: 1280, height: 720, dpi: 120, scenario: 'normal', experiment: 'primary', vsyncCondition: 'display-paced',metrics:{presentModes:['Composed: Flip']},contentDisplayCorrelation:'established' };
-  run.views=[{atMs:0,drawnLiveSnakes:1}];run.census=[{atMs:0,players:[{wireLivingSnakes:1,alive:true,setup:true}]}];
+  run.views=[{atMs:0,drawnLiveSnakes:1,submittedPellets:100,pelletsBeforeOmission:100,pictureRetainedPellets:100,foodBudgetApplied:false}];run.census=[{atMs:0,players:[{wireLivingSnakes:1,alive:true,setup:true}]}];
   assert.equal(comparison(run, structuredClone(run)).classification, 'direct comparison');
   for (const change of [r => r.renderAdapters = [{ luid: 'B' }], r => r.refreshHz = 60, r => r.validity.valid = false,r=>r.metrics.presentModes=['Hardware: Independent Flip'],r=>r.metrics.presentModes=[],r=>r.metrics.presentModes=['Unknown'],r=>r.contentDisplayCorrelation='unestablished']) {
     const other = structuredClone(run); change(other); assert.equal(comparison(run, other).classification, 'labelled comparison only');
@@ -289,9 +289,78 @@ function completeBattledome() {
     foreground:true,visible:true,occluded:false,minimized:false,clientRect:[0,0,960,540],displayBounds:[0,0,1920,1080],gpuEngines:[{instance:'authored',utilization:1}]}));
   run.stats=times.map(atMs=>({atMs,ticksPerSecond:142.85,deferredTicks:0,lostSeconds:0,bots:100,players:1}));
   run.census=times.map(atMs=>({atMs,wholeMapFood:true,admittedBotSlots:100,totalAliveSnakes:101,players:[{alive:true,setup:true,protocol:19,wireLivingSnakes:101,decoratedWireFood:1000}]}));
-  run.views=times.filter(t=>t%2000===0).map(atMs=>({atMs,wholeMap:true,retainedPellets:1000,visiblePellets:1000,drawnLiveSnakes:101}));
+  run.views=times.filter(t=>t%2000===0).map(atMs=>({atMs,wholeMap:true,retainedPellets:1000,visiblePellets:1000,submittedPellets:1000,pelletsBeforeOmission:1000,pictureRetainedPellets:1000,foodBudgetApplied:false,drawnLiveSnakes:101}));
   return run;
 }
+
+test('heavy food omission stays valid but cannot read as an equal submitted scene',()=>{
+  const run=completeBattledome(),peer=completeBattledome();peer.client='native';
+  run.views.forEach(v=>v.submittedPellets=200);
+  assert.equal(validity(run).valid,true);
+  assert.equal(foodSubmission(run.views[0]).omissionShare,.8);
+  const report=foodSubmissionEvidence(run);
+  assert.equal(report.status,'established');assert.equal(report.maximumOmissionShare,.8);
+  assert.ok(report.samples.every(v=>v.omissionShare===.8));
+  run.validity=validity(run);peer.validity=validity(peer);
+  for(const [a,b] of [[run,peer],[peer,run]]){
+    const pair=comparison(a,b);assert.equal(pair.classification,'labelled comparison only');
+    assert.ok(pair.reasons.some(r=>r.startsWith('different food submission:')));
+  }
+  peer.views.forEach(v=>delete v.submittedPellets);
+  const unknown=comparison(run,peer);
+  assert.ok(unknown.reasons.some(r=>r.startsWith('different food submission cannot be excluded')));
+});
+
+test('food submission fails closed for missing, contradictory, empty and upstream-filtered counts',()=>{
+  const view={submittedPellets:100,pelletsBeforeOmission:100,pictureRetainedPellets:100,foodBudgetApplied:false};
+  assert.deepEqual(foodSubmission(view),{status:'established',reason:null,omissionShare:0});
+  for(const change of [v=>delete v.submittedPellets,v=>delete v.pelletsBeforeOmission,v=>delete v.foodBudgetApplied,v=>delete v.pictureRetainedPellets,
+    v=>v.pictureRetainedPellets=99,v=>v.pictureRetainedPellets=-1,v=>v.pictureRetainedPellets=100.5,v=>v.pictureRetainedPellets=null,
+    v=>v.submittedPellets=-1,v=>v.submittedPellets=101,v=>v.submittedPellets=.5,v=>v.pelletsBeforeOmission=NaN,
+    v=>v.submittedPellets=null,v=>v.submittedPellets='100',v=>v.foodBudgetApplied=true,
+    v=>{v.submittedPellets=0;v.pelletsBeforeOmission=0;}]){
+    const bad={...view};change(bad);assert.equal(foodSubmission(bad).status,'unestablished');
+    const run=completeBattledome();Object.assign(run.views[0],bad);
+    for(const key of Object.keys(view))if(!Object.hasOwn(bad,key))delete run.views[0][key];
+    assert.ok(validity(run).reasons.some(r=>r.startsWith('Native food submission evidence')));
+    assert.ok(comparison(run,completeBattledome()).reasons.some(r=>r.includes('food submission evidence missing')));
+  }
+  assert.equal(foodSubmissionEvidence({}).status,'unestablished');
+});
+
+test('food qualification threshold retains small shares and includes exactly five percentage points',()=>{
+  const a=completeBattledome(),b=completeBattledome();a.validity=b.validity={valid:true};
+  for(const [submitted,qualified] of [[1000,false],[951,false],[950,true],[0,true]]){
+    a.views.forEach(v=>v.submittedPellets=submitted);
+    const pair=comparison(a,b);
+    assert.equal(pair.foodSubmission.a.maximumOmissionShare,(1000-submitted)/1000);
+    assert.equal(pair.reasons.some(r=>r.startsWith('different food submission:')),qualified);
+  }
+  a.views.forEach(v=>v.submittedPellets=900);b.views.forEach(v=>v.submittedPellets=900);
+  assert.equal(comparison(a,b).classification,'direct comparison','identical established omission shares add no difference qualification');
+  a.views.forEach(v=>v.submittedPellets=700);b.views.forEach(v=>v.submittedPellets=750);
+  assert.ok(comparison(a,b).reasons.some(r=>r.startsWith('different food submission:')));
+  b.views[0].foodBudgetApplied=true;
+  assert.equal(comparison(a,b).classification,'labelled comparison only');
+});
+
+test('a fabricated denominator cannot match honest omission shares beyond the same-picture population',()=>{
+  const dishonest=completeBattledome(),honest=completeBattledome();
+  dishonest.views.forEach(v=>{v.pelletsBeforeOmission=5000;v.submittedPellets=1000;});
+  honest.views.forEach(v=>v.submittedPellets=200);
+  assert.equal(validity(honest).valid,true);
+  assert.equal(validity(dishonest).valid,false);
+  assert.equal(foodSubmission(dishonest.views[0]).omissionShare,null);
+  // Even a caller with a stale precomputed validity cannot establish equal work.
+  dishonest.validity=honest.validity={valid:true};
+  assert.equal(comparison(dishonest,honest).classification,'labelled comparison only');
+  const newer=structuredClone(honest);
+  newer.views.forEach(v=>v.retainedPellets=900);
+  assert.equal(foodSubmissionEvidence(newer).status,'established','current state is not a same-picture population bound');
+  for(const change of [v=>v.submittedPellets=1001,v=>v.pelletsBeforeOmission=1001]){
+    const run=completeBattledome();change(run.views[0]);assert.equal(validity(run).valid,false);
+  }
+});
 test('complete 60-second delivery cannot pass a blank drawn-snake scene',()=>{
   const run=completeBattledome();assert.equal(validity(run).valid,true);
   run.views.forEach(v=>v.drawnLiveSnakes=0);

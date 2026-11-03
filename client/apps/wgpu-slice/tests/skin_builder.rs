@@ -454,6 +454,8 @@ fn builder_quota_and_held_picture_retry_at_dpr_one_to_five() {
                 login.studio.state.reveal_control(focus, logical);
                 let menu = login.prepare_host(extent, dpr, false, None).unwrap();
                 let mut picture = slither_wgpu_slice::render::PreparedFrame {
+                    #[cfg(feature = "frame-bench")]
+                    food_submission: None,
                     frame: slither_wgpu_slice::frame::Frame {
                         identity: 0,
                         extent: menu.extent,
