@@ -281,9 +281,22 @@ pub(in crate::gpu) struct Workers {
     behavior: Behavior,
 }
 
+// Two participants lose to serial in the 4,096/8,192-pellet paced controls.
+// Four improve both; leave smaller available CPU budgets serial by default.
+// The density table in the linked study records this adoption cutoff.
+fn default_participants(available: usize) -> usize {
+    if available < MAX_PARTICIPANTS {
+        1
+    } else {
+        MAX_PARTICIPANTS
+    }
+}
+
 impl Default for Workers {
     fn default() -> Self {
-        Self::with_participants(thread::available_parallelism().map_or(1, usize::from))
+        Self::with_participants(default_participants(
+            thread::available_parallelism().map_or(1, usize::from),
+        ))
     }
 }
 
@@ -874,6 +887,12 @@ mod tests {
 
     #[test]
     fn sparse_and_serial_admission_spawn_nothing() {
+        for available in 0..4 {
+            assert_eq!(default_participants(available), 1);
+        }
+        for available in [4, 8, 16] {
+            assert_eq!(default_participants(available), 4);
+        }
         let (frame, mut b) = scene();
         let mut mirror = vec![[0; 96]; b.visible.len()];
         let mut flags = vec![0; b.visible.len()];
