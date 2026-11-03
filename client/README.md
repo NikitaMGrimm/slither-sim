@@ -117,6 +117,10 @@ Canvas workflows; diagnostic and extension routes have been removed.
 
 ## Test
 
+The opt-in [visible-frame comparison harness](tools/compare-bench/README.md)
+measures local desktop/browser presentation with external inputs and results.
+It is separate from offline checks and never runs as a benchmark in CI.
+
 ```sh
 npm run check
 ```

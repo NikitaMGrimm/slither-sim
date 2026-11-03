@@ -55,6 +55,47 @@ fn frame_bench_public_bind_and_json_activation_are_rejected() {
     assert!(serde_json::from_str::<crate::client::HostConfig>(r#"{"frameBench":true}"#).is_err());
 }
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn frame_bench_body_protection_is_explicit_and_does_not_protect_bots() {
+    fn fixture(protect: bool) -> RawSimulator {
+        let mut config = SimulationConfig {
+            agents: 2,
+            ..Default::default()
+        };
+        config.world = Config::sandbox();
+        config.world.food_count = 0;
+        let mut host = RawSimulator::new(7, config, 2).unwrap();
+        for slot in 0..2 {
+            assert!(host.connect(slot, PlayerAppearance::default()).unwrap());
+            let heading = if slot == 0 { 0. } else { std::f64::consts::PI };
+            let point = Point {
+                x: slot as f64 * 2. * physics::BODY_RADIUS * physics::scale(2),
+                y: 0.,
+            };
+            host.backend
+                .world
+                .correct_pose(slot, point, vec![point; 2], heading)
+                .unwrap();
+            host.backend.slots[slot].control = Action {
+                heading,
+                boost: false,
+            };
+        }
+        if protect {
+            host.backend.world.frame_bench_protect(1);
+        }
+        host
+    }
+    let mut plain = fixture(false);
+    let mut protected = fixture(true);
+    plain.advance_ticks(1).unwrap();
+    protected.advance_ticks(1).unwrap();
+    assert!(!plain.backend.world.snakes()[0].alive);
+    assert!(protected.backend.world.snakes()[0].alive);
+    assert!(!protected.backend.world.snakes()[1].alive);
+}
+
 use super::{
     broadcast::{Board, LEADERBOARD_ROWS, clock_due},
     connection::{MAX_RECORD_BYTES, RECORD_OVERHEAD},

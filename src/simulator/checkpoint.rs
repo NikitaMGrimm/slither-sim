@@ -1080,6 +1080,8 @@ impl State {
             food: d.food,
         })?;
         Ok(Simulator {
+            #[cfg(feature = "frame-bench")]
+            frame_bench_protected_slots: 0,
             config,
             radius: self.radius,
             snakes,

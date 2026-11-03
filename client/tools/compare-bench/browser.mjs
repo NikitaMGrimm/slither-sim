@@ -66,6 +66,8 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
     `--log-net-log=${log}`, '--net-log-capture-mode=Everything', `--window-size=${width},${height}`, `--window-position=${x},${y}`, 'about:blank',
   ], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: false });
   register(child);
+  let chromeOutput = '';
+  child.stdout.on('data', b => chromeOutput += b); child.stderr.on('data', b => chromeOutput += b);
   let browser, page, closing;
   const close = async () => {
     if (closing) return closing;
@@ -75,6 +77,7 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
     browser?.ws.close();
     if (child.exitCode === null) await Promise.race([new Promise(resolve => child.once('close', resolve)), delay(3000)]);
     await fs.writeFile(path.join(directory, 'denied-requests.json'), JSON.stringify(blocked));
+    await fs.writeFile(path.join(directory, 'chrome-console.txt'), chromeOutput);
     proxy.closeAllConnections(); proxy.close(); pageServer.closeAllConnections(); pageServer.close();
     })();
     return closing;
@@ -93,6 +96,7 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
     const gpu = await browser.send('SystemInfo.getInfo');
     const processes = await browser.send('SystemInfo.getProcessInfo');
     const gpuPid = processes.processInfo.find(p => p.type === 'GPU')?.id;
+    await fs.writeFile(path.join(directory, 'browser-gpu.json'), JSON.stringify({ gpu, processes, gpuPid, adapterRequest: adapter ?? null }, null, 2));
     page = await CDP.open(targets.find(t => t.type === 'page').webSocketDebuggerUrl);
     await page.send('Network.enable'); await page.send('Page.enable');
     // Defense in depth; the deny proxy and resolver remain the network boundary.
@@ -110,11 +114,14 @@ export async function ntl({ chrome, mod, directory, endpoint, width, height, x, 
     if (!ready) throw Error('NTL DOM/bootstrap contract changed: expected #nick, #ip-server, #connect-btn in local authored shell. Public origin was not fetched.');
     await page.evaluate(`(()=>{ const set=(id,v)=>{const e=document.querySelector(id); e.value=v; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true}));}; set('#nick','FrameBench'); set('#ip-server',${JSON.stringify(endpoint.replace('ws://', '').replace('/slither', ''))}); document.querySelector('#connect-btn').click(); return true; })()`);
     let joined;
-    for (let i = 0; i < 150; i++) {
-      joined = await page.evaluate(`Boolean(window.playing&&window.snake&&Number.isFinite(window.snake.xx)&&Number.isFinite(window.gsc))`);
+    for (let i = 0; i < 600; i++) {
+      const setup = page.events.some(e => e.method === 'Network.webSocketFrameReceived'
+        && e.params.response.opcode === 2 && Buffer.from(e.params.response.payloadData, 'base64')[2] === 97);
+      joined = setup && await page.evaluate(`Boolean(window.playing&&window.snake&&Number.isFinite(window.snake.xx)&&Number.isFinite(window.gsc))`);
       if (joined) break; await delay(100);
     }
     if (!joined) throw Error('NTL failed local protocol-13 join/preflight (playing, snake.xx, gsc). See CDP/netlog; no timing accepted.');
+    await delay(1000);
     await fs.writeFile(path.join(directory, 'view-contract-preflight.json'), JSON.stringify(await page.evaluate(`(()=>{
       const arrays=[]; for(const k of Object.keys(window)){try{const v=window[k]; if(Array.isArray(v))arrays.push({name:k,length:v.length,firstKeys:v.find(x=>x&&typeof x==='object')?Object.keys(v.find(x=>x&&typeof x==='object')).slice(0,40):[]});}catch{}}
       return {arrays,scalars:Object.fromEntries(['mww','mhh','grd','gsc','view_xx','view_yy','real_flux_grd','flux_grd','foods_c'].map(k=>[k,window[k]]))};

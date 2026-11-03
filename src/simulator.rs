@@ -822,6 +822,9 @@ pub struct FoodSpawnEvent {
 /// ```
 #[derive(Clone, Debug)]
 pub struct Simulator {
+    /// Transient measurement control, absent from normal builds/checkpoints.
+    #[cfg(feature = "frame-bench")]
+    frame_bench_protected_slots: usize,
     config: Config,
     /// Stable slots: checked operations never remove or reorder snakes.
     snakes: Vec<Snake>,
@@ -875,6 +878,10 @@ pub struct Simulator {
     parallel: bool,
 }
 impl Simulator {
+    #[cfg(feature = "frame-bench")]
+    pub(crate) fn frame_bench_protect(&mut self, slots: usize) {
+        self.frame_bench_protected_slots = slots;
+    }
     /// Split large `observe_all` and `observe_selected` batches over the current
     /// rayon pool, with identical results. The global pool uses `RAYON_NUM_THREADS`
     /// or the core count; `ThreadPool::install` overrides it. Off by default so
@@ -912,6 +919,8 @@ impl Simulator {
         config.validate()?;
         let min_mass = config.min_score.and_then(MassFloor::for_score);
         let mut world = Self {
+            #[cfg(feature = "frame-bench")]
+            frame_bench_protected_slots: 0,
             radius: config.radius,
             config,
             snakes: vec![],
@@ -1932,6 +1941,13 @@ impl Simulator {
             if let Ok(k) = boundary_deaths.binary_search_by_key(&i, |&(j, _)| j) {
                 dead.push((i, None, boundary_deaths[k].1));
                 fallen[i] = true;
+                continue;
+            }
+            // The visible-frame harness needs a stable local life without
+            // physical input. Bots still strike this body; rim/pit deaths above
+            // remain real. This feature is not a mechanics-evidence workload.
+            #[cfg(feature = "frame-bench")]
+            if i < self.frame_bench_protected_slots {
                 continue;
             }
             let s = &self.snakes[i];

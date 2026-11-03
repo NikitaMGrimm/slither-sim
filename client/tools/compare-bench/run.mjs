@@ -104,7 +104,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
     provenance, machine, networkVerified: false, windowSamples: [], views: [], census: [], stats: [],
     acceptance: 'harness smoke only; not comparative client acceptance',
-    survival: 'host circular steering at 0.75*radius, boost off, ordinary collisions; any death invalidates' };
+    survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
   const cancel = () => {
     interrupted = true;
@@ -148,10 +148,17 @@ async function runAttempt(config, root, item, provenance, machine) {
         { cwd: directory, env: { ...process.env, LOCALAPPDATA: data, SLITHER_FRAME_PACING: '1' }, windowsHide: false });
       register(native); native.stdout.on('data', b => clientLog += b); native.stderr.on('data', b => clientLog += b);
       await windows({ mode: 'setup', clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
-      await waitFor(() => hostLog.includes('"alive":true') || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 20000, 'Own admission');
+      await waitFor(() => hostLog.split(/\r?\n/).some(l => l.startsWith('frame-bench: ') && JSON.parse(l.slice(13)).players?.[0]?.setup)
+        || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
       r.vsync = 'Fifo (source); PresentMon records actual mode and SyncInterval';
       r.networkVerified = true; // Direct explicit --server bypasses discovery; verify socket census below.
     }
+    r.worldReady = await waitFor(() => {
+      const line = hostLog.split(/\r?\n/).filter(l => l.startsWith('frame-bench: ')).at(-1);
+      if (!line) return null;
+      const census = JSON.parse(line.slice(13));
+      return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
+    }, 60000, 'All internal bot seats and living player readiness');
     await delay(config.warmupSeconds * 1000);
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv'); let pmLog = '';
@@ -175,10 +182,15 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.startMs = first.qpcMs; r.endMs = r.startMs + config.seconds * 1000;
     r.windowSamples = r.windowSamples.filter(s => s.qpcMs <= r.endMs);
     r.refreshHz = first.refreshHz;
+    r.displayAdapters = machine.dxgiAdapters.filter(a => a.outputs?.includes(r.display));
+    r.displayBindings = machine.displayBindings.filter(b => b.display === r.display);
     const engines = r.windowSamples.flatMap(s => s.gpuEngines ?? []);
     const renderLuids = [...new Set(engines.filter(e => /engtype_3d/i.test(e.instance) && e.utilization > .01)
       .map(e => e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
     r.renderAdapters = renderLuids.map(luid => machine.dxgiAdapters.find(a => a.luid === luid) ?? { luid, name: 'unmapped' });
+    r.presentationPath = r.renderAdapters.length && r.displayBindings.length
+      ? r.renderAdapters.every(a => r.displayBindings.some(b => b.targetLuid === a.luid)) ? 'same-adapter render/output' : 'cross-adapter render/output'
+      : 'unknown render/output path';
     r.adapterRequest = config.adapter ?? { chromeLuid: 'default', native: 'default', vlither: 'default' };
     r.expectedRenderLuid = config.experiment === 'primary' ? config.targetAdapterLuid
       : item.client === 'ntl' && config.adapter?.chromeLuid !== 'default' ? config.adapter?.chromeLuid : null;
@@ -245,6 +257,7 @@ export async function main(args = process.argv.slice(2)) {
   if (process.platform !== 'win32') throw Error('Windows only; analysis/tests are portable');
   const config = JSON.parse(await fs.readFile(args[1], 'utf8'));
   const root = path.resolve(config.output);
+  config.output = root;
   if (root === repository || root.startsWith(repository + path.sep)) throw Error('Results and inputs must stay outside Git');
   await fs.mkdir(root, { recursive: true });
   if (args[0] === 'inspect') {

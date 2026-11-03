@@ -60,7 +60,7 @@ function Click([IntPtr]$h, [int]$x, [int]$y) {
 if ($c.mode -eq 'machine') {
   $adapters = @(Get-CimInstance Win32_VideoController | Select-Object Name,DriverVersion,CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate)
   $screens = @([Windows.Forms.Screen]::AllScreens | ForEach-Object { @{ display=$_.DeviceName; bounds=@($_.Bounds.X,$_.Bounds.Y,$_.Bounds.Width,$_.Bounds.Height); refreshHz=[BenchGraphics]::Refresh($_.DeviceName) } })
-  @{ adapters=$adapters; dxgiAdapters=@([BenchGraphics]::Adapters()); screens=$screens; logicalProcessors=[Environment]::ProcessorCount; os=[Environment]::OSVersion.VersionString } | ConvertTo-Json -Depth 5 -Compress
+  @{ adapters=$adapters; dxgiAdapters=@([BenchGraphics]::Adapters()); displayBindings=@([BenchGraphics]::DisplayBindings()); screens=$screens; logicalProcessors=[Environment]::ProcessorCount; os=[Environment]::OSVersion.VersionString } | ConvertTo-Json -Depth 5 -Compress
   exit
 }
 $deadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -106,6 +106,7 @@ try {
     $counter
   })
 } catch { $gpuError = $_.Exception.Message }
+$displayBindings = @([BenchGraphics]::DisplayBindings())
 while ([DateTime]::UtcNow -lt $end) {
   $r = New-Object BenchWindow+Rect
   [BenchWindow]::GetClientRect($hwnd,[ref]$r) | Out-Null
@@ -115,6 +116,7 @@ while ([DateTime]::UtcNow -lt $end) {
   $cpu = [BenchWindow]::Cpu(); $total = $cpu[1]-$prevCpu[1]
   $load = if ($total -gt 0) { 100*(1-($cpu[0]-$prevCpu[0])/$total) } else { 0 }
   $screen = [Windows.Forms.Screen]::FromHandle($hwnd)
+  $binding = $displayBindings | Where-Object display -EQ $screen.DeviceName | Select-Object -First 1
   $build = @(Get-Process -Name cargo,rustc,cl,link,gcc,cc1,cc1plus,make,ninja,cmake,'wasm-bindgen' -ErrorAction SilentlyContinue).Count -gt 0
   if ([DateTime]::UtcNow -ge $nextBuildCheck) {
     $buildCommands = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -match '(--test|check\.mjs|build-web\.mjs|npm.*(test|check))' }).Count -gt 0
@@ -126,7 +128,7 @@ while ([DateTime]::UtcNow -lt $end) {
   @{ qpcMs=[BenchWindow]::QpcMs(); foreground=([BenchWindow]::GetForegroundWindow() -eq $hwnd);
      occluded=[BenchWindow]::Occluded($hwnd); minimized=[BenchWindow]::IsIconic($hwnd); visible=[BenchWindow]::IsWindowVisible($hwnd);
      width=$r.R; height=$r.B; dpi=[BenchWindow]::GetDpiForWindow($hwnd); display=$screen.DeviceName;
-     refreshHz=[BenchGraphics]::Refresh($screen.DeviceName); gpuEngines=$gpuEngines; gpuCounterError=$gpuError;
+     refreshHz=$binding.refreshHz; nominalRefreshHz=[BenchGraphics]::Refresh($screen.DeviceName); gpuEngines=$gpuEngines; gpuCounterError=$gpuError;
      displayBounds=@($screen.Bounds.X,$screen.Bounds.Y,$screen.Bounds.Width,$screen.Bounds.Height);
      machineCpuPercent=$load; hostCpuCores= $(if ($elapsed -gt 0) {($hostCpu-$prevHost)/$elapsed} else {0}); buildRunning=$build } | ConvertTo-Json -Depth 5 -Compress
   $prevCpu=$cpu; $prevHost=$hostCpu; $prevAt=$now

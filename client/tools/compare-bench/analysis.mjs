@@ -85,6 +85,8 @@ export function validity(run) {
   if (run.views?.some(v => !Number.isInteger(v.visiblePellets) || !Number.isInteger(v.retainedPellets))) reasons.push('Pellet census unavailable');
   if (run.views?.some(v => v.connected === false || v.alive === false)) reasons.push('Client not alive/connected');
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
+  if (run.scenario === 'normal' && ['original','native'].includes(run.client)
+      && run.views?.some(v => v.userZoom !== 1)) reasons.push('Normal scenario left stock zoom');
   if (run.scenario === 'battledome' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
   if (run.scenario === 'battledome' && (!run.census?.length || run.census.some(v => !v.wholeMapFood))) reasons.push('Whole-map food delivery not enabled');
   if (run.metrics && (run.metrics.coveredMs < run.seconds * 1000 * .9 || run.metrics.boundaryGapMs.some(g => g > 250))) reasons.push('Incomplete display coverage at window boundaries');
