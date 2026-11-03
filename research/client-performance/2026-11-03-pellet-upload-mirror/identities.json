@@ -31,29 +31,55 @@
   "controls": {
     "rtx/3840x2160/native": {
       "output_digest": "6ed1a3fd769bd0b7",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     },
     "rtx/3840x2160/original": {
       "output_digest": "6ed1a3fd769bd0b7",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     },
     "igpu/3840x2160/original": {
       "output_digest": "6ed1a3fd769bd0b7",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     },
     "igpu/3840x2160/native": {
       "output_digest": "6ed1a3fd769bd0b7",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     },
     "igpu/1920x1080/original": {
       "output_digest": "f6792038f2b2c216",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     },
     "igpu/1920x1080/native": {
       "output_digest": "f6792038f2b2c216",
-      "quad_digest": "d1fba762150c532c"
+      "quad_digest": "d1fba762150c532c",
+      "frame_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3"
     }
   },
+  "frame_numeric_fields": [
+    "frame",
+    "model_ms",
+    "messages",
+    "foods",
+    "snakes",
+    "preys",
+    "draws",
+    "correction",
+    "lagging",
+    "zoom",
+    "own_exists",
+    "raw_x",
+    "raw_y",
+    "head_x",
+    "head_y",
+    "heading",
+    "speed_per_32ms"
+  ],
+  "quad_digest_note": "PROFILE_PARITY was off in timed runs; the unchanged quad digest is an inactive accumulator, not canonical-state evidence. The control digest hashes sent bytes; numeric SHA-256 hashes the listed retained per-frame CSV fields. Actual image hashes are separate.",
   "image_parity": {
     "replay/rtx/3840x2160/original": {
       "callbacks": 600,

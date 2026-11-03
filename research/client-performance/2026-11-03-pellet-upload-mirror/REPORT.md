@@ -163,8 +163,12 @@ These controls compare the pre-change retained renderer with the new serialized
 mirror. They share projection arithmetic, textures and fragment math. Their
 images omit unchanged egui painting identically; timing runs include native
 menu/egui. They establish image preservation by this packing change, not an
-independent validation of all retained-renderer behavior. Canonical/state digests
-also match in every timed run; those controls alone do not exercise the GPU.
+independent validation of all retained-renderer behavior. Sent-byte control
+digests and hashes of the selected numeric frame columns listed in
+`identities.json` match in every timed run; these are not complete world-state
+digests. The timed driver's canonical-parity mode was off, so its constant
+quad-digest accumulator is not parity evidence. Actual image hashes above
+exercise rendering separately from those controls.
 
 The explicit authored GPU regression compares retained submission with the
 generic canonical path across spawn fade, settled animation and consumption. It

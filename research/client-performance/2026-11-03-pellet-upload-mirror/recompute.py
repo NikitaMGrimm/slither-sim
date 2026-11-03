@@ -21,6 +21,7 @@ def records():
         control = identity['controls']['/'.join([r['adapter'], r['physical'], r['quality']])]
         assert r['output_digest'] == control['output_digest']
         assert r['quad_digest'] == control['quad_digest']
+        assert r['frame_numeric_sha256'] == control['frame_numeric_sha256']
     for case, r in identity['image_parity'].items():
         assert (r['callbacks'], r['skips'], r['messages']) == (
             600, 0, 8 if case.startswith('rectangle/') else 29044)
