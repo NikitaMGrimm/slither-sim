@@ -34,7 +34,8 @@ Put this config and all inputs/results outside Git:
   "x": 0,
   "y": 0,
   "seconds": 60,
-  "rounds": 3
+  "rounds": 3,
+  "telemetryControls": true
 }
 ```
 
@@ -66,6 +67,11 @@ Apply local Cargo target/jobs limits per command. No build/test runs during timi
   failures. Full High-effects Original/Native are separate variants. Smoke uses
   primary with five-second windows. Foreground/input/occlusion, host tick health,
   stream coverage, scene evidence, GPU and refresh changes are validity gates.
+  The first real round also pairs telemetry on/off for Original, Native and NTL.
+  Each session first calibrates NTL zoom and verifies its closed netlog; any
+  non-loopback transport evidence stops before timed rounds. If its farthest
+  view is limited, additional Original/Native Battledome runs match that scale.
+  These remain labelled comparisons alongside separate whole-map runs.
 
 Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
 500 internal bots; stress triples ambient attempts and initial/refill target.
@@ -76,8 +82,9 @@ steering and socket-player collision protection; bots still die on its body.
 
 Replace `mod` to use updated NTL. Manifest/package/tree hashes are recorded;
 changed visible UI contracts fail preflight in one small adapter. No minified game
-globals are read. The local shell needs no official page/assets. Screenshots
-provide presence/extent candidates, not exact counts or continuous camera proof.
+globals are read. The local shell needs no official page/assets. Timed screenshots
+provide bounded presence/extent evidence, not exact counts; their acquisition
+cost is included in the telemetry on/off control. Image analysis runs afterwards.
 Set `vlitherRef` to pin upstream; omission fetches the default tip and records its
 commit. The user-space build uses a labelled authored launch/telemetry wrapper
 without changing stock render or zoom limits.

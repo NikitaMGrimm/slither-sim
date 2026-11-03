@@ -19,9 +19,10 @@ export async function closeServer(server) {
 }
 // Resolves failures as data so an early spawn error cannot become an unhandled
 // rejection while a caller is still preparing browser observations.
-export function collectorCompletion(child) {
+export function collectorCompletion(child,onProgress=()=>{}) {
   let log='';
-  child.stdout?.on('data',bytes=>log+=bytes);child.stderr?.on('data',bytes=>log+=bytes);
+  const append=bytes=>{log+=bytes;onProgress(log);};
+  child.stdout?.on('data',append);child.stderr?.on('data',append);
   return new Promise(resolve=>{
     child.once('error',error=>resolve({exitCode:null,error:error.message,log}));
     child.once('close',exitCode=>resolve({exitCode,log}));

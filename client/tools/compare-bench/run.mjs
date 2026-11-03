@@ -4,12 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, schedule, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,transientFailure,hostStats, wholeMap, validity, netlogProof, comparison,nativeProduction,drawnSnakeEvidence } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
+import {roundPlan,anchoredBoundary} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -113,12 +114,14 @@ async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, pm, host, native,networkMonitor;
-  let pmLog = '',pmCompleted;
+  let pmLog = '',pmCompleted;const browserFrames=[];
   const r = { schema: 'slither-frame-bench-v1', ...item, seconds: config.seconds,
     experiment: config.experiment, targetAdapterLuid: config.targetAdapterLuid,
     targetDisplay: config.targetDisplay, targetRefreshHz: config.targetRefreshHz,
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
     provenance, machine, telemetry:config.telemetry??'on', windowSamples: [], views: [], census: [], stats: [],
+    ntlViewCalibration:config.ntlViewCalibration,
+    browserViewSampling:item.client==='ntl'&&config.telemetry!=='off'?'CDP screenshots every 1.5 s plus capture time; decode after window; included in telemetry perturbation control':'no timed picture sampling',
     acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
@@ -194,7 +197,7 @@ async function runAttempt(config, root, item, provenance, machine) {
         { cwd: directory, env:clientEnv,windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
       networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.binary,directory,maxSeconds:nativeNetworkMaxSeconds(config),startedUnixMs:r.nativeStartedUnixMs});
-      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
+      await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.viewCondition==='ntl-farthest'?'normal':item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Native winit window, borderless task-owned HWND';
       await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
         || (native.exitCode !== null ? Promise.reject(Error(`Client exited ${native.exitCode}: ${clientLog}`)) : null), 60000, 'Own admission');
@@ -205,6 +208,20 @@ async function runAttempt(config, root, item, provenance, machine) {
       if (!census) return null;
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
+    if(item.viewCondition==='ntl-farthest'&&!browser){
+      const target=config.ntlViewCalibration?.physicalPixelsPerWorldUnit;
+      if(!Number.isFinite(target)||target<=0)throw Error('Matched NTL view calibration unavailable');
+      let matched=false;
+      for(let i=0;i<8;i++){
+        const view=await waitFor(()=>r.views.at(-1),4000,'Native zoom telemetry');
+        const scale=view.zoom*config.width/view.viewport?.[0];
+        if(!Number.isFinite(scale)||scale<=0)throw Error('Native physical zoom unavailable');
+        if(Math.abs(scale/target-1)<=.03){matched=true;break;}
+        await windows({mode:'wheel',clientPid:native.pid,notches:Math.log(target/scale)/Math.log(1.12)},directory,`match-zoom-${i}`,children);
+        const previous=r.views.length;await waitFor(()=>r.views.length>previous,4000,'Native post-wheel telemetry');
+      }
+      if(!matched)throw Error('Native wheel input did not reach the calibrated NTL view');
+    }
     await delay(config.warmupSeconds * 1000);
     await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
     if(browser){
@@ -218,16 +235,25 @@ async function runAttempt(config, root, item, provenance, machine) {
     }
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
-    r.presentMonArguments=presentMonArguments({session:`SlitherBench-${randomUUID()}`,file:csvPath,pid:browser?browser.gpuPid:native.pid,seconds:config.seconds});
+    r.presentMonSession=`SlitherBench-${randomUUID()}`;
+    r.presentMonArguments=presentMonArguments({session:r.presentMonSession,file:csvPath,pid:browser?browser.gpuPid:native.pid,seconds:config.seconds});
     pm = spawn(config.presentMon,r.presentMonArguments,{windowsHide:true});register(pm);
-    pmCompleted=collectorCompletion(pm);
+    pmCompleted=collectorCompletion(pm,log=>{r.collectorFailure??=presentMonFailure(log);});
     const early=await Promise.race([pmCompleted,delay(1000).then(()=>null)]);
     if (early) {pmLog=early.log;throw Error(`PresentMon preflight failed: ${early.error??early.exitCode}; ${pmLog}. No elevation or security changes attempted.`);}
     if(browser&&config.telemetry!=='off')r.productionStarted=await browser.productionStart();
     const samplesPromise = windows({ mode: 'sample', clientPid: native.pid,clientPids:browser?browser.processIds:[native.pid], gpuPid: browser ? browser.gpuPid : native.pid, hostPid: host.pid, seconds: config.seconds + .5 }, directory, 'window-load', children);
     let monitoring = true;
+    const captureStarted=Date.now();let nextPicture=captureStarted+1500;
     samplesPromise.finally(() => { monitoring = false; }).catch(() => {});
     while (monitoring) {
+      if(r.collectorFailure)throw Error(r.collectorFailure);
+      if(pm.exitCode!==null)throw Error(`PresentMon collection ended early (${pm.exitCode})`);
+      if(Date.now()-captureStarted>10000&&!await fs.stat(csvPath).then(s=>s.size>0,()=>false))throw Error('No presentation CSV within ten seconds; collection unavailable');
+      if(browser&&config.telemetry!=='off'&&Date.now()>=nextPicture){
+        const before=now(),file=await browser.capture(`view-${browserFrames.length}`);
+        browserFrames.push({file,atMs:(before+now())/2});nextPicture=Date.now()+1500;
+      }
       await delay(250);
     }
     r.windowSamples = await samplesPromise;
@@ -245,6 +271,17 @@ async function runAttempt(config, root, item, provenance, machine) {
       r.contentMetrics=contentIntervals(r.production,{canvas:canvases[0].canvas,seconds:config.seconds,startMs:r.windowSamples[0].atMs-browserToQpc,endMs:r.windowSamples[0].atMs+config.seconds*1000-browserToQpc});
       const after=await browser.capture('after-window');r.postflightView={...pngEvidence(await fs.readFile(after)),atMs:now()};r.views.push(r.postflightView);
       r.contentDisplayCorrelation='unestablished';
+    }
+    for(const frame of browserFrames)r.views.push({...pngEvidence(await fs.readFile(frame.file)),atMs:frame.atMs});
+    if(browser){
+      for(const view of r.views){
+        const census=r.census.filter(c=>Math.abs(c.atMs-view.atMs)<=1200).sort((a,b)=>Math.abs(a.atMs-view.atMs)-Math.abs(b.atMs-view.atMs))[0];
+        if(item.scenario==='battledome'){
+          view.boundaryAnchor=anchoredBoundary(view,census);
+          view.wholeMap=view.boundaryAnchor?.wholeMap===true;
+        }
+      }
+      r.views.sort((a,b)=>a.atMs-b.atMs);
     }
     if (!r.windowSamples.length) throw Error('Window monitoring returned no samples');
     const first = r.windowSamples[0]; r.display = first.display; r.dpi = first.dpi;
@@ -298,6 +335,12 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.telemetryErrors=telemetryErrors;
     if(telemetryErrors.length)r.error??='Malformed timed telemetry; inspect telemetryErrors';
     try { await browser?.close(); } catch (e) { r.cleanupError = e.message; }
+    if(pm?.exitCode===null&&r.presentMonSession){
+      // A force-killed ETW consumer leaves a live session. Stop only the exact
+      // unique session this attempt started before terminating owned children.
+      try{r.traceCleanup=execute(config.presentMon,['--session_name',r.presentMonSession,'--terminate_existing_session'],{timeout:5000});}
+      catch(error){r.cleanupError??=`Owned ETW session cleanup failed: ${error.message}`;}
+    }
     for (const child of [...children].reverse()) await stop(child);
     if(networkMonitor){
       try{r.nativeNetwork=await networkMonitor.finish();}catch(error){r.networkError=error.message;}
@@ -368,20 +411,29 @@ export async function main(args = process.argv.slice(2)) {
   const results = [],roundAttempts=[];let pending=Array.from({length:rounds},(_,i)=>i+1);
   const maxAttempts=config.maxRoundAttempts??3;
   if(!Number.isInteger(maxAttempts)||maxAttempts<1||maxAttempts>3)throw Error('maxRoundAttempts must be 1..3');
+  if(config.telemetryControls!==undefined&&typeof config.telemetryControls!=='boolean')throw Error('telemetryControls must be boolean');
+  if(clients.includes('ntl')){
+    if(provenance.ntl.error||!provenance.ntl.tree?.sha256)throw Error('NTL provenance unavailable; preflight will not load it');
+    const {calibrateNtl}=await import('./calibrate.mjs');
+    config.ntlViewCalibration=await calibrateNtl(config,session,provenance.ntl);
+  }
+  const plan=roundPlan(rounds,clients,{telemetryControls:args[0]==='run'&&config.telemetryControls!==false&&!config.telemetry,
+    limitedNtlView:config.ntlViewCalibration?.wholeMap===false}).map(item=>({...item,telemetry:config.telemetry??item.telemetry}));
+  await save(path.join(session,'run-plan.json'),plan);
   for(let attempt=1;attempt<=maxAttempts&&pending.length&&!interrupted;attempt++){
     const retry=[];
     for(const round of pending){
       const preflight=(await windows({mode:'preflight'},session,`round-${round}-attempt-${attempt}-preflight`,[]))[0];
       const record={round,attempt,preflight,results:[]};roundAttempts.push(record);
       if(preflight.competingWork.length||preflight.idleMs<5000){record.blocked='competing work or recent owner input';retry.push(round);continue;}
-      const order=schedule(rounds,clients).filter(item=>item.round===round);
+      const order=plan.filter(item=>item.round===round);
       let transient=false;
-      for(const item of order){for(const scenario of ['battledome','normal']){
+      for(const item of order){
         if(interrupted)break;
-        const result=await runAttempt(config,session,{...item,scenario,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
+        const result=await runAttempt({...config,telemetry:item.telemetry},session,{...item,attempt},provenance,machine);results.push(result);record.results.push(result.directory);
         transient=transientFailure(result.run);
         if(transient)break;
-      }if(transient||interrupted)break;}
+      }
       if(transient){record.blocked='transient validity failure; retained partial round';retry.push(round);}
       await fs.writeFile(path.join(session,'round-attempts.json'),JSON.stringify(roundAttempts,null,2));
     }

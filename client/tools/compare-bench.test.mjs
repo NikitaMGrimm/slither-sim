@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal } from './compare-bench/run.mjs';
-import { adapterFlags,profilePreferences,chromeSession,CDP } from './compare-bench/browser.mjs';
+import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
+import {roundPlan,anchoredBoundary,zoomPlateau} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog} from './compare-bench/resources.mjs';
@@ -13,6 +14,53 @@ import path from 'node:path';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import {EventEmitter} from 'node:events';
+import {PassThrough} from 'node:stream';
+
+test('navigation waits for the matching document, including load before command acknowledgement',async()=>{
+  for(const early of [true,false]){
+    let resolved=false,seen=0;
+    const load=(page,loaderId)=>page.onEvent({method:'Page.lifecycleEvent',params:{name:'load',frameId:'frame',loaderId}});
+    const page={onEvent:()=>seen++,send:async(method)=>{
+      if(method==='Page.setLifecycleEventsEnabled')return {};
+      assert.equal(typeof page.onEvent,'function');load(page,'old-document');
+      if(early)load(page,'new-document');else setTimeout(()=>{assert.equal(resolved,false);load(page,'new-document');},5);
+      return {frameId:'frame',loaderId:'new-document'};
+    }};
+    const previous=page.onEvent;await navigateLoaded(page,'http://authored.invalid');resolved=true;
+    assert.equal(page.onEvent,previous);assert.equal(seen,2);
+  }
+  const page={send:async()=>({frameId:'frame',loaderId:'missing'})};
+  await assert.rejects(navigateLoaded(page,'http://authored.invalid',5),/load timed out/);
+  assert.equal(page.onEvent,undefined);
+});
+
+test('first-round controls and limited-view pairs retain reversed client ordering',()=>{
+  const plan=roundPlan(3,['original','native','ntl','vlither'],{limitedNtlView:true});
+  assert.equal(plan.length,36);assert.equal(plan.filter(r=>r.telemetry==='off').length,6);
+  assert.ok(plan.filter(r=>r.telemetry==='off').every(r=>r.round===1&&r.client!=='vlither'));
+  assert.deepEqual([...new Set(plan.filter(r=>r.round===2).map(r=>r.client))],['vlither','ntl','native','original']);
+  for(const round of [1,2,3])for(const client of ['original','native'])assert.ok(plan.some(r=>r.round===round&&r.client===client&&r.scenario==='battledome'&&r.viewCondition==='ntl-farthest'&&r.telemetry==='on'));
+  assert.equal(roundPlan(3,['original','native','ntl','vlither'],{telemetryControls:false}).length,24);
+});
+
+test('outer-circle anchoring rejects a pit circle and measures a zoom plateau',()=>{
+  const census={radius:1000,players:[{alive:true,setup:true,x:750,y:0}]};
+  const view={viewport:[1000,800],boundary:{x:350,y:400,radius:200}};
+  const anchor=anchoredBoundary(view,census);assert.equal(anchor.physicalPixelsPerWorldUnit,.2);assert.equal(anchor.wholeMap,true);
+  assert.equal(anchoredBoundary({...view,boundary:{x:350,y:400,radius:100}},census),null);
+  assert.equal(zoomPlateau([anchor,{...anchor,physicalPixelsPerWorldUnit:.201},anchor]),true);
+  assert.equal(zoomPlateau([anchor,{...anchor,physicalPixelsPerWorldUnit:.25},anchor]),false);
+});
+
+test('collector exposes split live ETW loss before capture completion',async()=>{
+  const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();
+  let failure=null;const done=collectorCompletion(child,log=>{failure??=presentMonFailure(log);});
+  child.stdout.write('[ETW Status] EventsLost=0 BuffersLost=0 OverflowedPresents=');assert.equal(failure,null);
+  child.stdout.write('12\n');assert.match(failure,/overflow/i);
+  child.emit('close',0);assert.match((await done).log,/OverflowedPresents=12/);
+  assert.ok(transientFailure({error:failure}));
+});
 
 test('CSV quoting, BOM and malformed rows', () => {
   assert.deepEqual(csv('\uFEFFa,b\r\n"a,b","x""y"\r\n'), [{ a: 'a,b', b: 'x"y' }]);
@@ -97,6 +145,15 @@ test('complete 60-second delivery cannot pass a blank drawn-snake scene',()=>{
   const other=completeBattledome();run.validity=validity(run);other.validity=validity(other);
   assert.equal(comparison(run,other).classification,'labelled comparison only');
   assert.ok(comparison(run,other).reasons.some(reason=>reason.includes('drawn-snake')));
+});
+test('a labelled limited view must match its calibrated physical scale',()=>{
+  const run=completeBattledome();run.viewCondition='ntl-farthest';
+  run.ntlViewCalibration={physicalPixelsPerWorldUnit:.2};
+  run.views.forEach(v=>Object.assign(v,{wholeMap:false,zoom:.2,viewport:[960,540]}));
+  assert.equal(validity(run).valid,true);
+  run.views[10].zoom=.25;
+  assert.ok(validity(run).reasons.includes('Farthest NTL view scale not matched within 5%'));
+  delete run.ntlViewCalibration;assert.equal(validity(run).valid,false);
 });
 test('native network observations retain early TCP and UDP violations without claiming complete proof',()=>{
   const sample={atUnixMs:0,pids:[7],tcpCollected:true,udpCollected:true,tcp:[{pid:7,localAddress:'127.0.0.1',remoteAddress:'127.0.0.1',state:'Established'}],udp:[{pid:7,localAddress:'::1',remoteAddress:null}]};

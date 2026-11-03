@@ -54,6 +54,7 @@ export function hostStats(text) {
 }
 export function presentMonFailure(text) {
   if (/[1-9]\d*\s+ETW events were lost/i.test(text)) return 'PresentMon lost ETW events; presentation coverage is incomplete';
+  if (/[1-9]\d*\s+ETW buffers were lost/i.test(text)||/\b(?:EventsLost|BuffersLost|OverflowedPresents)=[1-9]\d*/.test(text)) return 'PresentMon ETW loss or present overflow; presentation coverage is incomplete';
   if (/access.*denied|error.*(?:trace|session)|failed to start/i.test(text)) return 'PresentMon ETW capture failed; inspect retained console output';
   return null;
 }
@@ -63,11 +64,11 @@ export function presentMonArguments({session,file,pid,seconds}) {
   // providers are unnecessary for the displayed timestamps measured here.
   return ['--session_name',session,'--output_file',file,'--process_id',String(pid),
     '--v2_metrics','--qpc_time_ms','--timed',String(seconds+12),'--terminate_after_timed',
-    '--no_track_gpu','--no_track_input','--no_console_stats'];
+    '--no_track_gpu','--no_track_input','--no_console_stats','--track_etw_status'];
 }
 export function transientFailure(run) {
   return (run.windowSamples??[]).some(s=>s.buildRunning||s.ownerInput||!s.foreground||s.occluded||s.minimized||!s.visible)
-    || /ETW events|Foreground acquisition|Owner input|Window obscured/.test(run.error??'');
+    || /ETW|PresentMon collection|presentation CSV|Foreground acquisition|Owner input|Window obscured/.test(run.error??'');
 }
 export function checkedPresentation(collector,{pids,seconds,startMs,endMs}) {
   if(collector.error||collector.exitCode!==0)throw Error(`PresentMon collection failed: ${collector.error??`exit ${collector.exitCode}`}`);
@@ -198,8 +199,15 @@ export function validity(run) {
   if (run.client === 'vlither' && run.views?.some(v => v.protocol !== 19)) reasons.push('Vlither protocol changed');
   if (run.scenario === 'normal' && ['original','native'].includes(run.client)
       && run.views?.some(v => v.userZoom !== 1)) reasons.push('Normal scenario left stock zoom');
-  if (run.scenario === 'battledome' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
-  if(run.scenario==='battledome'&&run.views?.some(v=>v.sceneEvidence==='image'))reasons.push('Image boundary is unanchored to outer map extent; whole-map acceptance unavailable');
+  if (run.scenario === 'battledome' && run.viewCondition!=='ntl-farthest' && (!run.views?.length || run.views.some(v => !v.wholeMap))) reasons.push('Whole-map camera not verified (limited view)');
+  if(run.scenario==='battledome'&&run.views?.some(v=>v.sceneEvidence==='image'&&!v.boundaryAnchor))reasons.push('Image boundary is unanchored to outer map extent; whole-map acceptance unavailable');
+  if(run.viewCondition==='ntl-farthest'){
+    const target=run.ntlViewCalibration?.physicalPixelsPerWorldUnit;
+    if(!Number.isFinite(target)||target<=0||!run.views?.length||run.views.some(v=>{
+      const scale=v.boundaryAnchor?.physicalPixelsPerWorldUnit??v.zoom*run.width/v.viewport?.[0];
+      return !Number.isFinite(scale)||Math.abs(scale/target-1)>.05;
+    }))reasons.push('Farthest NTL view scale not matched within 5%');
+  }
   if (run.scenario === 'battledome' && (!run.census?.length || run.census.some(v => !v.wholeMapFood))) reasons.push('Whole-map food delivery not enabled');
   if (run.metrics && (run.metrics.coveredMs < run.seconds * 1000 * .9 || run.metrics.boundaryGapMs.some(g => g > 250))) reasons.push('Incomplete display coverage at window boundaries');
   if (!run.vsync) reasons.push('Vsync state unknown');
@@ -216,6 +224,7 @@ export function validity(run) {
 export function comparison(a, b) {
   const reasons = [];
   const gpu = r => (r.renderAdapters ?? []).map(a => a.luid).sort().join(',');
+  if((a.viewCondition??'whole-map')!==(b.viewCondition??'whole-map'))reasons.push('different view conditions');
   if (!a.validity?.valid || !b.validity?.valid) reasons.push('invalid run');
   if (!gpu(a) || gpu(a) !== gpu(b)) reasons.push('different or unknown render adapters');
   for (const field of ['display', 'refreshHz', 'width', 'height', 'dpi', 'scenario', 'experiment', 'vsyncCondition']) {

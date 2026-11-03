@@ -136,6 +136,15 @@ if ($c.mode -eq 'focus') {
   @{foreground=$true; lastInputTick=[BenchWindow]::LastInputTick()} | ConvertTo-Json -Compress
   exit
 }
+if ($c.mode -eq 'wheel') {
+  $delta=[int][Math]::Round([Math]::Max(-200,[Math]::Min(200,$c.notches))*120)
+  $r=New-Object BenchWindow+Rect
+  [BenchWindow]::GetClientRect($hwnd,[ref]$r)|Out-Null
+  $pt=New-Object BenchWindow+Point;$pt.X=[int]($r.R/2);$pt.Y=[int]($r.B/2)
+  [BenchWindow]::ClientToScreen($hwnd,[ref]$pt)|Out-Null
+  [BenchWindow]::PostMessage($hwnd,0x20A,[IntPtr]($delta -shl 16),[IntPtr](($pt.Y -shl 16) -bor ($pt.X -band 65535)))|Out-Null
+  exit
+}
 if($c.mode -eq 'close') {
   [BenchWindow]::PostMessage($hwnd,0x10,[IntPtr]0,[IntPtr]0)|Out-Null
   exit
