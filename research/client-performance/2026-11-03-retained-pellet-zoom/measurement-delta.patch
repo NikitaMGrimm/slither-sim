@@ -1,0 +1,78 @@
+--- a/base/client/src/presentation/food.rs
++++ b/base/client/src/presentation/food.rs
+@@ -815,0 +816 @@
++        let profile_begin=std::time::Instant::now();
+@@ -818,0 +820 @@
++        FOOD_ADVANCE_NS.with(|x|x.set(x.get()+profile_begin.elapsed().as_nanos() as u64));
+@@ -825,0 +828 @@
++        let clone_begin=std::time::Instant::now();
+@@ -826,0 +830 @@
++        FOOD_CLONE_NS.with(|x|x.set(x.get()+clone_begin.elapsed().as_nanos() as u64));
+@@ -990,0 +995,4 @@
++
++thread_local!{static FOOD_ADVANCE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};static FOOD_CLONE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};}
++#[allow(missing_docs)]pub fn take_food_advance_ns()->u64{FOOD_ADVANCE_NS.with(|x|x.replace(0))}
++#[allow(missing_docs)]pub fn take_food_clone_ns()->u64{FOOD_CLONE_NS.with(|x|x.replace(0))}
+--- a/base/client/src/presentation.rs
++++ b/base/client/src/presentation.rs
+@@ -589,0 +590,2 @@
++
++pub use food::{take_food_advance_ns,take_food_clone_ns};
+--- a/base/client/apps/wgpu-slice/src/render.rs
++++ b/base/client/apps/wgpu-slice/src/render.rs
+@@ -1852,0 +1853,4 @@
++
++#[cfg(feature="frame-profile")]pub(crate)struct PhaseScope(&'static str);
++#[cfg(feature="frame-profile")]impl Drop for PhaseScope{fn drop(&mut self){observe_preparation(self.0,0);}}
++#[cfg(feature="frame-profile")]pub(crate)fn phase_scope(begin:&'static str,end:&'static str)->PhaseScope{observe_preparation(begin,0);PhaseScope(end)}
+--- a/base/client/apps/wgpu-slice/src/pellet_batch.rs
++++ b/base/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -83,0 +84 @@
++            let _source_profile=crate::render::phase_scope("pellet_sources_begin","pellet_sources_end");
+--- a/base/client/apps/wgpu-slice/src/pellet_gpu.rs
++++ b/base/client/apps/wgpu-slice/src/pellet_gpu.rs
+@@ -318,0 +319 @@
++        let _profile=crate::render::phase_scope("pellet_prepare_begin","pellet_prepare_end");
+@@ -321,0 +323 @@
++        let math_profile=crate::render::phase_scope("pellet_math_begin","pellet_math_end");
+@@ -351,0 +354 @@
++        drop(math_profile);
+--- a/candidate/client/src/presentation/food.rs
++++ b/candidate/client/src/presentation/food.rs
+@@ -815,0 +816 @@
++        let profile_begin=std::time::Instant::now();
+@@ -818,0 +820 @@
++        FOOD_ADVANCE_NS.with(|x|x.set(x.get()+profile_begin.elapsed().as_nanos() as u64));
+@@ -825,0 +828 @@
++        let clone_begin=std::time::Instant::now();
+@@ -826,0 +830 @@
++        FOOD_CLONE_NS.with(|x|x.set(x.get()+clone_begin.elapsed().as_nanos() as u64));
+@@ -990,0 +995,4 @@
++
++thread_local!{static FOOD_ADVANCE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};static FOOD_CLONE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};}
++#[allow(missing_docs)]pub fn take_food_advance_ns()->u64{FOOD_ADVANCE_NS.with(|x|x.replace(0))}
++#[allow(missing_docs)]pub fn take_food_clone_ns()->u64{FOOD_CLONE_NS.with(|x|x.replace(0))}
+--- a/candidate/client/src/presentation.rs
++++ b/candidate/client/src/presentation.rs
+@@ -589,0 +590,2 @@
++
++pub use food::{take_food_advance_ns,take_food_clone_ns};
+--- a/candidate/client/apps/wgpu-slice/src/render.rs
++++ b/candidate/client/apps/wgpu-slice/src/render.rs
+@@ -1849,0 +1850,4 @@
++
++#[cfg(feature="frame-profile")]pub(crate)struct PhaseScope(&'static str);
++#[cfg(feature="frame-profile")]impl Drop for PhaseScope{fn drop(&mut self){observe_preparation(self.0,0);}}
++#[cfg(feature="frame-profile")]pub(crate)fn phase_scope(begin:&'static str,end:&'static str)->PhaseScope{observe_preparation(begin,0);PhaseScope(end)}
+--- a/candidate/client/apps/wgpu-slice/src/pellet_batch.rs
++++ b/candidate/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -102,0 +103 @@
++            let _source_profile=crate::render::phase_scope("pellet_sources_begin","pellet_sources_end");
+--- a/candidate/client/apps/wgpu-slice/src/pellet_gpu.rs
++++ b/candidate/client/apps/wgpu-slice/src/pellet_gpu.rs
+@@ -318,0 +319 @@
++        let _profile=crate::render::phase_scope("pellet_prepare_begin","pellet_prepare_end");
+@@ -321,0 +323 @@
++        let math_profile=crate::render::phase_scope("pellet_math_begin","pellet_math_end");
+@@ -352,0 +355 @@
++        drop(math_profile);

@@ -179,7 +179,7 @@ impl PressureEntityBudget {
             select_pressure(foods, self.food_commands / 7, |food| {
                 Ok::<_, std::convert::Infallible>(
                     bounds.is_some_and(|b| b.contains(food.snapshot().render_position))
-                        && super::food_painter::zoom_eligible(food.snapshot(), zoom_factor),
+                        && super::food_painter::food_zoom_eligible(food.snapshot(), zoom_factor),
                 )
             })
             .expect("infallible food visibility"),

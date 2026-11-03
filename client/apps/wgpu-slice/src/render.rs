@@ -979,24 +979,21 @@ fn prepare_composed(
         client.food_bounds(),
         user_zoom,
     );
-    let mut retained_food = if !pressure
-        && quality.high_quality
-        && quality.blend == 1.
-        && user_zoom == 1.
-        && draws.is_empty()
-    {
-        bank.food_batch_cache.prepare(
-            client.foods(),
-            view,
-            client.food_bounds(),
-            &bank.assets,
-            &bank.food_outline,
-            &mut bank.food_asset_index,
-            MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
-        )?
-    } else {
-        None
-    };
+    let mut retained_food =
+        if !pressure && quality.high_quality && quality.blend == 1. && draws.is_empty() {
+            bank.food_batch_cache.prepare(
+                client.foods(),
+                view,
+                client.food_bounds(),
+                &bank.assets,
+                &bank.food_outline,
+                &mut bank.food_asset_index,
+                user_zoom,
+                MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+            )?
+        } else {
+            None
+        };
     let total_food_charge = retained_food.as_ref().map_or(0, |b| b.draw_count());
     let food = if let Some(batch) = &retained_food {
         FoodPaintPlan {

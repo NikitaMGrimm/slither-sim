@@ -1,0 +1,6 @@
+{
+  "observation": "The initial launcher wrote optional stage keys in arm-dependent order without binding each row to the retained header.",
+  "affected": "tail stage, allocation and whole-window columns in the initial profile and v1 adoption summary CSVs",
+  "unaffected": "main callback quantiles, status, load and binary columns; original callback, phase, allocation, process and load journals",
+  "correction": "Retain original summaries unchanged, reconstruct bounded summaries from journals, and use a zero-filled common schema with header-key validation for v2. No timing result is invented or re-measured by this repair."
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "mutation": "stock-only-admission",
+    "test": "crowded_wheel_views_keep_retained_food_and_frozen_retry_inputs",
+    "result": "expected assertion failure, not compilation failure",
+    "restored_sha256": "5741fa80a4320dd8210cc89a711dbf54547a845855669d04e2f86980aa47b1a6"
+  },
+  {
+    "mutation": "ignore-sprite-zoom",
+    "test": "compact_dynamic_rectangles_and_alphas_match_the_image_oracle_by_bits",
+    "result": "expected assertion failure, not compilation failure",
+    "restored_sha256": "808745775964013a3fb5ff70d32e3b163b760d7afdf4c6cafcb2cbcd5447c3ea"
+  },
+  {
+    "mutation": "rebuild-empty-zoom",
+    "test": "empty_zoom_does_not_rebuild_groups_after_membership_changes",
+    "result": "expected assertion failure, not compilation failure",
+    "restored_sha256": "808745775964013a3fb5ff70d32e3b163b760d7afdf4c6cafcb2cbcd5447c3ea"
+  }
+]

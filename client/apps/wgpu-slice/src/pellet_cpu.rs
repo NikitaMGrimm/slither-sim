@@ -43,6 +43,7 @@ pub(super) fn project(
     input: Input,
     sources: &Sources,
     view: BodyPaintView,
+    user_zoom: f64,
     attachment: [u32; 2],
 ) -> Result<Projected> {
     let f = FoodPaintSnapshot {
@@ -51,8 +52,8 @@ pub(super) fn project(
     };
     let pulse = food_pulse(f);
     let glows = [
-        glow_pair(frame, f, view, false, pulse)?,
-        glow_pair(frame, f, view, true, pulse)?,
+        glow_pair(frame, f, view, false, pulse, user_zoom)?,
+        glow_pair(frame, f, view, true, pulse, user_zoom)?,
     ];
     let mut bits = 1;
     let alpha = food_body_alpha(f, 1., pulse);
@@ -74,7 +75,7 @@ pub(super) fn project(
     }
     Ok(Projected {
         slot: input.slot,
-        bytes: exact_instance(frame, f, view, &glows, pulse)?.bytes(),
+        bytes: exact_instance(frame, f, view, &glows, pulse, user_zoom)?.bytes(),
         bits,
         areas,
         bins,
