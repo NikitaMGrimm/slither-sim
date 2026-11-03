@@ -199,8 +199,8 @@ Authored tests compare grouping/ranges/slots with the original tree oracle,
 including swap removals, conflicting static metadata, retry after source failure,
 signed-zero fallback, equal-serial sibling creations, weak lifetime, rollback and
 queued-picture isolation. The existing 25,000-pellet regression exercises changing
-animation and camera states. Mutant and full-check results are recorded below
-in [mutation-checks.json](mutation-checks.json): forcing all creation identities
+animation and camera states. [Mutation checks](mutation-checks.json) show that
+forcing all creation identities
 to match fails the sibling-creation assertion; removing the cached-family
 metadata guard fails the canonical-fallback assertion. Both failures were test
 assertions, not compiler errors. Source bytes were restored and verified.
@@ -212,6 +212,12 @@ all 14 non-GPU pellet-batch regressions passed. Study recompute and tests pass,
 including rejection of wrong binary identities, incomplete callbacks, skips,
 malformed digests, wrong configurations and incorrect exclusions. Browser GPU
 execution remains unverified.
+
+After rebasing, the focused core identity and 14 pellet-batch tests, all 48
+updated comparison-tool tests and the history guard passed. The authored
+offscreen worker/serial lifecycle image test also passed on RTX/Vulkan and
+AMD/DX12, covering both quality modes, non-empty prefix/overlay, resize and
+offline reconnect. The rebased runtime source hashes match the measured runtime.
 
 ## Other attempts and limits
 
