@@ -420,7 +420,10 @@ impl Frame {
         }
         Ok(())
     }
-    #[inline]
+    // Food supplies a constant axis-aligned transform. Specialize it without
+    // changing the checked f64 arithmetic or the f32 submission boundary.
+    // See research/client-performance/2026-11-02-retained-pellets/REPORT.md.
+    #[inline(always)]
     pub(crate) fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
         let key = ResourceKey::from(d.asset);
         let r = d.destination;
