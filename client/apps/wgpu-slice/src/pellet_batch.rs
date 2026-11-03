@@ -65,6 +65,7 @@ impl Cache {
         assets: &[BodyAsset],
         outlines: &[bool],
         index: &mut FoodAssetIndex,
+        user_zoom: f64,
         limit: usize,
     ) -> Result<Option<Batch>> {
         if world.foods().len() < 1024
@@ -72,6 +73,9 @@ impl Cache {
             || view.camera.x.abs() > 1e9
             || view.camera.y.abs() > 1e9
             || !(0.0001..=100.).contains(&view.zoom)
+            || !user_zoom.is_finite()
+            || user_zoom <= 0.
+            || user_zoom > 100.
         {
             return Ok(None);
         }
@@ -170,7 +174,7 @@ impl Cache {
                 .iter()
                 .map(|i| world.foods()[families[*i].indices[0]].clone())
                 .collect();
-            validate_food_with_index(
+            let validated = validate_food_with_index(
                 FoodPaintInput {
                     foods: &representatives,
                     view,
@@ -186,8 +190,14 @@ impl Cache {
                 },
                 index,
                 1.,
-            )
-            .map_err(|e| e.to_string())?;
+            );
+            // Generic zoom planning intentionally ignores sources of subpixel
+            // food. If this conservative all-source check fails, let that path
+            // decide which sources matter; never reject an otherwise valid view.
+            if user_zoom != 1. && validated.is_err() {
+                return Ok(None);
+            }
+            validated.map_err(|e| e.to_string())?;
             let mut groups = Vec::new();
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
@@ -230,7 +240,17 @@ impl Cache {
             let p = f.render_position;
             let inside =
                 p.x >= limits[0] && p.x <= limits[1] && p.y >= limits[2] && p.y <= limits[3];
-            visible[sources.slots[i]] = inside;
+            let slot = sources.slots[i];
+            let inside = inside
+                && (user_zoom >= 1.
+                    || food_zoom_eligible(
+                        FoodPaintSnapshot {
+                            animation: f,
+                            sources: sources.groups[sources.slot_groups[slot]].sources,
+                        },
+                        user_zoom,
+                    ));
+            visible[slot] = inside;
             count += usize::from(inside);
         }
         if count.checked_mul(7).is_none_or(|n| n > limit) {
@@ -243,6 +263,7 @@ impl Cache {
             bounds: bounds.expect("checked bounds"),
             visible,
             visible_count: count,
+            user_zoom,
             early_at: 0,
             late_at: 0,
         }))
@@ -310,6 +331,10 @@ pub struct Batch {
     pub(crate) bounds: FoodCullBounds,
     pub(crate) visible: Vec<bool>,
     pub(crate) visible_count: usize,
+    // Freeze the exact overload/LOD factor with the queued picture; the view's
+    // camera zoom alone cannot recover the user factor or stock whole-source rule.
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-retained-pellet-zoom/REPORT.md.
+    pub(crate) user_zoom: f64,
     pub(crate) early_at: usize,
     pub(crate) late_at: usize,
 }
@@ -318,6 +343,7 @@ impl PartialEq for Batch {
         self.world == other.world
             && self.view == other.view
             && self.bounds == other.bounds
+            && self.user_zoom == other.user_zoom
             && self.early_at == other.early_at
             && self.late_at == other.late_at
     }
@@ -358,7 +384,7 @@ impl Batch {
             .ok_or(crate::frame::DRAW_MEMORY_LIMIT)?;
         crate::frame::check_draw_count(count)?;
         let mut index = FoodAssetIndex::default();
-        let plan = plan_food_with_index(
+        let plan = plan_food_with_zoom_and_index(
             FoodPaintInput {
                 foods: self.world.foods(),
                 view: self.view,
@@ -375,6 +401,7 @@ impl Batch {
             &mut index,
             Vec::new(),
             Vec::new(),
+            self.user_zoom,
         )
         .map_err(|e| {
             if e == FoodPaintError::Allocation {
@@ -408,29 +435,31 @@ fn project_food(
     source: FoodSource,
     center: Point,
     alpha: f64,
+    user_zoom: f64,
 ) -> Result<crate::frame::Quad> {
     let a = source.asset();
-    let (source, destination) =
-        match food_image_draw(source, center, f.animation.scale, 1.).map_err(|e| e.to_string())? {
-            FoodImageDraw::Whole { x, y } => (
-                BodyRect {
-                    x: 0.,
-                    y: 0.,
-                    width: f64::from(a.width),
-                    height: f64::from(a.height),
-                },
-                BodyRect {
-                    x,
-                    y,
-                    width: f64::from(a.width),
-                    height: f64::from(a.height),
-                },
-            ),
-            FoodImageDraw::Scaled {
-                source,
-                destination,
-            } => (source, destination),
-        };
+    let (source, destination) = match food_image_draw(source, center, f.animation.scale, user_zoom)
+        .map_err(|e| e.to_string())?
+    {
+        FoodImageDraw::Whole { x, y } => (
+            BodyRect {
+                x: 0.,
+                y: 0.,
+                width: f64::from(a.width),
+                height: f64::from(a.height),
+            },
+            BodyRect {
+                x,
+                y,
+                width: f64::from(a.width),
+                height: f64::from(a.height),
+            },
+        ),
+        FoodImageDraw::Scaled {
+            source,
+            destination,
+        } => (source, destination),
+    };
     frame.project(
         &Draw {
             asset: a,
@@ -454,11 +483,12 @@ pub(crate) fn glow_pair(
     view: BodyPaintView,
     outer: bool,
     pulse: f64,
+    user_zoom: f64,
 ) -> Result<(crate::frame::Quad, f32)> {
     let f = f.into();
     let glow = food_glow_paint(f, view, outer, 1., pulse).map_err(|e| e.to_string())?;
     Ok((
-        project_food(frame, f, glow.source, glow.center, glow.alpha[0])?,
+        project_food(frame, f, glow.source, glow.center, glow.alpha[0], user_zoom)?,
         glow.alpha[1] as f32,
     ))
 }
@@ -469,10 +499,18 @@ pub(crate) fn exact_instance(
     view: BodyPaintView,
     glows: &[(crate::frame::Quad, f32); 2],
     pulse: f64,
+    user_zoom: f64,
 ) -> Result<Instance> {
     let f = f.into();
     let center = food_body_center(f, view);
-    let body = project_food(frame, f, f.sources.body, center, f.animation.fade)?;
+    let body = project_food(
+        frame,
+        f,
+        f.sources.body,
+        center,
+        f.animation.fade,
+        user_zoom,
+    )?;
     let pairs = [
         (&body, food_body_alpha(f, 1., pulse)[1] as f32),
         (&glows[0].0, glows[0].1),
@@ -581,10 +619,140 @@ pub(crate) mod tests {
                 &bank.assets,
                 &bank.food_outline,
                 &mut bank.food_asset_index,
+                1.,
                 MAX_FOOD_PAINT_COMMANDS,
             )
             .unwrap()
             .unwrap()
+    }
+
+    #[test]
+    fn zoom_batches_preserve_lod_counts_budget_and_canonical_barriers() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle(&bank);
+        let mut cache = Cache::default();
+        for delta in [1., 5., 5., 5., 5., 5., 5., 5., 5., 5., 5., 5., 5.] {
+            world.advance(step(delta), |_| unreachable!()).unwrap();
+            for user_zoom in [1., 1. / 1.12, 1. / 1.12_f64.powi(4), 0.05, 0.001, 1.25] {
+                let v = BodyPaintView {
+                    zoom: view().zoom * user_zoom,
+                    ..view()
+                };
+                let bounds = Some(FoodCullBounds::from_view(v).unwrap());
+                let b = cache
+                    .prepare(
+                        &world,
+                        v,
+                        bounds,
+                        &bank.assets,
+                        &bank.food_outline,
+                        &mut bank.food_asset_index,
+                        user_zoom,
+                        MAX_FOOD_PAINT_COMMANDS,
+                    )
+                    .unwrap()
+                    .unwrap();
+                let input = FoodPaintInput {
+                    foods: world.foods(),
+                    view: v,
+                    quality: BodyPaintQuality {
+                        high_quality: true,
+                        blend: 1.,
+                    },
+                    bounds,
+                    assets: &bank.assets,
+                    target_handle: None,
+                    entry_alpha: 1.,
+                    command_limit: MAX_FOOD_PAINT_COMMANDS,
+                };
+                let plan = plan_food_with_zoom(input, Vec::new(), Vec::new(), user_zoom).unwrap();
+                assert_eq!(b.visible_count, plan.counts.visible_foods);
+                assert_eq!(b.draw_count(), plan.counts.total());
+                assert_eq!(
+                    b.canonical(&[]).unwrap(),
+                    plan.early
+                        .iter()
+                        .chain(&plan.late)
+                        .map(Draw::from)
+                        .collect::<Vec<_>>()
+                );
+                // Compact barriers must still reconstruct exactly over any prefix.
+                let Some(command) = plan.early.first() else {
+                    continue;
+                };
+                let middle = Draw::from(command);
+                let mut inserted = b.clone();
+                inserted.late_at = 1;
+                let mut expected: Vec<_> = plan.early.iter().map(Draw::from).collect();
+                expected.push(middle.clone());
+                expected.extend(plan.late.iter().map(Draw::from));
+                assert_eq!(inserted.canonical(&[middle]).unwrap(), expected);
+                if b.visible_count > 0 {
+                    assert!(
+                        cache
+                            .prepare(
+                                &world,
+                                v,
+                                bounds,
+                                &bank.assets,
+                                &bank.food_outline,
+                                &mut bank.food_asset_index,
+                                user_zoom,
+                                b.draw_count() - 1
+                            )
+                            .unwrap()
+                            .is_none()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn subpixel_zoom_does_not_reject_an_unused_missing_source() {
+        let mut bank = Bank::new().unwrap();
+        let world = rectangle(&bank);
+        let missing = world.foods()[0].snapshot().sources.body.asset().handle;
+        bank.assets.retain(|a| a.handle != missing);
+        let v = view();
+        let bounds = Some(FoodCullBounds::from_view(v).unwrap());
+        let mut cache = Cache::default();
+        assert!(
+            cache
+                .prepare(
+                    &world,
+                    v,
+                    bounds,
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    0.001,
+                    0
+                )
+                .unwrap()
+                .is_none()
+        );
+        let plan = plan_food_with_zoom_and_index(
+            FoodPaintInput {
+                foods: world.foods(),
+                view: v,
+                quality: BodyPaintQuality {
+                    high_quality: true,
+                    blend: 1.,
+                },
+                bounds,
+                assets: &bank.assets,
+                target_handle: None,
+                entry_alpha: 1.,
+                command_limit: 0,
+            },
+            &mut bank.food_asset_index,
+            Vec::new(),
+            Vec::new(),
+            0.001,
+        )
+        .unwrap();
+        assert_eq!(plan.counts.total(), 0);
     }
 
     #[test]
@@ -667,6 +835,7 @@ pub(crate) mod tests {
                     &bank.assets,
                     &bank.food_outline,
                     &mut bank.food_asset_index,
+                    1.,
                     MAX_FOOD_PAINT_COMMANDS
                 )
                 .unwrap()
@@ -1236,87 +1405,98 @@ pub(crate) mod tests {
         };
         for _ in 0..12 {
             world.advance(step(2.31), |_| unreachable!()).unwrap();
-            for i in (0..world.foods().len()).step_by(179) {
-                let food = world.foods()[i].snapshot();
-                let pulse = food_pulse(food);
-                let glows = [
-                    glow_pair(&frame, food, view(), false, pulse).unwrap(),
-                    glow_pair(&frame, food, view(), true, pulse).unwrap(),
-                ];
-                let packed = exact_instance(&frame, food, view(), &glows, pulse).unwrap();
-                let plan = plan_food(FoodPaintInput {
-                    foods: &world.foods()[i..i + 1],
-                    view: view(),
-                    quality: BodyPaintQuality {
-                        high_quality: true,
-                        blend: 1.,
-                    },
-                    bounds: Some(FoodCullBounds::from_view(view()).unwrap()),
-                    assets: &bank.assets,
-                    target_handle: None,
-                    entry_alpha: 1.,
-                    command_limit: 7,
-                })
-                .unwrap();
-                let resident = bank
-                    .assets
-                    .iter()
-                    .map(|a| (ResourceKey::from(*a), *a))
-                    .collect();
-                let oracle = Frame {
-                    draws: plan
-                        .early
+            for user_zoom in [1., 1. / 1.12, 1. / 1.12_f64.powi(4), 0.05, 1.25] {
+                for i in (0..world.foods().len()).step_by(179) {
+                    let food = world.foods()[i].snapshot();
+                    if !food_zoom_eligible(food, user_zoom) {
+                        continue;
+                    }
+                    let pulse = food_pulse(food);
+                    let glows = [
+                        glow_pair(&frame, food, view(), false, pulse, user_zoom).unwrap(),
+                        glow_pair(&frame, food, view(), true, pulse, user_zoom).unwrap(),
+                    ];
+                    let packed =
+                        exact_instance(&frame, food, view(), &glows, pulse, user_zoom).unwrap();
+                    let plan = plan_food_with_zoom(
+                        FoodPaintInput {
+                            foods: &world.foods()[i..i + 1],
+                            view: view(),
+                            quality: BodyPaintQuality {
+                                high_quality: true,
+                                blend: 1.,
+                            },
+                            bounds: Some(FoodCullBounds::from_view(view()).unwrap()),
+                            assets: &bank.assets,
+                            target_handle: None,
+                            entry_alpha: 1.,
+                            command_limit: 7,
+                        },
+                        Vec::new(),
+                        Vec::new(),
+                        user_zoom,
+                    )
+                    .unwrap();
+                    let resident = bank
+                        .assets
                         .iter()
-                        .chain(&plan.late)
-                        .map(Draw::from)
-                        .collect(),
-                    ..frame.clone()
-                }
-                .quads(&resident)
-                .unwrap();
-                for (part, first) in [1, 3, 5].into_iter().enumerate() {
-                    let q = &oracle[first];
-                    let second = &oracle[first + 1];
-                    assert_eq!(
-                        packed.0[part].map(f32::to_bits),
-                        [
-                            q.vertices[0][0],
-                            q.vertices[0][1],
-                            q.vertices[2][0],
-                            q.vertices[2][1]
-                        ]
-                        .map(f32::to_bits)
-                    );
-                    let actual = match part {
-                        0 => [
-                            packed.0[3][0],
-                            packed.0[3][1],
-                            packed.0[4][2],
-                            packed.0[4][3],
-                        ],
-                        1 => [
-                            packed.0[3][2],
-                            packed.0[3][3],
-                            packed.0[5][0],
-                            packed.0[5][1],
-                        ],
-                        _ => [
-                            packed.0[4][0],
-                            packed.0[4][1],
-                            packed.0[5][2],
-                            packed.0[5][3],
-                        ],
-                    };
-                    assert_eq!(
-                        actual.map(f32::to_bits),
-                        [
-                            q.vertices[0][4],
-                            second.vertices[0][4],
-                            q.vertices[2][2],
-                            q.vertices[2][3]
-                        ]
-                        .map(f32::to_bits)
-                    );
+                        .map(|a| (ResourceKey::from(*a), *a))
+                        .collect();
+                    let oracle = Frame {
+                        draws: plan
+                            .early
+                            .iter()
+                            .chain(&plan.late)
+                            .map(Draw::from)
+                            .collect(),
+                        ..frame.clone()
+                    }
+                    .quads(&resident)
+                    .unwrap();
+                    for (part, first) in [1, 3, 5].into_iter().enumerate() {
+                        let q = &oracle[first];
+                        let second = &oracle[first + 1];
+                        assert_eq!(
+                            packed.0[part].map(f32::to_bits),
+                            [
+                                q.vertices[0][0],
+                                q.vertices[0][1],
+                                q.vertices[2][0],
+                                q.vertices[2][1]
+                            ]
+                            .map(f32::to_bits)
+                        );
+                        let actual = match part {
+                            0 => [
+                                packed.0[3][0],
+                                packed.0[3][1],
+                                packed.0[4][2],
+                                packed.0[4][3],
+                            ],
+                            1 => [
+                                packed.0[3][2],
+                                packed.0[3][3],
+                                packed.0[5][0],
+                                packed.0[5][1],
+                            ],
+                            _ => [
+                                packed.0[4][0],
+                                packed.0[4][1],
+                                packed.0[5][2],
+                                packed.0[5][3],
+                            ],
+                        };
+                        assert_eq!(
+                            actual.map(f32::to_bits),
+                            [
+                                q.vertices[0][4],
+                                second.vertices[0][4],
+                                q.vertices[2][2],
+                                q.vertices[2][3]
+                            ]
+                            .map(f32::to_bits)
+                        );
+                    }
                 }
             }
         }
@@ -1438,6 +1618,7 @@ pub(crate) mod tests {
                     &bank.assets,
                     &bank.food_outline,
                     &mut bank.food_asset_index,
+                    1.,
                     MAX_FOOD_PAINT_COMMANDS,
                 )
                 .unwrap();

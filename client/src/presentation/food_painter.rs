@@ -267,12 +267,15 @@ fn validate_view(view: BodyPaintView) -> Result<(), FoodPaintError> {
     Ok(())
 }
 
-pub(super) fn zoom_eligible(food: FoodSnapshot, zoom_factor: f64) -> bool {
+/// Existing wheel-zoom subpixel admission, shared by generic and retained paint.
+#[inline]
+pub fn food_zoom_eligible(food: impl Into<FoodPaintSnapshot>, zoom_factor: f64) -> bool {
+    let food = food.into();
     zoom_factor >= 1. || {
-        let width = if food.scale == 1. {
+        let width = if food.animation.scale == 1. {
             f64::from(food.sources.body.asset().width)
         } else {
-            food.sources.body.width() * food.scale
+            food.sources.body.width() * food.animation.scale
         };
         width * zoom_factor >= 1.
     }
@@ -298,7 +301,7 @@ fn validate(
         // Omitted subpixel food consumes neither commands nor resources
         // (docs/zoom.md). Factor one still checks every retained source; the
         // optional catalog index preserves the same validation for eligible food.
-        if !zoom_eligible(food, zoom_factor) {
+        if !food_zoom_eligible(food, zoom_factor) {
             continue;
         }
         let sources = food.sources;
@@ -559,7 +562,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
             .filter(|(_, f)| bounds.contains(f.render_position))
             // Opt-in wheel LOD: omit food whose body is smaller than one
             // logical pixel. Default traversal stays exact (docs/zoom.md).
-            .filter(|(_, f)| zoom_eligible(*f, zoom_factor))
+            .filter(|(_, f)| food_zoom_eligible(*f, zoom_factor))
     };
     for (index, food) in visible() {
         let center = food_body_center(food, v);

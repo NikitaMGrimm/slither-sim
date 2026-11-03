@@ -35,6 +35,7 @@ struct Job {
     frame: Frame,
     sources: Arc<Sources>,
     view: BodyPaintView,
+    user_zoom: f64,
     attachment: [u32; 2],
     next: AtomicUsize,
     cancelled: AtomicBool,
@@ -66,6 +67,7 @@ impl Job {
             input,
             &self.sources,
             self.view,
+            self.user_zoom,
             self.attachment,
         )
     }
@@ -392,6 +394,7 @@ impl Workers {
             },
             sources: b.sources.clone(),
             view: b.view,
+            user_zoom: b.user_zoom,
             attachment,
             next: AtomicUsize::new(0),
             cancelled: AtomicBool::new(false),
@@ -505,6 +508,7 @@ mod tests {
             frame: frame.clone(),
             sources: b.sources.clone(),
             view: b.view,
+            user_zoom: b.user_zoom,
             attachment: frame.extent,
             next: AtomicUsize::new(0),
             cancelled: AtomicBool::new(false),
@@ -691,6 +695,7 @@ mod tests {
                                         },
                                         &b.sources,
                                         b.view,
+                                        b.user_zoom,
                                         frame.extent,
                                     )
                                     .unwrap()
@@ -724,6 +729,7 @@ mod tests {
                                             },
                                             &b.sources,
                                             b.view,
+                                            b.user_zoom,
                                             frame.extent,
                                         )
                                         .unwrap()

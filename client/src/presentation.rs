@@ -108,8 +108,8 @@ pub use food_painter::{
     FoodAssetIndex, FoodCullBounds, FoodGlowPaint, FoodImageCommand, FoodImageDraw,
     FoodPaintCounts, FoodPaintError, FoodPaintInput, FoodPaintPass, FoodPaintPlan,
     MAX_FOOD_PAINT_COMMANDS, food_body_alpha, food_body_center, food_glow_paint, food_image_draw,
-    food_pulse, plan_food, plan_food_with_index, plan_food_with_storage, plan_food_with_zoom,
-    plan_food_with_zoom_and_index, validate_food_with_index,
+    food_pulse, food_zoom_eligible, plan_food, plan_food_with_index, plan_food_with_storage,
+    plan_food_with_zoom, plan_food_with_zoom_and_index, validate_food_with_index,
 };
 pub(crate) use hud::HudLeaderboardRowsBudget;
 pub use hud::{
