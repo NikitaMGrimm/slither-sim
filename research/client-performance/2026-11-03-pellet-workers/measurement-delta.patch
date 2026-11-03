@@ -1,0 +1,195 @@
+--- client/src/presentation/food.rs
++++ measured/client/src/presentation/food.rs
+@@ -778,9 +778,11 @@
+         if !(0. ..=5.).contains(&step.delta) {
+             return Err(FoodError::InvalidInput);
+         }
++        let profile_begin=std::time::Instant::now();
+         let mut next = self.clone();
+         next.advance_in_place(step.delta, &mut pose)?;
+         *self = next;
++        FOOD_ADVANCE_NS.with(|x|x.set(x.get()+profile_begin.elapsed().as_nanos() as u64));
+         Ok(())
+     }
+ 
+@@ -788,7 +790,9 @@
+     where
+         F: FnMut(SnakeObjectToken) -> Result<FoodEaterPose, FoodError>,
+     {
++        let clone_begin=std::time::Instant::now();
+         let foods = Arc::make_mut(&mut self.foods);
++        FOOD_CLONE_NS.with(|x|x.set(x.get()+clone_begin.elapsed().as_nanos() as u64));
+         let mut removed = false;
+         for index in (0..foods.len()).rev() {
+             let f = &mut foods[index].state;
+@@ -900,3 +904,7 @@
+         assert_eq!(world, before);
+     }
+ }
++
++thread_local!{static FOOD_ADVANCE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};static FOOD_CLONE_NS:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};}
++#[allow(missing_docs)]pub fn take_food_advance_ns()->u64{FOOD_ADVANCE_NS.with(|x|x.replace(0))}
++#[allow(missing_docs)]pub fn take_food_clone_ns()->u64{FOOD_CLONE_NS.with(|x|x.replace(0))}
+--- client/src/presentation.rs
++++ measured/client/src/presentation.rs
+@@ -101,7 +101,7 @@
+ pub use food::{
+     FoodConsume, FoodEaterPose, FoodError, FoodFactory, FoodFactoryInput, FoodInstance,
+     FoodPaintSnapshot, FoodPaintState, FoodPalette, FoodPresentation, FoodSnapshot, FoodSource,
+-    FoodSourceIdentity, FoodSources, FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken,
++    FoodSourceIdentity, FoodSources, FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken, take_food_advance_ns, take_food_clone_ns,
+     food_palette,
+ };
+ pub use food_painter::{
+--- client/apps/wgpu-slice/src/pellet_batch.rs
++++ measured/client/apps/wgpu-slice/src/pellet_batch.rs
+@@ -78,6 +78,7 @@
+             .as_ref()
+             .filter(|s| s.source_identity == world.source_identity() && s.assets == assets);
+         if current.is_none() {
++            let _source_profile=crate::render::phase_scope("pellet_sources_begin","pellet_sources_end");
+             let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> =
+                 BTreeMap::new();
+             for (i, f) in world.foods().iter().enumerate().rev() {
+--- client/apps/wgpu-slice/src/pellet_gpu.rs
++++ measured/client/apps/wgpu-slice/src/pellet_gpu.rs
+@@ -316,9 +316,11 @@
+         attachment: [u32; 2],
+         samples: u32,
+     ) -> RenderResult<[bool; 4]> {
++        let _profile=crate::render::phase_scope("pellet_prepare_begin","pellet_prepare_end");
+         self.ensure_sources(r, b)?;
+         let mut flags = vec![0u32; b.visible.len()];
+         let mut coverage = [0.; 4];
++        let math_profile=crate::render::phase_scope("pellet_math_begin","pellet_math_end");
+         #[cfg(not(target_arch = "wasm32"))]
+         let parallel = self.workers.prepare(
+             frame,
+@@ -349,6 +351,7 @@
+                 .apply(&mut self.mirror, &mut flags, &mut coverage);
+             }
+         }
++        drop(math_profile);
+         r.queue.write_buffer(
+             self.dynamic.as_ref().expect("dynamic instances"),
+             0,
+--- client/apps/wgpu-slice/src/pellet_cpu.rs
++++ measured/client/apps/wgpu-slice/src/pellet_cpu.rs
+@@ -84,3 +84,8 @@
+ #[cfg(not(target_arch = "wasm32"))]
+ #[path = "pellet_workers.rs"]
+ pub(super) mod workers;
++
++#[cfg(all(test, windows))]
++#[allow(dead_code)]
++#[path = "../examples/support/offscreen.rs"]
++mod offscreen;
+--- client/apps/wgpu-slice/src/pellet_workers.rs
++++ measured/client/apps/wgpu-slice/src/pellet_workers.rs
+@@ -16,12 +16,12 @@
+     thread::{self, JoinHandle},
+ };
+ 
+-// Resource cap including main: leave CPU capacity for other applications.
+-// available_parallelism limits this further; Wasm does not instantiate a pool.
++// Main participates. The earlier 4->8 pilot saved only 0.2-0.25 ms for
++// twice the participants; cap portable available_parallelism at four.
+ const MAX_PARTICIPANTS: usize = 4;
+-// Paced density controls show only tens of microseconds saved at 1,024 visible
+-// pellets, versus a repeatable reduction with two/four participants at 2,048.
+-// Below that, neither copy inputs nor start workers.
++// With 4 ms gaps, two participants at 1,024 settled pellets were effectively
++// tied with serial (0.0954/0.0959 ms). At 2,048, two/four took 0.124/0.094 ms
++// versus 0.190 ms serial. Below that, neither copy inputs nor start workers.
+ // Measured cutoff, not a gameplay or visual limit:
+ // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
+ const MIN_VISIBLE: usize = 2048;
+@@ -281,22 +281,9 @@
+     behavior: Behavior,
+ }
+ 
+-// Two participants lose to serial in the 4,096/8,192-pellet paced controls.
+-// Four improve both; leave smaller available CPU budgets serial by default.
+-// The density table in the linked study records this adoption cutoff.
+-fn default_participants(available: usize) -> usize {
+-    if available < MAX_PARTICIPANTS {
+-        1
+-    } else {
+-        MAX_PARTICIPANTS
+-    }
+-}
+-
+ impl Default for Workers {
+     fn default() -> Self {
+-        Self::with_participants(default_participants(
+-            thread::available_parallelism().map_or(1, usize::from),
+-        ))
++        Self::with_participants(thread::available_parallelism().map_or(1, usize::from))
+     }
+ }
+ 
+@@ -547,7 +534,7 @@
+     fn all_participant_counts_preserve_ordered_bytes_flags_and_coverage() {
+         let (frame, b) = scene();
+         let expected = expected(&job(&frame, &b));
+-        for n in [2, 3, 4] {
++        for n in [2, 4] {
+             let pool = Pool::new(n, Behavior::default()).unwrap();
+             ready(&pool);
+             for _ in 0..5 {
+@@ -625,10 +612,6 @@
+     #[ignore]
+     fn measure_pool_density() {
+         let mut bank = Bank::new().unwrap();
+-        println!(
+-            "available_parallelism={:?}",
+-            thread::available_parallelism()
+-        );
+         let paced = std::env::var_os("PELLET_DENSITY_PACED").is_some();
+         println!("density,settled,participants,repeat,p50_ns,p95_ns");
+         for settled in [false, true] {
+@@ -852,8 +835,8 @@
+             resources.extend(page.resources);
+             serial.sync_resources(&resources).unwrap();
+             parallel.sync_resources(&resources).unwrap();
+-            let actual = crate::pellet_batch::offscreen::target(&parallel, physical);
+-            let expected = crate::pellet_batch::offscreen::target(&serial, physical);
++            let actual = super::super::offscreen::target(&parallel, physical);
++            let expected = super::super::offscreen::target(&serial, physical);
+             sp.render(
+                 &mut serial,
+                 &frame,
+@@ -873,8 +856,8 @@
+             )
+             .unwrap();
+             assert_eq!(
+-                crate::pellet_batch::offscreen::pixels(&parallel, &actual).unwrap(),
+-                crate::pellet_batch::offscreen::pixels(&serial, &expected).unwrap(),
++                super::super::offscreen::pixels(&parallel, &actual).unwrap(),
++                super::super::offscreen::pixels(&serial, &expected).unwrap(),
+                 "tick={tick} quality={quality:?}"
+             );
+         }
+@@ -887,12 +870,6 @@
+ 
+     #[test]
+     fn sparse_and_serial_admission_spawn_nothing() {
+-        for available in 0..4 {
+-            assert_eq!(default_participants(available), 1);
+-        }
+-        for available in [4, 8, 16] {
+-            assert_eq!(default_participants(available), 4);
+-        }
+         let (frame, mut b) = scene();
+         let mut mirror = vec![[0; 96]; b.visible.len()];
+         let mut flags = vec![0; b.visible.len()];
+--- client/apps/wgpu-slice/src/render.rs
++++ measured/client/apps/wgpu-slice/src/render.rs
+@@ -1850,3 +1850,7 @@
+         finish(frame, &mut bank, "HUD").unwrap();
+     }
+ }
++
++#[cfg(feature="frame-profile")]pub(crate)struct PhaseScope(&'static str);
++#[cfg(feature="frame-profile")]impl Drop for PhaseScope{fn drop(&mut self){observe_preparation(self.0,0);}}
++#[cfg(feature="frame-profile")]pub(crate)fn phase_scope(begin:&'static str,end:&'static str)->PhaseScope{observe_preparation(begin,0);PhaseScope(end)}

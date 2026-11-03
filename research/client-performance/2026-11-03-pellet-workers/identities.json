@@ -1,0 +1,236 @@
+{
+  "replay_input": {
+    "local_id": "retained-join-A",
+    "sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43"
+  },
+  "base_main": "be40e2287ec918cadb6558729fbbc9c99e57e126",
+  "measured_candidate_runtime_revision": "ec80d1ae7e44bc99d0b275ab417fe5e675ea692d",
+  "reviewed_runtime_revision": "b45c6b6531acf163a5c3b052b008720cba73628f",
+  "earlier": {
+    "base": {
+      "revision": "dd756cdffd7d3fb8b1ec48e9e15fe5a4df111379",
+      "runtime_source_sha256": {
+        "client/src/presentation/food.rs": "63a490d1469b09eec8afc7c515a7feac297ac7ce47f194d63e960fa42cf806c0",
+        "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499",
+        "client/src/presentation.rs": "f8a08f288b795f38e8d1e443b7ed6cd996f28da5636e9a4cd490e603131f4cfe",
+        "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "9c37aedc22c5a31897858d2aa8252284b6435393225a028ef2214ad99b35d893",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "edb748316bed3e1a8b0b57c956fac78b60a03553dbf7e56f29cc101cf93bd7f6",
+        "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+      },
+      "measured_source_sha256": {
+        "client/src/presentation/food.rs": "cdb4ef0e444fe214588bbba30058bf1c96dd7f15961b969ae19dba4da84cea09",
+        "client/src/presentation/food_painter.rs": "13e235b5e53573b34a3cfde43643ebf6c28831803f2f7f073e871c75609ca499",
+        "client/src/presentation.rs": "6ebe7d6355a84fbe34d2ecc8ec7b5566d19886431cdea4311ee67b10053264f9",
+        "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "46d34a56faf10b1b6724b876d6607a5baf8853e22d3484f4b9030ce20c53f3a5",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba93ad0b169026c626424330d6ad5633bd9c42e54c3ec752fd2555c48ecaaea6",
+        "client/apps/wgpu-slice/src/render.rs": "24e489ed48d54ff27d0fcede92c66f366138b588f470eb08b3ed058078f60cd7"
+      },
+      "driver_sha256": "d04287efc8245aa4c47ac1c272fa53e3644fe02ad51b0dc2738377f561c8d2a5",
+      "binary_sha256": "41d56d17e0e85a52426c816c88f81e9393a972bf85b27e766dd6a995e1017b2e"
+    },
+    "serial": {
+      "revision": "c6c716d406132854cd1af40857d3547938ef581d",
+      "runtime_source_sha256": {
+        "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+        "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+        "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+        "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "0ab45c722ec2899af0fb60fee8bba25cc6408d1cb8b7befb2875366af6b98e61",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "edb748316bed3e1a8b0b57c956fac78b60a03553dbf7e56f29cc101cf93bd7f6",
+        "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+      },
+      "measured_source_sha256": {
+        "client/src/presentation/food.rs": "694c0008851a2612bb5ec01c38e72a98515b337fd40a770d9c76ba7e34164f23",
+        "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+        "client/src/presentation.rs": "877c3654c782009f03804f813bb4e85cb45c38a8b37308667f0033c76c83f0e2",
+        "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "5fe6f5af4e3d0326dddaa382606c026184c3655e8ade34c2649298444b0ac81d",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba93ad0b169026c626424330d6ad5633bd9c42e54c3ec752fd2555c48ecaaea6",
+        "client/apps/wgpu-slice/src/render.rs": "24e489ed48d54ff27d0fcede92c66f366138b588f470eb08b3ed058078f60cd7"
+      },
+      "driver_sha256": "d04287efc8245aa4c47ac1c272fa53e3644fe02ad51b0dc2738377f561c8d2a5",
+      "binary_sha256": "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+    },
+    "pool": {
+      "revision": "cf77eaf529d853940828b07da121f08552fdf328",
+      "runtime_source_sha256": {
+        "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+        "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+        "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+        "client/apps/wgpu-slice/src/gpu.rs": "4bdf5b21641a24292833a470a253025dcf70228580f34534efbef82d7e72c7f4",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "570c2466d511875e89f2e51718c6a4f112b2aa2322bb983b9d7c8a9919bc2ad4",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "590ace6a732368dadb106e42d0e071a4e0833a2e4225c3fbe5641c03caef995b",
+        "client/apps/wgpu-slice/src/pellet_cpu.rs": "6dde1d7c3ac905257f710a3efa70556a1fbfe0e6a188e392f4a96a1af63eba98",
+        "client/apps/wgpu-slice/src/pellet_workers.rs": "edbcd6c0ed52ab2a8be64304c4e2a27bf062f9239f3ee1e717b34b2f2ceb8db7",
+        "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+      },
+      "measured_source_sha256": {
+        "client/src/presentation/food.rs": "694c0008851a2612bb5ec01c38e72a98515b337fd40a770d9c76ba7e34164f23",
+        "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+        "client/src/presentation.rs": "877c3654c782009f03804f813bb4e85cb45c38a8b37308667f0033c76c83f0e2",
+        "client/apps/wgpu-slice/src/gpu.rs": "4bdf5b21641a24292833a470a253025dcf70228580f34534efbef82d7e72c7f4",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "b0a38c5e7f367ef8d46b33645b86a22c61709af7300fe647d7616a50824a4820",
+        "client/apps/wgpu-slice/src/pellet_gpu.rs": "076d4efcef4ae500f45a27f377fd73e500263eb5c2e737b68d2446c20f788abb",
+        "client/apps/wgpu-slice/src/pellet_cpu.rs": "6dde1d7c3ac905257f710a3efa70556a1fbfe0e6a188e392f4a96a1af63eba98",
+        "client/apps/wgpu-slice/src/pellet_workers.rs": "edbcd6c0ed52ab2a8be64304c4e2a27bf062f9239f3ee1e717b34b2f2ceb8db7",
+        "client/apps/wgpu-slice/src/render.rs": "24e489ed48d54ff27d0fcede92c66f366138b588f470eb08b3ed058078f60cd7"
+      },
+      "driver_sha256": "1970c4659b499b37c7753f43aadf4f7e6e72b40ed34cd518514ee4101c128654",
+      "binary_sha256": "aebb61b5d3ba7a943a361af55afb6a3d869a4504a30f9706bcd8f6abc72b27fd"
+    },
+    "replay_input": {
+      "local_id": "retained-join-A",
+      "sha256": "a9e9bbdaf3c8ebc940f9c75ecfda7aa6aff58d09f396119e13ab0ead16d8cc43"
+    },
+    "reviewed_runtime_revision": "a96dc299539fe0d1a0d14c09d391e8edffb6f40e",
+    "reviewed_runtime_source_sha256": {
+      "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+      "client/apps/wgpu-slice/src/gpu.rs": "4bdf5b21641a24292833a470a253025dcf70228580f34534efbef82d7e72c7f4",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "626fa34dd5009219dfcd5baf1180e3e53f8ab37d50351a4cb7860b8eeb55cb33",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "590ace6a732368dadb106e42d0e071a4e0833a2e4225c3fbe5641c03caef995b",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "29d00b401a0eb86c2b4ef64ab816b6850949e18d011f719a51fe5765b3a81f95",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "2ad3a6d5de69c4a3d5450c7bb4eb41f4e5b94c953fa0987616efedcbf66dd43f",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+    },
+    "source_note": "The frozen production expressions match the reviewed source. The retained delta changes only resource/cutoff rationale comments, test fixture reuse/participant coverage and diagnostic test output. Passive counters/scopes and the common private driver are separate measured-source identities. No current-file gate.",
+    "earlier_image_baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30",
+    "density": {
+      "binary_sha256": "ffb64ef9017f2b9ae13ed2c9d53a9c7b98ff05f5581e7e46cc0b09f4b5cf1c29",
+      "revision": "a96dc299539fe0d1a0d14c09d391e8edffb6f40e",
+      "source_sha256": {
+        "client/apps/wgpu-slice/src/pellet_workers.rs": "2ad3a6d5de69c4a3d5450c7bb4eb41f4e5b94c953fa0987616efedcbf66dd43f",
+        "client/apps/wgpu-slice/src/pellet_cpu.rs": "29d00b401a0eb86c2b4ef64ab816b6850949e18d011f719a51fe5765b3a81f95",
+        "client/apps/wgpu-slice/src/pellet_batch.rs": "626fa34dd5009219dfcd5baf1180e3e53f8ab37d50351a4cb7860b8eeb55cb33"
+      },
+      "features": [
+        "frame-profile"
+      ],
+      "profile": "release",
+      "build_jobs": 2,
+      "load_sha256": "2d4345279040167224c9110c72a314e61a198fe4fdaf8a0d962225fc050a5316",
+      "compile_samples": 0,
+      "load_min": 0.0,
+      "load_max": 44.53125
+    },
+    "timing_canonical_active": false
+  },
+  "serial": {
+    "binary_sha256": "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905",
+    "driver_sha256": "d04287efc8245aa4c47ac1c272fa53e3644fe02ad51b0dc2738377f561c8d2a5",
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+      "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "0ab45c722ec2899af0fb60fee8bba25cc6408d1cb8b7befb2875366af6b98e61",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "edb748316bed3e1a8b0b57c956fac78b60a03553dbf7e56f29cc101cf93bd7f6",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+    },
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "694c0008851a2612bb5ec01c38e72a98515b337fd40a770d9c76ba7e34164f23",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "877c3654c782009f03804f813bb4e85cb45c38a8b37308667f0033c76c83f0e2",
+      "client/apps/wgpu-slice/src/gpu.rs": "f795684bccece52568592307c41403675b59a77e96b57f1e072e2b9eca355e3a",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "5fe6f5af4e3d0326dddaa382606c026184c3655e8ade34c2649298444b0ac81d",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba93ad0b169026c626424330d6ad5633bd9c42e54c3ec752fd2555c48ecaaea6",
+      "client/apps/wgpu-slice/src/render.rs": "24e489ed48d54ff27d0fcede92c66f366138b588f470eb08b3ed058078f60cd7"
+    }
+  },
+  "pool": {
+    "binary_sha256": "176235805e4e56003b2b336542e36ab8330a6180d9ef88fb929c2fd67d253c71",
+    "driver_sha256": "28e67c3f6f5c9c97204134b6605514e25a802795685efe0e3c87f6c17dce25af",
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "b0018b016de38c6baa38aea7027e2a86ea2404922da1e1b3d5ef189aa677ee74",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "3ebb813c9cf9a0020aff70ff210ebf3bd7818aa457b3240b15b53e5180a9719c",
+      "client/apps/wgpu-slice/src/gpu.rs": "4bdf5b21641a24292833a470a253025dcf70228580f34534efbef82d7e72c7f4",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "91b29a3e8dedb0cffaa3a06a34fbbe1d281da232caf1157b9c93ef20fe88355c",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "590ace6a732368dadb106e42d0e071a4e0833a2e4225c3fbe5641c03caef995b",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "29d00b401a0eb86c2b4ef64ab816b6850949e18d011f719a51fe5765b3a81f95",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "853d5a5a32e8aeb2a90b2faf3bcc88b073a098736e8b928ccc8b6604202b044f",
+      "client/apps/wgpu-slice/src/render.rs": "ccf090792bb1e8df450551fc26963bfa96efc06fea3f6687a03315e27120821d"
+    },
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "694c0008851a2612bb5ec01c38e72a98515b337fd40a770d9c76ba7e34164f23",
+      "client/src/presentation/food_painter.rs": "76eb9ade70a50eebbaad944614507b583c4395aaa14c4b3fd6e991f04109593c",
+      "client/src/presentation.rs": "877c3654c782009f03804f813bb4e85cb45c38a8b37308667f0033c76c83f0e2",
+      "client/apps/wgpu-slice/src/gpu.rs": "4bdf5b21641a24292833a470a253025dcf70228580f34534efbef82d7e72c7f4",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "886cac09caabe289d6783c164756e27be846c256830499c79ddf020d628213e5",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "076d4efcef4ae500f45a27f377fd73e500263eb5c2e737b68d2446c20f788abb",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "6dde1d7c3ac905257f710a3efa70556a1fbfe0e6a188e392f4a96a1af63eba98",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "edbcd6c0ed52ab2a8be64304c4e2a27bf062f9239f3ee1e717b34b2f2ceb8db7",
+      "client/apps/wgpu-slice/src/render.rs": "24e489ed48d54ff27d0fcede92c66f366138b588f470eb08b3ed058078f60cd7"
+    }
+  },
+  "image_baseline_binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+  "image_baseline_driver_sha256": "5d132698641b3fe8c5c98d6eb3179ffd7eb46e1c4891619a12ecfb606293b4b4",
+  "density": {
+    "binary_sha256": "ffb64ef9017f2b9ae13ed2c9d53a9c7b98ff05f5581e7e46cc0b09f4b5cf1c29",
+    "revision": "a96dc299539fe0d1a0d14c09d391e8edffb6f40e",
+    "source_sha256": {
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "2ad3a6d5de69c4a3d5450c7bb4eb41f4e5b94c953fa0987616efedcbf66dd43f",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "29d00b401a0eb86c2b4ef64ab816b6850949e18d011f719a51fe5765b3a81f95",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "626fa34dd5009219dfcd5baf1180e3e53f8ab37d50351a4cb7860b8eeb55cb33"
+    },
+    "features": [
+      "frame-profile"
+    ],
+    "profile": "release",
+    "build_jobs": 2,
+    "load_sha256": "2d4345279040167224c9110c72a314e61a198fe4fdaf8a0d962225fc050a5316",
+    "compile_samples": 0,
+    "load_min": 0.0,
+    "load_max": 44.53125
+  },
+  "timing_canonical_active": false,
+  "note": "Frozen four-participant projection matches the candidate admitted path. Reviewed source additionally defaults to serial below four available logical CPUs, as decided from the retained density controls; measured runs on this host force four or an explicit diagnostic override. Other deltas are passive counters/scopes, rationale comments and tests, retained in measurement-delta.patch. Baseline runtime is byte-identical in the measured files to #450 as merged on main. Historical source hashes remain historical; tests read neither Git revisions nor current source.",
+  "timing_binary_arms": {
+    "initial": {
+      "base": [
+        "41d56d17e0e85a52426c816c88f81e9393a972bf85b27e766dd6a995e1017b2e"
+      ],
+      "serial": [
+        "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+      ],
+      "pool": [
+        "aebb61b5d3ba7a943a361af55afb6a3d869a4504a30f9706bcd8f6abc72b27fd"
+      ]
+    },
+    "range": {
+      "serial": [
+        "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+      ],
+      "pool": [
+        "e031435f3ee3d7dbcd06e6210069287d01f0178911f1151ac09ea8a16e5736fd"
+      ]
+    },
+    "bit": {
+      "serial": [
+        "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+      ],
+      "pool": [
+        "947892caf995eb461c764afa8d65f9170889c1112137ba8cc10e443085e67459"
+      ]
+    },
+    "slab": {
+      "serial": [
+        "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+      ],
+      "pool": [
+        "5d7eac2ac5229e1c4c920285cce23f175c08d52cfd7abfb63e0548a7f4eb27a7"
+      ]
+    },
+    "final": {
+      "serial": [
+        "73f7198f4ad79701f476a738652a5a30a4d964343d658464ebdb592c6d832905"
+      ],
+      "pool": [
+        "176235805e4e56003b2b336542e36ab8330a6180d9ef88fb929c2fd67d253c71"
+      ]
+    }
+  }
+}

@@ -14,7 +14,7 @@ use std::{
 #[cfg(all(test, windows))]
 #[allow(dead_code)]
 #[path = "../examples/support/offscreen.rs"]
-mod offscreen;
+pub(crate) mod offscreen;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Group {
@@ -42,6 +42,8 @@ pub(crate) struct Sources {
     pub groups: Vec<Group>,
     /// Dense world index -> grouped instance slot.
     pub slots: Vec<usize>,
+    /// Group of each already grouped slot, independent of animation.
+    pub slot_groups: Vec<usize>,
     pub assets: Vec<BodyAsset>,
 }
 
@@ -112,6 +114,14 @@ impl Cache {
                 }
                 family.1.push(i);
             }
+            // Compact projections substitute family metadata. Finite, nonzero
+            // dimensions compare bit-exactly with numeric equality. Zero halves
+            // may differ only in sign, so use the canonical path for that rare
+            // family instead of rechecking every pellet's source bits.
+            // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-workers/REPORT.md.
+            if families.values().any(|(s, _)| source_has_zero_half(s)) {
+                return Ok(None);
+            }
             // Source readiness still covers all retained sources, including culled food.
             let representatives: Vec<_> = families
                 .values()
@@ -138,12 +148,17 @@ impl Cache {
             let mut groups = Vec::new();
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
+            let mut slot_groups = Vec::new();
+            slot_groups
+                .try_reserve_exact(world.foods().len())
+                .map_err(|_| crate::frame::DRAW_ALLOCATION_FAILED)?;
             for (_, (sources, indices)) in families {
                 let start = grouped;
                 for i in indices {
                     slots[i] = grouped;
                     grouped += 1;
                 }
+                slot_groups.resize(grouped, groups.len());
                 groups.push(Group {
                     sources,
                     range: start..grouped,
@@ -153,6 +168,7 @@ impl Cache {
                 source_identity: world.source_identity(),
                 groups,
                 slots,
+                slot_groups,
                 assets: assets.to_vec(),
             }));
         }
@@ -181,6 +197,28 @@ impl Cache {
             late_at: 0,
         }))
     }
+}
+
+#[inline]
+fn source_has_zero_half(s: &FoodSources) -> bool {
+    [&s.body, &s.outline, &s.inner, &s.outer]
+        .into_iter()
+        .any(|source| source.half_width() == 0. || source.half_height() == 0.)
+}
+
+#[cfg(test)]
+#[inline(always)]
+fn same_source_bits(a: &FoodSources, b: &FoodSources) -> bool {
+    a.indices == b.indices
+        && [&a.body, &a.outline, &a.inner, &a.outer]
+            .into_iter()
+            .zip([&b.body, &b.outline, &b.inner, &b.outer])
+            .all(|(a, b)| {
+                a.asset() == b.asset()
+                    && [a.width(), a.height(), a.half_width(), a.half_height()].map(f64::to_bits)
+                        == [b.width(), b.height(), b.half_width(), b.half_height()]
+                            .map(f64::to_bits)
+            })
 }
 
 /// Opaque retained inputs. The ordinary image stream remains available as an oracle.
@@ -391,13 +429,16 @@ pub(crate) fn exact_instance(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::bank::Bank;
 
-    fn rectangle(bank: &Bank) -> FoodWorld {
+    pub(crate) fn rectangle(bank: &Bank) -> FoodWorld {
+        rectangle_count(bank, 25_000)
+    }
+    pub(crate) fn rectangle_count(bank: &Bank, count: usize) -> FoodWorld {
         let mut world = FoodWorld::new();
-        for i in 0..25_000 {
+        for i in 0..count {
             let factory = bank.food(
                 (i % 10) as u8,
                 [
@@ -424,7 +465,7 @@ mod tests {
         }
         world
     }
-    fn step(delta: f64) -> FrameStep {
+    pub(crate) fn step(delta: f64) -> FrameStep {
         FrameStep {
             delta,
             unlagged_delta: delta,
@@ -435,7 +476,7 @@ mod tests {
             doubled_accumulated: delta * 2.,
         }
     }
-    fn view() -> BodyPaintView {
+    pub(crate) fn view() -> BodyPaintView {
         BodyPaintView {
             camera: Point {
                 x: 16_200.,
@@ -446,7 +487,12 @@ mod tests {
             half_height: 422.,
         }
     }
-    fn batch(cache: &mut Cache, bank: &mut Bank, world: &FoodWorld, view: BodyPaintView) -> Batch {
+    pub(crate) fn batch(
+        cache: &mut Cache,
+        bank: &mut Bank,
+        world: &FoodWorld,
+        view: BodyPaintView,
+    ) -> Batch {
         cache
             .prepare(
                 world,
@@ -459,6 +505,93 @@ mod tests {
             )
             .unwrap()
             .unwrap()
+    }
+
+    #[test]
+    fn exact_metadata_comparison_covers_every_source_and_axis() {
+        let bank = Bank::new().unwrap();
+        let world = rectangle_count(&bank, 1024);
+        let original = world.foods()[0].snapshot().sources;
+        assert!(same_source_bits(&original, &original));
+        assert!(!source_has_zero_half(&original));
+        for part in 0..4 {
+            for axis in 0..2 {
+                let mut positive = original;
+                let mut negative = original;
+                for (sources, zero) in [(&mut positive, 0.), (&mut negative, -0.)] {
+                    let source = match part {
+                        0 => &mut sources.body,
+                        1 => &mut sources.outline,
+                        2 => &mut sources.inner,
+                        _ => &mut sources.outer,
+                    };
+                    *source = FoodSource::new(
+                        source.asset(),
+                        source.width(),
+                        source.height(),
+                        if axis == 0 { zero } else { source.half_width() },
+                        if axis == 1 {
+                            zero
+                        } else {
+                            source.half_height()
+                        },
+                    )
+                    .unwrap();
+                }
+                assert!(source_has_zero_half(&positive));
+                assert!(source_has_zero_half(&negative));
+                assert_eq!(positive, negative);
+                assert!(!same_source_bits(&positive, &negative));
+            }
+        }
+    }
+
+    #[test]
+    fn signed_zero_source_metadata_uses_the_canonical_fallback() {
+        let mut bank = Bank::new().unwrap();
+        let mut positive = bank.food(0, [0., 0.]);
+        for s in &mut positive.bodies {
+            *s = FoodSource::new(s.asset(), s.width(), s.height(), 0., s.half_height()).unwrap();
+        }
+        let mut negative = positive.clone();
+        for s in &mut negative.bodies {
+            *s = FoodSource::new(s.asset(), s.width(), s.height(), -0., s.half_height()).unwrap();
+        }
+        let mut world = FoodWorld::new();
+        for i in 0..1024 {
+            let factory = if i % 2 == 0 { &positive } else { &negative };
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: i,
+                        sector: (0, 0),
+                        position: view().camera,
+                        base_size: 0.2,
+                        raw_color: 0,
+                        rapid: true,
+                    },
+                    factory.input(1.),
+                )
+                .unwrap();
+        }
+        let a = world.foods()[0].snapshot().sources;
+        let b = world.foods()[1].snapshot().sources;
+        assert_eq!(a, b);
+        assert_ne!(a.body.half_width().to_bits(), b.body.half_width().to_bits());
+        assert!(
+            Cache::default()
+                .prepare(
+                    &world,
+                    view(),
+                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    MAX_FOOD_PAINT_COMMANDS
+                )
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -483,6 +616,14 @@ mod tests {
                 ..view()
             };
             let b = batch(&mut cache, &mut bank, &world, view);
+            for (i, food) in world.foods().iter().enumerate() {
+                let slot = b.sources.slots[i];
+                let group = &b.sources.groups[b.sources.slot_groups[slot]];
+                assert!(group.range.contains(&slot));
+                let expected = food.snapshot().sources;
+                assert_eq!(group.sources, expected);
+                assert!(same_source_bits(&group.sources, &expected));
+            }
             assert!(Arc::ptr_eq(&sources, &b.sources));
             assert_eq!(sources.source_identity, world.source_identity());
             let plan = plan_food_with_index(

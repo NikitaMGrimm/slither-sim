@@ -1,15 +1,14 @@
 //! Ordered instanced pellet passes using the renderer's existing texture arrays.
 use super::{
     DrawState, LayerHistory, LayerTarget, Multisample, Pipeline, RenderResult, Renderer,
-    VertexChunk, additive_pair,
-    soft_layers::{covered_area, select_glows},
-    zero_pair,
+    VertexChunk, additive_pair, soft_layers::select_glows, zero_pair,
 };
 use crate::{
     frame::{Frame, QUAD_VERTEX_BYTES, ResourceKey, VERTEX_CHUNK_QUADS},
-    pellet_batch::{Batch, Sources, exact_instance, glow_pair},
+    gpu::pellet_cpu::{Input, project},
+    pellet_batch::{Batch, Sources},
 };
-use slither_client::presentation::{FoodSource, food_body_alpha, food_pulse};
+use slither_client::presentation::FoodSource;
 use std::{ops::Range, sync::Arc};
 
 fn timestamp_indices(
@@ -75,6 +74,8 @@ pub(super) struct Pellets {
     // entire mirror each frame. See
     // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-upload-mirror/REPORT.md.
     mirror: Vec<[u8; 96]>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) workers: super::pellet_cpu::workers::Workers,
     bindings: Vec<[Option<SourceDraw>; 3]>,
 }
 fn uniform(
@@ -218,6 +219,8 @@ impl Pellets {
             dynamic: None,
             sources: None,
             mirror: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            workers: Default::default(),
             bindings: Vec::new(),
         }
     }
@@ -316,35 +319,35 @@ impl Pellets {
         self.ensure_sources(r, b)?;
         let mut flags = vec![0u32; b.visible.len()];
         let mut coverage = [0.; 4];
-        for (i, food) in b.world.foods().iter().enumerate().rev() {
-            let slot = b.sources.slots[i];
-            if !b.visible[slot] {
-                continue;
-            }
-            let f = food.snapshot();
-            let pulse = food_pulse(f);
-            let glows = [
-                glow_pair(frame, f, b.view, false, pulse)?,
-                glow_pair(frame, f, b.view, true, pulse)?,
-            ];
-            let mut bits = 1;
-            let body_alpha = food_body_alpha(f, 1., pulse);
-            if zero_pair(body_alpha[0] as f32, body_alpha[1] as f32) {
-                bits |= 32;
-            }
-            for (outer, (q, second)) in glows.iter().enumerate() {
-                let bin = super::glow_bin(q, *second, attachment);
-                if bin > 0 {
-                    coverage[bin as usize] += covered_area(&q.vertices);
+        #[cfg(not(target_arch = "wasm32"))]
+        let parallel = self.workers.prepare(
+            frame,
+            b,
+            attachment,
+            &mut self.mirror,
+            &mut flags,
+            &mut coverage,
+        )?;
+        #[cfg(target_arch = "wasm32")]
+        let parallel = false;
+        if !parallel {
+            for (i, food) in b.world.foods().iter().enumerate().rev() {
+                let slot = b.sources.slots[i];
+                if !b.visible[slot] {
+                    continue;
                 }
-                bits |= u32::from(bin) << if outer == 1 { 3 } else { 1 };
-                if zero_pair(q.vertices[0][4], *second) {
-                    bits |= if outer == 1 { 128 } else { 64 };
-                }
+                project(
+                    frame,
+                    Input {
+                        slot,
+                        animation: food.paint_state(),
+                    },
+                    &b.sources,
+                    b.view,
+                    attachment,
+                )?
+                .apply(&mut self.mirror, &mut flags, &mut coverage);
             }
-            let exact = exact_instance(frame, f, b.view, &glows, pulse)?;
-            self.mirror[slot] = exact.bytes();
-            flags[slot] = bits;
         }
         r.queue.write_buffer(
             self.dynamic.as_ref().expect("dynamic instances"),
