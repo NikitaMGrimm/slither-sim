@@ -78,7 +78,7 @@ impl Cache {
             .as_ref()
             .filter(|s| s.source_identity == world.source_identity() && s.assets == assets);
         if current.is_none() {
-            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, Vec<usize>)> =
+            let mut families: BTreeMap<[ResourceKey; 4], (FoodSources, bool, Vec<usize>)> =
                 BTreeMap::new();
             for (i, f) in world.foods().iter().enumerate().rev() {
                 let f = f.snapshot();
@@ -108,18 +108,20 @@ impl Cache {
                     s.inner.asset().into(),
                     s.outer.asset().into(),
                 ];
-                let family = families.entry(key).or_insert_with(|| (s, Vec::new()));
+                let family = families
+                    .entry(key)
+                    .or_insert_with(|| (s, source_has_zero_half(&s), Vec::new()));
                 // Grouped paint inputs reuse this metadata. Numeric equality
                 // alone collapses signed zero; keep exact source bits too.
-                if family.0 != s || !same_source_bits(&family.0, &s) {
+                if family.0 != s || (family.1 && !same_source_bits(&family.0, &s)) {
                     return Ok(None);
                 }
-                family.1.push(i);
+                family.2.push(i);
             }
             // Source readiness still covers all retained sources, including culled food.
             let representatives: Vec<_> = families
                 .values()
-                .map(|(_, indices)| world.foods()[indices[0]].clone())
+                .map(|(_, _, indices)| world.foods()[indices[0]].clone())
                 .collect();
             validate_food_with_index(
                 FoodPaintInput {
@@ -143,7 +145,7 @@ impl Cache {
             let mut grouped = 0;
             let mut slots = vec![0; world.foods().len()];
             let mut slot_groups = Vec::with_capacity(world.foods().len());
-            for (_, (sources, indices)) in families {
+            for (_, (sources, _, indices)) in families {
                 let start = grouped;
                 for i in indices {
                     slots[i] = grouped;
@@ -190,8 +192,17 @@ impl Cache {
     }
 }
 
-// Rebuild bursts must not copy two full source records into each comparison.
-// Keep exact signed-zero admission, but borrow and inline the numeric check.
+// FoodSource validates finite metadata and strictly positive full sizes. After
+// numeric equality, only a signed-zero half can have different bits. Test for
+// that possibility once per family, preserving the authored signed-zero
+// fallback without repeating a full bit comparison per ordinary pellet.
+#[inline(always)]
+fn source_has_zero_half(s: &FoodSources) -> bool {
+    [&s.body, &s.outline, &s.inner, &s.outer]
+        .into_iter()
+        .any(|source| source.half_width() == 0. || source.half_height() == 0.)
+}
+
 #[inline(always)]
 fn same_source_bits(a: &FoodSources, b: &FoodSources) -> bool {
     [&a.body, &a.outline, &a.inner, &a.outer]
@@ -487,6 +498,44 @@ pub(crate) mod tests {
             )
             .unwrap()
             .unwrap()
+    }
+
+    #[test]
+    fn zero_half_classification_covers_every_source_and_axis() {
+        let bank = Bank::new().unwrap();
+        let world = rectangle_count(&bank, 1024);
+        let original = world.foods()[0].snapshot().sources;
+        assert!(!source_has_zero_half(&original));
+        for part in 0..4 {
+            for axis in 0..2 {
+                let mut positive = original;
+                let mut negative = original;
+                for (sources, zero) in [(&mut positive, 0.), (&mut negative, -0.)] {
+                    let source = match part {
+                        0 => &mut sources.body,
+                        1 => &mut sources.outline,
+                        2 => &mut sources.inner,
+                        _ => &mut sources.outer,
+                    };
+                    *source = FoodSource::new(
+                        source.asset(),
+                        source.width(),
+                        source.height(),
+                        if axis == 0 { zero } else { source.half_width() },
+                        if axis == 1 {
+                            zero
+                        } else {
+                            source.half_height()
+                        },
+                    )
+                    .unwrap();
+                }
+                assert_eq!(positive, negative);
+                assert!(source_has_zero_half(&positive));
+                assert!(source_has_zero_half(&negative));
+                assert!(!same_source_bits(&positive, &negative));
+            }
+        }
     }
 
     #[test]
