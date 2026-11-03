@@ -63,5 +63,10 @@
     "revision": "bd23661930e06d6a1c6e5fc15765dde45711ea8d",
     "binary_sha256": "0d6d678f53dcbecbd825a8dcc809496cf4aa2e801703c3a7c86b764bdef98d38"
   },
-  "note": "Final timing and controls compare main 140a373a (including #456 and #455) with the rebased zoom candidate. Runtime and passive measured source hashes are separate; the driver is identical. Earlier pilot/composition data remains in restricted local scratch and is not pooled into these tables. No current-file provenance gate."
+  "note": "Final timing and controls compare main 140a373a (including #456 and #455) with the rebased zoom candidate. Runtime and passive measured source hashes are separate; the driver is identical. Earlier pilot/composition data remains in restricted local scratch and is not pooled into these tables. No current-file provenance gate.",
+  "reviewed_source_sha256": {
+    "client/apps/wgpu-slice/src/pellet_batch.rs": "b667ffb3715284a33ee49de179ccc45fb86a4b18eb5a813a3cc57d82694ae276"
+  },
+  "reviewed_source_note": "The reviewed pellet_batch.rs adds the large-pellet LOD-boundary bit oracle and factors its test helper; production expressions are unchanged from the recorded candidate runtime. Measured source identities and all timing data remain unchanged.",
+  "original_measurement_delta_sha256": "8e8eeb27cce9a50104427cbf2908b78dd0e8a93c87a8b1dbb0d913dea3bde165"
 }

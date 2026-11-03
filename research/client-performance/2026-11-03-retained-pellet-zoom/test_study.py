@@ -1,4 +1,5 @@
-import copy,json,unittest
+import copy,gzip,hashlib,json,re,subprocess,tempfile,unittest
+from pathlib import Path
 import recompute as s
 class Study(unittest.TestCase):
  def setUp(self):
@@ -26,4 +27,38 @@ class Study(unittest.TestCase):
   for field,value in [('quad_digest','d1fba762150c532c'),('quad_digest',''),('canonical_and_send_digest',''),('canonical_quads',0),('callbacks',599),('skips',1),('binary_sha256','0'*64)]:
    c=copy.deepcopy(self.c);c['1920x1080']['candidate'][field]=value
    with self.subTest(field=field),self.assertRaises(AssertionError):s.validate(self.r,self.p,c,self.i)
+
+ def test_instrumentation_reproduces_measured_sources(self):
+  verify_instrumentation(self.i,(s.ROOT/'measurement-delta.patch').read_bytes())
+ def test_changed_instrumentation_is_rejected(self):
+  patch=(s.ROOT/'measurement-delta.patch').read_bytes()
+  changed=patch.replace(b'profile_begin=std::time::Instant::now();',b'profile_begin=std::time::Instant::now(); // changed',1)
+  self.assertNotEqual(changed,patch)
+  with self.assertRaises(AssertionError)as error:verify_instrumentation(self.i,changed)
+  self.assertEqual(error.exception.args[0][:2],('base','client/src/presentation/food.rs'))
+
+def verify_instrumentation(ids,patch):
+ # Frozen source bases survive squash merge/shallow clones. Never read current
+ # runtime files or depend on PR-branch objects for this historical study.
+ bases=json.loads(gzip.decompress((s.ROOT/'source-bases.json.gz').read_bytes()))
+ needed={h for arm in s.ARMS for p,h in ids[arm]['runtime_source_sha256'].items()if h!=ids[arm]['measured_source_sha256'][p]}
+ assert set(bases)==needed
+ for digest,source in bases.items():assert hashlib.sha256(source.encode('utf-8')).hexdigest()==digest
+ for arm in s.ARMS:
+  with tempfile.TemporaryDirectory()as temp:
+   root=Path(temp)
+   for path,digest in ids[arm]['runtime_source_sha256'].items():
+    if digest in bases:
+     target=root/path;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(bases[digest].encode('utf-8'))
+   selected=b''.join(b for b in re.split(rb'(?=^--- )',patch,flags=re.M)if b.startswith(b'--- a/'+arm.encode()+b'/'))
+   assert selected
+   command=['git','-c','core.autocrlf=false','-c','core.eol=lf','apply','--unidiff-zero','--verbose','-p2','-']
+   result=subprocess.run(command,input=selected,cwd=root,capture_output=True)
+   assert result.returncode==0,result.stderr.decode('utf-8')
+   assert b'offset'not in result.stderr
+   for path,expected in ids[arm]['measured_source_sha256'].items():
+    source=root/path
+    actual=hashlib.sha256(source.read_bytes()).hexdigest()if source.exists()else ids[arm]['runtime_source_sha256'][path]
+    assert actual==expected,(arm,path,actual,expected)
+
 if __name__=='__main__':unittest.main()

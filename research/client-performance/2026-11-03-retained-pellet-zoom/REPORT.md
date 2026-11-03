@@ -28,8 +28,12 @@ Both arms are release builds with the same private replay driver and passive
 instrumentation. [identities.json](identities.json) records each binary, driver,
 runtime source and instrumented source identity separately.
 [measurement-delta.patch](measurement-delta.patch) retains the instrumentation
-delta (zero context; apply with `git apply --unidiff-zero`). It does not alter
-production expressions. Historical identities are not current-file hash gates.
+delta. Extract one arm, then apply with the explicit LF/strip settings below.
+It does not alter production expressions. Historical identities are not
+current-file hash gates. The reviewed source adds only an authored test/helper;
+its separate full-file hash is in `identities.json`. The frozen bases retain
+the measured version; the later test/helper change is visible in this PR.
+Timings describe the recorded measured source, not a rebuild with that regression.
 
 ## Method and reproduction
 
@@ -198,6 +202,15 @@ against its generic canonical submission path bounds the maximum RGB difference
 to **1 byte**, within the existing 2-byte paired-addition allowance. This is
 rounding-bounded parity, not byte identity on those AMD configurations.
 
+**Reviewer-reported rounding attribution:** an authored 4,096-pellet case at
+factor 0.05 on AMD/DX12 differed by one byte in two RGB channels with MSAA4;
+single-sample was exact. Reordering only the generic draws to retained
+family/part/slot order removed that difference. This identifies additive draw
+order interacting with MSAA rounding in that case. We did not rerun the
+reviewer's scene here. Canonical command order/barriers are preserved, while
+the GPU uses grouped submission. Neither universal byte identity nor a
+universal one-byte bound is established by these finite controls.
+
 These comparisons render the actual retained submission and generic canonical
 submission; the latter reconstructs the original image stream via
 `Batch::canonical`. They share core policy, textures and fragment math and are
@@ -225,6 +238,29 @@ focused tests passed again.
 native tests/builds, Wasm builds, authored Canvas ABI checks and repository guard.
 The browser's shared implementation compiles; browser WebGPU/WebGL runtime and
 owner play/presented cadence were not exercised. Tests never connect outside.
+
+## Instrumentation reproduction clarification (2026-11-03)
+
+The original arm payloads reproduce every recorded measured-source hash with
+`-p2` and LF output; no offset messages occur. Omitting LF control in a temporary
+Windows directory lets this host's global Git setting write CRLF, changing raw
+hashes. The earlier shorthand command did not explain the arm extraction or
+strip count. Headers now consistently name `a/<arm>/...` and `b/<arm>/...`.
+No measured identity or timing row was changed.
+
+For an extracted arm patch in the matching historical source tree:
+
+```text
+git -c core.autocrlf=false -c core.eol=lf apply --unidiff-zero --verbose -p2 - < arm.patch
+```
+
+The study tests extract each arm automatically, verify the deduplicated frozen
+bases in [source-bases.json.gz](source-bases.json.gz), apply it and compare every
+result to `measured_source_sha256`. Unchanged files must have identical runtime
+and measured hashes. They reject changed instrumentation and need neither
+current runtime files nor PR-branch Git objects, so they also work after squash
+merge in a fresh shallow checkout. The original patch hash is retained in
+`identities.json`; #456's historical record was checked but not edited.
 
 ## Earlier diagnostics, rejected pilot and summary repair
 

@@ -1439,6 +1439,101 @@ pub(crate) mod tests {
         assert_eq!(original.foods()[17].snapshot().base_size, 0.2);
     }
 
+    fn assert_compact_food_bits(
+        bank: &Bank,
+        record: &FoodPresentation,
+        frame: &Frame,
+        v: BodyPaintView,
+        user_zoom: f64,
+    ) {
+        let food = record.snapshot();
+        let pulse = food_pulse(food);
+        let glows = [
+            glow_pair(frame, food, v, false, pulse, user_zoom).unwrap(),
+            glow_pair(frame, food, v, true, pulse, user_zoom).unwrap(),
+        ];
+        let packed = exact_instance(frame, food, v, &glows, pulse, user_zoom).unwrap();
+        let plan = plan_food_with_zoom(
+            FoodPaintInput {
+                foods: std::slice::from_ref(record),
+                view: v,
+                quality: BodyPaintQuality {
+                    high_quality: true,
+                    blend: 1.,
+                },
+                bounds: Some(FoodCullBounds::from_view(v).unwrap()),
+                assets: &bank.assets,
+                target_handle: None,
+                entry_alpha: 1.,
+                command_limit: 7,
+            },
+            Vec::new(),
+            Vec::new(),
+            user_zoom,
+        )
+        .unwrap();
+        let resident = bank
+            .assets
+            .iter()
+            .map(|a| (ResourceKey::from(*a), *a))
+            .collect();
+        let oracle = Frame {
+            draws: plan
+                .early
+                .iter()
+                .chain(&plan.late)
+                .map(Draw::from)
+                .collect(),
+            ..frame.clone()
+        }
+        .quads(&resident)
+        .unwrap();
+        for (part, first) in [1, 3, 5].into_iter().enumerate() {
+            let q = &oracle[first];
+            let second = &oracle[first + 1];
+            assert_eq!(
+                packed.0[part].map(f32::to_bits),
+                [
+                    q.vertices[0][0],
+                    q.vertices[0][1],
+                    q.vertices[2][0],
+                    q.vertices[2][1]
+                ]
+                .map(f32::to_bits)
+            );
+            let actual = match part {
+                0 => [
+                    packed.0[3][0],
+                    packed.0[3][1],
+                    packed.0[4][2],
+                    packed.0[4][3],
+                ],
+                1 => [
+                    packed.0[3][2],
+                    packed.0[3][3],
+                    packed.0[5][0],
+                    packed.0[5][1],
+                ],
+                _ => [
+                    packed.0[4][0],
+                    packed.0[4][1],
+                    packed.0[5][2],
+                    packed.0[5][3],
+                ],
+            };
+            assert_eq!(
+                actual.map(f32::to_bits),
+                [
+                    q.vertices[0][4],
+                    second.vertices[0][4],
+                    q.vertices[2][2],
+                    q.vertices[2][3]
+                ]
+                .map(f32::to_bits)
+            );
+        }
+    }
+
     #[test]
     fn compact_dynamic_rectangles_and_alphas_match_the_image_oracle_by_bits() {
         let bank = Bank::new().unwrap();
@@ -1460,93 +1555,87 @@ pub(crate) mod tests {
                     if !food_zoom_eligible(food, user_zoom) {
                         continue;
                     }
-                    let pulse = food_pulse(food);
-                    let glows = [
-                        glow_pair(&frame, food, view(), false, pulse, user_zoom).unwrap(),
-                        glow_pair(&frame, food, view(), true, pulse, user_zoom).unwrap(),
-                    ];
-                    let packed =
-                        exact_instance(&frame, food, view(), &glows, pulse, user_zoom).unwrap();
-                    let plan = plan_food_with_zoom(
-                        FoodPaintInput {
-                            foods: &world.foods()[i..i + 1],
-                            view: view(),
-                            quality: BodyPaintQuality {
-                                high_quality: true,
-                                blend: 1.,
-                            },
-                            bounds: Some(FoodCullBounds::from_view(view()).unwrap()),
-                            assets: &bank.assets,
-                            target_handle: None,
-                            entry_alpha: 1.,
-                            command_limit: 7,
-                        },
-                        Vec::new(),
-                        Vec::new(),
-                        user_zoom,
-                    )
-                    .unwrap();
-                    let resident = bank
-                        .assets
-                        .iter()
-                        .map(|a| (ResourceKey::from(*a), *a))
-                        .collect();
-                    let oracle = Frame {
-                        draws: plan
-                            .early
-                            .iter()
-                            .chain(&plan.late)
-                            .map(Draw::from)
-                            .collect(),
-                        ..frame.clone()
-                    }
-                    .quads(&resident)
-                    .unwrap();
-                    for (part, first) in [1, 3, 5].into_iter().enumerate() {
-                        let q = &oracle[first];
-                        let second = &oracle[first + 1];
-                        assert_eq!(
-                            packed.0[part].map(f32::to_bits),
-                            [
-                                q.vertices[0][0],
-                                q.vertices[0][1],
-                                q.vertices[2][0],
-                                q.vertices[2][1]
-                            ]
-                            .map(f32::to_bits)
-                        );
-                        let actual = match part {
-                            0 => [
-                                packed.0[3][0],
-                                packed.0[3][1],
-                                packed.0[4][2],
-                                packed.0[4][3],
-                            ],
-                            1 => [
-                                packed.0[3][2],
-                                packed.0[3][3],
-                                packed.0[5][0],
-                                packed.0[5][1],
-                            ],
-                            _ => [
-                                packed.0[4][0],
-                                packed.0[4][1],
-                                packed.0[5][2],
-                                packed.0[5][3],
-                            ],
-                        };
-                        assert_eq!(
-                            actual.map(f32::to_bits),
-                            [
-                                q.vertices[0][4],
-                                second.vertices[0][4],
-                                q.vertices[2][2],
-                                q.vertices[2][3]
-                            ]
-                            .map(f32::to_bits)
-                        );
-                    }
+                    assert_compact_food_bits(&bank, &world.foods()[i], &frame, view(), user_zoom);
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn large_pellet_small_zoom_matches_projection_bits_across_lod_boundary() {
+        let bank = Bank::new().unwrap();
+        let mut world = FoodWorld::new();
+        let factory = bank.food(3, [0.73, 0.19]);
+        world
+            .spawn(
+                FoodSpawn {
+                    key: 1,
+                    sector: (0, 0),
+                    position: Point {
+                        x: 16_350.,
+                        y: 16_090.,
+                    },
+                    base_size: 32.,
+                    raw_color: 3,
+                    rapid: true,
+                },
+                factory.input(1.),
+            )
+            .unwrap();
+        for _ in 0..12 {
+            world.advance(step(5.), |_| unreachable!()).unwrap();
+        }
+        let record = &world.foods()[0];
+        let food = record.snapshot();
+        let width = if food.scale == 1. {
+            f64::from(food.sources.body.asset().width)
+        } else {
+            food.sources.body.width() * food.scale
+        };
+        assert!(
+            width * 0.05 > 1.,
+            "the fixed small-factor oracle must draw this pellet"
+        );
+        let edge = 1. / width;
+        let frame = Frame {
+            identity: 1,
+            extent: [1500, 844],
+            viewport_scale: 1.,
+            tick: 0,
+            draws: Vec::new(),
+            food_batch: None,
+            snakes: Vec::new(),
+        };
+        for factor in [0.05, edge * (1. - 1e-6), edge * (1. + 1e-6)] {
+            let v = BodyPaintView {
+                zoom: view().zoom * factor,
+                ..view()
+            };
+            if factor < edge {
+                assert!(!food_zoom_eligible(food, factor));
+                let plan = plan_food_with_zoom(
+                    FoodPaintInput {
+                        foods: std::slice::from_ref(record),
+                        view: v,
+                        quality: BodyPaintQuality {
+                            high_quality: true,
+                            blend: 1.,
+                        },
+                        bounds: Some(FoodCullBounds::from_view(v).unwrap()),
+                        assets: &bank.assets,
+                        target_handle: None,
+                        entry_alpha: 1.,
+                        command_limit: 7,
+                    },
+                    Vec::new(),
+                    Vec::new(),
+                    factor,
+                )
+                .unwrap();
+                assert_eq!(plan.counts.total(), 0);
+            } else {
+                assert!(food_zoom_eligible(food, factor));
+                assert_compact_food_bits(&bank, record, &frame, v, factor);
             }
         }
     }
