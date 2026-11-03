@@ -178,6 +178,64 @@ def zoom_tables():
     return '\n'.join(lines)
 
 
+def serial_tables():
+    identity = json.loads((ROOT / 'serial-identities.json').read_text(encoding='utf-8'))
+    for name, expected in identity['rejected_patches'].items():
+        assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected
+    assert len(identity['image_parity']) == 10
+    for case, arms in identity['image_parity'].items():
+        assert set(arms) == {'baseline', 'candidate'}
+        for arm, record in arms.items():
+            assert (record['callbacks'], record['skips']) == (600, 0)
+            assert record['messages'] == (8 if case.startswith('rectangle/') else 29044)
+            assert record['binary_sha256'] == identity['image_binaries'][arm]
+            assert len(record['image_sequence_sha256']) == 64
+        assert arms['baseline']['image_sequence_sha256'] == arms['candidate']['image_sequence_sha256']
+    with (ROOT / 'serial-runs.csv').open(newline='', encoding='utf-8') as stream:
+        rows = list(csv.DictReader(stream))
+    assert len({r['label'] for r in rows}) == len(rows)
+    for r in rows:
+        assert r['label'] == f'serial-{r["candidate"]}-{r["round"]}-{r["quality"]}-{r["arm"]}-{r["adapter"]}-{r["physical"]}'
+        assert (r['callbacks'], r['messages'], r['skips']) == ('600', '29044', '0')
+        role = 'always' if r['candidate'] == 'packed-pilot' and r['arm'] == 'baseline' else r['arm']
+        assert r['binary_sha256'] == identity['timing_binaries'][role]
+        assert r['status'] == ('compile_overlap' if int(r['compile_samples']) else 'accepted')
+    lines = ['| Adapter / physical / quality | Complete pairs | Art p50 before -> after ms | Art p95 before -> after ms | CPU stages before -> after ms | Pellet math before -> after ms | GPU before -> after ms |',
+             '| --- | ---: | ---: | ---: | ---: | ---: | ---: |']
+    notes = []
+    configs = [('always', 'rtx', '3840x2160')] + [('always-guard', 'igpu', size) for size in ['3840x2160', '1920x1080']]
+    metrics = ['wall_ns_p50_ms', 'wall_ns_p95_ms', 'cpu_ns_p50_ms', 'pellet_math_p50_ms', 'gpu_ns_p50_ms']
+    for candidate, adapter, size in configs:
+        for quality in ['original', 'native']:
+            groups = {}
+            for r in rows:
+                if (r['candidate'], r['adapter'], r['physical'], r['quality']) == (candidate, adapter, size, quality):
+                    pair = groups.setdefault(r['round'], {})
+                    assert r['arm'] not in pair
+                    pair[r['arm']] = r
+            assert all(set(p) == {'baseline', 'always'} for p in groups.values())
+            for pair in groups.values():
+                for key in ['numeric_state_sha256', 'control_digest']:
+                    assert pair['baseline'][key] == pair['always'][key]
+            pairs = [p for p in groups.values() if all(r['status'] == 'accepted' for r in p.values())]
+            assert len(pairs) >= 5
+            values = [f'{statistics.median(float(p["baseline"][key]) for p in pairs):.3f} -> '
+                      f'{statistics.median(float(p["always"][key]) for p in pairs):.3f}' for key in metrics]
+            name = f'{adapter} / {size} / {quality}'
+            lines.append(f'| {name} | {len(pairs)} | ' + ' | '.join(values) + ' |')
+            selected = [r for p in pairs for r in p.values()]
+            delta = [float(p['always']['wall_ns_p50_ms']) - float(p['baseline']['wall_ns_p50_ms']) for p in pairs]
+            spread = '; '.join(f'{arm} p50 range {min(float(p[arm]["wall_ns_p50_ms"]) for p in pairs):.3f} to '
+                               f'{max(float(p[arm]["wall_ns_p50_ms"]) for p in pairs):.3f} ms' for arm in ['baseline', 'always'])
+            notes.append(f'{name}: paired p50 difference median {statistics.median(delta):+.3f} ms, '
+                         f'range {min(delta):+.3f} to {max(delta):+.3f} ms; {spread}; '
+                         f'load {min(float(r["load_min"]) for r in selected):.1f} to {max(float(r["load_max"]) for r in selected):.1f}%; '
+                         f'observed cargo/test samples {sum(int(r["cargo_samples"]) for r in selected)}/{sum(int(r["test_samples"]) for r in selected)}.')
+    return '\n'.join(lines) + '\n\n' + '\n\n'.join(notes) + (
+        f'\n\nAll serial-probe runs retained: {len(rows)}; compile-overlap exclusions: '
+        f'{sum(r["status"] == "compile_overlap" for r in rows)}. Incomplete accepted pairs are retained but excluded from aggregates.')
+
+
 if __name__ == '__main__':
     output = tables()
     print(output)
@@ -185,6 +243,7 @@ if __name__ == '__main__':
     print(review_tables())
     print(menu_tables())
     print(zoom_tables())
+    print(serial_tables())
     if '--check' in sys.argv:
         report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
         assert report.split('<!-- BEGIN RESULTS -->\n')[1].split('\n<!-- END RESULTS -->')[0] == output
@@ -192,3 +251,4 @@ if __name__ == '__main__':
         assert report.split('<!-- BEGIN REVIEW RESULTS -->\n')[1].split('\n<!-- END REVIEW RESULTS -->')[0] == review_tables()
         assert report.split('<!-- BEGIN MENU RESULTS -->\n')[1].split('\n<!-- END MENU RESULTS -->')[0] == menu_tables()
         assert report.split('<!-- BEGIN ZOOM RESULTS -->\n')[1].split('\n<!-- END ZOOM RESULTS -->')[0] == zoom_tables()
+        assert report.split('<!-- BEGIN SERIAL RESULTS -->\n')[1].split('\n<!-- END SERIAL RESULTS -->')[0] == serial_tables()

@@ -1,0 +1,12 @@
+diff --git a/client/apps/wgpu-slice/src/frame.rs b/client/apps/wgpu-slice/src/frame.rs
+index d3d521d7..2ae50dc7 100644
+--- a/client/apps/wgpu-slice/src/frame.rs
++++ b/client/apps/wgpu-slice/src/frame.rs
+@@ -420,6 +420,7 @@ impl Frame {
+         }
+         Ok(())
+     }
++    #[inline]
+     pub(crate) fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
+         let key = ResourceKey::from(d.asset);
+         let r = d.destination;
