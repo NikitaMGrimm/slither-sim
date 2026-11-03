@@ -420,6 +420,7 @@ impl Frame {
         }
         Ok(())
     }
+    #[inline]
     pub(crate) fn project(&self, d: &Draw, source: BodyRect) -> Result<Quad> {
         let key = ResourceKey::from(d.asset);
         let r = d.destination;
