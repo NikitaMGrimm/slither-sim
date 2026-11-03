@@ -948,7 +948,7 @@ mod tests {
             active.sort_unstable();
             let maximum = active.last().copied().unwrap();
             let p95 = active[(active.len() - 1) * 95 / 100];
-            let state = if tick >= 18 {
+            let state = if world.foods().iter().any(|f| f.snapshot().eaten) {
                 "consumed"
             } else if world.foods().iter().all(|f| f.snapshot().fade == 1.) {
                 "settled"

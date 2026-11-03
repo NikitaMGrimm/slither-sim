@@ -73,7 +73,7 @@ pub(super) struct Pellets {
     // Retain little-endian upload bytes, including unchanged culled slots.
     // Serialize rewritten slots once instead of repacking and allocating the
     // entire mirror each frame. See
-    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-02-retained-pellets/REPORT.md.
+    // https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-pellet-upload-mirror/REPORT.md.
     mirror: Vec<[u8; 96]>,
     bindings: Vec<[Option<SourceDraw>; 3]>,
 }
