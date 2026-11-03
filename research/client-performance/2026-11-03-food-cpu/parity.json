@@ -1,0 +1,82 @@
+{
+  "replay/rtx/3840x2160/original": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "1e724e7de298e8a5230fdb48c4def5c1a04872933c89e5413101527fce87b4b1",
+    "baseline_image_sequence_sha256": "1e724e7de298e8a5230fdb48c4def5c1a04872933c89e5413101527fce87b4b1",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "replay/rtx/3840x2160/native": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "7c373f7398774a0a22548aec846edfc1a50bb8a1da23b687788980b4540a0e8f",
+    "baseline_image_sequence_sha256": "7c373f7398774a0a22548aec846edfc1a50bb8a1da23b687788980b4540a0e8f",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "replay/igpu/3840x2160/original": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "cac828245dab502c1506b5cba1f003d8ee57b1900e83f7b76c8633ba61688923",
+    "baseline_image_sequence_sha256": "cac828245dab502c1506b5cba1f003d8ee57b1900e83f7b76c8633ba61688923",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "replay/igpu/3840x2160/native": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "47df15fda3056ff0a27a90d9a90397ee8c35cdec82ac15d8c7fa13a3f6f29bc4",
+    "baseline_image_sequence_sha256": "47df15fda3056ff0a27a90d9a90397ee8c35cdec82ac15d8c7fa13a3f6f29bc4",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "replay/igpu/1920x1080/original": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "fb1b4d44e2d56b06e01d805ba9fa851b96481fb97391ffe50b94581944301111",
+    "baseline_image_sequence_sha256": "fb1b4d44e2d56b06e01d805ba9fa851b96481fb97391ffe50b94581944301111",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "replay/igpu/1920x1080/native": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "373fdd56be99cf40a94ed87f27e8226bcbe8054e0f6379e3a38589e659cf40b3",
+    "baseline_image_sequence_sha256": "373fdd56be99cf40a94ed87f27e8226bcbe8054e0f6379e3a38589e659cf40b3",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "rectangle/rtx/3840x2160/original": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "d7d27d0620c1fd33da47d6ade898bd6f9d2f4c06a2e5588969738a9963814e3b",
+    "baseline_image_sequence_sha256": "d7d27d0620c1fd33da47d6ade898bd6f9d2f4c06a2e5588969738a9963814e3b",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "rectangle/rtx/3840x2160/native": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "aaa12dec84927ac33a3d01b037b71307b635229199030bfa92fcd62cd0c46f41",
+    "baseline_image_sequence_sha256": "aaa12dec84927ac33a3d01b037b71307b635229199030bfa92fcd62cd0c46f41",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "rectangle/igpu/3840x2160/original": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "504508bbc5deed4596e9c1c07b50a87f461c4535bdfcf76ea29edec4ad279ade",
+    "baseline_image_sequence_sha256": "504508bbc5deed4596e9c1c07b50a87f461c4535bdfcf76ea29edec4ad279ade",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  },
+  "rectangle/igpu/3840x2160/native": {
+    "callbacks": 600,
+    "skips": 0,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "image_sequence_sha256": "04fdf842b58a63135a5eccbe08615af70cbbd19506eca2647e83aaf2520a0b16",
+    "baseline_image_sequence_sha256": "04fdf842b58a63135a5eccbe08615af70cbbd19506eca2647e83aaf2520a0b16",
+    "baseline_binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30"
+  }
+}

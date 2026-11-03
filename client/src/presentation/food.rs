@@ -258,16 +258,155 @@ pub struct FoodSnapshot {
     pub sources: FoodSources,
 }
 
+/// Only the changing numeric inputs needed to paint food.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FoodPaintState {
+    /// Current absolute render position.
+    pub render_position: Point,
+    /// Spawn fade, frozen during consumption.
+    pub fade: f64,
+    /// Current destination scale.
+    pub scale: f64,
+    /// Double-precision animation phase.
+    pub animation_phase: f64,
+}
+
+impl From<FoodSnapshot> for FoodPaintState {
+    #[inline(always)]
+    fn from(f: FoodSnapshot) -> Self {
+        Self {
+            render_position: f.render_position,
+            fade: f.fade,
+            scale: f.scale,
+            animation_phase: f.animation_phase,
+        }
+    }
+}
+
+/// Combine changing paint inputs with their frozen source family.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FoodPaintSnapshot {
+    /// Changing numeric inputs, copied without advancing time.
+    pub animation: FoodPaintState,
+    /// Frozen source selections and metadata.
+    pub sources: FoodSources,
+}
+
+impl From<FoodSnapshot> for FoodPaintSnapshot {
+    #[inline(always)]
+    fn from(f: FoodSnapshot) -> Self {
+        Self {
+            animation: f.into(),
+            sources: f.sources,
+        }
+    }
+}
+
+impl From<FoodPaintSnapshot> for FoodPaintState {
+    #[inline(always)]
+    fn from(f: FoodPaintSnapshot) -> Self {
+        f.animation
+    }
+}
+
+// Frame transactions copy the numeric record, not the frozen source metadata.
+// The public snapshot and its Debug representation retain their original shape.
+// https://github.com/NikitaMGrimm/slither-sim/blob/main/research/client-performance/2026-11-03-food-cpu/REPORT.md.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FoodState {
+    /// Unique retained food object identity.
+    instance: FoodInstance,
+    /// Potentially duplicate packed food key.
+    key: u32,
+    /// Creation sector, used by sector deletion even during flight.
+    sector: (u8, u8),
+    /// Original absolute position, unchanged during animation.
+    position: Point,
+    /// Unnormalized creation color.
+    raw_color: u8,
+    /// Effective zero-through-nine palette.
+    effective_palette: u8,
+    /// Original decoded size.
+    base_size: f64,
+    /// One or three, independent of animation rate.
+    spawn_speed: f64,
+    /// Current absolute render position.
+    render_position: Point,
+    /// Spawn fade; frozen during consumption.
+    fade: f64,
+    /// Current destination scale, including initial tiny scale and zero.
+    scale: f64,
+    /// Last uneaten scale; repeated consumption does not replace it.
+    uneaten_scale: f64,
+    /// Double-precision animation phase.
+    animation_phase: f64,
+    /// Size-derived phase speed.
+    animation_rate: f64,
+    /// Independent signed wobble speed.
+    wobble_rate: f64,
+    /// Whether a consume captured an eater request, possibly missing its object.
+    eaten: bool,
+    /// Fractional flight progress.
+    consumption_progress: f64,
+    /// Captured appearance token; missing-at-capture stays missing.
+    eater: Option<SnakeObjectToken>,
+    /// Zoom frozen at creation, not used to rescale destination dimensions.
+    creation_zoom: f64,
+}
+
 /// One owned instance. All transitions occur through its FoodWorld.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct FoodPresentation {
-    state: FoodSnapshot,
+    state: FoodState,
+    // The one-element vector makes the payload allocation fallible on stable
+    // Rust; Arc itself allocates only its fixed-size ownership header.
+    sources: Arc<Vec<FoodSources>>,
+}
+
+impl fmt::Debug for FoodPresentation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FoodPresentation")
+            .field("state", &self.snapshot())
+            .finish()
+    }
 }
 
 impl FoodPresentation {
+    /// Copy changing paint inputs without copying source metadata or sharing the world.
+    #[inline]
+    pub fn paint_state(&self) -> FoodPaintState {
+        FoodPaintState {
+            render_position: self.state.render_position,
+            fade: self.state.fade,
+            scale: self.state.scale,
+            animation_phase: self.state.animation_phase,
+        }
+    }
     /// Copy all numeric state, identities and retained source metadata.
+    #[inline(always)]
     pub fn snapshot(&self) -> FoodSnapshot {
-        self.state
+        FoodSnapshot {
+            instance: self.state.instance,
+            key: self.state.key,
+            sector: self.state.sector,
+            position: self.state.position,
+            raw_color: self.state.raw_color,
+            effective_palette: self.state.effective_palette,
+            base_size: self.state.base_size,
+            spawn_speed: self.state.spawn_speed,
+            render_position: self.state.render_position,
+            fade: self.state.fade,
+            scale: self.state.scale,
+            uneaten_scale: self.state.uneaten_scale,
+            animation_phase: self.state.animation_phase,
+            animation_rate: self.state.animation_rate,
+            wobble_rate: self.state.wobble_rate,
+            eaten: self.state.eaten,
+            consumption_progress: self.state.consumption_progress,
+            eater: self.state.eater,
+            creation_zoom: self.state.creation_zoom,
+            sources: self.sources[0],
+        }
     }
 }
 
@@ -400,8 +539,14 @@ fn create(
     if !animation_rate.is_finite() {
         return Err(FoodError::Arithmetic);
     }
+    let mut frozen = Vec::new();
+    frozen
+        .try_reserve_exact(1)
+        .map_err(|_| FoodError::Allocation)?;
+    frozen.push(sources);
     Ok(FoodPresentation {
-        state: FoodSnapshot {
+        sources: Arc::new(frozen),
+        state: FoodState {
             instance,
             key: spawn.key,
             sector: spawn.sector,
@@ -421,7 +566,6 @@ fn create(
             consumption_progress: 0.,
             eater: None,
             creation_zoom: z,
-            sources,
         },
     })
 }

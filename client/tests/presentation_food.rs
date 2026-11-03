@@ -762,3 +762,52 @@ fn cloned_food_branches_preserve_order_animation_and_serials() {
     assert_eq!(frozen.foods().len(), 3);
     assert_eq!(original.foods().len(), 4);
 }
+
+#[test]
+fn compact_paint_state_and_frozen_sources_preserve_snapshot_bits_and_debug() {
+    let palette = Palette::new(3);
+    let mut world = FoodWorld::new();
+    add(&mut world, &palette, 1);
+    let frozen = world.clone();
+    let initial = frozen.foods()[0].snapshot();
+    for _ in 0..9 {
+        world.advance(step(2.25), no_eater).unwrap();
+        let food = &world.foods()[0];
+        let snapshot = food.snapshot();
+        let paint = food.paint_state();
+        assert_eq!(
+            [
+                paint.render_position.x,
+                paint.render_position.y,
+                paint.fade,
+                paint.scale,
+                paint.animation_phase
+            ]
+            .map(f64::to_bits),
+            [
+                snapshot.render_position.x,
+                snapshot.render_position.y,
+                snapshot.fade,
+                snapshot.scale,
+                snapshot.animation_phase
+            ]
+            .map(f64::to_bits)
+        );
+        assert_eq!(FoodPaintSnapshot::from(snapshot).sources, initial.sources);
+        assert_eq!(snapshot.sources, initial.sources);
+        assert_eq!(
+            format!("{food:?}"),
+            format!("FoodPresentation {{ state: {snapshot:?} }}")
+        );
+        assert_eq!(frozen.foods()[0].snapshot(), initial);
+    }
+    let token = SnakeObjectToken::new(9).unwrap();
+    world.consume(1, FoodConsume::Eaten(Some(token)));
+    let before = world.clone();
+    assert_eq!(
+        world.advance(step(1.), |_| Err(FoodError::InvalidInput)),
+        Err(FoodError::InvalidInput)
+    );
+    assert_eq!(world, before);
+    assert_eq!(frozen.foods()[0].snapshot(), initial);
+}
