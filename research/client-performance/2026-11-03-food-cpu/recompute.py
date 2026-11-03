@@ -2,19 +2,29 @@
 from pathlib import Path
 import csv,json,statistics,sys
 ROOT=Path(__file__).resolve().parent
+EXPECTED_PARITY_KEYS={
+    f'replay/{adapter}/{size}/{quality}'
+    for adapter,size in [('rtx','3840x2160'),('igpu','3840x2160'),('igpu','1920x1080')]
+    for quality in ['original','native']
+} | {
+    f'rectangle/{adapter}/3840x2160/{quality}'
+    for adapter in ['rtx','igpu']
+    for quality in ['original','native']
+}
 
-def validate(rows,parity):
+def validate(rows,parity,identities):
     grouped={}
     for r in rows:
         assert int(r['callbacks'])==600 and int(r['messages'])==29044 and int(r['skips'])==0
         key=(r['adapter'],r['size'],r['quality'],r['pair'])
         pair=grouped.setdefault(key,{})
         assert r['arm'] in ('baseline','candidate') and r['arm']not in pair
+        assert r['binary_sha256']==identities[r['arm']]['binary_sha256'],'timing binary does not match arm identity'
         pair[r['arm']]=r
     for pair in grouped.values():
         assert set(pair)=={'baseline','candidate'}
         for field in ['command_digest','quad_digest']:assert pair['baseline'][field]==pair['candidate'][field]
-    assert len(parity)==10
+    assert set(parity)==EXPECTED_PARITY_KEYS,'parity configurations differ from the expected matrix'
     for record in parity.values():
         assert record['callbacks']==600 and record['skips']==0
         assert record['image_sequence_sha256']==record['baseline_image_sequence_sha256']
@@ -48,8 +58,9 @@ def table(rows):
 def main():
     with (ROOT/'runs.csv').open(newline='',encoding='utf-8') as stream:
         rows=list(csv.DictReader(stream))
-    parity=json.loads((ROOT/'parity.json').read_text())
-    validate(rows,parity);text=table(rows)
+    parity=json.loads((ROOT/'parity.json').read_text(encoding='utf-8'))
+    identities=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
+    validate(rows,parity,identities);text=table(rows)
     if '--check'in sys.argv:
         report=(ROOT/'REPORT.md').read_text(encoding='utf-8')
         assert text in report,'report aggregate table differs from runs.csv'

@@ -48,6 +48,23 @@ python recompute.py --check
 python -m unittest test_study.py
 ```
 
-The first command recomputes every aggregate in the table from the per-run CSV. The check verifies that table, pair completeness/assignment, callback and message counts, zero skips, parity sequence equality, and the retained image coverage. Tests reject short or skipped parity and arm reassignment. No recordings are needed and no test contacts a game server.
+The first command recomputes every aggregate in the table from the per-run CSV. The check verifies that table, pair completeness/assignment, each arm's timing-binary identity, callback and message counts, zero skips, parity sequence equality, and the exact ten-configuration image matrix. Tests reject short or skipped parity, arm reassignment, wrong binary hashes and a renamed configuration even when ten entries remain. No recordings are needed and no test contacts a game server.
 
 [identities.json](identities.json) records uninstrumented runtime hashes separately from the measured source hashes and the image-driver identity. Passive food advance/copy counters and exports explain the instrumented core difference; they are present in both timing arms. The image driver adds SHA-256 readback and omits egui painting. Frozen sources, all raw frames, process/load journals, previous pilots and a corrected local path/arm-name tooling failure remain outside Git. Historical hashes are not a routine current-file gate.
+
+Access: **restricted / local only**. The samples, frozen release executables, source snapshots and private `join_profile` offline driver live together in external performance scratch storage. They are not distributed with the repository; an authorized reviewer needs separately granted access. The public CSV, identities and image-sequence hashes above are the bounded evidence for recomputing this report.
+
+The exact timing invocation was the following, with `$sealedReleaseBinary` selecting the sealed baseline or candidate executable identified in `identities.json`, `$restrictedReplayInput` selecting retained-join-A, and `$freshSampleDirectory` selecting a new external sample directory:
+
+```powershell
+# All other PROFILE_* variables are unset; in particular no image hashing/readback probe.
+$env:PROFILE_ADAPTER='rtx'
+$env:PROFILE_BACKEND='vulkan'
+$env:PROFILE_SIZE='3840x2160'
+$env:PROFILE_MENUS='1'
+$env:PROFILE_PHASES='1'
+Remove-Item Env:PROFILE_NATIVE -ErrorAction SilentlyContinue
+& $sealedReleaseBinary replay $restrictedReplayInput $freshSampleDirectory 10 0
+```
+
+For Native, set `PROFILE_NATIVE=1` before that same invocation. For the AMD guardrails, set `PROFILE_ADAPTER=igpu`, `PROFILE_BACKEND=dx12` and `PROFILE_SIZE` to `1920x1080` or `3840x2160`. Each arm runs in a fresh process; pairs alternate baseline/candidate then candidate/baseline. This command consumes a local recording and makes no game-server connection.
