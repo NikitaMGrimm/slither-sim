@@ -6,7 +6,8 @@ use crate::state::Point;
 
 use super::{
     BodyAlpha, BodyAsset, BodyBlend, BodyPaintQuality, BodyPaintView, BodyRect, FoodInstance,
-    FoodPresentation, FoodSnapshot, FoodSource, MAX_RETAINED_FOODS, food::all_finite,
+    FoodPaintSnapshot, FoodPaintState, FoodPresentation, FoodSnapshot, FoodSource,
+    MAX_RETAINED_FOODS, food::all_finite,
 };
 
 /// Seven calls per visible food in the full quality path.
@@ -331,7 +332,7 @@ fn validate(
 }
 
 /// Exact Canvas overload and rectangle policy for one already selected food image.
-#[inline]
+#[inline(always)]
 pub fn food_image_draw(
     source: FoodSource,
     center: Point,
@@ -443,14 +444,16 @@ impl<F: FnMut(FoodImageCommand)> Recorder<F> {
 }
 
 /// The unchanged pulse term shared by the body and both glow pairs.
-#[inline]
-pub fn food_pulse(food: FoodSnapshot) -> f64 {
+#[inline(always)]
+pub fn food_pulse(food: impl Into<FoodPaintState>) -> f64 {
+    let food = food.into();
     0.5 + 0.5 * (food.animation_phase / 13.).cos()
 }
 
 /// Backing-pixel body/outline centre for an already prepared view.
-#[inline]
-pub fn food_body_center(food: FoodSnapshot, view: BodyPaintView) -> Point {
+#[inline(always)]
+pub fn food_body_center(food: impl Into<FoodPaintState>, view: BodyPaintView) -> Point {
+    let food = food.into();
     Point {
         x: view.half_width + view.zoom * (food.render_position.x - view.camera.x),
         y: view.half_height + view.zoom * (food.render_position.y - view.camera.y),
@@ -458,8 +461,9 @@ pub fn food_body_center(food: FoodSnapshot, view: BodyPaintView) -> Point {
 }
 
 /// Requested base and pulse body alpha, before Canvas assignment retention.
-#[inline]
-pub fn food_body_alpha(food: FoodSnapshot, blend: f64, pulse: f64) -> [f64; 2] {
+#[inline(always)]
+pub fn food_body_alpha(food: impl Into<FoodPaintState>, blend: f64, pulse: f64) -> [f64; 2] {
+    let food = food.into();
     [
         food.fade,
         (if blend == 1. { 1. } else { blend }) * pulse * food.fade,
@@ -479,14 +483,17 @@ pub struct FoodGlowPaint {
 
 /// Shared glow policy; preserve the multiplication order before f32 projection.
 /// Callers supply the same pulse once per food; view/quality admission is theirs.
-#[inline]
+#[inline(always)]
 pub fn food_glow_paint(
-    food: FoodSnapshot,
+    food: impl Into<FoodPaintSnapshot>,
     view: BodyPaintView,
     outer: bool,
     blend: f64,
     pulse: f64,
 ) -> Result<FoodGlowPaint, FoodPaintError> {
+    let paint = food.into();
+    let food = paint.animation;
+    let sources = paint.sources;
     let dx = food.render_position.x - view.camera.x;
     let dy = food.render_position.y - view.camera.y;
     let distance = dx * dx + dy * dy;
@@ -495,13 +502,13 @@ pub fn food_glow_paint(
     }
     let (source, shift, mut alpha) = if outer {
         (
-            food.sources.outer,
+            sources.outer,
             0.32,
             0.085 * (1. - distance / (16500. + distance)),
         )
     } else {
         (
-            food.sources.inner,
+            sources.inner,
             0.06,
             0.005 + 0.09 * (1. - distance / (86000. + distance)),
         )
