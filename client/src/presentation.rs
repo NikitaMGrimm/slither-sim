@@ -100,8 +100,9 @@ pub use face::{PairedFaceGeometry, PairedSideGeometry, PairedSideLayout};
 pub use follow_camera::{FollowCamera, INITIAL_ZOOM};
 pub use food::{
     FoodConsume, FoodEaterPose, FoodError, FoodFactory, FoodFactoryInput, FoodInstance,
-    FoodPalette, FoodPresentation, FoodSnapshot, FoodSource, FoodSourceIdentity, FoodSources,
-    FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken, food_palette,
+    FoodPaintSnapshot, FoodPaintState, FoodPalette, FoodPresentation, FoodSnapshot, FoodSource,
+    FoodSourceIdentity, FoodSources, FoodSpawn, FoodWorld, MAX_RETAINED_FOODS, SnakeObjectToken,
+    food_palette,
 };
 pub use food_painter::{
     FoodAssetIndex, FoodCullBounds, FoodGlowPaint, FoodImageCommand, FoodImageDraw,

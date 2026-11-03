@@ -160,7 +160,7 @@ impl Cache {
         let mut visible = vec![false; world.foods().len()];
         let mut count = 0;
         for (i, f) in world.foods().iter().enumerate() {
-            let f = f.snapshot();
+            let f = f.paint_state();
             let p = f.render_position;
             let inside =
                 p.x >= limits[0] && p.x <= limits[1] && p.y >= limits[2] && p.y <= limits[3];
@@ -283,16 +283,17 @@ impl Batch {
 
 /// Numeric half of the unchanged food image stream. Compute a paired rectangle
 /// once, retaining every f64 operation before the existing f32 boundary.
+#[inline(always)]
 fn project_food(
     frame: &Frame,
-    f: FoodSnapshot,
+    f: FoodPaintSnapshot,
     source: FoodSource,
     center: Point,
     alpha: f64,
 ) -> Result<crate::frame::Quad> {
     let a = source.asset();
     let (source, destination) =
-        match food_image_draw(source, center, f.scale, 1.).map_err(|e| e.to_string())? {
+        match food_image_draw(source, center, f.animation.scale, 1.).map_err(|e| e.to_string())? {
             FoodImageDraw::Whole { x, y } => (
                 BodyRect {
                     x: 0.,
@@ -328,28 +329,32 @@ fn project_food(
         source,
     )
 }
+#[inline(always)]
 pub(crate) fn glow_pair(
     frame: &Frame,
-    f: FoodSnapshot,
+    f: impl Into<FoodPaintSnapshot>,
     view: BodyPaintView,
     outer: bool,
     pulse: f64,
 ) -> Result<(crate::frame::Quad, f32)> {
+    let f = f.into();
     let glow = food_glow_paint(f, view, outer, 1., pulse).map_err(|e| e.to_string())?;
     Ok((
         project_food(frame, f, glow.source, glow.center, glow.alpha[0])?,
         glow.alpha[1] as f32,
     ))
 }
+#[inline(always)]
 pub(crate) fn exact_instance(
     frame: &Frame,
-    f: FoodSnapshot,
+    f: impl Into<FoodPaintSnapshot>,
     view: BodyPaintView,
     glows: &[(crate::frame::Quad, f32); 2],
     pulse: f64,
 ) -> Result<Instance> {
+    let f = f.into();
     let center = food_body_center(f, view);
-    let body = project_food(frame, f, f.sources.body, center, f.fade)?;
+    let body = project_food(frame, f, f.sources.body, center, f.animation.fade)?;
     let pairs = [
         (&body, food_body_alpha(f, 1., pulse)[1] as f32),
         (&glows[0].0, glows[0].1),
