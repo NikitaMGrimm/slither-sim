@@ -14,6 +14,16 @@ spec.loader.exec_module(study)
 
 
 class StudyTests(unittest.TestCase):
+    def test_audit_uses_the_recorded_candidate_controls(self):
+        identity = json.loads((ROOT / 'identities.json').read_text(encoding='utf-8'))
+        audit = json.loads((ROOT.parent / '2026-11-03-canonical-parity-audit' / 'canonical-evidence-audit.json').read_text(encoding='utf-8'))
+        for phase, source in [('initial', identity), ('reviewed', identity['review_fixes'])]:
+            for scene, arms in source['parity'].items():
+                for arm, expected in arms.items():
+                    actual = audit['original_explicit_controls'][f'{phase}/{scene}/{arm}']
+                    self.assertEqual(actual['binary_sha256'], expected['binary_sha256'])
+                    self.assertEqual(actual['quad_digest'], expected['quad_digest'])
+
     def test_retained_results_and_parity(self):
         output = study.tables()
         report = (ROOT / 'REPORT.md').read_text(encoding='utf-8')
