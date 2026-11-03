@@ -444,7 +444,7 @@ pub(crate) mod tests {
         }
         world
     }
-    fn step(delta: f64) -> FrameStep {
+    pub(crate) fn step(delta: f64) -> FrameStep {
         FrameStep {
             delta,
             unlagged_delta: delta,
@@ -488,25 +488,50 @@ pub(crate) mod tests {
 
     #[test]
     fn signed_zero_source_metadata_uses_the_canonical_fallback() {
-        let mut bank=Bank::new().unwrap();
-        let mut positive=bank.food(0,[0.,0.]);
+        let mut bank = Bank::new().unwrap();
+        let mut positive = bank.food(0, [0., 0.]);
         for s in &mut positive.bodies {
-            *s=FoodSource::new(s.asset(),s.width(),s.height(),0.,s.half_height()).unwrap();
+            *s = FoodSource::new(s.asset(), s.width(), s.height(), 0., s.half_height()).unwrap();
         }
-        let mut negative=positive.clone();
+        let mut negative = positive.clone();
         for s in &mut negative.bodies {
-            *s=FoodSource::new(s.asset(),s.width(),s.height(),-0.,s.half_height()).unwrap();
+            *s = FoodSource::new(s.asset(), s.width(), s.height(), -0., s.half_height()).unwrap();
         }
-        let mut world=FoodWorld::new();
+        let mut world = FoodWorld::new();
         for i in 0..1024 {
-            let factory=if i%2==0 {&positive}else{&negative};
-            world.spawn(FoodSpawn{key:i,sector:(0,0),position:view().camera,base_size:0.2,raw_color:0,rapid:true},factory.input(1.)).unwrap();
+            let factory = if i % 2 == 0 { &positive } else { &negative };
+            world
+                .spawn(
+                    FoodSpawn {
+                        key: i,
+                        sector: (0, 0),
+                        position: view().camera,
+                        base_size: 0.2,
+                        raw_color: 0,
+                        rapid: true,
+                    },
+                    factory.input(1.),
+                )
+                .unwrap();
         }
-        let a=world.foods()[0].snapshot().sources;
-        let b=world.foods()[1].snapshot().sources;
-        assert_eq!(a,b);
-        assert_ne!(a.body.half_width().to_bits(),b.body.half_width().to_bits());
-        assert!(Cache::default().prepare(&world,view(),Some(FoodCullBounds::from_view(view()).unwrap()),&bank.assets,&bank.food_outline,&mut bank.food_asset_index,MAX_FOOD_PAINT_COMMANDS).unwrap().is_none());
+        let a = world.foods()[0].snapshot().sources;
+        let b = world.foods()[1].snapshot().sources;
+        assert_eq!(a, b);
+        assert_ne!(a.body.half_width().to_bits(), b.body.half_width().to_bits());
+        assert!(
+            Cache::default()
+                .prepare(
+                    &world,
+                    view(),
+                    Some(FoodCullBounds::from_view(view()).unwrap()),
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    MAX_FOOD_PAINT_COMMANDS
+                )
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

@@ -84,3 +84,8 @@ pub(super) fn project(
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "pellet_workers.rs"]
 pub(super) mod workers;
+
+#[cfg(all(test, windows))]
+#[allow(dead_code)]
+#[path = "../examples/support/offscreen.rs"]
+mod offscreen;
