@@ -6,6 +6,38 @@ mod tape;
 use slither_client::{presentation::*, session_policy::Phase, state::Point};
 use slither_wgpu_slice::{frame::MAX_DRAWS, game::LocalGame, render};
 
+#[test]
+fn crowded_wheel_views_keep_retained_food_and_frozen_retry_inputs() {
+    for notches in [0., -1., -4., -1000.] {
+        let mut game = tape::playing();
+        let head = game.client().own_snake().unwrap().metrics().raw_head;
+        let mut food = vec![b'F', (head.x / 100.) as u8, (head.y / 100.) as u8];
+        for i in 0..1024_u16 {
+            food.extend([7, (i % 256) as u8, (i / 256) as u8, 20]);
+        }
+        game.receive(game.generation(), &tape::bundle(&[food]), 30.)
+            .unwrap();
+        game.wheel_zoom(notches);
+        for index in 0..24 {
+            game.begin_frame(60. + f64::from(index) * 16., [1500, 844], 1.)
+                .unwrap();
+            tape::effects(&mut game);
+            let picture = game.take_frame().unwrap();
+            if index == 23 {
+                assert!(picture.frame.food_batch.is_some(), "notches={notches}");
+                let frozen = picture.frame.canonical().unwrap();
+                game.wheel_zoom(2.);
+                game.retry_frame(picture).unwrap();
+                assert_eq!(
+                    game.take_frame().unwrap().frame.canonical().unwrap(),
+                    frozen
+                );
+            }
+            game.presented(true).unwrap();
+        }
+    }
+}
+
 // Native trig/Debug float text is platform-specific. This independent golden was
 // captured on Windows and paired with a pristine-main projection excluding only
 // the removed background draws. The original full-frame fixture remains unchanged.
