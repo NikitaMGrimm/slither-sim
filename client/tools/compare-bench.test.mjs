@@ -6,7 +6,7 @@ import { adapterFlags,profilePreferences,chromeSession,CDP } from './compare-ben
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog} from './compare-bench/resources.mjs';
-import {nativeNetworkEvidence,startNativeNetwork} from './compare-bench/native-network.mjs';
+import {nativeNetworkEvidence,startNativeNetwork,nativeNetworkMaxSeconds} from './compare-bench/native-network.mjs';
 import {spawn,execFileSync} from 'node:child_process';
 import vm from 'node:vm';
 import path from 'node:path';
@@ -109,6 +109,18 @@ test('native network observations retain early TCP and UDP violations without cl
   run.nativeNetwork=nativeNetworkEvidence([udp,closed]);assert.equal(validity(run).valid,false);
   udp.udp[0]={pid:7,localAddress:'127.0.0.1',remoteAddress:'203.0.113.1'};
   assert.equal(nativeNetworkEvidence([udp]).rejectedEndpoints.length,1);
+});
+test('native endpoint sampling outlives a long warmup and the measured window',()=>{
+  for(const warmupSeconds of [0,5,600]){
+    const seconds=60,deadline=nativeNetworkMaxSeconds({seconds,warmupSeconds});
+    // Authored elapsed-time model: launch/setup/admission, warmup, measurement,
+    // then shutdown. The old launch-relative deadline expired during warmup.
+    let elapsed=120;
+    elapsed+=warmupSeconds;assert.ok(deadline>elapsed,'sampler must reach measurement start');
+    elapsed+=seconds;assert.ok(deadline>elapsed,'sampler must cover measurement end');
+    elapsed+=30;assert.ok(deadline>elapsed,'sampler must cover shutdown');
+  }
+  for(const warmupSeconds of [-1,NaN,Infinity,'600'])assert.throws(()=>nativeNetworkMaxSeconds({seconds:60,warmupSeconds}),/warmupSeconds/);
 });
 test('unprivileged native collector samples authored loopback TCP and UDP over process lifetime',{skip:process.platform!=='win32',timeout:30000},async()=>{
   const directory=await fs.mkdtemp(path.join(os.tmpdir(),'native-network-'));

@@ -6,6 +6,11 @@ import {isIP} from 'node:net';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const loopback=address=>typeof address==='string'&&(isIP(address)===4?address.startsWith('127.'):isIP(address)===6&&(address==='::1'||/^::ffff:127\./i.test(address)));
+export function nativeNetworkMaxSeconds({seconds,warmupSeconds}) {
+  if(!Number.isFinite(warmupSeconds)||warmupSeconds<0)throw Error('warmupSeconds must be finite and nonnegative');
+  // Collection starts at launch, before readiness and the configured warmup.
+  return seconds+warmupSeconds+240;
+}
 export function nativeNetworkEvidence(samples,details={}) {
   const rejectedEndpoints=[];
   for(const sample of samples){

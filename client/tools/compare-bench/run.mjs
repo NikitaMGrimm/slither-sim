@@ -9,7 +9,7 @@ import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog} from './resources.mjs';
-import {startNativeNetwork} from './native-network.mjs';
+import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -179,7 +179,7 @@ async function runAttempt(config, root, item, provenance, machine) {
         SLITHER_BENCH_SERVER: endpoint.replace('ws://', '').replace('/slither', ''),
         ...(item.scenario === 'battledome' ? { SLITHER_BENCH_WHOLE_MAP: '1' } : {}) }, windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
-      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.vlitherBinary,directory,maxSeconds:config.seconds+240,startedUnixMs:r.nativeStartedUnixMs});
+      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.vlitherBinary,directory,maxSeconds:nativeNetworkMaxSeconds(config),startedUnixMs:r.nativeStartedUnixMs});
       await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'vlither', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Vlither GLFW window, borderless task-owned HWND';
       await waitFor(() => clientLog.includes('frame-bench-client: ') || (native.exitCode !== null ? Promise.reject(Error(`Vlither exited ${native.exitCode}: ${clientLog}`)) : null), 20000, 'Vlither local join');
@@ -193,7 +193,7 @@ async function runAttempt(config, root, item, provenance, machine) {
       native = spawn(config.binary, ['--server', endpoint.replace('ws://', '').replace('/slither', ''), '--nickname', 'FrameBench', '--skin', '0'],
         { cwd: directory, env:clientEnv,windowsHide: false });
       register(native); native.stdout.on('data', b => {clientLog+=b;clientJournal(b);}); native.stderr.on('data', b => {clientLog+=b;clientJournal(b);});
-      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.binary,directory,maxSeconds:config.seconds+240,startedUnixMs:r.nativeStartedUnixMs});
+      networkMonitor=await startNativeNetwork({pid:native.pid,executable:config.binary,directory,maxSeconds:nativeNetworkMaxSeconds(config),startedUnixMs:r.nativeStartedUnixMs});
       await windows({ mode: 'setup',borderless:true, clientPid: native.pid, client: 'ours', scenario: item.scenario, width: config.width, height: config.height, x: config.x, y: config.y }, directory, 'setup', children);
       r.windowMode='Native winit window, borderless task-owned HWND';
       await waitFor(() => completeJsonLines(hostLog, 'frame-bench: ').some(s => s.players?.[0]?.setup)
@@ -333,6 +333,7 @@ export async function main(args = process.argv.slice(2)) {
   Object.assign(config, { width: config.width ?? 3840, height: config.height ?? 2160, x: config.x ?? 0, y: config.y ?? 0,
     seconds: args[0] === 'smoke' ? 5 : config.seconds ?? 60, warmupSeconds: config.warmupSeconds ?? 5 });
   if (!Number.isInteger(config.seconds) || config.seconds < 3 || config.seconds > 180) throw Error('seconds must be 3..180');
+  nativeNetworkMaxSeconds(config);
   if(config.telemetry&&!['on','off'].includes(config.telemetry))throw Error('telemetry must be on or off (diagnostic only)');
   const clients = config.clients ?? ['original', 'native', 'ntl', 'vlither'];
   if (!Array.isArray(clients) || !clients.length || new Set(clients).size !== clients.length || clients.some(c => !['original','native','ntl','vlither'].includes(c))) throw Error('clients must be a unique nonempty subset of original, native, ntl, vlither');
