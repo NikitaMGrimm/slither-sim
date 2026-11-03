@@ -443,8 +443,10 @@ compare matched arms here rather than subtracting across studies.
 
 `serial-runs.csv` retains every run of the adopted and rejected serial probes,
 including excluded rows, binary/source labels, allocation requests, elapsed
-and per-run quantiles. Recorded numeric state/control digests match across each
-pair, including excluded samples. `serial-identities.json` records the measured runtime
+and per-run quantiles. Recorded sent-byte control digests match across each pair, including
+excluded samples. Canonical-parity mode was off in these timing runs; its
+constant quad-digest accumulator is not world-state parity evidence. Actual
+rendered-image controls are described separately below. `serial-identities.json` records the measured runtime
 and passive-instrumentation hashes, timing/image binaries and image parity.
 The measured candidate frame file is byte-identical to this follow-up's
 production frame file. Historical revisions are labels, not `git show` test
