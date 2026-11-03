@@ -2,6 +2,7 @@
 from pathlib import Path
 import csv,json,statistics,sys
 ROOT=Path(__file__).resolve().parent
+EMPTY_QUAD_DIGEST='d1fba762150c532c'
 EXPECTED_PARITY_KEYS={
     f'replay/{adapter}/{size}/{quality}'
     for adapter,size in [('rtx','3840x2160'),('igpu','3840x2160'),('igpu','1920x1080')]
@@ -12,7 +13,7 @@ EXPECTED_PARITY_KEYS={
     for quality in ['original','native']
 }
 
-def validate(rows,parity,identities):
+def validate(rows,parity,identities,canonical):
     grouped={}
     for r in rows:
         assert int(r['callbacks'])==600 and int(r['messages'])==29044 and int(r['skips'])==0
@@ -20,11 +21,14 @@ def validate(rows,parity,identities):
         pair=grouped.setdefault(key,{})
         assert r['arm'] in ('baseline','candidate') and r['arm']not in pair
         assert r['binary_sha256']==identities[r['arm']]['binary_sha256'],'timing binary does not match arm identity'
+        # Preserve historical rows, but never use their inactive accumulator as a gate.
+        assert r['quad_digest']==EMPTY_QUAD_DIGEST,'unexpected historical inactive accumulator'
         pair[r['arm']]=r
     for pair in grouped.values():
         assert set(pair)=={'baseline','candidate'}
-        for field in ['command_digest','quad_digest']:assert pair['baseline'][field]==pair['candidate'][field]
+        assert pair['baseline']['command_digest']==pair['candidate']['command_digest']
     assert set(parity)==EXPECTED_PARITY_KEYS,'parity configurations differ from the expected matrix'
+    assert identities['baseline_image_driver_sha256']==identities['candidate_image_driver_sha256'],'image drivers differ'
     baseline_image=identities['baseline_image_binary_sha256']
     candidate_image=identities['candidate_image_binary_sha256']
     assert baseline_image!=candidate_image,'parity arms must use distinct binaries'
@@ -33,6 +37,14 @@ def validate(rows,parity,identities):
         assert record['binary_sha256']==candidate_image,'candidate parity binary does not match identity'
         assert record['callbacks']==600 and record['skips']==0
         assert record['image_sequence_sha256']==record['baseline_image_sequence_sha256']
+    assert set(canonical)=={'baseline','candidate'}
+    for arm,record in canonical.items():
+        assert record['active'] is True,'canonical gate inactive'
+        assert (record['callbacks'],record['messages'],record['skips'])==(600,29044,0)
+        assert record['binary_sha256']==identities[arm+'_image_binary_sha256']
+        assert record['quad_digest'] not in (EMPTY_QUAD_DIGEST,'absent','empty',''),'canonical gate has no active digest'
+    for field in ['quad_digest','canonical_and_send_digest','selected_numeric_sha256']:
+        assert canonical['baseline'][field]==canonical['candidate'][field]
     return grouped
 
 def table(rows):
@@ -65,7 +77,8 @@ def main():
         rows=list(csv.DictReader(stream))
     parity=json.loads((ROOT/'parity.json').read_text(encoding='utf-8'))
     identities=json.loads((ROOT/'identities.json').read_text(encoding='utf-8'))
-    validate(rows,parity,identities);text=table(rows)
+    canonical=json.loads((ROOT/'canonical-parity.json').read_text(encoding='utf-8'))
+    validate(rows,parity,identities,canonical);text=table(rows)
     if '--check'in sys.argv:
         report=(ROOT/'REPORT.md').read_text(encoding='utf-8')
         assert text in report,'report aggregate table differs from runs.csv'

@@ -1,0 +1,26 @@
+{
+  "baseline": {
+    "active": true,
+    "binary_sha256": "4605ffc678ec41f4b3ff7cd86c88c6720a600b3240328aa99935fca70c52cc30",
+    "callbacks": 600,
+    "messages": 29044,
+    "skips": 0,
+    "quad_digest": "09045adb49ec2986",
+    "canonical_and_send_digest": "5ed8b093558d01c0",
+    "selected_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3",
+    "log_sha256": "8d8a02b369d753e1dc3967e92212b0efb848426b77c3614f757e4e8b8f067548",
+    "process_record_sha256": "d744d1e29fdfe320b1a00d7b81399d5c15ae3b582e8ee4ea98da17e23f309494"
+  },
+  "candidate": {
+    "active": true,
+    "binary_sha256": "8d7eae072217b9c325a54fcddf04b115ae1ed8356c6a95592d5b467ace98a542",
+    "callbacks": 600,
+    "messages": 29044,
+    "skips": 0,
+    "quad_digest": "09045adb49ec2986",
+    "canonical_and_send_digest": "5ed8b093558d01c0",
+    "selected_numeric_sha256": "36ca5be3d2bbba0c5dc99006eccbe0b1d0f9ef24056d81828160248b9457b3e3",
+    "log_sha256": "5fabda399527414919c8d7ee107dfde06ace934ea3a6e89a7ed8814aa8ce9a77",
+    "process_record_sha256": "e6883b0d4a71e237a3230a924f09ed35072e45e65dd966c17cce0ea8ae6b7262"
+  }
+}
