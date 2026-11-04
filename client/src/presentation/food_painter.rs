@@ -542,7 +542,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
         limit: input.command_limit,
         previous_alpha: input.entry_alpha,
         zoom_factor,
-        pixels_per_unit: pixels_per_unit,
+        pixels_per_unit,
     };
     let Some(bounds) = input.bounds else {
         return Ok(recorder.counts);
