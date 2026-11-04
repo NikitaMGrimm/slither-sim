@@ -41,6 +41,8 @@ class Study(unittest.TestCase):
         for key, value in controls.items():
             self.assertEqual(value['binary_sha256'], candidate['binary_sha256'])
             self.assertNotEqual(value['binary_sha256'], ids['base']['binary_sha256'])
+            # review-image-controls.json records the post-review binary; identities.json keeps the
+            # earlier timed candidate. Distinct hashes stop a control from silently reusing the old build.
             self.assertNotEqual(value['binary_sha256'], ids['candidate']['binary_sha256'])
             self.assertEqual(value['driver_sha256'], ids['base']['driver_sha256'])
             self.assertEqual(value['driver_sha256'], candidate['driver_sha256'])
