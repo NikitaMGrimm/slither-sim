@@ -4,6 +4,7 @@ use super::{BodyPaintPass, BodyPaintPlan, FoodImageDraw, FoodPaintError, FoodSou
 use crate::state::Point;
 
 /// Blend new downsampling from factor one through one ordinary zoom-out notch.
+#[inline]
 pub fn continuous_zoom_weight(factor: f64) -> f64 {
     if factor >= 1. {
         0.
@@ -14,12 +15,14 @@ pub fn continuous_zoom_weight(factor: f64) -> f64 {
     }
 }
 
+#[inline]
 fn smooth(t: f64) -> f64 {
     let t = t.clamp(0., 1.);
     t * t * (3. - 2. * t)
 }
 
 /// Continuous size fade, with the stock picture retained exactly at factor one.
+#[inline]
 pub fn zoom_size_fade(size: f64, low: f64, high: f64, factor: f64) -> f64 {
     let activation = continuous_zoom_weight(factor);
     1. - activation * (1. - smooth((size - low) / (high - low)))
@@ -28,6 +31,7 @@ pub fn zoom_size_fade(size: f64, low: f64, high: f64, factor: f64) -> f64 {
 /// Floor each image's own extent at one displayed physical pixel. Returned alpha
 /// is the exact rectangle-area ratio, not a body-dependent glow eligibility test.
 /// The stock overload, including its center/half-size convention, stays exact at 1.
+#[inline]
 pub fn continuous_food_image(
     source: FoodSource,
     center: Point,
@@ -49,8 +53,15 @@ pub fn continuous_food_image(
     else {
         unreachable!("non-stock zoom uses the explicit overload")
     };
-    let activation = continuous_zoom_weight(factor);
     let floor = 1. / physical_pixels_per_unit;
+    // Most settled glow images already exceed the floor. Their gain is exactly
+    // one; skip ratio divisions and rectangle rewrites. Inlining lets retained
+    // body/glow callers share uniform view checks without copying this policy.
+    // The frozen scalar oracle below pins the approved arithmetic by bits.
+    if destination.width >= floor && destination.height >= floor {
+        return Ok((draw, 1.));
+    }
+    let activation = continuous_zoom_weight(factor);
     let width = destination.width + activation * (floor - destination.width).max(0.);
     let height = destination.height + activation * (floor - destination.height).max(0.);
     let area = (destination.width / width) * (destination.height / height);
@@ -155,6 +166,80 @@ mod tests {
         assert!(body < 1.);
         assert_eq!(glow, 1.);
     }
+    // Frozen pre-trim arithmetic of the owner-approved prototype. Keep this
+    // separate from the optimized helper: a shared mistake cannot bless itself.
+    fn scalar_floor(
+        source: FoodSource,
+        center: Point,
+        scale: f64,
+        factor: f64,
+        density: f64,
+    ) -> (FoodImageDraw, f64) {
+        let draw = super::super::food_image_draw(source, center, scale, factor).unwrap();
+        if factor >= 1. {
+            return (draw, 1.);
+        }
+        let FoodImageDraw::Scaled {
+            source,
+            mut destination,
+        } = draw
+        else {
+            panic!()
+        };
+        let t = ((1. - factor) / 0.1).clamp(0., 1.);
+        let activation = t * t * (3. - 2. * t);
+        let floor = 1. / density;
+        let width = destination.width + activation * (floor - destination.width).max(0.);
+        let height = destination.height + activation * (floor - destination.height).max(0.);
+        let area = (destination.width / width) * (destination.height / height);
+        destination.x -= (width - destination.width) / 2.;
+        destination.y -= (height - destination.height) / 2.;
+        destination.width = width;
+        destination.height = height;
+        (
+            FoodImageDraw::Scaled {
+                source,
+                destination,
+            },
+            area,
+        )
+    }
+
+    #[test]
+    fn floor_fast_path_matches_frozen_scalar_bits_for_settled_and_fading_images() {
+        fn bits(draw: FoodImageDraw) -> Vec<u64> {
+            match draw {
+                FoodImageDraw::Whole { x, y } => vec![x.to_bits(), y.to_bits()],
+                FoodImageDraw::Scaled {
+                    source: s,
+                    destination: d,
+                } => [s.x, s.y, s.width, s.height, d.x, d.y, d.width, d.height]
+                    .map(f64::to_bits)
+                    .to_vec(),
+            }
+        }
+        for width in [1, 7, 32, 180] {
+            for factor in [1., 0.999999, 0.95, 0.9, 0.065, 0.001, 1.25] {
+                for density in [0.64, 1., 2.56, 4.] {
+                    for scale in [0., 0.05, 0.499, 0.999, 1., 1.2] {
+                        for center in [
+                            Point { x: 0., y: -0. },
+                            Point { x: 31.1, y: 17.3 },
+                            Point { x: -1e9, y: 1e9 },
+                        ] {
+                            let source = source(width);
+                            let a = scalar_floor(source, center, scale, factor, density);
+                            let b = continuous_food_image(source, center, scale, factor, density)
+                                .unwrap();
+                            assert_eq!(bits(a.0), bits(b.0));
+                            assert_eq!(a.1.to_bits(), b.1.to_bits());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn body_fade_keeps_sample_identity_cursor_and_antenna_barrier() {
         use super::super::{BodyAlpha, BodyBlend, BodyImageCommand, BodyRect};
