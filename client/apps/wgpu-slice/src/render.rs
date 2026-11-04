@@ -112,7 +112,7 @@ pub fn dimensions(extent: [u32; 2], scale: f64) -> Result<[u32; 2]> {
 }
 /// Convert body geometry coordinates to displayed logical pixels. Attachment
 /// resolution/MSAA do not affect this mapping. Use the larger axis so backing
-/// rounding cannot omit a shadow whose displayed diameter reaches four pixels.
+/// rounding does not make continuous detail fades depend on attachment resolution.
 pub fn body_logical_scale(
     extent: [u32; 2],
     scale: f64,
@@ -953,6 +953,10 @@ fn prepare_composed(
     preparation_phase!("background_end", identity);
     let user_zoom = client.camera().user_zoom_factor();
     let pressure = client.detail_pressure();
+    let continuous_zoom = user_zoom < 1.;
+    let physical_pixels_per_unit = bank
+        .overlay_viewport
+        .map_or(scale, |(_, dpr)| body_pixels_per_unit * dpr);
     let own_antenna_draws = if pressure {
         prepared
             .iter()
@@ -985,6 +989,9 @@ fn prepare_composed(
             prey_commands: 0,
         }
     };
+    // Keep the stock pressure allowance on both sides of factor one. Bypassing
+    // it only below one admits extra pellets at the first zoom microstep, even
+    // though the continuous size/alpha rules have barely changed (docs/zoom.md).
     let foods = entity_budget.foods(
         pressure,
         client.foods().foods(),
@@ -1006,6 +1013,9 @@ fn prepare_composed(
         } else {
             None
         };
+    if let Some(batch) = &mut retained_food {
+        batch.physical_pixels_per_unit = physical_pixels_per_unit;
+    }
     let total_food_charge = retained_food.as_ref().map_or(0, |b| b.draw_count());
     let food = if let Some(batch) = &retained_food {
         FoodPaintPlan {
@@ -1029,7 +1039,7 @@ fn prepare_composed(
             },
         }
     } else {
-        plan_food_with_zoom_and_index(
+        plan_food_with_zoom_and_density(
             FoodPaintInput {
                 foods: &foods,
                 view,
@@ -1044,6 +1054,7 @@ fn prepare_composed(
             early,
             late,
             user_zoom,
+            physical_pixels_per_unit,
         )
         .map_err(|e| {
             if e == FoodPaintError::CommandLimit {
@@ -1166,18 +1177,6 @@ fn prepare_composed(
                     draws.len() + total_food_charge + food.counts.late + prey_plan.late.len(),
                 )
             };
-            // Below two logical pixels across, separate outline/shadow/inner
-            // shimmer details cannot resolve. Reuse the existing low-quality
-            // passes without removing body geometry or changing global quality.
-            // Authored wheel LOD; measured workload and limits: docs/zoom.md.
-            let body_quality = if user_zoom < 1. && 29. * m.scale * view.zoom < 2. {
-                BodyPaintQuality {
-                    high_quality: false,
-                    blend: 0.,
-                }
-            } else {
-                quality
-            };
             let body_storage = std::mem::take(&mut bank.body_commands);
             let input = BodyPaintInput {
                 geometry: geometry.as_paint_geometry(),
@@ -1195,7 +1194,7 @@ fn prepare_composed(
                 },
                 assets: &bank.assets,
                 view,
-                quality: body_quality,
+                quality,
                 visual: BodyPaintVisual {
                     scale: m.scale,
                     spawn: m.spawn_progress,
@@ -1220,11 +1219,7 @@ fn prepare_composed(
                         .as_ref()
                         .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                     body_storage,
-                    if cfg!(feature = "frame-profile-no-shadow-cut") {
-                        1.
-                    } else {
-                        user_zoom
-                    },
+                    user_zoom,
                     body_pixels_per_unit,
                 )
             }
@@ -1235,6 +1230,15 @@ fn prepare_composed(
                     e.to_string()
                 }
             })?;
+            let body = {
+                let mut body = body;
+                fade_body_zoom_details(
+                    &mut body,
+                    29. * m.scale * view.zoom * body_pixels_per_unit,
+                    user_zoom,
+                );
+                body
+            };
             for command in &body.commands {
                 if command.pass == BodyPaintPass::Body {
                     observation.body_commands += 1;
@@ -1402,7 +1406,7 @@ fn prepare_composed(
     {
         // The text rasterizer requires at least one pixel. Subpixel world
         // names disappear with subpixel food instead of rejecting the picture.
-        if name.font_size * name_zoom < 1. {
+        if user_zoom >= 1. && name.font_size * name_zoom < 1. {
             continue;
         }
         use crate::text::{Align, Baseline, TextRun, TextStyle, Weight};
@@ -1414,7 +1418,7 @@ fn prepare_composed(
                     slant: TextSlant::Normal,
                     // Preserve stock sizing at default; names belong to the
                     // world when the player changes zoom (docs/zoom.md).
-                    size: name.font_size * name_zoom / scale,
+                    size: name.font_size * if continuous_zoom { 1. } else { name_zoom } / scale,
                     weight: Weight::Normal,
                     color: name.color,
                 },
@@ -1430,6 +1434,21 @@ fn prepare_composed(
             },
             scale,
         )? {
+            let draw = {
+                let mut draw = draw;
+                if continuous_zoom {
+                    // Retain one stock glyph raster and shrink its quad continuously;
+                    // re-rasterizing at every tiny font size adds quantized shape pops.
+                    draw.destination.x *= name_zoom;
+                    draw.destination.y *= name_zoom;
+                    draw.destination.width *= name_zoom;
+                    draw.destination.height *= name_zoom;
+                    let physical_size =
+                        name.font_size * name_zoom / scale * physical_pixels_per_unit;
+                    draw.effective_alpha *= zoom_size_fade(physical_size, 0., 2., user_zoom);
+                }
+                draw
+            };
             if pressure
                 && (draws.len() + total_food_charge) + text_draws.len() + 1 + own_antenna_draws
                     > MAX_DRAWS

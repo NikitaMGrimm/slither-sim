@@ -1,0 +1,116 @@
+{
+  "base": {
+    "revision": "1e849de979734c19ef838e154440de22ba37d547",
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+      "client/src/presentation.rs": "7c30e4676bb60ba0479faa6dceced6c254ac6390c55af7ed3054f84a3d405324",
+      "client/src/presentation/food_painter.rs": "863e7e82b18cbf0116361909827be38cbc37637d4890a826b73b977dfca5dfb9",
+      "client/src/presentation/client.rs": "e23ebf682e17a562864f1eff90cab80a64ce0d4c3530bf7dd1a2e59aa39973cd",
+      "client/apps/wgpu-slice/src/render.rs": "0229ed8b1aa32f78c67da2b731a1b2ec1e20e7dc3d90be420a9a75461a0a030d",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "c1c175fbed3ab302899812b1d8a0988a1f689ee62f7536cbd33e0286e5d62018",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "e26e5efb4445198e80c8097ba1a5fc5b3b84da01f1803c0a56403585f2ca62e9",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "5571cd76893243c10ba932e4b942daa04ccb5501207c0cceba78c39b0cbb0549",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "1238411273c9343667042ca32c6dbf7589984698e5caa8a8f50249308a278e23",
+      "client/src/presentation/body_painter.rs": "8e098e694d5f6a06a659dd8d682da67221f2de95610fdff699117395f420c4fb"
+    },
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "authored_driver_sha256": "a56ea1d584aab601a30607cdd7aa49f5089093fbc2a86e2de96379d59772a60e",
+    "features": "frame-profile,frame-bench",
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "ee102942d218b0e4d1b24ebc3022eda0312bde1887b079ecf2f4e84dcea9fb38",
+      "client/src/presentation.rs": "7ce25110100f4d5128dab0a7767dc8f5047c7be16fa12472582bc7bb43bfcdd0",
+      "client/src/presentation/food_painter.rs": "863e7e82b18cbf0116361909827be38cbc37637d4890a826b73b977dfca5dfb9",
+      "client/src/presentation/client.rs": "e23ebf682e17a562864f1eff90cab80a64ce0d4c3530bf7dd1a2e59aa39973cd",
+      "client/apps/wgpu-slice/src/render.rs": "c69bf5ebd1baeb8b6778052c4435201208a63d1181e12c845710ee65558b75c0",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "ef2d06cad89326e49accec046be3a50357b3214bd1c70564874fefedf5714aa5",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "ad1d33c5db7a469dcf7f13d6144933f5053457c0f6d782a08fd94d735bd7d051",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "5571cd76893243c10ba932e4b942daa04ccb5501207c0cceba78c39b0cbb0549",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "1238411273c9343667042ca32c6dbf7589984698e5caa8a8f50249308a278e23",
+      "client/src/presentation/body_painter.rs": "8e098e694d5f6a06a659dd8d682da67221f2de95610fdff699117395f420c4fb"
+    },
+    "authored_binary_sha256": "edde8c5fb65d775a58b8b64961cb421c41ea1fed426b42eb0802f30fb4e3b9ba",
+    "binary_sha256": "493b1f799617ba55a0bd5d9f23523dcbcbacdd74a4663ccdb47264aef854c0d0"
+  },
+  "look": {
+    "revision": "ea2b1dded1f8882fcdd56fd4e6aaa6b4028010f9",
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+      "client/src/presentation.rs": "4882f863090249d5907bdf0b23695af52a64a6be0d31881ef6c1fddc09c1b00f",
+      "client/src/presentation/food_painter.rs": "01e5da5936e6817a670928039a43d422298af8442eeaac48ebcd25a0a6082bb8",
+      "client/src/presentation/client.rs": "0bae56c377f4297df083a6c86a14712cf0b861cb8855e00bf25c266c6e75e20f",
+      "client/apps/wgpu-slice/src/render.rs": "08178d9a9889e5ee7968d8b626ef815ca96208c710e7cafc936869eef5b9e753",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "78f3f0638b3d41d9bd5027a69b65ddd47d999601a5f12b078f15c65273b3fe2f",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba5d3695d9991b0b30d3b81747fe6c5ef394f4f91de591e285f04a6a27c97ab6",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "client/src/presentation/continuous_zoom.rs": "62d629abe3da08904553b3922d4b1f874b37aced1eadd3c83a0fef3b08b4e856",
+      "client/src/presentation/body_painter.rs": "787db4e09740f953fd3d749107568c4cbaf06fe60b2458d1d168318b8b62ffc3"
+    },
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "authored_driver_sha256": "a56ea1d584aab601a30607cdd7aa49f5089093fbc2a86e2de96379d59772a60e",
+    "features": "frame-profile,frame-bench",
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "ee102942d218b0e4d1b24ebc3022eda0312bde1887b079ecf2f4e84dcea9fb38",
+      "client/src/presentation.rs": "b9137c77c9d57e9e80b74db2bd05745453b43dd41bf463f1ec4a54264efd4a61",
+      "client/src/presentation/food_painter.rs": "01e5da5936e6817a670928039a43d422298af8442eeaac48ebcd25a0a6082bb8",
+      "client/src/presentation/client.rs": "0bae56c377f4297df083a6c86a14712cf0b861cb8855e00bf25c266c6e75e20f",
+      "client/apps/wgpu-slice/src/render.rs": "e63e51957139ffc584b8efdaf55c7c5c679faacfcfd9fb8240f48a40f81603b1",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "32d75c039731b5d0f4567aac216920ef41196c7acd1c4950183c690f2cebd88e",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "16850b382a111d936a89551963184de3a7e0ea786470fdefe970c2540f07fe35",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "client/src/presentation/continuous_zoom.rs": "62d629abe3da08904553b3922d4b1f874b37aced1eadd3c83a0fef3b08b4e856",
+      "client/src/presentation/body_painter.rs": "787db4e09740f953fd3d749107568c4cbaf06fe60b2458d1d168318b8b62ffc3"
+    },
+    "authored_binary_sha256": "6dba77f1f858ed4782d274b741042b6336285d1983e853d36a29ed98557ad76d",
+    "binary_sha256": "58e2605b123aab19ed07c47b86aa70194963de0ca8d4358640eaba3758a2f75b"
+  },
+  "candidate": {
+    "revision": "1aef092dc16070ff16853dec8dc326058d2663a6",
+    "runtime_source_sha256": {
+      "client/src/presentation/food.rs": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+      "client/src/presentation.rs": "4882f863090249d5907bdf0b23695af52a64a6be0d31881ef6c1fddc09c1b00f",
+      "client/src/presentation/food_painter.rs": "9a767d5b778119113fbb6592b5c3ac3b16bbecbb5cd54388331175414e3bfa30",
+      "client/src/presentation/client.rs": "0bae56c377f4297df083a6c86a14712cf0b861cb8855e00bf25c266c6e75e20f",
+      "client/apps/wgpu-slice/src/render.rs": "79f1b935ae855f35ea3a21107ffb5da0f521352c5868c1bca6c1e7e2d89a0d6c",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "78f3f0638b3d41d9bd5027a69b65ddd47d999601a5f12b078f15c65273b3fe2f",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba5d3695d9991b0b30d3b81747fe6c5ef394f4f91de591e285f04a6a27c97ab6",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "client/src/presentation/continuous_zoom.rs": "76ba9b03f817627c2cfbd396f1b9acc830f4051ce7096e59b61f3b7e513f8293",
+      "client/src/presentation/body_painter.rs": "787db4e09740f953fd3d749107568c4cbaf06fe60b2458d1d168318b8b62ffc3"
+    },
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "authored_driver_sha256": "a56ea1d584aab601a30607cdd7aa49f5089093fbc2a86e2de96379d59772a60e",
+    "features": "frame-profile,frame-bench",
+    "measured_source_sha256": {
+      "client/src/presentation/food.rs": "ee102942d218b0e4d1b24ebc3022eda0312bde1887b079ecf2f4e84dcea9fb38",
+      "client/src/presentation.rs": "b9137c77c9d57e9e80b74db2bd05745453b43dd41bf463f1ec4a54264efd4a61",
+      "client/src/presentation/food_painter.rs": "9a767d5b778119113fbb6592b5c3ac3b16bbecbb5cd54388331175414e3bfa30",
+      "client/src/presentation/client.rs": "0bae56c377f4297df083a6c86a14712cf0b861cb8855e00bf25c266c6e75e20f",
+      "client/apps/wgpu-slice/src/render.rs": "86428c8ddf6f3dcb5de9b5be679a070c6b8952e8c06a595dc3ac069d6d4f43e3",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "32d75c039731b5d0f4567aac216920ef41196c7acd1c4950183c690f2cebd88e",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "16850b382a111d936a89551963184de3a7e0ea786470fdefe970c2540f07fe35",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "client/src/presentation/continuous_zoom.rs": "76ba9b03f817627c2cfbd396f1b9acc830f4051ce7096e59b61f3b7e513f8293",
+      "client/src/presentation/body_painter.rs": "787db4e09740f953fd3d749107568c4cbaf06fe60b2458d1d168318b8b62ffc3"
+    },
+    "authored_binary_sha256": "0e71c05dce14fd7fac87f29792fb24e51ec481436ae3886866491ac611a9602d",
+    "binary_sha256": "cbc3d5bb609697e6dabc1a0b3919466c827412131b2e98b734dba9e0ae4b55cf",
+    "reviewed_runtime_source_sha256": {
+      "client/src/presentation/food.rs": "f18556627c8e546b56cb9f9aba868c5f7492b5f7352e388476b0f0ca6bbc6945",
+      "client/src/presentation.rs": "4882f863090249d5907bdf0b23695af52a64a6be0d31881ef6c1fddc09c1b00f",
+      "client/src/presentation/food_painter.rs": "670d804c4ed544b68d573699e515c5761ab51e1b1d13afafb910c7e62d3578a0",
+      "client/src/presentation/client.rs": "0bae56c377f4297df083a6c86a14712cf0b861cb8855e00bf25c266c6e75e20f",
+      "client/apps/wgpu-slice/src/render.rs": "79f1b935ae855f35ea3a21107ffb5da0f521352c5868c1bca6c1e7e2d89a0d6c",
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "78f3f0638b3d41d9bd5027a69b65ddd47d999601a5f12b078f15c65273b3fe2f",
+      "client/apps/wgpu-slice/src/pellet_gpu.rs": "ba5d3695d9991b0b30d3b81747fe6c5ef394f4f91de591e285f04a6a27c97ab6",
+      "client/apps/wgpu-slice/src/pellet_cpu.rs": "af3d2fabb0f4a6a87f1335d79ae63734869f7dc0484b4f04ca04a79af3560726",
+      "client/apps/wgpu-slice/src/pellet_workers.rs": "a5997d17a9d9a2ee01fcad7ebdc57445cf193b77d7e37db51166d0ae35208052",
+      "client/src/presentation/continuous_zoom.rs": "76ba9b03f817627c2cfbd396f1b9acc830f4051ce7096e59b61f3b7e513f8293",
+      "client/src/presentation/body_painter.rs": "787db4e09740f953fd3d749107568c4cbaf06fe60b2458d1d168318b8b62ffc3"
+    },
+    "reviewed_runtime_revision": "436b8210"
+  }
+}

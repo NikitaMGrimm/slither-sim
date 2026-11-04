@@ -35,7 +35,7 @@ fn shadow_count(diameter_in_geometry: f64, logical_scale: f64, factor: f64) -> u
         variants: &variants,
         boost_glow: Some(use_asset(0)),
     }];
-    let plan = plan_standard_body_with_zoom_and_storage(
+    let mut plan = plan_standard_body_with_zoom_and_storage(
         BodyPaintInput {
             geometry: BodyPaintGeometry {
                 samples: &samples,
@@ -92,6 +92,7 @@ fn shadow_count(diameter_in_geometry: f64, logical_scale: f64, factor: f64) -> u
         logical_scale,
     )
     .unwrap();
+    fade_body_zoom_details(&mut plan, diameter_in_geometry * logical_scale, factor);
     plan.commands
         .iter()
         .filter(|c| c.pass == BodyPaintPass::BodyShadow)
@@ -99,7 +100,7 @@ fn shadow_count(diameter_in_geometry: f64, logical_scale: f64, factor: f64) -> u
 }
 
 #[test]
-fn native_shadow_cut_uses_displayed_logical_pixels_in_both_resolution_modes() {
+fn native_shadow_fade_uses_displayed_logical_pixels_in_both_resolution_modes() {
     for physical in [[1920, 1080], [3840, 2160]] {
         for dpr in [1., 1.5, 2.] {
             let mut previous = None;
@@ -131,10 +132,10 @@ fn native_shadow_cut_uses_displayed_logical_pixels_in_both_resolution_modes() {
                 let count = shadow_count(3.9, conversion, 0.2);
                 assert_eq!(
                     count == 0,
-                    3.9 * conversion < 4.,
+                    3.9 * conversion <= 2.,
                     "{physical:?} DPR {dpr} {requested:?}"
                 );
-                assert_eq!(shadow_count(3.5 / conversion, conversion, 0.2), 0);
+                assert_eq!(shadow_count(1.5 / conversion, conversion, 0.2), 0);
                 assert!(shadow_count(4.5 / conversion, conversion, 0.2) > 0);
                 assert!(shadow_count(0.1, conversion, 1.) > 0);
                 if let Some(previous) = previous {
@@ -151,12 +152,12 @@ fn native_shadow_cut_uses_displayed_logical_pixels_in_both_resolution_modes() {
 }
 
 #[test]
-fn native_viewport_metadata_reaches_shadow_eligibility_through_gameplay_preparation() {
+fn native_viewport_metadata_reaches_continuous_shadow_fade_in_gameplay() {
     for physical in [[1920, 1080], [3840, 2160]] {
         for dpr in [1., 1.5, 2.] {
             for requested in [WorldResolution::Original, WorldResolution::Native] {
                 let mut game = tape::playing();
-                // Allow the fractional wheel factors around four pixels without
+                // Probe both sides of the former four-pixel cutoff without
                 // the small authored arena clamping them to its whole-map limit.
                 let mut radius = vec![b'z'];
                 radius.extend(tape::u24(20_000));
@@ -219,8 +220,7 @@ fn native_viewport_metadata_reaches_shadow_eligibility_through_gameplay_preparat
                                 .count();
                             assert_eq!(
                                 body_shadows > 0,
-                                cfg!(feature = "frame-profile-no-shadow-cut")
-                                    || target_diameter > 4.,
+                                target_diameter > 2.,
                                 "{physical:?} DPR {dpr} {requested:?}: {diameter} logical px"
                             );
                         }

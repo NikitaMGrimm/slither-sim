@@ -54,7 +54,6 @@ wgpu = { version = "=30.0.1", default-features = false, features = ["std", "wgsl
 [features]
 feel-trace = ["slither-client/feel-trace"]
 frame-profile = ["wgpu/trace", "dep:wgpu-core", "dep:ron", "dep:serde"]
-frame-profile-no-shadow-cut = ["frame-profile"]
 latency-rig = ["slither-client/latency-rig"]
 frame-bench = ["slither-client/frame-bench"]
 

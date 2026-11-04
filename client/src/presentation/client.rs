@@ -133,7 +133,7 @@ fn select_pressure<T: Clone, E>(
 impl PressureEntityBudget {
     /// Reserve once from an untrimmed own plan. The antenna bound counts each
     /// segment and at most one pi-sweep fan per path point, including end caps.
-    /// Standard-shadow LOD can only reduce this conservative reservation.
+    /// Continuous detail fading can only reduce this reservation.
     pub fn for_own(own: Option<&PreparedSnake>) -> Self {
         let body = own
             .and_then(|s| s.body_geometry.as_ref())
@@ -170,7 +170,7 @@ impl PressureEntityBudget {
         pressure: bool,
         foods: &'a [super::FoodPresentation],
         bounds: Option<FoodCullBounds>,
-        zoom_factor: f64,
+        _zoom_factor: f64,
     ) -> Cow<'a, [super::FoodPresentation]> {
         if !pressure {
             return Cow::Borrowed(foods);
@@ -178,8 +178,7 @@ impl PressureEntityBudget {
         Cow::Owned(
             select_pressure(foods, self.food_commands / 7, |food| {
                 Ok::<_, std::convert::Infallible>(
-                    bounds.is_some_and(|b| b.contains(food.snapshot().render_position))
-                        && super::food_painter::food_zoom_eligible(food.snapshot(), zoom_factor),
+                    bounds.is_some_and(|b| b.contains(food.snapshot().render_position)),
                 )
             })
             .expect("infallible food visibility"),
