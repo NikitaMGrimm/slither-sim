@@ -122,7 +122,9 @@ pub struct FoodImageCommand {
 pub struct FoodPaintCounts {
     /// Distinct foods inside the cull rectangle that emit image commands.
     pub visible_foods: usize,
-    /// Same inclusive cull rectangle, before zoom omission; not image calls.
+    /// Same inclusive cull rectangle before zoom attenuation; not image calls.
+    /// Continuous zoom retains all of these foods; the field name also supports
+    /// historical benchmark receipts that used subpixel omission.
     #[cfg(feature = "frame-bench")]
     pub before_zoom_foods: usize,
     /// Outline and body calls before all snake work.

@@ -1136,7 +1136,7 @@ fn displayed_scale_does_not_hard_cut_shadows_and_is_validated() {
     for scale in [0.64, 1., 1.28, 2.56] {
         f.logical_pixels_per_unit = scale;
         let plan = f.plan().unwrap();
-        assert_eq!(plan.commands.iter().any(|c| c.pass == BodyShadow), true);
+        assert!(plan.commands.iter().any(|c| c.pass == BodyShadow));
     }
     for scale in [0., -1., f64::NAN, f64::INFINITY] {
         f.logical_pixels_per_unit = scale;

@@ -1219,11 +1219,7 @@ fn prepare_composed(
                         .as_ref()
                         .map_or(AntennaBarrierEffect::Disabled, |a| a.barrier_effect),
                     body_storage,
-                    if cfg!(feature = "frame-profile-no-shadow-cut") {
-                        1.
-                    } else {
-                        user_zoom
-                    },
+                    user_zoom,
                     body_pixels_per_unit,
                 )
             }
