@@ -163,9 +163,16 @@ export function foodSubmission(view) {
   const countsValid=Number.isSafeInteger(retained)&&retained>=0&&Number.isSafeInteger(before)&&before>=0&&before<=retained
     &&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
   const omissionShare=countsValid&&before>0?(before-submitted)/before:null;
+  const after=view.pelletsAfterBudget,limit=view.foodBudgetLimit;
+  const budgetKnown=countsValid&&before>0&&view.foodBudgetApplied===true&&view.foodBudgetCensusComplete===true
+    &&Number.isSafeInteger(limit)&&limit>=0&&Number.isSafeInteger(after)&&after===Math.min(before,limit)&&submitted<=after;
+  const hasCapacityFields=['pelletsAfterBudget','foodBudgetLimit','foodBudgetCensusComplete'].some(key=>Object.hasOwn(view,key));
+  const unbudgetedKnown=view.foodBudgetApplied===false&&view.foodBudgetCensusComplete===true&&limit===null&&after===before;
   const reason=!countsValid?'missing or contradictory planner counts':before===0?'empty culling bounds':
-    view.foodBudgetApplied!==false?'upstream food selection is applied or unestablished':null;
-  return {status:reason?'unestablished':'established',reason,omissionShare};
+    hasCapacityFields&&!budgetKnown&&!unbudgetedKnown?'missing or contradictory capacity fields':
+    view.foodBudgetApplied!==false&&!budgetKnown?'upstream food selection is applied or unestablished':null;
+  return {status:reason?'unestablished':'established',reason,omissionShare,
+    ...(budgetKnown?{capacity:{limit,afterBudget:after,reductionShare:(before-after)/before}}:{})};
 }
 export function foodSubmissionEvidence(run) {
   const samples=(run.views??[]).map(v=>({atMs:v.atMs,...foodSubmission(v)}));
@@ -173,6 +180,25 @@ export function foodSubmissionEvidence(run) {
   return {status:samples.length&&samples.every(s=>s.status==='established')?'established':'unestablished',
     minimumOmissionShare:shares.length?Math.min(...shares):null,
     maximumOmissionShare:shares.length?Math.max(...shares):null,samples};
+}
+// Every preflight row, including telemetry-off rows that deliberately stop
+// view receipts, needs a host census inside the sampled window; otherwise a
+// host that hung after admission still passes readiness.
+export function preflightHostFresh(run) {
+  const census=run.census?.at(-1);
+  return streamCoverage(census?[census]:[],run.startMs,run.endMs,1200);
+}
+export function preflightFoodSubmission(run) {
+  const view=run.views?.at(-1),census=run.census?.at(-1);
+  const evidence=foodSubmissionEvidence({views:view?[view]:[]});
+  // Reuse timed acquisition's view/host coverage bounds. A native receipt can
+  // precede the final host census by one view cadence, never indefinitely.
+  const freshness={viewCoversWindow:streamCoverage(view?[view]:[],run.startMs,run.endMs,3000),
+    censusCoversWindow:streamCoverage(census?[census]:[],run.startMs,run.endMs,1200),
+    censusDistanceMs:Number.isFinite(view?.atMs)&&Number.isFinite(census?.atMs)?Math.abs(view.atMs-census.atMs):null};
+  const fresh=freshness.viewCoversWindow&&freshness.censusCoversWindow
+    &&freshness.censusDistanceMs!==null&&freshness.censusDistanceMs<=3000;
+  return {...evidence,...(!fresh?{status:'unestablished',reason:'Native view or final host census is stale or untimestamped relative to the preflight window'}:{}),freshness};
 }
 export function drawnSnakeEvidence(run) {
   const reasons=[];let missing=!run.views?.length;
@@ -295,6 +321,7 @@ export function comparison(a, b) {
   const completeFood=foodA.status==='established'&&foodB.status==='established';
   const shares=[foodA.minimumOmissionShare,foodA.maximumOmissionShare,foodB.minimumOmissionShare,foodB.maximumOmissionShare].filter(Number.isFinite);
   if(!completeFood)reasons.push('food submission evidence missing or incomplete; equal submission unestablished');
+  if([...foodA.samples,...foodB.samples].some(s=>s.capacity))reasons.push('capacity food budget active; compare submitted versus full candidates');
   // Absorb only subtraction roundoff at the exact threshold (e.g. .30-.25).
   if(completeFood&&Math.max(...shares)-Math.min(...shares)+Number.EPSILON>=materialFoodOmission)
     reasons.push('different food submission: omission shares differ by at least 5 percentage points');

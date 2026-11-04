@@ -134,6 +134,15 @@ fn pressure_food_culls_before_quota_and_both_planner_paths_keep_the_same_set() {
             assert_eq!(canvas.len(), quota.min(visible));
             assert!(canvas.iter().all(|f| f.snapshot().render_position.x < 100.));
             assert_eq!(canvas, native);
+            #[cfg(feature = "frame-bench")]
+            {
+                let (counted, candidates) = budget.foods_with_candidates(world.foods(), bounds);
+                assert_eq!(candidates, visible);
+                assert_eq!(
+                    counted, native,
+                    "census must preserve the newest-visible selection, even at quota zero"
+                );
+            }
             let assets = [asset(1)];
             let canvas_plan = plan_food(food_input(&canvas, &assets)).unwrap();
             let native_plan = plan_food_with_zoom_and_index(

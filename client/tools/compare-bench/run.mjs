@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary,foodSubmission,foodSubmissionEvidence } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission,preflightHostFresh,windowReasons } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
@@ -114,7 +114,7 @@ async function modInput(input, session) {
   execute('powershell.exe', ['-NoProfile', '-File', path.join(here, 'unpack-mod.ps1'), '-Archive', archive, '-Destination', directory]);
   return { directory, packageSha256: hash(bytes), tree: await treeHash(directory) };
 }
-async function runAttempt(config, root, item, provenance, machine) {
+export async function runAttempt(config, root, item, provenance, machine) {
   const directory = path.join(root, `${item.scenario}-${item.round}-${item.client}-${randomUUID()}`);
   await fs.mkdir(directory);
   const children = []; let hostLog = '', clientLog = '', browser, pm, host, native,networkMonitor;
@@ -125,7 +125,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     width: config.width, height: config.height, dt: .007, bots: item.scenario === 'battledome' ? 100 : 500,
     provenance, machine, telemetry:config.telemetry??'on', windowSamples: [], views: [], census: [], stats: [],
     ntlViewCalibration:config.ntlViewCalibration,
-    browserViewSampling:item.client==='ntl'&&config.telemetry!=='off'?'CDP screenshots every 1.5 s plus capture time; decode after window; included in telemetry perturbation control':'no timed picture sampling',
+    browserViewSampling:config.preflightOnly?'untimed setup pictures only':item.client==='ntl'&&config.telemetry!=='off'?'CDP screenshots every 1.5 s plus capture time; decode after window; included in telemetry perturbation control':'no timed picture sampling',
     acceptance: 'qualified acquisition; content/display equivalence must be established separately',
     survival: 'host circular steering at 0.75*radius, boost off, socket player ignores body collisions; boundary/pit rules and bots unchanged; any death invalidates' };
   const register = child => { children.push(child); child.on('error', () => {}); };
@@ -161,7 +161,7 @@ async function runAttempt(config, root, item, provenance, machine) {
     r.endpoint = endpoint;
     if (item.client === 'ntl') {
       if(provenance.ntl?.error||!provenance.ntl?.tree?.sha256)throw Error('NTL mod provenance unavailable; package will not be loaded');
-      browser = await ntl({ ...config, directory, endpoint, register, scenario:item.scenario,productionProbe:config.telemetry!=='off' });
+      browser = await ntl({ ...config, directory, endpoint, register, scenario:item.scenario,productionProbe:!config.preflightOnly&&config.telemetry!=='off' });
       native = browser.child;
       r.adapter = browser.adapter; r.chromeVersion = browser.chromeVersion;
       r.adapterRequest = config.adapter; r.vsync = 'Chrome default compositor pacing; actual SyncInterval unmeasured until ETW';
@@ -198,7 +198,10 @@ async function runAttempt(config, root, item, provenance, machine) {
       const clientEnv={...process.env,LOCALAPPDATA:data};
       delete clientEnv.SLITHER_FRAME_PACING;delete clientEnv.SLITHER_FRAME_PACING_JOURNAL;
       delete clientEnv.SLITHER_FRAME_PACING_SETUP_STOP;
-      if(config.telemetry!=='off')Object.assign(clientEnv,{SLITHER_FRAME_PACING:'1',SLITHER_FRAME_PACING_JOURNAL:path.join(directory,'native-production.json')});
+      if(config.telemetry!=='off'){
+        clientEnv.SLITHER_FRAME_PACING='1';
+        if(!config.preflightOnly)clientEnv.SLITHER_FRAME_PACING_JOURNAL=path.join(directory,'native-production.json');
+      }
       else if(item.viewCondition==='ntl-farthest'){
         setupViewStopFile=path.join(directory,'stop-setup-view');clientEnv.SLITHER_FRAME_PACING_SETUP_STOP=setupViewStopFile;
       }
@@ -219,6 +222,8 @@ async function runAttempt(config, root, item, provenance, machine) {
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
     [r.setupFocus]=await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
+    [r.beforeViewSetup]=await windows({mode:'visibility',clientPid:native.pid},directory,'before-view-visibility',children);
+    requireSetupAvailability(r.setupFocus,r.beforeViewSetup);
     if(browser&&item.scenario==='battledome'){
       r.viewSetup=await settleNtlView(browser,config.ntlViewCalibration,item.viewCondition,async index=>{
         const file=await browser.capture(`before-warmup-${index}`),picture=pngEvidence(await fs.readFile(file));
@@ -263,6 +268,34 @@ async function runAttempt(config, root, item, provenance, machine) {
     }
     [r.setupAvailability]=await windows({mode:'visibility',clientPid:native.pid},directory,'after-warmup-visibility',children);
     requireSetupAvailability(r.setupFocus,r.setupAvailability);
+    if(config.preflightOnly){
+      // Exercise exactly the row's setup/warmup, then stop before any ETW or
+      // content-production capture. This path never creates comparative metrics.
+      r.purpose='untimed row setup preflight';
+      r.windowSamples=await windows({mode:'sample',initialInputTick:r.setupFocus.lastInputTick,
+        clientPid:native.pid,clientPids:browser?browser.processIds:[native.pid],gpuPid:browser?browser.gpuPid:native.pid,
+        hostPid:host.pid,seconds:.5},directory,'preflight-window',children);
+      const first=r.windowSamples[0],last=r.windowSamples.at(-1);
+      Object.assign(r,{startMs:first?.qpcMs,endMs:(last?.qpcMs??NaN)+1,display:first?.display,dpi:first?.dpi,refreshHz:first?.refreshHz});
+      r.preflightWindowReasons=windowReasons(r);
+      r.preflightTimingBlockers=r.preflightWindowReasons.filter(reason=>reason==='Build/test process running');
+      const setupReasons=r.preflightWindowReasons.filter(reason=>reason!=='Build/test process running');
+      const luids=[...new Set(r.windowSamples.flatMap(s=>s.gpuEngines??[]).filter(e=>/engtype_3d/i.test(e.instance)&&e.utilization>.01)
+        .map(e=>e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
+      r.preflightRenderLuids=luids;
+      if(config.experiment==='primary'&&(luids.length!==1||luids[0]!==config.targetAdapterLuid))setupReasons.push('Preflight render LUID does not match target');
+      if((config.targetDisplay&&first?.display!==config.targetDisplay)||(config.targetRefreshHz&&first?.refreshHz!==config.targetRefreshHz))setupReasons.push('Preflight display/refresh does not match target');
+      if(config.telemetry==='off'&&item.viewCondition==='ntl-farthest'&&!Number.isFinite(r.viewSetup?.stoppedAtMs))setupReasons.push('Native setup stop not acknowledged');
+      const census=r.census.at(-1);
+      if(census?.admittedBotSlots!==r.bots||!census.players?.[0]?.alive||!census.players[0].setup
+        ||census.players[0].protocol!==(item.client==='ntl'?13:19))setupReasons.push('Preflight admission/life/protocol not established');
+      if(!preflightHostFresh(r))setupReasons.push('Final host census is stale or untimestamped relative to the preflight window');
+      const foodSubmission=preflightFoodSubmission(r);
+      if(['original','native'].includes(item.client)&&config.telemetry!=='off'&&foodSubmission.status!=='established')
+        setupReasons.push(`Food submission census incomplete or stale; ${foodSubmission.reason??'update the native instrumented input'}`);
+      r.preflight={passed:setupReasons.length===0,reasons:setupReasons,inputDetection:{focus:r.setupFocus,afterWarmup:r.setupAvailability},
+        census,setupStop:r.viewSetup?.stoppedAtMs??null,foodSubmission};
+    }else{
     // Start ETW before the fixed window; retain the guards before/after it too.
     const csvPath = path.join(directory, 'presentmon.csv');
     r.presentMonSession=`SlitherBench-${randomUUID()}`;
@@ -360,6 +393,7 @@ async function runAttempt(config, root, item, provenance, machine) {
       r.nativeProduction=nativeProduction(JSON.parse(await fs.readFile(path.join(directory,'native-production.json'),'utf8')),{startMs:r.startMs,endMs:r.endMs,qpcUnixOffset:offset});
       r.contentDisplayCorrelation='unestablished';
     }
+    }
   } catch (error) { r.error = error.message; }
   finally {
     r.telemetryErrors=telemetryErrors;
@@ -385,7 +419,15 @@ async function runAttempt(config, root, item, provenance, machine) {
     }
     r.views=r.views.map(v=>({...v,foodOmissionShare:foodSubmission(v).omissionShare}));
     r.sceneAcceptance={drawnSnakes:drawnSnakeEvidence(r),foodSubmission:foodSubmissionEvidence(r)};
-    r.validity = validity(r); await save(path.join(directory, 'result.json'), r);
+    if(config.preflightOnly){
+      const reasons=r.preflight?.reasons??[];
+      if(r.error)reasons.push(r.error);
+      if(r.cleanupError)reasons.push(r.cleanupError);
+      if(item.client==='ntl'?!r.networkVerified:r.nativeNetwork?.status!=='sampled-loopback-only')reasons.push('Preflight loopback network evidence failed');
+      r.preflight={...r.preflight,passed:reasons.length===0,reasons};
+      r.validity={valid:false,reasons:['Untimed preflight; no comparison window or presentation metrics']};
+    }else r.validity = validity(r);
+    await save(path.join(directory, 'result.json'), r);
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
   }
   console.log(JSON.stringify({ directory, scenario: item.scenario, client: item.client, valid: r.validity.valid, reasons: r.validity.reasons }));
@@ -405,7 +447,7 @@ export async function main(args = process.argv.slice(2)) {
   }
   if (args[0] === 'prepare') { console.log(JSON.stringify(await prepare(config, root))); return; }
   Object.assign(config, { width: config.width ?? 3840, height: config.height ?? 2160, x: config.x ?? 0, y: config.y ?? 0,
-    seconds: args[0] === 'smoke' ? 5 : config.seconds ?? 60, warmupSeconds: config.warmupSeconds ?? 5 });
+    seconds: args[0] === 'smoke' ? 5 : config.seconds ?? 60, warmupSeconds: config.warmupSeconds ?? 5,preflightOnly:args[0]==='preflight' });
   if (!Number.isInteger(config.seconds) || config.seconds < 3 || config.seconds > 180) throw Error('seconds must be 3..180');
   nativeNetworkMaxSeconds(config);
   if(config.telemetry&&!['on','off'].includes(config.telemetry))throw Error('telemetry must be on or off (diagnostic only)');
@@ -452,8 +494,20 @@ export async function main(args = process.argv.slice(2)) {
     const report=config.ntlViewCalibration;
     console.log(JSON.stringify({session,timedRoundsStarted:false,networkVerified:report.network.verified,
       noPacketReachabilityProbeCount:report.network.noPacketReachabilityProbeCount,zoomPlateau:report.plateau,
-      displayGate:report.displayGate,readyForTimedRound:report.displayGate?.passed===true}));
+      displayGate:report.displayGate,ntlCalibrationReady:report.displayGate?.passed===true}));
     if(report.displayGate?.passed!==true)process.exitCode=2;
+    else{
+      const {preflightPlan}=await import('./matrix.mjs');const rows=[];
+      for(const item of preflightPlan(clients,report.wholeMap===false)){
+        const row=await runAttempt({...config,telemetry:item.telemetry},session,item,provenance,machine);rows.push(row);
+        await save(path.join(session,`preflight-row-${rows.length}.json`),row);
+        if(!row.run.preflight?.passed){process.exitCode=2;break;}
+      }
+      const summary={purpose:'untimed setup checks; no comparison',rows:rows.map(row=>({directory:row.directory,...row.run.preflight})),
+        setupPreflightPassed:rows.length===preflightPlan(clients,report.wholeMap===false).length&&rows.every(row=>row.run.preflight?.passed),timedRoundsStarted:false};
+      await save(path.join(session,'preflight-summary.json'),summary);
+      console.log(JSON.stringify({session,setupPreflightPassed:summary.setupPreflightPassed,timedRoundsStarted:false}));
+    }
     return;
   }
   if(clients.includes('ntl'))requireNtlDisplayGate(config.ntlViewCalibration);
