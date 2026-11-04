@@ -99,9 +99,12 @@ including its other content. This is a measured fixture bound, not a universal
 maximum. Other geometry can still exhaust the remaining budget.
 
 A generic/canonical fallback needs up to seven commands per food: 458,745 for
-65,535, already above the picture limit before snakes. A backdrop can require
-that fallback. Admission rejects the complete picture; native release retains
-the previous accepted picture. No partial pellet selection conceals that limit.
+65,535, already above the picture limit before snakes. World-preparation
+admission rejects the complete picture; native release skips it and leaves the
+previous presentation displayed. A backdrop also requires canonical expansion
+during menu composition. If that composition exceeds its draw quota, the menu
+overlay is skipped and the original world picture is submitted. No partial
+pellet selection conceals the limit.
 Tests check compact retention, complete fallback rejection, current-radius fit
 and draw/capacity/pixel bounds. These checks do not promise every population fits.
 

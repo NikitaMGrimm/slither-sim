@@ -21,10 +21,10 @@ def load():
         rows = list(csv.DictReader(stream))
     with (ROOT / 'pop.csv').open(newline='', encoding='utf-8') as stream:
         pop = list(csv.DictReader(stream))
-    return rows, json.loads((ROOT / 'identities.json').read_text(encoding='utf-8')), json.loads((ROOT / 'image-controls.json').read_text(encoding='utf-8')), pop
+    return rows, json.loads((ROOT / 'identities.json').read_text(encoding='utf-8')), json.loads((ROOT / 'image-controls.json').read_text(encoding='utf-8')), pop, json.loads((ROOT / 'capacity.json').read_text(encoding='utf-8'))
 
 
-def validate(rows, ids, images, pop):
+def validate(rows, ids, images, pop, capacity):
     assert set(ids) == {'base', 'look', 'candidate'}
     assert len({v['binary_sha256'] for v in ids.values()}) == 3
     assert len({v['driver_sha256'] for v in ids.values()}) == 1
@@ -79,11 +79,18 @@ def validate(rows, ids, images, pop):
         assert abs(int(row['total_rgb']) - int(row['previous_total_rgb'])) == int(row['delta_light'])
         ratio = int(row['delta_light']) / max(1, int(row['previous_total_rgb']))
         assert math.isclose(ratio, float(row['relative_light_jump']), rel_tol=1e-12, abs_tol=1e-15)
+    assert set(capacity) == {'native', 'original'}
+    for value in capacity.values():
+        assert value['callbacks'] == 600 and value['skips'] == 0
+        assert value['visible_foods'] == 65535
+        assert value['binary_sha256'] == ids['candidate']['binary_sha256']
+        assert value['driver_sha256'] == ids['candidate']['driver_sha256']
+        assert 0 < value['max_picture_quads'] <= 262144
     return accepted
 
 
-def tables(rows, ids, images, pop):
-    groups = validate(rows, ids, images, pop)
+def tables(rows, ids, images, pop, capacity):
+    groups = validate(rows, ids, images, pop, capacity)
     timing = ['| Adapter / view / quality | Main ms p50/p95 | Approved look ms p50/p95 | Trimmed ms p50/p95 | Trim p50 paired range ms |', '| --- | ---: | ---: | ---: | ---: |']
     stages = ['| Adapter / view / quality | Pellet prepare: main / look / trimmed ms | Trimmed redraw / submit / GPU ms |', '| --- | ---: | ---: |']
     for config, blocks in sorted(groups.items()):
@@ -105,7 +112,14 @@ def tables(rows, ids, images, pop):
         for arm in ['base', 'candidate']:
             selected = [r for r in pop if (r['quality'], r['arm']) == (quality, arm)]
             pops.append(f'| {quality} / {arm} | {len(selected)} | {max(int(r["max_adjacent_rgb"]) for r in selected)} | {max(int(r["delta_light"]) for r in selected)} | {100 * max(float(r["relative_light_jump"]) for r in selected):.7f} |')
-    return {'TIMING': '\n'.join(timing), 'STAGES': '\n'.join(stages), 'POP': '\n'.join(pops)}
+    selected = [r for r in rows if r['block_accepted'] == 'true']
+    compiled = sum(int(r['compile_samples']) > 0 for r in rows)
+    partners = len(rows) - compiled - len(selected)
+    summary = f"Retained attempts: {len(rows)}; compile-overlapped: {compiled}; clean partners excluded with their block: {partners}; selected samples: {len(selected)}; complete selected blocks: {sum(map(len, groups.values()))}. Selected sample median machine load: {min(float(r['load_p50']) for r in selected):.1f}-{max(float(r['load_p50']) for r in selected):.1f}%."
+    budget = ['| Authored quality | Callbacks / skips | Visible food | Maximum picture charge / limit |', '| --- | ---: | ---: | ---: |']
+    for quality, value in sorted(capacity.items()):
+        budget.append(f"| {quality} | {value['callbacks']} / {value['skips']} | {value['visible_foods']} | {value['max_picture_quads']} / 262144 |")
+    return {'SUMMARY': summary, 'CAPACITY': '\n'.join(budget), 'TIMING': '\n'.join(timing), 'STAGES': '\n'.join(stages), 'POP': '\n'.join(pops)}
 
 
 if __name__ == '__main__':
