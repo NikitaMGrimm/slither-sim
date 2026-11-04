@@ -41,6 +41,7 @@ class Study(unittest.TestCase):
         for key, value in controls.items():
             self.assertEqual(value['binary_sha256'], candidate['binary_sha256'])
             self.assertNotEqual(value['binary_sha256'], ids['base']['binary_sha256'])
+            self.assertNotEqual(value['binary_sha256'], ids['candidate']['binary_sha256'])
             self.assertEqual(value['driver_sha256'], ids['base']['driver_sha256'])
             self.assertEqual(value['driver_sha256'], candidate['driver_sha256'])
             self.assertEqual(value['callbacks'], 600)
