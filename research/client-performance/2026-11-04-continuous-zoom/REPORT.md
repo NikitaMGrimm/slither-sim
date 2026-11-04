@@ -274,5 +274,7 @@ historical and unchanged. These corrections were not re-timed; the tables do
 not describe a measured execution of this later source. In particular, pressure
 scenes now keep their existing generic budgeted path below factor one, whose
 performance is not measured here. The authored whole-map budget regression
-still passes. The focused tests were run before and after the runtime fixes;
-full client/Wasm and study validation is repeated for this revision.
+still passes. The focused tests were run before and after the runtime fixes.
+The full `npm --prefix client run check` passed again, including strict native
+and Wasm Clippy, native tests, desktop/Wasm builds and synthetic Wasm ABI checks.
+All five study tests, recomputation and seven documentation tests also passed.
