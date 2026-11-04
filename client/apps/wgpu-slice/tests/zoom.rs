@@ -128,6 +128,83 @@ fn benchmark_far_zoom_submits_every_candidate_and_freezes_census() {
     }
 }
 
+#[cfg(feature = "frame-bench")]
+#[test]
+fn pressure_food_admission_is_continuous_across_factor_one() {
+    let mut game = tape::playing();
+    let mut packets = Vec::new();
+    for id in 8..264_u16 {
+        let mut snake = tape::snake((id % 9) as u8);
+        snake[1..3].copy_from_slice(&id.to_be_bytes());
+        packets.push(snake);
+    }
+    for chunk in 0..5_u16 {
+        let mut food = vec![b'F', 11, 10];
+        for i in chunk * 1000..(chunk + 1) * 1000 {
+            food.extend([0, ((i % 80) * 3) as u8, ((i / 80) * 3) as u8, 20]);
+        }
+        packets.push(food);
+    }
+    game.receive(game.generation(), &tape::bundle(&packets), 40.)
+        .unwrap();
+    tape::pictures(&mut game);
+    assert_eq!(game.client().received().snakes.len(), 257);
+    assert!(game.client().detail_pressure());
+    let food_handles: std::collections::HashSet<_> = game
+        .client()
+        .foods()
+        .foods()
+        .iter()
+        .flat_map(|f| {
+            let s = f.snapshot().sources;
+            [s.outline, s.body, s.inner, s.outer].map(|s| s.asset().handle)
+        })
+        .collect();
+    let quality = game.quality();
+    let mut stock: Option<Vec<slither_wgpu_slice::frame::Draw>> = None;
+    for requested in [1_f64, 1. - 1e-12, 1. - 1e-6, 1. - 1e-5] {
+        let mut world = game.client().clone();
+        world.wheel_zoom(requested.ln() / 1.12_f64.ln());
+        let picture =
+            render::prepare_gameplay(&mut world, &mut game.bank, [1500, 844], 1., 100, quality)
+                .unwrap();
+        let factor = world.camera().user_zoom_factor();
+        assert!(factor >= requested && factor <= 1.);
+        let food = picture.food_submission.unwrap();
+        assert!(food.budget_applied, "pressure must stay active at {factor}");
+        assert_eq!(food.counts.visible_foods, 4681);
+        assert_eq!(food.counts.before_zoom_foods, 4681);
+        assert!(picture.draw_count() <= MAX_DRAWS);
+        let draws: Vec<_> = picture
+            .frame
+            .draws
+            .iter()
+            .filter(|d| food_handles.contains(&d.asset.handle))
+            .cloned()
+            .collect();
+        assert_eq!(draws.len(), food.counts.visible_foods * 7);
+        if let Some(stock) = &stock {
+            for (a, b) in draws.iter().zip(stock) {
+                assert_eq!(a.asset, b.asset);
+                assert_eq!(a.source, b.source);
+                assert_eq!(a.blend, b.blend);
+                for (x, y) in [
+                    (a.destination.x, b.destination.x),
+                    (a.destination.y, b.destination.y),
+                    (a.destination.width, b.destination.width),
+                    (a.destination.height, b.destination.height),
+                    (a.effective_alpha, b.effective_alpha),
+                ] {
+                    assert!((x - y).abs() < 0.01, "food jump at {factor}: {x} vs {y}");
+                }
+            }
+        } else {
+            stock = Some(draws);
+        }
+        game.bank.recycle_frame(picture);
+    }
+}
+
 // Native trig/Debug float text is platform-specific. This independent golden was
 // captured on Windows and paired with a pristine-main projection excluding only
 // the removed background draws. The original full-frame fixture remains unchanged.

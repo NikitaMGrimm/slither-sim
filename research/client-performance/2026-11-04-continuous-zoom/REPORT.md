@@ -26,10 +26,9 @@ for separate work; these results do not establish that such a change would win.
 
 The existing benchmark field `pelletsBeforeOmission` keeps its name for historical
 receipts. It now counts the same in-bounds food as `submittedPellets` in continuous
-zoom. Every selected non-main art callback has zero food omissions. Food budget
-selection is reported inactive when the continuous path bypasses that selection;
-other pressure policy is unchanged. Native and generic planner tests cover these
-counts and retained-picture retry.
+zoom. Every selected non-main art callback has zero food omissions. In the measured composition, food budget selection was inactive below factor
+one; the review amendment below corrects that admission discontinuity. Native
+and generic planner tests cover the counts and retained-picture retry.
 
 ## Inputs, identities and access
 
@@ -55,8 +54,10 @@ reviewed as part of this implementation.
 `identities.json` records runtime revision, executable, common driver and
 instrumented-source hashes for each arm. Main is `1e849de9`; the ungated approved
 look before the trim is `ea2b1dde`; the measured trimmed source is `1aef092d`.
-The final runtime differs from that measured source only in the shorthand of
-one `pixels_per_unit` field initializer, with no arithmetic/control-flow change.
+The initially published runtime at `7cca3d82` differed from that measured source
+only in the shorthand of one `pixels_per_unit` field initializer, with no
+arithmetic/control-flow change. The review fixes below are later source changes;
+the timing tables continue to describe the original measured composition.
 Both full-file identities are recorded honestly. `source-only-delta.patch` and
 `food-painter-measured.rs.gz` retain that link; the test applies the actual patch
 and verifies both hashes without old Git objects or current-working-file gates.

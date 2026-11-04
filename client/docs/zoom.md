@@ -87,8 +87,11 @@ Native food planning combines this zoom policy with the retained catalog index
 from [frame performance](frame-performance.md#retained-food-cpu-preparation).
 Factor one keeps stock retained-source validation and draw ordering; catalog
 changes refresh the index once per plan, without per-food asset-table rescans.
-Other geometry retains existing complete-or-reject picture budgeting; there is
-no unbounded allocation or geometry trimming at the renderer boundary.
+The existing pressure food allowance stays active at every zoom, selecting the
+same newest visible foods on either side of factor one. Disabling it on the
+first zoom-out microstep would abruptly admit previously excluded pellets.
+Outside that pressure selection, geometry retains complete-or-reject picture
+budgeting; there is no trimming at the renderer boundary.
 
 The opt-in `frame_perf --zoom` workload uses only authored synthetic packets and
 procedural assets: 65 snakes (64 with 120 points), 65,535 food, one prey and a
@@ -104,7 +107,9 @@ admission rejects the complete picture; native release skips it and leaves the
 previous presentation displayed. A backdrop also requires canonical expansion
 during menu composition. If that composition exceeds its draw quota, the menu
 overlay is skipped and the original world picture is submitted. No partial
-pellet selection conceals the limit.
+pellet selection conceals the limit. Canonical food command-limit failures use
+the same recognised draw-quota error, so optional composition takes this fallback
+in strict builds as well as release.
 Tests check compact retention, complete fallback rejection, current-radius fit
 and draw/capacity/pixel bounds. These checks do not promise every population fits.
 

@@ -989,30 +989,30 @@ fn prepare_composed(
             prey_commands: 0,
         }
     };
+    // Keep the stock pressure allowance on both sides of factor one. Bypassing
+    // it only below one admits extra pellets at the first zoom microstep, even
+    // though the continuous size/alpha rules have barely changed (docs/zoom.md).
     let foods = entity_budget.foods(
-        pressure && !continuous_zoom,
+        pressure,
         client.foods().foods(),
         client.food_bounds(),
         user_zoom,
     );
-    let mut retained_food = if (!pressure || continuous_zoom)
-        && quality.high_quality
-        && quality.blend == 1.
-        && draws.is_empty()
-    {
-        bank.food_batch_cache.prepare(
-            client.foods(),
-            view,
-            client.food_bounds(),
-            &bank.assets,
-            &bank.food_outline,
-            &mut bank.food_asset_index,
-            user_zoom,
-            MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
-        )?
-    } else {
-        None
-    };
+    let mut retained_food =
+        if !pressure && quality.high_quality && quality.blend == 1. && draws.is_empty() {
+            bank.food_batch_cache.prepare(
+                client.foods(),
+                view,
+                client.food_bounds(),
+                &bank.assets,
+                &bank.food_outline,
+                &mut bank.food_asset_index,
+                user_zoom,
+                MAX_FOOD_PAINT_COMMANDS.min(MAX_DRAWS - draws.len()),
+            )?
+        } else {
+            None
+        };
     if let Some(batch) = &mut retained_food {
         batch.physical_pixels_per_unit = physical_pixels_per_unit;
     }
@@ -1541,7 +1541,7 @@ fn prepare_composed(
         food_submission: Some(FoodSubmission {
             counts: food.counts,
             retained_pellets: client.foods().foods().len(),
-            budget_applied: pressure && !continuous_zoom,
+            budget_applied: pressure,
         }),
     })
 }

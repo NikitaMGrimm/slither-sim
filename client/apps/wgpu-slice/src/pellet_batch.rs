@@ -402,12 +402,14 @@ impl Batch {
             self.user_zoom,
             self.physical_pixels_per_unit,
         )
-        .map_err(|e| {
-            if e == FoodPaintError::Allocation {
-                crate::frame::DRAW_ALLOCATION_FAILED.to_owned()
-            } else {
-                e.to_string()
-            }
+        // Canonical expansion charges seven commands even when the retained
+        // picture charges three quads. Preserve the quota error recognised by
+        // optional menu composition so the compact world can still be submitted.
+        // See the complete-picture fallback in docs/zoom.md.
+        .map_err(|e| match e {
+            FoodPaintError::CommandLimit => crate::frame::DRAW_MEMORY_LIMIT.to_owned(),
+            FoodPaintError::Allocation => crate::frame::DRAW_ALLOCATION_FAILED.to_owned(),
+            other => other.to_string(),
         })?;
         let count = draws
             .len()
@@ -648,7 +650,7 @@ pub(crate) mod tests {
         for _ in 0..12 {
             world.advance(step(5.), |_| unreachable!()).unwrap();
         }
-        for factor in [0.065, 0.001] {
+        for factor in [0.065, 0.0203, 0.001] {
             let v = BodyPaintView {
                 zoom: view().zoom * factor,
                 ..view()
@@ -670,7 +672,38 @@ pub(crate) mod tests {
             assert_eq!(b.draw_count(), 196_605);
             // A generic fallback must reject all seven original commands before
             // allocation rather than partially publish a smaller food population.
-            assert!(b.canonical(&[]).is_err());
+            // Optional composition must preserve the compact world on canonical
+            // quota failure, including strict builds; no partial picture escapes.
+            let frame = Frame {
+                identity: 7,
+                extent: [1500, 844],
+                viewport_scale: 1.,
+                tick: 0,
+                draws: Vec::new(),
+                food_batch: Some(b.clone()),
+                snakes: Vec::new(),
+            };
+            let picture = crate::render::PreparedFrame {
+                #[cfg(feature = "frame-bench")]
+                food_submission: None,
+                resources: bank.resources(&frame).unwrap(),
+                frame,
+                overlay: None,
+            };
+            let before = picture.frame.clone();
+            assert!(
+                crate::menu::MenuFrame::compose_optional(
+                    crate::menu::MenuFrame::world_crossfade([1500, 844], 1., 0.4),
+                    &picture,
+                )
+                .unwrap()
+                .is_none()
+            );
+            assert_eq!(picture.frame, before);
+            assert_eq!(
+                b.canonical(&[]).unwrap_err(),
+                crate::frame::DRAW_MEMORY_LIMIT
+            );
             assert!(
                 Cache::default()
                     .prepare(
