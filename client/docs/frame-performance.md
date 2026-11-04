@@ -87,9 +87,10 @@ not use the timing run's 10/30 warmup/sample counts.
 `FRAME_PERF_MODE` to Original or Native, isolates the 500-model/default control
 in a fresh process/device for each chosen case. `FRAME_PERF_CONTROL_ONLY=1`
 selects default 500-model cases without the strict one-case isolation.
-The diagnostic build feature `frame-profile-no-shadow-cut` forces the candidate
-renderer to retain shadows, for the third-binary comparison; it is not a user
-quality setting. Record this feature and each executable hash in provenance.
+The earlier shadow-cut studies used a separate retained-shadow diagnostic build.
+Continuous zoom now retains full visits and fades the completed shadow layer;
+the obsolete `frame-profile-no-shadow-cut` feature has been removed. Historical
+study identities and their recorded commands remain unchanged.
 
 `FRAME_PERF_SHARED_HISTORY=1` runs the same authored one-pixel geometry upload
 before each presented cell, outside preparation/submission timing. It fills nine
