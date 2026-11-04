@@ -164,7 +164,7 @@ export function foodSubmission(view) {
     &&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
   const omissionShare=countsValid&&before>0?(before-submitted)/before:null;
   const after=view.pelletsAfterBudget,limit=view.foodBudgetLimit;
-  const budgetKnown=view.foodBudgetApplied===true&&view.foodBudgetCensusComplete===true
+  const budgetKnown=countsValid&&before>0&&view.foodBudgetApplied===true&&view.foodBudgetCensusComplete===true
     &&Number.isSafeInteger(limit)&&limit>=0&&Number.isSafeInteger(after)&&after===Math.min(before,limit)&&submitted<=after;
   const hasCapacityFields=['pelletsAfterBudget','foodBudgetLimit','foodBudgetCensusComplete'].some(key=>Object.hasOwn(view,key));
   const unbudgetedKnown=view.foodBudgetApplied===false&&view.foodBudgetCensusComplete===true&&limit===null&&after===before;

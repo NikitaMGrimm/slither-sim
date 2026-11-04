@@ -368,6 +368,15 @@ test('native preflight rejects a stale food receipt despite valid counts and req
   }
 });
 
+test('capacity metadata is withheld for empty or invalid planner counts',()=>{
+  const empty={pelletsBeforeOmission:0,submittedPellets:0,pictureRetainedPellets:0,pelletsAfterBudget:0,
+    foodBudgetLimit:4681,foodBudgetCensusComplete:true,foodBudgetApplied:true};
+  assert.equal(foodSubmission(empty).status,'unestablished');
+  assert.equal(foodSubmission(empty).capacity,undefined,'no 0/0 reduction share');
+  const invalid={...empty,pelletsBeforeOmission:10,pictureRetainedPellets:10,pelletsAfterBudget:10,submittedPellets:'4'};
+  assert.equal(foodSubmission(invalid).capacity,undefined);
+});
+
 test('every preflight row, including telemetry off, requires a fresh final host census',()=>{
   // Off rows stop view receipts, so only host freshness proves the host still answers.
   const off={startMs:65000,endMs:65251,census:[{atMs:65100}],views:[]};
