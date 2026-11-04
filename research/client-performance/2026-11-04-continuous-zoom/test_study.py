@@ -3,6 +3,8 @@ import gzip
 import hashlib
 import importlib.util
 from pathlib import Path
+import subprocess
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location('continuous_zoom_study', Path(__file__).with_name('recompute.py'))
@@ -17,10 +19,13 @@ class Study(unittest.TestCase):
         source = gzip.decompress((root / 'food-painter-measured.rs.gz').read_bytes())
         path = 'client/src/presentation/food_painter.rs'
         self.assertEqual(hashlib.sha256(source).hexdigest(), ids['candidate']['runtime_source_sha256'][path])
-        old = b'        pixels_per_unit: pixels_per_unit,\n'
-        self.assertEqual(source.count(old), 1)
-        reviewed = source.replace(old, b'        pixels_per_unit,\n')
-        self.assertEqual(hashlib.sha256(reviewed).hexdigest(), ids['candidate']['reviewed_runtime_source_sha256'][path])
+        with tempfile.TemporaryDirectory(prefix='zoom-source-study-') as temporary:
+            target = Path(temporary).resolve() / path
+            self.assertTrue(target.is_relative_to(Path(temporary).resolve()))
+            target.parent.mkdir(parents=True)
+            target.write_bytes(source)
+            subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'apply', '-p1', str(root / 'source-only-delta.patch')], cwd=temporary, check=True, capture_output=True)
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), ids['candidate']['reviewed_runtime_source_sha256'][path])
 
     def test_retained_controls_and_complete_blocks(self):
         study.tables(*study.load())
