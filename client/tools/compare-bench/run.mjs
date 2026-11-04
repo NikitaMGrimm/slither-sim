@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission,windowReasons } from './analysis.mjs';
+import { checkedPresentation,presentMonArguments,presentMonFailure,hostStats, wholeMap, validity, netlogProof,nativeProduction,drawnSnakeEvidence,anchoredBoundary,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission,preflightHostFresh,windowReasons } from './analysis.mjs';
 import { contentIntervals } from './content-probe.mjs';
 import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
@@ -289,6 +289,7 @@ export async function runAttempt(config, root, item, provenance, machine) {
       const census=r.census.at(-1);
       if(census?.admittedBotSlots!==r.bots||!census.players?.[0]?.alive||!census.players[0].setup
         ||census.players[0].protocol!==(item.client==='ntl'?13:19))setupReasons.push('Preflight admission/life/protocol not established');
+      if(!preflightHostFresh(r))setupReasons.push('Final host census is stale or untimestamped relative to the preflight window');
       const foodSubmission=preflightFoodSubmission(r);
       if(['original','native'].includes(item.client)&&config.telemetry!=='off'&&foodSubmission.status!=='established')
         setupReasons.push(`Food submission census incomplete or stale; ${foodSubmission.reason??'update the native instrumented input'}`);

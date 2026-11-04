@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission,preflightHostFresh } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
 import {roundPlan,preflightPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
@@ -365,6 +365,15 @@ test('native preflight rejects a stale food receipt despite valid counts and req
   assert.match(preflightFoodSubmission(stopped).reason,/stale or untimestamped/);
   for(const change of [v=>delete v.submittedPellets,v=>v.submittedPellets=101,v=>v.pictureRetainedPellets=99]){
     const bad=structuredClone(run);change(bad.views[0]);assert.equal(preflightFoodSubmission(bad).status,'unestablished');
+  }
+});
+
+test('every preflight row, including telemetry off, requires a fresh final host census',()=>{
+  // Off rows stop view receipts, so only host freshness proves the host still answers.
+  const off={startMs:65000,endMs:65251,census:[{atMs:65100}],views:[]};
+  assert.equal(preflightHostFresh(off),true);
+  for(const change of [r=>r.census[0].atMs=60000,r=>delete r.census[0].atMs,r=>r.census=[],r=>delete r.endMs]){
+    const bad=structuredClone(off);change(bad);assert.equal(preflightHostFresh(bad),false);
   }
 });
 

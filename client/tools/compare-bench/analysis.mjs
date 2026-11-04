@@ -181,6 +181,13 @@ export function foodSubmissionEvidence(run) {
     minimumOmissionShare:shares.length?Math.min(...shares):null,
     maximumOmissionShare:shares.length?Math.max(...shares):null,samples};
 }
+// Every preflight row, including telemetry-off rows that deliberately stop
+// view receipts, needs a host census inside the sampled window; otherwise a
+// host that hung after admission still passes readiness.
+export function preflightHostFresh(run) {
+  const census=run.census?.at(-1);
+  return streamCoverage(census?[census]:[],run.startMs,run.endMs,1200);
+}
 export function preflightFoodSubmission(run) {
   const view=run.views?.at(-1),census=run.census?.at(-1);
   const evidence=foodSubmissionEvidence({views:view?[view]:[]});
