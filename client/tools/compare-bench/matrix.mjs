@@ -13,7 +13,7 @@ export function preflightPlan(clients,limitedNtlView) {
   const viewCondition=limitedNtlView?'ntl-farthest':'whole-map';
   const rows=clients.map(client=>({round:0,client,scenario:'battledome',telemetry:'on',viewCondition}));
   if(limitedNtlView&&clients.includes('native'))rows.splice(2,0,{round:0,client:'native',scenario:'battledome',telemetry:'off',viewCondition});
-  if(clients.includes('native'))rows.push({round:0,client:'native',scenario:'normal',telemetry:'on',viewCondition:'stock'});
+  rows.push(...clients.map(client=>({round:0,client,scenario:'normal',telemetry:'on',viewCondition:'stock'})));
   return rows;
 }
 

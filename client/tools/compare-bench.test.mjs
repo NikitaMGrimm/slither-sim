@@ -62,14 +62,22 @@ test('run/smoke require a passing NTL display gate before planning',()=>{
   assert.doesNotThrow(()=>requireNtlDisplayGate({displayGate:{passed:true,reasons:[]}}));
 });
 
-test('untimed preflight exercises matched native on/off, NTL scale, Vlither picture and the normal census',()=>{
+test('untimed preflight covers every client/scenario pair and the matched setup-stop control',()=>{
   const rows=preflightPlan(['original','native','ntl','vlither'],true);
-  assert.equal(rows.length,6);
+  assert.equal(rows.length,9);
   assert.ok(rows.every(r=>r.round===0));
+  for(const client of ['original','native','ntl','vlither'])for(const scenario of ['battledome','normal']){
+    const on=rows.filter(r=>r.client===client&&r.scenario===scenario&&r.telemetry==='on');
+    assert.equal(on.length,1);
+    assert.equal(on[0].viewCondition,scenario==='battledome'?'ntl-farthest':'stock');
+  }
   assert.ok(rows.some(r=>r.client==='native'&&r.telemetry==='off'&&r.viewCondition==='ntl-farthest'));
   assert.ok(rows.some(r=>r.client==='vlither'&&r.viewCondition==='ntl-farthest'));
-  assert.equal(rows.at(-1).scenario,'normal');
-  assert.ok(preflightPlan(['original','native','ntl','vlither'],false).every(r=>r.telemetry==='on'));
+  const whole=preflightPlan(['original','native','ntl','vlither'],false);
+  assert.equal(whole.length,8);
+  assert.ok(whole.every(r=>r.telemetry==='on'&&r.viewCondition===(r.scenario==='battledome'?'whole-map':'stock')));
+  const subset=preflightPlan(['ntl','vlither'],true);
+  assert.equal(subset.length,4);assert.ok(subset.every(r=>['ntl','vlither'].includes(r.client)));
 });
 
 test('Windows wheel input preserves fractional corrections before 1/120-notch rounding',{skip:process.platform!=='win32'},async()=>{

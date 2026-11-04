@@ -279,7 +279,7 @@ export async function runAttempt(config, root, item, provenance, machine) {
       Object.assign(r,{startMs:first?.qpcMs,endMs:(last?.qpcMs??NaN)+1,display:first?.display,dpi:first?.dpi,refreshHz:first?.refreshHz});
       r.preflightWindowReasons=windowReasons(r);
       r.preflightTimingBlockers=r.preflightWindowReasons.filter(reason=>reason==='Build/test process running');
-      const setupReasons=r.preflightWindowReasons.filter(reason=>reason!=='Build/test process running');
+      const setupReasons=[...r.preflightWindowReasons];
       const luids=[...new Set(r.windowSamples.flatMap(s=>s.gpuEngines??[]).filter(e=>/engtype_3d/i.test(e.instance)&&e.utilization>.01)
         .map(e=>e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
       r.preflightRenderLuids=luids;
