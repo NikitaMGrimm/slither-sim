@@ -166,7 +166,10 @@ export function foodSubmission(view) {
   const after=view.pelletsAfterBudget,limit=view.foodBudgetLimit;
   const budgetKnown=view.foodBudgetApplied===true&&view.foodBudgetCensusComplete===true
     &&Number.isSafeInteger(limit)&&limit>=0&&Number.isSafeInteger(after)&&after===Math.min(before,limit)&&submitted<=after;
+  const hasCapacityFields=['pelletsAfterBudget','foodBudgetLimit','foodBudgetCensusComplete'].some(key=>Object.hasOwn(view,key));
+  const unbudgetedKnown=view.foodBudgetApplied===false&&view.foodBudgetCensusComplete===true&&limit===null&&after===before;
   const reason=!countsValid?'missing or contradictory planner counts':before===0?'empty culling bounds':
+    hasCapacityFields&&!budgetKnown&&!unbudgetedKnown?'missing or contradictory capacity fields':
     view.foodBudgetApplied!==false&&!budgetKnown?'upstream food selection is applied or unestablished':null;
   return {status:reason?'unestablished':'established',reason,omissionShare,
     ...(budgetKnown?{capacity:{limit,afterBudget:after,reductionShare:(before-after)/before}}:{})};
@@ -177,6 +180,18 @@ export function foodSubmissionEvidence(run) {
   return {status:samples.length&&samples.every(s=>s.status==='established')?'established':'unestablished',
     minimumOmissionShare:shares.length?Math.min(...shares):null,
     maximumOmissionShare:shares.length?Math.max(...shares):null,samples};
+}
+export function preflightFoodSubmission(run) {
+  const view=run.views?.at(-1),census=run.census?.at(-1);
+  const evidence=foodSubmissionEvidence({views:view?[view]:[]});
+  // Reuse timed acquisition's view/host coverage bounds. A native receipt can
+  // precede the final host census by one view cadence, never indefinitely.
+  const freshness={viewCoversWindow:streamCoverage(view?[view]:[],run.startMs,run.endMs,3000),
+    censusCoversWindow:streamCoverage(census?[census]:[],run.startMs,run.endMs,1200),
+    censusDistanceMs:Number.isFinite(view?.atMs)&&Number.isFinite(census?.atMs)?Math.abs(view.atMs-census.atMs):null};
+  const fresh=freshness.viewCoversWindow&&freshness.censusCoversWindow
+    &&freshness.censusDistanceMs!==null&&freshness.censusDistanceMs<=3000;
+  return {...evidence,...(!fresh?{status:'unestablished',reason:'Native view or final host census is stale or untimestamped relative to the preflight window'}:{}),freshness};
 }
 export function drawnSnakeEvidence(run) {
   const reasons=[];let missing=!run.views?.length;

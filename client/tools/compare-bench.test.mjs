@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence } from './compare-bench/analysis.mjs';
+import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
 import {roundPlan,preflightPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
@@ -349,6 +349,25 @@ test('food submission fails closed for missing, contradictory, empty and upstrea
   assert.equal(foodSubmissionEvidence({}).status,'unestablished');
 });
 
+test('native preflight rejects a stale food receipt despite valid counts and requires a fresh final host census',()=>{
+  const run={startMs:60000,endMs:60500,census:[{atMs:60450}],views:[{atMs:59000,
+    submittedPellets:100,pelletsBeforeOmission:100,pictureRetainedPellets:100,foodBudgetApplied:false}]};
+  assert.equal(preflightFoodSubmission(run).status,'established','normal two-second view cadence remains accepted');
+  for(const change of [r=>r.views[0].atMs=0,r=>r.views[0].atMs=63501,r=>delete r.views[0].atMs,
+    r=>r.census[0].atMs=0,r=>r.census[0].atMs=61701,r=>delete r.census[0].atMs,
+    r=>r.census=[],r=>r.views=[],r=>delete r.startMs,r=>delete r.endMs,
+    r=>{r.views[0].atMs=57500;r.census[0].atMs=60501;}]){
+    const bad=structuredClone(run);change(bad);
+    assert.equal(preflightFoodSubmission(bad).status,'unestablished');
+  }
+  const stopped=structuredClone(run);stopped.views[0].atMs=0;
+  assert.equal(foodSubmissionEvidence(stopped).status,'established','regression: old count-only check accepts stopped telemetry');
+  assert.match(preflightFoodSubmission(stopped).reason,/stale or untimestamped/);
+  for(const change of [v=>delete v.submittedPellets,v=>v.submittedPellets=101,v=>v.pictureRetainedPellets=99]){
+    const bad=structuredClone(run);change(bad.views[0]);assert.equal(preflightFoodSubmission(bad).status,'unestablished');
+  }
+});
+
 test('food qualification threshold retains small shares and includes exactly five percentage points',()=>{
   const a=completeBattledome(),b=completeBattledome();a.validity=b.validity={valid:true};
   for(const [submitted,qualified] of [[1000,false],[951,false],[950,true],[0,true]]){
@@ -397,6 +416,24 @@ test('capacity census exposes the full denominator and cap without asserting equ
   assert.ok(pair.reasons.some(r=>r.includes('capacity food budget')));
   for(const change of [v=>delete v.foodBudgetCensusComplete,v=>v.pelletsAfterBudget=4682,v=>v.submittedPellets=4682]){
     const bad=structuredClone(run);change(bad.views[0]);assert.equal(validity(bad).valid,false);
+  }
+  for(const flags of [{foodBudgetApplied:false},{foodBudgetApplied:false,foodBudgetCensusComplete:false}]){
+    const bad=structuredClone(run);bad.views.forEach(v=>Object.assign(v,flags));
+    assert.equal(validity(bad).valid,false,'flipping pressure off cannot conceal an active capacity limit');
+    assert.equal(foodSubmissionEvidence(bad).status,'unestablished');
+    // Pairwise analysis must reject the contradiction even with cached validity.
+    bad.validity={valid:true};assert.equal(comparison(bad,structuredClone(bad)).classification,'labelled comparison only');
+  }
+});
+
+test('unbudgeted capacity metadata must be complete, inactive and unchanged from candidates',()=>{
+  const view={submittedPellets:100,pelletsBeforeOmission:100,pictureRetainedPellets:100,foodBudgetApplied:false,
+    pelletsAfterBudget:100,foodBudgetLimit:null,foodBudgetCensusComplete:true};
+  assert.equal(foodSubmission(view).status,'established');
+  for(const change of [v=>v.foodBudgetCensusComplete=false,v=>v.foodBudgetLimit=4681,v=>v.foodBudgetLimit=0,
+    v=>v.pelletsAfterBudget=99,v=>v.pelletsAfterBudget=101,v=>delete v.pelletsAfterBudget,
+    v=>delete v.foodBudgetLimit,v=>delete v.foodBudgetCensusComplete]){
+    const bad={...view};change(bad);assert.equal(foodSubmission(bad).status,'unestablished');
   }
 });
 test('complete 60-second delivery cannot pass a blank drawn-snake scene',()=>{
