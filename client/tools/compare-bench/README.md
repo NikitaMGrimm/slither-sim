@@ -95,12 +95,23 @@ Vlither build/receipt before acquisition; an old binary fails provenance checks.
 Matching the view does not establish content/display correlation, exact NTL scene
 counts or identical presentation modes. Those qualifications still apply.
 
+`preflight` exercises calibration, matched Original/Native views, native setup
+telemetry stop, the NTL row scale, Vlither's physical picture capture and the
+Normal native census. It stops before PresentMon or any measurement window;
+each row remains invalid as comparison evidence. Input, occlusion or setup
+failure stops the sequence and retains the receipts. The initial calibration
+keeps its strict build/test gate; row probes also disclose competing builds as
+timing blockers without treating them as failed untimed setup evidence.
+
 Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
 500 internal bots; stress triples ambient attempts and initial/refill target.
 After population scaling: target **163500**, **2406.845341348622 attempts/s**.
 Actual physical, received, visible and image-candidate pellet counts remain
 separate. A nondefault loopback-only host feature supplies identical orbit
 steering and socket-player collision protection; bots still die on its body.
+When detail pressure applies, results retain the full pre-budget candidate count,
+the selected count and the declared food limit. Total host bot population alone
+does not establish detail pressure: server interest can deliver fewer snakes.
 
 Replace `mod` to use updated NTL. Manifest/package/tree hashes are recorded;
 changed visible UI contracts fail preflight in one small adapter. No minified game

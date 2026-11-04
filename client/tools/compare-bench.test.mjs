@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
+import {roundPlan,preflightPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
@@ -60,6 +60,27 @@ test('run/smoke require a passing NTL display gate before planning',()=>{
   }
   assert.throws(()=>requireNtlDisplayGate({displayGate:{passed:false,reasons:['Window occluded','Wrong display']}}),/NTL display preflight rejected.*Window occluded; Wrong display/);
   assert.doesNotThrow(()=>requireNtlDisplayGate({displayGate:{passed:true,reasons:[]}}));
+});
+
+test('untimed preflight exercises matched native on/off, NTL scale, Vlither picture and the normal census',()=>{
+  const rows=preflightPlan(['original','native','ntl','vlither'],true);
+  assert.equal(rows.length,6);
+  assert.ok(rows.every(r=>r.round===0));
+  assert.ok(rows.some(r=>r.client==='native'&&r.telemetry==='off'&&r.viewCondition==='ntl-farthest'));
+  assert.ok(rows.some(r=>r.client==='vlither'&&r.viewCondition==='ntl-farthest'));
+  assert.equal(rows.at(-1).scenario,'normal');
+  assert.ok(preflightPlan(['original','native','ntl','vlither'],false).every(r=>r.telemetry==='on'));
+});
+
+test('Windows wheel input preserves fractional corrections before 1/120-notch rounding',{skip:process.platform!=='win32'},async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'bench-wheel-test-'));
+  try{
+    for(const [notches,delta] of [[-.281320735,-34],[2.9261002,351],[-24.158542,-2899],[.001,0],[999,24000]]){
+      const file=path.join(dir,'config.json');await fs.writeFile(file,JSON.stringify({mode:'wheel-delta',notches}));
+      const result=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-File',path.resolve('tools/compare-bench/windows.ps1'),'-Config',file],{encoding:'utf8',windowsHide:true}));
+      assert.equal(result.delta,delta);
+    }
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
 test('moving foreground before picture setup never permits input or focus loss to be hidden by warmup',()=>{
   const focus={lastInputTick:50},current={lastInputTick:50,idleMs:5000,foreground:true,visible:true,minimized:false,occluded:false};
@@ -359,6 +380,23 @@ test('a fabricated denominator cannot match honest omission shares beyond the sa
   assert.equal(foodSubmissionEvidence(newer).status,'established','current state is not a same-picture population bound');
   for(const change of [v=>v.submittedPellets=1001,v=>v.pelletsBeforeOmission=1001]){
     const run=completeBattledome();change(run.views[0]);assert.equal(validity(run).valid,false);
+  }
+});
+
+test('capacity census exposes the full denominator and cap without asserting equal submission',()=>{
+  const run=completeBattledome();run.scenario='normal';
+  run.views.forEach(v=>Object.assign(v,{retainedPellets:10000,receivedUneatenPellets:10000,visiblePellets:10000,
+    pictureRetainedPellets:10000,pelletsBeforeOmission:10000,pelletsAfterBudget:4681,submittedPellets:4681,
+    foodBudgetLimit:4681,foodBudgetApplied:true,foodBudgetCensusComplete:true,userZoom:1}));
+  run.census.forEach(c=>c.players[0].decoratedWireFood=10000);
+  assert.equal(validity(run).valid,true);
+  const sample=foodSubmission(run.views[0]);assert.equal(sample.status,'established');
+  assert.equal(sample.omissionShare,.5319);assert.equal(sample.capacity.afterBudget,4681);
+  run.validity=validity(run);
+  const pair=comparison(run,structuredClone(run));assert.equal(pair.classification,'labelled comparison only');
+  assert.ok(pair.reasons.some(r=>r.includes('capacity food budget')));
+  for(const change of [v=>delete v.foodBudgetCensusComplete,v=>v.pelletsAfterBudget=4682,v=>v.submittedPellets=4682]){
+    const bad=structuredClone(run);change(bad.views[0]);assert.equal(validity(bad).valid,false);
   }
 });
 test('complete 60-second delivery cannot pass a blank drawn-snake scene',()=>{

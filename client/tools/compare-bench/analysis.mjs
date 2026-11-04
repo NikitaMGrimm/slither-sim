@@ -163,9 +163,13 @@ export function foodSubmission(view) {
   const countsValid=Number.isSafeInteger(retained)&&retained>=0&&Number.isSafeInteger(before)&&before>=0&&before<=retained
     &&Number.isSafeInteger(submitted)&&submitted>=0&&submitted<=before;
   const omissionShare=countsValid&&before>0?(before-submitted)/before:null;
+  const after=view.pelletsAfterBudget,limit=view.foodBudgetLimit;
+  const budgetKnown=view.foodBudgetApplied===true&&view.foodBudgetCensusComplete===true
+    &&Number.isSafeInteger(limit)&&limit>=0&&Number.isSafeInteger(after)&&after===Math.min(before,limit)&&submitted<=after;
   const reason=!countsValid?'missing or contradictory planner counts':before===0?'empty culling bounds':
-    view.foodBudgetApplied!==false?'upstream food selection is applied or unestablished':null;
-  return {status:reason?'unestablished':'established',reason,omissionShare};
+    view.foodBudgetApplied!==false&&!budgetKnown?'upstream food selection is applied or unestablished':null;
+  return {status:reason?'unestablished':'established',reason,omissionShare,
+    ...(budgetKnown?{capacity:{limit,afterBudget:after,reductionShare:(before-after)/before}}:{})};
 }
 export function foodSubmissionEvidence(run) {
   const samples=(run.views??[]).map(v=>({atMs:v.atMs,...foodSubmission(v)}));
@@ -295,6 +299,7 @@ export function comparison(a, b) {
   const completeFood=foodA.status==='established'&&foodB.status==='established';
   const shares=[foodA.minimumOmissionShare,foodA.maximumOmissionShare,foodB.minimumOmissionShare,foodB.maximumOmissionShare].filter(Number.isFinite);
   if(!completeFood)reasons.push('food submission evidence missing or incomplete; equal submission unestablished');
+  if([...foodA.samples,...foodB.samples].some(s=>s.capacity))reasons.push('capacity food budget active; compare submitted versus full candidates');
   // Absorb only subtraction roundoff at the exact threshold (e.g. .30-.25).
   if(completeFood&&Math.max(...shares)-Math.min(...shares)+Number.EPSILON>=materialFoodOmission)
     reasons.push('different food submission: omission shares differ by at least 5 percentage points');

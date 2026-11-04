@@ -185,6 +185,29 @@ impl PressureEntityBudget {
         )
     }
 
+    /// Benchmark sample: continue the existing selection walk past the quota to
+    /// count all cull candidates, preserving the ordinary newest-first result.
+    #[cfg(feature = "frame-bench")]
+    pub fn foods_with_candidates<'a>(
+        self,
+        foods: &'a [super::FoodPresentation],
+        bounds: Option<FoodCullBounds>,
+    ) -> (Cow<'a, [super::FoodPresentation]>, usize) {
+        let limit = self.food_commands / 7;
+        let mut selected = Vec::with_capacity(limit.min(foods.len()));
+        let mut candidates = 0;
+        for food in foods.iter().rev() {
+            if bounds.is_some_and(|b| b.contains(food.snapshot().render_position)) {
+                candidates += 1;
+                if selected.len() < limit {
+                    selected.push(food.clone());
+                }
+            }
+        }
+        selected.reverse();
+        (Cow::Owned(selected), candidates)
+    }
+
     /// Cull body and independently visible interpolated glows before applying
     /// the shared prey quota. Retained prey/eater state is never modified.
     pub fn preys<'a>(

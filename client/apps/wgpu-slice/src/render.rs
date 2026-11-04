@@ -60,10 +60,36 @@ pub struct PreparedFrame {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FoodSubmission {
     pub counts: FoodPaintCounts,
+    /// Full cull candidates before capacity selection; sampled under pressure.
+    pub candidates: Option<usize>,
+    pub budget_limit: Option<usize>,
     /// All retained food in the same prepared picture, before culling/budgeting.
     pub retained_pellets: usize,
     /// Pressure selection precedes the planner and can itself omit food.
     pub budget_applied: bool,
+}
+// Full pressure denominators require visiting the rest of the retained array.
+// Do that at the view-census cadence only, with telemetry on. A process-wide
+// atomic covers preparation workers without a mutex or per-worker oversampling.
+#[cfg(feature = "frame-bench")]
+fn pressure_census_due() -> bool {
+    use std::sync::{
+        LazyLock,
+        atomic::{AtomicU64, Ordering},
+    };
+    static ENABLED: LazyLock<bool> =
+        LazyLock::new(|| std::env::var_os("SLITHER_FRAME_PACING").is_some());
+    static START: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    if !*ENABLED {
+        return false;
+    }
+    let now = START.elapsed().as_millis() as u64 + 1;
+    let previous = LAST.load(Ordering::Relaxed);
+    (previous == 0 || now.saturating_sub(previous) >= 2000)
+        && LAST
+            .compare_exchange(previous, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
 }
 /// Producer limits bound text resources; they no longer reserve world capacity.
 pub const PANEL_PRODUCER_DRAWS: usize = 96;
@@ -992,6 +1018,25 @@ fn prepare_composed(
     // Keep the stock pressure allowance on both sides of factor one. Bypassing
     // it only below one admits extra pellets at the first zoom microstep, even
     // though the continuous size/alpha rules have barely changed (docs/zoom.md).
+    #[cfg(feature = "frame-bench")]
+    let full_pressure_census = pressure && pressure_census_due();
+    #[cfg(feature = "frame-bench")]
+    let (foods, pressure_candidates) = if full_pressure_census {
+        let (foods, candidates) =
+            entity_budget.foods_with_candidates(client.foods().foods(), client.food_bounds());
+        (foods, Some(candidates))
+    } else {
+        (
+            entity_budget.foods(
+                pressure,
+                client.foods().foods(),
+                client.food_bounds(),
+                user_zoom,
+            ),
+            None,
+        )
+    };
+    #[cfg(not(feature = "frame-bench"))]
     let foods = entity_budget.foods(
         pressure,
         client.foods().foods(),
@@ -1540,6 +1585,12 @@ fn prepare_composed(
         #[cfg(feature = "frame-bench")]
         food_submission: Some(FoodSubmission {
             counts: food.counts,
+            candidates: if pressure {
+                pressure_candidates
+            } else {
+                Some(food.counts.before_zoom_foods)
+            },
+            budget_limit: pressure.then_some(entity_budget.food_commands / 7),
             retained_pellets: client.foods().foods().len(),
             budget_applied: pressure,
         }),

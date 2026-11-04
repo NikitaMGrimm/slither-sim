@@ -228,10 +228,19 @@ not a claim of no external socket attempts. Each network proof records
 `noPacketReachabilityProbeCount`, the named `allowances` with per-socket receipts,
 and `externalSocketAttemptsObserved`. All other non-loopback traffic fails.
 
-`preflight` runs only NTL's untimed local join, zoom, network and display checks;
-it never starts PresentMon or timed rounds. Its single display snapshot is not
-continuous run acceptance. A display-only failure returns exit 2 with the network
-and zoom results retained, without touching an occluding owner window.
+`preflight` first runs NTL's untimed local join, zoom, network and display checks.
+Only a passing display gate permits the row setup probes: Original/Native matched
+views, the native setup-only stop, NTL's calibrated row, Vlither's anchored picture
+capture and Normal's native food census. These use the same setup/warmup paths
+but stop before PresentMon or a measurement window; every row remains invalid as
+comparison evidence. Stable last-input ticks, idle time, visibility, actual GPU,
+display, life and protocol are retained. A failed row stops further acquisition.
+The initial calibration keeps its strict build/test gate; row probes disclose
+competing builds as timing blockers without rejecting untimed setup evidence.
+A display-only failure returns exit 2 with network and zoom results
+retained, without touching an occluding owner window. No input or display gate is
+bypassed. The wheel adapter uses double-precision clamping before rounding to
+WM_MOUSEWHEEL's 1/120-notch units, preserving small native/Vlither corrections.
 For `run` and `smoke`, any missing or non-passing NTL display gate raises the
 named `NTL display preflight rejected` error with its reasons before a run plan
 is written or any round begins.
@@ -310,20 +319,28 @@ The ordinary `retainedPellets` census may be newer after worker/retry handoff
 and is not substituted for this bound. These counters are absent in ordinary builds.
 Results retain `foodOmissionShare` per view, including zero, and the full
 submission evidence in `sceneAcceptance` and comparisons. Missing/contradictory
-counts, an empty denominator, or upstream capacity-pressure selection leave
-submission unestablished; native acquisition acceptance requires established
+counts or an empty denominator leave submission unestablished; native acquisition acceptance requires established
 evidence. Missing peer evidence always qualifies a comparison. A difference of
 at least five percentage points across sampled omission shares adds **different
 food submission**: one in twenty candidates is enough to reject an equal-work
 interpretation. This reporting threshold never hides smaller values or changes
 rendering acceptance.
 Material omission with unknown peer counts is explicitly qualified as a possible
-difference, not asserted as equal work. The current zoom policy can omit a whole
-pellet with its outline/glows; the under-two-pixel quality switch is for snake
-bodies. Sprite-width bins make omission sensitive even inside the allowed
-plus/minus 5% physical-scale band. Matched scale alone establishes neither equal
-food submission nor equal pixel contribution; continuous fading would still
-need that distinction. Telemetry-off controls remain outside scene acceptance.
+difference, not asserted as equal work. Continuous zoom retains in-bounds food,
+while capacity pressure can still select a subset. `pelletsBeforeOmission` covers
+the full cull rectangle before that budget; `pelletsAfterBudget`, `foodBudgetLimit`
+and `foodBudgetCensusComplete` identify the selected subset and denominator scope.
+Legacy partial denominators remain unestablished. Full pressure denominators
+continue the selection traversal past its quota only at the two-second census
+cadence with telemetry on; logging waits for that picture. No full-array traversal
+is added to each frame, telemetry-off rows or ordinary builds. This sampled
+continuation is part of the on/off perturbation control. Capacity always qualifies
+comparisons explicitly. Host population does not imply received snake count or
+detail pressure; retain both the delivered census and the actual pressure flag.
+The former size cutoff made omission highly sensitive within the plus/minus 5%
+scale band; historical receipts keep that meaning. Current scale changes still
+affect coverage/density/alpha, so equal submission does not establish equal pixel
+contribution. Telemetry-off controls remain outside scene acceptance.
 The feature's counter increments and picture metadata remain common to on/off
 rows; this residual cost is not isolated by the telemetry control.
 

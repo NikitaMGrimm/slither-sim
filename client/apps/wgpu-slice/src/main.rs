@@ -748,7 +748,22 @@ mod desktop {
                 *last = now;
                 *count += 1;
                 let seconds = now.duration_since(*since).as_secs_f64();
-                if seconds >= 2. {
+                let log_due = seconds >= 2.;
+                #[cfg(feature = "frame-bench")]
+                let log_due = log_due
+                    || (seconds >= 1.
+                        && food_submission
+                            .is_some_and(|food| food.budget_applied && food.candidates.is_some()));
+                if log_due {
+                    #[cfg(feature = "frame-bench")]
+                    if self.pacing_setup_stop.is_none()
+                        && food_submission
+                            .is_some_and(|food| food.budget_applied && food.candidates.is_none())
+                    {
+                        // Wait for a picture with a sampled full denominator;
+                        // never publish the post-budget subset as all candidates.
+                        return;
+                    }
                     let client = self.game.client();
                     let camera = client.camera();
                     let position = camera.position();
@@ -800,7 +815,10 @@ mod desktop {
                         let mut view = view;
                         if let Some(food) = food_submission {
                             view["submittedPellets"] = food.counts.visible_foods.into();
-                            view["pelletsBeforeOmission"] = food.counts.before_zoom_foods.into();
+                            view["pelletsBeforeOmission"] = serde_json::json!(food.candidates);
+                            view["pelletsAfterBudget"] = food.counts.before_zoom_foods.into();
+                            view["foodBudgetLimit"] = serde_json::json!(food.budget_limit);
+                            view["foodBudgetCensusComplete"] = food.candidates.is_some().into();
                             view["pictureRetainedPellets"] = food.retained_pellets.into();
                             view["foodBudgetApplied"] = food.budget_applied.into();
                         }

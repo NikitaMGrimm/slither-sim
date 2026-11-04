@@ -81,6 +81,15 @@ function Competing-Work {
     )
   } | Select-Object ProcessId,Name)
 }
+function Wheel-Delta([double]$notches) {
+  # Integer literals select Math.Min/Max(Int32,Int32), silently rounding
+  # fractional corrections to whole notches before the WM_MOUSEWHEEL quantum.
+  [int][Math]::Round([Math]::Max(-200.0,[Math]::Min(200.0,$notches))*120.0)
+}
+if($c.mode -eq 'wheel-delta') {
+  @{delta=(Wheel-Delta ([double]$c.notches))}|ConvertTo-Json -Compress
+  exit
+}
 if ($c.mode -eq 'preflight') {
   @{competingWork=@(Competing-Work); idleMs=[BenchWindow]::IdleMs(); lastInputTick=[BenchWindow]::LastInputTick()} | ConvertTo-Json -Depth 4 -Compress
   exit
@@ -137,7 +146,7 @@ if ($c.mode -eq 'focus') {
   exit
 }
 if ($c.mode -eq 'wheel') {
-  $delta=[int][Math]::Round([Math]::Max(-200,[Math]::Min(200,$c.notches))*120)
+  $delta=Wheel-Delta ([double]$c.notches)
   $r=New-Object BenchWindow+Rect
   [BenchWindow]::GetClientRect($hwnd,[ref]$r)|Out-Null
   $pt=New-Object BenchWindow+Point;$pt.X=[int]($r.R/2);$pt.Y=[int]($r.B/2)
@@ -151,7 +160,7 @@ if($c.mode -eq 'close') {
 }
 if($c.mode -eq 'visibility') {
   @{foreground=([BenchWindow]::GetForegroundWindow() -eq $hwnd);visible=[BenchWindow]::IsWindowVisible($hwnd);
-    minimized=[BenchWindow]::IsIconic($hwnd);occluded=(@([BenchWindow]::Occluders($hwnd)).Count -gt 0);
+    minimized=[BenchWindow]::IsIconic($hwnd);occluded=(@([BenchWindow]::Occluders($hwnd)).Count -gt 0);occludingWindows=@([BenchWindow]::Occluders($hwnd));
     lastInputTick=[BenchWindow]::LastInputTick();idleMs=[BenchWindow]::IdleMs()}|ConvertTo-Json -Compress
   exit
 }
