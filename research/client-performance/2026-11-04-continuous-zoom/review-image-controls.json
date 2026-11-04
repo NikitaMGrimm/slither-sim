@@ -1,0 +1,50 @@
+{
+  "candidate": {
+    "revision": "cb3752f697e953c9ff10bd3df2ca4dbd8e28ebd6",
+    "binary_sha256": "6ef53ea438dfe84997066abb961648593a2d9d9addec89c26db8586cdd59e501",
+    "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+    "features": "frame-profile,frame-bench",
+    "runtime_source_sha256": {
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "ab370199a1198844eb832abf703cc1d47791a4d53706c75959b30887b711b010",
+      "client/apps/wgpu-slice/src/render.rs": "8dd01c334f445315be1d2edd4cef9ceb174190d60d5cb6465296fee9e29ebe9a"
+    },
+    "measured_source_sha256": {
+      "client/apps/wgpu-slice/src/pellet_batch.rs": "70ac3d4280b8d6e94fe5be6b77e90d02465fa20e271710a7c42b4017d819e601",
+      "client/apps/wgpu-slice/src/render.rs": "6ce0f857a0655393080bc72fb1e7ee71422460e33f870632934df18301bb6718"
+    }
+  },
+  "controls": {
+    "rtx/native/stock": {
+      "callbacks": 600,
+      "skips": 0,
+      "binary_sha256": "6ef53ea438dfe84997066abb961648593a2d9d9addec89c26db8586cdd59e501",
+      "image_sequence_sha256": "7c373f7398774a0a22548aec846edfc1a50bb8a1da23b687788980b4540a0e8f",
+      "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+      "unique_frame_hashes": 541
+    },
+    "rtx/original/stock": {
+      "callbacks": 600,
+      "skips": 0,
+      "binary_sha256": "6ef53ea438dfe84997066abb961648593a2d9d9addec89c26db8586cdd59e501",
+      "image_sequence_sha256": "1e724e7de298e8a5230fdb48c4def5c1a04872933c89e5413101527fce87b4b1",
+      "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+      "unique_frame_hashes": 541
+    },
+    "igpu/native/stock": {
+      "callbacks": 600,
+      "skips": 0,
+      "binary_sha256": "6ef53ea438dfe84997066abb961648593a2d9d9addec89c26db8586cdd59e501",
+      "image_sequence_sha256": "47df15fda3056ff0a27a90d9a90397ee8c35cdec82ac15d8c7fa13a3f6f29bc4",
+      "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+      "unique_frame_hashes": 541
+    },
+    "igpu/original/stock": {
+      "callbacks": 600,
+      "skips": 0,
+      "binary_sha256": "6ef53ea438dfe84997066abb961648593a2d9d9addec89c26db8586cdd59e501",
+      "image_sequence_sha256": "cac828245dab502c1506b5cba1f003d8ee57b1900e83f7b76c8633ba61688923",
+      "driver_sha256": "4206f694ef142da03e4fc86f76489f667d6cef82621ddb5a32573382200f46ce",
+      "unique_frame_hashes": 541
+    }
+  }
+}

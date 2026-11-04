@@ -25,10 +25,12 @@ settled, zero-scale and fading inputs. A larger projection/cache change is left
 for separate work; these results do not establish that such a change would win.
 
 The existing benchmark field `pelletsBeforeOmission` keeps its name for historical
-receipts. It now counts the same in-bounds food as `submittedPellets` in continuous
-zoom. Every selected non-main art callback has zero food omissions. In the measured composition, food budget selection was inactive below factor
-one; the review amendment below corrects that admission discontinuity. Native
-and generic planner tests cover the counts and retained-picture retry.
+receipts. It counts the same in-bounds food as `submittedPellets` in continuous
+zoom, after any pressure selection; `budget_applied` identifies that selection.
+Every selected non-main art callback has zero food omissions. In the measured
+composition, food budget selection was inactive below factor one; the review
+amendment below corrects that admission discontinuity. Native and generic planner
+tests cover the counts and retained-picture retry.
 
 ## Inputs, identities and access
 
@@ -236,3 +238,41 @@ python -B -m unittest discover -s research/client-performance/2026-11-04-continu
 The tests reject wrong arm identities, short/skipped/inactive image controls,
 wrong configuration keys, malformed digests and false admission. Source identity
 checks consume the archived source/patch, never a later current runtime file.
+
+## 2026-11-04 review corrections
+
+Two regression fixes follow the measured composition, at runtime source
+`cb3752f697e953c9ff10bd3df2ca4dbd8e28ebd6`:
+
+- Canonical food `CommandLimit` now maps to the recognised `DRAW_MEMORY_LIMIT`
+  quota. With 65,535 authored food at factors 0.065, 0.0203 and 0.001, the compact
+  batch fits while canonical expansion does not. `MenuFrame::compose_optional`
+  now returns `Ok(None)`, retaining the unchanged original world for submission,
+  rather than returning an unrecognised planning error. The regression failed
+  on the reviewed source with `Err(food paint planning failed: CommandLimit)`.
+- Pressure food selection uses the existing stock allowance at every zoom;
+  retained batches do not bypass that selection. An authored 257-snake /
+  5,000-in-bounds-food microstep control retains 4,681 foods at factor one and
+  immediately below it, with the same command order and continuous geometry.
+  The regression failed on the reviewed source at actual factor
+  0.999999819999926, where pressure selection was disabled. Factor one keeps
+  its original allowance and path; no new fade or budget constant is added.
+
+`review-image-controls.json` records a fresh release binary, the unchanged
+private image driver's identity, the runtime/instrumented hashes of the two
+changed production files and 2,400 exact factor-one GPU image pairs. Both
+qualities at 4K are covered on RTX/Vulkan and AMD/DX12 against the retained main
+baseline (`1e849de9`). The replay command uses zero wheel notches and
+`PROFILE_HASH_PIXELS=1`, with the adapter/quality/menu flags above. Each
+configuration processes 600 callbacks with zero skips and multiple distinct
+frame hashes. The same full-frame readback method, menu composition and
+shared-renderer limits above apply. The baseline image
+sequences are retained earlier controls, not newly generated measurements.
+
+All timing rows, source identities, pop probes and capacity records above remain
+historical and unchanged. These corrections were not re-timed; the tables do
+not describe a measured execution of this later source. In particular, pressure
+scenes now keep their existing generic budgeted path below factor one, whose
+performance is not measured here. The authored whole-map budget regression
+still passes. The focused tests were run before and after the runtime fixes;
+full client/Wasm and study validation is repeated for this revision.
