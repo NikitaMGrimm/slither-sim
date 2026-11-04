@@ -60,25 +60,29 @@ can appear. This does not reveal entities the server did not send.
 
 ## Bounds and synthetic measurement
 
-The [draw/chunk contracts](draw-chunks.md) remain hard limits. Before allocating
-food commands or looking up their unused sprite resources, zoom-out omits bodies
-smaller than one logical pixel, including their outline/glow passes; names below
-one pixel are omitted before text rasterization. Bodies narrower than two logical
-pixels use the existing low-quality passes: omit outline/shadow/inner shimmer,
-retaining the body, outer boost and death passes. These rules are opt-in to
-zoom-out; default output remains exact.
-The interleaved body-shadow layer is also omitted when the wheel factor is below
-one and `29 * scale * camera_zoom * backing_to_logical < 4` displayed logical
-pixels. Native presentation derives `backing_to_logical` from window physical
-size/DPR and the unchanged projection, conservatively using the larger axis.
-Original/Native attachment resolution and MSAA do not change that conversion.
-This preserves curve
-samples, palette ordinals, other pass order and distance-cursor visits, including
-the antenna/death boundary. Factor one retains every command. The
-[Battledome study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
-records CPU/GPU measurements, default-view equality and unresolved GPU controls.
-A configured local background uses one repeating-texture quad regardless of tile count;
-without local art, the world clears to black.
+The [draw/chunk contracts](draw-chunks.md) remain hard limits. Zoom-out keeps
+pellet bodies and glows instead of discarding the entire food when its body is
+subpixel. Each image uses its own extent: floor its drawn width/height at one
+displayed physical pixel and multiply opacity by true/drawn area. A broad glow
+therefore survives independently of its tiny body. The floor blends smoothly
+from exact stock at factor one to full strength at 0.9. No protocol, movement
+clock, source selection, animation phase or camera smoothing changes.
+
+Snake decorations fade across 1-3 displayed logical pixels and body shadows
+across 2-6, replacing their hard two/four-pixel switches. All geometry visits
+are computed first so sample ordinals, distance cursors and antenna/death
+barriers survive. Names shrink a retained stock glyph raster and fade below
+two physical pixels instead of disappearing at a font-size cutoff. Native
+presentation derives the displayed size from physical size/DPR and the unchanged
+projection. Original still rasterizes into its capped target, so its final
+filtering can differ from Native even with the same intended physical floor.
+These are owner-approved presentation rules, not measured server mechanics.
+See the [continuous zoom study](../../research/client-performance/2026-11-04-continuous-zoom/REPORT.md)
+for authored threshold probes, controls and cost. The earlier
+[shadow study](../../research/client-performance/2026-11-01-zoomout-shadows/REPORT.md)
+records the superseded omission policy; its measurements remain historical.
+A configured local background uses one repeating-texture quad regardless of tile
+count; without local art, the world clears to black.
 Native food planning combines this zoom policy with the retained catalog index
 from [frame performance](frame-performance.md#retained-food-cpu-preparation).
 Factor one keeps stock retained-source validation and draw ordering; catalog
@@ -88,20 +92,26 @@ no unbounded allocation or geometry trimming at the renderer boundary.
 
 The opt-in `frame_perf --zoom` workload uses only authored synthetic packets and
 procedural assets: 65 snakes (64 with 120 points), 65,535 food, one prey and a
-23,000-unit arena diameter at 960x540. It opens no socket/window. Full-quality
-food alone could request 458,745 quads if all were visible, exceeding the
-262,144-picture ceiling before snakes; subpixel LOD prevents that case at the
-whole-map scale. Tests check current-radius fit and picture draw/capacity/pixel
-bounds with this fixture. This establishes resource behavior for the stated
-workload, not every possible server population.
+23,000-unit arena diameter at 960x540. It opens no socket/window. Compact native
+zoom-out charges three existing paired quads per food: 196,605 for that food
+population. The authored 4K whole-map replay reached **238,567 of 262,144** quads
+including its other content. This is a measured fixture bound, not a universal
+maximum. Other geometry can still exhaust the remaining budget.
+
+A generic/canonical fallback needs up to seven commands per food: 458,745 for
+65,535, already above the picture limit before snakes. A backdrop can require
+that fallback. Admission rejects the complete picture; native release retains
+the previous accepted picture. No partial pellet selection conceals that limit.
+Tests check compact retention, complete fallback rejection, current-radius fit
+and draw/capacity/pixel bounds. These checks do not promise every population fits.
 
 From the repository root, in PowerShell (one Cargo process at a time):
 
 ```powershell
 $env:CARGO_TARGET_DIR = 'D:/CargoTargets/<worktree-folder>'
-$env:CARGO_BUILD_JOBS = '1'
+$env:CARGO_BUILD_JOBS = '2'
 cargo build --release --locked -p slither-wgpu-slice --features frame-profile --example frame_perf
-& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --zoom C:/new/external/output
+& "$env:CARGO_TARGET_DIR/release/examples/frame_perf.exe" --zoom D:/new/external/output
 ```
 
 The driver settles interpolation, then alternates five rounds per level with
@@ -114,9 +124,10 @@ specimens, not a before/after fidelity comparison. Report CPU median/p95 and
 round variation; GPU frame rate, physical wheel feel and owner acceptance remain
 separate checks.
 
-Use 16.7 ms p95 as a diagnostic CPU picture-build target for maximum zoom-out on
-this workload. It is not a frame-rate promise or an iGPU measurement. Preserve
-slow trials and report their scope separately from the final measurements.
+At 240 Hz the frame budget is 4.17 ms (170 Hz: 5.88 ms). The retained
+continuous view remains above that in dense art workloads; timing tables state
+CPU/GPU stages and spread without claiming presented cadence or a budget pass.
+Preserve slow trials separately from the final matched measurements.
 
 ## Default-view regression
 

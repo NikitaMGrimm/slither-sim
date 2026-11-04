@@ -293,7 +293,7 @@ function completeBattledome() {
   return run;
 }
 
-test('heavy food omission stays valid but cannot read as an equal submitted scene',()=>{
+test('historical heavy food omission stays valid but cannot read as an equal submitted scene',()=>{
   const run=completeBattledome(),peer=completeBattledome();peer.client='native';
   run.views.forEach(v=>v.submittedPellets=200);
   assert.equal(validity(run).valid,true);

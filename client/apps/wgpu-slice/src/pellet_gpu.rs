@@ -345,6 +345,7 @@ impl Pellets {
                     &b.sources,
                     b.view,
                     b.user_zoom,
+                    b.physical_pixels_per_unit,
                     attachment,
                 )?
                 .apply(&mut self.mirror, &mut flags, &mut coverage);

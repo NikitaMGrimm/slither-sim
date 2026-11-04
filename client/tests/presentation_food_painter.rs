@@ -112,7 +112,7 @@ fn calls(plan: &FoodPaintPlan) -> impl Iterator<Item = &FoodImageCommand> {
 }
 
 #[test]
-fn user_zoom_scales_all_food_passes_and_omits_subpixel_food_only_when_zoomed_out() {
+fn user_zoom_scales_all_food_passes_and_preserves_subpixel_food() {
     let palette = Palette::new();
     let assets = palette.assets();
     let mut world = FoodWorld::new();
@@ -146,8 +146,14 @@ fn user_zoom_scales_all_food_passes_and_omits_subpixel_food_only_when_zoomed_out
         }
     }
     let tiny = plan_food_with_zoom(input(&world, &assets), vec![], vec![], 0.001).unwrap();
-    assert_eq!(tiny.counts.total(), 0);
-    assert_eq!(tiny.early.capacity() + tiny.late.capacity(), 0);
+    assert_eq!(tiny.counts.total(), 7);
+    for command in calls(&tiny) {
+        let FoodImageDraw::Scaled { destination, .. } = command.draw else {
+            panic!()
+        };
+        assert!(destination.width >= 1. && destination.height >= 1.);
+        assert!(command.alpha.effective < stock.early[0].alpha.effective);
+    }
 }
 
 #[test]
@@ -189,7 +195,7 @@ fn reciprocal_zoom_preserves_a_growing_foods_declared_crop() {
 
 #[cfg(feature = "frame-bench")]
 #[test]
-fn benchmark_counts_share_culling_bounds_before_omission_and_count_food_not_calls() {
+fn benchmark_counts_include_subpixel_and_zero_scale_food_not_calls() {
     let palette = Palette::new();
     let assets = palette.assets();
     let mut world = FoodWorld::new();
@@ -200,14 +206,14 @@ fn benchmark_counts_share_culling_bounds_before_omission_and_count_food_not_call
     let before = world.clone();
     let plan = plan_food_with_zoom(input(&world, &assets), vec![], vec![], 0.05).unwrap();
     assert_eq!(plan.counts.before_zoom_foods, 2);
-    assert_eq!(plan.counts.visible_foods, 1);
-    assert_eq!(plan.counts.total(), 7);
+    assert_eq!(plan.counts.visible_foods, 2);
+    assert_eq!(plan.counts.total(), 14);
     assert_eq!(
         calls(&plan)
             .map(|c| c.instance)
             .collect::<std::collections::HashSet<_>>()
             .len(),
-        1
+        2
     );
     let stock = plan_food(input(&world, &assets)).unwrap();
     assert_eq!(stock.counts.before_zoom_foods, 2);

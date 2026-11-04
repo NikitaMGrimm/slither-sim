@@ -80,21 +80,6 @@ impl Cache {
             return Ok(None);
         }
         let limits = bounds.expect("checked bounds").limits();
-        // A whole-map view can omit every pellet under the existing subpixel
-        // rule. Do not rebuild/upload source groups for that empty picture.
-        // Keep generic validation (including eligible offscreen sources) intact.
-        if user_zoom < 1.
-            && !world.foods().iter().any(|food| {
-                let f = food.snapshot();
-                f.render_position.x >= limits[0]
-                    && f.render_position.x <= limits[1]
-                    && f.render_position.y >= limits[2]
-                    && f.render_position.y <= limits[3]
-                    && food_zoom_eligible(f, user_zoom)
-            })
-        {
-            return Ok(None);
-        }
         let current = self
             .sources
             .as_ref()
@@ -206,12 +191,6 @@ impl Cache {
                 index,
                 1.,
             );
-            // Generic zoom planning intentionally ignores sources of subpixel
-            // food. If this conservative all-source check fails, let that path
-            // decide which sources matter; never reject an otherwise valid view.
-            if user_zoom != 1. && validated.is_err() {
-                return Ok(None);
-            }
             validated.map_err(|e| e.to_string())?;
             let mut groups = Vec::new();
             let mut grouped = 0;
@@ -250,33 +229,19 @@ impl Cache {
         let sources = self.sources.as_ref().expect("retained sources").clone();
         let mut visible = vec![false; world.foods().len()];
         let mut count = 0;
-        #[cfg(feature = "frame-bench")]
-        let mut before_zoom_count = 0;
         for (i, f) in world.foods().iter().enumerate() {
             let f = f.paint_state();
             let p = f.render_position;
             let inside =
                 p.x >= limits[0] && p.x <= limits[1] && p.y >= limits[2] && p.y <= limits[3];
-            // Count before eligibility in this existing traversal. Zoomed
-            // retained batches can submit only part of this cull rectangle.
-            #[cfg(feature = "frame-bench")]
-            {
-                before_zoom_count += usize::from(inside);
-            }
             let slot = sources.slots[i];
-            let inside = inside
-                && (user_zoom >= 1.
-                    || food_zoom_eligible(
-                        FoodPaintSnapshot {
-                            animation: f,
-                            sources: sources.groups[sources.slot_groups[slot]].sources,
-                        },
-                        user_zoom,
-                    ));
             visible[slot] = inside;
             count += usize::from(inside);
         }
-        if count.checked_mul(7).is_none_or(|n| n > limit) {
+        if count
+            .checked_mul(if user_zoom < 1. { 3 } else { 7 })
+            .is_none_or(|n| n > limit)
+        {
             return Ok(None);
         }
         Ok(Some(Batch {
@@ -288,7 +253,8 @@ impl Cache {
             visible_count: count,
             user_zoom,
             #[cfg(feature = "frame-bench")]
-            before_zoom_count,
+            before_zoom_count: count,
+            physical_pixels_per_unit: 1.,
             early_at: 0,
             late_at: 0,
         }))
@@ -362,6 +328,7 @@ pub struct Batch {
     pub(crate) user_zoom: f64,
     #[cfg(feature = "frame-bench")]
     pub(crate) before_zoom_count: usize,
+    pub(crate) physical_pixels_per_unit: f64,
     pub(crate) early_at: usize,
     pub(crate) late_at: usize,
 }
@@ -371,13 +338,17 @@ impl PartialEq for Batch {
             && self.view == other.view
             && self.bounds == other.bounds
             && self.user_zoom == other.user_zoom
+            && self.physical_pixels_per_unit == other.physical_pixels_per_unit
             && self.early_at == other.early_at
             && self.late_at == other.late_at
     }
 }
 impl Batch {
     pub fn draw_count(&self) -> usize {
-        self.visible_count * 7
+        // Compact native budgeting counts the three paired GPU quads, not
+        // their seven-command canonical expansion. Generic composition still
+        // preflights all seven before allocating and can reject the picture.
+        self.visible_count * if self.user_zoom < 1. { 3 } else { 7 }
     }
     pub(crate) fn resource_assets(&self) -> impl Iterator<Item = BodyAsset> + '_ {
         self.sources
@@ -411,7 +382,7 @@ impl Batch {
             .ok_or(crate::frame::DRAW_MEMORY_LIMIT)?;
         crate::frame::check_draw_count(count)?;
         let mut index = FoodAssetIndex::default();
-        let plan = plan_food_with_zoom_and_index(
+        let plan = plan_food_with_zoom_and_density(
             FoodPaintInput {
                 foods: self.world.foods(),
                 view: self.view,
@@ -423,12 +394,13 @@ impl Batch {
                 assets: &self.sources.assets,
                 target_handle: None,
                 entry_alpha: 1.,
-                command_limit: MAX_FOOD_PAINT_COMMANDS,
+                command_limit: MAX_FOOD_PAINT_COMMANDS.min(crate::frame::MAX_DRAWS - draws.len()),
             },
             &mut index,
             Vec::new(),
             Vec::new(),
             self.user_zoom,
+            self.physical_pixels_per_unit,
         )
         .map_err(|e| {
             if e == FoodPaintError::Allocation {
@@ -437,6 +409,11 @@ impl Batch {
                 e.to_string()
             }
         })?;
+        let count = draws
+            .len()
+            .checked_add(plan.counts.total())
+            .ok_or(crate::frame::DRAW_MEMORY_LIMIT)?;
+        crate::frame::check_draw_count(count)?;
         let mut result = Vec::new();
         result
             .try_reserve_exact(count)
@@ -463,11 +440,12 @@ fn project_food(
     center: Point,
     alpha: f64,
     user_zoom: f64,
-) -> Result<crate::frame::Quad> {
+    density: f64,
+) -> Result<(crate::frame::Quad, f64)> {
     let a = source.asset();
-    let (source, destination) = match food_image_draw(source, center, f.animation.scale, user_zoom)
-        .map_err(|e| e.to_string())?
-    {
+    let (draw, gain) = continuous_food_image(source, center, f.animation.scale, user_zoom, density)
+        .map_err(|e| e.to_string())?;
+    let (source, destination) = match draw {
         FoodImageDraw::Whole { x, y } => (
             BodyRect {
                 x: 0.,
@@ -487,7 +465,7 @@ fn project_food(
             destination,
         } => (source, destination),
     };
-    frame.project(
+    let quad = frame.project(
         &Draw {
             asset: a,
             corners: None,
@@ -497,11 +475,12 @@ fn project_food(
             destination,
             translation: [0., 0.],
             rotation: 0.,
-            effective_alpha: alpha,
+            effective_alpha: alpha * gain,
             blend: BodyBlend::Lighter,
         },
         source,
-    )
+    )?;
+    Ok((quad, gain))
 }
 #[inline(always)]
 pub(crate) fn glow_pair(
@@ -511,13 +490,20 @@ pub(crate) fn glow_pair(
     outer: bool,
     pulse: f64,
     user_zoom: f64,
+    density: f64,
 ) -> Result<(crate::frame::Quad, f32)> {
     let f = f.into();
     let glow = food_glow_paint(f, view, outer, 1., pulse).map_err(|e| e.to_string())?;
-    Ok((
-        project_food(frame, f, glow.source, glow.center, glow.alpha[0], user_zoom)?,
-        glow.alpha[1] as f32,
-    ))
+    let (quad, gain) = project_food(
+        frame,
+        f,
+        glow.source,
+        glow.center,
+        glow.alpha[0],
+        user_zoom,
+        density,
+    )?;
+    Ok((quad, (glow.alpha[1] * gain) as f32))
 }
 #[inline(always)]
 pub(crate) fn exact_instance(
@@ -527,19 +513,21 @@ pub(crate) fn exact_instance(
     glows: &[(crate::frame::Quad, f32); 2],
     pulse: f64,
     user_zoom: f64,
+    density: f64,
 ) -> Result<Instance> {
     let f = f.into();
     let center = food_body_center(f, view);
-    let body = project_food(
+    let (body, gain) = project_food(
         frame,
         f,
         f.sources.body,
         center,
         f.animation.fade,
         user_zoom,
+        density,
     )?;
     let pairs = [
-        (&body, food_body_alpha(f, 1., pulse)[1] as f32),
+        (&body, (food_body_alpha(f, 1., pulse)[1] * gain) as f32),
         (&glows[0].0, glows[0].1),
         (&glows[1].0, glows[1].1),
     ];
@@ -654,6 +642,54 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn continuous_zoom_keeps_65535_subpixel_foods_with_complete_native_budget() {
+        let mut bank = Bank::new().unwrap();
+        let mut world = rectangle_count(&bank, 65_535);
+        for _ in 0..12 {
+            world.advance(step(5.), |_| unreachable!()).unwrap();
+        }
+        for factor in [0.065, 0.001] {
+            let v = BodyPaintView {
+                zoom: view().zoom * factor,
+                ..view()
+            };
+            let b = Cache::default()
+                .prepare(
+                    &world,
+                    v,
+                    Some(FoodCullBounds::from_view(v).unwrap()),
+                    &bank.assets,
+                    &bank.food_outline,
+                    &mut bank.food_asset_index,
+                    factor,
+                    crate::frame::MAX_DRAWS,
+                )
+                .unwrap()
+                .unwrap();
+            assert_eq!(b.visible_count, 65_535);
+            assert_eq!(b.draw_count(), 196_605);
+            // A generic fallback must reject all seven original commands before
+            // allocation rather than partially publish a smaller food population.
+            assert!(b.canonical(&[]).is_err());
+            assert!(
+                Cache::default()
+                    .prepare(
+                        &world,
+                        v,
+                        Some(FoodCullBounds::from_view(v).unwrap()),
+                        &bank.assets,
+                        &bank.food_outline,
+                        &mut bank.food_asset_index,
+                        factor,
+                        b.draw_count() - 1
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn zoom_batches_preserve_lod_counts_budget_and_canonical_barriers() {
         let mut bank = Bank::new().unwrap();
         let mut world = rectangle(&bank);
@@ -698,7 +734,10 @@ pub(crate) mod tests {
                 }
                 let b = b.unwrap();
                 assert_eq!(b.visible_count, plan.counts.visible_foods);
-                assert_eq!(b.draw_count(), plan.counts.total());
+                assert_eq!(
+                    b.draw_count(),
+                    plan.counts.total() / 7 * if user_zoom < 1. { 3 } else { 7 }
+                );
                 assert_eq!(
                     b.canonical(&[]).unwrap(),
                     plan.early
@@ -737,79 +776,6 @@ pub(crate) mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn empty_zoom_does_not_rebuild_groups_after_membership_changes() {
-        let mut bank = Bank::new().unwrap();
-        let mut world = rectangle(&bank);
-        let mut cache = Cache::default();
-        let previous = batch(&mut cache, &mut bank, &world, view()).sources;
-        world.consume(1, FoodConsume::Immediate);
-        assert_ne!(previous.source_identity, world.source_identity());
-        assert!(
-            cache
-                .prepare(
-                    &world,
-                    view(),
-                    Some(FoodCullBounds::from_view(view()).unwrap()),
-                    &bank.assets,
-                    &bank.food_outline,
-                    &mut bank.food_asset_index,
-                    0.001,
-                    MAX_FOOD_PAINT_COMMANDS
-                )
-                .unwrap()
-                .is_none()
-        );
-        assert!(Arc::ptr_eq(cache.sources.as_ref().unwrap(), &previous));
-    }
-
-    #[test]
-    fn subpixel_zoom_does_not_reject_an_unused_missing_source() {
-        let mut bank = Bank::new().unwrap();
-        let world = rectangle(&bank);
-        let missing = world.foods()[0].snapshot().sources.body.asset().handle;
-        bank.assets.retain(|a| a.handle != missing);
-        let v = view();
-        let bounds = Some(FoodCullBounds::from_view(v).unwrap());
-        let mut cache = Cache::default();
-        assert!(
-            cache
-                .prepare(
-                    &world,
-                    v,
-                    bounds,
-                    &bank.assets,
-                    &bank.food_outline,
-                    &mut bank.food_asset_index,
-                    0.001,
-                    0
-                )
-                .unwrap()
-                .is_none()
-        );
-        let plan = plan_food_with_zoom_and_index(
-            FoodPaintInput {
-                foods: world.foods(),
-                view: v,
-                quality: BodyPaintQuality {
-                    high_quality: true,
-                    blend: 1.,
-                },
-                bounds,
-                assets: &bank.assets,
-                target_handle: None,
-                entry_alpha: 1.,
-                command_limit: 0,
-            },
-            &mut bank.food_asset_index,
-            Vec::new(),
-            Vec::new(),
-            0.001,
-        )
-        .unwrap();
-        assert_eq!(plan.counts.total(), 0);
     }
 
     #[test]
@@ -1463,10 +1429,10 @@ pub(crate) mod tests {
         let food = record.snapshot();
         let pulse = food_pulse(food);
         let glows = [
-            glow_pair(frame, food, v, false, pulse, user_zoom).unwrap(),
-            glow_pair(frame, food, v, true, pulse, user_zoom).unwrap(),
+            glow_pair(frame, food, v, false, pulse, user_zoom, 1.).unwrap(),
+            glow_pair(frame, food, v, true, pulse, user_zoom, 1.).unwrap(),
         ];
-        let packed = exact_instance(frame, food, v, &glows, pulse, user_zoom).unwrap();
+        let packed = exact_instance(frame, food, v, &glows, pulse, user_zoom, 1.).unwrap();
         let plan = plan_food_with_zoom(
             FoodPaintInput {
                 foods: std::slice::from_ref(record),
@@ -1565,10 +1531,6 @@ pub(crate) mod tests {
             world.advance(step(2.31), |_| unreachable!()).unwrap();
             for user_zoom in [1., 1. / 1.12, 1. / 1.12_f64.powi(4), 0.05, 1.25] {
                 for i in (0..world.foods().len()).step_by(179) {
-                    let food = world.foods()[i].snapshot();
-                    if !food_zoom_eligible(food, user_zoom) {
-                        continue;
-                    }
                     assert_compact_food_bits(&bank, &world.foods()[i], &frame, view(), user_zoom);
                 }
             }
@@ -1625,32 +1587,7 @@ pub(crate) mod tests {
                 zoom: view().zoom * factor,
                 ..view()
             };
-            if factor < edge {
-                assert!(!food_zoom_eligible(food, factor));
-                let plan = plan_food_with_zoom(
-                    FoodPaintInput {
-                        foods: std::slice::from_ref(record),
-                        view: v,
-                        quality: BodyPaintQuality {
-                            high_quality: true,
-                            blend: 1.,
-                        },
-                        bounds: Some(FoodCullBounds::from_view(v).unwrap()),
-                        assets: &bank.assets,
-                        target_handle: None,
-                        entry_alpha: 1.,
-                        command_limit: 7,
-                    },
-                    Vec::new(),
-                    Vec::new(),
-                    factor,
-                )
-                .unwrap();
-                assert_eq!(plan.counts.total(), 0);
-            } else {
-                assert!(food_zoom_eligible(food, factor));
-                assert_compact_food_bits(&bank, record, &frame, v, factor);
-            }
+            assert_compact_food_bits(&bank, record, &frame, v, factor);
         }
     }
 

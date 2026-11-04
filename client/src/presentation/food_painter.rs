@@ -270,24 +270,9 @@ fn validate_view(view: BodyPaintView) -> Result<(), FoodPaintError> {
     Ok(())
 }
 
-/// Existing wheel-zoom subpixel admission, shared by generic and retained paint.
-#[inline]
-pub fn food_zoom_eligible(food: impl Into<FoodPaintSnapshot>, zoom_factor: f64) -> bool {
-    let food = food.into();
-    zoom_factor >= 1. || {
-        let width = if food.animation.scale == 1. {
-            f64::from(food.sources.body.asset().width)
-        } else {
-            food.sources.body.width() * food.animation.scale
-        };
-        width * zoom_factor >= 1.
-    }
-}
-
 fn validate(
     input: FoodPaintInput<'_>,
     mut index: Option<&mut FoodAssetIndex>,
-    zoom_factor: f64,
 ) -> Result<(), FoodPaintError> {
     validate_view(input.view)?;
     if !(0. ..=1.).contains(&input.quality.blend) || !(0. ..=1.).contains(&input.entry_alpha) {
@@ -301,12 +286,6 @@ fn validate(
     }
     for food in input.foods {
         let food = food.snapshot();
-        // Omitted subpixel food consumes neither commands nor resources
-        // (docs/zoom.md). Factor one still checks every retained source; the
-        // optional catalog index preserves the same validation for eligible food.
-        if !food_zoom_eligible(food, zoom_factor) {
-            continue;
-        }
         let sources = food.sources;
         for source in [sources.body, sources.outline, sources.inner, sources.outer] {
             source
@@ -394,6 +373,7 @@ struct Recorder<F> {
     limit: usize,
     previous_alpha: f64,
     zoom_factor: f64,
+    pixels_per_unit: f64,
 }
 
 fn alpha_assignment(requested: f64, previous: f64) -> BodyAlpha {
@@ -418,7 +398,18 @@ impl<F: FnMut(FoodImageCommand)> Recorder<F> {
         // Keep Canvas's assignment rule explicit even though valid food state
         // normally requests bounded alpha. Do not clamp or elide zero calls.
         let alpha = alpha_assignment(alpha, self.previous_alpha);
-        let draw = food_image_draw(source, center, food.scale, self.zoom_factor)?;
+        let (draw, gain) = super::continuous_food_image(
+            source,
+            center,
+            food.scale,
+            self.zoom_factor,
+            self.pixels_per_unit,
+        )?;
+        let alpha = BodyAlpha {
+            requested: alpha.requested * gain,
+            effective: alpha.effective * gain,
+            ..alpha
+        };
         let sequence = self.counts.total();
         if sequence >= self.limit || sequence >= MAX_FOOD_PAINT_COMMANDS {
             return Err(FoodPaintError::CommandLimit);
@@ -540,6 +531,7 @@ pub fn food_glow_paint(
 fn generate<F: FnMut(FoodImageCommand)>(
     input: FoodPaintInput<'_>,
     zoom_factor: f64,
+    pixels_per_unit: f64,
     emit: F,
 ) -> Result<FoodPaintCounts, FoodPaintError> {
     let mut recorder = Recorder {
@@ -548,6 +540,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
         limit: input.command_limit,
         previous_alpha: input.entry_alpha,
         zoom_factor,
+        pixels_per_unit: pixels_per_unit,
     };
     let Some(bounds) = input.bounds else {
         return Ok(recorder.counts);
@@ -564,16 +557,10 @@ fn generate<F: FnMut(FoodImageCommand)>(
             .map(|(i, food)| (i, food.snapshot()))
             .filter(|(_, f)| bounds.contains(f.render_position))
     };
-    let visible = || in_bounds().filter(|(_, f)| food_zoom_eligible(*f, zoom_factor));
     for (index, food) in in_bounds() {
         #[cfg(feature = "frame-bench")]
         {
             recorder.counts.before_zoom_foods += 1;
-        }
-        // Opt-in wheel LOD; count before it during the existing outline walk,
-        // never with a separate census scan. See docs/zoom.md.
-        if !food_zoom_eligible(food, zoom_factor) {
-            continue;
         }
         let center = food_body_center(food, v);
         recorder.image(
@@ -587,7 +574,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
         recorder.counts.visible_foods += 1;
     }
     recorder.previous_alpha = input.entry_alpha;
-    for (index, food) in visible() {
+    for (index, food) in in_bounds() {
         let center = food_body_center(food, v);
         recorder.image(
             food,
@@ -611,7 +598,7 @@ fn generate<F: FnMut(FoodImageCommand)>(
     }
     recorder.previous_alpha = input.entry_alpha;
     if detailed {
-        for (index, food) in visible() {
+        for (index, food) in in_bounds() {
             let pulse = food_pulse(food);
             for (pass, outer) in [
                 (FoodPaintPass::InnerGlow, false),
@@ -640,7 +627,7 @@ pub fn plan_food_with_storage(
     early: Vec<FoodImageCommand>,
     late: Vec<FoodImageCommand>,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    plan_food_impl(input, early, late, 1., None)
+    plan_food_impl(input, early, late, 1., 1., None)
 }
 
 /// Reuse command storage and a catalog-sized index. Every call checks for table
@@ -651,7 +638,7 @@ pub fn plan_food_with_index(
     early: Vec<FoodImageCommand>,
     late: Vec<FoodImageCommand>,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    plan_food_impl(input, early, late, 1., Some(index))
+    plan_food_impl(input, early, late, 1., 1., Some(index))
 }
 
 /// Opt-in wheel projection of stock sprites, with subpixel-food LOD.
@@ -661,7 +648,7 @@ pub fn plan_food_with_zoom(
     late: Vec<FoodImageCommand>,
     zoom_factor: f64,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    plan_food_impl(input, early, late, zoom_factor, None)
+    plan_food_impl(input, early, late, zoom_factor, 1., None)
 }
 
 /// Combine wheel projection/LOD with a retained catalog-sized source index.
@@ -674,7 +661,19 @@ pub fn plan_food_with_zoom_and_index(
     late: Vec<FoodImageCommand>,
     zoom_factor: f64,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    plan_food_impl(input, early, late, zoom_factor, Some(index))
+    plan_food_impl(input, early, late, zoom_factor, 1., Some(index))
+}
+
+/// Local look prototype: physical-pixel floor for each food source independently.
+pub fn plan_food_with_zoom_and_density(
+    input: FoodPaintInput<'_>,
+    index: &mut FoodAssetIndex,
+    early: Vec<FoodImageCommand>,
+    late: Vec<FoodImageCommand>,
+    factor: f64,
+    density: f64,
+) -> Result<FoodPaintPlan, FoodPaintError> {
+    plan_food_impl(input, early, late, factor, density, Some(index))
 }
 
 /// Validate frozen inputs and sources without materializing image commands.
@@ -688,7 +687,7 @@ pub fn validate_food_with_index(
     if !zoom_factor.is_finite() || zoom_factor <= 0. {
         return Err(FoodPaintError::InvalidView);
     }
-    validate(input, Some(index), zoom_factor)
+    validate(input, Some(index))
 }
 
 fn plan_food_impl(
@@ -696,13 +695,18 @@ fn plan_food_impl(
     mut early: Vec<FoodImageCommand>,
     mut late: Vec<FoodImageCommand>,
     zoom_factor: f64,
+    pixels_per_unit: f64,
     index: Option<&mut FoodAssetIndex>,
 ) -> Result<FoodPaintPlan, FoodPaintError> {
-    if !zoom_factor.is_finite() || zoom_factor <= 0. {
+    if !zoom_factor.is_finite()
+        || zoom_factor <= 0.
+        || !pixels_per_unit.is_finite()
+        || pixels_per_unit <= 0.
+    {
         return Err(FoodPaintError::InvalidView);
     }
-    validate(input, index, zoom_factor)?;
-    let counts = generate(input, zoom_factor, |_| {})?;
+    validate(input, index)?;
+    let counts = generate(input, zoom_factor, pixels_per_unit, |_| {})?;
     early.clear();
     late.clear();
     early
@@ -710,7 +714,7 @@ fn plan_food_impl(
         .map_err(|_| FoodPaintError::Allocation)?;
     late.try_reserve_exact(counts.late)
         .map_err(|_| FoodPaintError::Allocation)?;
-    generate(input, zoom_factor, |command| {
+    generate(input, zoom_factor, pixels_per_unit, |command| {
         if matches!(command.pass, FoodPaintPass::Outline | FoodPaintPass::Body) {
             early.push(command);
         } else {

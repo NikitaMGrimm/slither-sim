@@ -539,11 +539,7 @@ fn fade_progress(fade: BodyFade, i: usize, n: usize, head: bool) -> Option<f64> 
     }
 }
 
-fn command_count(
-    input: &BodyPaintInput<'_>,
-    style: BodyStyle,
-    distant: bool,
-) -> Result<usize, BodyPaintError> {
+fn command_count(input: &BodyPaintInput<'_>, style: BodyStyle) -> Result<usize, BodyPaintError> {
     let n = input.geometry.active_count;
     let samples = &input.geometry.samples[..n];
     let quality = has_quality(input);
@@ -558,7 +554,7 @@ fn command_count(
             }
         }
         if s.flag >= 1 {
-            count += 1 + usize::from(!distant && i >= 4 && samples[i - 4].flag == 2);
+            count += 1 + usize::from(i >= 4 && samples[i - 4].flag == 2);
             count += [
                 style.head_fade.map(|f| (f, true)),
                 style.tail_fade.map(|f| (f, false)),
@@ -879,12 +875,10 @@ pub fn plan_standard_body_with_storage(
     plan_standard_body_with_zoom_and_storage(input, effect, commands, 1., 1.)
 }
 
-/// Zoom-out drops the overlapping body-shadow layer below four logical pixels
-/// across. It otherwise preserves the stock samples, pass order and scratch
-/// cursor, including the antenna/death boundary. Factor one stays exact.
-/// `logical_pixels_per_unit` maps geometry coordinates to the displayed window,
-/// after backing expansion and before physical DPR. It never changes geometry.
-/// Authored presentation LOD; rationale and workload: docs/zoom.md.
+/// Retain full standard-body visits before continuous detail fading. The caller
+/// can fade the completed plan without changing sample order or the antenna/death
+/// cursor. These display inputs remain validated; no hard shadow cutoff applies.
+/// See docs/zoom.md and `fade_body_zoom_details`.
 pub fn plan_standard_body_with_zoom_and_storage(
     input: BodyPaintInput<'_>,
     effect: AntennaBarrierEffect,
@@ -915,9 +909,7 @@ pub fn plan_standard_body_with_zoom_and_storage(
         return Err(BodyPaintError::InvalidVisual);
     }
     let style = validate(&input, false)?;
-    let distant = zoom_factor < 1.
-        && 29. * input.visual.scale * input.view.zoom * logical_pixels_per_unit < 4.;
-    let count = command_count(&input, style, distant)?;
+    let count = command_count(&input, style)?;
     commands.clear();
     commands
         .try_reserve_exact(count)
@@ -1022,17 +1014,13 @@ pub fn plan_standard_body_with_zoom_and_storage(
                 opacity * p.visit(j)?
             };
             let alpha = BodyAlpha::assign(request, root_alpha.effective);
-            // Retain the visit even when this subpixel shading layer is omitted:
-            // later boost/death passes consume the same distance cursor.
-            if !distant {
-                p.draw(
-                    j,
-                    BodyShadow,
-                    shadow,
-                    square(p.swell(j, shadow_size)),
-                    alpha,
-                )?;
-            }
+            p.draw(
+                j,
+                BodyShadow,
+                shadow,
+                square(p.swell(j, shadow_size)),
+                alpha,
+            )?;
         }
         let usage = input.recipe.palettes[p.palette(i)].variants[p.variant(i)];
         let mut alpha = BodyAlpha::assign(opacity, root_alpha.effective);

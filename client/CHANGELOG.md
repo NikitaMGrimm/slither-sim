@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep pellets, glows, snake detail and names continuous while zooming out,
+  using area-weighted physical-pixel floors and size fades without subpixel
+  omission; preserve the exact factor-one picture.
+
 - Allow Servers and Settings during the visible death-return fade, retaining
   modal input and one settled-login focus handoff; keep Change Skin unavailable.
 

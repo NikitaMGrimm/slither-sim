@@ -8,7 +8,7 @@ use slither_wgpu_slice::{frame::MAX_DRAWS, game::LocalGame, render};
 
 #[test]
 fn crowded_wheel_views_keep_retained_food_and_frozen_retry_inputs() {
-    for notches in [0., -1., -4., -1000.] {
+    for notches in [0., -1., -4., 0.065_f64.ln() / 1.12_f64.ln(), -1000.] {
         let mut game = tape::playing();
         let head = game.client().own_snake().unwrap().metrics().raw_head;
         let mut food = vec![b'F', (head.x / 100.) as u8, (head.y / 100.) as u8];
@@ -24,9 +24,7 @@ fn crowded_wheel_views_keep_retained_food_and_frozen_retry_inputs() {
             tape::effects(&mut game);
             let picture = game.take_frame().unwrap();
             if index == 23 {
-                if notches != -1000. {
-                    assert!(picture.frame.food_batch.is_some(), "notches={notches}");
-                }
+                assert!(picture.frame.food_batch.is_some(), "notches={notches}");
                 let frozen = picture.frame.canonical().unwrap();
                 game.wheel_zoom(2.);
                 game.retry_frame(picture).unwrap();
@@ -69,7 +67,7 @@ fn benchmark_food_counts_follow_retained_batch_and_picture_retry() {
 
 #[cfg(feature = "frame-bench")]
 #[test]
-fn benchmark_partial_zoom_retained_batch_counts_candidates_before_eligibility() {
+fn benchmark_far_zoom_submits_every_candidate_and_freezes_census() {
     let mut game = tape::playing();
     let mut radius = vec![b'z'];
     radius.extend(tape::u24(10000));
@@ -111,13 +109,13 @@ fn benchmark_partial_zoom_retained_batch_counts_candidates_before_eligibility() 
                 .frame
                 .food_batch
                 .as_ref()
-                .expect("partially omitted zoom must use the retained path");
+                .expect("continuous zoom must use the retained path");
             let food = picture.food_submission.unwrap();
             assert!(!food.budget_applied);
             assert_eq!(food.retained_pellets, 1024);
             assert_eq!(food.counts.before_zoom_foods, 1000);
-            assert_eq!(food.counts.visible_foods, 200);
-            assert_eq!(batch.draw_count(), 200 * 7);
+            assert_eq!(food.counts.visible_foods, 1000);
+            assert_eq!(batch.draw_count(), 1000 * 3);
             let canonical = picture.frame.canonical().unwrap();
             let identity = picture.frame.identity;
             game.retry_frame(picture).unwrap();
@@ -518,9 +516,10 @@ fn maximum_zoom_out_fits_current_radius_and_preserves_draw_budgets() {
             assert!(p.frame.snakes.iter().all(|s| s.body_commands > 0));
             #[cfg(feature = "frame-bench")]
             {
-                assert!(p.frame.food_batch.is_none());
+                assert!(p.frame.food_batch.is_some());
                 let food = p.food_submission.unwrap();
-                assert!(food.counts.before_zoom_foods > food.counts.visible_foods);
+                assert_eq!(food.counts.before_zoom_foods, food.counts.visible_foods);
+                assert!(!food.budget_applied);
             }
         }
         assert!(p.frame.draws.capacity() <= MAX_DRAWS);

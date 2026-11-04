@@ -1067,7 +1067,7 @@ fn mixed_runs_do_not_need_an_unused_base_palette_glow() {
 }
 
 #[test]
-fn distant_shadow_lod_preserves_other_passes_and_scratch_with_mixed_flags_and_fades() {
+fn zoom_retains_full_visits_and_scratch_before_continuous_fading() {
     for quality in [false, true] {
         let mut f = Fixture::new(24);
         f.view.zoom = 0.08;
@@ -1090,22 +1090,11 @@ fn distant_shadow_lod_preserves_other_passes_and_scratch_with_mixed_flags_and_fa
         f.zoom_factor = Some(0.1);
         let distant = f.plan().unwrap();
         assert_eq!(distant.final_distance_cursor, stock.final_distance_cursor);
-        let removed = stock
-            .commands
-            .iter()
-            .filter(|c| c.pass == BodyShadow)
-            .count();
-        assert!(removed > 0);
-        assert_eq!(distant.antenna_barrier, stock.antenna_barrier - removed);
-        let mut expected: Vec<_> = stock
-            .commands
-            .into_iter()
-            .filter(|c| c.pass != BodyShadow)
-            .collect();
-        for (sequence, command) in expected.iter_mut().enumerate() {
-            command.sequence = sequence;
-        }
-        assert_eq!(distant.commands, expected);
+        assert!(distant.commands.iter().any(|c| c.pass == BodyShadow));
+        assert_eq!(
+            distant, stock,
+            "complete visits precede continuous renderer fading"
+        );
         f.limit = distant.commands.len();
         assert_eq!(
             f.plan().unwrap(),
@@ -1118,7 +1107,7 @@ fn distant_shadow_lod_preserves_other_passes_and_scratch_with_mixed_flags_and_fa
 }
 
 #[test]
-fn shadow_lod_requires_zoom_out_and_strictly_less_than_four_projected_pixels() {
+fn zoom_display_validation_preserves_full_geometry() {
     let mut f = Fixture::new(12);
     for zoom in [4. / 29., 0.5] {
         f.view.zoom = zoom;
@@ -1140,17 +1129,14 @@ fn shadow_lod_requires_zoom_out_and_strictly_less_than_four_projected_pixels() {
 }
 
 #[test]
-fn shadow_lod_checks_displayed_scale_and_validates_it() {
+fn displayed_scale_does_not_hard_cut_shadows_and_is_validated() {
     let mut f = Fixture::new(12);
     f.view.zoom = 3.9 / 29.;
     f.zoom_factor = Some(0.2);
     for scale in [0.64, 1., 1.28, 2.56] {
         f.logical_pixels_per_unit = scale;
         let plan = f.plan().unwrap();
-        assert_eq!(
-            plan.commands.iter().any(|c| c.pass == BodyShadow),
-            3.9 * scale >= 4.
-        );
+        assert_eq!(plan.commands.iter().any(|c| c.pass == BodyShadow), true);
     }
     for scale in [0., -1., f64::NAN, f64::INFINITY] {
         f.logical_pixels_per_unit = scale;
