@@ -97,11 +97,11 @@ counts or identical presentation modes. Those qualifications still apply.
 
 `preflight` exercises calibration, matched Original/Native views, native setup
 telemetry stop, the NTL row scale, Vlither's physical picture capture and the
-Normal native census. It stops before PresentMon or any measurement window;
+Normal setup for every configured client. The full preflight has nine rows when
+NTL is limited, including the native setup-stop control. It stops before PresentMon or any measurement window;
 each row remains invalid as comparison evidence. Input, occlusion or setup
-failure stops the sequence and retains the receipts. The initial calibration
-keeps its strict build/test gate; row probes also disclose competing builds as
-timing blockers without treating them as failed untimed setup evidence.
+failure stops the sequence and retains the receipts. Both calibration and row
+probes reject competing builds/tests; samples retain blocking process names/PIDs.
 
 Battledome uses 100 internal A4 bots and whole-map server interest. Normal uses
 500 internal bots; stress triples ambient attempts and initial/refill target.

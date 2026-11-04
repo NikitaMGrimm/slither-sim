@@ -203,6 +203,7 @@ $clientIds = @($c.clientPids)
 foreach($id in $clientIds) { $p=Get-Process -Id $id -ErrorAction SilentlyContinue; if($p){$clientCpu[[string]$id]=$p.TotalProcessorTime.TotalSeconds} }
 $prevAt = [Diagnostics.Stopwatch]::GetTimestamp()
 $buildCommands = $false
+$competingWork = @()
 $nextBuildCheck = [DateTime]::MinValue
 $gpuEngines = @()
 $gpuError = $null
@@ -228,7 +229,8 @@ while ([DateTime]::UtcNow -lt $end) {
   $displayBindings = @([BenchGraphics]::DisplayBindings())
   $binding = $displayBindings | Where-Object display -EQ $screen.DeviceName | Select-Object -First 1
   if ([DateTime]::UtcNow -ge $nextBuildCheck) {
-    $buildCommands = @(Competing-Work).Count -gt 0
+    $competingWork = @(Competing-Work)
+    $buildCommands = $competingWork.Count -gt 0
     $nextBuildCheck = [DateTime]::UtcNow.AddSeconds(1)
   }
   $build = $buildCommands
@@ -248,7 +250,7 @@ while ([DateTime]::UtcNow -lt $end) {
      clientRect=@($clientOrigin.X,$clientOrigin.Y,$r.R,$r.B);
      ownerInput=([BenchWindow]::LastInputTick() -ne $inputAtStart); processCpu=$processCpu; clientCpuDeltaSeconds=$clientDelta;
      clientCpuCores=$(if($elapsed -gt 0){$clientDelta/$elapsed}else{0});
-     machineCpuPercent=$load; hostCpuCores= $(if ($elapsed -gt 0) {($hostCpu-$prevHost)/$elapsed} else {0}); buildRunning=$build } | ConvertTo-Json -Depth 5 -Compress
+     machineCpuPercent=$load; hostCpuCores= $(if ($elapsed -gt 0) {($hostCpu-$prevHost)/$elapsed} else {0}); buildRunning=$build; competingWork=$competingWork } | ConvertTo-Json -Depth 5 -Compress
   # CPU deltas include all dedicated Chrome children, not only the GPU process.
   $prevCpu=$cpu; $prevHost=$hostCpu; $prevAt=$now
   if ($occluders.Count -gt 0 -or [BenchWindow]::LastInputTick() -ne $inputAtStart -or [BenchWindow]::GetForegroundWindow() -ne $hwnd) { break }

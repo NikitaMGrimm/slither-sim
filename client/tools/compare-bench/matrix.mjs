@@ -13,7 +13,7 @@ export function preflightPlan(clients,limitedNtlView) {
   const viewCondition=limitedNtlView?'ntl-farthest':'whole-map';
   const rows=clients.map(client=>({round:0,client,scenario:'battledome',telemetry:'on',viewCondition}));
   if(limitedNtlView&&clients.includes('native'))rows.splice(2,0,{round:0,client:'native',scenario:'battledome',telemetry:'off',viewCondition});
-  if(clients.includes('native'))rows.push({round:0,client:'native',scenario:'normal',telemetry:'on',viewCondition:'stock'});
+  rows.push(...clients.map(client=>({round:0,client,scenario:'normal',telemetry:'on',viewCondition:'stock'})));
   return rows;
 }
 
@@ -32,6 +32,20 @@ export function requireSetupAvailability(focus,current) {
   if(!Number.isFinite(focus?.lastInputTick)||!Number.isFinite(current?.idleMs)||current.idleMs<5000
     ||focus.lastInputTick!==current.lastInputTick||current.foreground!==true||current.visible!==true
     ||current.minimized!==false||current.occluded!==false)throw Error('Owner input or window obscured during setup/warmup; no timed capture');
+}
+
+export async function settleBrowserVisibility(focus,pid,read,pause) {
+  for(let i=0;;i++){
+    const current=await read(i);
+    // Chrome fullscreen can briefly create a separate owned surface. Wait for
+    // it to disappear; acceptance still requires the unmodified visibility gate.
+    const ownedTransient=Number.isFinite(focus?.lastInputTick)&&Number.isFinite(current?.idleMs)&&current.idleMs>=5000
+      &&focus.lastInputTick===current.lastInputTick&&current.foreground===true&&current.visible===true&&current.minimized===false
+      &&current.occluded===true&&current.occludingWindows?.length>0
+      &&current.occludingWindows.every(w=>w.pid===pid&&w.windowClass==='Chrome_WidgetWin_1');
+    if(!ownedTransient||i===7){requireSetupAvailability(focus,current);return current;}
+    await pause(500);
+  }
 }
 
 export function checkNtlCalibratedView(picture,census,calibration,viewCondition,settings) {

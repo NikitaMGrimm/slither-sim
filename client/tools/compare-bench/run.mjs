@@ -10,7 +10,7 @@ import { pngEvidence } from './picture.mjs';
 import { ntl } from './browser.mjs';
 import {collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './resources.mjs';
 import {startNativeNetwork,nativeNetworkMaxSeconds} from './native-network.mjs';
-import {roundPlan,settleNtlView,settleNativeView,settleVlitherView,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './matrix.mjs';
+import {roundPlan,settleNtlView,settleNativeView,settleVlitherView,collectRounds,requireNtlDisplayGate,requireSetupAvailability,settleBrowserVisibility,sessionReport} from './matrix.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repository = path.resolve(here, '../../..');
@@ -222,7 +222,13 @@ export async function runAttempt(config, root, item, provenance, machine) {
       return census.admittedBotSlots === r.bots && census.players?.[0]?.alive && census.players[0].setup ? census : null;
     }, 60000, 'All internal bot seats and living player readiness');
     [r.setupFocus]=await windows({mode:'focus',clientPid:native.pid},directory,'foreground',children);
-    [r.beforeViewSetup]=await windows({mode:'visibility',clientPid:native.pid},directory,'before-view-visibility',children);
+    if(browser){
+      r.beforeViewSetupSnapshots=[];
+      r.beforeViewSetup=await settleBrowserVisibility(r.setupFocus,native.pid,async i=>{
+        const [snapshot]=await windows({mode:'visibility',clientPid:native.pid},directory,`before-view-visibility-${i}`,children);
+        r.beforeViewSetupSnapshots.push({...snapshot,atMs:now()});return snapshot;
+      },delay);
+    }else [r.beforeViewSetup]=await windows({mode:'visibility',clientPid:native.pid},directory,'before-view-visibility',children);
     requireSetupAvailability(r.setupFocus,r.beforeViewSetup);
     if(browser&&item.scenario==='battledome'){
       r.viewSetup=await settleNtlView(browser,config.ntlViewCalibration,item.viewCondition,async index=>{
@@ -279,7 +285,7 @@ export async function runAttempt(config, root, item, provenance, machine) {
       Object.assign(r,{startMs:first?.qpcMs,endMs:(last?.qpcMs??NaN)+1,display:first?.display,dpi:first?.dpi,refreshHz:first?.refreshHz});
       r.preflightWindowReasons=windowReasons(r);
       r.preflightTimingBlockers=r.preflightWindowReasons.filter(reason=>reason==='Build/test process running');
-      const setupReasons=r.preflightWindowReasons.filter(reason=>reason!=='Build/test process running');
+      const setupReasons=[...r.preflightWindowReasons];
       const luids=[...new Set(r.windowSamples.flatMap(s=>s.gpuEngines??[]).filter(e=>/engtype_3d/i.test(e.instance)&&e.utilization>.01)
         .map(e=>e.instance.match(/luid_0x[0-9a-f]+_0x[0-9a-f]+/i)?.[0].toLowerCase()).filter(Boolean))];
       r.preflightRenderLuids=luids;
