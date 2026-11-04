@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { csv, presentation,checkedPresentation,presentMonArguments,transientFailure,hostStats, validity, wholeMap, schedule, netlogProof, comparison, presentMonFailure,streamCoverage,contained,nativeProduction,drawnSnakeEvidence,anchoredBoundary,vlitherPhysicalScale,checkVlitherPicture,foodSubmission,foodSubmissionEvidence,preflightFoodSubmission,preflightHostFresh } from './compare-bench/analysis.mjs';
 import { endpointFrom, completeJsonLines,outsideRepository,lineJournal,nativeViewEvidence } from './compare-bench/run.mjs';
 import { adapterFlags,profilePreferences,chromeSession,CDP,navigateLoaded } from './compare-bench/browser.mjs';
-import {roundPlan,preflightPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,sessionReport} from './compare-bench/matrix.mjs';
+import {roundPlan,preflightPlan,zoomPlateau,checkNtlCalibratedView,settleNtlView,settleNativeView,settleVlitherView,vlitherWheel,collectRounds,requireNtlDisplayGate,requireSetupAvailability,settleBrowserVisibility,sessionReport} from './compare-bench/matrix.mjs';
 import { installContentProbe,contentIntervals } from './compare-bench/content-probe.mjs';
 import { pictureEvidence } from './compare-bench/picture.mjs';
 import {resourceScope,collectorCompletion,recoverCollectorLog,cleanupPresentMon} from './compare-bench/resources.mjs';
@@ -78,6 +78,24 @@ test('untimed preflight covers every client/scenario pair and the matched setup-
   assert.ok(whole.every(r=>r.telemetry==='on'&&r.viewCondition===(r.scenario==='battledome'?'whole-map':'stock')));
   const subset=preflightPlan(['ntl','vlither'],true);
   assert.equal(subset.length,4);assert.ok(subset.every(r=>['ntl','vlither'].includes(r.client)));
+});
+
+test('browser setup waits only for bounded owned Chrome occlusion and still requires clear stable input',async()=>{
+  const focus={lastInputTick:50},clear={lastInputTick:50,idleMs:5000,foreground:true,visible:true,minimized:false,occluded:false,occludingWindows:[]};
+  const owned={...clear,occluded:true,occludingWindows:[{pid:123,windowClass:'Chrome_WidgetWin_1'}]};
+  const reads=[],pauses=[];
+  assert.equal(await settleBrowserVisibility(focus,123,async i=>{reads.push(i);return i===0?owned:clear;},async ms=>pauses.push(ms)),clear);
+  assert.deepEqual(reads,[0,1]);assert.deepEqual(pauses,[500]);
+  for(const change of [r=>r.occludingWindows[0].pid=456,r=>r.occludingWindows[0].windowClass='Other',
+    r=>r.lastInputTick=51,r=>r.idleMs=0,r=>r.foreground=false,r=>r.visible=false,r=>r.minimized=true,
+    r=>r.occludingWindows.push({pid:456,windowClass:'Chrome_WidgetWin_1'})]){
+    const bad=structuredClone(owned);change(bad);let calls=0;
+    await assert.rejects(settleBrowserVisibility(focus,123,async()=>{calls++;return bad;},async()=>assert.fail('must not wait for external interference')),/Owner input or window obscured/);
+    assert.equal(calls,1);
+  }
+  let attempts=0;
+  await assert.rejects(settleBrowserVisibility(focus,123,async()=>{attempts++;return owned;},async()=>{}),/window obscured/);
+  assert.equal(attempts,8,'persistent owned surfaces still fail closed');
 });
 
 test('Windows wheel input preserves fractional corrections before 1/120-notch rounding',{skip:process.platform!=='win32'},async()=>{

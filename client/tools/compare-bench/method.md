@@ -238,6 +238,9 @@ comparison evidence. Stable last-input ticks, idle time, visibility, actual GPU,
 display, life and protocol are retained. A failed row stops further acquisition.
 Both calibration and row probes reject competing builds/tests, retaining their
 process names/PIDs in the window samples. A blocked row stops further acquisition.
+Browser setup allows up to eight visibility samples for a separate surface owned
+by its Chrome PID to disappear. Stable input/foreground state is required during
+that wait, and the ordinary unoccluded gate must pass before view setup or warmup.
 A display-only failure returns exit 2 with network and zoom results
 retained, without touching an occluding owner window. No input or display gate is
 bypassed. The wheel adapter uses double-precision clamping before rounding to

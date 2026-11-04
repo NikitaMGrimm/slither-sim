@@ -34,6 +34,20 @@ export function requireSetupAvailability(focus,current) {
     ||current.minimized!==false||current.occluded!==false)throw Error('Owner input or window obscured during setup/warmup; no timed capture');
 }
 
+export async function settleBrowserVisibility(focus,pid,read,pause) {
+  for(let i=0;;i++){
+    const current=await read(i);
+    // Chrome fullscreen can briefly create a separate owned surface. Wait for
+    // it to disappear; acceptance still requires the unmodified visibility gate.
+    const ownedTransient=Number.isFinite(focus?.lastInputTick)&&Number.isFinite(current?.idleMs)&&current.idleMs>=5000
+      &&focus.lastInputTick===current.lastInputTick&&current.foreground===true&&current.visible===true&&current.minimized===false
+      &&current.occluded===true&&current.occludingWindows?.length>0
+      &&current.occludingWindows.every(w=>w.pid===pid&&w.windowClass==='Chrome_WidgetWin_1');
+    if(!ownedTransient||i===7){requireSetupAvailability(focus,current);return current;}
+    await pause(500);
+  }
+}
+
 export function checkNtlCalibratedView(picture,census,calibration,viewCondition,settings) {
   const fail=reason=>{throw Error(`NTL calibrated view preflight: ${reason}`);};
   if(!calibration||!Number.isFinite(calibration.physicalPixelsPerWorldUnit)||calibration.physicalPixelsPerWorldUnit<=0)fail('missing reference scale');
