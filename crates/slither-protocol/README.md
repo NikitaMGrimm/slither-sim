@@ -142,8 +142,9 @@ remain `Message::Unknown` with their exact bytes.
 `DecodeAdmission` preserves the existing shared-layout differences: `Sim`
 allows removal lengths 3–7, loose pong/life-control tails, zero sector count or
 radius, and unchecked direction bytes; client admission requires removal 3/4,
-exact pong/life-control lengths, positive setup sector count/radius and valid
-prey direction. Only `ClientPresentation` checks appearance direction. The
+exact pong/life-control lengths, a positive setup radius and valid prey
+direction. Sector count is retained metadata, including zero, in all admissions.
+Only `ClientPresentation` checks appearance direction. The
 same HUD limits and minimap admission rules apply as in v19. All admissions
 require complete v13 coordinate tuples and explicit IDs. Version-19 consumers
 continue rejecting version-13 setup until they explicitly adopt this reader.
